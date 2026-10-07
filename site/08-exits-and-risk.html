@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>08 · Exits &amp; risk — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="08-exits-and-risk.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class="active"><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">08</span> Trading engine · <a href="../docs/08-exits-and-risk.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="08-exits-risk">08 — Exits &amp; Risk</h1>
+<h2 id="1-r-multiples">1. R-multiples<a class="hash" href="#1-r-multiples" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>1R</strong> = amount risked = <code>|entry − initial_stop| × qty</code>. All results are in R, so trades are comparable.</li>
+<li><strong>Expectancy</strong> <code>E[R] = P(win)·avg_win_R − P(loss)·avg_loss_R − cost_R</code>.</li>
+<li>Break-even win rate before costs: 33.3% at 1:2, 25% at 1:3.</li>
+</ul>
+<h2 id="2-exit-policy-library">2. Exit policy library<a class="hash" href="#2-exit-policy-library" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Policy</th>
+<th>Description</th>
+<th>Key parameters</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>FIXED_RR</code></td>
+<td>Full exit at k×R or stop</td>
+<td>k ∈ {1.5, 2, 2.5, 3}</td>
+</tr>
+<tr>
+<td><code>PARTIAL_BE</code></td>
+<td>Book x% at T1, stop → breakeven, rest at T2</td>
+<td>x, T1, T2</td>
+</tr>
+<tr>
+<td><code>PARTIAL_TRAIL</code></td>
+<td>Book x% at T1, trail remainder</td>
+<td>x, T1, trail</td>
+</tr>
+<tr>
+<td><code>ATR_TRAIL</code></td>
+<td>Chandelier/ATR trail after activation</td>
+<td>period, multiple, activate_at</td>
+</tr>
+<tr>
+<td><code>STRUCTURE_TRAIL</code></td>
+<td>Trail beyond prior swing / previous candle</td>
+<td>lookback</td>
+</tr>
+<tr>
+<td><code>EMA_TRAIL</code></td>
+<td>Exit on close beyond EMA</td>
+<td>length</td>
+</tr>
+<tr>
+<td><code>PYRAMID</code></td>
+<td>Add at progress levels, trail combined position</td>
+<td>see §4</td>
+</tr>
+<tr>
+<td><code>TIME_STOP</code></td>
+<td>Exit if not ≥ +x R after N bars/sessions</td>
+<td>x, N</td>
+</tr>
+<tr>
+<td><code>SESSION_EXIT</code></td>
+<td>Intraday square-off</td>
+<td>time</td>
+</tr>
+<tr>
+<td><code>MAX_HOLD</code></td>
+<td>Swing exit at end of session N</td>
+<td>N ≤ 5</td>
+</tr>
+<tr>
+<td><code>EVENT_EXIT</code></td>
+<td>Exit before results</td>
+<td>days before</td>
+</tr>
+</tbody></table>
+<p><code>SESSION_EXIT</code> (intraday) and <code>MAX_HOLD</code> (swing) are always on.</p>
+<h2 id="3-how-the-exit-is-chosen">3. How the exit is chosen<a class="hash" href="#3-how-the-exit-is-chosen" aria-label="Link to this section">#</a></h2>
+<p><strong>Per cell (weekly):</strong> replay the same historical entries under every candidate policy; choose by
+out-of-sample risk-adjusted expectancy (<code>mean_R − λ·downside_dev_R</code>), requiring minimum samples and stability
+across folds — prefer the middle of a plateau over a sharp peak.</p>
+<p><strong>From MAE/MFE (trade &quot;nature&quot;):</strong></p>
+<ul>
+<li>Stop: if 90% of winners never went beyond 0.8R adverse, 1R is sound; if winners routinely dip 1.2R, the stop is too tight.</li>
+<li>Target: if median MFE is 2.4R but only 30% reach 3R, prefer 2–2.5R or partial booking.</li>
+<li>Trail activation: where MFE giveback becomes common.</li>
+</ul>
+<p><strong>Per trade (tonight):</strong> scale by current ATR; snap to structure (swing points, previous-day levels, round
+numbers); <strong>obstacle check</strong> — cap target before a strong level or skip if achievable R:R &lt; <code>min_rr</code>; reduce
+target for late intraday triggers (learned).</p>
+<h2 id="4-pyramiding">4. Pyramiding<a class="hash" href="#4-pyramiding" aria-label="Link to this section">#</a></h2>
+<p>Used only where the cell shows trend persistence (fat MFE tail), mostly 30m+ and swing.</p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Initial position</td>
+<td>50% of full size</td>
+</tr>
+<tr>
+<td>Add triggers</td>
+<td>+1R, +2R (on trigger-TF close)</td>
+</tr>
+<tr>
+<td>Add sizes</td>
+<td>30%, 20%</td>
+</tr>
+<tr>
+<td>Max adds</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Risk rule</td>
+<td>Before each add, move stops so <strong>total open risk ≤ initial 1R</strong></td>
+</tr>
+</tbody></table>
+<h2 id="5-time-rules">5. Time rules<a class="hash" href="#5-time-rules" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Intraday</th>
+<th>Swing</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Latest entry</td>
+<td>e.g. 14:30</td>
+<td>Signal valid N sessions (default 1)</td>
+</tr>
+<tr>
+<td>Forced exit</td>
+<td>Square-off (e.g. 15:15)</td>
+<td>Close of session ≤ 5</td>
+</tr>
+<tr>
+<td>Time stop</td>
+<td>e.g. &lt; +0.5R after 6 bars</td>
+<td>e.g. &lt; +0.5R after 2 sessions</td>
+</tr>
+<tr>
+<td>Overnight gap</td>
+<td>—</td>
+<td>Gap through stop ⇒ filled at open (simulated realistically)</td>
+</tr>
+</tbody></table>
+<h2 id="6-position-sizing-per-account">6. Position sizing (per account)<a class="hash" href="#6-position-sizing-per-account" aria-label="Link to this section">#</a></h2>
+<div class="code"><pre><code class="nohighlight">risk_amount = account_capital × risk_per_trade_pct
+qty         = min(risk_amount / |entry − stop|, max_capital_per_trade / entry, liquidity_cap)
+qty         = round_down_to_lot(qty)        # futures
+skip if qty &lt; 1 lot, or cost_R &gt; max_cost_R</code></pre></div>
+<p>Optional confidence scaling (capped fractional Kelly, 0.5×–1.25×) — off until calibration is proven in paper trading.</p>
+<p>Learned multipliers on top (<a href="09-learning-engine.html">doc 09</a> §14): <strong>meta-labelling</strong> size × 0.5–1.5,
+<strong>equity-curve throttle</strong> × 0.5 while the system&#39;s equity is below its 20-trade average, <strong>reduced market-gate
+day</strong> × 0.75. The multipliers never raise risk above the profile&#39;s maximum per trade.</p>
+<h2 id="7-portfolio-limits-per-account-from-its-risk-profile">7. Portfolio limits (per account, from its risk profile)<a class="hash" href="#7-portfolio-limits-per-account-from-its-risk-profile" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Max new entries per day</td>
+<td>3</td>
+</tr>
+<tr>
+<td>Max open positions</td>
+<td>5</td>
+</tr>
+<tr>
+<td>Max total open risk (heat)</td>
+<td>3%</td>
+</tr>
+<tr>
+<td>Max per sector</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Max pair correlation (60-day returns)</td>
+<td>0.60 — above it the lower-ranked ticket goes to reserve</td>
+</tr>
+<tr>
+<td>Daily loss limit</td>
+<td>−2R or −1.5% → no new entries</td>
+</tr>
+<tr>
+<td>Weekly loss limit</td>
+<td>−5R → half size next week</td>
+</tr>
+<tr>
+<td>Max drawdown (goal)</td>
+<td>8% → halt new entries, review</td>
+</tr>
+<tr>
+<td>Consecutive losses in a cell</td>
+<td>4 → pause cell</td>
+</tr>
+</tbody></table>
+<h2 id="8-costs-slippage">8. Costs &amp; slippage<a class="hash" href="#8-costs-slippage" aria-label="Link to this section">#</a></h2>
+<p>Brokerage, exchange charges, STT/CTT, GST, stamp duty, SEBI fees — <strong>from your broker&#39;s current charge
+sheet in config</strong> (rates change with budgets). Slippage: ticks + fraction of bar range; extra for stop exits
+and gaps. Every simulation includes costs.</p>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="07-strategies.html"><small>← Previous  [</small>07 · Strategies</a>
+    <a class="next" href="09-learning-engine.html"><small>Next  ] →</small>09 · Learning engine</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-07 17:14</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-r-multiples" class="d2">1. R-multiples</a>
+<a href="#2-exit-policy-library" class="d2">2. Exit policy library</a>
+<a href="#3-how-the-exit-is-chosen" class="d2">3. How the exit is chosen</a>
+<a href="#4-pyramiding" class="d2">4. Pyramiding</a>
+<a href="#5-time-rules" class="d2">5. Time rules</a>
+<a href="#6-position-sizing-per-account" class="d2">6. Position sizing (per account)</a>
+<a href="#7-portfolio-limits-per-account-from-its-risk-profile" class="d2">7. Portfolio limits (per account, from its risk profile)</a>
+<a href="#8-costs-slippage" class="d2">8. Costs &amp;amp; slippage</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

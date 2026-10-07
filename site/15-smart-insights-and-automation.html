@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>15 · Smart insights &amp; automation — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="15-smart-insights-and-automation.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class="active"><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">15</span> Tools &amp; experience · <a href="../docs/15-smart-insights-and-automation.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="15-smart-insights-automation">15 — Smart Insights &amp; Automation</h1>
+<p>How xDrishti turns data into <strong>decisions you can act on</strong>, for both trading and portfolio management —
+without taking decisions away from you. Everything here is deterministic rules and statistics evaluated by the
+services; the LLM only explains (<a href="14-ai-assistant.html">doc 14</a>).</p>
+<h2 id="1-where-the-system-is-smart">1. Where the system is &quot;smart&quot;<a class="hash" href="#1-where-the-system-is-smart" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Smart behaviour</th>
+<th>Where you see it</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Next-day plan</td>
+<td>Learned setups, calibrated probabilities, top-N selection (<a href="09-learning-engine.html">docs 09–10</a>)</td>
+<td>Plan review</td>
+</tr>
+<tr>
+<td><strong>Pre-trade checklist</strong></td>
+<td>Every proposed ticket is checked against your holdings, sector limits, results dates and data quality</td>
+<td>Plan review (per ticket)</td>
+</tr>
+<tr>
+<td><strong>Portfolio Action center</strong></td>
+<td>Rules flag positions that need a decision, per account</td>
+<td>Portfolio</td>
+</tr>
+<tr>
+<td><strong>Price alerts</strong></td>
+<td>Your alerts are watched by the services, not your browser</td>
+<td>Portfolio, notifications</td>
+</tr>
+<tr>
+<td><strong>Data quality gate</strong></td>
+<td>Instruments failing validation are skipped by the nightly scan and flagged on tickets</td>
+<td>Data quality, Plan review</td>
+</tr>
+<tr>
+<td><strong>Report auto-insights</strong></td>
+<td>Best/worst strategy, basket gap, side bias, best exit, regime, weekday, calibration — in plain sentences</td>
+<td>Reports → Overview</td>
+</tr>
+<tr>
+<td><strong>Schedule intelligence</strong></td>
+<td>Dependency and timing checks; run-after chains; catch-up after sleep; automatic data failover</td>
+<td>Services, Accounts</td>
+</tr>
+<tr>
+<td><strong>Decision feedback</strong></td>
+<td>Your approvals/rejections are graded against the system&#39;s proposal</td>
+<td>Reports → Decisions</td>
+</tr>
+<tr>
+<td><strong>Auto-approval (autonomy)</strong></td>
+<td>Tickets above your probability threshold with every check passing are approved at the cutoff</td>
+<td>Plan review, Learning → Autonomy</td>
+</tr>
+<tr>
+<td><strong>Lessons &amp; execution feedback</strong></td>
+<td>Problems detected by monitors become lessons with a fix and a measured result; grading uses real fills</td>
+<td>Learning</td>
+</tr>
+<tr>
+<td><strong>Tweak &amp; re-run</strong></td>
+<td>Change a learning knob and replay 12 months walk-forward with honest comparison rules</td>
+<td>Learning → Tweak &amp; re-run</td>
+</tr>
+<tr>
+<td><strong>Smart rules</strong></td>
+<td>Market gate (no-trade days), equity-curve throttle, meta-labelling, learned entry windows, correlation-aware plan (<a href="09-learning-engine.html">doc 09</a> §14)</td>
+<td>Plan review banner &amp; tickets, Learning → Smart rules</td>
+</tr>
+<tr>
+<td><strong>Graded on fills</strong></td>
+<td>Live and paper trades graded at executed prices; R at plan prices kept for the execution gap</td>
+<td>Today, Reports → Trade list, Learning → Plan vs actual</td>
+</tr>
+<tr>
+<td><strong>Automatic loss tags</strong></td>
+<td>Every loss tagged (gap, gave back profit, against regime, late entry, slippage, news) and linked to a lesson</td>
+<td>Learning → Lessons, Reports → Trade list</td>
+</tr>
+<tr>
+<td><strong>Weekly learning digest</strong></td>
+<td>One summary instead of daily approvals</td>
+<td>Today, Learning, notification</td>
+</tr>
+</tbody></table>
+<h2 id="2-pre-trade-checklist-per-proposed-ticket">2. Pre-trade checklist (per proposed ticket)<a class="hash" href="#2-pre-trade-checklist-per-proposed-ticket" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Rule</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Data quality</td>
+<td>Instrument&#39;s latest validation status</td>
+<td>✗ fail blocks one-click approval (you can still approve with a confirmation, and it is recorded)</td>
+</tr>
+<tr>
+<td>Holdings conflict</td>
+<td>SELL ticket on an instrument you hold long in any account; or an open trade already exists</td>
+<td>⚠</td>
+</tr>
+<tr>
+<td>Sector exposure</td>
+<td>Open trades + already-approved tickets in the same sector ≥ profile limit</td>
+<td>⚠</td>
+</tr>
+<tr>
+<td>Event risk</td>
+<td>Quarterly results within 3 days</td>
+<td>⚠</td>
+</tr>
+<tr>
+<td>(later) Correlation</td>
+<td>60-day correlation with open trades &gt; 0.7</td>
+<td>⚠</td>
+</tr>
+</tbody></table>
+<p>Checks are shown on the ticket card; &quot;approved despite&quot; reasons are stored and appear in the Decisions report.</p>
+<h2 id="3-portfolio-action-center">3. Portfolio Action center<a class="hash" href="#3-portfolio-action-center" aria-label="Link to this section">#</a></h2>
+<p>Evaluated per account by the <strong>Price alerts &amp; action center</strong> service (every minute in market hours, and after
+each sync). Thresholds are configurable (Settings → Action center thresholds).</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Default trigger</th>
+<th>Suggested action</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Below cost</td>
+<td>Unrealised ≤ −10% (high if ≤ −20%)</td>
+<td>Hold with a stop alert, average only if the thesis holds, or exit</td>
+</tr>
+<tr>
+<td>Large gain</td>
+<td>Unrealised ≥ +25%</td>
+<td>Book part of the gain or set a trailing-stop alert</td>
+</tr>
+<tr>
+<td>Overweight</td>
+<td>Weight &gt; max(15%, 1.5 × equal-weight share) of the account (≥ 3 positions)</td>
+<td>Trim or rebalance</td>
+</tr>
+<tr>
+<td>Sector concentration</td>
+<td>One sector &gt; 35% of the account</td>
+<td>Diversify</td>
+</tr>
+<tr>
+<td>Max holding exceeded</td>
+<td>Trading-bucket position older than the 5-session limit</td>
+<td>Exit per plan rules</td>
+</tr>
+<tr>
+<td>Results due</td>
+<td>Results within 7 days</td>
+<td>Decide before the event</td>
+</tr>
+<tr>
+<td>Long-term soon</td>
+<td>Profitable holding becomes &gt; 12 months within 30 days</td>
+<td>Check tax impact before selling early (informational only)</td>
+</tr>
+<tr>
+<td>Lagging Nifty</td>
+<td>Held &gt; 180 days and XIRR more than 10 pp below the same cash flows in Nifty 50</td>
+<td>Review the thesis / replace</td>
+</tr>
+<tr>
+<td>Not in a basket</td>
+<td>Holding not assigned to any basket</td>
+<td>Assign for basket analytics</td>
+</tr>
+</tbody></table>
+<p>Each item offers <strong>Open</strong>, <strong>Set alert</strong>, <strong>Add to basket</strong>, <strong>Snooze 7 days</strong> or <strong>Done</strong>; every action is
+audited. Per-account tiles on the Portfolio page show value, P&amp;L, XIRR, day change, top holding and the number
+of open action items, so you can focus on the account that needs attention.</p>
+<h2 id="4-price-alerts">4. Price alerts<a class="hash" href="#4-price-alerts" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Conditions: price <strong>at or below</strong> / <strong>at or above</strong> a level (quick presets ±5/10/20%), optional note.</li>
+<li>Evaluated by services: alert symbols join the polled set (or the live set if already streamed); triggered
+alerts create a notification and audit entry. Alerts survive logout and browser close.</li>
+<li>Later: indicator alerts (e.g. close below 50 DMA), trailing alerts, alert on basket-level drawdown.</li>
+</ul>
+<h2 id="5-data-quality-gate">5. Data quality gate<a class="hash" href="#5-data-quality-gate" aria-label="Link to this section">#</a></h2>
+<p>After every end-of-day fetch the <strong>Data validation</strong> service re-checks the last N sessions of every tracked
+instrument (<a href="05-data-and-brokers.html">doc 05</a> §10b). Results drive:</p>
+<ul>
+<li>a data quality score (pass = 1, warning = ½) shown on the Data quality page and Today,</li>
+<li><strong>per-instrument fail-closed</strong>: failing instruments are skipped by the nightly scan and flagged on any ticket,</li>
+<li>one-click repairs (re-fetch the day, refresh aggregates) followed by automatic re-validation.</li>
+</ul>
+<h2 id="6-report-auto-insights">6. Report auto-insights<a class="hash" href="#6-report-auto-insights" aria-label="Link to this section">#</a></h2>
+<p>Computed from graded trades for the current filters (minimum 15 trades per group):
+best and weakest strategy (pause candidate), best vs worst basket gap, long vs short bias, best exit policy,
+most/least favourable regime, best/worst weekday, calibration quality (predicted vs actual win rate).
+The local LLM can turn these into the weekly review text; numbers always come from the report engine.</p>
+<h2 id="7-schedule-intelligence">7. Schedule intelligence<a class="hash" href="#7-schedule-intelligence" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Rules checked on every schedule change: pre-open check after the review cutoff and before 09:15 (and ideally
+after NSE pre-open price discovery ~09:08); EOD fetch after 15:35; nightly pipeline after EOD fetch and
+portfolio sync; live window covering the session; no backups in market hours; no circular &quot;run after&quot; chains.
+Errors block saving; warnings are shown.</li>
+<li><strong>Run-after chains</strong> (e.g. data validation after EOD fetch; AI suggestions after the nightly pipeline).</li>
+<li><strong>Catch-up</strong> of missed runs after the machine wakes; <strong>automatic data failover</strong> to the standby Data account.</li>
+</ul>
+<h2 id="8-further-smart-features-roadmap-candidates">8. Further smart features (roadmap candidates)<a class="hash" href="#8-further-smart-features-roadmap-candidates" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Idea</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rebalancing to basket target weights</td>
+<td>Suggested buy/sell list to bring long-term baskets back to targets</td>
+</tr>
+<tr>
+<td>Regime-aware sizing</td>
+<td>Scale risk per trade down in high-volatility regimes (learned)</td>
+</tr>
+<tr>
+<td>Correlation clusters</td>
+<td>Avoid hidden concentration across accounts</td>
+</tr>
+<tr>
+<td>What-if on approvals</td>
+<td>Show portfolio heat / sector exposure if you approve a ticket</td>
+</tr>
+<tr>
+<td>Post-trade review prompts</td>
+<td>Journal questions after each closed trade; discipline score</td>
+</tr>
+<tr>
+<td>Tax-lot aware selling</td>
+<td>Prefer lots that minimise short-term gains (informational)</td>
+</tr>
+<tr>
+<td>Earnings &amp; corporate-action calendar</td>
+<td>Feed event filters and alerts</td>
+</tr>
+<tr>
+<td>Dividend tracking in XIRR</td>
+<td>Dividends from ledger as cash flows</td>
+</tr>
+<tr>
+<td>Volatility-scaled position sizing</td>
+<td>Size so each trade risks the same rupees after slippage, capped by liquidity (capacity)</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="14-ai-assistant.html"><small>← Previous  [</small>14 · AI assistant</a>
+    <a class="next" href="16-configuration.html"><small>Next  ] →</small>16 · Configuration</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/15-smart-insights-and-automation.md</code> · 2026-10-07 17:14</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-where-the-system-is-smart" class="d2">1. Where the system is &amp;quot;smart&amp;quot;</a>
+<a href="#2-pre-trade-checklist-per-proposed-ticket" class="d2">2. Pre-trade checklist (per proposed ticket)</a>
+<a href="#3-portfolio-action-center" class="d2">3. Portfolio Action center</a>
+<a href="#4-price-alerts" class="d2">4. Price alerts</a>
+<a href="#5-data-quality-gate" class="d2">5. Data quality gate</a>
+<a href="#6-report-auto-insights" class="d2">6. Report auto-insights</a>
+<a href="#7-schedule-intelligence" class="d2">7. Schedule intelligence</a>
+<a href="#8-further-smart-features-roadmap-candidates" class="d2">8. Further smart features (roadmap candidates)</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

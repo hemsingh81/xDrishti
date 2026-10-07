@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>20 · Extended modules — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="20-extended-modules.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class="active"><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">20</span> Delivery &amp; operations · <a href="../docs/20-extended-modules.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="20-extended-modules-later-phases">20 — Extended Modules (later phases)</h1>
+<p>Designed now so v1 leaves room for them; built after v1 is proven.</p>
+<table>
+<thead>
+<tr>
+<th>Module</th>
+<th>Phase</th>
+<th>Container / project</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A. Automated order placement</td>
+<td>P12</td>
+<td><code>xd-exec</code> / <code>XDrishti.Execution</code></td>
+</tr>
+<tr>
+<td>B. Tick &amp; order-book data</td>
+<td>Recorder from P7, features P13</td>
+<td><code>xd-feed</code> / <code>XDrishti.Feed</code></td>
+</tr>
+<tr>
+<td>C. Options &amp; statistical arbitrage</td>
+<td>P14</td>
+<td>Engine modules</td>
+</tr>
+<tr>
+<td>D. Fundamentals &amp; events</td>
+<td>P15</td>
+<td>Worker jobs + assistant extraction</td>
+</tr>
+<tr>
+<td>HFT / latency arbitrage</td>
+<td><strong>Not pursued</strong></td>
+<td>—</td>
+</tr>
+</tbody></table>
+<h2 id="a-automated-order-placement">A. Automated order placement<a class="hash" href="#a-automated-order-placement" aria-label="Link to this section">#</a></h2>
+<p><strong>Modes per account:</strong> <code>paper</code> → <code>manual_live</code> → <code>assisted</code> (system prepares exact order / super-order
+parameters) → <code>semi_auto</code> (one-tap confirm in UI) → <code>auto_live</code> (within hard limits, every action notified).</p>
+<figure class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Planned
+    Planned --&gt; Armed: trigger window opens
+    Armed --&gt; PreTradeCheck: trigger fires
+    PreTradeCheck --&gt; Rejected: limit breached
+    PreTradeCheck --&gt; Submitted: passes
+    Submitted --&gt; Open: broker ack
+    Submitted --&gt; Failed: reject / timeout
+    Open --&gt; Filled
+    Open --&gt; Cancelled: validity ends
+    Filled --&gt; Protected: broker-side SL/target placed
+    Protected --&gt; Managing: trail / partial / pyramid
+    Managing --&gt; Closed: exit / square-off / max hold
+    Closed --&gt; Reconciled: matches broker trade book</pre></figure>
+<ul>
+<li><strong>Broker-side stop first</strong> — protection never depends on the Mac staying up.</li>
+<li>Pre-trade checks: same limits as planning + price band vs LTP, freeze quantity, margin.</li>
+<li>Idempotent client order ids; order-update stream + end-of-day reconciliation; mismatch ⇒ freeze.</li>
+<li>Kill switch: ours (stop new, cancel pending, optional exit-all) + broker&#39;s where available; triggered by
+max drawdown, daily loss, feed loss or a button.</li>
+<li>Prerequisites: ISP static IP whitelisted at Dhan; daily login/2FA; ≤ 2 orders/s; Dhan sandbox testing first.</li>
+</ul>
+<h2 id="b-tick-order-book-data">B. Tick &amp; order-book data<a class="hash" href="#b-tick-order-book-data" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Dhan live feed + <strong>20-level depth</strong> (up to 50 instruments/connection) and <strong>200-level depth</strong> (NSE equity
+&amp; derivatives) over WebSocket (binary). No historical depth from brokers ⇒ record our own.</li>
+<li>Extends the v1 <code>xd-feed</code> (which already streams the active set): adds 20-level depth subscriptions for a
+configured recording list; writes to Timescale hypertables (compressed); ~50–100 GB/year.</li>
+<li><strong>Start recording in P7</strong> so ≥ 6 months exist by P13.</li>
+<li>Uses: order-book imbalance, depth pressure near trigger, aggressive volume delta, spread → meta-model
+features and realistic slippage. Kept only if OOS improves.</li>
+<li><strong>HFT/latency arbitrage not pursued:</strong> home latency vs co-located firms, order-rate limits and costs leave
+no retail edge.</li>
+</ul>
+<h2 id="c-options-statistical-arbitrage">C. Options &amp; statistical arbitrage<a class="hash" href="#c-options-statistical-arbitrage" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Data: Dhan <strong>option chain API</strong> (OI, Greeks, IV, bid/ask; ~1 request / 3 s per underlying-expiry) and
+<strong>expired options data API</strong> for backtests; own chain snapshots (5-min for indices, EOD for stocks).</li>
+<li>Families: directional expression (ITM/ATM options for our signals), defined-risk debit spreads (swing),
+index credit spreads / iron condors in range regimes, event/IV-aware positioning.</li>
+<li>New learning dimension <strong>instrument expression</strong> (cash / future / option_buy / debit_spread …).</li>
+<li>Simulation from historical option prices; Black-Scholes with recorded IV only as fallback; premium and
+underlying-based exits; exit before expiry by default; liquidity filters (index options first).</li>
+<li>&quot;Slow&quot; statistical arbitrage: <code>PAIRS</code> (cointegration mean reversion) and <code>BASIS</code> (cash-futures) on 5m+
+bars — two-leg, so practical with module A.</li>
+</ul>
+<h2 id="d-fundamentals-events">D. Fundamentals &amp; events<a class="hash" href="#d-fundamentals-events" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Data: exchange filings (results XBRL/PDF), shareholding (promoter holding, pledges), announcements,
+results calendar — stored <strong>point-in-time by filing timestamp</strong>.</li>
+<li>Uses: swing universe quality filter; features (growth, margin trend, surprise vs last 4 quarters,
+valuation percentile); <code>PEAD</code> (post-earnings drift) swing family; event-risk filter.</li>
+<li>Assistant extracts structured fields from PDFs/announcements, validated against XBRL; outputs are
+features measured like any other, never trade decisions.</li>
+</ul>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="19-risks-and-compliance.html"><small>← Previous  [</small>19 · Risks &amp; compliance</a>
+    <a class="next" href="21-glossary.html"><small>Next  ] →</small>21 · Glossary</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/20-extended-modules.md</code> · 2026-10-07 17:14</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#a-automated-order-placement" class="d2">A. Automated order placement</a>
+<a href="#b-tick-order-book-data" class="d2">B. Tick &amp;amp; order-book data</a>
+<a href="#c-options-statistical-arbitrage" class="d2">C. Options &amp;amp; statistical arbitrage</a>
+<a href="#d-fundamentals-events" class="d2">D. Fundamentals &amp;amp; events</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

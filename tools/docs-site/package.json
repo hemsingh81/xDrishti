@@ -1,0 +1,14 @@
+{
+  "name": "xdrishti-docs-site",
+  "private": true,
+  "type": "module",
+  "description": "Builds the interactive HTML version of /docs into /site",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@highlightjs/cdn-assets": "11.12.0",
+    "marked": "15.0.12",
+    "mermaid": "11.17.2"
+  }
+}

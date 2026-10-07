@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>18 · Roadmap — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="18-roadmap.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout no-toc">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class="active"><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">18</span> Delivery &amp; operations · <a href="../docs/18-roadmap.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="18-roadmap">18 — Roadmap</h1>
+<p>Part-time (~10–12 h/week) with an AI coding assistant. Each phase ends with an exit criterion. Portfolio
+monitoring comes early because it is useful on its own while the trading engine is being built.</p>
+<figure class="diagram"><pre class="mermaid">gantt
+    dateFormat  YYYY-MM-DD
+    axisFormat  %b %y
+    title xDrishti (indicative)
+    section Foundation
+    P0 Foundations &amp; data trial          :p0, 2026-10-12, 2w
+    P1 Data platform &amp; instruments       :p1, after p0, 5w
+    P2 Portfolio monitor &amp; live feed     :p2, after p1, 4w
+    section Engine
+    P3 Simulator, DSL &amp; first strategies :p3, after p2, 5w
+    P4 Exits &amp; exit learning             :p4, after p3, 3w
+    P5 Strategy Lab v1                   :p5, after p4, 3w
+    section Intelligence
+    P6 Learning engine &amp; ML.NET model    :p6, after p5, 5w
+    P7 Selection, accounts, nightly plan :p7, after p6, 3w
+    section Experience
+    P8 Reports &amp; UI complete             :p8, after p7, 3w
+    P9 AI assistant and Hermes PoC       :p9, after p8, 3w
+    section Validation
+    P10 Paper trading                    :p10, after p7, 12w
+    P11 Small live capital               :p11, after p10, 8w
+    section Extended
+    P12 Execution service                :p12, after p11, 6w
+    P13 Tick/depth features              :p13, after p12, 5w
+    P14 Options and stat-arb             :p14, after p13, 8w
+    P15 Fundamentals and events          :p15, after p14, 4w</pre></figure>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Deliverables</th>
+<th>Exit criterion</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>P0 Foundations</strong> (2w)</td>
+<td>Answer open questions (doc 01 §5); review the <strong>clickable prototype</strong> (<code>prototype/</code>); Podman machine (libkrun); repo skeleton: .NET solution, React (Vite) app, <code>compose.yaml</code> with <code>xd-db</code>; Keychain→secrets script; Dhan trial (Data API, API key/secret token flow, 1-minute history for 20 symbols); <strong>CSV profile for your files</strong> + sample import; <code>xd-llm</code> GPU benchmark; ML.NET spike on linux/arm64</td>
+<td>Data-quality note written; stack starts with one command</td>
+</tr>
+<tr>
+<td><strong>P1 Data platform &amp; instruments</strong> (5w)</td>
+<td>Dhan adapter (instrument master, history, accounts); <strong>CSV import</strong> (profiles, preview, validation, upsert, undo, folder watch, CLI); Timescale hypertables + continuous aggregates (5m…1h, 1D/1W/1M); corporate actions; calendar; context data; <strong>master list, tracked instruments, baskets</strong> (manual, rule-based, system); EOD fetch + backfill jobs; quality checks; <strong>Data quality window</strong> (validation service, stored-vs-recomputed aggregates, repair); React shell with <strong>login (password; re-entry for sensitive actions), Accounts (list/detail tabs, role matrix, risk profiles, wizard), Services screen with schedule configuration &amp; dependency checks</strong>, Instruments, Baskets and Data/Import screens; commands/desired-state + audit</td>
+<td>Your CSV history imported; 5 unattended EOD fetches; all timeframes match a hand-check on 10 samples</td>
+</tr>
+<tr>
+<td><strong>P2 Portfolio monitor &amp; live feed</strong> (4w)</td>
+<td>Account sync (holdings, positions, trade history, ledger); transactions, FIFO lots, positions, buckets; CSV/manual trade import; <strong>XIRR</strong>, returns, benchmark; daily valuations; <code>xd-feed</code> live feed for the active set + quote polling for holdings; Portfolio screen (per-account tiles, <strong>Action center</strong>, price alerts, group by bucket/basket/account/sector, tree-grid, charts)</td>
+<td>Portfolio values and XIRR match a spreadsheet check for 3 accounts/buckets; live P&amp;L updates during market hours</td>
+</tr>
+<tr>
+<td><strong>P3 Simulator, DSL &amp; first strategies</strong> (5w)</td>
+<td>Streaming indicators/features; DSL parser → expression trees + look-ahead lint; event-driven simulator (conditional entries, stops, square-off, max hold, gaps, costs, slippage, MAE/MFE); <code>ORB</code>, <code>VWAP_PULLBACK</code>, <code>BASE_BREAKOUT</code>; scans scoped by basket</td>
+<td>20 random trades hand-verified against charts</td>
+</tr>
+<tr>
+<td><strong>P4 Exits &amp; exit learning</strong> (3w)</td>
+<td>All exit policies incl. pyramiding; same-entries comparison; per-cell exit choice (walk-forward); MAE/MFE diagnostics</td>
+<td>Chosen exits stable across folds</td>
+</tr>
+<tr>
+<td><strong>P5 Strategy Lab v1</strong> (3w)</td>
+<td>Lab API + Hangfire runs + SignalR progress; verdict &amp; report; test ledger; <code>xd</code> CLI; Strategy Lab page (Monaco + schema); basket as test universe; <code>xd-sandbox</code> for C# plugins</td>
+<td>3 of your own ideas tested end-to-end without code changes</td>
+</tr>
+<tr>
+<td><strong>P6 Learning engine &amp; ML.NET model</strong> (5w)</td>
+<td>Regime labels; cell stats (Bayesian, recency); triple-barrier labels; ML.NET LightGBM/FastTree + PAV calibration + feature contributions; model registry; drift, lifecycle, changelog, hypothesis loop; <strong>lessons</strong> (monitors → problem/fix/result), <strong>experiments</strong> (tweak &amp; re-run replay with honest comparison rules), frozen-model counterfactual; <strong>meta-labelling model, learned entry windows, automatic loss tags</strong>; remaining strategies</td>
+<td>Meta-model beats baselines OOS; calibration error ≤ 5 pp; a knob change can be replayed and compared in &lt; 10 min</td>
+</tr>
+<tr>
+<td><strong>P7 Selection, accounts &amp; nightly plan</strong> (3w)</td>
+<td>Filters, merge, ranking, portfolio fill; per-account allocation (Trading-role accounts); <strong>plan review &amp; approval workflow with pre-trade checklist, suggestions inbox, review cutoff</strong>; auto-journal; grading (primary/reserve/rejected); pre-open check; <strong>autonomy levels with auto-approval at the cutoff</strong>; <strong>smart rules in the nightly plan</strong> (market gate, equity-curve throttle, correlation-aware selection); <strong>weekly learning digest</strong>; fail-closed nightly pipeline; plan tickets join the live active set; <strong>start depth recording</strong></td>
+<td>Plans published 10 consecutive sessions unattended</td>
+</tr>
+<tr>
+<td><strong>P8 Reports &amp; UI</strong> (3w)</td>
+<td>All screens &amp; reports: <strong>Learning screen</strong> (journey, lessons, plan vs actual, setups, tweak &amp; re-run, autonomy), Overview with auto-insights, multi-basket comparison, pivot builder, lenses, filters, drill-down, exports, PWA; responsive 360 px → 4K</td>
+<td>&quot;What works, in which basket, on which TF, with which exit&quot; answered in &lt; 2 min</td>
+</tr>
+<tr>
+<td><strong>P9 AI assistant</strong> (3w)</td>
+<td><code>xd-llm</code>, <code>xd-mcp</code>, assistant endpoint &amp; chat; briefing; data Q&amp;A (incl. portfolio &amp; baskets); strategy drafting; eval set; Hermes PoC (doc 14 §6)</td>
+<td>Eval set passes; Hermes adopt/reject decided</td>
+</tr>
+<tr>
+<td><strong>P10 Paper trading</strong> (≥ 12w, from P7)</td>
+<td>Follow plans on paper/minimal size; weekly review; config changes only via hypothesis loop</td>
+<td>≥ 60 graded trades; positive expectancy after costs within backtest band; drawdown within Monte Carlo 90th pct</td>
+</tr>
+<tr>
+<td><strong>P11 Small live</strong> (≥ 8w)</td>
+<td>25–50% of intended risk; live vs paper slippage; <strong>execution feedback</strong> (grade on fills, slippage per liquidity bucket, capacity score)</td>
+<td>Live within expectations ⇒ scale gradually</td>
+</tr>
+<tr>
+<td><strong>P12 Execution service</strong> (6w)</td>
+<td><code>xd-exec</code>: state machine, pre-trade checks, broker-side stops, kill switch, reconciliation; Dhan sandbox → assisted → semi-auto → auto; ISP static IP</td>
+<td>30 semi-auto sessions with zero reconciliation breaks</td>
+</tr>
+<tr>
+<td><strong>P13 Tick/depth features</strong> (5w)</td>
+<td>Microstructure features from ≥ 6 months recorded data; depth-based slippage</td>
+<td>Kept only if OOS intraday expectancy improves</td>
+</tr>
+<tr>
+<td><strong>P14 Options &amp; stat-arb</strong> (8w)</td>
+<td>Option-chain archive, expired-options backtests, instrument-expression dimension, defined-risk structures; <code>PAIRS</code>/<code>BASIS</code></td>
+<td>An option expression beats cash/futures OOS after costs, else stays disabled</td>
+</tr>
+<tr>
+<td><strong>P15 Fundamentals &amp; events</strong> (4w)</td>
+<td>Point-in-time filings, quality filters, earnings features, <code>PEAD</code>, LLM extraction with validation</td>
+<td>Features/filters improve OOS or are dropped</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
+    <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-07 17:14</footer>
+</main>
+
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
