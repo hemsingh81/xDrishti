@@ -1,0 +1,37 @@
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vs/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+coverage/
+*.tsbuildinfo
+
+# .NET
+bin/
+obj/
+*.user
+TestResults/
+*.trx
+
+# Local runtime data (market data, models, exports, backups) — never committed
+data/**
+!data/README.md
+!data/inbox/
+!data/inbox/.gitkeep
+
+# Secrets and local overrides
+.env
+.env.*
+!.env.example
+*.pfx
+*.key
+appsettings.*.local.json
+deploy/secrets/

@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13 · Reports &amp; UI — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="13-reports-and-ui.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class="active"><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">13</span> Tools &amp; experience · <a href="../design/13-reports-and-ui.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="13-reports-ui-react">13 — Reports &amp; UI (React)</h1>
+<h2 id="1-screens">1. Screens<a class="hash" href="#1-screens" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Screen</th>
+<th>Purpose</th>
+<th>Key components</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Login / lock screen</strong></td>
+<td>One centred panel: about + non-sensitive service status (no balances before sign-in) on the left, form on the right. Show/hide password, Caps Lock warning, attempts left, live lockout countdown. Idle or manual <strong>lock</strong> keeps the user and asks only for the password (&quot;Welcome back · Unlock&quot;), and survives a page reload; password re-entry for sensitive actions</td>
+<td>Form, status strip</td>
+</tr>
+<tr>
+<td><strong>Today</strong></td>
+<td>Plan status, live open positions &amp; P&amp;L, armed tickets, alerts, briefing, services health</td>
+<td>KPI tiles, ticket cards, live price panel (SignalR)</td>
+</tr>
+<tr>
+<td><strong>Plan review</strong></td>
+<td>Approve / modify / reject proposed tickets before cutoff; reserve list; limits check</td>
+<td>Ticket cards with chart, bulk approve, countdown to cutoff</td>
+</tr>
+<tr>
+<td><strong>Suggestions</strong></td>
+<td>AI / engine suggestions inbox (track instrument, basket changes, promotions)</td>
+<td>Cards with reason &amp; evidence, accept / reject</td>
+</tr>
+<tr>
+<td><strong>Portfolio</strong></td>
+<td>All holdings/trades across accounts: added date, value, return %, XIRR; group by bucket / basket / account / strategy / sector (<a href="12-portfolio-monitoring.html">doc 12</a>)</td>
+<td>Header tiles, tree-grid, treemap, value-vs-benchmark chart, position drawer</td>
+</tr>
+<tr>
+<td><strong>Instruments</strong></td>
+<td>Master-list search, tracked instruments, coverage &amp; quality, bulk actions (<a href="06-instruments-and-baskets.html">doc 06</a>)</td>
+<td>Faceted search, Data Grid, chips</td>
+</tr>
+<tr>
+<td><strong>Baskets</strong></td>
+<td>Create/edit manual &amp; rule-based baskets, members, basket performance &amp; benchmark</td>
+<td>Drag &amp; drop, rule builder with live preview, comparison charts</td>
+</tr>
+<tr>
+<td><strong>Trade Plan</strong></td>
+<td>Tickets per account with reasons, reserve list, pre-open check</td>
+<td>Ticket cards with Lightweight Charts (entry/stop/target overlays), account switcher</td>
+</tr>
+<tr>
+<td><strong>Journal</strong></td>
+<td>Taken/skipped/modified (auto-matched), notes, tags</td>
+<td>Data Grid, trade replay chart</td>
+</tr>
+<tr>
+<td><strong>Reports</strong></td>
+<td>Landing <strong>Overview</strong> dashboard with auto-insights, report catalogue, <strong>multi-basket comparison</strong>, pivot builder; common filters incl. multi-select baskets</td>
+<td>ECharts, heatmaps, Data Grid, export</td>
+</tr>
+<tr>
+<td><strong>Strategy Lab</strong></td>
+<td>Editor/form, runs queue, verdict report, version compare</td>
+<td>Monaco + schema, progress via SignalR</td>
+</tr>
+<tr>
+<td><strong>Learning</strong></td>
+<td>How the system improves: <strong>journey</strong> (live vs frozen model vs plan prices, with problem/fix markers), <strong>lessons</strong> (what went wrong → fix → result), <strong>plan vs actual</strong> execution gap, <strong>setups</strong> (cell heatmap &amp; lifecycle), <strong>smart rules</strong> (market gate, equity throttle, meta-labelling, entry windows, correlation), <strong>tweak &amp; re-run</strong> experiments, <strong>autonomy</strong> settings &amp; change log with monitoring/rollback, <strong>weekly digest</strong> (<a href="09-learning-engine.html">doc 09</a> §9–§14)</td>
+<td>ECharts, lesson cards, knobs + replay progress, change log</td>
+</tr>
+<tr>
+<td><strong>Data &amp; Import</strong></td>
+<td>CSV upload/preview/commit/undo, import profiles, coverage per timeframe, EOD fetch runs, quality issues</td>
+<td>Dropzone, preview grid, coverage heatmap</td>
+</tr>
+<tr>
+<td><strong>Accounts</strong></td>
+<td>List + detail with tabs (Overview, Roles, Trading, Portfolio, Data, Connection, Activity), role matrix, shared risk profiles, add-account wizard, data failover (<a href="04-accounts-access-and-operations.html">doc 04</a> §1.1)</td>
+<td>Master-detail, tabs, wizard</td>
+</tr>
+<tr>
+<td><strong>Data quality</strong></td>
+<td>Every tracked instrument: coverage, validation status, aggregates vs 1-minute, official-daily match, repair (<a href="05-data-and-brokers.html">doc 05</a> §10b)</td>
+<td>Status table, inspect drawer with stored-vs-recomputed table</td>
+</tr>
+<tr>
+<td><strong>Config</strong></td>
+<td>Trading config editor, validate, diff, activate, history</td>
+<td>Monaco YAML + JSON Schema, diff view</td>
+</tr>
+<tr>
+<td><strong>Assistant</strong></td>
+<td>Chat over your data; answers show numbers, query and chart</td>
+<td>Streaming chat panel</td>
+</tr>
+<tr>
+<td><strong>Services</strong></td>
+<td>Every background service: editable schedule (type, time, days, window, interval, run-after), retries, timeout, catch-up, parameters; dependency checks; trading-day timeline; run now, pause, history</td>
+<td>Status table, configure dialog, timeline</td>
+</tr>
+<tr>
+<td><strong>Audit</strong></td>
+<td>Logins, configuration changes, approvals, service actions</td>
+<td>Filterable log</td>
+</tr>
+</tbody></table>
+<p>Every analytic screen has a <strong>lens selector</strong> — <em>All trades · By basket · By instrument · By individual trade ·
+By strategy · By account</em> (<a href="06-instruments-and-baskets.html">doc 06</a> §4) — plus a common filter bar: <strong>date range</strong> ·
+source (backtest / paper / live) · account · <strong>basket</strong> · style · strategy · timeframe · side · exit policy ·
+regime · symbol · sector · plan status · discretionary vs system trades.</p>
+<h2 id="1b-clickable-prototype">1b. Clickable prototype<a class="hash" href="#1b-clickable-prototype" aria-label="Link to this section">#</a></h2>
+<p>A working front-end prototype of these screens lives in <a href="../prototype/index.html"><code>prototype/index.html</code></a> (open it
+directly in a browser — offline, demo data, no backend; services and the live feed are simulated in the
+browser). It demonstrates the login (demo credentials prefilled); Accounts (list/detail tabs, role matrix, risk
+profiles, wizard, data failover); plan review with approve / modify / reject, the pre-trade checklist and
+<strong>auto-approval at the cutoff</strong>; suggestions inbox; portfolio with per-account tiles, Action center, price alerts,
+XIRR and animated grouping; instruments (one scrollable grid with sticky header and symbol column) &amp; baskets; CSV
+import with aggregation; the Data quality window; the <strong>Learning</strong> screen (journey, lessons with loss tags, plan vs actual with
+fills ledger, setups, smart rules, tweak &amp; re-run, autonomy, weekly digest); live tickets filled with simulated
+slippage and graded on fills; Reports (overview with auto-insights, basket comparison, pivot and 10 more
+reports); Strategy Lab; Services with schedule configuration, dependency checks, timeline and catch-up; settings
+with password re-entry; the audit log — responsive from phones to 4K monitors, light and dark.</p>
+<p><strong>Visual language</strong> (carried into the React app): Inter font and a standard, calm palette (Tailwind <em>slate/gray</em>
+neutrals with one <em>indigo</em> accent; green/red/amber only for meaning), a light sidebar with a soft colour-tinted
+icon per screen, tiles with tinted icons and count-up numbers, collapsible cards, animated dialogs/drawers/toasts
+(respecting <em>reduce motion</em>), light and dark themes, and scrollable data grids with sticky headers instead of
+pagination. In MUI this is one theme object (palette, shape, typography) shared by every screen.</p>
+<p><strong>Navigation for speed:</strong> a command palette (<strong>⌘K / Ctrl K</strong> or <strong>/</strong>) searches pages, Learning tabs, actions
+(run nightly, digest, lock, theme), baskets and every instrument (opens its chart drawer); <strong>g + letter</strong> jumps to
+a page (g t Today, g r Plan review, g p Portfolio, g l Learning …); <strong>?</strong> lists all shortcuts; the browser tab
+title shows the current screen.</p>
+<h2 id="1c-reports-experience">1c. Reports experience<a class="hash" href="#1c-reports-experience" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Landing = Overview:</strong> KPI tiles (trades, win rate, expectancy, total R &amp; ₹, profit factor, max drawdown),
+<strong>auto-insights</strong> in plain sentences (<a href="15-smart-insights-and-automation.html">doc 15</a> §6), equity &amp; drawdown,
+monthly results, strategy × timeframe heatmap, expectancy by basket, R distribution, win rate by weekday.</li>
+<li><strong>Left-hand catalogue:</strong> Overview · Basket comparison · Strategies · Exit policies · Side &amp; regime · Calendar &amp;
+time · MAE/MFE · Calibration · Instruments · Accounts · Decisions · Pivot builder · Trade list.</li>
+<li><strong>Global filters:</strong> date range with presets, <strong>multi-select baskets</strong>, side, style, account.</li>
+<li><strong>Basket comparison:</strong> choose 2+ baskets → side-by-side KPIs (trades, win rate, expectancy, total R, profit
+factor, max drawdown, net ₹, best strategy, buy-and-hold return), overlaid cumulative-R curves, expectancy by
+strategy per basket, basket × side and basket × style heatmaps.</li>
+<li><strong>Pivot builder:</strong> any two dimensions (strategy, timeframe, basket, side, style, exit, regime, account,
+instrument, sector, weekday, month, decision) × metric (expectancy, total R, win rate, trades, profit factor).</li>
+</ul>
+<h2 id="1d-responsive-design-all-monitors">1d. Responsive design (all monitors)<a class="hash" href="#1d-responsive-design-all-monitors" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Width</th>
+<th>Layout</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&lt; 480 px (phones)</td>
+<td>Single column, 2-up KPI tiles, larger touch targets, off-canvas navigation</td>
+</tr>
+<tr>
+<td>481–860 px (small tablets)</td>
+<td>Single column, off-canvas navigation, wrapping filters</td>
+</tr>
+<tr>
+<td>861–1200 px (tablets / small laptops)</td>
+<td>Icon-only sidebar (expandable), 1–2 column grids</td>
+</tr>
+<tr>
+<td>1201–1679 px (laptops / desktops)</td>
+<td>Full sidebar (collapsible), 2–3 column grids</td>
+</tr>
+<tr>
+<td>1680–2559 px (large / QHD)</td>
+<td>No max-width cap, 2-column plan tickets, taller charts, larger base font</td>
+</tr>
+<tr>
+<td>≥ 2560 px (4K / ultrawide)</td>
+<td>Up to 4 columns of tickets/cards, larger charts and font</td>
+</tr>
+</tbody></table>
+<p>Rules: no horizontal page scroll at any width (wide tables scroll inside their card), fluid grids
+(<code>auto-fit</code>/<code>minmax</code>), charts resize with their containers, sidebar state remembered per device.</p>
+<h2 id="2-report-catalogue">2. Report catalogue<a class="hash" href="#2-report-catalogue" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Report</th>
+<th>Answers</th>
+<th>Visuals</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>R1</td>
+<td>Next-day plan</td>
+<td>What to do tomorrow and why</td>
+<td>Ticket cards, mini-charts, reserve list</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Daily scorecard</td>
+<td>How did yesterday&#39;s plan do</td>
+<td>R per ticket, trigger hit/missed</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>Performance overview</td>
+<td>Am I making money</td>
+<td>Equity (R, ₹), underwater drawdown, KPI tiles</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>Strategy × timeframe matrix</td>
+<td>What works</td>
+<td>Expectancy heatmap, split by side</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>Exit-policy comparison</td>
+<td>1:2 vs 1:3 vs trail vs pyramid per cell</td>
+<td>Grouped bars on identical entries</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>Side analysis</td>
+<td>Longs vs shorts</td>
+<td>Side-by-side KPIs and equity</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>Regime analysis</td>
+<td>What works in which market</td>
+<td>Cell × regime heatmap, regime timeline</td>
+</tr>
+<tr>
+<td>R8</td>
+<td>MAE/MFE</td>
+<td>Stops too tight? targets too greedy?</td>
+<td>Scatter, histograms with target markers</td>
+</tr>
+<tr>
+<td>R9</td>
+<td>R distribution</td>
+<td>Payoff shape</td>
+<td>Histogram</td>
+</tr>
+<tr>
+<td>R10</td>
+<td>Calendar &amp; time-of-day</td>
+<td>When it works</td>
+<td>Calendar heatmap, weekday/hour/expiry bars</td>
+</tr>
+<tr>
+<td>R11</td>
+<td>Symbol &amp; sector</td>
+<td>Where it works</td>
+<td>Treemap / ranked bars</td>
+</tr>
+<tr>
+<td>R12</td>
+<td>Calibration</td>
+<td>Are probabilities honest</td>
+<td>Reliability diagram</td>
+</tr>
+<tr>
+<td>R13</td>
+<td>Selector effectiveness</td>
+<td>Does top-3 beat the rest</td>
+<td>Primary/reserve/rejected, top-k curves</td>
+</tr>
+<tr>
+<td>R14</td>
+<td>Backtest vs paper vs live</td>
+<td>Does reality match research</td>
+<td>Overlaid equity, slippage distribution</td>
+</tr>
+<tr>
+<td>R15</td>
+<td>Monte Carlo risk</td>
+<td>Expected drawdowns</td>
+<td>Fan chart, percentiles</td>
+</tr>
+<tr>
+<td>R16</td>
+<td>Learning changelog</td>
+<td>What changed and why</td>
+<td>Timeline</td>
+</tr>
+<tr>
+<td>R17</td>
+<td>Account comparison</td>
+<td>How each account performs</td>
+<td>Per-account KPIs and equity</td>
+</tr>
+<tr>
+<td>R18</td>
+<td>Data quality</td>
+<td>Can tonight&#39;s data be trusted</td>
+<td>Check status, flagged symbols</td>
+</tr>
+<tr>
+<td>R19</td>
+<td>Discipline</td>
+<td>Am I following the plan</td>
+<td>Taken vs recommended, cost of deviations in R</td>
+</tr>
+<tr>
+<td>R20</td>
+<td>Basket comparison</td>
+<td>Which basket works best, for which style/strategy</td>
+<td>Side-by-side KPIs, basket × strategy heatmap, vs basket buy-and-hold &amp; Nifty</td>
+</tr>
+<tr>
+<td>R21</td>
+<td>Instrument scorecard</td>
+<td>Which instruments consistently work / fail</td>
+<td>Ranked table, sparkline equity per instrument</td>
+</tr>
+<tr>
+<td>R22</td>
+<td>Portfolio overview</td>
+<td>What is my portfolio worth and how is it doing</td>
+<td>Value, invested, P&amp;L, XIRR, alpha; allocation by bucket/basket/sector</td>
+</tr>
+<tr>
+<td>R23</td>
+<td>Portfolio returns</td>
+<td>Returns and XIRR by group over time</td>
+<td>XIRR by group bars, value vs benchmark, drawdown</td>
+</tr>
+<tr>
+<td>R24</td>
+<td>Realised P&amp;L</td>
+<td>What did closed trades make</td>
+<td>FIFO realised P&amp;L by period / bucket / instrument, charges breakdown</td>
+</tr>
+<tr>
+<td>R25</td>
+<td>Data coverage</td>
+<td>Do I have complete data for every tracked instrument and timeframe</td>
+<td>Coverage heatmap, import &amp; EOD history</td>
+</tr>
+<tr>
+<td>R26</td>
+<td>Decisions review</td>
+<td>Do my approvals/rejections add value vs the system&#39;s proposal</td>
+<td>Approved vs rejected vs lapsed outcomes in R</td>
+</tr>
+<tr>
+<td>R27</td>
+<td>Basket comparison</td>
+<td>Which basket works best and why</td>
+<td>Multi-select baskets: KPIs, overlaid equity, strategy × basket, buy &amp; hold</td>
+</tr>
+<tr>
+<td>R28</td>
+<td>Pivot</td>
+<td>Any dimension × any dimension</td>
+<td>Heatmap with metric selector</td>
+</tr>
+<tr>
+<td>R29</td>
+<td>Data quality</td>
+<td>Is every timeframe correct</td>
+<td>Validation status, stored vs recomputed</td>
+</tr>
+<tr>
+<td>R30</td>
+<td>Learning journey</td>
+<td>Is the system actually getting better</td>
+<td>Weekly expectancy: live vs frozen-model counterfactual vs plan prices; problem→fix bands; cumulative uplift</td>
+</tr>
+<tr>
+<td>R31</td>
+<td>Lessons</td>
+<td>What went wrong and how it was fixed</td>
+<td>Lesson cards (problem → diagnosis → fix → result), before/after metric, walk-forward evidence</td>
+</tr>
+<tr>
+<td>R32</td>
+<td>Execution gap</td>
+<td>Where the edge is lost between plan and fills</td>
+<td>Waterfall (plan → slippage → missed → overrides → charges → actual), by strategy and month</td>
+</tr>
+<tr>
+<td>R33</td>
+<td>Experiments</td>
+<td>Which settings were tried and what they did</td>
+<td>Experiment history with Δ expectancy, folds better, verdict, status</td>
+</tr>
+<tr>
+<td>R34</td>
+<td>Loss tags</td>
+<td>Why trades lose</td>
+<td>Tag counts and R lost by tag, linked lessons</td>
+</tr>
+<tr>
+<td>R35</td>
+<td>Smart-rule evidence</td>
+<td>Is each rule still earning its place</td>
+<td>Throttle: equity with/without; meta: R taken vs skipped; gate: R by VIX/breadth bucket; windows: R by hour; correlation matrix</td>
+</tr>
+</tbody></table>
+<p><strong>Standard KPIs:</strong> trades · win rate · avg win/loss R · expectancy · profit factor · total R · net ₹ after
+costs · max drawdown (R, %) · Sharpe/Sortino · avg holding · exposure · longest loss streak.</p>
+<p><strong>Drill-down:</strong> heatmap cell → cell detail (equity, exit comparison, MAE/MFE, regime split) → trade list →
+trade replay (entry, stop, target, trail path, exit reason, feature snapshot).</p>
+<h2 id="3-exports-delivery">3. Exports &amp; delivery<a class="hash" href="#3-exports-delivery" aria-label="Link to this section">#</a></h2>
+<p>Plan: page + PDF/HTML. Portfolio: CSV/Excel of positions, transactions and realised P&amp;L. Any report: CSV/Excel. Weekly review pack (PDF): R3, R4, R5, R12, R13, R16 + assistant
+summary. Notifications appear in-app (SignalR); optional external channel only if you enable one.</p>
+<h2 id="4-implementation-notes">4. Implementation notes<a class="hash" href="#4-implementation-notes" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Report queries live in the .NET Reporting module; heavy aggregates via SQL materialised views refreshed
+nightly; responses are chart-ready series.</li>
+<li>Lightweight Charts for anything price-based; ECharts for analytics.</li>
+<li>The SPA is a PWA so it can be &quot;installed&quot; on your phone (LAN access).</li>
+</ul>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="12-portfolio-monitoring.html"><small>← Previous  [</small>12 · Portfolio monitoring</a>
+    <a class="next" href="14-ai-assistant.html"><small>Next  ] →</small>14 · AI assistant</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-screens" class="d2">1. Screens</a>
+<a href="#1b-clickable-prototype" class="d2">1b. Clickable prototype</a>
+<a href="#1c-reports-experience" class="d2">1c. Reports experience</a>
+<a href="#1d-responsive-design-all-monitors" class="d2">1d. Responsive design (all monitors)</a>
+<a href="#2-report-catalogue" class="d2">2. Report catalogue</a>
+<a href="#3-exports-delivery" class="d2">3. Exports &amp;amp; delivery</a>
+<a href="#4-implementation-notes" class="d2">4. Implementation notes</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

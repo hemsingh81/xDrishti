@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>06 · Instruments &amp; baskets — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="06-instruments-and-baskets.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class="active"><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">06</span> Data &amp; instruments · <a href="../design/06-instruments-and-baskets.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="06-instruments-baskets">06 — Instruments &amp; Baskets</h1>
+<p>How you choose <strong>what the system works on</strong> and how you <strong>group and evaluate</strong> it.</p>
+<h2 id="1-concepts">1. Concepts<a class="hash" href="#1-concepts" aria-label="Link to this section">#</a></h2>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    M[&quot;Master list&lt;br/&gt;all instruments from Dhan&lt;br/&gt;(refreshed daily)&quot;] --&gt;|you add| T[&quot;Tracked instruments&lt;br/&gt;data collected · eligible for scans&quot;]
+    T --&gt;|you group| B[&quot;Baskets&lt;br/&gt;MyChoice · MyLongTerm · Best stocks · …&quot;]
+    B --&gt; S[&quot;Scopes&lt;br/&gt;scan · Strategy Lab · reports · portfolio · live watch&quot;]</pre></figure>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Master list</strong></td>
+<td>Every instrument in Dhan&#39;s instrument (scrip) master — equities, indices, futures, options — refreshed nightly, mapped to canonical symbols (<a href="05-data-and-brokers.html">doc 05</a>)</td>
+</tr>
+<tr>
+<td><strong>Tracked instrument</strong></td>
+<td>An instrument you&#39;ve switched on. Only tracked instruments get historical data, end-of-day updates, scans and analytics</td>
+</tr>
+<tr>
+<td><strong>Basket</strong></td>
+<td>A named group of tracked instruments; an instrument can be in many baskets</td>
+</tr>
+<tr>
+<td><strong>Scope</strong></td>
+<td>Which basket(s) a strategy scan, a Strategy Lab test, a report or a portfolio view applies to</td>
+</tr>
+</tbody></table>
+<h2 id="2-master-list-tracked-instruments">2. Master list &amp; tracked instruments<a class="hash" href="#2-master-list-tracked-instruments" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Search &amp; add</strong> from the Instruments screen: filter the master list by name, symbol, exchange, segment,
+instrument type, sector, index membership, F&amp;O eligibility, price, turnover.</li>
+<li><strong>Bulk add</strong> by pasting symbols, uploading a CSV list, or adding all members of an index/rule-based basket.</li>
+<li><strong>On activation</strong> the system backfills history: first from your CSV files if present, then gaps from the
+Dhan historical API (1-minute up to ~5 years, daily since listing), and builds all timeframes.</li>
+<li><strong>On deactivation</strong> collection stops; history is kept (re-activation only fills the gap).</li>
+<li>Status shown per instrument: data coverage (from/to), last update, quality issues, baskets, open positions.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Canonical symbol</td>
+<td><code>NSE:TATASTEEL</code></td>
+</tr>
+<tr>
+<td>Broker ids</td>
+<td>Dhan <code>security_id</code> + segment</td>
+</tr>
+<tr>
+<td>Type / segment</td>
+<td>EQ / NSE_EQ (also IDX, FUT, OPT)</td>
+</tr>
+<tr>
+<td>Sector / industry</td>
+<td>Metals</td>
+</tr>
+<tr>
+<td>Lot size, tick size</td>
+<td>1 / 0.05 (futures: contract lot size)</td>
+</tr>
+<tr>
+<td>Flags</td>
+<td>F&amp;O eligible, ASM/GSM, in ban period</td>
+</tr>
+<tr>
+<td>Tracking</td>
+<td>active since 2026-10-15; data from 2021-10-01</td>
+</tr>
+</tbody></table>
+<h2 id="3-baskets">3. Baskets<a class="hash" href="#3-baskets" aria-label="Link to this section">#</a></h2>
+<h3 id="31-basket-types">3.1 Basket types<a class="hash" href="#31-basket-types" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>How membership is defined</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Manual</strong></td>
+<td>You add/remove instruments</td>
+<td>MyChoice, MyLongTerm, Best stocks, Watchlist</td>
+</tr>
+<tr>
+<td><strong>Rule-based (dynamic)</strong></td>
+<td>A saved filter re-evaluated nightly</td>
+<td>&quot;F&amp;O stocks with turnover &gt; ₹50 Cr&quot;, &quot;Nifty 50 members&quot;, &quot;Sector = IT&quot;, &quot;Near 52-week high&quot;</td>
+</tr>
+<tr>
+<td><strong>System</strong></td>
+<td>Maintained automatically</td>
+<td>Open positions, Holdings, Today&#39;s plan, Paused-cell instruments</td>
+</tr>
+</tbody></table>
+<h3 id="32-basket-attributes">3.2 Basket attributes<a class="hash" href="#32-basket-attributes" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Attribute</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Name, colour, description</td>
+<td>Display</td>
+</tr>
+<tr>
+<td>Purpose</td>
+<td><code>trading</code> · <code>long_term</code> · <code>watch</code> — drives defaults (e.g. long-term baskets excluded from intraday scans)</td>
+</tr>
+<tr>
+<td>Allowed styles / sides</td>
+<td>e.g. MyLongTerm: swing BUY only</td>
+</tr>
+<tr>
+<td>Strategies in scope</td>
+<td>Which strategies scan this basket (default: all enabled)</td>
+</tr>
+<tr>
+<td>Risk profile override (optional)</td>
+<td>e.g. smaller risk per trade for a speculative basket</td>
+</tr>
+<tr>
+<td>Target weights (optional, long-term)</td>
+<td>For allocation drift view in the portfolio</td>
+</tr>
+<tr>
+<td>Membership history</td>
+<td>Added / removed dates and notes — enables point-in-time evaluation</td>
+</tr>
+</tbody></table>
+<h3 id="33-how-baskets-are-used">3.3 How baskets are used<a class="hash" href="#33-how-baskets-are-used" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Scan scope</strong></td>
+<td>Nightly plan scans &quot;Best stocks&quot; and &quot;MyChoice&quot; for intraday; &quot;MyLongTerm&quot; only for swing BUY</td>
+</tr>
+<tr>
+<td><strong>Strategy Lab universe</strong></td>
+<td>&quot;Test VWAP_RSI_TREND on MyChoice, 2022–today&quot;</td>
+</tr>
+<tr>
+<td><strong>Reports lens</strong></td>
+<td>Compare results of all baskets side by side</td>
+</tr>
+<tr>
+<td><strong>Portfolio grouping</strong></td>
+<td>Value, return and XIRR per basket (<a href="12-portfolio-monitoring.html">doc 12</a>)</td>
+</tr>
+<tr>
+<td><strong>Live watch</strong></td>
+<td>Pin a basket to the live price panel (counts toward the live-feed budget, <a href="05-data-and-brokers.html">doc 05</a> §5)</td>
+</tr>
+</tbody></table>
+<h2 id="4-evaluation-lenses-looking-at-results-from-different-angles">4. Evaluation lenses — looking at results from different angles<a class="hash" href="#4-evaluation-lenses-looking-at-results-from-different-angles" aria-label="Link to this section">#</a></h2>
+<p>Every analytic screen uses the same <strong>lens + filters</strong> model: pick the lens (how rows are grouped), then
+filter by date range, source, account, style, strategy, timeframe, side, exit, regime, basket.</p>
+<table>
+<thead>
+<tr>
+<th>Lens</th>
+<th>Rows</th>
+<th>Typical question</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>All trades</strong></td>
+<td>One summary + equity curve</td>
+<td>&quot;How is the whole system doing this quarter?&quot;</td>
+</tr>
+<tr>
+<td><strong>By basket</strong></td>
+<td>One row per basket</td>
+<td>&quot;Is MyChoice better than Best stocks for intraday?&quot;</td>
+</tr>
+<tr>
+<td><strong>By instrument</strong></td>
+<td>One row per symbol</td>
+<td>&quot;Which stocks consistently work / fail?&quot;</td>
+</tr>
+<tr>
+<td><strong>By individual trade</strong></td>
+<td>One row per trade, drill to replay</td>
+<td>&quot;Why did this TATASTEEL trade lose?&quot;</td>
+</tr>
+<tr>
+<td><strong>By strategy / cell</strong></td>
+<td>Strategy × TF × side × exit</td>
+<td>&quot;Which setups work in which basket?&quot;</td>
+</tr>
+<tr>
+<td><strong>By account</strong></td>
+<td>One row per broker account</td>
+<td>&quot;How does each account perform?&quot;</td>
+</tr>
+<tr>
+<td><strong>By sector / regime / month</strong></td>
+<td>Grouped rows</td>
+<td>&quot;Where and when does it work?&quot;</td>
+</tr>
+</tbody></table>
+<p>Lenses can be combined as a pivot (e.g. <em>basket × strategy</em> heatmap of expectancy, or <em>basket × month</em>
+returns). Each basket row also shows a <strong>buy-and-hold benchmark</strong> (equal-weight basket return and Nifty 50
+over the same period) so trading results are judged against simply holding the basket.</p>
+<p><strong>Overlapping baskets:</strong> an instrument in several baskets appears under each, so per-basket totals are not
+additive — the UI says so. For additive totals (e.g. portfolio value) a position has one <strong>portfolio bucket</strong>
+(<a href="12-portfolio-monitoring.html">doc 12</a> §5).</p>
+<p><strong>Point-in-time vs current membership:</strong> reports default to <em>current</em> membership; switch to <em>as-of</em>
+membership to evaluate a basket exactly as it was composed on each trade date.</p>
+<h2 id="5-data-model">5. Data model<a class="hash" href="#5-data-model" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key columns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>market.instruments</code></td>
+<td>id, canonical_symbol, type, segment, sector, lot_size, tick_size, flags, listed_on</td>
+</tr>
+<tr>
+<td><code>market.instrument_broker_ids</code></td>
+<td>instrument_id, broker, broker_id, segment</td>
+</tr>
+<tr>
+<td><code>catalog.tracked_instruments</code></td>
+<td>instrument_id, active, active_since, data_from, data_to, last_update</td>
+</tr>
+<tr>
+<td><code>catalog.baskets</code></td>
+<td>id, name, type (manual/rule/system), purpose, colour, settings (JSON), rule (JSON)</td>
+</tr>
+<tr>
+<td><code>catalog.basket_members</code></td>
+<td>basket_id, instrument_id, valid_from, valid_to, note, target_weight</td>
+</tr>
+</tbody></table>
+<h2 id="6-screens">6. Screens<a class="hash" href="#6-screens" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Instruments</strong> — master-list search with facets; tracked list with coverage/quality/basket chips; bulk actions
+(track, untrack, add to basket, backfill).</li>
+<li><strong>Baskets</strong> — list with key stats; editor (manual add/remove, drag &amp; drop, rule builder with live preview);
+basket detail (members, performance by lens, benchmark, open positions).</li>
+</ul>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="05-data-and-brokers.html"><small>← Previous  [</small>05 · Data &amp; brokers</a>
+    <a class="next" href="07-strategies.html"><small>Next  ] →</small>07 · Strategies</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-concepts" class="d2">1. Concepts</a>
+<a href="#2-master-list-tracked-instruments" class="d2">2. Master list &amp;amp; tracked instruments</a>
+<a href="#3-baskets" class="d2">3. Baskets</a>
+<a href="#31-basket-types" class="d3">3.1 Basket types</a>
+<a href="#32-basket-attributes" class="d3">3.2 Basket attributes</a>
+<a href="#33-how-baskets-are-used" class="d3">3.3 How baskets are used</a>
+<a href="#4-evaluation-lenses-looking-at-results-from-different-angles" class="d2">4. Evaluation lenses — looking at results from different angles</a>
+<a href="#5-data-model" class="d2">5. Data model</a>
+<a href="#6-screens" class="d2">6. Screens</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

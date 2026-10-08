@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>07 · Strategies — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="07-strategies.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class="active"><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">07</span> Trading engine · <a href="../design/07-strategies.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="07-strategies-signals">07 — Strategies &amp; Signals</h1>
+<h2 id="1-strategy-anatomy">1. Strategy anatomy<a class="hash" href="#1-strategy-anatomy" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Description</th>
+<th>Example (Opening Range Breakout)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>Unique name</td>
+<td><code>ORB</code></td>
+</tr>
+<tr>
+<td><code>styles</code></td>
+<td>intraday / swing</td>
+<td>intraday</td>
+</tr>
+<tr>
+<td><code>timeframes</code></td>
+<td>Allowed entry timeframes</td>
+<td>5m, 15m, 30m</td>
+</tr>
+<tr>
+<td><code>sides</code></td>
+<td>BUY / SELL</td>
+<td>both</td>
+</tr>
+<tr>
+<td><code>setup</code></td>
+<td>Conditions known before the trigger (evaluated tonight)</td>
+<td>High relative volume yesterday, NR7, trend filter</td>
+</tr>
+<tr>
+<td><code>trigger</code></td>
+<td>What must happen to enter (evaluated tomorrow)</td>
+<td>Candle closes above OR-high (BUY)</td>
+</tr>
+<tr>
+<td><code>valid_window</code></td>
+<td>When the trigger may fire</td>
+<td>09:30–11:30</td>
+</tr>
+<tr>
+<td><code>initial_stop</code></td>
+<td>Where the idea is wrong</td>
+<td>OR opposite side / trigger-candle extreme / k × ATR</td>
+</tr>
+<tr>
+<td><code>filters</code></td>
+<td>Context gates</td>
+<td>Higher-TF trend agrees; not results day</td>
+</tr>
+<tr>
+<td><code>invalidation</code></td>
+<td>Cancel if…</td>
+<td>Gap beyond trigger; stop level hit before trigger</td>
+</tr>
+<tr>
+<td><code>params</code></td>
+<td>≤ 4 tunable values</td>
+<td>OR length, ATR multiple</td>
+</tr>
+</tbody></table>
+<p>Built-in strategies are written in the same rules language users use in the Strategy Lab
+(<a href="11-strategy-lab.html">doc 11</a>), so there is one way to define a strategy.</p>
+<h2 id="2-conditional-trade-plans">2. Conditional trade plans<a class="hash" href="#2-conditional-trade-plans" aria-label="Link to this section">#</a></h2>
+<p>Intraday entries can&#39;t be fixed the night before, so each plan item is a <strong>conditional ticket</strong> — and the
+simulator tests exactly this ticket on history:</p>
+<div class="code"><pre><code class="nohighlight">BUY RELIANCE | INTRADAY | 15m | ORB         basket: Best stocks   account: dhan_main
+  Trigger : 15m candle CLOSE above 2,948.0 between 09:30 and 11:30
+  Entry   : at trigger-candle close (limit +0.1% max)
+  Stop    : 2,921.5 (OR low) → risk/share 26.5
+  Exit    : 50% at 1R, stop → breakeven, trail rest ATR(15m)×2; square-off 15:15
+  Size    : 37 shares (risk ₹980 = 0.49% of capital)
+  P(win)  : 0.57 (n=214, regime UP_LOW_VOL)   E[R]: +0.38 after costs
+  Cancel  : open &gt; 2,960 (gap &gt; 0.5 ATR) or 2,921.5 touched before trigger
+  Why     : NR7 yesterday, rel-volume 1.8×, 1h &amp; 1D uptrend, sector strongest</code></pre></div>
+<p>Swing tickets from daily bars: signal known at close; trigger typically &quot;buy-stop above today&#39;s high
+tomorrow&quot; or &quot;enter at open if gap within limits&quot;.</p>
+<h2 id="3-starter-library">3. Starter library<a class="hash" href="#3-starter-library" aria-label="Link to this section">#</a></h2>
+<p>Each mirrored for SELL where sensible. Most cells will fail qualification — expected and healthy.</p>
+<p><strong>Intraday (5m–1h):</strong> <code>ORB</code> (opening-range breakout) · <code>PDH_PDL_BREAK</code> / <code>PDH_PDL_REJECT</code> (previous-day
+high/low) · <code>VWAP_PULLBACK</code> · <code>VWAP_RECLAIM</code> · <code>EMA_PULLBACK</code> (9/21 EMA with higher-TF trend) ·
+<code>GAP_GO</code> / <code>GAP_FILL</code> · <code>INSIDE_BAR_BO</code> · <code>CPR</code> (central pivot range) · <code>MEAN_REV_BANDS</code>.</p>
+<p><strong>Swing (1h/1D, ≤ 5 sessions):</strong> <code>BASE_BREAKOUT</code> · <code>TREND_PULLBACK</code> (20 EMA / 50 DMA) · <code>NR7_ID_BO</code> ·
+<code>RSI2_REVERSION</code> (above/below 200 DMA) · <code>BB_SQUEEZE</code> · <code>HIGH_52W_MOMENTUM</code> · <code>FAILED_BREAKOUT</code> ·
+<code>RS_ROTATION</code> (strongest stocks in strongest sectors).</p>
+<h2 id="4-multi-timeframe-mapping">4. Multi-timeframe mapping<a class="hash" href="#4-multi-timeframe-mapping" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Entry TF</th>
+<th>Bias TFs</th>
+<th>Typical style</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>5m</td>
+<td>15m, 1h</td>
+<td>Intraday</td>
+</tr>
+<tr>
+<td>10m</td>
+<td>30m, 1h</td>
+<td>Intraday</td>
+</tr>
+<tr>
+<td>15m</td>
+<td>1h, 1D</td>
+<td>Intraday</td>
+</tr>
+<tr>
+<td>30m</td>
+<td>1h, 1D</td>
+<td>Intraday / short swing</td>
+</tr>
+<tr>
+<td>1h</td>
+<td>1D</td>
+<td>Intraday / swing</td>
+</tr>
+<tr>
+<td>1D</td>
+<td>1W</td>
+<td>Swing</td>
+</tr>
+</tbody></table>
+<p>Confluence (same symbol &amp; side on several timeframes/strategies) is a feature and a selection bonus.</p>
+<h2 id="5-feature-catalogue-point-in-time">5. Feature catalogue (point-in-time)<a class="hash" href="#5-feature-catalogue-point-in-time" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Examples</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Trend</td>
+<td>EMA slopes (9/21/50/200), price vs EMAs, ADX, swing structure, supertrend</td>
+</tr>
+<tr>
+<td>Momentum</td>
+<td>RSI(2/14), ROC, MACD histogram, distance from N-day high/low</td>
+</tr>
+<tr>
+<td>Volatility</td>
+<td>ATR %, ATR percentile, Bollinger bandwidth, NR4/NR7, inside bars, gap in ATR</td>
+</tr>
+<tr>
+<td>Volume</td>
+<td>Relative volume (same time-of-day), delivery %, OI change</td>
+</tr>
+<tr>
+<td>Levels</td>
+<td>Distance to previous-day H/L/C, CPR width, VWAP distance, 52-week high/low, round numbers</td>
+</tr>
+<tr>
+<td>Relative strength</td>
+<td>Stock vs index, stock vs sector, sector vs index (5/20/60 days)</td>
+</tr>
+<tr>
+<td>Market context</td>
+<td>Index trend/ADX, VIX level/percentile/change, breadth</td>
+</tr>
+<tr>
+<td>Calendar</td>
+<td>Weekday, time of day, expiry day/week, pre/post holiday, days to results</td>
+</tr>
+<tr>
+<td>Plan geometry</td>
+<td>Stop distance in ATR, room to next obstacle in R, achievable R:R</td>
+</tr>
+</tbody></table>
+<h2 id="6-market-regime">6. Market regime<a class="hash" href="#6-market-regime" aria-label="Link to this section">#</a></h2>
+<p>Daily label from index data: <strong>trend</strong> (UP / DOWN / RANGE via DMA slope + ADX) × <strong>volatility</strong> (LOW /
+NORMAL / HIGH via VIX and ATR percentiles) → up to 9 regimes. Used to condition statistics and as a feature.</p>
+<h2 id="7-side-specifics">7. Side specifics<a class="hash" href="#7-side-specifics" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>BUY and SELL are learned separately (different speed, stops, regimes).</li>
+<li>Intraday SELL: cash (MIS) or futures; swing SELL: futures only.</li>
+<li>Circuit-locked stocks excluded on the locked side.</li>
+</ul>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
+    <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
+<a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>
+<a href="#3-starter-library" class="d2">3. Starter library</a>
+<a href="#4-multi-timeframe-mapping" class="d2">4. Multi-timeframe mapping</a>
+<a href="#5-feature-catalogue-point-in-time" class="d2">5. Feature catalogue (point-in-time)</a>
+<a href="#6-market-regime" class="d2">6. Market regime</a>
+<a href="#7-side-specifics" class="d2">7. Side specifics</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

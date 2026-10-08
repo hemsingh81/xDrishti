@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>14 · AI assistant — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="14-ai-assistant.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class="active"><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">14</span> Tools &amp; experience · <a href="../design/14-ai-assistant.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="14-ai-assistant-local-llm">14 — AI Assistant (local LLM)</h1>
+<h2 id="1-roles">1. Roles<a class="hash" href="#1-roles" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Who</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Signals, stops, targets, sizes</td>
+<td>Deterministic .NET engine</td>
+<td>Exact, testable</td>
+</tr>
+<tr>
+<td>P(win), expected R</td>
+<td>Gradient-boosted trees in ML.NET (trained &amp; scored in .NET)</td>
+<td>Measurable accuracy</td>
+</tr>
+<tr>
+<td>Exit choice, ranking, selection</td>
+<td>Deterministic rules on learned statistics</td>
+<td>Auditable</td>
+</tr>
+<tr>
+<td>Daily briefing, weekly review</td>
+<td><strong>LLM</strong></td>
+<td>Language summarisation</td>
+</tr>
+<tr>
+<td>Questions about your data</td>
+<td><strong>LLM + read-only tools</strong></td>
+<td>Numbers come from tools</td>
+</tr>
+<tr>
+<td>Draft strategy rules for the Strategy Lab</td>
+<td><strong>LLM</strong> (you confirm; tests decide)</td>
+<td>Faster research</td>
+</tr>
+<tr>
+<td>Propose hypotheses (one variable)</td>
+<td><strong>LLM</strong> (engine validates)</td>
+<td>Research help</td>
+</tr>
+<tr>
+<td>Suggest instruments / basket changes / next-day focus</td>
+<td><strong>LLM + engine evidence</strong> → suggestions inbox; <strong>you accept or reject</strong></td>
+<td>Human in the loop</td>
+</tr>
+<tr>
+<td>Extract data from filings/announcements (later)</td>
+<td><strong>LLM</strong> (validated)</td>
+<td>Unstructured text</td>
+</tr>
+<tr>
+<td>Predict prices / make trade decisions</td>
+<td><strong>Never</strong></td>
+<td>Unverifiable</td>
+</tr>
+</tbody></table>
+<h2 id="2-setup">2. Setup<a class="hash" href="#2-setup" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Choice</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Model server</td>
+<td><code>xd-llm</code>: llama.cpp server via RamaLama on a <strong>libkrun</strong> Podman machine (GPU), OpenAI-compatible API</td>
+</tr>
+<tr>
+<td>Main model</td>
+<td>~30B-class open model, 4-bit (≈ 18–22 GB), ≥ 32K context (e.g. Qwen3-30B-A3B)</td>
+</tr>
+<tr>
+<td>Small model</td>
+<td>7–14B for classification tasks</td>
+</tr>
+<tr>
+<td>Embeddings</td>
+<td>nomic-embed-text or bge-m3 (for search over notes/docs)</td>
+</tr>
+<tr>
+<td>Fallback</td>
+<td>Host-native llama.cpp/Ollama if container GPU speed is insufficient (endpoint change only)</td>
+</tr>
+</tbody></table>
+<p>Model choice is config; select by our eval set, not leaderboards.</p>
+<h2 id="3-integration-net">3. Integration (.NET)<a class="hash" href="#3-integration-net" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><code>xd-api</code> assistant endpoint uses <strong>Microsoft.Extensions.AI</strong> with tool calling; streams to React.</li>
+<li>Tools are served by <strong><code>xd-mcp</code></strong> (ModelContextProtocol C# SDK) over a <strong>read-only DB role</strong>:
+<code>list_tables</code>, <code>describe_table</code>, <code>run_sql(read_only, row limit)</code>, <code>get_report(type, filters)</code>,
+<code>get_plan(date, account)</code>, <code>get_cell(key)</code>, <code>get_portfolio(group_by, as_of)</code>, <code>get_basket(name)</code>,
+<code>make_chart(spec)</code>, <code>lab_validate(yaml)</code>, <code>lab_run(yaml)</code>.</li>
+<li>Guardrails: numbers only from tool results; no write tools except <code>lab_run</code>; no promotion; no config
+changes (only proposed diffs you apply in the Config screen); prompts and tool calls logged in <code>ai.*</code>;
+broker secrets never in context. If the LLM is down, the nightly plan is unaffected.</li>
+</ul>
+<h2 id="4-features">4. Features<a class="hash" href="#4-features" aria-label="Link to this section">#</a></h2>
+<ol>
+<li><strong>Daily briefing</strong> (≤ 300 words): regime, the tickets with one-line rationale, risks, system changes.</li>
+<li><strong>Ask your data</strong>: &quot;Expectancy of 15m SELL setups in high-vol regimes in 2025?&quot; → query + numbers + chart.
+Also portfolio and baskets: &quot;XIRR of MyLongTerm vs Nifty this year?&quot;, &quot;Which basket worked best for 15m setups?&quot;</li>
+<li><strong>Strategy drafting</strong>: English idea → DSL YAML → validation → you confirm → Lab run → summary.</li>
+<li><strong>Hypothesis proposals</strong> for the learning loop (<a href="09-learning-engine.html">doc 09</a> §5).</li>
+<li><strong>Event flags</strong> (later): classify announcements for the event-risk filter.</li>
+</ol>
+<h2 id="5-eval-set-re-run-on-every-modelprompt-change">5. Eval set (re-run on every model/prompt change)<a class="hash" href="#5-eval-set-re-run-on-every-modelprompt-change" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Task</th>
+<th>Test</th>
+<th>Pass</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Data questions</td>
+<td>30 questions with known answers</td>
+<td>≥ 90% exact numbers</td>
+</tr>
+<tr>
+<td>Briefing</td>
+<td>10 historical plans</td>
+<td>No numbers absent from input; all tickets covered</td>
+</tr>
+<tr>
+<td>Strategy drafting</td>
+<td>10 ideas</td>
+<td>Valid DSL; matches intent on review</td>
+</tr>
+<tr>
+<td>Event flags</td>
+<td>200 labelled announcements</td>
+<td>Precision on &quot;material&quot; ≥ 80%</td>
+</tr>
+</tbody></table>
+<h2 id="6-hermes-agent-nous-research-decision">6. Hermes Agent (Nous Research) — decision<a class="hash" href="#6-hermes-agent-nous-research-decision" aria-label="Link to this section">#</a></h2>
+<p><strong>What it is:</strong> open-source (MIT) always-on agent: persistent memory, self-written skills, built-in cron,
+MCP client, messaging gateways (Telegram, WhatsApp…), works with local OpenAI-compatible models.</p>
+<p><strong>Decision:</strong> not part of the core. Build the built-in assistant first. Evaluate Hermes in Phase 9 as an
+<strong>optional front-end</strong> (phone access, scheduled summaries) connected only to <code>xd-llm</code> and <code>xd-mcp</code>.</p>
+<p><strong>Why cautious:</strong> a third-party review (Sept 2026) cites 44 published CVEs including high-severity
+remote-code-execution and supply-chain issues, and an audit found unrestricted shell and credential-file
+access in default config; self-written skills/memory can persist errors or injected instructions; it needs
+≥ 32–64K context.</p>
+<p><strong>If adopted, mandatory hardening:</strong> own image from a pinned release (no <code>curl | bash</code>); shell, browser,
+web-search, file-system and media tools disabled; only <code>xd-mcp</code> registered; no secrets mounted; egress only
+to <code>xd-llm</code>/<code>xd-mcp</code>; skills git-tracked and memory reviewed weekly; messaging off by default; monthly CVE
+check.</p>
+<p><strong>PoC pass criteria:</strong> hardened container works with the local model · ≥ 90% on the data-question eval ·
+8/10 strategy drafts valid · cron summary delivered 5 days running · prompt-injection probe (malicious journal
+note) causes no unintended tool calls · runs alongside the core stack without memory pressure · clear benefit
+over the built-in assistant.</p>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="13-reports-and-ui.html"><small>← Previous  [</small>13 · Reports &amp; UI</a>
+    <a class="next" href="15-smart-insights-and-automation.html"><small>Next  ] →</small>15 · Smart insights &amp; automation</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/14-ai-assistant.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-roles" class="d2">1. Roles</a>
+<a href="#2-setup" class="d2">2. Setup</a>
+<a href="#3-integration-net" class="d2">3. Integration (.NET)</a>
+<a href="#4-features" class="d2">4. Features</a>
+<a href="#5-eval-set-re-run-on-every-modelprompt-change" class="d2">5. Eval set (re-run on every model/prompt change)</a>
+<a href="#6-hermes-agent-nous-research-decision" class="d2">6. Hermes Agent (Nous Research) — decision</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@
         "http.server",
         "8765",
         "--directory",
-        "site"
+        "docs/site"
       ],
       "port": 8765
     },
@@ -21,7 +21,7 @@
         "http.server",
         "8766",
         "--directory",
-        "prototype"
+        "docs/prototype"
       ],
       "port": 8766
     }

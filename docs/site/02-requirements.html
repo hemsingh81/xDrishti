@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · Requirements — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="02-requirements.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class="active"><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">02</span> Foundation · <a href="../design/02-requirements.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="02-requirements">02 — Requirements</h1>
+<h2 id="1-functional-requirements">1. Functional requirements<a class="hash" href="#1-functional-requirements" aria-label="Link to this section">#</a></h2>
+<h3 id="fr-1-data">FR-1 Data<a class="hash" href="#fr-1-data" aria-label="Link to this section">#</a></h3>
+<ol>
+<li><strong>Import 1-minute OHLCV from CSV files</strong> (upload, watched folder, CLI) using saved column-mapping profiles;
+preview, validate, upsert with source precedence, report and undo per import job.</li>
+<li><strong>Aggregate</strong> 1-minute bars into 5m/10m/15m/30m/1h (09:15-aligned), 1D, 1W, 1M with identical rules for
+CSV and Dhan data; refresh after every import/fetch.</li>
+<li><strong>End-of-day fetch</strong> from the Dhan Data API for <strong>all tracked instruments</strong> (today&#39;s 1-minute + daily), gap
+backfill, instrument master refresh.</li>
+<li><strong>Live data only for the active set</strong> (open positions, armed tickets, context indices, optional pinned
+basket) via Dhan WebSocket; holdings via quote polling; live bars replaced by official bars at EOD.</li>
+<li>Adjust for splits/bonus; keep raw prices for tradable levels.</li>
+<li>Store context: indices, India VIX, breadth, sector indices, calendar, expiries, lot sizes, corporate actions.</li>
+<li>Data-quality checks; fail closed (no plan) on critical failures.</li>
+<li><strong>Data quality window</strong>: per-instrument validation of completeness, bar sanity, spikes, stored-vs-recomputed
+aggregates and derived-vs-official daily, with inspect, repair and run history.</li>
+</ol>
+<h3 id="fr-2-instruments-baskets">FR-2 Instruments &amp; baskets<a class="hash" href="#fr-2-instruments-baskets" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Master list from Dhan&#39;s instrument master, searchable and filterable.</li>
+<li>Tracked instruments: add/remove (single or bulk); activation triggers history backfill (CSV, then Dhan).</li>
+<li>Baskets: manual, rule-based (dynamic) and system baskets; an instrument can be in many baskets;
+membership history kept.</li>
+<li>Baskets define scopes for scans, Strategy Lab tests, reports, portfolio grouping and live watch.</li>
+<li>Evaluation lenses: all trades, by basket, by instrument, by individual trade, by strategy, by account.</li>
+</ol>
+<h3 id="fr-3-brokers-accounts">FR-3 Brokers &amp; accounts<a class="hash" href="#fr-3-brokers-accounts" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Pluggable broker adapters behind common interfaces (Dhan in v1; Upstox and others later).</li>
+<li>Any number of accounts, each with its own risk profile, styles, instruments and mode.</li>
+<li>Each account has one or more <strong>roles</strong> — Data, Trading, Portfolio; exactly one primary Data account
+(optional standby with automatic failover); role changes audited and protected by password re-entry.</li>
+<li>Read funds, positions, holdings, trade history and ledger per account (read-only in v1).</li>
+<li>Auto-journal: match broker fills to recommendations.</li>
+<li>Token lifecycle per account (Dhan 24 h tokens via API key/secret).</li>
+</ol>
+<h3 id="fr-3b-access-operating-model">FR-3b Access &amp; operating model<a class="hash" href="#fr-3b-access-operating-model" aria-label="Link to this section">#</a></h3>
+<ol>
+<li><p>Login required for every screen and API (username + password; no second factor — personal, LAN-only), idle timeout, lockout, password re-entry for sensitive actions.</p>
+</li>
+<li><p>All configuration and actions are persisted as desired state and executed by background services under a
+service identity — independent of any logged-in session or open browser.</p>
+</li>
+<li><p>Missed schedules (machine asleep) are caught up on start; jobs are idempotent and retried.</p>
+</li>
+<li><p>Services screen: status, schedule, last/next run, run now, pause/resume.</p>
+</li>
+<li><p>Service schedules editable in the UI (type, time, days, window, interval, run-after, retries, timeout,
+catch-up, parameters) with dependency &amp; timing validation; automatic data failover to a standby account.</p>
+</li>
+</ol>
+<h3 id="fr-3c-human-in-the-loop-decisions">FR-3c Human-in-the-loop decisions<a class="hash" href="#fr-3c-human-in-the-loop-decisions" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Next-day tickets are <strong>proposed</strong>; you approve, modify (re-validated) or reject; unreviewed tickets lapse at
+the review cutoff; only approved tickets are armed.</li>
+<li>AI/engine suggestions (track instrument, basket membership, promotions, config changes) go to an inbox for
+approval, with reasons and expiry.</li>
+<li>Reports compare system proposals vs your decisions.</li>
+<li>Pre-trade checklist per ticket (data quality, holdings conflict, sector exposure, event risk).</li>
+<li>Optional auto-approval at the cutoff for tickets above a probability threshold with every check passing
+(autonomy level <em>supervised</em> or higher); auto-approved tickets are marked and audited.</li>
+</ol>
+<h3 id="fr-4-portfolio-monitoring">FR-4 Portfolio monitoring<a class="hash" href="#fr-4-portfolio-monitoring" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Build transactions, FIFO lots and positions from broker trade history, CSV imports and manual entries.</li>
+<li>Per position/trade: added date, days held, quantity, average cost, LTP, value, unrealised/realised P&amp;L,
+return %, day change, <strong>XIRR</strong>, CAGR, weight.</li>
+<li>Per group (bucket, basket, account, strategy, sector, total): invested, value, returns, <strong>XIRR</strong>, benchmark
+XIRR and alpha, drawdown.</li>
+<li>Portfolio buckets (exclusive, additive) and basket lens (overlapping).</li>
+<li>Live values during market hours; daily valuation snapshots; alerts.</li>
+<li>Per-account tiles and an Action center of positions needing a decision (rules in doc 15); price alerts
+evaluated by services.</li>
+</ol>
+<h3 id="fr-5-strategies-signals">FR-5 Strategies &amp; signals<a class="hash" href="#fr-5-strategies-signals" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Strategies declare timeframes, sides, styles, setup, trigger, entry, initial stop, filters, invalidation.</li>
+<li>Multi-timeframe filters (bias from higher timeframe).</li>
+<li>Output = conditional trade plans (trigger + validity window + invalidation).</li>
+</ol>
+<h3 id="fr-6-exits-risk">FR-6 Exits &amp; risk<a class="hash" href="#fr-6-exits-risk" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Exit policy library: fixed R:R, partials, ATR/structure/EMA trailing, pyramiding, time stop, session exit,
+max hold (≤ 5 sessions), event exit.</li>
+<li>Exit chosen per setup cell (walk-forward), fitted per trade (volatility, structure, obstacles).</li>
+<li>Fixed-fractional sizing with lot rounding; portfolio and per-account limits.</li>
+</ol>
+<h3 id="fr-7-learning">FR-7 Learning<a class="hash" href="#fr-7-learning" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Walk-forward backtest of every strategy × timeframe × side × exit policy.</li>
+<li>Per-cell statistics (Bayesian, recency-weighted, regime-conditioned).</li>
+<li>Calibrated meta-model P(success) per candidate; must beat baselines.</li>
+<li>Daily grading of primary, reserve and rejected recommendations.</li>
+<li>Drift detection, auto-pause, re-qualification; cell lifecycle.</li>
+<li>Hypothesis loop: one-variable experiments, tested offline and in shadow before promotion.</li>
+<li>Learning changelog explaining every automatic change.</li>
+<li>Learn from <strong>actual executions</strong>: grade on fills, decompose plan-vs-actual gap, per-liquidity slippage model,
+capacity score (doc 09 §9).</li>
+<li><strong>Lessons</strong> for every detected problem (what went wrong → diagnosis → fix → result) with revert (doc 09 §10).</li>
+<li><strong>Learning screen</strong> showing progress against a frozen-model counterfactual, learning health, setups and
+lessons (doc 09 §11).</li>
+<li><strong>Tweak &amp; re-run</strong>: change learning knobs and replay walk-forward with honest comparison rules; shadow →
+apply with password; automatic rollback (doc 09 §12).</li>
+<li><strong>Autonomy levels</strong> (advisory / supervised / autonomous within limits) to reduce manual work while risk
+increases, new strategies, live execution and account changes always need you (doc 09 §13).</li>
+<li><strong>Smart rules</strong> learned from history and applied nightly: market gate (no-trade / reduced days),
+equity-curve throttle, meta-labelling (take / size), learned entry windows, correlation-aware plan (doc 09 §14).</li>
+<li><strong>Automatic loss tags</strong> on every losing trade, linked to lessons; <strong>weekly learning digest</strong>.</li>
+</ol>
+<h3 id="fr-8-selection-plan">FR-8 Selection &amp; plan<a class="hash" href="#fr-8-selection-plan" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Eligibility filters, duplicate merge (confluence), ranking by conservative expected R.</li>
+<li>Constraints: max new entries/day, max open positions, heat, sector, correlation, net exposure, loss limits.</li>
+<li>Per-account allocation (replicate or distribute) and sizing.</li>
+<li>Primary plan + reserve list; optional pre-open gap validation.</li>
+</ol>
+<h3 id="fr-9-strategy-lab">FR-9 Strategy Lab<a class="hash" href="#fr-9-strategy-lab" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Submit strategies at runtime: rules file, form, plain English (LLM-drafted, user-confirmed), C# plugin;
+choose a basket (or instruments) as the test universe.</li>
+<li>Validate (schema, look-ahead lint), quick test, full walk-forward test, robustness checks.</li>
+<li>Verdict (PASS / MARGINAL / FAIL) with reasons, KPIs, charts, comparisons, trade replay.</li>
+<li>Test ledger with multiple-testing-adjusted thresholds; promotion only through paper stage.</li>
+</ol>
+<h3 id="fr-10-reports-ui">FR-10 Reports &amp; UI<a class="hash" href="#fr-10-reports-ui" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Next-day plan per account, journal, portfolio, performance for any date range with lenses and filters.</li>
+<li>Reports landing overview with auto-insights; multi-basket comparison; pivot builder.</li>
+<li>Visual analytics: equity/drawdown, heatmaps, exit comparison, MAE/MFE, calibration, selector effectiveness,
+Monte Carlo, learning changelog, cell lifecycle, data quality, discipline.</li>
+<li>Config editor with validation, diff and versioned activation.</li>
+<li>Exports: PDF/HTML/CSV.</li>
+<li>Responsive layout from 360 px phones to 4K / ultrawide monitors.</li>
+</ol>
+<h3 id="fr-11-ai-assistant">FR-11 AI assistant<a class="hash" href="#fr-11-ai-assistant" aria-label="Link to this section">#</a></h3>
+<ol>
+<li>Daily briefing and weekly review written from structured data.</li>
+<li>Natural-language questions over data via read-only tools; numbers only from tool results.</li>
+<li>Strategy drafting for the Strategy Lab; hypothesis proposals.</li>
+</ol>
+<h2 id="2-non-functional-requirements">2. Non-functional requirements<a class="hash" href="#2-non-functional-requirements" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-1</td>
+<td>Fully local on macOS (Apple Silicon) in Podman containers; no cloud dependency</td>
+</tr>
+<tr>
+<td>NFR-2</td>
+<td>EOD fetch + nightly cycle &lt; 45 min for ~200 tracked instruments; full re-learn &lt; 4 h; CSV import ≥ 1 M rows/min</td>
+</tr>
+<tr>
+<td>NFR-2b</td>
+<td>Live updates &lt; 2 s from tick to screen for the active set; live feed limited to the active set</td>
+</tr>
+<tr>
+<td>NFR-3</td>
+<td>Reproducible: any plan/test regenerable from data snapshot + config version + model version</td>
+</tr>
+<tr>
+<td>NFR-4</td>
+<td>No look-ahead: enforced by engine design and automated tests</td>
+</tr>
+<tr>
+<td>NFR-5</td>
+<td>Explainable: reasons and statistics attached to every recommendation</td>
+</tr>
+<tr>
+<td>NFR-6</td>
+<td>Config validated on load (JSON Schema); invalid config never activates</td>
+</tr>
+<tr>
+<td>NFR-7</td>
+<td>Fail closed: incomplete data or failed stage ⇒ no plan, clear error</td>
+</tr>
+<tr>
+<td>NFR-8</td>
+<td>Secrets never in code, config, logs or LLM prompts</td>
+</tr>
+<tr>
+<td>NFR-9</td>
+<td>Personal use: single owner; login (password); LAN-only access; audit of logins, changes and approvals</td>
+</tr>
+<tr>
+<td>NFR-11</td>
+<td>Services keep running when no one is logged in; UI is only a control plane</td>
+</tr>
+<tr>
+<td>NFR-12</td>
+<td>Responsive UI from 360 px phones to 3840 px monitors with no horizontal page scroll</td>
+</tr>
+<tr>
+<td>NFR-10</td>
+<td>Running cost ≈ ₹590/month (Dhan Data API); all software open source / free</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="01-overview.html"><small>← Previous  [</small>01 · Overview</a>
+    <a class="next" href="03-target-architecture.html"><small>Next  ] →</small>03 · Target architecture</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/02-requirements.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-functional-requirements" class="d2">1. Functional requirements</a>
+<a href="#fr-1-data" class="d3">FR-1 Data</a>
+<a href="#fr-2-instruments-baskets" class="d3">FR-2 Instruments &amp;amp; baskets</a>
+<a href="#fr-3-brokers-accounts" class="d3">FR-3 Brokers &amp;amp; accounts</a>
+<a href="#fr-3b-access-operating-model" class="d3">FR-3b Access &amp;amp; operating model</a>
+<a href="#fr-3c-human-in-the-loop-decisions" class="d3">FR-3c Human-in-the-loop decisions</a>
+<a href="#fr-4-portfolio-monitoring" class="d3">FR-4 Portfolio monitoring</a>
+<a href="#fr-5-strategies-signals" class="d3">FR-5 Strategies &amp;amp; signals</a>
+<a href="#fr-6-exits-risk" class="d3">FR-6 Exits &amp;amp; risk</a>
+<a href="#fr-7-learning" class="d3">FR-7 Learning</a>
+<a href="#fr-8-selection-plan" class="d3">FR-8 Selection &amp;amp; plan</a>
+<a href="#fr-9-strategy-lab" class="d3">FR-9 Strategy Lab</a>
+<a href="#fr-10-reports-ui" class="d3">FR-10 Reports &amp;amp; UI</a>
+<a href="#fr-11-ai-assistant" class="d3">FR-11 AI assistant</a>
+<a href="#2-non-functional-requirements" class="d2">2. Non-functional requirements</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

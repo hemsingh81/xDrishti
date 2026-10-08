@@ -1,4 +1,4 @@
-// Builds the interactive HTML documentation site from /docs/*.md into /site.
+// Builds the interactive HTML documentation site from /docs/design/*.md into /docs/site.
 // Usage: cd tools/docs-site && npm install && npm run build
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,8 +6,8 @@ import { Marked } from 'marked';
 
 const here = import.meta.dirname;
 const root = path.resolve(here, '../..');
-const docsDir = path.join(root, 'docs');
-const outDir = path.join(root, 'site');
+const docsDir = path.join(root, 'docs', 'design');
+const outDir = path.join(root, 'docs', 'site');
 const assetsOut = path.join(outDir, 'assets');
 
 const GROUPS = [
@@ -50,7 +50,7 @@ const rewriteHref = (href) => {
 // ---------- doc metadata from README ----------
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
 const docs = [];
-for (const m of readme.matchAll(/^\|\s*(\d{2})\s*\|\s*\[\**([^\]]+?)\**\]\(docs\/([^)]+\.md)\)\s*\|\s*([^|]+?)\s*\|/gm)) {
+for (const m of readme.matchAll(/^\|\s*(\d{2})\s*\|\s*\[\**([^\]]+?)\**\]\(docs\/design\/([^)]+\.md)\)\s*\|\s*([^|]+?)\s*\|/gm)) {
   docs.push({ num: m[1], title: m[2].replace(/\*/g, ''), file: m[3], desc: m[4] });
 }
 if (!docs.length) throw new Error('No docs found in README table');
@@ -174,7 +174,7 @@ ${topbar(true)}
 <div class="layout${p.toc.length ? '' : ' no-toc'}">
 ${sidebar(p.file)}
 <main class="content" id="content">
-  <div class="doc-meta"><span class="pill">${p.num}</span> ${esc(GROUPS.find((g) => g.nums.includes(p.num)).name)} · <a href="../docs/${p.file}">Markdown source</a></div>
+  <div class="doc-meta"><span class="pill">${p.num}</span> ${esc(GROUPS.find((g) => g.nums.includes(p.num)).name)} · <a href="../design/${p.file}">Markdown source</a></div>
   <article class="doc">
 ${p.body}
   </article>

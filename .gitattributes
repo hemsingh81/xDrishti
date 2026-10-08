@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.sln text eol=crlf
+*.woff2 binary
+*.png binary
+*.jpg binary
+docs/site/** linguist-generated=true
+docs/prototype/assets/vendor/** linguist-vendored=true

@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04 · Accounts, access &amp; operations — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="04-accounts-access-and-operations.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class="active"><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">04</span> Foundation · <a href="../design/04-accounts-access-and-operations.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="04-accounts-access-operating-model">04 — Accounts, Access &amp; Operating Model</h1>
+<p>Four rules shape how xDrishti is used day to day:</p>
+<ol>
+<li><strong>Personal use only</strong> — one owner, only the owner&#39;s broker accounts.</li>
+<li><strong>Login required</strong> — nobody else can open or use the application.</li>
+<li><strong>Configure once, services run it</strong> — what you set up is executed by background services on the machine,
+not by your browser session.</li>
+<li><strong>Human in the loop</strong> — the system and the AI <em>propose</em>; you <em>confirm</em> the decisions that matter.</li>
+</ol>
+<h2 id="1-broker-accounts-and-their-roles">1. Broker accounts and their roles<a class="hash" href="#1-broker-accounts-and-their-roles" aria-label="Link to this section">#</a></h2>
+<p>You can register any number of broker accounts. Each account is given one or more <strong>roles</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>What the account is used for</th>
+<th>Requirements</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Data</strong></td>
+<td>Market data: instrument master, historical &amp; end-of-day 1-minute data, live feed for the active set, quotes</td>
+<td>Dhan Data API subscription on this account</td>
+</tr>
+<tr>
+<td><strong>Trading</strong></td>
+<td>Receives next-day plan tickets (sized to its capital and risk profile); auto-journal of fills; later order execution</td>
+<td>Risk profile, capital source, allowed styles/instruments</td>
+</tr>
+<tr>
+<td><strong>Portfolio</strong></td>
+<td>Holdings, positions, trade history and ledger are synced and monitored</td>
+<td>Sync schedule, default bucket</td>
+</tr>
+</tbody></table>
+<p>One account can hold several roles at once, for example:</p>
+<table>
+<thead>
+<tr>
+<th>Account</th>
+<th align="center">Data</th>
+<th align="center">Trading</th>
+<th align="center">Portfolio</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dhan · Main</td>
+<td align="center">✅ primary</td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td>Pays the ₹499 Data API; trades and is monitored</td>
+</tr>
+<tr>
+<td>Dhan · Long-term</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">✅</td>
+<td>Monitoring only (holdings, XIRR)</td>
+</tr>
+<tr>
+<td>Dhan · Swing</td>
+<td align="center">✅ standby</td>
+<td align="center">✅</td>
+<td align="center">✅</td>
+<td>Can take over data if the main account&#39;s token fails</td>
+</tr>
+<tr>
+<td>Upstox · Old (later)</td>
+<td align="center">—</td>
+<td align="center">—</td>
+<td align="center">✅</td>
+<td>Monitoring only once the Upstox adapter exists</td>
+</tr>
+</tbody></table>
+<p><strong>Rules enforced by the system</strong></p>
+<ul>
+<li>Exactly <strong>one primary Data account</strong>; optionally one <strong>standby</strong> that takes over automatically if the primary&#39;s
+token or subscription fails (only if it also has an active Data API subscription).</li>
+<li>A Trading account must have a risk profile; plan allocation only goes to accounts with the Trading role.</li>
+<li>Portfolio views include only accounts with the Portfolio role (filterable per account).</li>
+<li>Removing a role stops the related services for that account; history is kept.</li>
+<li>Every role change is audited and needs re-authentication (password).</li>
+</ul>
+<p><strong>Per-account settings:</strong> display name, broker, client id, credential reference (secrets live in the macOS
+Keychain → Podman secrets, never in the database), roles, mode (<code>paper</code> / <code>manual_live</code>; automated modes in a
+later phase), risk profile, capital source, sync schedule, token status &amp; last successful sync.</p>
+<h3 id="11-accounts-screen">1.1 Accounts screen<a class="hash" href="#11-accounts-screen" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>View</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Accounts</strong> (list + detail)</td>
+<td>Left: every account with roles, token health, holdings value. Right: tabs <strong>Overview</strong> (value, P&amp;L, funds, token, sync) · <strong>Roles</strong> · <strong>Trading</strong> (mode, risk profile, capital source/amount, styles, allowed instruments per style, per-account overrides of risk %, max entries, max open, daily loss) · <strong>Portfolio</strong> (default bucket, trade-history import start, include in totals, buckets) · <strong>Data</strong> (primary/standby, subscription &amp; renewal, live-feed budget, failover test) · <strong>Connection</strong> (name, client id, Keychain reference, colour, notes, token refresh, test) · <strong>Activity</strong> (audit for this account)</td>
+</tr>
+<tr>
+<td><strong>Role matrix</strong></td>
+<td>All accounts × roles in one table; tick to change (step-up), pick the primary Data account</td>
+</tr>
+<tr>
+<td><strong>Risk profiles</strong></td>
+<td>Shared profiles (e.g. Standard, Conservative, Aggressive): risk per trade, max new entries/day, max open positions, daily loss, max per sector, max heat; shows which accounts use each</td>
+</tr>
+<tr>
+<td><strong>Add account wizard</strong></td>
+<td>Broker &amp; identity → credentials (Keychain item, connection test) → roles → role settings → review &amp; confirm with your password</td>
+</tr>
+</tbody></table>
+<p><strong>Automatic failover:</strong> if the primary Data account&#39;s token or subscription fails, the services switch to the
+standby Data account, notify you and record it in the audit log.</p>
+<h2 id="2-access-control-login">2. Access control (login)<a class="hash" href="#2-access-control-login" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Design</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Login</td>
+<td>Username + password on a centred sign-in panel; a locked session shows <em>Welcome back · Unlock</em> (password only, survives reload); single owner account created at first start. No second factor: the app is personal and reachable only on this machine / home LAN (a passkey can be added later if remote access is ever enabled)</td>
+</tr>
+<tr>
+<td>Password storage</td>
+<td>ASP.NET Core Identity hashing (PBKDF2); never stored in plain text</td>
+</tr>
+<tr>
+<td>Sessions</td>
+<td>Secure HTTP-only cookie; idle timeout 30 min (configurable); absolute timeout 12 h; &quot;lock&quot; button</td>
+</tr>
+<tr>
+<td>Lockout</td>
+<td>5 failed attempts → 15-minute lockout; all attempts in the audit log</td>
+</tr>
+<tr>
+<td>Step-up auth</td>
+<td>Password re-entry for sensitive actions: account roles/credentials, config activation, enabling execution, deleting data</td>
+</tr>
+<tr>
+<td>Recovery</td>
+<td>One-time recovery codes generated at setup</td>
+</tr>
+<tr>
+<td>Every endpoint protected</td>
+<td>REST, SignalR, Hangfire dashboard and file downloads require login; only <code>/health</code> is anonymous</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>Reachable only on the home LAN via HTTPS (Caddy); optional WireGuard for remote; MCP/LLM on the internal network only</td>
+</tr>
+</tbody></table>
+<h2 id="3-operating-model-configure-once-services-run-it">3. Operating model — configure once, services run it<a class="hash" href="#3-operating-model-configure-once-services-run-it" aria-label="Link to this section">#</a></h2>
+<p>The UI is a <strong>control plane</strong>: it records what you want. Background <strong>services</strong> are the <strong>execution plane</strong>:
+they do the work on the machine, whether or not you are logged in or the browser is open.</p>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    U([&quot;You (logged in)&quot;]) --&gt;|configure / approve| API[&quot;xd-api&lt;br/&gt;validates · audits&quot;]
+    API --&gt;|desired state &amp; commands| DB[(&quot;PostgreSQL&lt;br/&gt;config · catalog · approvals · commands&quot;)]
+    DB --&gt; SVC[&quot;Services (no user session)&lt;br/&gt;xd-worker · Hangfire jobs · xd-feed&quot;]
+    SVC --&gt;|results · status| DB
+    SVC --&gt; BRK[(&quot;Dhan APIs&quot;)]
+    DB --&gt;|SignalR when you're online| U</pre></figure>
+<ul>
+<li>Every action you take is stored as <strong>desired state</strong> (e.g. &quot;INFY is tracked&quot;, &quot;basket MyChoice contains …&quot;,
+&quot;ticket T-123 approved&quot;) plus an <strong>audit record</strong> (who, when, what changed).</li>
+<li>Services run under a <strong>service identity</strong>, not your session. Logging out, closing the browser or the phone
+has no effect on scheduled work.</li>
+<li>Services <strong>reconcile</strong> desired vs actual state: on every run and on start-up. If the Mac was asleep at
+15:50, the end-of-day fetch runs as soon as the services are back (catch-up for missed schedules).</li>
+<li>Jobs are idempotent, retried with back-off and resumable; failures raise in-app notifications.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>You do this (once)</th>
+<th>Services then do this (automatically)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Track an instrument</td>
+<td>Backfill history (CSV, then Dhan), add to end-of-day fetch, build all timeframes</td>
+</tr>
+<tr>
+<td>Create a basket / add instruments</td>
+<td>Include in the next scan scope, reports and portfolio grouping</td>
+</tr>
+<tr>
+<td>Assign the Data role to an account</td>
+<td>Switch market-data jobs and the live feed to that account</td>
+</tr>
+<tr>
+<td>Assign the Portfolio role</td>
+<td>Nightly sync of holdings, trades, ledger; valuations; XIRR</td>
+</tr>
+<tr>
+<td>Assign the Trading role</td>
+<td>Allocate and size plan tickets for that account</td>
+</tr>
+<tr>
+<td>Approve tomorrow&#39;s tickets</td>
+<td>Pre-open check, arm tickets, subscribe live feed, trigger/stop/target alerts</td>
+</tr>
+<tr>
+<td>Drop CSV files in the inbox</td>
+<td>Import, validate, aggregate, report</td>
+</tr>
+<tr>
+<td>Activate a config version</td>
+<td>Apply from the next scheduled run</td>
+</tr>
+<tr>
+<td>Accept an AI suggestion</td>
+<td>Apply the change (e.g. add instrument to basket) and log it</td>
+</tr>
+</tbody></table>
+<p><strong>Services overview</strong> (default schedules — all editable on the Services screen):</p>
+<table>
+<thead>
+<tr>
+<th>Service / job</th>
+<th>Default schedule</th>
+<th>Runs as</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Live feed (active set)</td>
+<td>Window 09:00–15:35, trading days</td>
+<td><code>xd-feed</code></td>
+</tr>
+<tr>
+<td>Holdings quote refresh</td>
+<td>Every 5 min, 09:15–15:30</td>
+<td><code>xd-feed</code></td>
+</tr>
+<tr>
+<td><strong>Pre-open check &amp; arming</strong></td>
+<td><strong>09:10</strong> (after the 09:05 review cutoff and NSE pre-open price discovery, before the 09:15 open)</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>Price alerts &amp; action center</td>
+<td>Every 1 min, 09:15–15:30</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>End-of-day fetch &amp; aggregation</td>
+<td>15:50</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>Data validation</td>
+<td>Runs after the EOD fetch</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>Account &amp; portfolio sync</td>
+<td>16:30</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>Nightly pipeline → proposed plan</td>
+<td>18:30</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>AI suggestions &amp; briefing</td>
+<td>Runs after the nightly pipeline</td>
+<td><code>xd-worker</code> + <code>xd-llm</code></td>
+</tr>
+<tr>
+<td>CSV inbox watcher</td>
+<td>Continuous</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>Weekly retrain / monthly review</td>
+<td>Sat 10:00 / 1st of month</td>
+<td><code>xd-worker</code></td>
+</tr>
+<tr>
+<td>Backup</td>
+<td>Daily 23:30</td>
+<td><code>xd-backup</code></td>
+</tr>
+</tbody></table>
+<h3 id="31-schedule-configuration">3.1 Schedule configuration<a class="hash" href="#31-schedule-configuration" aria-label="Link to this section">#</a></h3>
+<p>Each service has an editable schedule stored in the database (not in code):</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Options</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Schedule type</td>
+<td>Daily at a time (chosen days) · Weekly · Run after another service · Time window · Every N minutes within a window · Continuous</td>
+</tr>
+<tr>
+<td>Execution</td>
+<td>Enabled/paused · retries (0–5) · timeout · catch up missed runs · notify on failure</td>
+</tr>
+<tr>
+<td>Parameters</td>
+<td>Service-specific, e.g. EOD throttle and gap look-back; validation sessions, tolerance and spike multiple; pre-open gap threshold; live-feed instrument cap</td>
+</tr>
+</tbody></table>
+<p><strong>Dependency &amp; timing rules</strong> (checked on every change; errors block saving, warnings are shown):
+pre-open check after the review cutoff and before 09:15 (warning before ~09:08); EOD fetch after 15:35; nightly
+pipeline after the EOD fetch and the portfolio sync; live window covers 09:15–15:30; no backup during market
+hours; no circular &quot;run after&quot; chains; window start before end. The Services screen also shows a trading-day
+<strong>timeline</strong> with market hours, the review cutoff, every scheduled run and the run-after chains, plus a preview
+of the next three runs while editing.</p>
+<h2 id="4-human-in-the-loop">4. Human in the loop<a class="hash" href="#4-human-in-the-loop" aria-label="Link to this section">#</a></h2>
+<h3 id="41-who-decides-what">4.1 Who decides what<a class="hash" href="#41-who-decides-what" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Examples</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Automatic</strong> (no approval)</td>
+<td>Data fetch, aggregation, quality checks, grading, cell statistics, portfolio sync, valuations</td>
+<td>Services</td>
+</tr>
+<tr>
+<td><strong>Proposed → you confirm</strong></td>
+<td>Next-day trade tickets · AI instrument suggestions (track, add to / remove from basket) · hypothesis promotions · cell promotions to Active · config change proposals · (later) semi-auto orders</td>
+<td>You</td>
+</tr>
+<tr>
+<td><strong>Only you</strong></td>
+<td>Accounts &amp; roles, credentials, baskets you create, risk limits, enabling execution</td>
+<td>You</td>
+</tr>
+</tbody></table>
+<h3 id="42-next-day-plan-approval">4.2 Next-day plan approval<a class="hash" href="#42-next-day-plan-approval" aria-label="Link to this section">#</a></h3>
+<figure class="diagram"><pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Proposed: nightly pipeline
+    Proposed --&gt; Approved: you approve
+    Proposed --&gt; Modified: you edit (size, stop, account)
+    Modified --&gt; Approved: re-validated against limits
+    Proposed --&gt; Rejected: you reject (reason optional)
+    Proposed --&gt; Lapsed: not reviewed by cutoff
+    Approved --&gt; Armed: pre-open check passes (09:10)
+    Approved --&gt; Invalidated: gap / event at pre-open
+    Armed --&gt; Triggered: trigger condition met
+    Armed --&gt; Expired: validity window ends
+    Triggered --&gt; Closed: exit / square-off / max hold</pre></figure>
+<ul>
+<li>The nightly pipeline produces a <strong>proposed plan</strong> (primary tickets + reserve list) with reasons, P(win),
+expected R and the AI briefing. You review it in the evening or morning (phone works via the PWA).</li>
+<li>Actions per ticket: <strong>Approve</strong>, <strong>Modify</strong> (reduce size, tighten stop, change account, choose reserve instead),
+<strong>Reject</strong>. Bulk &quot;approve all within limits&quot; is available. Every modification is re-validated against risk limits.</li>
+<li><strong>Review cutoff</strong> (default 09:05): unreviewed tickets <strong>lapse</strong> (safe default — <code>unreviewed_policy: lapse</code>).</li>
+<li>Only <strong>Approved → Armed</strong> tickets enter the live active set and alerts.</li>
+<li>Every decision is recorded. Reports compare <strong>system proposal vs your decision</strong> — e.g. &quot;rejected tickets would
+have made +4.2R this month&quot; — so you can see whether your overrides add value.</li>
+</ul>
+<h3 id="43-ai-suggestions-inbox">4.3 AI suggestions inbox<a class="hash" href="#43-ai-suggestions-inbox" aria-label="Link to this section">#</a></h3>
+<p>The assistant and learning engine post suggestions to an <strong>inbox</strong>; each has a reason, evidence and an expiry:</p>
+<table>
+<thead>
+<tr>
+<th>Suggestion</th>
+<th>Example</th>
+<th>If accepted</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Track instrument</td>
+<td>&quot;Track PERSISTENT — strong RS, 3 passing setups in Best stocks rules&quot;</td>
+<td>Instrument tracked &amp; backfilled</td>
+</tr>
+<tr>
+<td>Add to / remove from basket</td>
+<td>&quot;Add TATAPOWER to Best stocks (rule match, liquidity ok)&quot;</td>
+<td>Membership updated (dated)</td>
+</tr>
+<tr>
+<td>Next-day focus</td>
+<td>&quot;Prefer swing over intraday tomorrow: high-VIX regime&quot;</td>
+<td>Shown with the plan (no automatic effect)</td>
+</tr>
+<tr>
+<td>Hypothesis / promotion</td>
+<td>&quot;ORB 15m BUY: target 2.0R → 2.5R passed walk-forward + shadow&quot;</td>
+<td>Config version created for activation</td>
+</tr>
+</tbody></table>
+<p>Rejected suggestions are not repeated for a configurable number of days.</p>
+<h2 id="5-data-model-additions">5. Data model additions<a class="hash" href="#5-data-model-additions" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>trading.accounts</code></td>
+<td>Broker accounts (no secrets)</td>
+</tr>
+<tr>
+<td><code>trading.account_roles</code></td>
+<td>account_id, role (data/trading/portfolio), is_primary/standby, enabled, settings</td>
+</tr>
+<tr>
+<td><code>auth.*</code></td>
+<td>ASP.NET Core Identity tables (user, password hash, lockout)</td>
+</tr>
+<tr>
+<td><code>ops.commands</code></td>
+<td>Desired-state changes and requested actions, status, actor, timestamps</td>
+</tr>
+<tr>
+<td><code>ops.audit_log</code></td>
+<td>Every login, configuration change, approval and service action</td>
+</tr>
+<tr>
+<td><code>workflow.approvals</code></td>
+<td>Item type, item id, decision, modifications, actor, decided_at, cutoff</td>
+</tr>
+<tr>
+<td><code>workflow.suggestions</code></td>
+<td>Source (AI / engine), type, payload, reason, expiry, status</td>
+</tr>
+<tr>
+<td><code>ops.service_runs</code></td>
+<td>Service/job runs with schedule, start/end, outcome, catch-up flag</td>
+</tr>
+</tbody></table>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
+    <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
+<a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>
+<a href="#2-access-control-login" class="d2">2. Access control (login)</a>
+<a href="#3-operating-model-configure-once-services-run-it" class="d2">3. Operating model — configure once, services run it</a>
+<a href="#31-schedule-configuration" class="d3">3.1 Schedule configuration</a>
+<a href="#4-human-in-the-loop" class="d2">4. Human in the loop</a>
+<a href="#41-who-decides-what" class="d3">4.1 Who decides what</a>
+<a href="#42-next-day-plan-approval" class="d3">4.2 Next-day plan approval</a>
+<a href="#43-ai-suggestions-inbox" class="d3">4.3 AI suggestions inbox</a>
+<a href="#5-data-model-additions" class="d2">5. Data model additions</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

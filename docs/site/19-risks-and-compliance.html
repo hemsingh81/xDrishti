@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>19 · Risks &amp; compliance — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="19-risks-and-compliance.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class=""><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class="active"><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">19</span> Delivery &amp; operations · <a href="../design/19-risks-and-compliance.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="19-risks-compliance">19 — Risks &amp; Compliance</h1>
+<h2 id="1-research-risks">1. Research risks<a class="hash" href="#1-research-risks" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Pitfall</th>
+<th>Countermeasure</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Overfitting</td>
+<td>Walk-forward OOS only, ≤ 4 params, plateaus, min samples, paper stage</td>
+</tr>
+<tr>
+<td>Multiple-testing luck</td>
+<td>Test ledger, deflated thresholds, consistency across folds/years</td>
+</tr>
+<tr>
+<td>Look-ahead bias</td>
+<td>Closed-bar-only DSL, point-in-time features, single code path, automated tests</td>
+</tr>
+<tr>
+<td>Survivorship bias</td>
+<td>Historical constituents incl. delisted stocks</td>
+</tr>
+<tr>
+<td>Intrabar ambiguity</td>
+<td>Resolve on 1-minute path; if still ambiguous assume the worse outcome</td>
+</tr>
+<tr>
+<td>Unrealistic fills</td>
+<td>Gap fills at open, slippage model, no fills at locked circuits</td>
+</tr>
+<tr>
+<td>Cost blindness</td>
+<td>Costs in every simulation; <code>max_cost_R</code> filter</td>
+</tr>
+<tr>
+<td>Regime dependence</td>
+<td>Regime-conditioned stats, drift monitor, auto-pause</td>
+</tr>
+<tr>
+<td>ML leakage</td>
+<td>Purged &amp; embargoed walk-forward</td>
+</tr>
+</tbody></table>
+<h2 id="2-market-risks">2. Market risks<a class="hash" href="#2-market-risks" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Countermeasure</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Overnight gaps (swing)</td>
+<td>Heat cap, event exits, max hold ≤ 5 sessions</td>
+</tr>
+<tr>
+<td>Correlated losses</td>
+<td>Sector/correlation limits, net exposure caps</td>
+</tr>
+<tr>
+<td>Liquidity/slippage</td>
+<td>Turnover filters; live slippage measured</td>
+</tr>
+<tr>
+<td>Extreme days</td>
+<td>Daily loss limit, gap/VIX filter, max-drawdown halt</td>
+</tr>
+<tr>
+<td>Short constraints</td>
+<td>Swing shorts via futures only</td>
+</tr>
+<tr>
+<td>F&amp;O ban, surveillance, margin changes</td>
+<td>Nightly exclusion filters</td>
+</tr>
+</tbody></table>
+<h2 id="3-behavioural-risks">3. Behavioural risks<a class="hash" href="#3-behavioural-risks" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Countermeasure</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Skipping/adding trades</td>
+<td>Auto-journal + discipline report quantifies deviations</td>
+</tr>
+<tr>
+<td>Tweaking after every loss</td>
+<td>Changes only via hypothesis loop; versioned config</td>
+</tr>
+<tr>
+<td>Over-trusting LLM prose</td>
+<td>Numbers only from tools; LLM never decides trades</td>
+</tr>
+<tr>
+<td>Scaling too early</td>
+<td>Paper ≥ 12 weeks, then reduced-size live</td>
+</tr>
+</tbody></table>
+<h2 id="4-operational-risks">4. Operational risks<a class="hash" href="#4-operational-risks" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Countermeasure</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Bad data → wrong plan</td>
+<td>Quality gates; fail closed</td>
+</tr>
+<tr>
+<td>Misconfigured schedules (e.g. pre-open before cutoff, nightly before data)</td>
+<td>Dependency &amp; timing rules block invalid schedules; timeline view; catch-up</td>
+</tr>
+<tr>
+<td>Automation over-reach (system changes too much on its own)</td>
+<td>Autonomy levels; weekly cap on automatic changes; always-ask list (risk increases, new strategies, live execution, accounts); change log with revert; automatic rollback after 60-trade monitoring</td>
+</tr>
+<tr>
+<td>Overfitting through repeated experiments</td>
+<td>Required improvement rises with trials (multiple-testing guard); 12 OOS folds; judged after live gap and on total R; shadow before apply</td>
+</tr>
+<tr>
+<td>Smart rules filtering too much (e.g. too many no-trade days) or learned on noise</td>
+<td>Evidence shown per rule; review flag when a rule removes &gt; 50% of trades or its skipped trades are not worse than taken ones; rules learned from walk-forward data, not only live trades</td>
+</tr>
+<tr>
+<td>Learning from plan prices that cannot be achieved</td>
+<td>Grade on actual fills; slippage model per liquidity bucket; capacity score</td>
+</tr>
+<tr>
+<td>Alert fatigue (too many action items)</td>
+<td>Smarter thresholds (relative to account size), severity filter, snooze/done, per-account focus</td>
+</tr>
+<tr>
+<td>Plan not reviewed in time</td>
+<td>Unreviewed tickets lapse (safe default); reminders before cutoff; phone review via PWA</td>
+</tr>
+<tr>
+<td>Account role misconfiguration (no data account, wrong trading account)</td>
+<td>Validation rules (exactly one primary Data account), password re-entry, audit, Services screen warnings</td>
+</tr>
+<tr>
+<td>Unauthorised access</td>
+<td>Login (strong password), lockout, idle timeout, LAN-only, audit of logins</td>
+</tr>
+<tr>
+<td>CSV import errors (wrong timezone, bar-end labels, adjusted vs raw prices, duplicates)</td>
+<td>Import profiles, preview before commit, session-boundary checks, conflict log, undo per import job</td>
+</tr>
+<tr>
+<td>Live-feed overload or disconnects</td>
+<td>Live data only for the active set (cap <code>max_ws_instruments</code>); auto-reconnect; EOD official data replaces live bars</td>
+</tr>
+<tr>
+<td>Incomplete portfolio history (API history window, other brokers)</td>
+<td>CSV/manual transaction import; reconciliation of computed vs broker holdings each night</td>
+</tr>
+<tr>
+<td>Misleading XIRR on short holdings</td>
+<td>Absolute return below <code>min_days_for_xirr</code>; XIRR flagged &quot;short period&quot;</td>
+</tr>
+<tr>
+<td>Silent job failure</td>
+<td>Hangfire retries + in-app notification + Seq alerts</td>
+</tr>
+<tr>
+<td>Data loss</td>
+<td>Nightly restic backups; monthly restore test</td>
+</tr>
+<tr>
+<td>Secret leakage</td>
+<td>Keychain → Podman secrets; never in config/logs/LLM</td>
+</tr>
+<tr>
+<td>Broker API changes / token expiry</td>
+<td>Adapter isolation, retries, fallback provider, token status on Accounts screen</td>
+</tr>
+<tr>
+<td>Mac asleep/offline</td>
+<td>Power settings, UPS, wired network; broker-side stops once execution exists</td>
+</tr>
+<tr>
+<td>VM disk/memory exhaustion</td>
+<td>Machine sizing, Timescale compression, disk alerts, external SSD for ticks</td>
+</tr>
+<tr>
+<td>Runaway automated orders (later)</td>
+<td>Pre-trade checks, ≤ 2 orders/s, idempotency, kill switch, reconciliation freeze</td>
+</tr>
+<tr>
+<td>Third-party agent vulnerabilities (Hermes)</td>
+<td>Optional only; hardened container; pinned version; CVE checks</td>
+</tr>
+</tbody></table>
+<h2 id="5-compliance-india">5. Compliance (India)<a class="hash" href="#5-compliance-india" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Personal use only</strong>: one user, own accounts. Sharing or selling recommendations could require SEBI
+Research Analyst / Investment Adviser registration — out of scope by design.</li>
+<li><strong>SEBI retail algo framework</strong> (mandatory since 1 April 2026) applies when orders are placed via broker APIs:
+registered app on a <strong>whitelisted static IP</strong>, daily login/2FA, broker as principal. Own strategies staying
+<strong>≤ 10 orders/second per exchange</strong> are tagged with the broker&#39;s generic algo ID; above that, exchange
+approval is needed. v1 places no orders; Phase 12 caps at 2 orders/s. Re-check circulars before Phase 12.</li>
+<li>Data APIs used within the broker&#39;s terms.</li>
+<li>Forex/CFD trading via offshore platforms (e.g. MT5 brokers) is not part of this system.</li>
+</ul>
+<h2 id="6-expectations">6. Expectations<a class="hash" href="#6-expectations" aria-label="Link to this section">#</a></h2>
+<p>Good systematic setups typically show 40–60% win rates and +0.1R to +0.4R expectancy after costs. Backtests
+showing 80% wins and +1R/trade are almost certainly overfit or leaking. Losing weeks and multi-week drawdowns
+are normal; the Monte Carlo report shows what to expect. The value is consistency, risk control and learning
+from evidence.</p>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="18-roadmap.html"><small>← Previous  [</small>18 · Roadmap</a>
+    <a class="next" href="20-extended-modules.html"><small>Next  ] →</small>20 · Extended modules</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/19-risks-and-compliance.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-research-risks" class="d2">1. Research risks</a>
+<a href="#2-market-risks" class="d2">2. Market risks</a>
+<a href="#3-behavioural-risks" class="d2">3. Behavioural risks</a>
+<a href="#4-operational-risks" class="d2">4. Operational risks</a>
+<a href="#5-compliance-india" class="d2">5. Compliance (India)</a>
+<a href="#6-expectations" class="d2">6. Expectations</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

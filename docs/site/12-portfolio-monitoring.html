@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>12 · Portfolio monitoring — xDrishti</title>
+<script>(function(){var t;try{t=localStorage.getItem('xd-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="stylesheet" href="assets/vendor/github.min.css" id="hl-light">
+<link rel="stylesheet" href="assets/vendor/github-dark.min.css" id="hl-dark">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body data-page="12-portfolio-monitoring.md">
+<div id="progress" aria-hidden="true"></div>
+<header class="topbar">
+  <button class="icon-btn" id="menu-btn" aria-label="Toggle navigation" title="Toggle navigation">☰</button>
+  <a class="brand" href="index.html"><span class="logo">◉</span> xDrishti <span class="brand-sub">design docs</span></a>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search all docs…  ( / )" autocomplete="off" aria-label="Search all documents">
+    <div id="results" class="results" role="listbox" hidden></div>
+  </div>
+  <div class="tools">
+    <button class="btn" id="expand-all" title="Expand all sections">Expand all</button>
+    <button class="btn" id="collapse-all" title="Collapse all sections">Collapse all</button>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
+  </div>
+</header>
+<div class="layout">
+<nav class="sidebar" id="sidebar" aria-label="Documents">
+  <a class="side-home" href="index.html">Home</a>
+  <div class="side-group"><div class="side-title">Foundation</div>
+    <a href="01-overview.html" class=""><span class="num">01</span>Overview</a>
+    <a href="02-requirements.html" class=""><span class="num">02</span>Requirements</a>
+    <a href="03-target-architecture.html" class=""><span class="num">03</span>Target architecture</a>
+    <a href="04-accounts-access-and-operations.html" class=""><span class="num">04</span>Accounts, access &amp; operations</a>
+  </div>
+  <div class="side-group"><div class="side-title">Data & instruments</div>
+    <a href="05-data-and-brokers.html" class=""><span class="num">05</span>Data &amp; brokers</a>
+    <a href="06-instruments-and-baskets.html" class=""><span class="num">06</span>Instruments &amp; baskets</a>
+  </div>
+  <div class="side-group"><div class="side-title">Trading engine</div>
+    <a href="07-strategies.html" class=""><span class="num">07</span>Strategies</a>
+    <a href="08-exits-and-risk.html" class=""><span class="num">08</span>Exits &amp; risk</a>
+    <a href="09-learning-engine.html" class=""><span class="num">09</span>Learning engine</a>
+    <a href="10-trade-selection.html" class=""><span class="num">10</span>Trade selection</a>
+  </div>
+  <div class="side-group"><div class="side-title">Tools & experience</div>
+    <a href="11-strategy-lab.html" class=""><span class="num">11</span>Strategy Lab</a>
+    <a href="12-portfolio-monitoring.html" class="active"><span class="num">12</span>Portfolio monitoring</a>
+    <a href="13-reports-and-ui.html" class=""><span class="num">13</span>Reports &amp; UI</a>
+    <a href="14-ai-assistant.html" class=""><span class="num">14</span>AI assistant</a>
+    <a href="15-smart-insights-and-automation.html" class=""><span class="num">15</span>Smart insights &amp; automation</a>
+  </div>
+  <div class="side-group"><div class="side-title">Delivery & operations</div>
+    <a href="16-configuration.html" class=""><span class="num">16</span>Configuration</a>
+    <a href="17-deployment-and-operations.html" class=""><span class="num">17</span>Deployment &amp; operations</a>
+    <a href="18-roadmap.html" class=""><span class="num">18</span>Roadmap</a>
+    <a href="19-risks-and-compliance.html" class=""><span class="num">19</span>Risks &amp; compliance</a>
+    <a href="20-extended-modules.html" class=""><span class="num">20</span>Extended modules</a>
+  </div>
+  <div class="side-group"><div class="side-title">Reference</div>
+    <a href="21-glossary.html" class=""><span class="num">21</span>Glossary</a>
+  </div>
+</nav>
+<main class="content" id="content">
+  <div class="doc-meta"><span class="pill">12</span> Tools &amp; experience · <a href="../design/12-portfolio-monitoring.md">Markdown source</a></div>
+  <article class="doc">
+<h1 id="12-portfolio-monitoring">12 — Portfolio Monitoring</h1>
+<p>Add your broker accounts and monitor <strong>every trade and holding</strong>: when it was added, current value, return %,
+XIRR, and totals — grouped by basket, account, strategy or sector.</p>
+<h2 id="1-data-sources">1. Data sources<a class="hash" href="#1-data-sources" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>What it provides</th>
+<th>When</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dhan <strong>holdings</strong> &amp; <strong>positions</strong> APIs</td>
+<td>Current holdings (delivery) and open positions (intraday/F&amp;O)</td>
+<td>On sync (nightly + on demand + market hours)</td>
+</tr>
+<tr>
+<td>Dhan <strong>trade history</strong> API</td>
+<td>Every trade with date/time, price, quantity, side and full charge breakdown (paginated by date range)</td>
+<td>Nightly incremental; one-time backfill</td>
+</tr>
+<tr>
+<td>Dhan <strong>ledger</strong> API</td>
+<td>Cash credits/debits (funds added/withdrawn, dividends, charges)</td>
+<td>Nightly</td>
+</tr>
+<tr>
+<td><strong>CSV import</strong></td>
+<td>Older trades (before API history / other brokers), contract-note or tradebook exports</td>
+<td>On demand</td>
+</tr>
+<tr>
+<td><strong>Manual entry</strong></td>
+<td>Corrections, off-platform transactions</td>
+<td>On demand</td>
+</tr>
+<tr>
+<td>Corporate actions</td>
+<td>Splits, bonuses, dividends</td>
+<td>Nightly</td>
+</tr>
+<tr>
+<td>Prices</td>
+<td>Live quotes for open trades &amp; holdings; EOD close for valuation (<a href="05-data-and-brokers.html">doc 05</a> §5)</td>
+<td>Market hours / EOD</td>
+</tr>
+</tbody></table>
+<h2 id="2-domain-model">2. Domain model<a class="hash" href="#2-domain-model" aria-label="Link to this section">#</a></h2>
+<figure class="diagram"><pre class="mermaid">flowchart LR
+    TX[&quot;Transactions&lt;br/&gt;buy · sell · bonus · split · dividend · charges&quot;] --&gt; LOTS[&quot;Lots&lt;br/&gt;FIFO open quantities with cost&quot;]
+    LOTS --&gt; POS[&quot;Positions&lt;br/&gt;per account × instrument × bucket&quot;]
+    POS --&gt; VAL[&quot;Valuations&lt;br/&gt;live &amp; daily snapshots&quot;]
+    TX --&gt; CF[&quot;Cash flows&lt;br/&gt;for XIRR&quot;]
+    VAL --&gt; CF
+    POS --&gt; GRP[&quot;Groupings&lt;br/&gt;account · bucket · basket · strategy · sector&quot;]</pre></figure>
+<ul>
+<li><strong>Transaction</strong> — immutable record (source: broker / CSV / manual; charges attached).</li>
+<li><strong>Lot</strong> — each buy creates a lot; sells consume lots <strong>FIFO</strong> (matches Indian practice) → realised P&amp;L per lot.</li>
+<li><strong>Position</strong> — open quantity, average cost (incl. charges), first-added date, linked plan ticket (if any).</li>
+<li><strong>Valuation</strong> — market value at a time; a daily snapshot after close builds the portfolio value history.</li>
+<li><strong>Cash flow</strong> — dated money in/out used for XIRR.</li>
+</ul>
+<h2 id="3-metrics">3. Metrics<a class="hash" href="#3-metrics" aria-label="Link to this section">#</a></h2>
+<h3 id="per-position-trade">Per position / trade<a class="hash" href="#per-position-trade" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Added on</td>
+<td>Date/time of first buy (and of each add)</td>
+</tr>
+<tr>
+<td>Days held</td>
+<td>Calendar days since first buy (or until exit)</td>
+</tr>
+<tr>
+<td>Quantity, avg cost</td>
+<td>Open quantity; average cost including charges</td>
+</tr>
+<tr>
+<td>LTP, market value</td>
+<td>Live or last close price × quantity</td>
+</tr>
+<tr>
+<td>Unrealised P&amp;L (₹, %)</td>
+<td>Market value − remaining cost</td>
+</tr>
+<tr>
+<td>Realised P&amp;L (₹)</td>
+<td>From FIFO-closed lots, net of charges</td>
+</tr>
+<tr>
+<td>Total return %</td>
+<td>(Realised + unrealised + dividends) / total invested</td>
+</tr>
+<tr>
+<td>Day change (₹, %)</td>
+<td>vs previous close</td>
+</tr>
+<tr>
+<td><strong>XIRR</strong></td>
+<td>Annualised return from dated cash flows (§4)</td>
+</tr>
+<tr>
+<td>CAGR</td>
+<td>For holdings &gt; 1 year</td>
+</tr>
+<tr>
+<td>Weight %</td>
+<td>Share of portfolio (or bucket) value</td>
+</tr>
+<tr>
+<td>System trade info</td>
+<td>Strategy, cell, entry plan, R-multiple, stop/target distance (if from a plan ticket)</td>
+</tr>
+</tbody></table>
+<h3 id="per-group-basket-bucket-account-strategy-sector-total">Per group (basket / bucket / account / strategy / sector / total)<a class="hash" href="#per-group-basket-bucket-account-strategy-sector-total" aria-label="Link to this section">#</a></h3>
+<p>Invested · current value · realised · unrealised · total return % · <strong>XIRR</strong> · day change · number of open
+positions · win rate &amp; expectancy of closed trades · <strong>benchmark XIRR</strong> (same cash flows invested in Nifty 50)
+and <strong>alpha</strong> (XIRR − benchmark XIRR) · max drawdown of the group&#39;s value history.</p>
+<h2 id="4-xirr">4. XIRR<a class="hash" href="#4-xirr" aria-label="Link to this section">#</a></h2>
+<p>Cash flows: each buy = −(amount + charges); each sell = +(amount − charges); dividends = +amount; plus the
+<strong>terminal value</strong> = +current market value on the valuation date. XIRR is the rate <em>r</em> where</p>
+<div class="code"><pre><code class="nohighlight">Σ  CFᵢ / (1 + r)^((dᵢ − d₀) / 365)  =  0</code></pre></div>
+<ul>
+<li>Solved with Newton–Raphson, falling back to bisection if it doesn&#39;t converge (Excel-compatible results).</li>
+<li>Computed for any set of cash flows: one trade, a position, a bucket, a basket, an account, the total.</li>
+<li><strong>Short periods:</strong> annualising a few days&#39; return gives misleading numbers; below <code>min_days_for_xirr</code>
+(default 30) the UI shows absolute return and marks XIRR as &quot;short period&quot;.</li>
+<li>Example: buy ₹1,00,000 on 1 Jan; add ₹50,000 on 1 Apr; value ₹1,72,000 on 31 Dec → XIRR ≈ 16.1%
+(absolute return 14.7%).</li>
+</ul>
+<h2 id="5-grouping-baskets-vs-portfolio-buckets">5. Grouping: baskets vs portfolio buckets<a class="hash" href="#5-grouping-baskets-vs-portfolio-buckets" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Overlap</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Instrument baskets</strong> (<a href="06-instruments-and-baskets.html">doc 06</a>)</td>
+<td>An instrument can be in many baskets</td>
+<td>Analysis lens — totals not additive</td>
+</tr>
+<tr>
+<td><strong>Portfolio bucket</strong></td>
+<td>Each position belongs to exactly <strong>one</strong> bucket</td>
+<td>Additive view — bucket totals sum to the portfolio</td>
+</tr>
+</tbody></table>
+<ul>
+<li>A position&#39;s bucket defaults to the instrument&#39;s primary basket (e.g. MyLongTerm) and can be overridden per
+trade — e.g. the same stock bought for long-term (bucket <em>MyLongTerm</em>) and for a swing trade (bucket <em>Trading</em>)
+is tracked as two positions with separate lots, returns and XIRR.</li>
+<li>System-plan trades default to bucket <em>Trading</em> (configurable).</li>
+</ul>
+<p>Views: <strong>tree</strong> — Total → Account → Bucket → Position → Lots/Transactions; <strong>pivot</strong> — rows by bucket,
+basket, account, strategy or sector with the metrics in §3.</p>
+<h2 id="6-live-updates">6. Live updates<a class="hash" href="#6-live-updates" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Update method</th>
+<th>Frequency</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Open intraday &amp; swing positions, armed tickets</td>
+<td>Dhan WebSocket (active set)</td>
+<td>Real-time</td>
+</tr>
+<tr>
+<td>Long-term holdings</td>
+<td>Dhan quote API (up to 1,000 instruments/request)</td>
+<td>Every <code>holdings_refresh_minutes</code> (default 5)</td>
+</tr>
+<tr>
+<td>Portfolio snapshot</td>
+<td>EOD official close</td>
+<td>Daily after close</td>
+</tr>
+</tbody></table>
+<p>The React Portfolio screen receives updates via SignalR; values recalculate incrementally.</p>
+<h2 id="7-alerts">7. Alerts<a class="hash" href="#7-alerts" aria-label="Link to this section">#</a></h2>
+<p>Price reaches a plan&#39;s stop/target level · swing position at max holding (5 sessions) · results date within
+N days for a holding · position weight &gt; <code>max_position_weight_pct</code> · bucket drawdown &gt; threshold · large day
+move on a holding · data or token issue for an account.</p>
+<h2 id="8-link-to-the-trading-system">8. Link to the trading system<a class="hash" href="#8-link-to-the-trading-system" aria-label="Link to this section">#</a></h2>
+<ul>
+<li>Positions created from plan tickets keep <code>plan_item_id</code> → strategy, cell, R-multiple and grading.</li>
+<li>Trades not matching any plan are tagged <strong>discretionary</strong>; their results are reported separately (and in the
+discipline report).</li>
+<li>Long-term holdings are not managed by the system&#39;s exits unless you assign a strategy/exit to them.</li>
+</ul>
+<h2 id="9-data-model-portfolio-schema">9. Data model (<code>portfolio</code> schema)<a class="hash" href="#9-data-model-portfolio-schema" aria-label="Link to this section">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Key columns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>accounts</code> (in <code>trading</code>)</td>
+<td>id, broker, mode, profile</td>
+</tr>
+<tr>
+<td><code>transactions</code></td>
+<td>id, account_id, instrument_id, type, ts, qty, price, charges (JSON), source, external_id, bucket_id, plan_item_id</td>
+</tr>
+<tr>
+<td><code>lots</code></td>
+<td>id, transaction_id, open_qty, cost_per_unit, opened_at, closed_at</td>
+</tr>
+<tr>
+<td><code>lot_closures</code></td>
+<td>lot_id, sell_transaction_id, qty, realised_pnl</td>
+</tr>
+<tr>
+<td><code>positions</code></td>
+<td>account_id, instrument_id, bucket_id, qty, avg_cost, first_added_at, status</td>
+</tr>
+<tr>
+<td><code>buckets</code></td>
+<td>id, name, default_basket_id</td>
+</tr>
+<tr>
+<td><code>cash_flows</code></td>
+<td>id, account_id, ts, amount, kind (deposit/withdrawal/dividend/charge/trade)</td>
+</tr>
+<tr>
+<td><code>valuations_daily</code></td>
+<td>date, account_id, bucket_id, position_id, market_value, invested, realised, unrealised</td>
+</tr>
+<tr>
+<td><code>corporate_action_adjustments</code></td>
+<td>instrument_id, ex_date, ratio, applied_to_lots</td>
+</tr>
+</tbody></table>
+<h2 id="10-portfolio-screen-react">10. Portfolio screen (React)<a class="hash" href="#10-portfolio-screen-react" aria-label="Link to this section">#</a></h2>
+<ul>
+<li><strong>Account tiles (one per Portfolio account + &quot;All accounts&quot;):</strong> value, unrealised P&amp;L (₹, %), day change, XIRR,
+open positions, realised P&amp;L, top holding and its weight, number of open action items — click to focus the
+whole page on that account.</li>
+<li><strong>Action center:</strong> positions that need a decision, per account — below cost, large gain, overweight, sector
+concentration, max holding exceeded, results due, long-term soon, lagging Nifty, not in a basket — with
+Open / Set alert / Add to basket / Snooze / Done (<a href="15-smart-insights-and-automation.html">doc 15</a> §3).</li>
+<li><strong>Header tiles:</strong> total value · invested · total P&amp;L (₹, %) · <strong>XIRR</strong> · day change · benchmark XIRR / alpha.</li>
+<li><strong>Group by:</strong> Bucket · Basket · Account · Strategy · Sector · None — with tree-grid (expand to lots and
+transactions) and column chooser.</li>
+<li><strong>Charts:</strong> allocation by group, sector exposure stacked by account, portfolio value vs the same cash flows in
+Nifty 50, XIRR by group.</li>
+<li><strong>Price alerts:</strong> create from the Action center or a position; evaluated by the services; list in an Alerts panel.</li>
+<li><strong>Position drawer:</strong> transaction timeline, price chart with buy/sell markers, lots, alerts, linked plan ticket.</li>
+<li><strong>Filters:</strong> date range (for realised results), account, bucket, basket, status (open/closed), source.</li>
+<li><strong>Exports:</strong> CSV/Excel of positions, transactions and realised P&amp;L.</li>
+</ul>
+<p>Out of scope for now: tax reports (STCG/LTCG statements) — the lot data supports adding them later.</p>
+
+  </article>
+  <nav class="pager" aria-label="Previous and next document">
+    <a class="prev" href="11-strategy-lab.html"><small>← Previous  [</small>11 · Strategy Lab</a>
+    <a class="next" href="13-reports-and-ui.html"><small>Next  ] →</small>13 · Reports &amp; UI</a>
+  </nav>
+  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-08 12:11</footer>
+</main>
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources" class="d2">1. Data sources</a>
+<a href="#2-domain-model" class="d2">2. Domain model</a>
+<a href="#3-metrics" class="d2">3. Metrics</a>
+<a href="#per-position-trade" class="d3">Per position / trade</a>
+<a href="#per-group-basket-bucket-account-strategy-sector-total" class="d3">Per group (basket / bucket / account / strategy / sector / total)</a>
+<a href="#4-xirr" class="d2">4. XIRR</a>
+<a href="#5-grouping-baskets-vs-portfolio-buckets" class="d2">5. Grouping: baskets vs portfolio buckets</a>
+<a href="#6-live-updates" class="d2">6. Live updates</a>
+<a href="#7-alerts" class="d2">7. Alerts</a>
+<a href="#8-link-to-the-trading-system" class="d2">8. Link to the trading system</a>
+<a href="#9-data-model-portfolio-schema" class="d2">9. Data model (portfolio schema)</a>
+<a href="#10-portfolio-screen-react" class="d2">10. Portfolio screen (React)</a></aside>
+</div>
+<div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
+<script src="assets/search-index.js"></script>
+<script src="assets/vendor/mermaid.min.js"></script>
+<script src="assets/vendor/highlight.min.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

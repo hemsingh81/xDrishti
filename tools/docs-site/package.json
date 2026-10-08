@@ -2,7 +2,7 @@
   "name": "xdrishti-docs-site",
   "private": true,
   "type": "module",
-  "description": "Builds the interactive HTML version of /docs into /site",
+  "description": "Builds the interactive HTML version of /docs/design into /docs/site",
   "scripts": {
     "build": "node build.mjs"
   },
