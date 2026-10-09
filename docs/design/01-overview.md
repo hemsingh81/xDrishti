@@ -85,15 +85,21 @@ Both BUY and SELL. Overnight shorts use futures (cash shorts can't be carried ov
 
 Full rationale: [03-target-architecture.md](03-target-architecture.md).
 
-## 5. Open questions
+## 5. Decisions
 
-1. **CSV format** — please share one sample file so the import profile can be set up (column names, timestamp
-   format, whether timestamps mark the bar start or end, raw or adjusted prices).
-2. Trading capital and risk per trade (default 0.5% per trade, 1.5% daily loss limit).
-3. Initial baskets and their purpose (e.g. MyChoice = intraday, MyLongTerm = holdings only, Best stocks = swing).
-4. Multiple accounts: **replicate** the same trades across accounts or **distribute** them? (default replicate)
-5. How far back should portfolio history go (Dhan trade history vs. older CSV/contract-note import)?
-6. Willing to get a **static IP** from your ISP? Required only for automated order placement (later phase).
+Recorded 2026-10-09 (story P0-12). Numbers and names below are working values: capital, accounts and baskets are
+entered **in the application** (ADR 0002), never in the repository.
+
+| # | Question | Decision | Status |
+|---|----------|----------|--------|
+| Q1 | **CSV format** — one sample file to set up the import profile (column names, timestamp format, bar start or end, raw or adjusted prices) | Not provided yet | **Open** — story P0-14 stays blocked; needed before P1-07 |
+| Q2 | Trading capital and risk per trade | Defaults stay: **0.5% per trade, 1.5% daily loss limit** ([doc 16](16-configuration.md)). Capital is entered per account in the accounts wizard | Decided in P1-16 |
+| Q3 | Initial baskets and their purpose | Working names as configured in [doc 16](16-configuration.md): **Best stocks** (intraday + swing), **MyChoice** (intraday), **MyLongTerm** (swing, BUY only); baskets are created in the app | Decided in P1-15 (baskets are app data, not a blocker) |
+| Q4 | Several accounts: replicate or distribute | **Replicate** (default; `allocation.mode` stays configurable) | Decided |
+| Q5 | Portfolio history depth | Start with the **Dhan trade-history window**; import older lots from CSV / contract notes later (P2-03) | Decided |
+| Q6 | ISP static IP | **Later** — needed only before automated orders (P12); revisit at the P11 exit | Decided |
+| Q7 | Repository hosting | **Local-only** git; no remote or CI dependence for now; back the code up ([doc 17](17-deployment-and-operations.md) §1) | Decided |
+| Q8 | Podman machine size | **Keep 10 CPUs / 24 GB / 120 GB** for now; revisit at the xd-llm benchmark (P0-15) and before tick data (P13) | Decided |
 
 ## 6. Definition of success (v1)
 

@@ -53,7 +53,7 @@ Each folder has a short README describing what goes in it.
 
 | # | Document | Content |
 |---|----------|---------|
-| 01 | [Overview](docs/design/01-overview.md) | What it is, principles, fixed decisions, open questions |
+| 01 | [Overview](docs/design/01-overview.md) | What it is, principles, fixed decisions, recorded answers |
 | 02 | [Requirements](docs/design/02-requirements.md) | Functional & non-functional requirements |
 | 03 | [**Target architecture**](docs/design/03-target-architecture.md) | Tech stack, components, solution structure, data model, APIs, flows |
 | 04 | [Accounts, access & operations](docs/design/04-accounts-access-and-operations.md) | Account roles (data/trading/portfolio), login, services run it, human-in-the-loop approvals |

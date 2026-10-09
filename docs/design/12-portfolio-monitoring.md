@@ -15,6 +15,9 @@ XIRR, and totals — grouped by basket, account, strategy or sector.
 | Corporate actions | Splits, bonuses, dividends | Nightly |
 | Prices | Live quotes for open trades & holdings; EOD close for valuation ([doc 05](05-data-and-brokers.md) §5) | Market hours / EOD |
 
+**History depth (decision Q5):** start with what Dhan's trade-history API returns; older lots come from CSV / contract-note
+import (P2-03). Computed-vs-broker holdings are reconciled nightly, so gaps in history show up as differences.
+
 ## 2. Domain model
 
 ```mermaid

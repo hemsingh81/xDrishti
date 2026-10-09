@@ -103,6 +103,8 @@
   const bar = (a, b, color) => `<div class="bar" style="--wc:${color || "var(--accent)"}"><i style="width:${pct(a, b)}%"></i></div>`;
   const waiting = (s) => s.st !== "done" && s.dep.filter((d) => M.byId[d] && M.byId[d].st !== "done");
   const sprintRange = (n) => { const a = addDays(d0, (n - 1) * XD.meta.sprintDays); return `${fmt(a)} – ${fmt(addDays(a, XD.meta.sprintDays - 1))}`; };
+  const qState = (q) => (state.qd[q.id] === undefined ? q.st : state.qd[q.id] ? "answered" : "open");
+  const openQs = () => XD.questions.filter((q) => qState(q) === "open");
   const curSprint = () => { const n = Math.floor(days(d0, today) / XD.meta.sprintDays) + 1; return n; };
   const docLinks = (doc) => String(doc || "").split(/,\s*/).map((part) => {
     const m = part.match(/\b(0[1-9]|1\d|2[01])\b/);
@@ -123,7 +125,7 @@
     const doing = all.filter((s) => s.st === "doing" || s.st === "review");
     const ready = all.filter((s) => s.st === "ready");
     const blocked = all.filter((s) => s.st === "blocked");
-    const openQ = XD.questions.filter((q) => !state.qd[q.id]);
+    const openQ = openQs();
     const cur = M.epics.find((e) => e.state !== "done");
     const core = M.byEpic.P9, paper = M.byEpic.P10, live = M.byEpic.P11;
     const preStart = today < d0;
@@ -317,12 +319,14 @@
   const RISK_ST = ["open", "mitigating", "closed"];
   views.risks = () => {
     const tab = state.rt;
-    const tabs = `<div class="tabs">${[["questions", `Open questions (${XD.questions.filter((q) => !state.qd[q.id]).length})`], ["risks", `Risks (${XD.risks.filter((r) => (state.risk[r.id] || "open") !== "closed").length})`], ["decisions", "Decisions (ADRs)"]].map(([id, l]) => `<button class="tab ${tab === id ? "active" : ""}" data-act="risk-tab" data-v="${id}" type="button">${l}</button>`).join("")}</div>`;
+    const tabs = `<div class="tabs">${[["questions", `Questions (${openQs().length} open)`], ["risks", `Risks (${XD.risks.filter((r) => (state.risk[r.id] || "open") !== "closed").length})`], ["decisions", "Decisions (ADRs)"]].map(([id, l]) => `<button class="tab ${tab === id ? "active" : ""}" data-act="risk-tab" data-v="${id}" type="button">${l}</button>`).join("")}</div>`;
     if (tab === "questions") {
-      return tabs + `<p class="muted" style="margin-bottom:12px">Answers are saved in this browser. When you have decided, mark it answered — then copy the decision into the design docs (or tell Claude to).</p>` + XD.questions.map((q) => `<div class="qcard ${state.qd[q.id] ? "ans" : ""}"><div class="qh"><span class="chip">${q.id}</span><b style="flex:1;font-weight:500">${esc(q.t)}</b>${state.qd[q.id] ? '<span class="chip st-done">Answered</span>' : '<span class="chip st-doing">Open</span>'}</div>
-        <div class="chips"><span class="dim" style="font-size:12px">Blocks:</span>${q.blocks.map((id) => `<button class="chip st-${M.byId[id].st}" style="cursor:pointer;border:0" data-act="open-story" data-id="${id}" type="button">${id}</button>`).join("")}${q.def ? `<span class="dim" style="font-size:12px;margin-left:8px">${esc(q.def)}</span>` : ""}</div>
-        <textarea class="field" data-q="${q.id}" placeholder="Your answer…" aria-label="Answer to ${q.id}">${esc(state.q[q.id] || "")}</textarea>
-        <div><button class="btn sm" data-act="toggle-q" data-id="${q.id}" type="button">${state.qd[q.id] ? "Reopen" : "Mark answered"}</button></div></div>`).join("");
+      const badge = (q) => ({ answered: '<span class="chip st-done">Answered</span>', deferred: `<span class="chip st-ready">Decided in ${esc(q.by)}</span>`, open: '<span class="chip st-doing">Open</span>' })[qState(q)];
+      return tabs + `<p class="muted" style="margin-bottom:12px">Recorded answers come from <code>docs/design/01-overview.md</code> §5. Anything you type below is saved in this browser only — tell Claude to write it into the docs.</p>` + XD.questions.map((q) => `<div class="qcard ${qState(q) === "answered" ? "ans" : ""}"><div class="qh"><span class="chip">${q.id}</span><b style="flex:1;font-weight:500">${esc(q.t)}</b>${badge(q)}</div>
+        ${q.a ? `<div class="check ${qState(q) === "answered" ? "ok" : ""}" style="padding:0"><span class="mark">${qState(q) === "answered" ? "✓" : ""}</span><span><b>${qState(q) === "open" ? "Status" : "Decision"}</b>${q.d ? ` <span class="dim">· ${esc(q.d)}</span>` : ""}<br>${esc(q.a)}</span></div>` : ""}
+        <div class="chips"><span class="dim" style="font-size:12px">Blocks:</span>${q.blocks.map((id) => `<button class="chip st-${M.byId[id].st}" style="cursor:pointer;border:0" data-act="open-story" data-id="${id}" type="button">${id}</button>`).join("")}</div>
+        <textarea class="field" data-q="${q.id}" placeholder="${qState(q) === "open" ? "Your answer…" : "Change of mind? Note it here…"}" aria-label="Notes on ${q.id}">${esc(state.q[q.id] || "")}</textarea>
+        <div><button class="btn sm" data-act="toggle-q" data-id="${q.id}" type="button">${qState(q) === "answered" ? "Reopen" : "Mark answered"}</button></div></div>`).join("");
     }
     if (tab === "risks") {
       const cell = (l, i) => { const rs = XD.risks.filter((r) => r.l === l && r.i === i && (state.risk[r.id] || "open") !== "closed"); const sc = l * i; return `<div class="${sc >= 15 ? "c4" : sc >= 10 ? "c3" : sc >= 5 ? "c2" : "c1"}">${rs.map((r) => `<span class="rid" data-act="focus-risk" data-id="${r.id}" title="${esc(r.t)}">${r.id}</span>`).join("")}</div>`; };
@@ -400,7 +404,7 @@
     if (!views[v]) v = "overview";
     $("#page-title").textContent = TITLES[v];
     document.title = `${TITLES[v]} — xDrishti delivery plan`;
-    $("#nav").innerHTML = NAV.map(([id, ico, name]) => `<a href="#/${id}" class="${id === v ? "active" : ""}" ${id === v ? 'aria-current="page"' : ""}><span class="ico" aria-hidden="true">${ico}</span>${name}${id === "backlog" ? `<span class="count">${M.stories.length}</span>` : ""}${id === "risks" ? `<span class="count">${XD.questions.filter((q) => !state.qd[q.id]).length}</span>` : ""}</a>`).join("");
+    $("#nav").innerHTML = NAV.map(([id, ico, name]) => `<a href="#/${id}" class="${id === v ? "active" : ""}" ${id === v ? 'aria-current="page"' : ""}><span class="ico" aria-hidden="true">${ico}</span>${name}${id === "backlog" ? `<span class="count">${M.stories.length}</span>` : ""}${id === "risks" ? `<span class="count">${openQs().length}</span>` : ""}</a>`).join("");
     const scroll = $("#view").dataset.v === v ? window.scrollY : 0;
     $("#view").innerHTML = views[v]();
     $("#view").dataset.v = v;
@@ -502,7 +506,7 @@ ${XD.questions.filter((q) => q.blocks.includes(s.id)).map((q) => `- ${q.id}: ${q
     reset: () => { $("#export-menu").open = false; if (confirm("Reset all your status changes, notes, answers and custom stories in this browser?")) { state = defaults(); save(); render(); toast("Reset"); } },
     "sprint-scope": (el) => { state.sp = el.dataset.v; save(); render(); },
     "risk-tab": (el) => { state.rt = el.dataset.v; save(); render(); },
-    "toggle-q": (el) => { state.qd[el.dataset.id] = !state.qd[el.dataset.id]; if (!state.qd[el.dataset.id]) delete state.qd[el.dataset.id]; save(); render(); },
+    "toggle-q": (el) => { const q = XD.questions.find((x) => x.id === el.dataset.id); state.qd[q.id] = qState(q) !== "answered"; save(); render(); },
     "focus-risk": (el) => { const r = $(`#risk-${el.dataset.id}`); r?.scrollIntoView({ block: "center", behavior: "smooth" }); r?.animate([{ background: "var(--accent-soft)" }, { background: "transparent" }], 1400); },
     "flow-all": (el) => { M.epics.forEach((e) => (state.closed[e.id] = el.dataset.v === "0")); save(); $$("details.jr").forEach((d) => (d.open = el.dataset.v === "1")); },
   };

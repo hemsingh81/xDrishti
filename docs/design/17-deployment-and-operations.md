@@ -7,7 +7,13 @@ broker/exchange APIs.
 
 - Containers run in a Linux VM (Podman machine). Use the **libkrun** provider on Apple Silicon — it gives
   containers GPU acceleration (Vulkan), which `xd-llm` needs.
-- Suggested size (Mac has 48 GB): **10 CPUs, 32 GB RAM, 250 GB disk**; tune in Phase 0.
+- Size: planned **10 CPUs, 32 GB RAM, 250 GB disk**; the running machine is **10 CPUs, 24 GB, 120 GB** (decision Q8,
+  2026-10-09: keep it until the xd-llm benchmark in P0-15; grow it before the local LLM or tick data need more).
+- Static IP (decision Q6): not needed until automated orders (P12) — see §6.
+- The 30B-class local LLM needs ≈ 18–22 GB ([doc 14](14-ai-assistant.md) §2), which does not fit beside the stack in 24 GB:
+  **P0-15 must settle the machine size** before P9-01.
+- Source code: **local git only** (decision Q7) — no remote yet. Keep a copy outside the Mac's internal disk
+  (Time Machine or the external SSD) until a remote is chosen; `xd-backup` protects data, not code.
 - The Mac must be awake for nightly jobs (and during market hours for later live services): no sleep on
   power, wired network, small UPS recommended.
 
@@ -80,5 +86,5 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 | Dhan Data API (one account) | ≈ ₹590/month incl. GST |
 | NSE files (optional reconciliation) | ₹0 |
 | External SSD + UPS (one-time, recommended) | ≈ ₹10–18k |
-| ISP static IP | Only when automated orders are enabled (later) |
+| ISP static IP | Only when automated orders are enabled (P12); decision Q6: later, revisit at the P11 exit |
 | Cloud | ₹0 — none used |

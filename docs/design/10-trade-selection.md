@@ -83,6 +83,7 @@ once 3 trigger, the rest are cancelled. `plan` mode limits the plan itself to 3.
    profile, size from its capital and lot sizes.
 3. Mode `replicate`: every eligible account gets the same top tickets, sized individually.
    Mode `distribute`: ranked tickets are spread across accounts, no symbol duplicated.
+   **Default: `replicate`** (decision Q4, 2026-10-09).
 4. Cross-account limits: max accounts per symbol, max total risk across all accounts.
 
 ## 6b. Pre-trade checklist

@@ -69,6 +69,7 @@
   registered app on a **whitelisted static IP**, daily login/2FA, broker as principal. Own strategies staying
   **≤ 10 orders/second per exchange** are tagged with the broker's generic algo ID; above that, exchange
   approval is needed. v1 places no orders; Phase 12 caps at 2 orders/s. Re-check circulars before Phase 12.
+  Static-IP decision (Q6, 2026-10-09): not needed until Phase 12; ask the ISP and re-check circulars at the P11 exit.
 - Data APIs used within the broker's terms.
 - Forex/CFD trading via offshore platforms (e.g. MT5 brokers) is not part of this system.
 

@@ -278,16 +278,67 @@ grouped by basket, account, strategy or sector,</li>
 </tr>
 </tbody></table>
 <p>Full rationale: <a href="03-target-architecture.html">03-target-architecture.md</a>.</p>
-<h2 id="5-open-questions">5. Open questions<a class="hash" href="#5-open-questions" aria-label="Link to this section">#</a></h2>
-<ol>
-<li><strong>CSV format</strong> — please share one sample file so the import profile can be set up (column names, timestamp
-format, whether timestamps mark the bar start or end, raw or adjusted prices).</li>
-<li>Trading capital and risk per trade (default 0.5% per trade, 1.5% daily loss limit).</li>
-<li>Initial baskets and their purpose (e.g. MyChoice = intraday, MyLongTerm = holdings only, Best stocks = swing).</li>
-<li>Multiple accounts: <strong>replicate</strong> the same trades across accounts or <strong>distribute</strong> them? (default replicate)</li>
-<li>How far back should portfolio history go (Dhan trade history vs. older CSV/contract-note import)?</li>
-<li>Willing to get a <strong>static IP</strong> from your ISP? Required only for automated order placement (later phase).</li>
-</ol>
+<h2 id="5-decisions">5. Decisions<a class="hash" href="#5-decisions" aria-label="Link to this section">#</a></h2>
+<p>Recorded 2026-10-09 (story P0-12). Numbers and names below are working values: capital, accounts and baskets are
+entered <strong>in the application</strong> (ADR 0002), never in the repository.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Decision</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Q1</td>
+<td><strong>CSV format</strong> — one sample file to set up the import profile (column names, timestamp format, bar start or end, raw or adjusted prices)</td>
+<td>Not provided yet</td>
+<td><strong>Open</strong> — story P0-14 stays blocked; needed before P1-07</td>
+</tr>
+<tr>
+<td>Q2</td>
+<td>Trading capital and risk per trade</td>
+<td>Defaults stay: <strong>0.5% per trade, 1.5% daily loss limit</strong> (<a href="16-configuration.html">doc 16</a>). Capital is entered per account in the accounts wizard</td>
+<td>Decided in P1-16</td>
+</tr>
+<tr>
+<td>Q3</td>
+<td>Initial baskets and their purpose</td>
+<td>Working names as configured in <a href="16-configuration.html">doc 16</a>: <strong>Best stocks</strong> (intraday + swing), <strong>MyChoice</strong> (intraday), <strong>MyLongTerm</strong> (swing, BUY only); baskets are created in the app</td>
+<td>Decided in P1-15 (baskets are app data, not a blocker)</td>
+</tr>
+<tr>
+<td>Q4</td>
+<td>Several accounts: replicate or distribute</td>
+<td><strong>Replicate</strong> (default; <code>allocation.mode</code> stays configurable)</td>
+<td>Decided</td>
+</tr>
+<tr>
+<td>Q5</td>
+<td>Portfolio history depth</td>
+<td>Start with the <strong>Dhan trade-history window</strong>; import older lots from CSV / contract notes later (P2-03)</td>
+<td>Decided</td>
+</tr>
+<tr>
+<td>Q6</td>
+<td>ISP static IP</td>
+<td><strong>Later</strong> — needed only before automated orders (P12); revisit at the P11 exit</td>
+<td>Decided</td>
+</tr>
+<tr>
+<td>Q7</td>
+<td>Repository hosting</td>
+<td><strong>Local-only</strong> git; no remote or CI dependence for now; back the code up (<a href="17-deployment-and-operations.html">doc 17</a> §1)</td>
+<td>Decided</td>
+</tr>
+<tr>
+<td>Q8</td>
+<td>Podman machine size</td>
+<td><strong>Keep 10 CPUs / 24 GB / 120 GB</strong> for now; revisit at the xd-llm benchmark (P0-15) and before tick data (P13)</td>
+<td>Decided</td>
+</tr>
+</tbody></table>
 <h2 id="6-definition-of-success-v1">6. Definition of success (v1)<a class="hash" href="#6-definition-of-success-v1" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>Your CSV history imported; all tracked instruments updated every evening; all timeframes consistent.</li>
@@ -394,13 +445,13 @@ expected R, plain-English reason.</li>
     <span></span>
     <a class="next" href="02-requirements.html"><small>Next  ] →</small>02 · Requirements</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/01-overview.md</code> · 2026-10-08 16:17</footer>
+  <footer class="foot">Generated from <code>docs/01-overview.md</code> · 2026-10-09 15:32</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-what-xdrishti-is" class="d2">1. What xDrishti is</a>
 <a href="#2-core-principles" class="d2">2. Core principles</a>
 <a href="#3-trading-styles" class="d2">3. Trading styles</a>
 <a href="#4-fixed-decisions" class="d2">4. Fixed decisions</a>
-<a href="#5-open-questions" class="d2">5. Open questions</a>
+<a href="#5-decisions" class="d2">5. Decisions</a>
 <a href="#6-definition-of-success-v1" class="d2">6. Definition of success (v1)</a>
 <a href="#7-document-map" class="d2">7. Document map</a></aside>
 </div>

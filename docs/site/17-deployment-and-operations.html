@@ -71,7 +71,13 @@ broker/exchange APIs.</p>
 <ul>
 <li>Containers run in a Linux VM (Podman machine). Use the <strong>libkrun</strong> provider on Apple Silicon — it gives
 containers GPU acceleration (Vulkan), which <code>xd-llm</code> needs.</li>
-<li>Suggested size (Mac has 48 GB): <strong>10 CPUs, 32 GB RAM, 250 GB disk</strong>; tune in Phase 0.</li>
+<li>Size: planned <strong>10 CPUs, 32 GB RAM, 250 GB disk</strong>; the running machine is <strong>10 CPUs, 24 GB, 120 GB</strong> (decision Q8,
+2026-10-09: keep it until the xd-llm benchmark in P0-15; grow it before the local LLM or tick data need more).</li>
+<li>Static IP (decision Q6): not needed until automated orders (P12) — see §6.</li>
+<li>The 30B-class local LLM needs ≈ 18–22 GB (<a href="14-ai-assistant.html">doc 14</a> §2), which does not fit beside the stack in 24 GB:
+<strong>P0-15 must settle the machine size</strong> before P9-01.</li>
+<li>Source code: <strong>local git only</strong> (decision Q7) — no remote yet. Keep a copy outside the Mac&#39;s internal disk
+(Time Machine or the external SSD) until a remote is chosen; <code>xd-backup</code> protects data, not code.</li>
 <li>The Mac must be awake for nightly jobs (and during market hours for later live services): no sleep on
 power, wired network, small UPS recommended.</li>
 </ul>
@@ -89,7 +95,7 @@ power, wired network, small UPS recommended.</li>
 <td><code>xd-proxy</code></td>
 <td>Caddy (+ React build)</td>
 <td>core</td>
-<td>Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes <code>/api</code>, <code>/health</code> (later <code>/hubs</code>, <code>/hangfire</code>); compression, security headers</td>
+<td>Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes <code>/api</code>, <code>/health</code> (later <code>/hubs</code>, <code>/hangfire</code>); serves the docs read-only at <code>/prototype/</code> (clickable prototype, delivery plan at <code>/prototype/delivery/</code>) and <code>/docs/</code> (design-docs site); compression, security headers</td>
 </tr>
 <tr>
 <td><code>xd-migrate</code></td>
@@ -296,7 +302,7 @@ power, wired network, small UPS recommended.</li>
 </tr>
 <tr>
 <td>ISP static IP</td>
-<td>Only when automated orders are enabled (later)</td>
+<td>Only when automated orders are enabled (P12); decision Q6: later, revisit at the P11 exit</td>
 </tr>
 <tr>
 <td>Cloud</td>
@@ -309,7 +315,7 @@ power, wired network, small UPS recommended.</li>
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-08 16:17</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-09 15:32</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

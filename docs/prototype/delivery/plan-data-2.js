@@ -173,14 +173,14 @@
   ];
 
   XD.questions = [
-    { id: "Q1", t: "Share one sample CSV file (columns, timestamp format, bar start/end, raw vs adjusted prices).", blocks: ["P0-14", "P1-07"], def: "" },
-    { id: "Q2", t: "Trading capital and risk per trade (default 0.5% per trade, 1.5% daily loss limit).", blocks: ["P4-04", "P7-02"], def: "Default: 0.5% / 1.5%" },
-    { id: "Q3", t: "Initial baskets and their purpose (e.g. MyChoice = intraday, MyLongTerm = holdings only, Best stocks = swing).", blocks: ["P1-15"], def: "" },
-    { id: "Q4", t: "Multiple accounts: replicate the same trades across accounts or distribute?", blocks: ["P7-02"], def: "Default: replicate" },
-    { id: "Q5", t: "How far back should portfolio history go (Dhan trade history vs older CSV/contract notes)?", blocks: ["P2-01", "P2-03"], def: "" },
-    { id: "Q6", t: "Willing to get a static IP from your ISP? Required only for automated orders (P12).", blocks: ["P12-09"], def: "Not needed until P12" },
-    { id: "Q7", t: "Repository hosting: GitHub remote or local-only? (affects CI and backups of the code)", blocks: ["OPS-05"], def: "" },
-    { id: "Q8", t: "Machine capacity: keep Podman at 24 GB / 120 GB or grow it before xd-llm and tick data?", blocks: ["P0-15", "P9-01", "P13-01"], def: "" },
+    { id: "Q1", t: "Share one sample CSV file (columns, timestamp format, bar start/end, raw vs adjusted prices).", blocks: ["P0-14", "P1-07"], st: "open", a: "Still needed from you — P0-14 stays blocked until the file is provided." },
+    { id: "Q2", t: "Trading capital and risk per trade (default 0.5% per trade, 1.5% daily loss limit).", blocks: ["P4-04", "P7-02", "P1-16"], st: "deferred", by: "P1-16", d: "2026-10-09", a: "Defaults stay: 0.5% per trade, 1.5% daily loss (doc 16). Capital is entered per account in the app (accounts wizard, P1-16) — never written into the docs." },
+    { id: "Q3", t: "Initial baskets and their purpose (e.g. MyChoice = intraday, MyLongTerm = holdings only, Best stocks = swing).", blocks: [], st: "deferred", by: "P1-15", d: "2026-10-09", a: "Baskets are app data (created in P1-15), so nothing waits on this. Working names as in doc 16: Best stocks (intraday + swing), MyChoice (intraday), MyLongTerm (swing, BUY only)." },
+    { id: "Q4", t: "Multiple accounts: replicate the same trades across accounts or distribute?", blocks: ["P7-02"], st: "answered", d: "2026-10-09", a: "Replicate (default). Mode stays configurable per setup: allocation.mode." },
+    { id: "Q5", t: "How far back should portfolio history go (Dhan trade history vs older CSV/contract notes)?", blocks: ["P2-01", "P2-03"], st: "answered", d: "2026-10-09", a: "Start with the Dhan trade-history window; import older lots from CSV / contract notes later (P2-03)." },
+    { id: "Q6", t: "Willing to get a static IP from your ISP? Required only for automated orders (P12).", blocks: ["P12-09"], st: "answered", d: "2026-10-09", a: "Later — only needed before automated orders (P12). Revisit at the P11 exit." },
+    { id: "Q7", t: "Repository hosting: GitHub remote or local-only? (affects CI and backups of the code)", blocks: ["OPS-05"], st: "answered", d: "2026-10-09", a: "Local-only for now; no remote or CI dependence. Keep the code backed up (see doc 17 §1)." },
+    { id: "Q8", t: "Machine capacity: keep Podman at 24 GB / 120 GB or grow it before xd-llm and tick data?", blocks: ["P0-15", "P9-01", "P13-01"], st: "answered", d: "2026-10-09", a: "Keep 24 GB / 120 GB for now; revisit at the xd-llm benchmark (P0-15) and before P13." },
   ];
 
   XD.risks = [

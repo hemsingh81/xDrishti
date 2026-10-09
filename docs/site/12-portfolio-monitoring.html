@@ -112,6 +112,8 @@ XIRR, and totals — grouped by basket, account, strategy or sector.</p>
 <td>Market hours / EOD</td>
 </tr>
 </tbody></table>
+<p><strong>History depth (decision Q5):</strong> start with what Dhan&#39;s trade-history API returns; older lots come from CSV / contract-note
+import (P2-03). Computed-vs-broker holdings are reconciled nightly, so gaps in history show up as differences.</p>
 <h2 id="2-domain-model">2. Domain model<a class="hash" href="#2-domain-model" aria-label="Link to this section">#</a></h2>
 <figure class="diagram"><pre class="mermaid">flowchart LR
     TX[&quot;Transactions&lt;br/&gt;buy · sell · bonus · split · dividend · charges&quot;] --&gt; LOTS[&quot;Lots&lt;br/&gt;FIFO open quantities with cost&quot;]
@@ -336,7 +338,7 @@ Nifty 50, XIRR by group.</li>
     <a class="prev" href="11-strategy-lab.html"><small>← Previous  [</small>11 · Strategy Lab</a>
     <a class="next" href="13-reports-and-ui.html"><small>Next  ] →</small>13 · Reports &amp; UI</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-08 16:17</footer>
+  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-09 15:32</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources" class="d2">1. Data sources</a>
 <a href="#2-domain-model" class="d2">2. Domain model</a>
