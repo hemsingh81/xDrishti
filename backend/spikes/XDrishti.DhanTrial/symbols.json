@@ -1,0 +1,27 @@
+{
+  "recentDays": 45,
+  "deepMonths": 12,
+  "deep": ["RELIANCE", "TATAPOWER", "ZENSARTECH"],
+  "symbols": [
+    { "name": "RELIANCE", "kind": "equity" },
+    { "name": "HDFCBANK", "kind": "equity" },
+    { "name": "ICICIBANK", "kind": "equity" },
+    { "name": "INFY", "kind": "equity" },
+    { "name": "TCS", "kind": "equity" },
+    { "name": "SBIN", "kind": "equity" },
+    { "name": "ITC", "kind": "equity" },
+    { "name": "LT", "kind": "equity" },
+    { "name": "AXISBANK", "kind": "equity" },
+    { "name": "BHARTIARTL", "kind": "equity" },
+    { "name": "KOTAKBANK", "kind": "equity" },
+    { "name": "HINDUNILVR", "kind": "equity" },
+    { "name": "MARUTI", "kind": "equity" },
+    { "name": "SUNPHARMA", "kind": "equity" },
+    { "name": "TATAPOWER", "kind": "equity" },
+    { "name": "PERSISTENT", "kind": "equity" },
+    { "name": "ZENSARTECH", "kind": "equity" },
+    { "name": "GRSE", "kind": "equity" },
+    { "name": "NIFTY 50", "kind": "index", "aliases": ["NIFTY", "Nifty 50"] },
+    { "name": "NIFTY BANK", "kind": "index", "aliases": ["BANKNIFTY", "Nifty Bank"] }
+  ]
+}

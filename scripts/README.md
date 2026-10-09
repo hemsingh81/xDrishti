@@ -9,6 +9,7 @@ Developer helpers (macOS). They use the .NET SDK in `~/.dotnet` and Podman Deskt
 | `dev-api.sh` | Runs the API on the host with hot reload (port 5080) against the containerised database. |
 | `build-docs.sh` | Rebuilds the HTML docs (`docs/site`) from `docs/design/*.md`. |
 | `_fingerprint.sh` | Internal: hash of uncommitted code changes; `check.sh` stores it after a green run and the Stop hook compares (ADR 0004). |
+| `dhan-secrets.sh` / `dhan-trial.sh` | P0-13 only: store Dhan credentials in the Keychain, then run the read-only Dhan Data API trial (report in `data/trial/`). |
 | `serve.sh` | Serves the clickable prototype (8766) and the docs site (8765). |
 
 The stack itself starts with `deploy/xd-up.sh` and stops with `deploy/xd-down.sh`.

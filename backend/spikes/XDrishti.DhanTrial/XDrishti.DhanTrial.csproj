@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Throwaway spike (P0-13): read-only Dhan Data API trial. Not shipped; useful parts move to Infrastructure in P1. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>xd-dhan-trial</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.DhanTrial.Tests" />
+    <None Update="symbols.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

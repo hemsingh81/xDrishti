@@ -35,6 +35,10 @@
 - Primary constructors for DI; `sealed` classes by default; file-scoped namespaces; one public type per file.
 - Packages: add versions only in `Directory.Packages.props`; new src project → add a `COPY` line in `Dockerfile`.
 
+## Spikes
+- `spikes/` holds throwaway investigations (not shipped, not in images). They follow the same build rules and are tested; useful code
+  is promoted into the layers behind existing ports, the rest is deleted when the story is done.
+
 ## Commands
 - Build: `dotnet build XDrishti.slnx` · Test: `dotnet test --solution XDrishti.slnx` · Format: `dotnet format XDrishti.slnx`
 - Run API against the container DB: `scripts/dev-api.sh` (reads the DB password from the Keychain).
