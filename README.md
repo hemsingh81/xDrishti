@@ -42,6 +42,7 @@ Each folder has a short README describing what goes in it.
 | **Run the system** | `deploy/xd-up.sh` → app on http://localhost:8080 (System status at `/system`, API docs at `/api/docs`, logs at http://localhost:5341). Stop with `deploy/xd-down.sh`. |
 | Develop | Backend: `scripts/dev-api.sh` (hot reload) · Frontend: `cd frontend && npm run dev` · Before every commit: `scripts/check.sh` |
 | Follow the rules | [Engineering standards](docs/engineering/README.md) and the `CLAUDE.md` file in each folder |
+| **See the delivery plan** | http://localhost:8080/prototype/delivery/ — epics, stories, roadmap, flow, board, sprints, risks (source: [`docs/prototype/delivery/`](docs/prototype/delivery/)). |
 | Try the planned UI | Open [`docs/prototype/index.html`](docs/prototype/index.html) — login is prefilled, press **Sign in**. |
 | Read the design | Open [`docs/site/index.html`](docs/site/index.html), or the Markdown in [`docs/design/`](docs/design/). |
 | Rebuild the HTML docs | `scripts/build-docs.sh` (after editing `docs/design/*.md`) |

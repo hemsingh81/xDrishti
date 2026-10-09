@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#4f46e5">
+<title>xDrishti — delivery plan</title>
+<meta name="description" content="Epics, stories, roadmap, board, sprints, risks and decisions for building xDrishti.">
+<script>(function(){var t;try{t=localStorage.getItem('xd-proto-theme')}catch(e){}document.documentElement.dataset.theme=t||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')})();</script>
+<link rel="preload" href="../assets/vendor/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="delivery.css?v=2">
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="Sections">
+    <a class="brand" href="#/overview"><span class="logo" aria-hidden="true">◉</span><span><b>xDrishti</b><small>Delivery plan</small></span></a>
+    <nav id="nav"></nav>
+    <div class="side-foot">
+      <div class="foot-title">Open</div>
+      <a href="../index.html">Clickable prototype</a>
+      <a id="lnk-docs" href="#" target="_blank" rel="noopener">Design docs</a>
+      <a id="lnk-app" href="#" target="_blank" rel="noopener">Running app</a>
+      <p class="hint">Status changes and notes are saved in this browser only.</p>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <h1 id="page-title">Overview</h1>
+      <div class="top-actions">
+        <label class="search"><span class="sr">Search stories</span><input id="q" type="search" placeholder="Search stories  ( / )" autocomplete="off"></label>
+        <button class="btn primary" data-act="new-story" type="button">+ Story</button>
+        <details class="menu" id="export-menu">
+          <summary class="btn">Export ▾</summary>
+          <div class="menu-pop">
+            <button data-act="export-md" type="button">Backlog as Markdown</button>
+            <button data-act="export-csv" type="button">Backlog as CSV</button>
+            <button data-act="export-json" type="button">My changes as JSON</button>
+            <hr>
+            <button data-act="reset" class="danger" type="button">Reset my changes…</button>
+          </div>
+        </details>
+        <button class="btn icon" data-act="theme" type="button" aria-label="Toggle theme" title="Toggle theme">◐</button>
+      </div>
+    </header>
+    <main id="view" tabindex="-1"></main>
+  </div>
+</div>
+<div id="scrim" hidden></div>
+<aside id="drawer" class="drawer" aria-hidden="true" aria-label="Details" tabindex="-1"></aside>
+<dialog id="modal"></dialog>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="plan-data-1.js?v=1"></script>
+<script src="plan-data-2.js?v=1"></script>
+<script src="plan-app.js?v=2"></script>
+</body>
+</html>

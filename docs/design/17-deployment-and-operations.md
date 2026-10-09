@@ -15,7 +15,7 @@ broker/exchange APIs.
 
 | Container | Image basis | Profile | Notes |
 |-----------|-------------|---------|-------|
-| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health` (later `/hubs`, `/hangfire`); compression, security headers |
+| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health` (later `/hubs`, `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site); compression, security headers |
 | `xd-migrate` | API image, `migrate` | core | One-shot: applies migrations, then exits |
 | `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint |
 | `xd-worker` | .NET 10 + Hangfire | core | CSV import (watches `data/inbox`), EOD fetch, aggregation, account & portfolio sync, nightly pipeline, backtests, Lab runs, ML.NET training; scale replicas |

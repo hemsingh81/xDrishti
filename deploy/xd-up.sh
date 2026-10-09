@@ -71,6 +71,9 @@ cat <<INFO
   App            http://localhost:${XD_HTTP_PORT}
   System status  http://localhost:${XD_HTTP_PORT}/system
   API docs       http://localhost:${XD_HTTP_PORT}/api/docs
+  Delivery plan  http://localhost:${XD_HTTP_PORT}/prototype/delivery/
+  Prototype      http://localhost:${XD_HTTP_PORT}/prototype/
+  Design docs    http://localhost:${XD_HTTP_PORT}/docs/
   API status     http://localhost:${XD_HTTP_PORT}/api/system/status
   Logs (Seq)     http://localhost:${XD_SEQ_PORT}
 INFO

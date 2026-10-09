@@ -27,6 +27,21 @@
 		}
 	}
 
+	# Project documentation, served read-only from the repo: the clickable prototype (with the delivery plan at
+	# /prototype/delivery/) and the generated design-docs site. Always revalidated so edits show immediately.
+	redir /prototype /prototype/ permanent
+	redir /docs /docs/ permanent
+	handle_path /prototype/* {
+		root * /srv/prototype
+		header Cache-Control "no-cache"
+		file_server
+	}
+	handle_path /docs/* {
+		root * /srv/docs
+		header Cache-Control "no-cache"
+		file_server
+	}
+
 	root * /srv
 
 	# Content-hashed build assets that exist: cached for a year.

@@ -6,7 +6,7 @@
 | [`engineering/`](engineering/README.md) | Engineering standards: SOLID, modularity, reuse, testing, performance, definition of done. |
 | [`specs/`](specs/README.md) | Per-slice specs (template + workflow) that coding agents implement; see ADR 0004. |
 | [`adr/`](adr/) | Architecture decision records — one short file per significant decision, added as implementation goes. |
-| [`prototype/`](prototype/index.html) | Clickable UX prototype (offline, demo data). Reference for the React app; frozen once the real UI exists. |
+| [`prototype/`](prototype/index.html) | Clickable UX prototype (offline, demo data). Reference for the React app; frozen once the real UI exists. [`prototype/delivery/`](prototype/delivery/index.html) is the delivery plan: epics, stories, roadmap, flow, board, sprints, risks. |
 | [`site/`](site/index.html) | Generated, searchable HTML version of `design/`. Do not edit — run `scripts/build-docs.sh`. |
 
 Editing rules: change the Markdown in `design/`, then rebuild the site. When implementation changes a design

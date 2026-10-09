@@ -11,6 +11,7 @@ deploy/xd-down.sh          # stop (data kept);  --purge deletes all data
 | Service | Purpose | URL / port |
 |---------|---------|-----------|
 | `xd-proxy` | Caddy: React app + reverse proxy to the API | http://localhost:8080 |
+| `xd-proxy` extras | Serves `docs/prototype` at `/prototype/` (delivery plan at `/prototype/delivery/`) and `docs/site` at `/docs/`, read-only | via proxy |
 | `xd-api` | ASP.NET Core API (OpenAPI docs at `/api/docs`) | via proxy |
 | `xd-worker` | Background services (heartbeat for now) | — |
 | `xd-migrate` | One-shot database migrations | — |
