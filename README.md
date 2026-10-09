@@ -13,19 +13,20 @@ once configured, everything runs as background services.
 ML.NET (training & scoring in-process) · local LLM (llama.cpp/RamaLama) · Podman Desktop — fully local, no cloud.
 **Data & broker:** your 1-minute CSV files + Dhan Data API (EOD for tracked instruments, live only for active trades); multiple Dhan accounts.
 
-> Status: design complete — implementation starts with Phase 0 ([roadmap](docs/design/18-roadmap.md)).
+> Status: **Phase 0 — foundation running** (frontend, API, worker, database deployed on Podman). Next: Phase 1 ([roadmap](docs/design/18-roadmap.md)).
 
 ## Repository layout
 
 ```
 xDrishti/
-├── backend/      .NET 10 solution — src/XDrishti.* projects and tests/  (Phase 0 onwards)
-├── frontend/     React 19 + TypeScript + Vite app
+├── backend/      .NET 10 solution — src/XDrishti.* projects, tests/, Dockerfile, contracts/
+├── frontend/     React 19 + TypeScript + Vite + MUI app (served by Caddy in production)
 ├── data/         local runtime data (CSV inbox, exports, models) — git-ignored
-├── deploy/       Podman compose, Caddy, Keychain → secrets script, launchd
-├── scripts/      developer scripts (build docs, serve prototype & docs)
+├── deploy/       Podman Compose stack, Caddy, DB init, xd-up.sh / xd-down.sh
+├── scripts/      check.sh (all quality gates), gen-api.sh, dev-api.sh, build-docs.sh, serve.sh
 ├── docs/
 │   ├── design/     design documents 01–21 (Markdown source of truth)
+│   ├── engineering/ engineering standards (rules for all code)
 │   ├── adr/        architecture decision records
 │   ├── prototype/  clickable UX prototype (offline, demo data)
 │   └── site/       generated HTML version of the design docs
@@ -38,10 +39,14 @@ Each folder has a short README describing what goes in it.
 
 | To… | Do this |
 |-----|---------|
-| Try the planned UI | Open [`docs/prototype/index.html`](docs/prototype/index.html) — login is prefilled, press **Sign in**. Start with **Today**, **Plan review** and **Learning**; press **⌘K** to jump anywhere. |
-| Read the design | Open [`docs/site/index.html`](docs/site/index.html) (search with `/` or `⌘K`, `[` / `]` between docs), or the Markdown in [`docs/design/`](docs/design/). |
-| Serve both locally | `scripts/serve.sh` → prototype on http://localhost:8766, docs on http://localhost:8765 |
+| **Run the system** | `deploy/xd-up.sh` → app on http://localhost:8080 (System status at `/system`, API docs at `/api/docs`, logs at http://localhost:5341). Stop with `deploy/xd-down.sh`. |
+| Develop | Backend: `scripts/dev-api.sh` (hot reload) · Frontend: `cd frontend && npm run dev` · Before every commit: `scripts/check.sh` |
+| Follow the rules | [Engineering standards](docs/engineering/README.md) and the `CLAUDE.md` file in each folder |
+| Try the planned UI | Open [`docs/prototype/index.html`](docs/prototype/index.html) — login is prefilled, press **Sign in**. |
+| Read the design | Open [`docs/site/index.html`](docs/site/index.html), or the Markdown in [`docs/design/`](docs/design/). |
 | Rebuild the HTML docs | `scripts/build-docs.sh` (after editing `docs/design/*.md`) |
+
+**Requirements:** macOS with Podman Desktop (machine running), .NET 10 SDK, Node 24. `docker-compose` v5 in `~/.local/bin` (used by `podman compose`).
 
 ## Design documents
 

@@ -1,0 +1,151 @@
+# xDrishti — local stack on Podman Desktop. Start with deploy/xd-up.sh (it prepares secrets first).
+# Docs: docs/design/17-deployment-and-operations.md · rules: deploy/CLAUDE.md
+name: xdrishti
+
+x-dotnet-env: &dotnet-env
+  DOTNET_ENVIRONMENT: Production
+  ASPNETCORE_ENVIRONMENT: Production
+  Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_app
+  Serilog__WriteTo__1__Name: Seq
+  Serilog__WriteTo__1__Args__serverUrl: http://xd-seq:5341
+
+x-hardening: &hardening
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+services:
+  xd-db:
+    image: docker.io/timescale/timescaledb:2.30.2-pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xdrishti
+      POSTGRES_USER: xd_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      TIMESCALEDB_TELEMETRY: "off"
+    secrets:
+      - db_owner_password
+      - source: db_app_password
+        target: Database__Password
+    volumes:
+      - xd-db-data:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    networks: [back]
+    shm_size: 256m
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U xd_owner -d xdrishti]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: applies EF Core migrations as the database owner, then exits.
+  xd-migrate:
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    command: [migrate]
+    restart: "no"
+    environment:
+      <<: *dotnet-env
+      Database__ConnectionString: Host=xd-db;Port=5432;Database=xdrishti;Username=xd_owner
+    secrets:
+      - source: db_owner_password
+        target: Database__Password
+    networks: [back]
+    pull_policy: never # uses the image built for xd-api (compose builds all images before starting)
+    depends_on:
+      xd-db: { condition: service_healthy }
+    <<: *hardening
+
+  xd-api:
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    build:
+      context: ../backend
+      target: api
+      args: { VERSION: "${XD_VERSION:-0.1.0}" }
+    restart: unless-stopped
+    environment: *dotnet-env
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+    networks: [back]
+    mem_limit: 1g
+    depends_on:
+      xd-migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, dotnet, XDrishti.Api.dll, --healthcheck]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    <<: *hardening
+
+  xd-worker:
+    image: localhost/xdrishti/worker:${XD_VERSION:-0.1.0}
+    build:
+      context: ../backend
+      target: worker
+      args: { VERSION: "${XD_VERSION:-0.1.0}" }
+    restart: unless-stopped
+    environment: *dotnet-env
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+    networks: [back]
+    mem_limit: 2g
+    depends_on:
+      xd-migrate: { condition: service_completed_successfully }
+    <<: *hardening
+
+  xd-proxy:
+    image: localhost/xdrishti/proxy:${XD_VERSION:-0.1.0}
+    build:
+      context: ../frontend
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:${XD_HTTP_PORT:-8080}:8080
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    tmpfs: ["/data:mode=1777", "/config:mode=1777"]
+    networks: [front, back]
+    mem_limit: 256m
+    depends_on:
+      xd-api: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+  xd-seq:
+    image: docker.io/datalust/seq:2026.1.17182
+    profiles: [ops]
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"
+    ports:
+      - 127.0.0.1:${XD_SEQ_PORT:-5341}:80
+    volumes:
+      - xd-seq-data:/data
+    networks: [front, back]
+    mem_limit: 1g
+
+networks:
+  front: {}
+  back:
+    internal: true
+
+volumes:
+  xd-db-data: {}
+  xd-seq-data: {}
+
+# Secret files are written from the macOS Keychain by deploy/xd-up.sh (never committed, never in images).
+secrets:
+  db_owner_password:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_owner_password
+  db_app_password:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_app_password

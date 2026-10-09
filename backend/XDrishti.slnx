@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/XDrishti.Domain/XDrishti.Domain.csproj" />
+    <Project Path="src/XDrishti.Application/XDrishti.Application.csproj" />
+    <Project Path="src/XDrishti.Infrastructure/XDrishti.Infrastructure.csproj" />
+    <Project Path="src/XDrishti.Hosting/XDrishti.Hosting.csproj" />
+    <Project Path="src/XDrishti.Api/XDrishti.Api.csproj" />
+    <Project Path="src/XDrishti.Worker/XDrishti.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/XDrishti.Domain.Tests/XDrishti.Domain.Tests.csproj" />
+    <Project Path="tests/XDrishti.Application.Tests/XDrishti.Application.Tests.csproj" />
+    <Project Path="tests/XDrishti.Architecture.Tests/XDrishti.Architecture.Tests.csproj" />
+    <Project Path="tests/XDrishti.Api.IntegrationTests/XDrishti.Api.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <!-- Background host: scheduled services (EOD fetch, nightly pipeline… later via Hangfire). -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Infrastructure\XDrishti.Infrastructure.csproj" />
+    <ProjectReference Include="..\XDrishti.Hosting\XDrishti.Hosting.csproj" />
+  </ItemGroup>
+</Project>

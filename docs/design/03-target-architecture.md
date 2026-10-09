@@ -194,8 +194,12 @@ One repository (monorepo) holds the code, configuration, deployment and design m
 ```
 xDrishti/
 ├── backend/                         # .NET 10 solution
-│   ├── XDrishti.sln                 # (created in P0)
+│   ├── XDrishti.slnx                # solution (src/, tests/ folders)
+│   ├── global.json                  # SDK pin + Microsoft Testing Platform
 │   ├── Directory.Build.props        # shared build settings, analyzers, nullable, warnings-as-errors
+│   ├── Directory.Packages.props     # central package versions
+│   ├── Dockerfile                   # multi-stage: targets api, worker (chiseled, non-root)
+│   ├── contracts/XDrishti.Api.json  # OpenAPI contract generated at build (source of frontend types)
 │   ├── src/
 │   │   ├── XDrishti.Domain/         # entities & value objects: Bar, Instrument, Signal, TradeTicket, RMultiple, Cell…
 │   │   ├── XDrishti.Application/    # use cases, interfaces (ports), pipeline orchestration
@@ -210,21 +214,23 @@ xDrishti/
 │   │   ├── XDrishti.Simulation/
 │   │   ├── XDrishti.Learning/       # cells, meta-model, smart rules, experiments, lessons
 │   │   ├── XDrishti.Planning/
-│   │   ├── XDrishti.Api/            # host: endpoints, SignalR hubs, auth, OpenAPI
+│   │   ├── XDrishti.Hosting/        # shared host defaults: KeyPerFile secrets, Serilog, app info
+│   │   ├── XDrishti.Api/            # host: endpoints, SignalR hubs, auth, OpenAPI; `migrate` command
 │   │   ├── XDrishti.Worker/         # host: Hangfire server, scheduled services
 │   │   ├── XDrishti.Mcp/            # host: MCP read-only tool server
 │   │   ├── XDrishti.Cli/            # `xd` command-line tool
 │   │   ├── XDrishti.Feed/           # host: market-hours live feed for the active set (later: depth recorder)
 │   │   └── XDrishti.Execution/      # host (later): order service
-│   └── tests/                       # unit, integration (Testcontainers), look-ahead, golden-trade tests
-├── frontend/                        # React 19 + TypeScript + Vite app
-│   └── src/{app, pages, components, charts, api (generated), hooks, schemas, theme}
+│   └── tests/                       # Domain/Application unit, Architecture (layer rules), Api.IntegrationTests (Testcontainers)
+├── frontend/                        # React 19 + TypeScript + Vite + MUI; Dockerfile builds xd-proxy (Caddy + app)
+│   └── src/{app, features/<name>, shared/{api,ui,lib}, theme, test}
 ├── data/                            # local runtime data, git-ignored: inbox/ (CSV drop, mounted into xd-worker), exports/, models/
-├── deploy/                          # compose.yaml, Caddyfile, xd-up.sh (Keychain → Podman secrets), launchd plist
-├── scripts/                         # developer scripts (bootstrap, run, build docs)
+├── deploy/                          # compose.yaml (+ compose.dev.yaml), caddy/Caddyfile, db/init, xd-up.sh / xd-down.sh
+├── scripts/                         # check.sh (all gates), gen-api.sh, dev-api.sh, build-docs.sh, serve.sh
 ├── docs/
 │   ├── design/                      # these design documents (Markdown source of truth)
 │   ├── adr/                         # architecture decision records
+│   ├── engineering/                 # engineering standards (SOLID, modularity, testing, performance, DoD)
 │   ├── prototype/                   # clickable UX prototype (reference for the React app)
 │   └── site/                        # generated HTML version of docs/design
 └── tools/                           # docs-site builder, prototype vendoring

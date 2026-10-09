@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Use cases and ports. Depends only on Domain (+ DI abstractions). No EF Core, Npgsql or ASP.NET Core. -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Application.Tests" />
+  </ItemGroup>
+</Project>

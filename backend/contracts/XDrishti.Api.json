@@ -1,0 +1,185 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "xDrishti API",
+    "version": "v1"
+  },
+  "paths": {
+    "/api/system/status": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health of the API, database and background services",
+        "operationId": "GetSystemStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApplicationStatus": {
+        "required": [
+          "name",
+          "version",
+          "environment",
+          "instance",
+          "startedAt",
+          "uptimeSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uptimeSeconds": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DatabaseStatus": {
+        "required": [
+          "isConnected",
+          "serverVersion",
+          "timescaleVersion",
+          "latestMigration",
+          "pendingMigrations",
+          "latencyMs",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "isConnected": {
+            "type": "boolean"
+          },
+          "serverVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timescaleVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "latestMigration": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pendingMigrations": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "latencyMs": {
+            "type": "number",
+            "format": "double"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ServiceStatus": {
+        "required": [
+          "name",
+          "instance",
+          "version",
+          "startedAt",
+          "lastSeenAt",
+          "isAlive"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isAlive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SystemStatusResponse": {
+        "required": [
+          "application",
+          "database",
+          "services",
+          "isHealthy",
+          "checkedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "application": {
+            "$ref": "#/components/schemas/ApplicationStatus"
+          },
+          "database": {
+            "$ref": "#/components/schemas/DatabaseStatus"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceStatus"
+            }
+          },
+          "isHealthy": {
+            "type": "boolean"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "System"
+    }
+  ]
+}

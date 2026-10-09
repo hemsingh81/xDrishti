@@ -1,9 +1,14 @@
-# frontend — React 19 + TypeScript + Vite
+# frontend — React 19 + TypeScript + Vite + MUI
 
-MUI, TradingView Lightweight Charts, ECharts, TanStack Query, Monaco, SignalR. The API client is generated from
-the backend's OpenAPI document.
+Rules: [`CLAUDE.md`](CLAUDE.md) · UX reference: [`docs/prototype`](../docs/prototype/index.html).
 
-Planned layout: `src/{app, pages, components, charts, api, hooks, schemas, theme}`.
+| Task | Command |
+|------|---------|
+| Install | `npm ci` |
+| Dev server (hot reload; `/api` proxied to the stack on :8080) | `npm run dev` → http://localhost:5173 |
+| All checks (types, lint, format, tests) | `npm run check` |
+| Production build | `npm run build` |
+| Regenerate API types | `npm run gen:api` (after `../scripts/gen-api.sh` regenerated the contract) |
 
-The screens, navigation, colours and interactions follow the clickable prototype in
-[`docs/prototype/`](../docs/prototype/index.html) and [Reports & UI](../docs/design/13-reports-and-ui.md).
+Structure: `src/app` (shell, router, navigation) · `src/features/<name>` (feature + public `index.ts`) ·
+`src/shared/{api,ui,lib}` · `src/theme` · `src/test`. In production the build is served by `xd-proxy` (Caddy).

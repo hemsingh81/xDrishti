@@ -1,0 +1,10 @@
+# Development additions (included by xd-up.sh unless --no-dev):
+# exposes PostgreSQL on 127.0.0.1:5433 for `dotnet run`, EF tools and database GUIs.
+services:
+  xd-db:
+    ports:
+      - 127.0.0.1:${XD_DB_PORT:-5433}:5432
+    networks: [back, dev]
+
+networks:
+  dev: {}

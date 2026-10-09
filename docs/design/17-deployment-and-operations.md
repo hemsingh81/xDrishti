@@ -15,7 +15,8 @@ broker/exchange APIs.
 
 | Container | Image basis | Profile | Notes |
 |-----------|-------------|---------|-------|
-| `xd-proxy` | Caddy (+ React build) | core | Only published port (LAN); TLS; routes `/api`, `/hubs`, `/hangfire` |
+| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health` (later `/hubs`, `/hangfire`); compression, security headers |
+| `xd-migrate` | API image, `migrate` | core | One-shot: applies migrations, then exits |
 | `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint |
 | `xd-worker` | .NET 10 + Hangfire | core | CSV import (watches `data/inbox`), EOD fetch, aggregation, account & portfolio sync, nightly pipeline, backtests, Lab runs, ML.NET training; scale replicas |
 | `xd-feed` | .NET 10 | core | Market hours: Dhan WebSocket for the active set, quote polling for holdings, live bars & alerts (later also depth recording) |
@@ -44,9 +45,11 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 
 ## 4. Secrets
 
-1. Source of truth: **macOS Keychain** (broker API keys/secrets per account, DB passwords, backup key).
-2. `deploy/xd-up.sh` reads Keychain → creates/updates **Podman secrets** → starts the stack.
-3. Containers receive only what they need (mounted at `/run/secrets`, read by .NET KeyPerFile provider).
+1. Source of truth: **macOS Keychain** (`xdrishti/<area>/<name>`: broker API keys/secrets per account, DB passwords, backup key).
+2. `deploy/xd-up.sh` reads the Keychain (creating strong random DB passwords on first run) → writes secret files to
+   `~/Library/Application Support/xDrishti/secrets` (private folder) → Compose mounts them as file secrets
+   ([ADR 0003](../adr/0003-local-stack-compose-and-secrets.md)).
+3. Containers receive only what they need (mounted at `/run/secrets/<ConfigKey>`, read by .NET KeyPerFile provider).
 4. Never in images, compose files, environment dumps, logs or LLM context.
 
 ## 5. Operations
@@ -56,7 +59,9 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 | Start at boot | launchd agent → `podman machine start` → `xd-up.sh`; services run with **no user logged in to the app** |
 | Missed schedules | On start, services catch up missed runs (e.g. EOD fetch while the Mac slept) and reconcile desired state |
 | Schedules | Stored in the database (`ops.service_schedules`), edited on the Services screen with dependency validation; applied to Hangfire recurring jobs in `xd-worker` without restart |
-| Database migrations | EF Core migrations applied by a one-shot `xd-api migrate` step on deploy |
+| Database migrations | EF Core migrations applied by the one-shot `xd-migrate` service (API image, `migrate` command, as `xd_owner`) before `xd-api`/`xd-worker` start; apps connect as least-privilege `xd_app` |
+| Start / stop | `deploy/xd-up.sh` (secrets → build → start → wait healthy → print URLs), `deploy/xd-down.sh` (`--purge` deletes data) |
+| URLs (local) | App http://localhost:8080 · API docs `/api/docs` · Seq http://localhost:5341 · PostgreSQL `localhost:5433` (dev override) |
 | Upgrades | Versioned image tags; roll back by switching tag |
 | Backups | Nightly `pg_dump` + models + config → restic on external SSD; monthly restore test |
 | Health | ASP.NET health checks per container; failures → in-app notification |

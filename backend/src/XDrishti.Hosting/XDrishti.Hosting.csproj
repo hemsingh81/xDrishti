@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared host defaults for every executable (Api, Worker, later Feed, Mcp): configuration, logging, app info. -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Application\XDrishti.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.KeyPerFile" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.Seq" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+  </ItemGroup>
+</Project>

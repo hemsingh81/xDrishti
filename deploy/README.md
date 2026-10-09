@@ -1,6 +1,20 @@
 # deploy — Podman Desktop (local, no cloud)
 
-Planned contents: `compose.yaml` (profiles: core, llm, observability), `Caddyfile`, `xd-up.sh`
-(macOS Keychain → Podman secrets → start the stack), launchd agent for start at boot.
+Rules: [`CLAUDE.md`](CLAUDE.md) · design: [doc 17](../docs/design/17-deployment-and-operations.md) · secrets: [ADR 0003](../docs/adr/0003-local-stack-compose-and-secrets.md).
 
-See [Deployment & operations](../docs/design/17-deployment-and-operations.md).
+```bash
+deploy/xd-up.sh            # secrets from Keychain → build → start → wait healthy → print URLs
+deploy/xd-up.sh --no-build # restart without rebuilding images
+deploy/xd-down.sh          # stop (data kept);  --purge deletes all data
+```
+
+| Service | Purpose | URL / port |
+|---------|---------|-----------|
+| `xd-proxy` | Caddy: React app + reverse proxy to the API | http://localhost:8080 |
+| `xd-api` | ASP.NET Core API (OpenAPI docs at `/api/docs`) | via proxy |
+| `xd-worker` | Background services (heartbeat for now) | — |
+| `xd-migrate` | One-shot database migrations | — |
+| `xd-db` | PostgreSQL 18 + TimescaleDB 2.30 | localhost:5433 (dev override) |
+| `xd-seq` | Log viewer (profile `ops`) | http://localhost:5341 |
+
+Files: `compose.yaml`, `compose.dev.yaml`, `caddy/Caddyfile`, `db/init/` (roles, runs on first start), `xd-up.sh`, `xd-down.sh`.
