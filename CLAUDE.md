@@ -12,6 +12,13 @@ the roadmap phases in `docs/design/18-roadmap.md`. Engineering standards: `docs/
 - Trading configuration and strategies are **not files in the repo**: they live in the database, versioned, and are
   managed in the app (ADR 0002).
 
+## Agentic workflow (ADR 0004)
+- Work from an **Approved** spec in `docs/specs/` (copy `TEMPLATE.md`); unclear requirement → ask the user.
+- Use the subagents in `.claude/agents/` (`backend-dev`, `frontend-dev`, `test-writer`, `reviewer`) and the skills
+  `/new-feature`, `/add-endpoint`, `/new-migration`, `/phase-done`.
+- Finish every code change with `scripts/check.sh` green and an independent `reviewer` pass. Do not commit or push
+  unless the user asks.
+
 ## Non-negotiables
 - SOLID, modular, reusable, testable, fast — see `docs/engineering/README.md`. Prefer extending over modifying.
 - Every change: tests + `scripts/check.sh` green. API change → `scripts/gen-api.sh` in the same change.

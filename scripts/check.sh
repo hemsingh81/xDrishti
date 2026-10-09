@@ -25,4 +25,7 @@ npm run check
 say "Frontend: build"
 npm run build >/dev/null
 
+# Record this green run so the Stop hook knows the current changes were verified.
+"$ROOT/scripts/_fingerprint.sh" >"$(git -C "$ROOT" rev-parse --absolute-git-dir)/xd-check-pass"
+
 say "All checks passed"

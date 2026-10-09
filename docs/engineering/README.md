@@ -46,3 +46,30 @@ Rules: test behaviour, not implementation; one reason to fail per test; no sleep
 4. Database changes: an EF Core migration (never edit an applied one); time-series tables reviewed for hypertables.
 5. Design changes: `docs/design` updated; significant decisions recorded in `docs/adr`.
 6. The stack still starts with `deploy/xd-up.sh` and System status is green.
+
+## 5. Agentic development workflow
+
+The code is written mainly by AI coding agents (Claude Code) under human direction. The tooling is part of the repo, so
+every session starts with the same rules and the same safety net. Decision: [ADR 0004](../adr/0004-agentic-development-workflow.md).
+
+**Loop:** *spec → plan → implement a vertical slice → `scripts/check.sh` → independent review → you approve and commit.*
+
+| Piece | Where | Purpose |
+|-------|-------|---------|
+| Rules | `CLAUDE.md` (root, `backend/`, `backend/tests/`, `frontend/`, `deploy/`) | Loaded automatically; layer-specific conventions |
+| Specs | `docs/specs/` (`TEMPLATE.md`) | Goal, acceptance criteria, contract, test plan; only **Approved** specs are implemented |
+| Subagents | `.claude/agents/` — `backend-dev`, `frontend-dev`, `test-writer`, `reviewer` | Focused context; the read-only `reviewer` never reviews its own work |
+| Skills | `.claude/skills/` — `/new-feature`, `/add-endpoint`, `/new-migration`, `/phase-done` | Repeatable recipes for the common changes |
+| Hooks | `.claude/hooks/`, wired in `.claude/settings.json` | Block secret-looking content; format on edit; before finishing, require a green `scripts/check.sh` for changed code |
+| Permissions | `.claude/settings.json` | Safe commands pre-allowed; generated files, Keychain/secrets, force-push, Podman prune/volume removal denied |
+
+Rules for working with agents:
+- **Spec before code.** Unclear requirement → ask, or write the question into the spec's *Open questions*.
+- **One slice at a time**, small enough to review in one sitting. Independent slices can run in parallel agents, each in its
+  own git worktree, merged one by one with `check.sh` after each merge.
+- **The gate decides, not the agent.** "Done" means `scripts/check.sh` is green and the reviewer found no blockers.
+- **Agents never commit, push or touch the Podman data/volumes unless you ask.** Secrets never enter prompts, files or logs.
+- **Rules evolve through the repo.** When a review keeps finding the same mistake, add it to the right `CLAUDE.md` — or,
+  better, to an analyzer/architecture test — instead of repeating the correction.
+- **Product agents (P9 assistant, Hermes) are separate** from this workflow; see `docs/design/14-ai-assistant.md`.
+

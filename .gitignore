@@ -35,3 +35,6 @@ data/**
 *.key
 appsettings.*.local.json
 deploy/secrets/
+
+# Claude Code local overrides
+.claude/settings.local.json

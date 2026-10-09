@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(scripts/check.sh)",
+      "Bash(scripts/gen-api.sh)",
+      "Bash(scripts/build-docs.sh)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet format:*)",
+      "Bash(dotnet ef:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git worktree:*)",
+      "Bash(podman ps:*)",
+      "Bash(podman logs:*)",
+      "Bash(podman compose ps:*)"
+    ],
+    "deny": [
+      "Edit(docs/site/**)",
+      "Edit(backend/contracts/XDrishti.Api.json)",
+      "Edit(frontend/src/shared/api/schema.d.ts)",
+      "Read(**/Library/Application Support/xDrishti/secrets/**)",
+      "Read(.env*)",
+      "Bash(security find-generic-password:*)",
+      "Bash(security dump-keychain:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git commit --no-verify:*)",
+      "Bash(podman volume rm:*)",
+      "Bash(podman volume prune:*)",
+      "Bash(podman system prune:*)",
+      "Bash(podman system reset:*)",
+      "Bash(podman machine rm:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-secrets.sh" }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/format-on-edit.sh", "timeout": 60 }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/require-check.sh" }]
+      }
+    ]
+  }
+}
