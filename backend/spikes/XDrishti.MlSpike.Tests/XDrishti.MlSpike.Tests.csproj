@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.MlSpike\XDrishti.MlSpike.csproj" />
+  </ItemGroup>
+  <Import Project="..\..\tests\Tests.props" />
+</Project>

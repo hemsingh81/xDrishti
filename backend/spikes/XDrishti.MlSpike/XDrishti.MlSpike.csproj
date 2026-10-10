@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Throwaway spike (P0-16): ML.NET gradient-boosted trees on linux/arm64 in the shipped container images. Not shipped. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>xd-mlspike</AssemblyName>
+    <!-- Microsoft.ML's build targets refuse an arm64 PlatformTarget ("supports x64 and x86"); its supported opt-out. Needed for linux-arm64 publishes. -->
+    <EnableMLUnsupportedPlatformTargetCheck>false</EnableMLUnsupportedPlatformTargetCheck>
+    <!-- Same for the LightGBM package ("supports x64"); the arm64 native library is supplied separately (see Dockerfile). -->
+    <EnableLightGBMUnsupportedPlatformTargetCheck>false</EnableLightGBMUnsupportedPlatformTargetCheck>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML" />
+    <PackageReference Include="Microsoft.ML.LightGbm" />
+    <PackageReference Include="Microsoft.ML.FastTree" />
+    <InternalsVisibleTo Include="XDrishti.MlSpike.Tests" />
+  </ItemGroup>
+</Project>

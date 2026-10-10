@@ -24,5 +24,7 @@
     <Project Path="spikes/XDrishti.DhanTrial.Tests/XDrishti.DhanTrial.Tests.csproj" />
     <Project Path="spikes/XDrishti.LlmBench/XDrishti.LlmBench.csproj" />
     <Project Path="spikes/XDrishti.LlmBench.Tests/XDrishti.LlmBench.Tests.csproj" />
+    <Project Path="spikes/XDrishti.MlSpike/XDrishti.MlSpike.csproj" />
+    <Project Path="spikes/XDrishti.MlSpike.Tests/XDrishti.MlSpike.Tests.csproj" />
   </Folder>
 </Solution>
