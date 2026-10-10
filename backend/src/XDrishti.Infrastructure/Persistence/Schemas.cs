@@ -4,4 +4,6 @@ namespace XDrishti.Infrastructure.Persistence;
 public static class Schemas
 {
     public const string Platform = "platform";
+
+    public const string Auth = "auth";
 }

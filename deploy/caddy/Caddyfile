@@ -15,6 +15,8 @@
 		X-Frame-Options DENY
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# The app, the API and the guarded docs are one origin: forbid foreign scripts, frames, forms and plugins.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 		-Server
 	}
 
@@ -29,17 +31,43 @@
 
 	# Project documentation, served read-only from the repo: the clickable prototype (with the delivery plan at
 	# /prototype/delivery/) and the generated design-docs site. Always revalidated so edits show immediately.
+	# Not public: the proxy first asks the API whether the request carries a valid session cookie
+	# (GET /api/auth/verify → 204); anything else is sent to the login page and returns here afterwards.
 	redir /prototype /prototype/ permanent
 	redir /docs /docs/ permanent
 	handle_path /prototype/* {
-		root * /srv/prototype
+		forward_auth xd-api:8080 {
+			uri /api/auth/verify
+			@unauthenticated status 401
+			handle_response @unauthenticated {
+				redir * /login?next={http.request.orig_uri.path} 302
+			}
+		}
+		root * /srv-static/prototype
 		header Cache-Control "no-cache"
+		# The prototype and the docs site use inline scripts and styles of their own (static, read-only content).
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 		file_server
 	}
 	handle_path /docs/* {
-		root * /srv/docs
+		forward_auth xd-api:8080 {
+			uri /api/auth/verify
+			@unauthenticated status 401
+			handle_response @unauthenticated {
+				redir * /login?next={http.request.orig_uri.path} 302
+			}
+		}
+		root * /srv-static/docs
 		header Cache-Control "no-cache"
+		header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
 		file_server
+	}
+
+	# Defence in depth: the docs are mounted outside the SPA root (/srv), and any path that still looks like them but was not
+	# caught by the guarded handlers above (odd casing, repeated slashes, encoded segments) is refused, never served.
+	@unguardedDocs path_regexp (?i)^/+(prototype|docs)(/|$)
+	handle @unguardedDocs {
+		respond "Not found" 404
 	}
 
 	root * /srv

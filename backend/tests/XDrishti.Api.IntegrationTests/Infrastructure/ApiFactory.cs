@@ -1,6 +1,12 @@
+using System.Net.Http.Json;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
+using XDrishti.Api.Auth;
+using XDrishti.Application.Auth;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Infrastructure;
@@ -12,6 +18,13 @@ namespace XDrishti.Api.IntegrationTests.Infrastructure;
 public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string TimescaleImage = "docker.io/timescale/timescaledb:2.30.2-pg18";
+
+    /// <summary>Not a real credential: a made-up address and a password generated anew for every test run.</summary>
+    public const string OwnerEmail = "owner@example.invalid";
+
+    public const string OwnerName = "Test Owner";
+
+    private static int _clientCounter;
 
     private readonly PostgreSqlContainer _database;
 
@@ -25,10 +38,18 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             .Build();
     }
 
+    public string OwnerPassword { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
+
+    public AdjustableTimeProvider Clock { get; } = new();
+
+    /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
+    public string AdminConnectionString => _database.GetConnectionString();
+
     public async ValueTask InitializeAsync()
     {
         await _database.StartAsync();
         await DatabaseMigrator.MigrateAsync(Services);
+        (await OwnerBootstrap.ProvisionAsync(Services)).ShouldBe(0);
     }
 
     public override async ValueTask DisposeAsync()
@@ -41,6 +62,51 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("Database:ConnectionString", _database.GetConnectionString());
+        builder.UseSetting("Auth:Owner:Email", OwnerEmail);
+        builder.UseSetting("Auth:Owner:Name", OwnerName);
+        builder.UseSetting("Auth:Owner:Password", OwnerPassword);
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddSingleton<TimeProvider>(Clock);
+            services.AddTransient<IStartupFilter, LoopbackRemoteAddressStartupFilter>();
+        });
+    }
+
+    /// <summary>A client without a session. Each client appears to come from its own address (own rate-limit bucket); cookies are handled by the tests.</summary>
+    public HttpClient CreateAnonymousClient()
+    {
+        var client = CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false, AllowAutoRedirect = false });
+        var n = Interlocked.Increment(ref _clientCounter);
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", $"198.18.{n / 250}.{(n % 250) + 1}");
+        return client;
+    }
+
+    /// <summary>Signs in as the owner and returns a client that sends the session cookie and the CSRF token.</summary>
+    public async Task<SignedInClient> SignInAsync(CancellationToken cancellationToken)
+    {
+        var client = CreateAnonymousClient();
+        using var response = await client.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email = OwnerEmail, password = OwnerPassword }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var session = (await response.Content.ReadFromJsonAsync<SessionInfo>(cancellationToken))!;
+        var cookie = SessionCookieValue(response)!;
+        client.DefaultRequestHeaders.Add("Cookie", $"xd.sid={cookie}");
+        client.DefaultRequestHeaders.Add("X-CSRF-Token", session.CsrfToken);
+        return new SignedInClient(client, session, cookie);
+    }
+
+    /// <summary>Resets the owner to the factory's credentials: clears a lockout and ends every session. For tests that lock or change the account.</summary>
+    public async Task RestoreOwnerAsync() => (await OwnerBootstrap.ResetAsync(Services)).ShouldBe(0);
+
+    public static string? SessionCookieValue(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues("Set-Cookie", out var cookies))
+        {
+            return null;
+        }
+
+        var line = cookies.FirstOrDefault(c => c.StartsWith("xd.sid=", StringComparison.Ordinal));
+        return line?.Split(';')[0]["xd.sid=".Length..];
     }
 }
 

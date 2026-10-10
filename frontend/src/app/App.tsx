@@ -1,6 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useState } from 'react';
 import { RouterProvider } from 'react-router/dom';
+import { connectAuth } from '@/features/auth';
 import { AppThemeProvider } from '@/theme';
 import { createQueryClient } from './queryClient';
 import { createAppRouter } from './router';
@@ -11,7 +12,11 @@ const QueryDevtools = import.meta.env.DEV
   : () => null;
 
 export function App() {
-  const [queryClient] = useState(createQueryClient);
+  const [queryClient] = useState(() => {
+    const client = createQueryClient();
+    connectAuth(client); // CSRF header + global 401 handling, before the first request
+    return client;
+  });
   const [router] = useState(createAppRouter);
 
   return (

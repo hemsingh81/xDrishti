@@ -2,6 +2,7 @@ import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
 import { AppBar, IconButton, Toolbar, Tooltip, Typography } from '@mui/material';
+import { UserMenu } from '@/features/auth';
 import { useColorMode } from '@/theme';
 
 export function TopBar({ title, onMenu }: { title: string; onMenu: () => void }) {
@@ -20,6 +21,7 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
             {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>
         </Tooltip>
+        <UserMenu />
       </Toolbar>
     </AppBar>
   );

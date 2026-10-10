@@ -55,13 +55,13 @@ standby Data account, notify you and record it in the audit log.
 
 | Control | Design |
 |---------|--------|
-| Login | Username + password on a centred sign-in panel; a locked session shows *Welcome back · Unlock* (password only, survives reload); single owner account created at first start. No second factor: the app is personal and reachable only on this machine / home LAN (a passkey can be added later if remote access is ever enabled) |
-| Password storage | ASP.NET Core Identity hashing (PBKDF2); never stored in plain text |
-| Sessions | Secure HTTP-only cookie; idle timeout 30 min (configurable); absolute timeout 12 h; "lock" button |
-| Lockout | 5 failed attempts → 15-minute lockout; all attempts in the audit log |
+| Login | E-mail + password on a centred sign-in panel; a locked session shows *Welcome back · Unlock* (password only, survives reload); single fixed owner account, **no sign-up**: provisioned by `xd-migrate` from the Keychain items `xdrishti/auth/owner-email\|owner-name\|owner-password` (created with `scripts/auth-secrets.sh`) if none exists. Wrong e-mail and wrong password give the same `401 auth.invalid_credentials`. No second factor: the app is personal and reachable only on this machine / home LAN (a passkey can be added later if remote access is ever enabled) |
+| Password storage | PBKDF2-HMAC-SHA512, ≥ 210,000 iterations, random salt (parameters stored with the hash; upgraded at the next login); never stored or logged in plain text. Changed with `scripts/auth-secrets.sh` + `deploy/xd-up.sh --owner-reset` (also signs out every session) |
+| Sessions | Server-side, revocable, stored hashed in `auth.sessions`; opaque cookie `xd.sid` (HttpOnly, SameSite=Strict, `Secure` on HTTPS); idle timeout 30 min (sliding, last-seen written ≤ once a minute); absolute timeout 12 h; CSRF header `X-CSRF-Token` on every POST/PUT/PATCH/DELETE; sign-out revokes the session; "lock" button (later) |
+| Lockout | 5 consecutive failures → 15-minute lock (`423 auth.locked` + `retryAfterSeconds`; a correct password is refused during the lock); login route also limited to 10 attempts/minute per client address (`429`); every sign-in event (success, failure, lock, logout, idle/absolute expiry, owner provisioning/reset) in `auth.audit_events`, readable via `GET /api/auth/audit` |
 | Step-up auth | Password re-entry for sensitive actions: account roles/credentials, config activation, enabling execution, deleting data |
-| Recovery | One-time recovery codes generated at setup |
-| Every endpoint protected | REST, SignalR, Hangfire dashboard and file downloads require login; only `/health` is anonymous |
+| Recovery | No recovery codes: the owner resets the password from the Keychain (`xd-up.sh --owner-reset`); there is no e-mail reset |
+| Every endpoint protected | Closed by default (fallback authorization policy): REST, OpenAPI/API docs, SignalR, Hangfire dashboard and file downloads require a session; only `/health/*`, `POST /api/auth/login` and `GET /api/auth/session` are anonymous. The static docs at `/prototype/` and `/docs/` are protected by the proxy (`forward_auth` → `GET /api/auth/verify`); the React shell and its assets stay public so the login page can load |
 | Network | Reachable only on the home LAN via HTTPS (Caddy); optional WireGuard for remote; MCP/LLM on the internal network only |
 
 ## 3. Operating model — configure once, services run it

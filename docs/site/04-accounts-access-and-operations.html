@@ -188,19 +188,19 @@ standby Data account, notify you and record it in the audit log.</p>
 </thead>
 <tbody><tr>
 <td>Login</td>
-<td>Username + password on a centred sign-in panel; a locked session shows <em>Welcome back · Unlock</em> (password only, survives reload); single owner account created at first start. No second factor: the app is personal and reachable only on this machine / home LAN (a passkey can be added later if remote access is ever enabled)</td>
+<td>E-mail + password on a centred sign-in panel; a locked session shows <em>Welcome back · Unlock</em> (password only, survives reload); single fixed owner account, <strong>no sign-up</strong>: provisioned by <code>xd-migrate</code> from the Keychain items <code>xdrishti/auth/owner-email|owner-name|owner-password</code> (created with <code>scripts/auth-secrets.sh</code>) if none exists. Wrong e-mail and wrong password give the same <code>401 auth.invalid_credentials</code>. No second factor: the app is personal and reachable only on this machine / home LAN (a passkey can be added later if remote access is ever enabled)</td>
 </tr>
 <tr>
 <td>Password storage</td>
-<td>ASP.NET Core Identity hashing (PBKDF2); never stored in plain text</td>
+<td>PBKDF2-HMAC-SHA512, ≥ 210,000 iterations, random salt (parameters stored with the hash; upgraded at the next login); never stored or logged in plain text. Changed with <code>scripts/auth-secrets.sh</code> + <code>deploy/xd-up.sh --owner-reset</code> (also signs out every session)</td>
 </tr>
 <tr>
 <td>Sessions</td>
-<td>Secure HTTP-only cookie; idle timeout 30 min (configurable); absolute timeout 12 h; &quot;lock&quot; button</td>
+<td>Server-side, revocable, stored hashed in <code>auth.sessions</code>; opaque cookie <code>xd.sid</code> (HttpOnly, SameSite=Strict, <code>Secure</code> on HTTPS); idle timeout 30 min (sliding, last-seen written ≤ once a minute); absolute timeout 12 h; CSRF header <code>X-CSRF-Token</code> on every POST/PUT/PATCH/DELETE; sign-out revokes the session; &quot;lock&quot; button (later)</td>
 </tr>
 <tr>
 <td>Lockout</td>
-<td>5 failed attempts → 15-minute lockout; all attempts in the audit log</td>
+<td>5 consecutive failures → 15-minute lock (<code>423 auth.locked</code> + <code>retryAfterSeconds</code>; a correct password is refused during the lock); login route also limited to 10 attempts/minute per client address (<code>429</code>); every sign-in event (success, failure, lock, logout, idle/absolute expiry, owner provisioning/reset) in <code>auth.audit_events</code>, readable via <code>GET /api/auth/audit</code></td>
 </tr>
 <tr>
 <td>Step-up auth</td>
@@ -208,11 +208,11 @@ standby Data account, notify you and record it in the audit log.</p>
 </tr>
 <tr>
 <td>Recovery</td>
-<td>One-time recovery codes generated at setup</td>
+<td>No recovery codes: the owner resets the password from the Keychain (<code>xd-up.sh --owner-reset</code>); there is no e-mail reset</td>
 </tr>
 <tr>
 <td>Every endpoint protected</td>
-<td>REST, SignalR, Hangfire dashboard and file downloads require login; only <code>/health</code> is anonymous</td>
+<td>Closed by default (fallback authorization policy): REST, OpenAPI/API docs, SignalR, Hangfire dashboard and file downloads require a session; only <code>/health/*</code>, <code>POST /api/auth/login</code> and <code>GET /api/auth/session</code> are anonymous. The static docs at <code>/prototype/</code> and <code>/docs/</code> are protected by the proxy (<code>forward_auth</code> → <code>GET /api/auth/verify</code>); the React shell and its assets stay public so the login page can load</td>
 </tr>
 <tr>
 <td>Network</td>
@@ -508,7 +508,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-09 20:19</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-10 14:15</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

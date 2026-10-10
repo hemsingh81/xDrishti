@@ -11,4 +11,7 @@
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Infrastructure.Tests" />
+  </ItemGroup>
 </Project>

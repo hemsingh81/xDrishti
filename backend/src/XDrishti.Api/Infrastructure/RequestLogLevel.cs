@@ -12,6 +12,8 @@ internal static class RequestLogLevel
             return LogEventLevel.Error;
         }
 
-        return context.Request.Path.StartsWithSegments("/health") ? LogEventLevel.Verbose : LogEventLevel.Information;
+        // Probes and the proxy's per-request session check are noise: verbose only.
+        var quiet = context.Request.Path.StartsWithSegments("/health") || context.Request.Path.StartsWithSegments("/api/auth/verify");
+        return quiet ? LogEventLevel.Verbose : LogEventLevel.Information;
     }
 }

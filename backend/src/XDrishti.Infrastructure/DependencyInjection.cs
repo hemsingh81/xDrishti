@@ -4,7 +4,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
 
@@ -42,6 +44,13 @@ public static class DependencyInjection
 
         services.AddScoped<IServiceHeartbeatStore, ServiceHeartbeatStore>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();
+
+        services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddSingleton<ITokenGenerator, TokenGenerator>();
+        services.AddScoped<IOwnerAccountStore, OwnerAccountStore>();
+        services.AddScoped<ISessionStore, SessionStore>();
+        services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<IAuthUnitOfWork, AuthUnitOfWork>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", HealthStatus.Unhealthy, ["ready"]);

@@ -22,4 +22,18 @@ internal static class MigrationBuilderExtensions
                 END IF;
             END $$;
             """);
+
+    /// <summary>
+    /// Makes a table append-only for the runtime role (it can still read and insert). Call after <see cref="GrantSchemaUsageToAppRole"/>
+    /// and after any later migration that re-grants the schema. No-op when the role does not exist (e.g. integration-test databases).
+    /// </summary>
+    public static void MakeAppendOnlyForAppRole(this MigrationBuilder migrationBuilder, string schema, string table) =>
+        migrationBuilder.Sql($"""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{AppRole}') THEN
+                    REVOKE UPDATE, DELETE ON {schema}.{table} FROM {AppRole};
+                END IF;
+            END $$;
+            """);
 }

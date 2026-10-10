@@ -10,3 +10,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0003](0003-local-stack-compose-and-secrets.md) | Local stack: Docker Compose on Podman; secrets as files written from the Keychain | Accepted |
 | [0004](0004-agentic-development-workflow.md) | Agentic development: Claude Code native tooling + lightweight specs, no external framework | Accepted |
 | [0005](0005-local-llm-runtime-and-models.md) | Local LLM: container GPU runtime on the 24 GB machine, Qwen3-30B-A3B (alt gpt-oss-20b), on demand | Proposed (owner to confirm) |
+| [0006](0006-owner-auth-sessions.md) | Owner authentication: server-side cookie sessions, PBKDF2, derived CSRF token, closed-by-default API | Accepted |

@@ -1,0 +1,40 @@
+using Microsoft.Extensions.Logging;
+
+namespace XDrishti.Application.Auth;
+
+/// <summary>Structured log events of the auth module. Only the e-mail address is logged (text typed by a client goes through <see cref="LogSanitizer"/> first) — never passwords, hashes or tokens.</summary>
+internal static partial class AuthLog
+{
+    [LoggerMessage(EventId = 1001, Level = LogLevel.Information, Message = "Login succeeded for {Email}")]
+    public static partial void LoginSucceeded(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1002, Level = LogLevel.Warning, Message = "Login failed for {Email}")]
+    public static partial void LoginFailed(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1003, Level = LogLevel.Warning, Message = "Account {Email} locked for {Minutes} minutes after repeated failures")]
+    public static partial void AccountLocked(ILogger logger, string email, int minutes);
+
+    [LoggerMessage(EventId = 1004, Level = LogLevel.Warning, Message = "Login refused for {Email}: account is locked")]
+    public static partial void LoginRefusedLocked(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1005, Level = LogLevel.Information, Message = "Logout of {Email}")]
+    public static partial void LoggedOut(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1006, Level = LogLevel.Information, Message = "Session of {Email} ended: {Reason}")]
+    public static partial void SessionExpired(ILogger logger, string email, string reason);
+
+    [LoggerMessage(EventId = 1007, Level = LogLevel.Information, Message = "Owner account {Email} provisioned")]
+    public static partial void OwnerProvisioned(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1008, Level = LogLevel.Information, Message = "Owner account already exists; nothing to provision")]
+    public static partial void OwnerAlreadyExists(ILogger logger);
+
+    [LoggerMessage(EventId = 1009, Level = LogLevel.Warning, Message = "Owner password reset for {Email}; {Count} session(s) revoked")]
+    public static partial void OwnerPasswordReset(ILogger logger, string email, int count);
+
+    [LoggerMessage(EventId = 1010, Level = LogLevel.Information, Message = "Password hash of {Email} upgraded to current parameters")]
+    public static partial void PasswordHashUpgraded(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1011, Level = LogLevel.Warning, Message = "Sign-in gave up after {Attempts} concurrent-update conflicts on the owner account")]
+    public static partial void ConcurrencyGaveUp(ILogger logger, int attempts);
+}

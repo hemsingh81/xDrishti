@@ -1,6 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
+using XDrishti.Api.Auth;
+using XDrishti.Application.Auth;
 using XDrishti.Application.Platform.SystemStatus;
 
 namespace XDrishti.Api.Infrastructure;
@@ -11,6 +13,9 @@ namespace XDrishti.Api.Infrastructure;
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, NumberHandling = JsonNumberHandling.Strict)]
 [JsonSerializable(typeof(SystemStatusResponse))]
+[JsonSerializable(typeof(LoginRequest))]
+[JsonSerializable(typeof(SessionInfo))]
+[JsonSerializable(typeof(IReadOnlyList<AuditEventResponse>))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSerializable(typeof(HttpValidationProblemDetails))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using XDrishti.Domain.Auth;
 using XDrishti.Domain.Platform;
 
 namespace XDrishti.Infrastructure.Persistence;
@@ -10,6 +11,12 @@ namespace XDrishti.Infrastructure.Persistence;
 public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> options) : DbContext(options)
 {
     public DbSet<ServiceHeartbeat> ServiceHeartbeats => Set<ServiceHeartbeat>();
+
+    public DbSet<OwnerAccount> OwnerAccounts => Set<OwnerAccount>();
+
+    public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
+
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

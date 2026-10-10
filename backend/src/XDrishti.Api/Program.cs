@@ -1,3 +1,4 @@
+using XDrishti.Api.Auth;
 using XDrishti.Api.Infrastructure;
 using XDrishti.Application;
 using XDrishti.Hosting;
@@ -20,11 +21,17 @@ builder.Services
 
 var app = builder.Build();
 
-// One-shot deployment step: `dotnet XDrishti.Api.dll migrate`.
+// One-shot deployment step: `dotnet XDrishti.Api.dll migrate` (also provisions the owner account when none exists).
 if (args.Contains("migrate", StringComparer.Ordinal))
 {
     await DatabaseMigrator.MigrateAsync(app.Services);
-    return 0;
+    return await OwnerBootstrap.ProvisionAsync(app.Services);
+}
+
+// One-shot: `dotnet XDrishti.Api.dll owner-reset` replaces the owner's password from the secrets and ends all sessions.
+if (args.Contains("owner-reset", StringComparer.Ordinal))
+{
+    return await OwnerBootstrap.ResetAsync(app.Services);
 }
 
 app.UseApi();

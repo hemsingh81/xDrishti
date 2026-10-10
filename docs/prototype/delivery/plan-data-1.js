@@ -55,7 +55,7 @@
       refs: "04, 05, 06", goal: "Reliable market data for all tracked instruments, plus login, accounts, baskets and the service framework.",
       exit: "Your CSV history imported; 5 unattended EOD fetches; all timeframes match a hand-check on 10 samples.",
       stories: [
-        S("P1-01", "Password login, session, lockout, idle timeout, audit", "feature", "fullstack", 5, "must", "backlog", "04 §2", [], ["Every screen and API requires login; lockout after repeated failures", "Logins and failures audited; idle timeout works"]),
+        S("P1-01", "Password login, session, lockout, idle timeout, audit", "feature", "fullstack", 5, "must", "doing", "04 §2", [], ["Every screen and API requires login; lockout after repeated failures", "Logins and failures audited; idle timeout works"]),
         S("P1-02", "Password re-entry for sensitive actions", "feature", "fullstack", 2, "must", "backlog", "04 §2", ["P1-01"], ["Role changes and config activation require the password again", "Re-entry window expires and is audited"]),
         S("P1-03", "Dhan adapter: instrument master import and search", "feature", "backend", 3, "must", "backlog", "05 §7, 06 §2", [], ["Master list refreshes daily and is searchable/filterable", "Adapter sits behind a broker interface (no Dhan types leak)"]),
         S("P1-04", "Dhan adapter: token lifecycle and history client", "feature", "backend", 3, "must", "backlog", "05 §7, §8", ["P1-03"], ["Token auto-renewed; status visible per account", "Rate limits and retries handled; contract-tested with recorded fixtures"]),

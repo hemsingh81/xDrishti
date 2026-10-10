@@ -12,3 +12,9 @@ Rules: [`CLAUDE.md`](CLAUDE.md) · UX reference: [`docs/prototype`](../docs/prot
 
 Structure: `src/app` (shell, router, navigation) · `src/features/<name>` (feature + public `index.ts`) ·
 `src/shared/{api,ui,lib}` · `src/theme` · `src/test`. In production the build is served by `xd-proxy` (Caddy).
+
+Authentication (`src/features/auth`): every route except `/login` sits behind `RequireAuth`; the session cookie
+(`xd.sid`, HttpOnly) is set by the API, the CSRF token lives only in the TanStack Query cache (never in web storage)
+and is attached by the shared client to unsafe requests. In `npm run dev` the Vite proxy forwards cookies unchanged,
+so sign in through http://localhost:5173/login against the stack on :8080 (the static `/prototype/` and `/docs/` are
+served by the proxy only on :8080).

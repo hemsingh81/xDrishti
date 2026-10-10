@@ -22,8 +22,9 @@ broker/exchange APIs.
 
 | Container | Image basis | Profile | Notes |
 |-----------|-------------|---------|-------|
-| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health` (later `/hubs`, `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site); compression, security headers |
-| `xd-migrate` | API image, `migrate` | core | One-shot: applies migrations, then exits |
+| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health` (later `/hubs`, `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site) — both only for a signed-in owner (`forward_auth` to `/api/auth/verify`, otherwise redirect to `/login`); compression, security headers |
+| `xd-migrate` | API image, `migrate` | core | One-shot: applies migrations, provisions the owner account when none exists, then exits |
+| `xd-owner-reset` | API image, `owner-reset` | tools | On-demand one-shot (`xd-up.sh --owner-reset`): replaces the owner's password from the secrets, revokes all sessions |
 | `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint |
 | `xd-worker` | .NET 10 + Hangfire | core | CSV import (watches `data/inbox`), EOD fetch, aggregation, account & portfolio sync, nightly pipeline, backtests, Lab runs, ML.NET training; scale replicas |
 | `xd-feed` | .NET 10 | core | Market hours: Dhan WebSocket for the active set, quote polling for holdings, live bars & alerts (later also depth recording) |
@@ -57,6 +58,10 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
    `~/Library/Application Support/xDrishti/secrets` (private folder) → Compose mounts them as file secrets
    ([ADR 0003](../adr/0003-local-stack-compose-and-secrets.md)).
 3. Containers receive only what they need (mounted at `/run/secrets/<ConfigKey>`, read by .NET KeyPerFile provider).
+   The owner's sign-in credentials (`xdrishti/auth/owner-email|owner-name|owner-password`) are never generated: `xd-up.sh` asks for
+   them at a terminal (hidden password prompt) or fails with a pointer to `scripts/auth-secrets.sh`. They are mounted only into
+   `xd-migrate` (creates the owner when none exists) and the on-demand `xd-owner-reset` (profile `tools`, `xd-up.sh --owner-reset`),
+   never into the running `xd-api`.
 4. Never in images, compose files, environment dumps, logs or LLM context.
 
 ## 5. Operations

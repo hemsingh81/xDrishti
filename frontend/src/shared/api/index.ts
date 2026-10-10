@@ -1,2 +1,2 @@
-export { api, ApiError, unwrap } from './client';
-export type { Schemas, ServiceStatus, SystemStatus } from './types';
+export { api, ApiError, configureApiAuth, unwrap, type ApiAuthHooks } from './client';
+export type { Problem, Schemas, ServiceStatus, SessionInfo, SystemStatus, UserInfo } from './types';

@@ -25,6 +25,160 @@
           }
         }
       }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Sign in with e-mail and password; sets the session cookie",
+        "operationId": "Login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/session": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "The current session (user, CSRF token, timeouts), or 401",
+        "operationId": "GetSession",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "End the current session and clear the cookie",
+        "operationId": "Logout",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/auth/verify": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "204 when the cookie holds a valid session (used by the proxy for the static docs)",
+        "operationId": "VerifySession",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/auth/audit": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Latest sign-in events, newest first",
+        "operationId": "GetAuthAudit",
+        "parameters": [
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditEventResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -59,6 +213,43 @@
           "uptimeSeconds": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "AuditEventResponse": {
+        "required": [
+          "at",
+          "event",
+          "email",
+          "ip",
+          "userAgent"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ip": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userAgent": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -111,6 +302,67 @@
           }
         }
       },
+      "LoginRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "description": "Body of `POST /api/auth/login`."
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid."
+          },
+          "retryAfterSeconds": {
+            "type": "integer",
+            "description": "Present on auth.locked and auth.rate_limited: seconds until a new attempt may succeed.",
+            "format": "int32"
+          }
+        }
+      },
       "ServiceStatus": {
         "required": [
           "name",
@@ -144,6 +396,36 @@
           }
         }
       },
+      "SessionInfo": {
+        "required": [
+          "user",
+          "csrfToken",
+          "idleTimeoutSeconds",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "user": {
+            "description": "The signed-in owner.",
+            "$ref": "#/components/schemas/UserInfo"
+          },
+          "csrfToken": {
+            "type": "string",
+            "description": "Must be sent as `X-CSRF-Token` on every state-changing request."
+          },
+          "idleTimeoutSeconds": {
+            "type": "integer",
+            "description": "The session ends after this long without a request.",
+            "format": "int32"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Absolute end of the session, whatever the activity.",
+            "format": "date-time"
+          }
+        },
+        "description": "What the client needs to know about its session."
+      },
       "SystemStatusResponse": {
         "required": [
           "application",
@@ -174,12 +456,30 @@
             "format": "date-time"
           }
         }
+      },
+      "UserInfo": {
+        "required": [
+          "email",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          }
+        }
       }
     }
   },
   "tags": [
     {
       "name": "System"
+    },
+    {
+      "name": "Auth"
     }
   ]
 }

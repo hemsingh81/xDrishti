@@ -21,6 +21,91 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auth/login': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sign in with e-mail and password; sets the session cookie */
+    post: operations['Login'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/session': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The current session (user, CSRF token, timeouts), or 401 */
+    get: operations['GetSession'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** End the current session and clear the cookie */
+    post: operations['Logout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/verify': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 204 when the cookie holds a valid session (used by the proxy for the static docs) */
+    get: operations['VerifySession'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/audit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Latest sign-in events, newest first */
+    get: operations['GetAuthAudit'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -35,6 +120,14 @@ export interface components {
       /** Format: int64 */
       uptimeSeconds: number;
     };
+    AuditEventResponse: {
+      /** Format: date-time */
+      at: string;
+      event: string;
+      email: null | string;
+      ip: null | string;
+      userAgent: null | string;
+    };
     DatabaseStatus: {
       isConnected: boolean;
       serverVersion: null | string;
@@ -46,6 +139,26 @@ export interface components {
       latencyMs: number;
       error: null | string;
     };
+    /** @description Body of `POST /api/auth/login`. */
+    LoginRequest: {
+      email: string;
+      password: string;
+    };
+    ProblemDetails: {
+      type?: null | string;
+      title?: null | string;
+      /** Format: int32 */
+      status?: null | number;
+      detail?: null | string;
+      instance?: null | string;
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid. */
+      code?: string;
+      /**
+       * Format: int32
+       * @description Present on auth.locked and auth.rate_limited: seconds until a new attempt may succeed.
+       */
+      retryAfterSeconds?: number;
+    };
     ServiceStatus: {
       name: string;
       instance: string;
@@ -56,6 +169,23 @@ export interface components {
       lastSeenAt: string;
       isAlive: boolean;
     };
+    /** @description What the client needs to know about its session. */
+    SessionInfo: {
+      /** @description The signed-in owner. */
+      user: components['schemas']['UserInfo'];
+      /** @description Must be sent as `X-CSRF-Token` on every state-changing request. */
+      csrfToken: string;
+      /**
+       * Format: int32
+       * @description The session ends after this long without a request.
+       */
+      idleTimeoutSeconds: number;
+      /**
+       * Format: date-time
+       * @description Absolute end of the session, whatever the activity.
+       */
+      expiresAt: string;
+    };
     SystemStatusResponse: {
       application: components['schemas']['ApplicationStatus'];
       database: components['schemas']['DatabaseStatus'];
@@ -63,6 +193,10 @@ export interface components {
       isHealthy: boolean;
       /** Format: date-time */
       checkedAt: string;
+    };
+    UserInfo: {
+      email: string;
+      displayName: string;
     };
   };
   responses: never;
@@ -89,6 +223,144 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SystemStatusResponse'];
+        };
+      };
+    };
+  };
+  Login: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LoginRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionInfo'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionInfo'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  Logout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  VerifySession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  GetAuthAudit: {
+    parameters: {
+      query?: {
+        take?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditEventResponse'][];
         };
       };
     };

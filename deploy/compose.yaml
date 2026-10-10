@@ -51,8 +51,38 @@ services:
     secrets:
       - source: db_owner_password
         target: Database__Password
+      # Only the migration step reads the owner's credentials (to create the owner when none exists).
+      - source: auth_owner_email
+        target: Auth__Owner__Email
+      - source: auth_owner_name
+        target: Auth__Owner__Name
+      - source: auth_owner_password
+        target: Auth__Owner__Password
     networks: [back]
     pull_policy: never # uses the image built for xd-api (compose builds all images before starting)
+    depends_on:
+      xd-db: { condition: service_healthy }
+    <<: *hardening
+
+  # One-shot, on demand (`deploy/xd-up.sh --owner-reset`): replaces the owner's password from the secrets and
+  # revokes every session. Runs as the runtime role (xd_app); not part of the normal stack (profile "tools").
+  xd-owner-reset:
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    command: [owner-reset]
+    profiles: [tools]
+    restart: "no"
+    environment: *dotnet-env
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+      - source: auth_owner_email
+        target: Auth__Owner__Email
+      - source: auth_owner_name
+        target: Auth__Owner__Name
+      - source: auth_owner_password
+        target: Auth__Owner__Password
+    networks: [back]
+    pull_policy: never
     depends_on:
       xd-db: { condition: service_healthy }
     <<: *hardening
@@ -106,8 +136,8 @@ services:
       - 127.0.0.1:${XD_HTTP_PORT:-8080}:8080
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ../docs/prototype:/srv/prototype:ro
-      - ../docs/site:/srv/docs:ro
+      - ../docs/prototype:/srv-static/prototype:ro
+      - ../docs/site:/srv-static/docs:ro
     tmpfs: ["/data:mode=1777", "/config:mode=1777"]
     networks: [front, back]
     mem_limit: 256m
@@ -151,3 +181,9 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_owner_password
   db_app_password:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_app_password
+  auth_owner_email:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_email
+  auth_owner_name:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_name
+  auth_owner_password:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_password

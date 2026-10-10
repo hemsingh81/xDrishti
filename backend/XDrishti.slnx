@@ -16,6 +16,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/XDrishti.Domain.Tests/XDrishti.Domain.Tests.csproj" />
     <Project Path="tests/XDrishti.Application.Tests/XDrishti.Application.Tests.csproj" />
+    <Project Path="tests/XDrishti.Infrastructure.Tests/XDrishti.Infrastructure.Tests.csproj" />
     <Project Path="tests/XDrishti.Architecture.Tests/XDrishti.Architecture.Tests.csproj" />
     <Project Path="tests/XDrishti.Api.IntegrationTests/XDrishti.Api.IntegrationTests.csproj" />
   </Folder>
