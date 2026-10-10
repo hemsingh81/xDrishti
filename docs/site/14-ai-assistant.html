@@ -135,15 +135,15 @@
 </thead>
 <tbody><tr>
 <td>Model server</td>
-<td><code>xd-llm</code>: llama.cpp server via RamaLama on a <strong>libkrun</strong> Podman machine (GPU), OpenAI-compatible API</td>
+<td><code>xd-llm</code>: llama.cpp server (image <code>quay.io/ramalama/ramalama</code>, pinned) on the <strong>libkrun</strong> Podman machine with GPU (Vulkan), OpenAI-compatible API; started on demand (<a href="../adr/0005-local-llm-runtime-and-models.html">ADR 0005</a>)</td>
 </tr>
 <tr>
 <td>Main model</td>
-<td>~30B-class open model, 4-bit (≈ 18–22 GB), ≥ 32K context (e.g. Qwen3-30B-A3B)</td>
+<td><strong>Qwen3-30B-A3B Q4_K_M</strong> (MoE, ≈ 18.6 GB; measured 41 tok/s at 8K context in the container); alternate <strong>gpt-oss-20b</strong> (12 GB) — final pick by the eval set (§5). Context 16K default, 32K supported; keep prompts ≤ 8K tokens</td>
 </tr>
 <tr>
 <td>Small model</td>
-<td>7–14B for classification tasks</td>
+<td>none — the MoE main model is faster than a dense 8B; a dense 14B was rejected (first token 27 s)</td>
 </tr>
 <tr>
 <td>Embeddings</td>
@@ -151,7 +151,7 @@
 </tr>
 <tr>
 <td>Fallback</td>
-<td>Host-native llama.cpp/Ollama if container GPU speed is insufficient (endpoint change only)</td>
+<td>Host-native llama.cpp (Metal) — measured 1.1–1.4× faster generation and 1.4–1.8× faster prompt reading than the container, loads in 5–10 s; endpoint change only. The container meets the speed thresholds, so it stays the default</td>
 </tr>
 </tbody></table>
 <p>Model choice is config; select by our eval set, not leaderboards.</p>
@@ -228,7 +228,7 @@ over the built-in assistant.</p>
     <a class="prev" href="13-reports-and-ui.html"><small>← Previous  [</small>13 · Reports &amp; UI</a>
     <a class="next" href="15-smart-insights-and-automation.html"><small>Next  ] →</small>15 · Smart insights &amp; automation</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/14-ai-assistant.md</code> · 2026-10-09 15:32</footer>
+  <footer class="foot">Generated from <code>docs/14-ai-assistant.md</code> · 2026-10-09 20:19</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-roles" class="d2">1. Roles</a>
 <a href="#2-setup" class="d2">2. Setup</a>

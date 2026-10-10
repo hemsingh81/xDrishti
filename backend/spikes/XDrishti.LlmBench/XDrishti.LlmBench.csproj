@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Throwaway spike (P0-15): benchmark of OpenAI-compatible local LLM servers (llama.cpp / RamaLama). Not shipped. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>xd-llm-bench</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.LlmBench.Tests" />
+  </ItemGroup>
+</Project>

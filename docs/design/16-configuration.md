@@ -262,7 +262,7 @@ strategy_lab:
 assistant:
   enabled: true
   model: "qwen3-30b-a3b"           # served by xd-llm
-  context_tokens: 32768
+  context_tokens: 16384
   features: { daily_briefing: true, data_questions: true, strategy_drafting: true, hypotheses: true }
   hermes: { enabled: false }
 

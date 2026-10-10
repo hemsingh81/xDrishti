@@ -41,7 +41,7 @@
       refs: "14", goal: "A local assistant that answers from data and drafts strategies — never deciding trades.",
       exit: "Eval set passes; Hermes adopt/reject decided.",
       stories: [
-        S("P9-01", "xd-llm container (RamaLama/llama.cpp) with GPU", "ops", "infra", 5, "must", "backlog", "14 §2", ["P0-15"], ["Model served locally on the back network only", "Resource limits and health check"]),
+        S("P9-01", "xd-llm compose service (pinned llama.cpp image, GPU, on demand)", "ops", "infra", 5, "must", "backlog", "14 §2, ADR 0005", ["P0-15"], ["Built from the P0-15 sketch: no published port on the back network, started on demand with a readiness wait of up to 2 minutes", "Real memory limit measured; LLM effect on the API/worker checked; hardening verified against /dev/dri access"]),
         S("P9-02", "xd-mcp: read-only tools over a read-only DB role", "feature", "backend", 5, "must", "backlog", "14 §3", [], ["Tools return structured data only", "Role cannot write (tested)"]),
         S("P9-03", "Assistant endpoint and chat UI", "feature", "fullstack", 5, "must", "backlog", "14 §3", ["P9-01", "P9-02"], ["Streaming answers; tool calls visible", "Auth required; no secrets in prompts"]),
         S("P9-04", "Daily briefing and weekly review", "feature", "backend", 3, "should", "backlog", "14 §4", ["P9-03"], ["Written from structured data", "Numbers only from tool results"]),
@@ -180,7 +180,7 @@
     { id: "Q5", t: "How far back should portfolio history go (Dhan trade history vs older CSV/contract notes)?", blocks: ["P2-01", "P2-03"], st: "answered", d: "2026-10-09", a: "Start with the Dhan trade-history window; import older lots from CSV / contract notes later (P2-03)." },
     { id: "Q6", t: "Willing to get a static IP from your ISP? Required only for automated orders (P12).", blocks: ["P12-09"], st: "answered", d: "2026-10-09", a: "Later — only needed before automated orders (P12). Revisit at the P11 exit." },
     { id: "Q7", t: "Repository hosting: GitHub remote or local-only? (affects CI and backups of the code)", blocks: ["OPS-05"], st: "answered", d: "2026-10-09", a: "Local-only for now; no remote or CI dependence. Keep the code backed up (see doc 17 §1)." },
-    { id: "Q8", t: "Machine capacity: keep Podman at 24 GB / 120 GB or grow it before xd-llm and tick data?", blocks: ["P0-15", "P9-01", "P13-01"], st: "answered", d: "2026-10-09", a: "Keep 24 GB / 120 GB for now; revisit at the xd-llm benchmark (P0-15) and before P13." },
+    { id: "Q8", t: "Machine capacity: keep Podman at 24 GB / 120 GB or grow it before xd-llm and tick data?", blocks: ["P0-15", "P9-01", "P13-01"], st: "answered", d: "2026-10-09", a: "Keep 24 GB / 120 GB — verified by the xd-llm benchmark (P0-15, ADR 0005); revisit before P13 tick data." },
   ];
 
   XD.risks = [
@@ -205,12 +205,13 @@
     { id: "ADR 0002", t: "Configuration and strategies live in the application (database)", st: "Accepted" },
     { id: "ADR 0003", t: "Local stack: Compose on Podman; secrets as files from the Keychain", st: "Accepted" },
     { id: "ADR 0004", t: "Agentic development: Claude Code native tooling + lightweight specs", st: "Accepted" },
-    { id: "ADR 0005", t: "Authentication: password + cookie session design", st: "Planned", needed: "P1-01" },
-    { id: "ADR 0006", t: "Background jobs: Hangfire vs custom scheduler on desired state", st: "Planned", needed: "P1-13" },
-    { id: "ADR 0007", t: "Strategy DSL: grammar, versioning and look-ahead rules", st: "Planned", needed: "P3-02" },
-    { id: "ADR 0008", t: "Time-series layout: hypertable keys, chunking, compression, aggregates", st: "Planned", needed: "P1-06" },
-    { id: "ADR 0009", t: "Live transport: SignalR vs SSE for tick-to-screen", st: "Planned", needed: "P2-08" },
-    { id: "ADR 0010", t: "Hermes adopt or reject", st: "Planned", needed: "P9-08" },
-    { id: "ADR 0011", t: "Go / no-go for live capital", st: "Planned", needed: "P10-08" },
+    { id: "ADR 0005", t: "Local LLM: container GPU runtime on the 24 GB machine, Qwen3-30B-A3B, on demand (owner to confirm container vs native)", st: "Proposed" },
+    { id: "ADR 0006", t: "Authentication: password + cookie session design", st: "Planned", needed: "P1-01" },
+    { id: "ADR 0007", t: "Background jobs: Hangfire vs custom scheduler on desired state", st: "Planned", needed: "P1-13" },
+    { id: "ADR 0008", t: "Strategy DSL: grammar, versioning and look-ahead rules", st: "Planned", needed: "P3-02" },
+    { id: "ADR 0009", t: "Time-series layout: hypertable keys, chunking, compression, aggregates", st: "Planned", needed: "P1-06" },
+    { id: "ADR 0010", t: "Live transport: SignalR vs SSE for tick-to-screen", st: "Planned", needed: "P2-08" },
+    { id: "ADR 0011", t: "Hermes adopt or reject", st: "Planned", needed: "P9-08" },
+    { id: "ADR 0012", t: "Go / no-go for live capital", st: "Planned", needed: "P10-08" },
   ];
 })();

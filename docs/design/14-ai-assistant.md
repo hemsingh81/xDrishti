@@ -19,11 +19,11 @@
 
 | Component | Choice |
 |-----------|--------|
-| Model server | `xd-llm`: llama.cpp server via RamaLama on a **libkrun** Podman machine (GPU), OpenAI-compatible API |
-| Main model | ~30B-class open model, 4-bit (≈ 18–22 GB), ≥ 32K context (e.g. Qwen3-30B-A3B) |
-| Small model | 7–14B for classification tasks |
+| Model server | `xd-llm`: llama.cpp server (image `quay.io/ramalama/ramalama`, pinned) on the **libkrun** Podman machine with GPU (Vulkan), OpenAI-compatible API; started on demand ([ADR 0005](../adr/0005-local-llm-runtime-and-models.md)) |
+| Main model | **Qwen3-30B-A3B Q4_K_M** (MoE, ≈ 18.6 GB; measured 41 tok/s at 8K context in the container); alternate **gpt-oss-20b** (12 GB) — final pick by the eval set (§5). Context 16K default, 32K supported; keep prompts ≤ 8K tokens |
+| Small model | none — the MoE main model is faster than a dense 8B; a dense 14B was rejected (first token 27 s) |
 | Embeddings | nomic-embed-text or bge-m3 (for search over notes/docs) |
-| Fallback | Host-native llama.cpp/Ollama if container GPU speed is insufficient (endpoint change only) |
+| Fallback | Host-native llama.cpp (Metal) — measured 1.1–1.4× faster generation and 1.4–1.8× faster prompt reading than the container, loads in 5–10 s; endpoint change only. The container meets the speed thresholds, so it stays the default |
 
 Model choice is config; select by our eval set, not leaderboards.
 

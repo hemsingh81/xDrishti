@@ -99,7 +99,7 @@ entered **in the application** (ADR 0002), never in the repository.
 | Q5 | Portfolio history depth | Start with the **Dhan trade-history window**; import older lots from CSV / contract notes later (P2-03) | Decided |
 | Q6 | ISP static IP | **Later** — needed only before automated orders (P12); revisit at the P11 exit | Decided |
 | Q7 | Repository hosting | **Local-only** git; no remote or CI dependence for now; back the code up ([doc 17](17-deployment-and-operations.md) §1) | Decided |
-| Q8 | Podman machine size | **Keep 10 CPUs / 24 GB / 120 GB** for now; revisit at the xd-llm benchmark (P0-15) and before tick data (P13) | Decided |
+| Q8 | Podman machine size | **Keep 10 CPUs / 24 GB / 120 GB** — verified by the xd-llm benchmark (P0-15, [ADR 0005](../adr/0005-local-llm-runtime-and-models.md)); revisit before tick data (P13) | Decided, verified |
 
 ## 6. Definition of success (v1)
 

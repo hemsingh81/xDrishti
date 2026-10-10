@@ -144,8 +144,8 @@ can change without touching Planning or Learning.
 
 | Concern | Choice |
 |---------|--------|
-| Model server | **llama.cpp server via RamaLama** container with GPU (libkrun); OpenAI-compatible API |
-| Model | ~30B-class open model at 4-bit (e.g. Qwen3-30B-A3B) with ≥ 32K context; small 7–14B for classification |
+| Model server | **llama.cpp server** (pinned RamaLama image) in a container with GPU (libkrun); OpenAI-compatible API; started on demand ([ADR 0005](../adr/0005-local-llm-runtime-and-models.md)) |
+| Model | Qwen3-30B-A3B at 4-bit (alternate gpt-oss-20b), 16K default / 32K supported context; no separate small model |
 | Integration | Assistant endpoint in `xd-api` (Microsoft.Extensions.AI) + `xd-mcp` read-only tool server |
 | Optional | Hermes Agent as hardened front-end after PoC ([doc 14](14-ai-assistant.md)) |
 

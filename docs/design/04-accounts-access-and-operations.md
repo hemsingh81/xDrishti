@@ -111,7 +111,7 @@ flowchart LR
 | Data validation | Runs after the EOD fetch | `xd-worker` |
 | Account & portfolio sync | 16:30 | `xd-worker` |
 | Nightly pipeline → proposed plan | 18:30 | `xd-worker` |
-| AI suggestions & briefing | Runs after the nightly pipeline | `xd-worker` + `xd-llm` |
+| AI suggestions & briefing | After the nightly pipeline; starts `xd-llm` on demand and waits for readiness (a 30B load took 22–105 s) | `xd-worker` + `xd-llm` |
 | CSV inbox watcher | Continuous | `xd-worker` |
 | Weekly retrain / monthly review | Sat 10:00 / 1st of month | `xd-worker` |
 | Backup | Daily 23:30 | `xd-backup` |

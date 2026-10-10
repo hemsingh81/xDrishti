@@ -391,11 +391,11 @@ can change without touching Planning or Learning.</p>
 </thead>
 <tbody><tr>
 <td>Model server</td>
-<td><strong>llama.cpp server via RamaLama</strong> container with GPU (libkrun); OpenAI-compatible API</td>
+<td><strong>llama.cpp server</strong> (pinned RamaLama image) in a container with GPU (libkrun); OpenAI-compatible API; started on demand (<a href="../adr/0005-local-llm-runtime-and-models.html">ADR 0005</a>)</td>
 </tr>
 <tr>
 <td>Model</td>
-<td>~30B-class open model at 4-bit (e.g. Qwen3-30B-A3B) with ≥ 32K context; small 7–14B for classification</td>
+<td>Qwen3-30B-A3B at 4-bit (alternate gpt-oss-20b), 16K default / 32K supported context; no separate small model</td>
 </tr>
 <tr>
 <td>Integration</td>
@@ -812,7 +812,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-09 15:32</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-09 20:19</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

@@ -7,11 +7,12 @@ broker/exchange APIs.
 
 - Containers run in a Linux VM (Podman machine). Use the **libkrun** provider on Apple Silicon — it gives
   containers GPU acceleration (Vulkan), which `xd-llm` needs.
-- Size: planned **10 CPUs, 32 GB RAM, 250 GB disk**; the running machine is **10 CPUs, 24 GB, 120 GB** (decision Q8,
-  2026-10-09: keep it until the xd-llm benchmark in P0-15; grow it before the local LLM or tick data need more).
+- Size: **10 CPUs, 24 GB RAM, 120 GB disk** (decision Q8; confirmed by the xd-llm benchmark in P0-15, 2026-10-10: with the 30B model loaded and
+  the stack running the VM peaked at 5.3 GB because model weights live in GPU memory). Revisit the disk before tick-data storage (P13).
 - Static IP (decision Q6): not needed until automated orders (P12) — see §6.
-- The 30B-class local LLM needs ≈ 18–22 GB ([doc 14](14-ai-assistant.md) §2), which does not fit beside the stack in 24 GB:
-  **P0-15 must settle the machine size** before P9-01.
+- The host Mac (48 GB) is already swapping heavily (28–42 GB of macOS swap in use in the sampled P0-15 runs); a resident 30B model adds ≈ 20 GB of GPU memory and
+  loaded in 22–105 s (cause not established). `xd-llm` is therefore started on demand ([ADR 0005](../adr/0005-local-llm-runtime-and-models.md)).
+- Disk budget: VM disk 120 GB (originally planned 250 GB) holds the images, databases and, if used, the 18.6 GB model volume; revisit before tick data (P13).
 - Source code: **local git only** (decision Q7) — no remote yet. Keep a copy outside the Mac's internal disk
   (Time Machine or the external SSD) until a remote is chosen; `xd-backup` protects data, not code.
 - The Mac must be awake for nightly jobs (and during market hours for later live services): no sleep on
@@ -30,7 +31,7 @@ broker/exchange APIs.
 | `xd-db` | PostgreSQL + TimescaleDB (official image) | core | Named volume; read-only role for tools |
 | `xd-seq` | Seq | ops | Logs |
 | `xd-backup` | restic + pg_dump | ops | Nightly encrypted backup to external SSD |
-| `xd-llm` | RamaLama / llama.cpp server | ai | GPU via libkrun; models volume |
+| `xd-llm` | llama.cpp server (pinned RamaLama image) | ai | GPU via libkrun (`/dev/dri`); model from the host folder or the volume `xd-models` (decide in P9-01); no published port; on demand |
 | `xd-mcp` | .NET 10 | ai | Read-only MCP tools |
 | `xd-hermes` | Own image, pinned Hermes Agent | ai (optional) | Only after PoC; hardened (doc 14) |
 | `xd-exec` | .NET 10 | live (later) | Orders; isolated network; only holder of order-capable tokens |

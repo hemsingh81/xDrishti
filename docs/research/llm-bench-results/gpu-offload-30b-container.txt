@@ -1,0 +1,5 @@
+0.00.364.277 I llama_prepare_model_devices: using device Vulkan0 (Virtio-GPU Venus (Apple M4 Pro)) (unknown id) - 49152 MiB free
+0.00.464.837 I load_tensors: offloaded 49/49 layers to GPU
+0.00.464.840 I load_tensors:      Vulkan0 model buffer size = 17524.42 MiB
+0.00.464.840 I load_tensors:  Vulkan_Host model buffer size =   166.92 MiB
+1.33.628.670 I llama_kv_cache:    Vulkan0 KV buffer size =  3072.00 MiB
