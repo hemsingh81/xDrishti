@@ -10,6 +10,10 @@ internal static class HttpContextAuthExtensions
     public static ClientInfo GetClientInfo(this HttpContext context) =>
         new(context.Connection.RemoteIpAddress?.ToString(), context.Request.Headers.UserAgent.ToString());
 
+    /// <summary>Who is acting, for audit entries: the signed-in owner's e-mail address. Only call on endpoints that require a session.</summary>
+    public static string GetActor(this HttpContext context) =>
+        context.GetVerifiedSession()?.Info.User.Email ?? "unknown";
+
     /// <summary>The verified session of this request, set by the authentication handler; null when not signed in.</summary>
     public static VerifiedSession? GetVerifiedSession(this HttpContext context) =>
         context.Items.TryGetValue(VerifiedSessionKey, out var value) ? value as VerifiedSession : null;

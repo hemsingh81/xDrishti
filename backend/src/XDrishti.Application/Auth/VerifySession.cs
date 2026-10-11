@@ -12,7 +12,11 @@ public sealed record VerifySessionQuery(string SessionToken, ClientInfo Client) 
 /// <param name="SessionId">Identifies the session (for logout).</param>
 /// <param name="OwnerId">The signed-in owner.</param>
 /// <param name="Info">The session facts shown to the client.</param>
-public sealed record VerifiedSession(Guid SessionId, Guid OwnerId, SessionInfo Info);
+public sealed record VerifiedSession(Guid SessionId, Guid OwnerId, SessionInfo Info)
+{
+    /// <summary>True when the password was re-entered recently (the step-up window is open) at the time the session was verified.</summary>
+    public bool IsElevated => Info.ElevatedUntil is not null;
+}
 
 internal sealed class VerifySessionHandler(
     ISessionStore sessions,
@@ -56,7 +60,8 @@ internal sealed class VerifySessionHandler(
             new UserInfo(owner.Email, owner.DisplayName),
             tokens.DeriveCsrfToken(query.SessionToken),
             (int)AuthSession.IdleTimeout.TotalSeconds,
-            session.ExpiresAt);
+            session.ExpiresAt,
+            session.IsElevated(now) ? session.ElevatedUntil : null);
         return Result.Success(new VerifiedSession(session.Id, owner.Id, info));
     }
 

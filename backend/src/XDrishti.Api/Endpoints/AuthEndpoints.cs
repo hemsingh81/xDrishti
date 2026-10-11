@@ -22,6 +22,12 @@ internal sealed class AuthEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status423Locked)
             .ProducesProblem(StatusCodes.Status429TooManyRequests);
 
+        group.MapPost("/step-up", StepUpAsync)
+            .WithName("StepUp")
+            .WithSummary("Re-enter the password to allow sensitive actions for 5 minutes")
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status423Locked);
+
         group.MapGet("/session", GetSession)
             .AllowAnonymous()
             .WithName("GetSession")
@@ -56,6 +62,24 @@ internal sealed class AuthEndpoints : IEndpointModule
         SessionCookie.Write(http, result.Value.SessionToken, result.Value.Session.ExpiresAt);
         http.Response.Headers.CacheControl = "no-store";
         return TypedResults.Ok(result.Value.Session);
+    }
+
+    private static async Task<Results<Ok<StepUpResult>, ProblemHttpResult>> StepUpAsync(
+        StepUpRequest request,
+        HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> handler,
+        CancellationToken cancellationToken)
+    {
+        // Authorization guarantees a verified session here.
+        var session = http.GetVerifiedSession()!;
+        var result = await handler.HandleAsync(new StepUpCommand(session.SessionId, request.Password, http.GetClientInfo()), cancellationToken);
+        if (result.IsFailure)
+        {
+            return ProblemResults.From(result.Error, http);
+        }
+
+        http.Response.Headers.CacheControl = "no-store";
+        return TypedResults.Ok(result.Value);
     }
 
     private static Results<Ok<SessionInfo>, ProblemHttpResult> GetSession(HttpContext http)

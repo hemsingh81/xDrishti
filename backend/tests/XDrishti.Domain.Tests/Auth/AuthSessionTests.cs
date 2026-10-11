@@ -78,4 +78,48 @@ public sealed class AuthSessionTests
         session.RevokedAt.ShouldBe(T0.AddMinutes(1));
         session.Evaluate(T0.AddMinutes(1)).ShouldBe(SessionStatus.Revoked);
     }
+
+    [Fact]
+    public void A_new_session_is_not_elevated()
+    {
+        var session = NewSession();
+
+        session.ElevatedUntil.ShouldBeNull();
+        session.IsElevated(T0).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Elevate_opens_a_five_minute_window()
+    {
+        var session = NewSession();
+
+        var until = session.Elevate(T0.AddMinutes(1));
+
+        until.ShouldBe(T0.AddMinutes(6));
+        session.ElevatedUntil.ShouldBe(until);
+        session.IsElevated(T0.AddMinutes(5).AddSeconds(59)).ShouldBeTrue();
+        session.IsElevated(T0.AddMinutes(6)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Elevating_again_restarts_the_window()
+    {
+        var session = NewSession();
+        session.Elevate(T0);
+
+        session.Elevate(T0.AddMinutes(4));
+
+        session.IsElevated(T0.AddMinutes(8)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_revoked_session_is_never_elevated()
+    {
+        var session = NewSession();
+        session.Elevate(T0);
+
+        session.Revoke(T0.AddMinutes(1));
+
+        session.IsElevated(T0.AddMinutes(2)).ShouldBeFalse();
+    }
 }

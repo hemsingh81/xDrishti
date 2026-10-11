@@ -11,6 +11,18 @@ internal static class AuthApi
     public static Task<HttpResponseMessage> LoginAsync(this HttpClient client, string? email, string? password, CancellationToken cancellationToken) =>
         client.PostAsJsonAsync(new Uri("/api/auth/login", UriKind.Relative), new { email, password }, cancellationToken);
 
+    public static Task<HttpResponseMessage> StepUpAsync(this HttpClient client, string? password, CancellationToken cancellationToken) =>
+        client.PostAsJsonAsync(new Uri("/api/auth/step-up", UriKind.Relative), new { password }, cancellationToken);
+
+    public static Task<HttpResponseMessage> PostJsonAsync(this HttpClient client, string path, object? body, CancellationToken cancellationToken) =>
+        client.PostAsJsonAsync(new Uri(path, UriKind.Relative), body, cancellationToken);
+
+    public static Task<HttpResponseMessage> PutJsonAsync(this HttpClient client, string path, object? body, CancellationToken cancellationToken) =>
+        client.PutAsJsonAsync(new Uri(path, UriKind.Relative), body, cancellationToken);
+
+    public static Task<HttpResponseMessage> DeleteAsync(this HttpClient client, string path, CancellationToken cancellationToken) =>
+        client.DeleteAsync(new Uri(path, UriKind.Relative), cancellationToken);
+
     public static Task<HttpResponseMessage> GetAsync(this HttpClient client, string path, CancellationToken cancellationToken) =>
         client.GetAsync(new Uri(path, UriKind.Relative), cancellationToken);
 
@@ -26,6 +38,22 @@ internal static class AuthApi
         var code = root.TryGetProperty("code", out var c) ? c.GetString() : null;
         int? retry = root.TryGetProperty("retryAfterSeconds", out var r) ? r.GetInt32() : null;
         return (code, retry);
+    }
+
+    /// <summary>The field errors of an accounts.invalid response: field name to messages.</summary>
+    public static async Task<Dictionary<string, string[]>> ReadFieldErrorsAsync(this HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var errors = new Dictionary<string, string[]>();
+        if (document.RootElement.TryGetProperty("errors", out var element))
+        {
+            foreach (var property in element.EnumerateObject())
+            {
+                errors[property.Name] = [.. property.Value.EnumerateArray().Select(v => v.GetString()!)];
+            }
+        }
+
+        return errors;
     }
 
     public static async Task<T> WithDbAsync<T>(this ApiFactory factory, Func<XDrishtiDbContext, Task<T>> action)

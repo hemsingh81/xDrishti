@@ -38,6 +38,9 @@ internal sealed class AuthFixture
     public LogoutHandler Logout() =>
         new(Data, Data, Data, Clock, NullLogger<LogoutHandler>.Instance);
 
+    public StepUpHandler StepUp() =>
+        new(Data, Data, Data, Hasher, Clock, NullLogger<StepUpHandler>.Instance);
+
     public ProvisionOwnerHandler Provision() =>
         new(Data, Data, Data, Hasher, Clock, NullLogger<ProvisionOwnerHandler>.Instance);
 

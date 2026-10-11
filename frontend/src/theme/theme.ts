@@ -1,5 +1,6 @@
+import { dialogTitleClasses } from '@mui/material/DialogTitle';
 import { createTheme, type Theme } from '@mui/material/styles';
-import { fontFamily, palettes, shape, type ColorMode } from './tokens';
+import { dialogSpacing, fontFamily, palettes, shape, type ColorMode } from './tokens';
 
 /** Builds the MUI theme for a colour mode. Memoise the result — themes are expensive to create. */
 export function createAppTheme(mode: ColorMode): Theme {
@@ -32,6 +33,35 @@ export function createAppTheme(mode: ColorMode): Theme {
         styleOverrides: { root: { borderColor: p.border } },
       },
       MuiAppBar: { defaultProps: { elevation: 0, color: 'inherit' } },
+      // Dialogs: a tinted header band, a plain body and a neutral footer band (prototype .modal / .dlg-h / .dlg-b / .dlg-f).
+      MuiDialog: {
+        styleOverrides: {
+          paper: ({ ownerState }) => ({
+            backgroundImage: 'none', // no dark-mode elevation tint: the body stays `surface`
+            border: ownerState.fullScreen ? 0 : `1px solid ${p.border}`,
+            borderRadius: ownerState.fullScreen ? 0 : shape.radiusLarge,
+          }),
+        },
+      },
+      MuiDialogTitle: {
+        styleOverrides: {
+          root: { padding: dialogSpacing.header, background: p.accentSoft, borderBottom: `1px solid ${p.border}` },
+        },
+      },
+      MuiDialogContent: {
+        styleOverrides: {
+          root: {
+            padding: dialogSpacing.body,
+            // MUI drops the top padding after a title; the header is a separate band here, so keep it.
+            [`.${dialogTitleClasses.root} + &`]: { padding: dialogSpacing.body },
+          },
+        },
+      },
+      MuiDialogActions: {
+        styleOverrides: {
+          root: { padding: dialogSpacing.footer, background: p.surfaceAlt, borderTop: `1px solid ${p.border}` },
+        },
+      },
     },
   });
 }

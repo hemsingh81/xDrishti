@@ -24,6 +24,20 @@ internal static class MigrationBuilderExtensions
             """);
 
     /// <summary>
+    /// Gives the runtime role plain DML (read, insert, update, delete) on one table, without touching the other tables of the schema.
+    /// No-op when the role does not exist (e.g. integration-test databases).
+    /// </summary>
+    public static void GrantTableToAppRole(this MigrationBuilder migrationBuilder, string schema, string table) =>
+        migrationBuilder.Sql($"""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{AppRole}') THEN
+                    GRANT SELECT, INSERT, UPDATE, DELETE ON {schema}.{table} TO {AppRole};
+                END IF;
+            END $$;
+            """);
+
+    /// <summary>
     /// Makes a table append-only for the runtime role (it can still read and insert). Call after <see cref="GrantSchemaUsageToAppRole"/>
     /// and after any later migration that re-grants the schema. No-op when the role does not exist (e.g. integration-test databases).
     /// </summary>

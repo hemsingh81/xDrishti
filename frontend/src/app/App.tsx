@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { lazy, Suspense, useState } from 'react';
 import { RouterProvider } from 'react-router/dom';
-import { connectAuth } from '@/features/auth';
+import { connectAuth, StepUpProvider } from '@/features/auth';
 import { AppThemeProvider } from '@/theme';
 import { createQueryClient } from './queryClient';
 import { createAppRouter } from './router';
@@ -22,7 +22,9 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppThemeProvider>
-        <RouterProvider router={router} />
+        <StepUpProvider>
+          <RouterProvider router={router} />
+        </StepUpProvider>
       </AppThemeProvider>
       <Suspense>
         <QueryDevtools />

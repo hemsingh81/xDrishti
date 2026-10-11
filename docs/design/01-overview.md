@@ -67,7 +67,7 @@ Both BUY and SELL. Overnight shorts use futures (cash shorts can't be carried ov
 | Market | NSE: cash stocks + index/stock futures; options in a later phase |
 | Historical data | **Your 1-minute CSV files** + Dhan historical API for gaps |
 | Market-data API | **Dhan Data API only** (EOD for tracked instruments, live for the active set) |
-| Accounts | Multiple accounts (Dhan; Upstox later), each with **roles**: Data · Trading · Portfolio — one account can hold several; exactly one primary Data account |
+| Accounts | Multiple accounts (Dhan; other brokers later), each with **roles**: Data · Trading · Portfolio — one account can hold several; exactly one primary Data account |
 | Access | **Login required** (username + password; password re-entry for sensitive actions); single owner; every screen and API protected |
 | Operating model | **Configure once, services run it** — background services do the work whether or not you're logged in |
 | Insights | Pre-trade checklist, portfolio **Action center** per account, price alerts, data quality gate, report auto-insights |

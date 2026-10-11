@@ -87,6 +87,57 @@
         }
       }
     },
+    "/api/auth/step-up": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Re-enter the password to allow sensitive actions for 5 minutes",
+        "operationId": "StepUp",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepUpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepUpResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/session": {
       "get": {
         "tags": [
@@ -179,10 +230,1500 @@
           }
         }
       }
+    },
+    "/api/accounts": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Every active account with its roles, masked client id and which broker secrets are set (never their values)",
+        "operationId": "ListAccounts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountSummary"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Register a Dhan account (client id, write-only API key and secret, identity, roles and their settings); needs step-up",
+        "operationId": "CreateAccount",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccountInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "One account with all settings (client id masked; secrets only as set / not set)",
+        "operationId": "GetAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Remove an account (archive: history and audit trail are kept); needs step-up",
+        "operationId": "ArchiveAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/connection": {
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Change name, client id, colour and notes; needs step-up",
+        "operationId": "UpdateAccountConnection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/secrets": {
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Replace the Dhan API key and/or secret (write-only; omitted values stay) and the key's issue date; needs step-up",
+        "operationId": "UpdateAccountSecrets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSecretsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/roles": {
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Switch roles on or off and set the Data kind (primary or standby); needs step-up",
+        "operationId": "UpdateAccountRoles",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RolesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/make-primary-data": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Make the account the primary Data account (atomic swap; the previous primary becomes standby when possible); needs step-up",
+        "operationId": "MakePrimaryDataAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/trading": {
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up",
+        "operationId": "UpdateAccountTrading",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradingInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/portfolio": {
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Replace the portfolio settings (default bucket, history start, include in totals)",
+        "operationId": "UpdateAccountPortfolio",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/data": {
+      "put": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Change the Data settings (live-feed budget)",
+        "operationId": "UpdateAccountData",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/connect": {
+      "post": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Start the Dhan consent sign-in (at most 25 a day): returns the Dhan login page to open in the same tab; Dhan returns to /api/brokers/dhan/callback within 10 minutes; needs step-up",
+        "operationId": "ConnectAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectStartView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/token": {
+      "delete": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Disconnect: delete the stored access token (local only; Dhan tokens end at their expiry); nothing to do when not connected; needs step-up",
+        "operationId": "DisconnectAccount",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/activity": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Audit entries of the account, newest first",
+        "operationId": "GetAccountActivity",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccountEventView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/brokers/dhan": {
+      "get": {
+        "tags": [
+          "Brokers"
+        ],
+        "summary": "The redirect URL to register with the Dhan app: {public base URL}/api/brokers/dhan/callback",
+        "operationId": "GetDhan",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DhanRedirectView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/brokers/dhan/callback": {
+      "get": {
+        "tags": [
+          "Brokers"
+        ],
+        "summary": "Dhan's redirect after the consent login (?tokenId=…): exchanges it for a token and redirects (302) to /accounts?account={id}&connected=1 or &connectError={code}",
+        "operationId": "DhanCallback",
+        "parameters": [
+          {
+            "name": "tokenId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Found"
+          }
+        }
+      }
+    },
+    "/api/risk-profiles": {
+      "get": {
+        "tags": [
+          "Risk profiles"
+        ],
+        "summary": "All risk profiles with the number of accounts that use each",
+        "operationId": "ListRiskProfiles",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RiskProfileView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Risk profiles"
+        ],
+        "summary": "Create a risk profile; needs step-up",
+        "operationId": "CreateRiskProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskProfileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskProfileView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/risk-profiles/{id}": {
+      "put": {
+        "tags": [
+          "Risk profiles"
+        ],
+        "summary": "Replace the name and values of a risk profile; needs step-up",
+        "operationId": "UpdateRiskProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RiskProfileInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RiskProfileView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Risk profiles"
+        ],
+        "summary": "Delete a risk profile; refused (409) while an account uses it and for the built-in profiles; needs step-up",
+        "operationId": "DeleteRiskProfile",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio-buckets": {
+      "get": {
+        "tags": [
+          "Portfolio buckets"
+        ],
+        "summary": "All portfolio buckets (seeded: Trading, MyLongTerm, MyChoice)",
+        "operationId": "ListPortfolioBuckets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BucketView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Portfolio buckets"
+        ],
+        "summary": "Add a portfolio bucket",
+        "operationId": "AddPortfolioBucket",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BucketInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BucketView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccountDetail": {
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "broker",
+          "maskedClientId",
+          "color",
+          "notes",
+          "secrets",
+          "apiKeyIssuedOn",
+          "apiKeyExpiresOn",
+          "tokenStatus",
+          "connection",
+          "createdAt",
+          "updatedAt",
+          "roles",
+          "trading",
+          "portfolio",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "broker": {
+            "type": "string"
+          },
+          "maskedClientId": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "notes": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secrets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecretStatusView"
+            }
+          },
+          "apiKeyIssuedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "apiKeyExpiresOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "tokenStatus": {
+            "type": "string"
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionView"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/RolesView"
+          },
+          "trading": {
+            "$ref": "#/components/schemas/TradingSettingsView"
+          },
+          "portfolio": {
+            "$ref": "#/components/schemas/PortfolioSettingsView"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DataSettingsView"
+          }
+        },
+        "description": "Everything about one account. Secret values and tokens are never part of it (only set / not set); the client id is masked. ApiKeyIssuedOn and\nApiKeyExpiresOn are the day the Dhan API key was generated and the first day it is no longer valid (12 months). TokenStatus repeats Connection.Status."
+      },
+      "AccountEventView": {
+        "required": [
+          "at",
+          "event",
+          "detail",
+          "actor"
+        ],
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "event": {
+            "type": "string"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actor": {
+            "type": "string"
+          }
+        },
+        "description": "One audit entry of an account."
+      },
+      "AccountOverrides": {
+        "required": [
+          "riskPerTradePct",
+          "maxNewEntriesPerDay",
+          "maxOpenPositions",
+          "dailyLossPct"
+        ],
+        "type": "object",
+        "properties": {
+          "riskPerTradePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxNewEntriesPerDay": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxOpenPositions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "dailyLossPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "Per-account replacements for values of the risk profile; null means \"use the profile's value\"."
+      },
+      "AccountSummary": {
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "broker",
+          "maskedClientId",
+          "color",
+          "roles",
+          "secrets",
+          "apiKeyExpiresOn",
+          "tokenStatus",
+          "connection"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "broker": {
+            "type": "string"
+          },
+          "maskedClientId": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "roles": {
+            "$ref": "#/components/schemas/RolesView"
+          },
+          "secrets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecretStatusView"
+            }
+          },
+          "apiKeyExpiresOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "tokenStatus": {
+            "type": "string"
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionView"
+          }
+        },
+        "description": "One row of the accounts list. Broker is \"dhan\"; MaskedClientId shows the first four and last two characters; Secrets lists the\nsecret fields with set / not set; ApiKeyExpiresOn is the first day the Dhan API key is no longer valid; TokenStatus repeats\nConnection.Status (for the list's health dot)."
+      },
       "ApplicationStatus": {
         "required": [
           "name",
@@ -253,6 +1794,316 @@
           }
         }
       },
+      "BucketInput": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A new bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case."
+      },
+      "BucketView": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "ConnectStartView": {
+        "required": [
+          "authorizeUrl",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "authorizeUrl": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "Where to send the owner's browser to sign in at Dhan (same tab): Dhan's consent login page. The sign-in must come back before ExpiresAt."
+      },
+      "ConnectionInput": {
+        "required": [
+          "name",
+          "clientId",
+          "color",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "notes": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "New connection details of an account. Leave ClientId out to keep the current client id."
+      },
+      "ConnectionView": {
+        "required": [
+          "status",
+          "expiresAt",
+          "brokerUserName",
+          "brokerUserId",
+          "lastConnectedAt",
+          "lastError"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "brokerUserName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "brokerUserId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastConnectedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The account's connection to Dhan. Status is \"not_connected\", \"connected\", \"expired\" (the expiry has passed — derived when read,\nno broker call needed). ExpiresAt is when the token stops working (as Dhan states, otherwise 24 hours after sign-in).\nBrokerUserName and BrokerUserId (masked like the client id) are what Dhan reported for the token. LastError is a short safe text (at most\nDhan's error code). The token itself is never returned."
+      },
+      "CreateAccountInput": {
+        "required": [
+          "name",
+          "clientId",
+          "secrets",
+          "apiKeyIssuedOn",
+          "color",
+          "notes",
+          "roles",
+          "trading",
+          "portfolio",
+          "data"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secrets": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SecretsInput"
+              }
+            ]
+          },
+          "apiKeyIssuedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "color": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "notes": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "roles": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RolesInput"
+              }
+            ]
+          },
+          "trading": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TradingInput"
+              }
+            ]
+          },
+          "portfolio": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PortfolioInput"
+              }
+            ]
+          },
+          "data": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataInput"
+              }
+            ]
+          }
+        },
+        "description": "A new Dhan account. ClientId and Secrets (API key and secret) are required. ApiKeyIssuedOn is the day the API key was generated\n(default today, India time)."
+      },
+      "DataInput": {
+        "required": [
+          "liveFeedBudget"
+        ],
+        "type": "object",
+        "properties": {
+          "liveFeedBudget": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "DataRoleInput": {
+        "required": [
+          "enabled",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Switch the Data role. Kind (\"primary\" or \"standby\") is required when Enabled is true."
+      },
+      "DataRoleView": {
+        "required": [
+          "enabled",
+          "primary",
+          "standby"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "primary": {
+            "type": "boolean"
+          },
+          "standby": {
+            "type": "boolean"
+          }
+        },
+        "description": "Data role of an account: on/off and which kind."
+      },
+      "DataSettingsView": {
+        "required": [
+          "enabled",
+          "primary",
+          "standby",
+          "liveFeedBudget"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "primary": {
+            "type": "boolean"
+          },
+          "standby": {
+            "type": "boolean"
+          },
+          "liveFeedBudget": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "DatabaseStatus": {
         "required": [
           "isConnected",
@@ -302,6 +2153,137 @@
           }
         }
       },
+      "DhanRedirectView": {
+        "required": [
+          "redirectUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "redirectUrl": {
+            "type": "string"
+          }
+        },
+        "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled."
+          },
+          "retryAfterSeconds": {
+            "type": "integer",
+            "description": "Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.",
+            "format": "int32"
+          }
+        }
+      },
+      "InstrumentsInput": {
+        "required": [
+          "intraday",
+          "swingBuy",
+          "swingSell"
+        ],
+        "type": "object",
+        "properties": {
+          "intraday": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "swingBuy": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "swingSell": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "InstrumentsView": {
+        "required": [
+          "intraday",
+          "swingBuy",
+          "swingSell"
+        ],
+        "type": "object",
+        "properties": {
+          "intraday": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "swingBuy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "swingSell": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "LoginRequest": {
         "required": [
           "email",
@@ -317,6 +2299,76 @@
           }
         },
         "description": "Body of `POST /api/auth/login`."
+      },
+      "PortfolioInput": {
+        "required": [
+          "defaultBucket",
+          "historyFrom",
+          "includeInTotals"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultBucket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "historyFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "includeInTotals": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
+      "PortfolioRoleView": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PortfolioSettingsView": {
+        "required": [
+          "enabled",
+          "defaultBucket",
+          "historyFrom",
+          "includeInTotals"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "defaultBucket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "historyFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "includeInTotals": {
+            "type": "boolean"
+          }
+        }
       },
       "ProblemDetails": {
         "type": "object",
@@ -354,14 +2406,339 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled."
           },
           "retryAfterSeconds": {
             "type": "integer",
-            "description": "Present on auth.locked and auth.rate_limited: seconds until a new attempt may succeed.",
+            "description": "Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.",
             "format": "int32"
           }
         }
+      },
+      "RiskProfileInput": {
+        "required": [
+          "name",
+          "riskPerTradePct",
+          "maxCapitalPerTradePct",
+          "maxNewEntriesPerDay",
+          "maxOpenPositions",
+          "maxTotalRiskPct",
+          "maxPerSector",
+          "maxPairCorrelation",
+          "maxIntraday",
+          "maxSwing",
+          "dailyLossR",
+          "dailyLossPct",
+          "weeklyLossR",
+          "weeklyLossAction"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "riskPerTradePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxCapitalPerTradePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxNewEntriesPerDay": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxOpenPositions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxTotalRiskPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxPerSector": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxPairCorrelation": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxIntraday": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "maxSwing": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "dailyLossR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dailyLossPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "weeklyLossR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "weeklyLossAction": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The values of a risk profile to create or to replace an existing one with. Every value is required."
+      },
+      "RiskProfileView": {
+        "required": [
+          "id",
+          "name",
+          "isSeeded",
+          "accountCount",
+          "riskPerTradePct",
+          "maxCapitalPerTradePct",
+          "maxNewEntriesPerDay",
+          "maxOpenPositions",
+          "maxTotalRiskPct",
+          "maxPerSector",
+          "maxPairCorrelation",
+          "maxIntraday",
+          "maxSwing",
+          "dailyLossR",
+          "dailyLossPct",
+          "weeklyLossR",
+          "weeklyLossAction"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isSeeded": {
+            "type": "boolean"
+          },
+          "accountCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "riskPerTradePct": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxCapitalPerTradePct": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxNewEntriesPerDay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxOpenPositions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxTotalRiskPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxPerSector": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxPairCorrelation": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxIntraday": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxSwing": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dailyLossR": {
+            "type": "number",
+            "format": "double"
+          },
+          "dailyLossPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "weeklyLossR": {
+            "type": "number",
+            "format": "double"
+          },
+          "weeklyLossAction": {
+            "type": "string"
+          }
+        },
+        "description": "A shared set of risk limits. Percentages are in percent; \"R\" values are multiples of the risk per trade. IsSeeded marks a built-in profile\n(can be edited, not deleted); AccountCount is how many active accounts use it (a profile in use cannot be deleted);\nWeeklyLossAction is \"halve_size\", \"stop_new_entries\" or \"alert_only\"."
+      },
+      "RoleToggleInput": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RolesInput": {
+        "required": [
+          "data",
+          "trading",
+          "portfolio"
+        ],
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataRoleInput"
+              }
+            ]
+          },
+          "trading": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RoleToggleInput"
+              }
+            ]
+          },
+          "portfolio": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RoleToggleInput"
+              }
+            ]
+          }
+        },
+        "description": "Roles to switch; a role that is left out stays as it is."
+      },
+      "RolesView": {
+        "required": [
+          "data",
+          "trading",
+          "portfolio"
+        ],
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DataRoleView"
+          },
+          "trading": {
+            "$ref": "#/components/schemas/TradingRoleView"
+          },
+          "portfolio": {
+            "$ref": "#/components/schemas/PortfolioRoleView"
+          }
+        }
+      },
+      "SecretStatusView": {
+        "required": [
+          "name",
+          "set",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "set": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "Whether one of the owner's Dhan secrets is stored (encrypted) and when it last changed. Name is the request field name (\"apiKey\", \"apiSecret\"). The value itself is never returned."
+      },
+      "SecretsInput": {
+        "required": [
+          "apiKey",
+          "apiSecret"
+        ],
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "apiSecret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The Dhan API key and secret, write-only (app_id / app_secret). Surrounding spaces are\nremoved; the values are stored encrypted and never returned."
       },
       "ServiceStatus": {
         "required": [
@@ -422,9 +2799,42 @@
             "type": "string",
             "description": "Absolute end of the session, whatever the activity.",
             "format": "date-time"
+          },
+          "elevatedUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "End of the step-up window (password re-entered); null when the session is not elevated right now.",
+            "format": "date-time"
           }
         },
         "description": "What the client needs to know about its session."
+      },
+      "StepUpRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string"
+          }
+        },
+        "description": "Body of `POST /api/auth/step-up`."
+      },
+      "StepUpResult": {
+        "required": [
+          "elevatedUntil"
+        ],
+        "type": "object",
+        "properties": {
+          "elevatedUntil": {
+            "type": "string",
+            "description": "End of the window in which sensitive actions are allowed.",
+            "format": "date-time"
+          }
+        }
       },
       "SystemStatusResponse": {
         "required": [
@@ -457,6 +2867,187 @@
           }
         }
       },
+      "TradingInput": {
+        "required": [
+          "mode",
+          "riskProfileId",
+          "capitalSource",
+          "capitalAmount",
+          "styles",
+          "instruments",
+          "overrides"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "riskProfileId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "capitalSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "capitalAmount": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "styles": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "instruments": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/InstrumentsInput"
+              }
+            ]
+          },
+          "overrides": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AccountOverrides"
+              }
+            ]
+          }
+        },
+        "description": "The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is \"paper\" (default) or \"manual_live\"; CapitalSource is \"fixed\" (default) or \"broker_funds\"; Styles holds \"intraday\" and/or \"swing\"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT."
+      },
+      "TradingRoleView": {
+        "required": [
+          "enabled",
+          "mode",
+          "profile"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "profile": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Trading role. Mode is \"paper\" or \"manual_live\"; Profile is the name of the risk profile (null when none is chosen)."
+      },
+      "TradingSettingsView": {
+        "required": [
+          "enabled",
+          "mode",
+          "riskProfileId",
+          "riskProfileName",
+          "capitalSource",
+          "capitalAmount",
+          "styles",
+          "instruments",
+          "overrides"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "riskProfileId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "riskProfileName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "capitalSource": {
+            "type": "string"
+          },
+          "capitalAmount": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "styles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "instruments": {
+            "$ref": "#/components/schemas/InstrumentsView"
+          },
+          "overrides": {
+            "$ref": "#/components/schemas/AccountOverrides"
+          }
+        },
+        "description": "Trading configuration. Mode is \"paper\" or \"manual_live\", CapitalSource is \"fixed\" or \"broker_funds\", Styles holds \"intraday\" and/or \"swing\"; instruments are EQ_MIS, EQ_CNC or FUT."
+      },
+      "UpdateSecretsInput": {
+        "required": [
+          "apiKey",
+          "apiSecret",
+          "apiKeyIssuedOn"
+        ],
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "apiSecret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "apiKeyIssuedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "Replaces the account's API key and/or secret (write-only). A value that is left out stays as it is; an empty one is invalid.\nApiKeyIssuedOn is the day the key was generated: it defaults to today when a new API key is given and can also be corrected on its own."
+      },
       "UserInfo": {
         "required": [
           "email",
@@ -480,6 +3071,18 @@
     },
     {
       "name": "Auth"
+    },
+    {
+      "name": "Accounts"
+    },
+    {
+      "name": "Brokers"
+    },
+    {
+      "name": "Risk profiles"
+    },
+    {
+      "name": "Portfolio buckets"
     }
   ]
 }

@@ -1,7 +1,9 @@
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
 import MenuIcon from '@mui/icons-material/Menu';
-import { AppBar, IconButton, Toolbar, Tooltip, Typography } from '@mui/material';
+import { AppBar, IconButton, Skeleton, Toolbar, Tooltip, Typography } from '@mui/material';
+import { Suspense } from 'react';
+import { HeaderAccounts } from '@/features/accounts';
 import { UserMenu } from '@/features/auth';
 import { useColorMode } from '@/theme';
 
@@ -16,6 +18,10 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
         <Typography component="h2" sx={{ fontWeight: 650, flex: 1 }}>
           {title}
         </Typography>
+        {/* Same size as the control's button, so it loading in does not move the other controls. */}
+        <Suspense fallback={<Skeleton variant="rounded" width={64} height={30} sx={{ minWidth: { sm: 250 } }} />}>
+          <HeaderAccounts />
+        </Suspense>
         <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
           <IconButton aria-label="Toggle colour mode" onClick={toggle}>
             {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}

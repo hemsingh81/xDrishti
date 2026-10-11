@@ -38,6 +38,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auth/step-up': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Re-enter the password to allow sensitive actions for 5 minutes */
+    post: operations['StepUp'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/session': {
     parameters: {
       query?: never;
@@ -106,10 +123,372 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/accounts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Every active account with its roles, masked client id and which broker secrets are set (never their values) */
+    get: operations['ListAccounts'];
+    put?: never;
+    /** Register a Dhan account (client id, write-only API key and secret, identity, roles and their settings); needs step-up */
+    post: operations['CreateAccount'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One account with all settings (client id masked; secrets only as set / not set) */
+    get: operations['GetAccount'];
+    put?: never;
+    post?: never;
+    /** Remove an account (archive: history and audit trail are kept); needs step-up */
+    delete: operations['ArchiveAccount'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/connection': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Change name, client id, colour and notes; needs step-up */
+    put: operations['UpdateAccountConnection'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/secrets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace the Dhan API key and/or secret (write-only; omitted values stay) and the key's issue date; needs step-up */
+    put: operations['UpdateAccountSecrets'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/roles': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Switch roles on or off and set the Data kind (primary or standby); needs step-up */
+    put: operations['UpdateAccountRoles'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/make-primary-data': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Make the account the primary Data account (atomic swap; the previous primary becomes standby when possible); needs step-up */
+    post: operations['MakePrimaryDataAccount'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/trading': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace the trading configuration (mode, risk profile, capital, styles, instruments, overrides); needs step-up */
+    put: operations['UpdateAccountTrading'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/portfolio': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace the portfolio settings (default bucket, history start, include in totals) */
+    put: operations['UpdateAccountPortfolio'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/data': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Change the Data settings (live-feed budget) */
+    put: operations['UpdateAccountData'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/connect': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start the Dhan consent sign-in (at most 25 a day): returns the Dhan login page to open in the same tab; Dhan returns to /api/brokers/dhan/callback within 10 minutes; needs step-up */
+    post: operations['ConnectAccount'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Disconnect: delete the stored access token (local only; Dhan tokens end at their expiry); nothing to do when not connected; needs step-up */
+    delete: operations['DisconnectAccount'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/activity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Audit entries of the account, newest first */
+    get: operations['GetAccountActivity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/brokers/dhan': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The redirect URL to register with the Dhan app: {public base URL}/api/brokers/dhan/callback */
+    get: operations['GetDhan'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/brokers/dhan/callback': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Dhan's redirect after the consent login (?tokenId=…): exchanges it for a token and redirects (302) to /accounts?account={id}&connected=1 or &connectError={code} */
+    get: operations['DhanCallback'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/risk-profiles': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** All risk profiles with the number of accounts that use each */
+    get: operations['ListRiskProfiles'];
+    put?: never;
+    /** Create a risk profile; needs step-up */
+    post: operations['CreateRiskProfile'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/risk-profiles/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace the name and values of a risk profile; needs step-up */
+    put: operations['UpdateRiskProfile'];
+    post?: never;
+    /** Delete a risk profile; refused (409) while an account uses it and for the built-in profiles; needs step-up */
+    delete: operations['DeleteRiskProfile'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio-buckets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** All portfolio buckets (seeded: Trading, MyLongTerm, MyChoice) */
+    get: operations['ListPortfolioBuckets'];
+    put?: never;
+    /** Add a portfolio bucket */
+    post: operations['AddPortfolioBucket'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * @description Everything about one account. Secret values and tokens are never part of it (only set / not set); the client id is masked. ApiKeyIssuedOn and
+     *     ApiKeyExpiresOn are the day the Dhan API key was generated and the first day it is no longer valid (12 months). TokenStatus repeats Connection.Status.
+     */
+    AccountDetail: {
+      /** Format: uuid */
+      id: string;
+      slug: string;
+      name: string;
+      broker: string;
+      maskedClientId: string;
+      color: string;
+      notes: null | string;
+      secrets: components['schemas']['SecretStatusView'][];
+      /** Format: date */
+      apiKeyIssuedOn: string;
+      /** Format: date */
+      apiKeyExpiresOn: string;
+      tokenStatus: string;
+      connection: components['schemas']['ConnectionView'];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+      roles: components['schemas']['RolesView'];
+      trading: components['schemas']['TradingSettingsView'];
+      portfolio: components['schemas']['PortfolioSettingsView'];
+      data: components['schemas']['DataSettingsView'];
+    };
+    /** @description One audit entry of an account. */
+    AccountEventView: {
+      /** Format: date-time */
+      at: string;
+      event: string;
+      detail: null | string;
+      actor: string;
+    };
+    /** @description Per-account replacements for values of the risk profile; null means "use the profile's value". */
+    AccountOverrides: {
+      /** Format: double */
+      riskPerTradePct: null | number;
+      /** Format: int32 */
+      maxNewEntriesPerDay: null | number;
+      /** Format: int32 */
+      maxOpenPositions: null | number;
+      /** Format: double */
+      dailyLossPct: null | number;
+    };
+    /**
+     * @description One row of the accounts list. Broker is "dhan"; MaskedClientId shows the first four and last two characters; Secrets lists the
+     *     secret fields with set / not set; ApiKeyExpiresOn is the first day the Dhan API key is no longer valid; TokenStatus repeats
+     *     Connection.Status (for the list's health dot).
+     */
+    AccountSummary: {
+      /** Format: uuid */
+      id: string;
+      slug: string;
+      name: string;
+      broker: string;
+      maskedClientId: string;
+      color: string;
+      roles: components['schemas']['RolesView'];
+      secrets: components['schemas']['SecretStatusView'][];
+      /** Format: date */
+      apiKeyExpiresOn: string;
+      tokenStatus: string;
+      connection: components['schemas']['ConnectionView'];
+    };
     ApplicationStatus: {
       name: string;
       version: string;
@@ -128,6 +507,83 @@ export interface components {
       ip: null | string;
       userAgent: null | string;
     };
+    /** @description A new bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case. */
+    BucketInput: {
+      name: null | string;
+    };
+    BucketView: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+    };
+    /** @description Where to send the owner's browser to sign in at Dhan (same tab): Dhan's consent login page. The sign-in must come back before ExpiresAt. */
+    ConnectStartView: {
+      authorizeUrl: string;
+      /** Format: date-time */
+      expiresAt: string;
+    };
+    /** @description New connection details of an account. Leave ClientId out to keep the current client id. */
+    ConnectionInput: {
+      name: null | string;
+      clientId: null | string;
+      color: null | string;
+      notes: null | string;
+    };
+    /**
+     * @description The account's connection to Dhan. Status is "not_connected", "connected", "expired" (the expiry has passed — derived when read,
+     *     no broker call needed). ExpiresAt is when the token stops working (as Dhan states, otherwise 24 hours after sign-in).
+     *     BrokerUserName and BrokerUserId (masked like the client id) are what Dhan reported for the token. LastError is a short safe text (at most
+     *     Dhan's error code). The token itself is never returned.
+     */
+    ConnectionView: {
+      status: string;
+      /** Format: date-time */
+      expiresAt: null | string;
+      brokerUserName: null | string;
+      brokerUserId: null | string;
+      /** Format: date-time */
+      lastConnectedAt: null | string;
+      lastError: null | string;
+    };
+    /**
+     * @description A new Dhan account. ClientId and Secrets (API key and secret) are required. ApiKeyIssuedOn is the day the API key was generated
+     *     (default today, India time).
+     */
+    CreateAccountInput: {
+      name: null | string;
+      clientId: null | string;
+      secrets: null | components['schemas']['SecretsInput'];
+      /** Format: date */
+      apiKeyIssuedOn: null | string;
+      color: null | string;
+      notes: null | string;
+      roles: null | components['schemas']['RolesInput'];
+      trading: null | components['schemas']['TradingInput'];
+      portfolio: null | components['schemas']['PortfolioInput'];
+      data: null | components['schemas']['DataInput'];
+    };
+    DataInput: {
+      /** Format: int32 */
+      liveFeedBudget: null | number;
+    };
+    /** @description Switch the Data role. Kind ("primary" or "standby") is required when Enabled is true. */
+    DataRoleInput: {
+      enabled: boolean;
+      kind: null | string;
+    };
+    /** @description Data role of an account: on/off and which kind. */
+    DataRoleView: {
+      enabled: boolean;
+      primary: boolean;
+      standby: boolean;
+    };
+    DataSettingsView: {
+      enabled: boolean;
+      primary: boolean;
+      standby: boolean;
+      /** Format: int32 */
+      liveFeedBudget: number;
+    };
     DatabaseStatus: {
       isConnected: boolean;
       serverVersion: null | string;
@@ -139,10 +595,58 @@ export interface components {
       latencyMs: number;
       error: null | string;
     };
+    /** @description The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`. */
+    DhanRedirectView: {
+      redirectUrl: string;
+    };
+    HttpValidationProblemDetails: {
+      type?: null | string;
+      title?: null | string;
+      /** Format: int32 */
+      status?: null | number;
+      detail?: null | string;
+      instance?: null | string;
+      errors?: {
+        [key: string]: string[];
+      };
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled. */
+      code?: string;
+      /**
+       * Format: int32
+       * @description Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.
+       */
+      retryAfterSeconds?: number;
+    };
+    InstrumentsInput: {
+      intraday: null | string[];
+      swingBuy: null | string[];
+      swingSell: null | string[];
+    };
+    InstrumentsView: {
+      intraday: string[];
+      swingBuy: string[];
+      swingSell: string[];
+    };
     /** @description Body of `POST /api/auth/login`. */
     LoginRequest: {
       email: string;
       password: string;
+    };
+    PortfolioInput: {
+      defaultBucket: null | string;
+      /** Format: date */
+      historyFrom: null | string;
+      includeInTotals: null | boolean;
+    };
+    PortfolioRoleView: {
+      enabled: boolean;
+    };
+    PortfolioSettingsView: {
+      enabled: boolean;
+      defaultBucket: null | string;
+      /** Format: date */
+      historyFrom: null | string;
+      includeInTotals: boolean;
     };
     ProblemDetails: {
       type?: null | string;
@@ -151,13 +655,109 @@ export interface components {
       status?: null | number;
       detail?: null | string;
       instance?: null | string;
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid. */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled. */
       code?: string;
       /**
        * Format: int32
-       * @description Present on auth.locked and auth.rate_limited: seconds until a new attempt may succeed.
+       * @description Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.
        */
       retryAfterSeconds?: number;
+    };
+    /** @description The values of a risk profile to create or to replace an existing one with. Every value is required. */
+    RiskProfileInput: {
+      name: null | string;
+      /** Format: double */
+      riskPerTradePct: null | number;
+      /** Format: double */
+      maxCapitalPerTradePct: null | number;
+      /** Format: int32 */
+      maxNewEntriesPerDay: null | number;
+      /** Format: int32 */
+      maxOpenPositions: null | number;
+      /** Format: double */
+      maxTotalRiskPct: null | number;
+      /** Format: int32 */
+      maxPerSector: null | number;
+      /** Format: double */
+      maxPairCorrelation: null | number;
+      /** Format: int32 */
+      maxIntraday: null | number;
+      /** Format: int32 */
+      maxSwing: null | number;
+      /** Format: double */
+      dailyLossR: null | number;
+      /** Format: double */
+      dailyLossPct: null | number;
+      /** Format: double */
+      weeklyLossR: null | number;
+      weeklyLossAction: null | string;
+    };
+    /**
+     * @description A shared set of risk limits. Percentages are in percent; "R" values are multiples of the risk per trade. IsSeeded marks a built-in profile
+     *     (can be edited, not deleted); AccountCount is how many active accounts use it (a profile in use cannot be deleted);
+     *     WeeklyLossAction is "halve_size", "stop_new_entries" or "alert_only".
+     */
+    RiskProfileView: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      isSeeded: boolean;
+      /** Format: int32 */
+      accountCount: number;
+      /** Format: double */
+      riskPerTradePct: number;
+      /** Format: double */
+      maxCapitalPerTradePct: number;
+      /** Format: int32 */
+      maxNewEntriesPerDay: number;
+      /** Format: int32 */
+      maxOpenPositions: number;
+      /** Format: double */
+      maxTotalRiskPct: number;
+      /** Format: int32 */
+      maxPerSector: number;
+      /** Format: double */
+      maxPairCorrelation: number;
+      /** Format: int32 */
+      maxIntraday: number;
+      /** Format: int32 */
+      maxSwing: number;
+      /** Format: double */
+      dailyLossR: number;
+      /** Format: double */
+      dailyLossPct: number;
+      /** Format: double */
+      weeklyLossR: number;
+      weeklyLossAction: string;
+    };
+    RoleToggleInput: {
+      enabled: boolean;
+    };
+    /** @description Roles to switch; a role that is left out stays as it is. */
+    RolesInput: {
+      data: null | components['schemas']['DataRoleInput'];
+      trading: null | components['schemas']['RoleToggleInput'];
+      portfolio: null | components['schemas']['RoleToggleInput'];
+    };
+    RolesView: {
+      data: components['schemas']['DataRoleView'];
+      trading: components['schemas']['TradingRoleView'];
+      portfolio: components['schemas']['PortfolioRoleView'];
+    };
+    /** @description Whether one of the owner's Dhan secrets is stored (encrypted) and when it last changed. Name is the request field name ("apiKey", "apiSecret"). The value itself is never returned. */
+    SecretStatusView: {
+      name: string;
+      set: boolean;
+      /** Format: date-time */
+      updatedAt: null | string;
+    };
+    /**
+     * @description The Dhan API key and secret, write-only (app_id / app_secret). Surrounding spaces are
+     *     removed; the values are stored encrypted and never returned.
+     */
+    SecretsInput: {
+      apiKey: null | string;
+      apiSecret: null | string;
     };
     ServiceStatus: {
       name: string;
@@ -185,6 +785,22 @@ export interface components {
        * @description Absolute end of the session, whatever the activity.
        */
       expiresAt: string;
+      /**
+       * Format: date-time
+       * @description End of the step-up window (password re-entered); null when the session is not elevated right now.
+       */
+      elevatedUntil?: null | string;
+    };
+    /** @description Body of `POST /api/auth/step-up`. */
+    StepUpRequest: {
+      password: string;
+    };
+    StepUpResult: {
+      /**
+       * Format: date-time
+       * @description End of the window in which sensitive actions are allowed.
+       */
+      elevatedUntil: string;
     };
     SystemStatusResponse: {
       application: components['schemas']['ApplicationStatus'];
@@ -193,6 +809,48 @@ export interface components {
       isHealthy: boolean;
       /** Format: date-time */
       checkedAt: string;
+    };
+    /** @description The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. */
+    TradingInput: {
+      mode: null | string;
+      /** Format: uuid */
+      riskProfileId: null | string;
+      capitalSource: null | string;
+      /** Format: double */
+      capitalAmount: null | number;
+      styles: null | string[];
+      instruments: null | components['schemas']['InstrumentsInput'];
+      overrides: null | components['schemas']['AccountOverrides'];
+    };
+    /** @description Trading role. Mode is "paper" or "manual_live"; Profile is the name of the risk profile (null when none is chosen). */
+    TradingRoleView: {
+      enabled: boolean;
+      mode: string;
+      profile: null | string;
+    };
+    /** @description Trading configuration. Mode is "paper" or "manual_live", CapitalSource is "fixed" or "broker_funds", Styles holds "intraday" and/or "swing"; instruments are EQ_MIS, EQ_CNC or FUT. */
+    TradingSettingsView: {
+      enabled: boolean;
+      mode: string;
+      /** Format: uuid */
+      riskProfileId: null | string;
+      riskProfileName: null | string;
+      capitalSource: string;
+      /** Format: double */
+      capitalAmount: null | number;
+      styles: string[];
+      instruments: components['schemas']['InstrumentsView'];
+      overrides: components['schemas']['AccountOverrides'];
+    };
+    /**
+     * @description Replaces the account's API key and/or secret (write-only). A value that is left out stays as it is; an empty one is invalid.
+     *     ApiKeyIssuedOn is the day the key was generated: it defaults to today when a new API key is given and can also be corrected on its own.
+     */
+    UpdateSecretsInput: {
+      apiKey: null | string;
+      apiSecret: null | string;
+      /** Format: date */
+      apiKeyIssuedOn: null | string;
     };
     UserInfo: {
       email: string;
@@ -269,6 +927,48 @@ export interface operations {
       };
       /** @description Too Many Requests */
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StepUp: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StepUpRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StepUpResult'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
         headers: {
           [name: string]: unknown;
         };
@@ -361,6 +1061,1016 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuditEventResponse'][];
+        };
+      };
+    };
+  };
+  ListAccounts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountSummary'][];
+        };
+      };
+    };
+  };
+  CreateAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateAccountInput'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ArchiveAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateAccountConnection: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ConnectionInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateAccountSecrets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateSecretsInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateAccountRoles: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RolesInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  MakePrimaryDataAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateAccountTrading: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TradingInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateAccountPortfolio: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PortfolioInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateAccountData: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DataInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ConnectAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConnectStartView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Bad Gateway */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DisconnectAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountDetail'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAccountActivity: {
+    parameters: {
+      query?: {
+        take?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountEventView'][];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetDhan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DhanRedirectView'];
+        };
+      };
+    };
+  };
+  DhanCallback: {
+    parameters: {
+      query?: {
+        tokenId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Found */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ListRiskProfiles: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RiskProfileView'][];
+        };
+      };
+    };
+  };
+  CreateRiskProfile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RiskProfileInput'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RiskProfileView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateRiskProfile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RiskProfileInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RiskProfileView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DeleteRiskProfile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPortfolioBuckets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BucketView'][];
+        };
+      };
+    };
+  };
+  AddPortfolioBucket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BucketInput'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BucketView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

@@ -19,6 +19,12 @@ builder.Services
     .AddInfrastructure(builder.Configuration)
     .AddApi();
 
+// The API serves the broker vault: it refuses to start without its key. Only the build-time contract generation runs without secrets.
+if (!OpenApiGeneration.IsRunning)
+{
+    builder.Services.RequireBrokerVaultKey();
+}
+
 var app = builder.Build();
 
 // One-shot deployment step: `dotnet XDrishti.Api.dll migrate` (also provisions the owner account when none exists).

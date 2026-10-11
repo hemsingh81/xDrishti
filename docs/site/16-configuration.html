@@ -110,10 +110,14 @@ goals:
   max_drawdown_action: halt_and_review
 
 # Accounts and their roles are managed in the Accounts screen (stored in DB, password re-entry); shown here as seed.
+# Dhan only (ADR 0008, 0009). API key and secret are entered in the app (write-only) and kept
+# encrypted in accounts.broker_secrets — never in this file, the config versions or the repo.
 accounts:
   - id: dhan_main
-    broker: dhan
-    credentials: dhan_main               # Keychain item name — never the secret itself
+    broker: dhan                         # Dhan is the only broker
+    client_id: &quot;1000000001&quot;              # required; shown masked
+    api_key_issued_on: 2026-10-11        # keys are valid 12 months → warning 30 days before
+    secrets: [api_key, api_secret]       # set / not set only; values live in the vault
     roles:
       data:      { enabled: true, primary: true }
       trading:   { enabled: true, mode: paper, profile: standard, styles: [intraday, swing],
@@ -122,12 +126,12 @@ accounts:
       portfolio: { enabled: true, default_bucket: Trading }
   - id: dhan_longterm
     broker: dhan
-    credentials: dhan_longterm
+    client_id: &quot;1000000002&quot;
     roles:
       portfolio: { enabled: true, default_bucket: MyLongTerm }
   - id: dhan_swing
     broker: dhan
-    credentials: dhan_swing
+    client_id: &quot;1000000003&quot;
     roles:
       data:      { enabled: true, standby: true }   # failover if primary token/subscription fails
       trading:   { enabled: true, mode: manual_live, profile: conservative, styles: [swing],
@@ -140,7 +144,7 @@ access:
   idle_timeout_min: 30
   absolute_timeout_h: 12
   lockout: { attempts: 5, minutes: 15 }
-  step_up_for: [account_roles, credentials, config_activation, execution, data_deletion]
+  step_up_for: [account_roles, broker_secrets, config_activation, execution, data_deletion]
 
 approvals:
   plan_review_cutoff: &quot;09:05&quot;
@@ -148,7 +152,7 @@ approvals:
   allow_modifications: [reduce_size, tighten_stop, change_account, swap_with_reserve]
   suggestions: { expiry_days: 3, snooze_after_reject_days: 14 }
 
-risk_profiles:                     # shared; edited on Accounts → Risk profiles; accounts may override values
+risk_profiles:                     # shared; edited on Settings → Risk profiles; accounts may override values
   standard:
     risk_per_trade_pct: 0.5
     max_capital_per_trade_pct: 25
@@ -369,7 +373,10 @@ fundamentals:  { enabled: false, quality_filter: { min_profit_quarters_of_last_4
   &quot;Seq&quot;: { &quot;ServerUrl&quot;: &quot;http://xd-seq:5341&quot; },
   &quot;Secrets&quot;: { &quot;Path&quot;: &quot;/run/secrets&quot; }
 }</code></pre></div>
-<p>Passwords and broker keys are read from <code>/run/secrets/*</code> (Podman secrets) via the KeyPerFile provider.</p>
+<p>Passwords and the broker vault key (<code>BrokerVault__Key</code>, API only) are read from <code>/run/secrets/*</code> (Podman secrets) via the KeyPerFile provider.
+Broker API keys, secrets and tokens are not configuration: they are entered in the app and stored encrypted in the database (ADR 0008).
+<code>Brokers__PublicBaseUrl</code> (default <code>http://localhost:8080</code>, set from <code>XD_HTTP_PORT</code> in compose) is the base of the broker redirect URLs
+<code>/api/brokers/&lt;broker&gt;/callback</code>.</p>
 <h2 id="4-most-used-settings">4. Most-used settings<a class="hash" href="#4-most-used-settings" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -446,7 +453,7 @@ fundamentals:  { enabled: false, quality_filter: { min_profit_quarters_of_last_4
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-09 20:19</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-11 08:45</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

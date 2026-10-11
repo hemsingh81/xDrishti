@@ -24,10 +24,13 @@ internal static class ProblemResults
         var status = error.Kind switch
         {
             ErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
+            ErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             ErrorKind.Locked => StatusCodes.Status423Locked,
             ErrorKind.Validation => StatusCodes.Status400BadRequest,
             ErrorKind.NotFound => StatusCodes.Status404NotFound,
             ErrorKind.Conflict => StatusCodes.Status409Conflict,
+            ErrorKind.Upstream => StatusCodes.Status502BadGateway,
+            ErrorKind.RateLimited => StatusCodes.Status429TooManyRequests,
             _ => StatusCodes.Status500InternalServerError,
         };
 
@@ -36,7 +39,15 @@ internal static class ProblemResults
             context.Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
-        return TypedResults.Problem(Create(status, error.Message, error.Code, error.RetryAfterSeconds));
+        var problem = Create(status, error.Message, error.Code, error.RetryAfterSeconds);
+        if (error.Fields is { Count: > 0 } fields)
+        {
+            // Same shape as ASP.NET Core validation problems: "errors": { "<field>": ["message", ...] }.
+            var errors = fields.GroupBy(f => f.Field).ToDictionary(g => g.Key, g => g.Select(f => f.Message).ToArray());
+            problem = new HttpValidationProblemDetails(errors) { Status = problem.Status, Title = problem.Title, Extensions = problem.Extensions };
+        }
+
+        return TypedResults.Problem(problem);
     }
 
     /// <summary>For middleware and auth handlers that write the response themselves.</summary>

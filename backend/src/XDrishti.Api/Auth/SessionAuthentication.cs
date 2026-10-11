@@ -5,7 +5,7 @@ internal static class SessionAuthentication
 {
     public const string Scheme = "xd-session";
 
-    /// <summary>The session cookie: an opaque random token (HttpOnly, SameSite=Strict); only its hash is stored server-side.</summary>
+    /// <summary>The session cookie: an opaque random token (HttpOnly, SameSite=Lax — see <see cref="SessionCookie"/>); only its hash is stored server-side.</summary>
     public const string CookieName = "xd.sid";
 
     public const string CsrfHeader = "X-CSRF-Token";

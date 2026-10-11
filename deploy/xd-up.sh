@@ -4,7 +4,9 @@
 #   2. Reads secrets from the macOS Keychain (creates strong random ones on first run). The owner's sign-in items
 #      (xdrishti/auth/owner-email|owner-name|owner-password) are never invented: they are asked for at a terminal
 #      (hidden input for the password) or must exist already — see scripts/auth-secrets.sh.
-#   3. Writes them as files for the containers (private folder, never in the repo or images).
+#   3. Writes them as files for the containers (private folder, never in the repo or images). The broker vault key
+#      (xdrishti/broker/vault-key, created on the first run and never replaced) encrypts the broker API keys, secrets and
+#      tokens the owner enters in the app (ADR 0008); only xd-api gets it.
 #   4. Builds images and starts the stack, waits until healthy, prints the URLs.
 # Usage: deploy/xd-up.sh [--no-dev] [--no-build] [--owner-reset]
 #   --owner-reset  after the stack is up, replace the owner's password with the one now in the Keychain and
@@ -103,6 +105,28 @@ write_secret db_app_password "xdrishti/db/app"
 write_strict_secret auth_owner_email "xdrishti/auth/owner-email"
 write_strict_secret auth_owner_name "xdrishti/auth/owner-name"
 write_strict_secret auth_owner_password "xdrishti/auth/owner-password"
+
+# Broker vault key (ADR 0008). It encrypts the broker secrets stored in the database: a different key makes them unreadable. So it is
+# created only when the Keychain has no such item at all; an item that exists but cannot be read (locked keychain, denied access)
+# stops the start instead of being replaced.
+write_vault_key() {
+  local service="xdrishti/broker/vault-key" value
+  if security find-generic-password -a "$KEYCHAIN_ACCOUNT" -s "$service" >/dev/null 2>&1; then
+    value=$(strict_secret "$service") || exit 1
+  else
+    value=$(secret "$service")
+  fi
+  printf '%s' "$value" > "$XD_SECRETS_DIR/broker_vault_key"
+  chmod 644 "$XD_SECRETS_DIR/broker_vault_key"
+  unset value
+}
+write_vault_key
+
+# Credential-reference files of P1-16 (ADR 0007, replaced by the vault): plain copies of Keychain items that nothing reads any more.
+if [ -e "$XD_SECRETS_DIR/brokers" ] || [ -e "$XD_SECRETS_DIR/brokers.index" ]; then
+  rm -rf "$XD_SECRETS_DIR/brokers" "$XD_SECRETS_DIR/brokers.index"
+  say "Removed the old broker credential files (secrets/brokers, brokers.index); enter the API key and secret in the app instead."
+fi
 
 # 4) Build and start.
 files=(-f compose.yaml); [ "$DEV" = 1 ] && files+=(-f compose.dev.yaml)

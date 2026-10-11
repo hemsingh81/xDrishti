@@ -19,6 +19,7 @@ internal sealed class AuthSessionConfiguration : IEntityTypeConfiguration<AuthSe
         builder.Property(x => x.LastSeenAt).IsRequired();
         builder.Property(x => x.ExpiresAt).IsRequired();
         builder.Property(x => x.RevokedAt);
+        builder.Property(x => x.ElevatedUntil);
         builder.Property(x => x.Ip).HasMaxLength(64);
         builder.Property(x => x.UserAgent).HasMaxLength(256);
     }

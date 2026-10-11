@@ -44,6 +44,10 @@ internal static class ApiSetup
         // Endpoint modules are registered explicitly — one line per feature module.
         services.AddSingleton<IEndpointModule, SystemEndpoints>();
         services.AddSingleton<IEndpointModule, AuthEndpoints>();
+        services.AddSingleton<IEndpointModule, AccountsEndpoints>();
+        services.AddSingleton<IEndpointModule, BrokersEndpoints>();
+        services.AddSingleton<IEndpointModule, RiskProfilesEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioBucketsEndpoints>();
         return services;
     }
 
@@ -52,12 +56,17 @@ internal static class ApiSetup
         app.UseForwardedHeaders();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
-        app.UseSerilogRequestLogging(o => o.GetLevel = RequestLogLevel.ForPath);
+        app.UseSerilogRequestLogging(o =>
+        {
+            o.GetLevel = RequestLogLevel.ForPath;
+            o.Logger = app.Services.GetRequiredService<Serilog.ILogger>(); // the host's logger (HostDefaults keeps the static one out)
+        });
 
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseMiddleware<CsrfProtectionMiddleware>();
         app.UseAuthorization();
+        app.UseMiddleware<StepUpMiddleware>();
 
         // Liveness: process is up. Readiness: dependencies (database) reachable. Public: container probes use them.
         app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false }).AllowAnonymous();

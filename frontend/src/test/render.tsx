@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, type RenderResult } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router';
-import { connectAuth } from '@/features/auth';
+import { connectAuth, StepUpProvider } from '@/features/auth';
 import { AppThemeProvider } from '@/theme';
 
 /** Renders UI with the real providers (query cache, theme, router) — tests behave like the app. */
@@ -26,7 +26,9 @@ export function renderRoutes(
   const result = render(
     <QueryClientProvider client={client}>
       <AppThemeProvider>
-        <RouterProvider router={router} />
+        <StepUpProvider>
+          <RouterProvider router={router} />
+        </StepUpProvider>
       </AppThemeProvider>
     </QueryClientProvider>,
   );

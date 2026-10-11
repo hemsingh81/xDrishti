@@ -112,4 +112,20 @@ public sealed class VerifySessionHandlerTests
 
         result.Error.ShouldBe(AuthErrors.Unauthenticated);
     }
+
+    [Fact]
+    public async Task Elevation_is_reported_while_the_step_up_window_is_open_and_not_afterwards()
+    {
+        var token = await SignInAsync();
+        _fx.Data.Sessions.Single().Elevate(_fx.Clock.GetUtcNow());
+
+        var open = await VerifyAsync(token);
+        _fx.Clock.Advance(TimeSpan.FromMinutes(6));
+        var closed = await VerifyAsync(token);
+
+        open.Value.IsElevated.ShouldBeTrue();
+        open.Value.Info.ElevatedUntil.ShouldBe(AuthFixture.Start.AddMinutes(5));
+        closed.Value.IsElevated.ShouldBeFalse();
+        closed.Value.Info.ElevatedUntil.ShouldBeNull();
+    }
 }

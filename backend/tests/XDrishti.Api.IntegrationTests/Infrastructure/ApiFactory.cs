@@ -3,10 +3,13 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog.Core;
 using Testcontainers.PostgreSql;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Auth;
+using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Infrastructure;
@@ -42,6 +45,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public AdjustableTimeProvider Clock { get; } = new();
 
+    /// <summary>The broker vault key of this test run (random, never a real one).</summary>
+    public string VaultKey { get; } = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+
+    /// <summary>Every log event the API wrote during the run, rendered with all its properties.</summary>
+    public CapturedLogs Logs { get; } = new();
+
+    /// <summary>A fake Dhan server: the API's broker HTTP client never reaches the internet in tests.</summary>
+    public FakeBrokers Brokers { get; } = new();
+
     /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
     public string AdminConnectionString => _database.GetConnectionString();
 
@@ -62,6 +74,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("Database:ConnectionString", _database.GetConnectionString());
+        builder.UseSetting("BrokerVault:Key", VaultKey);
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);
         builder.UseSetting("Auth:Owner:Password", OwnerPassword);
@@ -69,6 +82,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             services.AddSingleton<TimeProvider>(Clock);
             services.AddTransient<IStartupFilter, LoopbackRemoteAddressStartupFilter>();
+            services.AddSingleton<ILogEventSink>(Logs);
+            Brokers.Clock = Clock;
+
+            // Only the innermost handler is replaced: the allow-list guard and the client settings stay as in production.
+            services.AddHttpClient(BrokerHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
         });
     }
 
@@ -93,6 +111,30 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         client.DefaultRequestHeaders.Add("Cookie", $"xd.sid={cookie}");
         client.DefaultRequestHeaders.Add("X-CSRF-Token", session.CsrfToken);
         return new SignedInClient(client, session, cookie);
+    }
+
+    /// <summary>Signs in and re-enters the password, so that sensitive endpoints are allowed for the next five minutes.</summary>
+    public async Task<SignedInClient> SignInElevatedAsync(CancellationToken cancellationToken)
+    {
+        var signedIn = await SignInAsync(cancellationToken);
+        using var response = await signedIn.Client.StepUpAsync(OwnerPassword, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return signedIn;
+    }
+
+    /// <summary>Removes every account (its secrets go with it), its audit trail, and the profiles and buckets the tests added, so a test starts from the seeded state.</summary>
+    public async Task ResetAccountsAsync()
+    {
+        await this.WithDbAsync(async db =>
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM accounts.account_events;
+                DELETE FROM accounts.broker_accounts;
+                DELETE FROM accounts.risk_profiles WHERE NOT is_seeded;
+                DELETE FROM accounts.portfolio_buckets WHERE name NOT IN ('Trading', 'MyLongTerm', 'MyChoice');
+                """);
+            return 0;
+        });
     }
 
     /// <summary>Resets the owner to the factory's credentials: clears a lockout and ends every session. For tests that lock or change the account.</summary>

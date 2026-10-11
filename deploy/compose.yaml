@@ -94,11 +94,19 @@ services:
       target: api
       args: { VERSION: "${XD_VERSION:-0.1.0}" }
     restart: unless-stopped
-    environment: *dotnet-env
+    environment:
+      <<: *dotnet-env
+      # Where the owner's browser reaches the app; Dhan redirects back to <this>/api/brokers/dhan/callback (ADR 0008, 0009).
+      Brokers__PublicBaseUrl: http://localhost:${XD_HTTP_PORT:-8080}
     secrets:
       - source: db_app_password
         target: Database__Password
-    networks: [back]
+      # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API gets it: the API refuses to start without it.
+      - source: broker_vault_key
+        target: BrokerVault__Key
+    # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009).
+    # The API's broker clients refuse every other endpoint (allow-list); nothing is published on this network.
+    networks: [back, egress]
     mem_limit: 1g
     depends_on:
       xd-migrate: { condition: service_completed_successfully }
@@ -170,6 +178,8 @@ networks:
   front: {}
   back:
     internal: true
+  # Outbound internet for xd-api only (Dhan sign-in, ADR 0008, 0009). Not internal, no published ports, no other member.
+  egress: {}
 
 volumes:
   xd-db-data: {}
@@ -187,3 +197,5 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_name
   auth_owner_password:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_password
+  broker_vault_key:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/broker_vault_key

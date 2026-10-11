@@ -12,4 +12,6 @@ public enum AuditEventType
     SessionExpiredAbsolute,
     OwnerProvisioned,
     OwnerPasswordReset,
+    StepUpSucceeded,
+    StepUpFailed,
 }

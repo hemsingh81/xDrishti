@@ -37,13 +37,13 @@ public sealed class LoginTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task The_cookie_is_http_only_same_site_strict_site_wide_and_not_secure_over_plain_http()
+    public async Task The_cookie_is_http_only_same_site_lax_site_wide_and_not_secure_over_plain_http()
     {
         var response = await factory.CreateAnonymousClient().LoginAsync(ApiFactory.OwnerEmail, factory.OwnerPassword, Ct);
 
         var cookie = response.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("xd.sid=", StringComparison.Ordinal)).ToLowerInvariant();
         cookie.ShouldContain("httponly");
-        cookie.ShouldContain("samesite=strict");
+        cookie.ShouldContain("samesite=lax"); // Lax: the brokers' top-level redirects to the callbacks carry the session (ADR 0008)
         cookie.ShouldContain("path=/");
         cookie.ShouldContain("expires=");
         cookie.ShouldNotContain("secure");

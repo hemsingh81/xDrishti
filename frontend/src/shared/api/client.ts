@@ -1,6 +1,6 @@
 import createClient from 'openapi-fetch';
 import type { paths } from './schema';
-import type { Problem } from './types';
+import type { Problem, ValidationProblem } from './types';
 
 /**
  * Typed HTTP client generated from the backend OpenAPI contract (npm run gen:api).
@@ -33,6 +33,7 @@ export function configureApiAuth(hooks: ApiAuthHooks | undefined): void {
 
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
 const anonymousPaths = new Set<string>(['/api/auth/login', '/api/auth/session']);
+const stepUpPath = '/api/auth/step-up';
 
 api.use({
   onRequest({ request, schemaPath }) {
@@ -53,6 +54,10 @@ api.use({
       .clone()
       .json()
       .catch(() => undefined)) as Problem | undefined;
+    // A wrong password in the step-up dialog is an answer to the user, not an ended session.
+    if (schemaPath === stepUpPath && problem?.code === 'auth.invalid_credentials') {
+      return undefined;
+    }
     authHooks.onUnauthorized(problem);
     return undefined;
   },
@@ -62,7 +67,7 @@ api.use({
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    readonly problem?: Problem,
+    readonly problem?: ValidationProblem,
   ) {
     super(problem?.title ?? `Request failed with status ${status}`);
     this.name = 'ApiError';
@@ -74,5 +79,12 @@ export function unwrap<T>(result: { data?: T; error?: unknown; response: Respons
   if (result.data !== undefined) {
     return result.data;
   }
-  throw new ApiError(result.response.status, result.error as Problem | undefined);
+  throw new ApiError(result.response.status, result.error as ValidationProblem | undefined);
+}
+
+/** For calls without a response body (204): returns normally on success, throws ApiError otherwise. */
+export function ensureOk(result: { error?: unknown; response: Response }): void {
+  if (!result.response.ok) {
+    throw new ApiError(result.response.status, result.error as ValidationProblem | undefined);
+  }
 }

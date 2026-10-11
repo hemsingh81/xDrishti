@@ -2,6 +2,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using XDrishti.Api.Auth;
+using XDrishti.Application.Accounts;
+using XDrishti.Application.Accounts.Buckets;
+using XDrishti.Application.Accounts.Connections;
+using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Platform.SystemStatus;
 
@@ -14,8 +18,28 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, NumberHandling = JsonNumberHandling.Strict)]
 [JsonSerializable(typeof(SystemStatusResponse))]
 [JsonSerializable(typeof(LoginRequest))]
+[JsonSerializable(typeof(StepUpRequest))]
+[JsonSerializable(typeof(StepUpResult))]
 [JsonSerializable(typeof(SessionInfo))]
 [JsonSerializable(typeof(IReadOnlyList<AuditEventResponse>))]
+[JsonSerializable(typeof(IReadOnlyList<AccountSummary>))]
+[JsonSerializable(typeof(AccountDetail))]
+[JsonSerializable(typeof(CreateAccountInput))]
+[JsonSerializable(typeof(ConnectionInput))]
+[JsonSerializable(typeof(UpdateSecretsInput))]
+[JsonSerializable(typeof(RolesInput))]
+[JsonSerializable(typeof(TradingInput))]
+[JsonSerializable(typeof(PortfolioInput))]
+[JsonSerializable(typeof(DataInput))]
+[JsonSerializable(typeof(ConnectStartView))]
+[JsonSerializable(typeof(DhanRedirectView))]
+[JsonSerializable(typeof(IReadOnlyList<AccountEventView>))]
+[JsonSerializable(typeof(IReadOnlyList<RiskProfileView>))]
+[JsonSerializable(typeof(RiskProfileView))]
+[JsonSerializable(typeof(RiskProfileInput))]
+[JsonSerializable(typeof(IReadOnlyList<BucketView>))]
+[JsonSerializable(typeof(BucketView))]
+[JsonSerializable(typeof(BucketInput))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSerializable(typeof(HttpValidationProblemDetails))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

@@ -22,6 +22,22 @@ describe('app routes', () => {
     expect(await screen.findByText('P2')).toBeInTheDocument();
   });
 
+  it('opens the Accounts screen (no longer a placeholder)', async () => {
+    renderRoutes(routes, { initialPath: '/accounts' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Accounts' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Accounts' })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
+  });
+
+  it('opens the Settings screen (no longer a placeholder)', async () => {
+    renderRoutes(routes, { initialPath: '/settings' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Risk profiles', selected: true })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
+  });
+
   it('shows not-found for unknown paths', async () => {
     renderRoutes(routes, { initialPath: '/nope' });
 

@@ -37,4 +37,13 @@ internal static partial class AuthLog
 
     [LoggerMessage(EventId = 1011, Level = LogLevel.Warning, Message = "Sign-in gave up after {Attempts} concurrent-update conflicts on the owner account")]
     public static partial void ConcurrencyGaveUp(ILogger logger, int attempts);
+
+    [LoggerMessage(EventId = 1012, Level = LogLevel.Information, Message = "Step-up succeeded for {Email}; sensitive actions allowed for {Minutes} minutes")]
+    public static partial void StepUpSucceeded(ILogger logger, string email, int minutes);
+
+    [LoggerMessage(EventId = 1013, Level = LogLevel.Warning, Message = "Step-up failed for {Email}")]
+    public static partial void StepUpFailed(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1014, Level = LogLevel.Warning, Message = "Step-up refused for {Email}: account is locked")]
+    public static partial void StepUpRefusedLocked(ILogger logger, string email);
 }

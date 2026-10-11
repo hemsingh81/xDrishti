@@ -1,0 +1,89 @@
+import { Alert, Grid, Stack } from '@mui/material';
+import type { AccountDetail } from '@/shared/api';
+import { formatInr } from '@/shared/lib/format';
+import { StatTile } from '@/shared/ui';
+import { modeLabel } from '../lib/labels';
+import { ApiKeyExpiry } from './ApiKeyExpiry';
+import { ConnectionStatus } from './ConnectionStatus';
+import { DisabledActions } from './DisabledActions';
+import { Facts, type Fact } from './Facts';
+import { RoleChips } from './RoleChips';
+import { SecretsStatus } from './SecretsStatus';
+
+const notReady = 'Available once the broker adapter and portfolio sync are built (P1-04, P2).';
+
+const tiles = [
+  { label: 'Holdings value', hint: 'open positions: —' },
+  { label: 'Unrealised', hint: 'realised: —' },
+  { label: 'Day change', hint: undefined },
+  { label: 'Funds available', hint: 'used: —' },
+];
+
+function tradingSummary(account: AccountDetail): string {
+  const t = account.trading;
+  const capital = t.capitalAmount === null ? 'capital not set' : `capital ${formatInr(t.capitalAmount)}`;
+  return [modeLabel(t.mode), `${t.riskProfileName ?? 'no'} profile`, capital, t.styles.join(' + ') || 'no style'].join(
+    ' · ',
+  );
+}
+
+function facts(account: AccountDetail): Fact[] {
+  const list: Fact[] = [
+    { label: 'Roles', value: <RoleChips roles={account.roles} /> },
+    { label: 'Token', value: <ConnectionStatus connection={account.connection} /> },
+    { label: 'Last sync', value: '—' },
+  ];
+  if (account.trading.enabled) {
+    list.push({ label: 'Trading', value: tradingSummary(account) });
+  }
+  if (account.portfolio.enabled) {
+    const p = account.portfolio;
+    list.push({
+      label: 'Portfolio',
+      value: `default bucket ${p.defaultBucket ?? '—'} · history from ${p.historyFrom ?? 'the beginning'} · ${
+        p.includeInTotals ? 'included in totals' : 'excluded from totals'
+      }`,
+    });
+  }
+  if (account.data.enabled) {
+    list.push({
+      label: 'Data',
+      value: `${account.data.primary ? 'primary' : 'standby'} · live-feed budget ${account.data.liveFeedBudget} · subscription unknown until the broker adapter`,
+    });
+  }
+  list.push({
+    label: 'Credentials',
+    value: (
+      <Stack spacing={0.5}>
+        <SecretsStatus secrets={account.secrets} />
+        <ApiKeyExpiry expiresOn={account.apiKeyExpiresOn} />
+      </Stack>
+    ),
+  });
+  if (account.notes) {
+    list.push({ label: 'Notes', value: account.notes });
+  }
+  return list;
+}
+
+/** Account at a glance: money tiles (not available yet), token status, roles, settings summaries and stored secrets. */
+export function OverviewTab({ account }: { account: AccountDetail }) {
+  return (
+    <Stack spacing={2.5}>
+      <Grid container spacing={2}>
+        {tiles.map((tile) => (
+          <Grid key={tile.label} size={{ xs: 6, md: 3 }}>
+            <StatTile label={tile.label} value="—" hint={tile.hint} />
+          </Grid>
+        ))}
+      </Grid>
+      <Alert role="status" severity="info">
+        {notReady}
+      </Alert>
+      <Facts items={facts(account)} />
+      <DisabledActions
+        actions={[{ label: 'Sync now', reason: 'Syncing needs the broker adapter and portfolio sync (P1-04, P2).' }]}
+      />
+    </Stack>
+  );
+}

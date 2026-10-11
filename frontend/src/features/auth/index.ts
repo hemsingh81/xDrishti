@@ -2,6 +2,9 @@
 import { lazy } from 'react';
 
 export { sessionQuery, sessionQueryKey, useSession, type SessionState } from './api/sessionQuery';
+export { StepUpProvider } from './components/StepUpProvider';
+export { useStepUp, type WithStepUp } from './hooks/useStepUp';
+export { isStepUpCancelled } from './lib/stepUpErrors';
 export { RequireAuth } from './components/RequireAuth';
 export { UserMenu } from './components/UserMenu';
 export { connectAuth } from './lib/connectAuth';

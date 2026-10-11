@@ -50,3 +50,10 @@ export function csrfTokenOf(queryClient: QueryClient): string | undefined {
   const state = queryClient.getQueryData<SessionState>(sessionQueryKey);
   return state?.status === 'authenticated' ? state.session.csrfToken : undefined;
 }
+
+/** Records the end of the step-up window in the cached session (the only place elevation is kept). */
+export function setElevatedUntil(queryClient: QueryClient, elevatedUntil: string): void {
+  queryClient.setQueryData<SessionState>(sessionQueryKey, (state) =>
+    state?.status === 'authenticated' ? authenticated({ ...state.session, elevatedUntil }) : state,
+  );
+}
