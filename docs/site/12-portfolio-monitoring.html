@@ -195,16 +195,15 @@ and ISIN, but <strong>no purchase date</strong> (docs read 2026-10-11), so the d
 <p><strong>The first import is part of saving the account&#39;s Portfolio settings</strong> (<a href="../adr/0013-portfolio-import-with-settings-and-daily-refresh.html">ADR 0013</a>,
 <a href="../specs/P2-01a-portfolio-import-on-save-and-daily-refresh.html">P2-01a</a>); there is no separate import endpoint or dialog. The settings carry a <strong>first import date</strong>
 (<code>firstImportDate</code>, default <strong>1 Jan 2025</strong>, between 1990-01-01 and today India). When the account is connected, has the Portfolio role and has <strong>no holdings</strong> in the system,
-the settings screen lists Dhan&#39;s holdings (<em>Preview</em>, <code>POST /api/accounts/{id}/holdings/preview</code>, saves nothing; <code>defaultDate</code> and every <code>suggestedDate</code> is the first import date)
-with a date per holding and one bulk date control. <em>Save</em> (<code>PUT /api/accounts/{id}/portfolio</code> with <code>firstImport.rows</code> = <code>[{key, acquiredOn?}]</code>) stores the settings and then
-imports in the same request: Dhan is fetched again inside one transaction (nothing from the preview is trusted), one holding with <strong>one lot</strong> (Dhan&#39;s quantity and average
-cost) is created per chosen key in the account&#39;s bucket (its own default bucket or the custom bucket chosen in the settings); a row without a date gets the first import date and
-its lot is flagged <code>uses_default_date</code> (counted on the Portfolio screen until its date is edited). The run is recorded with the trigger <code>import</code>. The answer carries the result:
-<code>import.status</code> <code>imported</code> (counts <code>imported</code>, <code>defaultDated</code>, <code>alreadyImported</code>, <code>unknown</code>), <code>skipped</code> (the account already has holdings: <code>firstImport</code> is ignored),
+<em>Save</em> (<code>PUT /api/accounts/{id}/portfolio</code>) stores the settings and then imports in the same request, <strong>without any per-holding list on the settings screen</strong>: Dhan is fetched
+again inside one transaction, one holding with <strong>one lot</strong> (Dhan&#39;s quantity and average cost) is created for every holding Dhan lists, in the account&#39;s bucket (its own default
+bucket or the custom bucket chosen in the settings), dated with the first import date and flagged <code>uses_default_date</code> (counted on the Portfolio screen until its date is edited
+there). <code>firstImport.rows</code> = <code>[{key, acquiredOn?}]</code> is an optional API detail: a row&#39;s date overrides the default for its key. The run is recorded with the trigger <code>import</code>. The answer carries the result:
+<code>import.status</code> <code>imported</code> (counts <code>imported</code>, <code>defaultDated</code>, <code>alreadyImported</code>, <code>unknown</code>), <code>skipped</code> (the account already has holdings: nothing is imported, Dhan is not called),
 <code>deferred</code> (not connected, or role off: nothing is called) or <code>failed</code> (the <strong>settings are still saved</strong>; <code>import.errorCode</code> <code>portfolio.import_failed</code>, <code>import.cause</code> the reason code
 such as <code>portfolio.not_connected</code> or <code>portfolio.sync_running</code>; retry with Save again or Sync now). Invalid dates or rows are <code>400 accounts.invalid</code> (fields <code>firstImportDate</code>,
 <code>firstImport.rows[i].key</code>, <code>firstImport.rows[i].acquiredOn</code>) and nothing is saved.
-<strong>An account that is not connected</strong> (or whose owner skipped the list) keeps the stored first import date, and its <strong>first sync</strong> — manual or daily — performs the import: every holding
+<strong>An account that is not connected</strong> keeps the stored first import date, and its <strong>first sync</strong> — manual or daily — performs the import: every holding
 Dhan lists gets one lot dated with the first import date (flagged as default, editable per lot) and the run is recorded as <code>import</code>. After that nothing imports again: saving the settings
 again or changing the first import date has no effect on existing holdings, and everything else arrives through the refresh below.</p>
 <p><strong>Lots.</strong> A holding has lots <code>(acquired_on, qty, unit_cost)</code>; a closed lot also has <code>closed_on</code>, <code>close_price</code> and <code>estimated</code>. A partial sale splits a lot into a
@@ -468,7 +467,7 @@ Nifty 50, XIRR by group.</li>
     <a class="prev" href="11-strategy-lab.html"><small>← Previous  [</small>11 · Strategy Lab</a>
     <a class="next" href="13-reports-and-ui.html"><small>Next  ] →</small>13 · Reports &amp; UI</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-11 17:24</footer>
+  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-11 18:10</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources" class="d2">1. Data sources</a>
 <a href="#2-domain-model" class="d2">2. Domain model</a>

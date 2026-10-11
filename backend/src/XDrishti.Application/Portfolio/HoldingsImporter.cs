@@ -8,8 +8,11 @@ using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Application.Portfolio;
 
-/// <summary>The holdings to import: the keys (from the preview) with an optional date each; <c>DefaultDate</c> dates the rows that have none (flagged then). Null: the first import date of the account.</summary>
-internal sealed record ImportInput(DateOnly? DefaultDate, IReadOnlyList<ImportRowInput>? Rows);
+/// <summary>
+/// The holdings to import: the keys (from the preview) with an optional date each; <c>DefaultDate</c> dates the rows that have none (flagged then). Null: the first
+/// import date of the account. With <c>All</c> every holding Dhan lists is imported and the rows only carry dates that override the default for their key.
+/// </summary>
+internal sealed record ImportInput(DateOnly? DefaultDate, IReadOnlyList<ImportRowInput>? Rows, bool All = false);
 
 /// <summary>What an import did: holdings created (or brought back), keys that were imported already, keys Dhan does not list, and lots on the default date.</summary>
 internal sealed record ImportResultView(int Imported, int AlreadyImported, int Unknown, int DefaultDateLots);
@@ -66,7 +69,7 @@ internal sealed class HoldingsImporter(
             return Result.Failure<ImportOutcome>(connected.Error);
         }
 
-        return await RunAsync(account.Value, bucket.Value, defaultDate, _ => requested, actor, cancellationToken);
+        return await RunAsync(account.Value, bucket.Value, defaultDate, input.All ? AllWithDates(requested) : _ => requested, actor, cancellationToken);
     }
 
     /// <summary>
@@ -83,6 +86,13 @@ internal sealed class HoldingsImporter(
             fetched => [.. fetched.Rows.Select(r => (r.Key, (DateOnly?)null))],
             actor,
             cancellationToken);
+    }
+
+    /// <summary>Every fetched holding; a key named in <paramref name="dates"/> takes its date, the others get the default date.</summary>
+    private static Func<FetchedHoldings, IReadOnlyList<(string Key, DateOnly? AcquiredOn)>> AllWithDates(IReadOnlyList<(string Key, DateOnly? AcquiredOn)> dates)
+    {
+        var byKey = dates.ToDictionary(d => d.Key, d => d.AcquiredOn, StringComparer.OrdinalIgnoreCase);
+        return fetched => [.. fetched.Rows.Select(r => (r.Key, byKey.GetValueOrDefault(r.Key)))];
     }
 
     /// <summary>

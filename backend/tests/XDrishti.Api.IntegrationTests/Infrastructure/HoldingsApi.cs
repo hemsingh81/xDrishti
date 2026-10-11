@@ -15,7 +15,7 @@ internal static class HoldingsApi
         return await response.ReadAsync<ImportPreview>(cancellationToken);
     }
 
-    /// <summary>Saves the portfolio settings (PUT) and returns the answer: the account and, with <c>firstImport</c> rows, what the first import did.</summary>
+    /// <summary>Saves the portfolio settings (PUT) and returns the answer: the account and what the first import did.</summary>
     public static async Task<PortfolioSaved> SavePortfolioAsync(this HttpClient client, Guid accountId, object body, CancellationToken cancellationToken)
     {
         using var response = await client.PutJsonAsync($"/api/accounts/{accountId}/portfolio", body, cancellationToken);

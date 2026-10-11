@@ -49,28 +49,48 @@ public sealed class FirstImportOnSaveTests
     }
 
     [Fact]
-    public async Task Rows_without_a_date_use_the_stored_first_import_date_when_the_request_names_none()
+    public async Task Rows_only_override_dates_every_holding_dhan_lists_is_imported()
     {
         var account = await AccountWithDhanHoldingsAsync();
-        Ok(await SaveAsync(account.Id, new PortfolioInput(null, null, FirstImportDate: Chosen)));
 
-        var saved = Ok(await SaveAsync(account.Id, new PortfolioInput(null, null, FirstImport: new FirstImportInput([new ImportRowInput("INE000A00001", null)]))));
+        var saved = Ok(await SaveAsync(account.Id, WithImport(Chosen, R("INE000A00001", new DateOnly(2023, 5, 5)))));
 
-        saved.Import!.DefaultDated.ShouldBe(1);
-        _fx.HoldingOf("AAA").Lots.Single().AcquiredOn.ShouldBe(Chosen);
+        saved.Import.ShouldBe(new FirstImportView("imported", 2, 1, 0, 0, null, null, null));
+        _fx.Data.Holdings.Select(h => h.TradingSymbol).Order().ShouldBe(["AAA", "BBB"]);
+        _fx.HoldingOf("AAA").Lots.Single().AcquiredOn.ShouldBe(new DateOnly(2023, 5, 5));
+        _fx.HoldingOf("BBB").Lots.Single().AcquiredOn.ShouldBe(Chosen);
     }
 
     [Fact]
-    public async Task Only_the_chosen_holdings_are_imported_and_the_others_arrive_with_the_next_sync_dated_today()
+    public async Task A_save_without_rows_imports_every_holding_with_the_request_date_flagged_default()
     {
         var account = await AccountWithDhanHoldingsAsync();
 
-        Ok(await SaveAsync(account.Id, WithImport(Chosen, R("INE000A00001", null))));
-        var later = Ok(await _fx.SyncAsync(account.Id));
+        var saved = Ok(await SaveAsync(account.Id, new PortfolioInput(null, null, FirstImportDate: Chosen)));
 
-        _fx.Data.Holdings.Select(h => h.TradingSymbol).Order().ShouldBe(["AAA", "BBB"]);
-        _fx.HoldingOf("BBB").Lots.Single().AcquiredOn.ShouldBe(_fx.Today);
-        (later.Trigger, later.NewCount, later.UnchangedCount).ShouldBe(("manual", 1, 1));
+        saved.Import.ShouldBe(new FirstImportView("imported", 2, 2, 0, 0, null, null, null));
+        _fx.Data.Holdings.SelectMany(h => h.Lots).ShouldAllBe(l => l.AcquiredOn == Chosen && l.UsesDefaultDate);
+        _fx.Data.Syncs.Single().Trigger.ShouldBe(SyncTrigger.Import);
+    }
+
+    [Fact]
+    public async Task A_save_without_rows_or_date_uses_the_stored_date_and_then_2025_01_01()
+    {
+        var stored = await AccountWithDhanHoldingsAsync(connect: false);
+        Ok(await SaveAsync(stored.Id, new PortfolioInput(null, null, FirstImportDate: Chosen)));
+        await _fx.Connections.ConnectByLoginAsync(stored);
+        Ok(await SaveAsync(stored.Id, new PortfolioInput(null, false)));
+        _fx.Data.Holdings.SelectMany(h => h.Lots).ShouldAllBe(l => l.AcquiredOn == Chosen);
+    }
+
+    [Fact]
+    public async Task A_save_with_no_stored_date_falls_back_to_2025_01_01()
+    {
+        var account = await AccountWithDhanHoldingsAsync();
+
+        Ok(await SaveAsync(account.Id, new PortfolioInput(null, null)));
+
+        _fx.Data.Holdings.SelectMany(h => h.Lots).ShouldAllBe(l => l.AcquiredOn == new DateOnly(2025, 1, 1) && l.UsesDefaultDate);
     }
 
     [Fact]
@@ -107,6 +127,21 @@ public sealed class FirstImportOnSaveTests
         _fx.Data.Holdings.SelectMany(h => h.Lots).ShouldAllBe(l => l.AcquiredOn == new DateOnly(2023, 1, 1));
         _fx.Data.Syncs.Count.ShouldBe(runs);
         saved.Account.Portfolio.FirstImportDate.ShouldBe(Chosen); // stored, but without effect on existing holdings
+    }
+
+    [Fact]
+    public async Task A_save_that_changes_nothing_on_an_account_with_holdings_skips_without_calling_dhan()
+    {
+        var account = await AccountWithDhanHoldingsAsync();
+        Ok(await SaveAsync(account.Id, new PortfolioInput(null, null)));
+        var runs = _fx.Data.Syncs.Count;
+        var tokens = _fx.Dhan.Tokens.Count;
+
+        var saved = Ok(await SaveAsync(account.Id, new PortfolioInput(null, null)));
+
+        saved.Import!.Status.ShouldBe("skipped");
+        _fx.Data.Syncs.Count.ShouldBe(runs);
+        _fx.Dhan.Tokens.Count.ShouldBe(tokens);
     }
 
     [Fact]
@@ -172,20 +207,6 @@ public sealed class FirstImportOnSaveTests
 
         saved.Import!.Status.ShouldBe("deferred");
         saved.Account.Portfolio.FirstImportDate.ShouldBe(Chosen);
-    }
-
-    [Fact]
-    public async Task Without_first_import_rows_nothing_is_imported_and_no_import_result_is_returned()
-    {
-        var account = await AccountWithDhanHoldingsAsync();
-
-        var withoutRows = Ok(await SaveAsync(account.Id, new PortfolioInput(null, null, FirstImportDate: Chosen)));
-        var emptyRows = Ok(await SaveAsync(account.Id, new PortfolioInput(null, null, FirstImport: new FirstImportInput([]))));
-
-        withoutRows.Import.ShouldBeNull();
-        emptyRows.Import.ShouldBeNull();
-        _fx.Data.Holdings.ShouldBeEmpty();
-        _fx.Dhan.Tokens.ShouldBeEmpty();
     }
 
     [Fact]

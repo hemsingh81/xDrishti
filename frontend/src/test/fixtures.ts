@@ -7,8 +7,6 @@ import type {
   HoldingPage,
   HoldingRow,
   HoldingsSummary,
-  ImportPreview,
-  ImportPreviewRow,
   FirstImportView,
   PortfolioSaved,
   InstrumentDetail,
@@ -904,66 +902,6 @@ export function buildLots(overrides: Partial<HoldingLots> = {}): HoldingLots {
   };
 }
 
-export function buildPreviewRow(overrides: Partial<ImportPreviewRow> = {}): ImportPreviewRow {
-  return {
-    key: 'INE002A01018',
-    symbol: 'RELIANCE',
-    name: 'Reliance Industries',
-    exchange: 'NSE',
-    qty: 40,
-    avgCost: 2_500,
-    lastPrice: 2_902.5,
-    instrumentId: instrumentId(1),
-    canonicalSymbol: 'NSE:RELIANCE',
-    mapped: true,
-    alreadyImported: false,
-    suggestedDate: '2025-01-01',
-    ...overrides,
-  };
-}
-
-/** Three new holdings (one not in the master list) and one already imported; the first import's default date. */
-export function buildImportPreview(overrides: Partial<ImportPreview> = {}): ImportPreview {
-  return {
-    defaultDate: '2025-01-01',
-    rows: [
-      buildPreviewRow(),
-      buildPreviewRow({
-        key: 'INE467B01029',
-        symbol: 'TCS',
-        name: 'Tata Consultancy Services',
-        qty: 10,
-        avgCost: 4_000,
-        lastPrice: 3_880,
-        canonicalSymbol: 'NSE:TCS',
-      }),
-      buildPreviewRow({
-        key: '500999:BSE',
-        symbol: 'SMALLCO',
-        name: 'Small Co Ltd',
-        exchange: 'BSE',
-        qty: 100,
-        avgCost: 50,
-        lastPrice: 60,
-        instrumentId: null,
-        canonicalSymbol: null,
-        mapped: false,
-      }),
-      buildPreviewRow({
-        key: 'INE009A01021',
-        symbol: 'INFY',
-        name: 'Infosys',
-        qty: 25,
-        avgCost: 1_600,
-        lastPrice: 1_700,
-        alreadyImported: true,
-        suggestedDate: '2024-08-14',
-      }),
-    ],
-    ...overrides,
-  };
-}
-
 export const buildFirstImportView = (overrides: Partial<FirstImportView> = {}): FirstImportView => ({
   status: 'imported',
   imported: 3,
@@ -976,10 +914,10 @@ export const buildFirstImportView = (overrides: Partial<FirstImportView> = {}): 
   ...overrides,
 });
 
-/** The answer of saving the portfolio settings: the account as saved and what the first import did (none by default). */
+/** The answer of saving the portfolio settings: the account as saved and what the first import did (skipped: holdings exist, by default). */
 export const buildPortfolioSaved = (
   account: AccountDetail,
-  imported: FirstImportView | null = null,
+  imported: FirstImportView = buildFirstImportView({ status: 'skipped', imported: 0, defaultDated: 0 }),
 ): PortfolioSaved => ({
   account,
   import: imported,

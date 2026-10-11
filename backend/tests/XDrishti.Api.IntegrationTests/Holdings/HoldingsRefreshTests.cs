@@ -101,9 +101,9 @@ public sealed class HoldingsRefreshTests(ApiFactory factory) : HoldingsTestBase(
     [Fact]
     public async Task Daily_mode_runs_once_after_the_time_and_catches_up_a_missed_time()
     {
-        var account = await ConnectedAccountAsync();
+        // Created with the schedule: saving the settings of a connected account imports at once (ADR 0013).
+        var account = await ConnectedAccountAsync(portfolio: new { refreshMode = "daily", refreshDailyTimeIst = "16:00" });
         Dhan.Holdings.Add(Holding("ALPHA", 100, 50m, 60m, "1001", "INE000A01011"));
-        await SetRefreshAsync(account.Id, new { refreshMode = "daily", refreshDailyTimeIst = "16:00" });
 
         await Runner.TickAsync(Ct); // 10:00: too early
         (await Factory.SyncsAsync(account.Id, Ct)).ShouldBeEmpty();
@@ -181,9 +181,9 @@ public sealed class HoldingsRefreshTests(ApiFactory factory) : HoldingsTestBase(
     [Fact]
     public async Task An_automatic_run_prunes_old_finished_records_but_keeps_failed_and_recent_ones_and_the_activity_index_exists()
     {
-        var account = await ConnectedAccountAsync();
+        // Created with the schedule: saving the settings of a connected account imports at once (ADR 0013).
+        var account = await ConnectedAccountAsync(portfolio: new { refreshMode = "daily", refreshDailyTimeIst = "09:00" });
         Dhan.Holdings.Add(Holding("ALPHA", 100, 50m, 60m, "1001", "INE000A01011"));
-        await SetRefreshAsync(account.Id, new { refreshMode = "daily", refreshDailyTimeIst = "09:00" });
         await Factory.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync(
@@ -218,8 +218,7 @@ public sealed class HoldingsRefreshTests(ApiFactory factory) : HoldingsTestBase(
     {
         var off = await ConnectedAccountAsync();
         Dhan.Holdings.Add(Holding("ALPHA", 100, 50m, 60m, "1001", "INE000A01011"));
-        var noRole = await ConnectedAccountAsync("Example Two", "1000000002");
-        await SetRefreshAsync(noRole.Id, new { refreshMode = "daily", refreshDailyTimeIst = "09:00" });
+        var noRole = await ConnectedAccountAsync("Example Two", "1000000002", new { refreshMode = "daily", refreshDailyTimeIst = "09:00" });
         using var roleOff = await Client.PutJsonAsync($"/api/accounts/{noRole.Id}/roles", new { portfolio = new { enabled = false } }, Ct);
         roleOff.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -232,9 +231,9 @@ public sealed class HoldingsRefreshTests(ApiFactory factory) : HoldingsTestBase(
     [Fact]
     public async Task The_hosted_service_runs_the_due_accounts_when_the_application_starts()
     {
-        var account = await ConnectedAccountAsync();
+        // Created with the schedule: saving the settings of a connected account imports at once (ADR 0013).
+        var account = await ConnectedAccountAsync(portfolio: new { refreshMode = "daily", refreshDailyTimeIst = "09:00" });
         Dhan.Holdings.Add(Holding("ALPHA", 100, 50m, 60m, "1001", "INE000A01011"));
-        await SetRefreshAsync(account.Id, new { refreshMode = "daily", refreshDailyTimeIst = "09:00" });
         Factory.Clock.Advance(TimeSpan.FromMinutes(11)); // an automatic first import waits until the settings are ten minutes old
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var host = Factory.WithWebHostBuilder(b =>

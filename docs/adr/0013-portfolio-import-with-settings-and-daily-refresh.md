@@ -11,9 +11,11 @@ Portfolio settings own everything about getting holdings in; the Portfolio scree
 1. **Auto refresh** is *Off* or *Daily at HH:MM IST* (default Off, time 16:00, after market close). Interval mode and `refresh_interval_minutes` are removed.
    Daily keeps ADR 0012's rules: one run per India day after the time, one catch-up if missed, a not-connected account records at most one skipped run per day.
 2. **First import is part of saving the account's Portfolio settings.** The settings carry a *first import date* (default 1 Jan 2025). When the account is connected and has no
-   holdings in the system, the settings screen lists the holdings found at Dhan with a date per holding (pre-filled with the first import date, one bulk date control);
-   *Save* stores the settings and imports with those dates in the same request. When the account is not connected (or the owner skips the list), the first import date is stored
-   and the **first sync** (manual or daily) performs the import, dating every holding with it (flagged "default date", editable per lot).
+   holdings in the system, *Save* stores the settings and **imports every holding Dhan lists in the same request, without any per-holding list**: each lot is dated with the
+   effective first import date (request, else stored, else 2025-01-01) and flagged "default date". Per-holding dates are edited later on the Portfolio screen (lot dates);
+   `firstImport.rows` stays an optional API detail whose dates override the default for their key. A save that changes nothing on an account that has holdings answers `skipped`
+   without calling Dhan. The answer always carries `import` (imported / skipped / deferred / failed). When the account is not connected (or the role is off), the date is stored,
+   the answer is `deferred`, and the **first sync** (manual or daily) performs the import the same way.
 3. **Afterwards the refresh handles everything**: new holding → lot dated today (IST); quantity increase → lot dated today; decrease/missing → FIFO close (ADR 0012 rules unchanged).
    Saving the settings again never imports again (the account already has holdings); changing the first import date afterwards has no effect on existing holdings.
 4. **Portfolio screen** has no Import dialog and no Auto refresh control. **Sync now** runs the same sync as the daily refresh, for that day (new holdings dated today); it is a manual

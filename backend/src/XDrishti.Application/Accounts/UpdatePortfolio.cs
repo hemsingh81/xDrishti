@@ -49,11 +49,8 @@ internal sealed class UpdatePortfolioHandler(
         var today = AccountTime.TodayInIndia(now);
         var firstImportDate = AccountInputs.ParseFirstImportDate(command.Input, today, errors);
         var importDate = firstImportDate ?? account.Portfolio.ImportDate;
-        var importRequest = command.Input?.FirstImport is { Rows: { Count: > 0 } rows } ? new ImportInput(importDate, rows) : null;
-        if (importRequest is not null)
-        {
-            HoldingsImporter.Check(importRequest, importDate, today, errors, "firstImport.");
-        }
+        var importRequest = new ImportInput(importDate, command.Input?.FirstImport?.Rows, All: true);
+        HoldingsImporter.Check(importRequest, importDate, today, errors, "firstImport.");
 
         if (errors.HasErrors)
         {
@@ -88,7 +85,7 @@ internal sealed class UpdatePortfolioHandler(
         }
 
         AccountsLog.PortfolioUpdated(logger, account.Slug);
-        var import = importRequest is null ? null : await FirstImportAsync(account, importRequest, command.Actor, cancellationToken);
+        var import = await FirstImportAsync(account, importRequest, command.Actor, cancellationToken);
         return Result.Success(new PortfolioSaved(await views.DetailAsync(account, cancellationToken), import));
     }
 
@@ -102,12 +99,12 @@ internal sealed class UpdatePortfolioHandler(
 
         if (!account.Portfolio.Enabled)
         {
-            return FirstImports.Deferred("The Portfolio role is off. Once it is on and the account is connected, the first sync imports every holding dated " + request.DefaultDate!.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ".");
+            return FirstImports.Deferred("The Portfolio role is off. Once it is on and the account is connected, the first sync imports every holding dated " + account.Portfolio.ImportDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ".");
         }
 
         if ((await fetcher.ConnectedAsync(account.Id, cancellationToken)).IsFailure)
         {
-            return FirstImports.Deferred("The account is not connected to Dhan. Once it is, the first sync imports every holding dated " + request.DefaultDate!.Value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ".");
+            return FirstImports.Deferred("The account is not connected to Dhan. Once it is, the first sync imports every holding dated " + account.Portfolio.ImportDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + ".");
         }
 
         var imported = await importer.ImportAsync(account.Id, request, actor, cancellationToken);

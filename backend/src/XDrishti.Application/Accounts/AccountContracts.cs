@@ -154,14 +154,14 @@ public sealed record PortfolioInput(
     FirstImportInput? FirstImport = null);
 
 /// <summary>
-/// The holdings to import when the portfolio settings are saved (ADR 0013). Rows are keys from <c>holdings/preview</c> with an optional acquisition date each
-/// (a row without one gets the first import date, flagged as such); at most 5000 rows. Used only when the account is connected to Dhan and has no holdings yet;
-/// an empty list imports nothing.
+/// Optional per-holding dates for the first import that happens when the portfolio settings are saved (ADR 0013). Without rows, every holding Dhan lists is
+/// imported dated with the first import date (flagged default-date); a row (key from <c>holdings/preview</c>, acquisition date) overrides the date of its holding.
+/// At most 5000 rows. Used only when the account is connected to Dhan and has no holdings yet.
 /// </summary>
 public sealed record FirstImportInput(IReadOnlyList<ImportRowInput>? Rows);
 
 /// <summary>
-/// What a first import did. Status: "imported" (the chosen holdings were created; the counts say how many), "skipped" (the account already has holdings, nothing was
+/// What a first import did. Status: "imported" (the holdings were created; the counts say how many), "skipped" (the account already has holdings, nothing was
 /// imported), "deferred" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or
 /// "failed" (the settings were saved but the import was not: ErrorCode is <c>portfolio.import_failed</c>, Cause the code of the reason, for example
 /// <c>portfolio.not_connected</c>, <c>portfolio.sync_running</c>; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those
@@ -177,8 +177,8 @@ public sealed record FirstImportView(
     string? Cause,
     string? Message);
 
-/// <summary>The answer of saving the portfolio settings: the account as saved and, when a first import was asked for, what it did (otherwise null).</summary>
-public sealed record PortfolioSaved(AccountDetail Account, FirstImportView? Import);
+/// <summary>The answer of saving the portfolio settings: the account as saved and what the first import did (always present; see <see cref="FirstImportView"/>).</summary>
+public sealed record PortfolioSaved(AccountDetail Account, FirstImportView Import);
 
 public sealed record DataInput(int? LiveFeedBudget);
 

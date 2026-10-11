@@ -51,8 +51,14 @@ public sealed class PortfolioRefreshRunnerTests
 
     private async Task<BrokerAccount> OnAsync(PortfolioInput refresh, string name = "Example One", string clientId = "1000000001", bool connect = true)
     {
-        var account = await _fx.ConnectedAsync(name, clientId, connect);
+        // Saved before connecting: a save on a connected account without holdings imports at once (ADR 0013), and these tests are about the loop.
+        var account = await _fx.ConnectedAsync(name, clientId, connect: false);
         await _fx.Connections.Accounts.UpdatePortfolio().HandleAsync(new UpdatePortfolioCommand(account.Id, refresh, Actor), CancellationToken.None);
+        if (connect)
+        {
+            await _fx.Connections.ConnectByLoginAsync(account);
+        }
+
         return account;
     }
 

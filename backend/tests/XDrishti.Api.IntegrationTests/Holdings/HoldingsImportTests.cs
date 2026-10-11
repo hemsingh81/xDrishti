@@ -94,7 +94,7 @@ public sealed class HoldingsImportTests(ApiFactory factory) : HoldingsTestBase(f
         }, Ct);
 
         var import = saved.Import!;
-        (import.Status, import.Imported, import.DefaultDated, import.AlreadyImported, import.Unknown).ShouldBe(("imported", 4, 2, 0, 1));
+        (import.Status, import.Imported, import.DefaultDated, import.AlreadyImported, import.Unknown).ShouldBe(("imported", 4, 2, 0, 0)); // every holding Dhan lists; the rows only override dates, an unknown key is ignored
         (saved.Account.Portfolio.RefreshMode, saved.Account.Portfolio.RefreshDailyTimeIst, saved.Account.Portfolio.FirstImportDate, saved.Account.Portfolio.HasHoldings)
             .ShouldBe(("daily", "17:00", DefaultDate, true));
         var alpha = await Factory.HoldingAsync("ALPHA", Ct);
@@ -125,20 +125,36 @@ public sealed class HoldingsImportTests(ApiFactory factory) : HoldingsTestBase(f
     }
 
     [Fact]
-    public async Task Rows_without_a_date_use_the_first_import_date_stored_earlier_and_a_second_save_imports_nothing_more()
+    public async Task A_save_without_rows_imports_every_holding_with_the_stored_date_and_a_second_save_imports_nothing_more()
     {
         var account = await ConnectedAccountAsync();
         DhanHolds();
-        await Client.SavePortfolioAsync(account.Id, new { firstImportDate = "2024-02-02" }, Ct);
 
-        var first = await Client.ImportAsync(account.Id, null, new[] { new { key = "INE000A01011" } }, Ct);
-        var second = await Client.ImportAsync(account.Id, null, new[] { new { key = "INE000B01012" } }, Ct);
+        var first = (await Client.SavePortfolioAsync(account.Id, new { firstImportDate = "2024-02-02" }, Ct)).Import!;
+        var requests = HoldingRequests.Count;
+        var second = (await Client.SavePortfolioAsync(account.Id, new { firstImportDate = "2024-03-03" }, Ct)).Import!;
+        var third = (await Client.SavePortfolioAsync(account.Id, new { }, Ct)).Import!;
 
-        first.Status.ShouldBe("imported");
-        (await Factory.HoldingAsync("ALPHA", Ct)).Lots.Single().AcquiredOn.ShouldBe(new DateOnly(2024, 2, 2));
+        (first.Status, first.Imported, first.DefaultDated).ShouldBe(("imported", 4, 4));
+        (await Factory.HoldingAsync("ALPHA", Ct)).Lots.Single().ShouldSatisfyAllConditions(
+            l => l.AcquiredOn.ShouldBe(new DateOnly(2024, 2, 2)),
+            l => l.UsesDefaultDate.ShouldBeTrue());
         (second.Status, second.Imported).ShouldBe(("skipped", 0));
-        (await Factory.CountAsync("portfolio.holdings", Ct)).ShouldBe(1);
-        (await Client.PreviewAsync(account.Id, Ct)).Rows.Single(r => r.Symbol == "ALPHA").AlreadyImported.ShouldBeTrue();
+        third.Status.ShouldBe("skipped");
+        HoldingRequests.Count.ShouldBe(requests); // an account with holdings is not asked Dhan again
+        (await Factory.CountAsync("portfolio.holdings", Ct)).ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task An_account_that_is_not_connected_gets_a_deferred_import_and_the_date_is_stored()
+    {
+        var account = await UnconnectedAccountAsync();
+
+        var saved = await Client.SavePortfolioAsync(account.Id, new { firstImportDate = "2024-02-02" }, Ct);
+
+        saved.Import!.Status.ShouldBe("deferred");
+        saved.Account.Portfolio.FirstImportDate.ShouldBe(new DateOnly(2024, 2, 2));
+        HoldingRequests.ShouldBeEmpty();
     }
 
     [Fact]
@@ -197,11 +213,11 @@ public sealed class HoldingsImportTests(ApiFactory factory) : HoldingsTestBase(f
         var account = await ConnectedAccountAsync();
         DhanHolds();
 
-        await Client.ImportAsync(account.Id, "2025-01-01", new object[] { new { key = "INE000A01011" }, new { key = "NOPE" } }, Ct);
+        await Client.ImportAsync(account.Id, "2025-01-01", new object[] { new { key = "INE000A01011" }, new { key = "NOPE" } }, Ct); // all four are imported
 
         var activity = await (await Client.GetAsync($"/api/accounts/{account.Id}/activity", Ct)).ReadAsync<List<AccountEventView>>(Ct);
         activity[0].Event.ShouldBe("HoldingsImported");
-        activity[0].Detail.ShouldBe("Holdings imported: 1 imported, 0 already imported, 1 not listed by Dhan; 1 lots on the default date 2025-01-01");
+        activity[0].Detail.ShouldBe("Holdings imported: 4 imported, 0 already imported, 0 not listed by Dhan; 4 lots on the default date 2025-01-01");
         AssertNoSecret(activity[0].Detail!);
     }
 

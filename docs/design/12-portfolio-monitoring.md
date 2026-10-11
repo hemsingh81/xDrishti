@@ -64,16 +64,15 @@ and ISIN, but **no purchase date** (docs read 2026-10-11), so the dates are **se
 **The first import is part of saving the account's Portfolio settings** ([ADR 0013](../adr/0013-portfolio-import-with-settings-and-daily-refresh.md),
 [P2-01a](../specs/P2-01a-portfolio-import-on-save-and-daily-refresh.md)); there is no separate import endpoint or dialog. The settings carry a **first import date**
 (`firstImportDate`, default **1 Jan 2025**, between 1990-01-01 and today India). When the account is connected, has the Portfolio role and has **no holdings** in the system,
-the settings screen lists Dhan's holdings (*Preview*, `POST /api/accounts/{id}/holdings/preview`, saves nothing; `defaultDate` and every `suggestedDate` is the first import date)
-with a date per holding and one bulk date control. *Save* (`PUT /api/accounts/{id}/portfolio` with `firstImport.rows` = `[{key, acquiredOn?}]`) stores the settings and then
-imports in the same request: Dhan is fetched again inside one transaction (nothing from the preview is trusted), one holding with **one lot** (Dhan's quantity and average
-cost) is created per chosen key in the account's bucket (its own default bucket or the custom bucket chosen in the settings); a row without a date gets the first import date and
-its lot is flagged `uses_default_date` (counted on the Portfolio screen until its date is edited). The run is recorded with the trigger `import`. The answer carries the result:
-`import.status` `imported` (counts `imported`, `defaultDated`, `alreadyImported`, `unknown`), `skipped` (the account already has holdings: `firstImport` is ignored),
+*Save* (`PUT /api/accounts/{id}/portfolio`) stores the settings and then imports in the same request, **without any per-holding list on the settings screen**: Dhan is fetched
+again inside one transaction, one holding with **one lot** (Dhan's quantity and average cost) is created for every holding Dhan lists, in the account's bucket (its own default
+bucket or the custom bucket chosen in the settings), dated with the first import date and flagged `uses_default_date` (counted on the Portfolio screen until its date is edited
+there). `firstImport.rows` = `[{key, acquiredOn?}]` is an optional API detail: a row's date overrides the default for its key. The run is recorded with the trigger `import`. The answer carries the result:
+`import.status` `imported` (counts `imported`, `defaultDated`, `alreadyImported`, `unknown`), `skipped` (the account already has holdings: nothing is imported, Dhan is not called),
 `deferred` (not connected, or role off: nothing is called) or `failed` (the **settings are still saved**; `import.errorCode` `portfolio.import_failed`, `import.cause` the reason code
 such as `portfolio.not_connected` or `portfolio.sync_running`; retry with Save again or Sync now). Invalid dates or rows are `400 accounts.invalid` (fields `firstImportDate`,
 `firstImport.rows[i].key`, `firstImport.rows[i].acquiredOn`) and nothing is saved.
-**An account that is not connected** (or whose owner skipped the list) keeps the stored first import date, and its **first sync** — manual or daily — performs the import: every holding
+**An account that is not connected** keeps the stored first import date, and its **first sync** — manual or daily — performs the import: every holding
 Dhan lists gets one lot dated with the first import date (flagged as default, editable per lot) and the run is recorded as `import`. After that nothing imports again: saving the settings
 again or changing the first import date has no effect on existing holdings, and everything else arrives through the refresh below.
 

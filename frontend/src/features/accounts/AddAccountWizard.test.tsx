@@ -173,9 +173,12 @@ describe('Add-account wizard', () => {
     ).toEqual(['Dhan · Main · Portfolio — account’s own bucket (created automatically)', 'MyLongTerm']);
     expect(within(select).queryByRole('option', { name: /Test Dhan Main/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText(/Import trade|history/i)).not.toBeInTheDocument();
-    // No account yet: only the date, and a note that the first sync imports.
+    // No account yet: only the date, and a note that the first sync after connecting imports.
     expect(within(dialog).getByLabelText('First import date')).toHaveValue('2025-01-01');
-    expect(within(dialog).getByText(/the first sync imports every holding with this date/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/import on the first sync after connecting/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('region', { name: 'First import' })).not.toBeInTheDocument();
+    // The label stays above the value (regression: it used to overlap the own bucket's text).
+    expect(within(dialog).getByText('Default bucket', { selector: 'label' })).toHaveAttribute('data-shrink', 'true');
     expect(within(dialog).queryByRole('table')).not.toBeInTheDocument();
     expect(within(dialog).getByRole('radio', { name: 'Off' })).toBeChecked();
   });

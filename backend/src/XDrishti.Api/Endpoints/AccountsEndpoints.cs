@@ -65,7 +65,7 @@ internal sealed class AccountsEndpoints : IEndpointModule
 
         group.MapPut("/{id:guid}/portfolio", UpdatePortfolioAsync)
             .WithName("UpdateAccountPortfolio")
-            .WithSummary("Save the portfolio settings (default bucket, include in totals, auto refresh off or daily at a time, first import date). With firstImport.rows, when the account is connected and has no holdings, the chosen holdings are imported in the same request; the settings are saved even when the import fails (import.status failed, import.errorCode portfolio.import_failed). Answer: {account, import}")
+            .WithSummary("Save the portfolio settings (default bucket, include in totals, auto refresh off or daily at a time, first import date). When the account is connected, has the Portfolio role and has no holdings, every holding Dhan lists is imported in the same request, dated with the first import date (optional firstImport.rows override dates per key); the settings are saved even when the import fails (import.status failed, import.errorCode portfolio.import_failed). Answer: {account, import} (import always present)")
             .ProducesRejections(conflict: true);
 
         group.MapPut("/{id:guid}/data", UpdateDataAsync)

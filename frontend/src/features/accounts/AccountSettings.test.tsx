@@ -264,11 +264,15 @@ describe('Portfolio tab', () => {
     expect(screen.queryByRole('option', { name: 'Choose…' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/history/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Import trade/)).not.toBeInTheDocument();
-    const firstImport = screen.getByRole('region', { name: 'First import' });
+    expect(screen.queryByRole('region', { name: 'First import' })).not.toBeInTheDocument();
     expect(
-      within(firstImport).getByText('Holdings are refreshed automatically; new ones are dated the day they appear.'),
-    ).toBeInTheDocument();
-    expect(within(firstImport).queryByRole('table')).not.toBeInTheDocument();
+      screen.getByText(/Holdings refresh automatically; new holdings are dated the day they appear/),
+    ).toBeVisible();
+    expect(screen.queryByLabelText('First import date')).not.toBeInTheDocument();
+    expect(screen.getByText('2025-01-01')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    // Regression: the label sits above the selected value instead of overlapping it.
+    expect(screen.getByText('Default bucket', { selector: 'label' })).toHaveAttribute('data-shrink', 'true');
   });
 
   it('lists the buckets with the account’s own default first', async () => {

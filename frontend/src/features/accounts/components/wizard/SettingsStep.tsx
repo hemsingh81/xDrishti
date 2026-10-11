@@ -8,7 +8,6 @@ import { scoped } from '../../lib/fieldErrors';
 import { autoBucketNameOf, maxLiveFeedBudget } from '../../lib/portfolioForm';
 import type { WizardState } from '../../lib/wizardState';
 import { BucketAdder } from '../BucketAdder';
-import { FirstImportSection } from '../firstImport/FirstImportSection';
 import { PortfolioFields } from '../PortfolioFields';
 import { TradingFields } from '../TradingFields';
 
@@ -53,20 +52,12 @@ export function SettingsStep({ state, errors, onChange }: SettingsStepProps) {
             buckets={buckets.data}
             ownBucketName={autoBucketNameOf(state.identity.name)}
             ownBucketPending
+            firstImport={{ hasHoldings: false, connected: false }}
             onChange={(patch) => {
               onChange({ portfolio: { ...state.portfolio, ...patch } });
             }}
           />
           <BucketAdder />
-          <FirstImportSection
-            idPrefix="wizard-portfolio"
-            date={state.portfolio.firstImportDate}
-            dateError={scoped(errors, 'portfolio').firstImportDate}
-            onDateChange={(firstImportDate) => {
-              onChange({ portfolio: { ...state.portfolio, firstImportDate } });
-            }}
-            hasHoldings={false}
-          />
         </Section>
       )}
       {state.roles.data && (

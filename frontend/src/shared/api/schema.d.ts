@@ -252,7 +252,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Save the portfolio settings (default bucket, include in totals, auto refresh off or daily at a time, first import date). With firstImport.rows, when the account is connected and has no holdings, the chosen holdings are imported in the same request; the settings are saved even when the import fails (import.status failed, import.errorCode portfolio.import_failed). Answer: {account, import} */
+    /** Save the portfolio settings (default bucket, include in totals, auto refresh off or daily at a time, first import date). When the account is connected, has the Portfolio role and has no holdings, every holding Dhan lists is imported in the same request, dated with the first import date (optional firstImport.rows override dates per key); the settings are saved even when the import fails (import.status failed, import.errorCode portfolio.import_failed). Answer: {account, import} (import always present) */
     put: operations['UpdateAccountPortfolio'];
     post?: never;
     delete?: never;
@@ -848,15 +848,15 @@ export interface components {
       count: number;
     };
     /**
-     * @description The holdings to import when the portfolio settings are saved (ADR 0013). Rows are keys from `holdings/preview` with an optional acquisition date each
-     *     (a row without one gets the first import date, flagged as such); at most 5000 rows. Used only when the account is connected to Dhan and has no holdings yet;
-     *     an empty list imports nothing.
+     * @description Optional per-holding dates for the first import that happens when the portfolio settings are saved (ADR 0013). Without rows, every holding Dhan lists is
+     *     imported dated with the first import date (flagged default-date); a row (key from `holdings/preview`, acquisition date) overrides the date of its holding.
+     *     At most 5000 rows. Used only when the account is connected to Dhan and has no holdings yet.
      */
     FirstImportInput: {
       rows: null | components['schemas']['ImportRowInput'][];
     };
     /**
-     * @description What a first import did. Status: "imported" (the chosen holdings were created; the counts say how many), "skipped" (the account already has holdings, nothing was
+     * @description What a first import did. Status: "imported" (the holdings were created; the counts say how many), "skipped" (the account already has holdings, nothing was
      *     imported), "deferred" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or
      *     "failed" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example
      *     `portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those
@@ -1156,10 +1156,10 @@ export interface components {
     PortfolioRoleView: {
       enabled: boolean;
     };
-    /** @description The answer of saving the portfolio settings: the account as saved and, when a first import was asked for, what it did (otherwise null). */
+    /** @description The answer of saving the portfolio settings: the account as saved and what the first import did (always present; see FirstImportView). */
     PortfolioSaved: {
       account: components['schemas']['AccountDetail'];
-      import: null | components['schemas']['FirstImportView'];
+      import: components['schemas']['FirstImportView'];
     };
     /**
      * @description Portfolio configuration. DefaultBucket is the name of the bucket imports go to (the account's own default bucket unless a custom bucket was chosen);
