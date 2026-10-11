@@ -27,10 +27,14 @@ goals:
   max_drawdown_action: halt_and_review
 
 # Accounts and their roles are managed in the Accounts screen (stored in DB, password re-entry); shown here as seed.
+# Dhan only (ADR 0008, 0009). API key and secret are entered in the app (write-only) and kept
+# encrypted in accounts.broker_secrets — never in this file, the config versions or the repo.
 accounts:
   - id: dhan_main
-    broker: dhan
-    credentials: dhan_main               # Keychain item name — never the secret itself
+    broker: dhan                         # Dhan is the only broker
+    client_id: "1000000001"              # required; shown masked
+    api_key_issued_on: 2026-10-11        # keys are valid 12 months → warning 30 days before
+    secrets: [api_key, api_secret]       # set / not set only; values live in the vault
     roles:
       data:      { enabled: true, primary: true }
       trading:   { enabled: true, mode: paper, profile: standard, styles: [intraday, swing],
@@ -39,12 +43,12 @@ accounts:
       portfolio: { enabled: true, default_bucket: Trading }
   - id: dhan_longterm
     broker: dhan
-    credentials: dhan_longterm
+    client_id: "1000000002"
     roles:
       portfolio: { enabled: true, default_bucket: MyLongTerm }
   - id: dhan_swing
     broker: dhan
-    credentials: dhan_swing
+    client_id: "1000000003"
     roles:
       data:      { enabled: true, standby: true }   # failover if primary token/subscription fails
       trading:   { enabled: true, mode: manual_live, profile: conservative, styles: [swing],
@@ -57,7 +61,7 @@ access:
   idle_timeout_min: 30
   absolute_timeout_h: 12
   lockout: { attempts: 5, minutes: 15 }
-  step_up_for: [account_roles, credentials, config_activation, execution, data_deletion]
+  step_up_for: [account_roles, broker_secrets, config_activation, execution, data_deletion]
 
 approvals:
   plan_review_cutoff: "09:05"
@@ -65,7 +69,7 @@ approvals:
   allow_modifications: [reduce_size, tighten_stop, change_account, swap_with_reserve]
   suggestions: { expiry_days: 3, snooze_after_reject_days: 14 }
 
-risk_profiles:                     # shared; edited on Accounts → Risk profiles; accounts may override values
+risk_profiles:                     # shared; edited on Settings → Risk profiles; accounts may override values
   standard:
     risk_per_trade_pct: 0.5
     max_capital_per_trade_pct: 25
@@ -291,7 +295,10 @@ fundamentals:  { enabled: false, quality_filter: { min_profit_quarters_of_last_4
   "Secrets": { "Path": "/run/secrets" }
 }
 ```
-Passwords and broker keys are read from `/run/secrets/*` (Podman secrets) via the KeyPerFile provider.
+Passwords and the broker vault key (`BrokerVault__Key`, API only) are read from `/run/secrets/*` (Podman secrets) via the KeyPerFile provider.
+Broker API keys, secrets and tokens are not configuration: they are entered in the app and stored encrypted in the database (ADR 0008).
+`Brokers__PublicBaseUrl` (default `http://localhost:8080`, set from `XD_HTTP_PORT` in compose) is the base of the broker redirect URLs
+`/api/brokers/<broker>/callback`.
 
 ## 4. Most-used settings
 

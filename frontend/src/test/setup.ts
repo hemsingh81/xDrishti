@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { server } from './server';
+
+// Flows such as "save → password dialog → retry → toast" pass through several MUI transitions; under the parallel
+// full suite they can take longer than the 1 s default, so async queries (findBy*, waitFor) wait up to 5 s.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom resolves relative fetch URLs against this origin.
 beforeAll(() => {

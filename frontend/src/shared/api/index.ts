@@ -1,2 +1,28 @@
-export { api, ApiError, unwrap } from './client';
-export type { Schemas, ServiceStatus, SystemStatus } from './types';
+export { api, ApiError, configureApiAuth, ensureOk, unwrap, type ApiAuthHooks } from './client';
+export type {
+  AccountDetail,
+  AccountEvent,
+  AccountOverrides,
+  AccountSummary,
+  BrokerConnection,
+  ConnectionInput,
+  ConnectStart,
+  CreateAccountInput,
+  PortfolioBucket,
+  PortfolioInput,
+  Problem,
+  RiskProfile,
+  RiskProfileInput,
+  RolesInput,
+  Schemas,
+  SecretStatus,
+  ServiceStatus,
+  SessionInfo,
+  StepUpResult,
+  SystemStatus,
+  TradingInput,
+  TradingSettings,
+  UpdateSecretsInput,
+  UserInfo,
+  ValidationProblem,
+} from './types';

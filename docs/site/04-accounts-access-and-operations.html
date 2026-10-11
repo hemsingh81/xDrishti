@@ -131,13 +131,6 @@ not by your browser session.</li>
 <td align="center">✅</td>
 <td>Can take over data if the main account&#39;s token fails</td>
 </tr>
-<tr>
-<td>Upstox · Old (later)</td>
-<td align="center">—</td>
-<td align="center">—</td>
-<td align="center">✅</td>
-<td>Monitoring only once the Upstox adapter exists</td>
-</tr>
 </tbody></table>
 <p><strong>Rules enforced by the system</strong></p>
 <ul>
@@ -148,9 +141,78 @@ token or subscription fails (only if it also has an active Data API subscription
 <li>Removing a role stops the related services for that account; history is kept.</li>
 <li>Every role change is audited and needs re-authentication (password).</li>
 </ul>
-<p><strong>Per-account settings:</strong> display name, broker, client id, credential reference (secrets live in the macOS
-Keychain → Podman secrets, never in the database), roles, mode (<code>paper</code> / <code>manual_live</code>; automated modes in a
-later phase), risk profile, capital source, sync schedule, token status &amp; last successful sync.</p>
+<p><strong>Per-account settings:</strong> display name, broker (Dhan only, <a href="../adr/0009-dhan-consent-flow-only.html">ADR 0009</a>), Dhan client id (shown
+masked: first 4 + last 2), the Dhan API key and secret (write-only, encrypted — see below), the day the API key was generated, roles,
+mode (<code>paper</code> / <code>manual_live</code>; automated modes in a later phase), risk profile, capital source, sync schedule, token status &amp; last successful sync.</p>
+<p><strong>Dhan accounts</strong> (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, narrowed by <a href="../adr/0009-dhan-consent-flow-only.html">ADR 0009</a>): Dhan is the only
+broker and the documented <em>API Key &amp; Secret</em> consent flow the only way to connect. Adding an account asks for what Dhan needs; the setup steps and the
+redirect URL are shown in the wizard and on the Connection tab (Dhan facts are constants in the UI):</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Dhan</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Identity</td>
+<td><strong>Client id</strong> — required (e.g. <code>1000000001</code>)</td>
+</tr>
+<tr>
+<td>Secrets (write-only)</td>
+<td><strong>API key</strong> (<code>app_id</code>), <strong>API secret</strong> (<code>app_secret</code>) — valid <strong>12 months</strong>; the owner gives the day it was generated (default today, India time); warning 30 days before expiry</td>
+</tr>
+<tr>
+<td>Setup steps shown</td>
+<td>web.dhan.co → My Profile → Access DhanHQ APIs → switch on <em>API key</em> → app name, <strong>Redirect URL</strong> (copy button), Postback optional</td>
+</tr>
+<tr>
+<td>Notes shown</td>
+<td>A static IP is needed only for placing orders (not for data/portfolio); 25 consents a day</td>
+</tr>
+</tbody></table>
+<p>The redirect URL is <code>&lt;Brokers__PublicBaseUrl&gt;/api/brokers/dhan/callback</code> (default base <code>http://localhost:8080</code>); the UI reads it from
+<code>GET /api/brokers/dhan</code> → <code>{redirectUrl}</code>. Another broker later means a new decision (the <code>broker</code> column and the connector port stay).</p>
+<p><strong>Connecting an account</strong> (<a href="../specs/P1-16c-connect-dhan-and-upstox.html">P1-16c</a>, <a href="../specs/P1-16d-dhan-consent-only-and-header-accounts.html">P1-16d</a>, ADR 0008, 0009) follows Dhan&#39;s documented flow (details in doc 05 §8):</p>
+<ol>
+<li><strong>Connect</strong> — <code>POST /api/accounts/{id}/connect</code> (step-up) → <code>{authorizeUrl, expiresAt}</code>. The API asks Dhan for a consent (<code>generate-consent</code>,
+at most <strong>25 per account and India day</strong>; the 26th answers <code>429 accounts.consent_limit</code> with <code>retryAfterSeconds</code> until midnight IST) and returns
+Dhan&#39;s login page. A <strong>pending sign-in</strong> (<code>accounts.pending_connects</code>) is stored: bound to the session, valid <strong>10 minutes</strong>, usable <strong>once</strong>; a newer
+sign-in of the same session closes an older one.</li>
+<li>The browser opens Dhan&#39;s login page (<code>consentApp-login</code>) in the same tab; the owner signs in there with Dhan&#39;s own 2FA.</li>
+<li><strong>Callback</strong> — Dhan redirects to <code>GET /api/brokers/dhan/callback?tokenId=…</code>. The callback needs the signed-in session (the session cookie is
+<code>SameSite=Lax</code> so it comes along with this top-level redirect) and the session&#39;s open pending sign-in (Dhan sends no state), uses it up at once,
+exchanges the <code>tokenId</code> server-side (<code>consumeApp-consent</code>), checks that the token belongs to the account&#39;s client id, stores the token encrypted
+(<code>access_token</code>) and always answers <strong>302</strong> to
+<code>/accounts?account={id}&amp;connected=1</code> or <code>/accounts?[account={id}&amp;]connectError={code}</code>. Codes: <code>accounts.connect_expired</code> (too late, used
+or another session), <code>accounts.connect_cancelled</code> (no tokenId), <code>accounts.connect_mismatch</code> (other client id; nothing stored),
+<code>accounts.broker_error</code>, <code>accounts.app_not_configured</code>, <code>auth.unauthenticated</code> (no session). It never shows broker data.</li>
+<li><strong>Disconnect</strong> — <code>DELETE /api/accounts/{id}/token</code> (step-up; deletes the stored token locally, no broker call: Dhan has no logout for these tokens).
+Dhan refusing, failing or timing out answers <code>502 accounts.broker_error</code> with a safe message (at most Dhan&#39;s error code).</li>
+</ol>
+<p>Every account shows <code>connection {status, expiresAt, brokerUserName, brokerUserId (masked), lastConnectedAt, lastError}</code>
+(<code>accounts.broker_connections</code>): status <code>not_connected</code> · <code>connected</code> · <code>expired</code> (derived when read once <code>expiresAt</code> has passed — no broker call).
+<code>tokenStatus</code> repeats the status for the list&#39;s health dot.
+A token belongs to the client id it was issued for: <strong>changing the client id</strong> of an account that has a token or a connected / expired
+connection deletes the stored token, resets the connection to <code>not_connected</code> and closes its open sign-ins in the same change (no broker call;
+audited as &quot;client id changed; broker connection cleared&quot;). <strong>Archiving</strong> deletes the token with the other secrets, resets the connection and
+deletes the account&#39;s pending sign-ins.
+Audit: <code>BrokerConnected</code>, <code>BrokerConnectFailed</code>, <code>BrokerDisconnected</code> (names, times and Dhan error codes only). Tokens, secrets and codes never
+appear in responses, redirects, logs or audit text.</p>
+<p><strong>Credential vault</strong> (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, replaces the credential references of ADR 0007): the API key
+and secret are entered in the app — in the add-account wizard (both required) or on the Connection tab (<em>Replace</em>, step-up; a value left out stays,
+an empty one is refused) — and stored in <code>accounts.broker_secrets</code> (one row per account and secret: <code>api_key</code>, <code>api_secret</code>, <code>access_token</code>) encrypted with <strong>AES-256-GCM</strong>: random 96-bit nonce per value, the account id and secret name as associated data (a value only
+decrypts for the account and name it was written for), a 256-bit key derived with HKDF-SHA256 from <code>BrokerVault__Key</code> (Keychain
+<code>xdrishti/broker/vault-key</code>, ≥ 32 characters; the API refuses to start without it) and a key version per row for later rotation. Responses only
+say <code>secrets: [{name, set, updatedAt}]</code> (plus <code>apiKeyIssuedOn</code> / <code>apiKeyExpiresOn</code>); values never appear in responses, logs, audit text, exceptions or
+<code>ToString()</code>. Replacing is audited by name only (&quot;API key replaced&quot;). Archiving an account deletes its stored secrets. Accounts created before the
+vault show &quot;API key: not set&quot;.</p>
+<p><strong>Sensitive changes need password re-entry (step-up, 5 minutes):</strong> creating, changing the connection (name, client id, colour, notes), replacing broker secrets, connecting, disconnecting, changing roles or
+the primary Data account, changing trading settings, removing an account, and creating, editing or deleting risk profiles. Without a recent
+step-up these endpoints answer <code>403 auth.step_up_required</code>. Portfolio and Data settings and adding portfolio buckets do not need it.</p>
+<p><strong>Removing an account archives it:</strong> it disappears from lists and services, its history and audit trail (<code>accounts.account_events</code>, insert-only
+for the runtime role) stay, its name becomes free again and its stored broker secrets are deleted. The primary Data account cannot be removed or lose the
+Data role until another account has been made primary (an atomic swap; the old primary becomes the standby when that slot is free).</p>
 <h3 id="11-accounts-screen">1.1 Accounts screen<a class="hash" href="#11-accounts-screen" aria-label="Link to this section">#</a></h3>
 <table>
 <thead>
@@ -161,21 +223,20 @@ later phase), risk profile, capital source, sync schedule, token status &amp; la
 </thead>
 <tbody><tr>
 <td><strong>Accounts</strong> (list + detail)</td>
-<td>Left: every account with roles, token health, holdings value. Right: tabs <strong>Overview</strong> (value, P&amp;L, funds, token, sync) · <strong>Roles</strong> · <strong>Trading</strong> (mode, risk profile, capital source/amount, styles, allowed instruments per style, per-account overrides of risk %, max entries, max open, daily loss) · <strong>Portfolio</strong> (default bucket, trade-history import start, include in totals, buckets) · <strong>Data</strong> (primary/standby, subscription &amp; renewal, live-feed budget, failover test) · <strong>Connection</strong> (name, client id, Keychain reference, colour, notes, token refresh, test) · <strong>Activity</strong> (audit for this account)</td>
-</tr>
-<tr>
-<td><strong>Role matrix</strong></td>
-<td>All accounts × roles in one table; tick to change (step-up), pick the primary Data account</td>
-</tr>
-<tr>
-<td><strong>Risk profiles</strong></td>
-<td>Shared profiles (e.g. Standard, Conservative, Aggressive): risk per trade, max new entries/day, max open positions, daily loss, max per sector, max heat; shows which accounts use each</td>
+<td>Left: every account with roles, token health, holdings value. Right: tabs <strong>Overview</strong> (value, P&amp;L, funds, token, sync) · <strong>Roles</strong> · <strong>Trading</strong> (mode, risk profile, capital source/amount, styles, allowed instruments per style, per-account overrides of risk %, max entries, max open, daily loss) · <strong>Portfolio</strong> (default bucket, trade-history import start, include in totals, buckets) · <strong>Data</strong> (primary/standby, subscription &amp; renewal, live-feed budget, failover test) · <strong>Connection</strong> (client id masked, name, colour, notes; secret status — set / last changed, Dhan key expiry — with <em>Replace</em> (write-only dialog, step-up); Dhan&#39;s setup steps and redirect URL; connection status chip and expiry with <em>Connect / Reconnect</em> and <em>Disconnect</em>) · <strong>Activity</strong> (audit for this account)</td>
 </tr>
 <tr>
 <td><strong>Add account wizard</strong></td>
-<td>Broker &amp; identity → credentials (Keychain item, connection test) → roles → role settings → review &amp; confirm with your password</td>
+<td>1 <em>Dhan app</em> (client id, API key and secret — masked, never pre-filled —, day the key was generated, setup steps, redirect URL with copy button) → 2 <em>Identity</em> → 3 <em>Roles</em> → 4 <em>Role settings</em> → 5 <em>Review &amp; create</em> (secrets shown as &quot;•••• set&quot;; confirm with your password; <em>Create and connect</em> starts the Dhan login)</td>
+</tr>
+<tr>
+<td><strong>Header accounts menu</strong></td>
+<td>Every account with colour dot, name and status chip (expiry when connected), and <em>Connect / Reconnect</em> for each account that is not connected (<a href="../specs/P1-16d-dhan-consent-only-and-header-accounts.html">P1-16d</a>)</td>
 </tr>
 </tbody></table>
+<p>The <strong>role matrix</strong> (all accounts × roles; tick to change, step-up; pick the primary Data account) and the shared <strong>risk profiles</strong> (Standard,
+Conservative, …: risk per trade, max new entries/day, max open positions, daily loss, max per sector, max heat; which accounts use each) live under
+<strong>Settings</strong> (<code>/settings</code>, tabs <em>Risk profiles</em> · <em>Account roles</em>), not on the Accounts page.</p>
 <p><strong>Automatic failover:</strong> if the primary Data account&#39;s token or subscription fails, the services switch to the
 standby Data account, notify you and record it in the audit log.</p>
 <h2 id="2-access-control-login">2. Access control (login)<a class="hash" href="#2-access-control-login" aria-label="Link to this section">#</a></h2>
@@ -188,31 +249,31 @@ standby Data account, notify you and record it in the audit log.</p>
 </thead>
 <tbody><tr>
 <td>Login</td>
-<td>Username + password on a centred sign-in panel; a locked session shows <em>Welcome back · Unlock</em> (password only, survives reload); single owner account created at first start. No second factor: the app is personal and reachable only on this machine / home LAN (a passkey can be added later if remote access is ever enabled)</td>
+<td>E-mail + password on a centred sign-in panel; a locked session shows <em>Welcome back · Unlock</em> (password only, survives reload); single fixed owner account, <strong>no sign-up</strong>: provisioned by <code>xd-migrate</code> from the Keychain items <code>xdrishti/auth/owner-email|owner-name|owner-password</code> (created with <code>scripts/auth-secrets.sh</code>) if none exists. Wrong e-mail and wrong password give the same <code>401 auth.invalid_credentials</code>. No second factor: the app is personal and reachable only on this machine / home LAN (a passkey can be added later if remote access is ever enabled)</td>
 </tr>
 <tr>
 <td>Password storage</td>
-<td>ASP.NET Core Identity hashing (PBKDF2); never stored in plain text</td>
+<td>PBKDF2-HMAC-SHA512, ≥ 210,000 iterations, random salt (parameters stored with the hash; upgraded at the next login); never stored or logged in plain text. Changed with <code>scripts/auth-secrets.sh</code> + <code>deploy/xd-up.sh --owner-reset</code> (also signs out every session)</td>
 </tr>
 <tr>
 <td>Sessions</td>
-<td>Secure HTTP-only cookie; idle timeout 30 min (configurable); absolute timeout 12 h; &quot;lock&quot; button</td>
+<td>Server-side, revocable, stored hashed in <code>auth.sessions</code>; opaque cookie <code>xd.sid</code> (HttpOnly, SameSite=Lax — <code>Strict</code> until ADR 0008: Dhan&#39;s sign-in redirect is a top-level cross-site GET that must carry it —, <code>Secure</code> on HTTPS); idle timeout 30 min (sliding, last-seen written ≤ once a minute); absolute timeout 12 h; CSRF header <code>X-CSRF-Token</code> on every POST/PUT/PATCH/DELETE; sign-out revokes the session; &quot;lock&quot; button (later)</td>
 </tr>
 <tr>
 <td>Lockout</td>
-<td>5 failed attempts → 15-minute lockout; all attempts in the audit log</td>
+<td>5 consecutive failures → 15-minute lock (<code>423 auth.locked</code> + <code>retryAfterSeconds</code>; a correct password is refused during the lock); login route also limited to 10 attempts/minute per client address (<code>429</code>); every sign-in event (success, failure, lock, logout, idle/absolute expiry, owner provisioning/reset) in <code>auth.audit_events</code>, readable via <code>GET /api/auth/audit</code></td>
 </tr>
 <tr>
 <td>Step-up auth</td>
-<td>Password re-entry for sensitive actions: account roles/credentials, config activation, enabling execution, deleting data</td>
+<td>Password re-entry for sensitive actions: account roles, broker secrets and connection, trading risk, risk profiles, removing accounts, config activation, enabling execution, deleting data. <code>POST /api/auth/step-up {password}</code> elevates the current session for <strong>5 minutes</strong> (<code>auth.sessions.elevated_until</code>; ends at logout/expiry), endpoints answer <code>403 auth.step_up_required</code> without it; wrong passwords count toward the same lockout as sign-in (<code>StepUpSucceeded</code> / <code>StepUpFailed</code> in the audit trail)</td>
 </tr>
 <tr>
 <td>Recovery</td>
-<td>One-time recovery codes generated at setup</td>
+<td>No recovery codes: the owner resets the password from the Keychain (<code>xd-up.sh --owner-reset</code>); there is no e-mail reset</td>
 </tr>
 <tr>
 <td>Every endpoint protected</td>
-<td>REST, SignalR, Hangfire dashboard and file downloads require login; only <code>/health</code> is anonymous</td>
+<td>Closed by default (fallback authorization policy): REST, OpenAPI/API docs, SignalR, Hangfire dashboard and file downloads require a session; only <code>/health/*</code>, <code>POST /api/auth/login</code> and <code>GET /api/auth/session</code> are anonymous. The Dhan callback <code>GET /api/brokers/dhan/callback</code> passes routing without a session but check it themselves and, without one, redirect to <code>/accounts?connectError=auth.unauthenticated</code> instead of answering 401. The static docs at <code>/prototype/</code> and <code>/docs/</code> are protected by the proxy (<code>forward_auth</code> → <code>GET /api/auth/verify</code>); the React shell and its assets stay public so the login page can load</td>
 </tr>
 <tr>
 <td>Network</td>
@@ -508,7 +569,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-09 20:19</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-11 10:15</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

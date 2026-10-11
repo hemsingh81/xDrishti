@@ -206,7 +206,7 @@
     { id: "ADR 0003", t: "Local stack: Compose on Podman; secrets as files from the Keychain", st: "Accepted" },
     { id: "ADR 0004", t: "Agentic development: Claude Code native tooling + lightweight specs", st: "Accepted" },
     { id: "ADR 0005", t: "Local LLM: container GPU runtime on the 24 GB machine, Qwen3-30B-A3B, on demand (owner to confirm container vs native)", st: "Proposed" },
-    { id: "ADR 0006", t: "Authentication: password + cookie session design", st: "Planned", needed: "P1-01" },
+    { id: "ADR 0006", t: "Owner authentication: server-side cookie sessions, PBKDF2, derived CSRF token", st: "Accepted" },
     { id: "ADR 0007", t: "Background jobs: Hangfire vs custom scheduler on desired state", st: "Planned", needed: "P1-13" },
     { id: "ADR 0008", t: "Strategy DSL: grammar, versioning and look-ahead rules", st: "Planned", needed: "P3-02" },
     { id: "ADR 0009", t: "Time-series layout: hypertable keys, chunking, compression, aggregates", st: "Planned", needed: "P1-06" },

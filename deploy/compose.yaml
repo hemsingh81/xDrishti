@@ -51,8 +51,38 @@ services:
     secrets:
       - source: db_owner_password
         target: Database__Password
+      # Only the migration step reads the owner's credentials (to create the owner when none exists).
+      - source: auth_owner_email
+        target: Auth__Owner__Email
+      - source: auth_owner_name
+        target: Auth__Owner__Name
+      - source: auth_owner_password
+        target: Auth__Owner__Password
     networks: [back]
     pull_policy: never # uses the image built for xd-api (compose builds all images before starting)
+    depends_on:
+      xd-db: { condition: service_healthy }
+    <<: *hardening
+
+  # One-shot, on demand (`deploy/xd-up.sh --owner-reset`): replaces the owner's password from the secrets and
+  # revokes every session. Runs as the runtime role (xd_app); not part of the normal stack (profile "tools").
+  xd-owner-reset:
+    image: localhost/xdrishti/api:${XD_VERSION:-0.1.0}
+    command: [owner-reset]
+    profiles: [tools]
+    restart: "no"
+    environment: *dotnet-env
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+      - source: auth_owner_email
+        target: Auth__Owner__Email
+      - source: auth_owner_name
+        target: Auth__Owner__Name
+      - source: auth_owner_password
+        target: Auth__Owner__Password
+    networks: [back]
+    pull_policy: never
     depends_on:
       xd-db: { condition: service_healthy }
     <<: *hardening
@@ -64,11 +94,19 @@ services:
       target: api
       args: { VERSION: "${XD_VERSION:-0.1.0}" }
     restart: unless-stopped
-    environment: *dotnet-env
+    environment:
+      <<: *dotnet-env
+      # Where the owner's browser reaches the app; Dhan redirects back to <this>/api/brokers/dhan/callback (ADR 0008, 0009).
+      Brokers__PublicBaseUrl: http://localhost:${XD_HTTP_PORT:-8080}
     secrets:
       - source: db_app_password
         target: Database__Password
-    networks: [back]
+      # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API gets it: the API refuses to start without it.
+      - source: broker_vault_key
+        target: BrokerVault__Key
+    # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009).
+    # The API's broker clients refuse every other endpoint (allow-list); nothing is published on this network.
+    networks: [back, egress]
     mem_limit: 1g
     depends_on:
       xd-migrate: { condition: service_completed_successfully }
@@ -106,8 +144,8 @@ services:
       - 127.0.0.1:${XD_HTTP_PORT:-8080}:8080
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ../docs/prototype:/srv/prototype:ro
-      - ../docs/site:/srv/docs:ro
+      - ../docs/prototype:/srv-static/prototype:ro
+      - ../docs/site:/srv-static/docs:ro
     tmpfs: ["/data:mode=1777", "/config:mode=1777"]
     networks: [front, back]
     mem_limit: 256m
@@ -140,6 +178,8 @@ networks:
   front: {}
   back:
     internal: true
+  # Outbound internet for xd-api only (Dhan sign-in, ADR 0008, 0009). Not internal, no published ports, no other member.
+  egress: {}
 
 volumes:
   xd-db-data: {}
@@ -151,3 +191,11 @@ secrets:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_owner_password
   db_app_password:
     file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/db_app_password
+  auth_owner_email:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_email
+  auth_owner_name:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_name
+  auth_owner_password:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/auth_owner_password
+  broker_vault_key:
+    file: ${XD_SECRETS_DIR:?Run deploy/xd-up.sh}/broker_vault_key

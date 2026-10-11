@@ -4,7 +4,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Infrastructure.Accounts;
+using XDrishti.Infrastructure.Auth;
+using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
 
@@ -43,9 +48,63 @@ public static class DependencyInjection
         services.AddScoped<IServiceHeartbeatStore, ServiceHeartbeatStore>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();
 
+        services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddSingleton<ITokenGenerator, TokenGenerator>();
+        services.AddScoped<IOwnerAccountStore, OwnerAccountStore>();
+        services.AddScoped<ISessionStore, SessionStore>();
+        services.AddScoped<IAuditLog, AuditLog>();
+        services.AddScoped<IAuthUnitOfWork, AuthUnitOfWork>();
+
+        services.AddOptions<BrokersOptions>()
+            .Bind(configuration.GetSection(BrokersOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(o => BrokersOptions.IsValidBaseUrl(o.PublicBaseUrl), BrokersOptions.InvalidBaseUrlMessage)
+            .ValidateOnStart();
+        services.AddSingleton<IBrokerSettings, BrokerSettings>();
+
+        // The vault key is checked when the vault is first used; hosts that serve it check it at start (RequireBrokerVaultKey).
+        services.AddOptions<BrokerVaultOptions>()
+            .Bind(configuration.GetSection(BrokerVaultOptions.SectionName))
+            .ValidateDataAnnotations();
+        services.AddSingleton(sp => new BrokerSecretCipher(sp.GetRequiredService<IOptions<BrokerVaultOptions>>().Value.Key));
+        services.AddScoped<IBrokerSecretVault, BrokerSecretVault>();
+        services.AddScoped<IAccountStore, AccountStore>();
+        services.AddScoped<IRiskProfileStore, RiskProfileStore>();
+        services.AddScoped<IBucketStore, BucketStore>();
+        services.AddScoped<IAccountEventLog, AccountEventLog>();
+        services.AddScoped<IAccountUnitOfWork, AccountUnitOfWork>();
+        services.AddScoped<IBrokerConnectionStore, BrokerConnectionStore>();
+        services.AddScoped<IPendingConnectStore, PendingConnectStore>();
+        services.AddDhanConnector();
+
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", HealthStatus.Unhealthy, ["ready"]);
 
+        return services;
+    }
+
+    /// <summary>
+    /// The Dhan connector and its HTTP client (ADR 0008, 0009): 15-second timeout, no retries (codes are single-use), no redirects, no
+    /// request logging (URLs and headers carry tokens and codes), and an allow-list guard in front of every request.
+    /// </summary>
+    private static void AddDhanConnector(this IServiceCollection services)
+    {
+        services.AddTransient<BrokerEndpointGuard>();
+        services.AddHttpClient(BrokerHttpClientNames.Dhan, BrokerHttp.Configure)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
+
+        services.AddScoped<IBrokerConnector, DhanConnector>();
+    }
+
+    /// <summary>
+    /// Makes the host refuse to start without a valid broker vault key (<c>BrokerVault:Key</c>, at least 32 characters). For hosts that
+    /// read or write broker secrets (the API); others never touch the key.
+    /// </summary>
+    public static IServiceCollection RequireBrokerVaultKey(this IServiceCollection services)
+    {
+        services.AddOptions<BrokerVaultOptions>().ValidateOnStart();
         return services;
     }
 

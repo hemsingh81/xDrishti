@@ -94,11 +94,6 @@
 <td>Free official bhavcopy / corporate actions / holidays for reconciliation</td>
 <td>₹0</td>
 </tr>
-<tr>
-<td>Upstox</td>
-<td>Adapter kept for later (second broker / fallback); <strong>disabled in v1</strong></td>
-<td>—</td>
-</tr>
 </tbody></table>
 <h2 id="2-three-data-tiers">2. Three data tiers<a class="hash" href="#2-three-data-tiers" aria-label="Link to this section">#</a></h2>
 <figure class="diagram"><pre class="mermaid">flowchart TB
@@ -279,9 +274,14 @@ connection. <code>live.max_ws_instruments</code> caps it (default 200).</li>
 <td>Dhan</td>
 </tr>
 <tr>
+<td><code>IBrokerConnector</code> (P1-16c)</td>
+<td>start/complete the browser consent login</td>
+<td>Dhan (API key &amp; secret consent flow) — §8.1</td>
+</tr>
+<tr>
 <td><code>ITokenProvider</code></td>
-<td>get, refresh, expiry</td>
-<td>Dhan (API key &amp; secret flow, 24 h tokens)</td>
+<td>get, refresh, expiry for the services</td>
+<td>Reads the vault and <code>accounts.broker_connections</code> (P1-12)</td>
 </tr>
 <tr>
 <td><code>IOrderExecutor</code></td>
@@ -294,7 +294,8 @@ connection. <code>live.max_ws_instruments</code> caps it (default 200).</li>
 <td>CSV</td>
 </tr>
 </tbody></table>
-<p>Adding Upstox or another broker later = one adapter project + config. The instrument master maps each broker id
+<p>Dhan is the only broker (<a href="../adr/0009-dhan-consent-flow-only.html">ADR 0009</a>); another one means a new decision, one connector and one adapter project. Dhan API keys, secrets and tokens are kept in the encrypted broker vault (<code>accounts.broker_secrets</code>, doc 04 §1).
+The instrument master maps each broker id
 (Dhan <code>security_id</code> + segment) to a canonical symbol; mapping mismatches are quality issues, never guessed.</p>
 <h2 id="8-accounts">8. Accounts<a class="hash" href="#8-accounts" aria-label="Link to this section">#</a></h2>
 <p>Any number of accounts (all your own), each with <strong>roles</strong> — Data, Trading, Portfolio — as described in
@@ -303,6 +304,45 @@ the <strong>primary Data account</strong> (with automatic failover to a standby 
 have mode (<code>paper</code> / <code>manual_live</code>; automated modes later), risk profile, allowed styles/instruments and capital source. Nightly sync reads funds, positions, holdings, trade
 history and ledger → feeds the <strong>auto-journal</strong> (fills matched to plan tickets) and <strong>portfolio monitoring</strong>
 (<a href="12-portfolio-monitoring.html">doc 12</a>).</p>
+<h3 id="81-connecting-dhan39s-consent-flow">8.1 Connecting: Dhan&#39;s consent flow<a class="hash" href="#81-connecting-dhan39s-consent-flow" aria-label="Link to this section">#</a></h3>
+<p>From Dhan&#39;s own documentation (verified 2026-10-11; ADR 0008, 0009, specs P1-16c, P1-16d). The connector calls only the endpoints below (allow-list in
+the HTTP client: HTTPS, exact host and path, method; no redirects followed), with a 15-second timeout, no retries (codes are single-use) and no
+request logging (URLs and headers carry tokens and codes; the <code>tokenId</code> in the consume URL counts as a secret). Dhan error codes are kept
+only when they have Dhan&#39;s form (<code>DH-901</code>); message texts are never used.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Dhan (API key &amp; secret)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Start</td>
+<td><code>POST https://auth.dhan.co/app/generate-consent?client_id={clientId}</code>, headers <code>app_id</code>, <code>app_secret</code> → <code>consentAppId</code> (max 25 a day)</td>
+</tr>
+<tr>
+<td>Browser</td>
+<td><code>https://auth.dhan.co/login/consentApp-login?consentAppId=…</code> → redirect <code>?tokenId=…</code> (no state)</td>
+</tr>
+<tr>
+<td>Exchange</td>
+<td><code>POST https://auth.dhan.co/app/consumeApp-consent?tokenId=…</code>, headers <code>app_id</code>, <code>app_secret</code> → <code>accessToken</code>, <code>expiryTime</code>, <code>dhanClientId</code>, <code>dhanClientName</code>, <code>dhanClientUcc</code></td>
+</tr>
+<tr>
+<td>Holder check</td>
+<td><code>dhanClientId</code> = the account&#39;s client id</td>
+</tr>
+<tr>
+<td>Expiry</td>
+<td><code>expiryTime</code> (ISO, India time unless an offset is given); otherwise 24 h after issue</td>
+</tr>
+<tr>
+<td>Disconnect</td>
+<td>token deleted locally (Dhan has no logout for these tokens; no call)</td>
+</tr>
+</tbody></table>
+<p>A 4xx answer is a refusal (wrong key/secret, used or expired tokenId), anything else (5xx, 3xx, timeout, network, unreadable body)
+is &quot;broker unavailable&quot;; both surface as <code>502 accounts.broker_error</code> with a safe message. Expiry times are stored in UTC.</p>
 <h2 id="9-storage">9. Storage<a class="hash" href="#9-storage" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -450,7 +490,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-09 20:19</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-11 10:15</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>
@@ -463,6 +503,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
 <a href="#6-end-of-day-fetch-tier-b" class="d2">6. End-of-day fetch (Tier B)</a>
 <a href="#7-broker-abstraction" class="d2">7. Broker abstraction</a>
 <a href="#8-accounts" class="d2">8. Accounts</a>
+<a href="#81-connecting-dhan39s-consent-flow" class="d3">8.1 Connecting: Dhan&amp;#39;s consent flow</a>
 <a href="#9-storage" class="d2">9. Storage</a>
 <a href="#10-data-quality" class="d2">10. Data quality</a>
 <a href="#10b-data-quality-window-validation-workbench" class="d3">10b. Data quality window (validation workbench)</a>

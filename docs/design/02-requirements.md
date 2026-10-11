@@ -26,7 +26,7 @@
 5. Evaluation lenses: all trades, by basket, by instrument, by individual trade, by strategy, by account.
 
 ### FR-3 Brokers & accounts
-1. Pluggable broker adapters behind common interfaces (Dhan in v1; Upstox and others later).
+1. Pluggable broker adapters behind common interfaces (Dhan in v1; others later).
 2. Any number of accounts, each with its own risk profile, styles, instruments and mode.
 3. Each account has one or more **roles** — Data, Trading, Portfolio; exactly one primary Data account
    (optional standby with automatic failover); role changes audited and protected by password re-entry.

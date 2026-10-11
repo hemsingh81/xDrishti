@@ -2,6 +2,7 @@ import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typog
 import type { ServiceStatus } from '@/shared/api';
 import { formatAgo, formatDateTime } from '@/shared/lib/format';
 import { StatusChip } from '@/shared/ui';
+import { monoFontFamily } from '@/theme';
 
 export function ServiceTable({ services }: { services: readonly ServiceStatus[] }) {
   if (services.length === 0) {
@@ -33,7 +34,7 @@ export function ServiceTable({ services }: { services: readonly ServiceStatus[] 
                 <StatusChip ok={s.isAlive} okLabel="Running" badLabel="Not reporting" />
               </TableCell>
               <TableCell>{s.version}</TableCell>
-              <TableCell sx={{ fontFamily: 'monospace' }}>{s.instance}</TableCell>
+              <TableCell sx={{ fontFamily: monoFontFamily }}>{s.instance}</TableCell>
               <TableCell>{formatDateTime(s.startedAt)}</TableCell>
               <TableCell>{formatAgo(s.lastSeenAt)}</TableCell>
             </TableRow>

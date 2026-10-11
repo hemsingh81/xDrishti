@@ -96,19 +96,25 @@ power, wired network, small UPS recommended.</li>
 <td><code>xd-proxy</code></td>
 <td>Caddy (+ React build)</td>
 <td>core</td>
-<td>Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes <code>/api</code>, <code>/health</code> (later <code>/hubs</code>, <code>/hangfire</code>); serves the docs read-only at <code>/prototype/</code> (clickable prototype, delivery plan at <code>/prototype/delivery/</code>) and <code>/docs/</code> (design-docs site); compression, security headers</td>
+<td>Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes <code>/api</code>, <code>/health</code> (later <code>/hubs</code>, <code>/hangfire</code>); serves the docs read-only at <code>/prototype/</code> (clickable prototype, delivery plan at <code>/prototype/delivery/</code>) and <code>/docs/</code> (design-docs site) — both only for a signed-in owner (<code>forward_auth</code> to <code>/api/auth/verify</code>, otherwise redirect to <code>/login</code>); compression, security headers</td>
 </tr>
 <tr>
 <td><code>xd-migrate</code></td>
 <td>API image, <code>migrate</code></td>
 <td>core</td>
-<td>One-shot: applies migrations, then exits</td>
+<td>One-shot: applies migrations, provisions the owner account when none exists, then exits</td>
+</tr>
+<tr>
+<td><code>xd-owner-reset</code></td>
+<td>API image, <code>owner-reset</code></td>
+<td>tools</td>
+<td>On-demand one-shot (<code>xd-up.sh --owner-reset</code>): replaces the owner&#39;s password from the secrets, revokes all sessions</td>
 </tr>
 <tr>
 <td><code>xd-api</code></td>
 <td>.NET 10 ASP.NET Core</td>
 <td>core</td>
-<td>REST, SignalR, auth, assistant endpoint</td>
+<td>REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (<code>BrokerVault__Key</code>, refuses to start without it); <code>Brokers__PublicBaseUrl</code> = <code>http://localhost:${XD_HTTP_PORT}</code> (broker redirect URLs); networks <code>back</code> + <code>egress</code> (broker sign-in)</td>
 </tr>
 <tr>
 <td><code>xd-worker</code></td>
@@ -183,29 +189,50 @@ power, wired network, small UPS recommended.</li>
 </thead>
 <tbody><tr>
 <td><code>front</code></td>
-<td>proxy, api</td>
+<td>proxy (the only published port), seq (ops)</td>
 </tr>
 <tr>
 <td><code>back</code> (internal)</td>
-<td>api, worker, sandbox*, db, llm, mcp, seq, feed</td>
+<td>api, worker, sandbox*, db, llm, mcp, seq, feed, proxy (to reach the api)</td>
+</tr>
+<tr>
+<td><code>egress</code> (not internal, nothing published)</td>
+<td><strong>api only</strong> (P1-16c)</td>
 </tr>
 <tr>
 <td><code>exec</code> (internal)</td>
-<td>exec, db</td>
+<td>exec, db (later)</td>
 </tr>
 <tr>
-<td>Egress allowed</td>
+<td>Egress allowed later</td>
 <td>worker, feed, exec (broker/exchange hosts only)</td>
 </tr>
 </tbody></table>
-<p>*<code>xd-sandbox</code> has no egress and no access except its job inputs/outputs.</p>
+<p>*<code>xd-sandbox</code> has no egress and no access except its job inputs/outputs.
+<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>): outbound only, no
+published ports, no other member. The network itself does not filter hosts; the API&#39;s broker HTTP client does — it reaches only the
+<code>generate-consent</code> and <code>consumeApp-consent</code> endpoints of <code>auth.dhan.co</code> (allow-list, HTTPS, no redirects, 15-second timeout;
+doc 05 §8.1). No order, position or funds endpoint is callable.</p>
 <h2 id="4-secrets">4. Secrets<a class="hash" href="#4-secrets" aria-label="Link to this section">#</a></h2>
 <ol>
-<li>Source of truth: <strong>macOS Keychain</strong> (<code>xdrishti/&lt;area&gt;/&lt;name&gt;</code>: broker API keys/secrets per account, DB passwords, backup key).</li>
+<li>Source of truth: <strong>macOS Keychain</strong> (<code>xdrishti/&lt;area&gt;/&lt;name&gt;</code>: DB passwords, owner sign-in, broker vault key, backup key). Broker API keys,
+secrets and tokens are the exception: they are entered in the app and stored encrypted in the database (item 4).</li>
 <li><code>deploy/xd-up.sh</code> reads the Keychain (creating strong random DB passwords on first run) → writes secret files to
 <code>~/Library/Application Support/xDrishti/secrets</code> (private folder) → Compose mounts them as file secrets
 (<a href="../adr/0003-local-stack-compose-and-secrets.html">ADR 0003</a>).</li>
-<li>Containers receive only what they need (mounted at <code>/run/secrets/&lt;ConfigKey&gt;</code>, read by .NET KeyPerFile provider).</li>
+<li>Containers receive only what they need (mounted at <code>/run/secrets/&lt;ConfigKey&gt;</code>, read by .NET KeyPerFile provider).
+The owner&#39;s sign-in credentials (<code>xdrishti/auth/owner-email|owner-name|owner-password</code>) are never generated: <code>xd-up.sh</code> asks for
+them at a terminal (hidden password prompt) or fails with a pointer to <code>scripts/auth-secrets.sh</code>. They are mounted only into
+<code>xd-migrate</code> (creates the owner when none exists) and the on-demand <code>xd-owner-reset</code> (profile <code>tools</code>, <code>xd-up.sh --owner-reset</code>),
+never into the running <code>xd-api</code>.</li>
+<li>Broker credentials (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, replacing the credential references of ADR 0007):
+the owner enters each account&#39;s API key and secret in the app (write-only, step-up); the API stores them in <code>accounts.broker_secrets</code>
+encrypted with AES-256-GCM (account id + secret name as associated data, key version per row). The key material is the Keychain item
+<code>xdrishti/broker/vault-key</code>: <code>xd-up.sh</code> creates it (32 random characters) only when no such item exists — an item that exists but cannot
+be read stops the start instead of being replaced, because another key makes every stored secret unreadable — and writes the secret file
+<code>broker_vault_key</code>, mounted <strong>only into <code>xd-api</code></strong> as <code>/run/secrets/BrokerVault__Key</code> (the 256-bit key is derived from it with
+HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secrets.sh</code>, <code>secrets/brokers.index</code> and the read-only
+<code>secrets/brokers</code> mount are gone (<code>xd-up.sh</code> deletes leftover files).</li>
 <li>Never in images, compose files, environment dumps, logs or LLM context.</li>
 </ol>
 <h2 id="5-operations">5. Operations<a class="hash" href="#5-operations" aria-label="Link to this section">#</a></h2>
@@ -316,7 +343,7 @@ power, wired network, small UPS recommended.</li>
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-09 20:19</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-11 10:15</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

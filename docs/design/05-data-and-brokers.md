@@ -8,7 +8,6 @@
 | **Dhan Data API** | The **only market-data API** in v1: instrument master, end-of-day 1-minute/daily fetch for tracked instruments, live feed for the active set, quotes for holdings | ₹499 + taxes / 30 days, on one account |
 | **Dhan Trading API** | Funds, positions, holdings, trade history, ledger — every Dhan account | Free |
 | NSE files (optional) | Free official bhavcopy / corporate actions / holidays for reconciliation | ₹0 |
-| Upstox | Adapter kept for later (second broker / fallback); **disabled in v1** | — |
 
 ## 2. Three data tiers
 
@@ -134,11 +133,13 @@ Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for
 | `IMarketDataProvider` | instruments, intraday/daily history, quotes | Dhan |
 | `ILiveFeed` | subscribe/unsubscribe, tick stream | Dhan WebSocket |
 | `IAccountReader` | funds, positions, holdings, trades (history), ledger | Dhan |
-| `ITokenProvider` | get, refresh, expiry | Dhan (API key & secret flow, 24 h tokens) |
+| `IBrokerConnector` (P1-16c) | start/complete the browser consent login | Dhan (API key & secret consent flow) — §8.1 |
+| `ITokenProvider` | get, refresh, expiry for the services | Reads the vault and `accounts.broker_connections` (P1-12) |
 | `IOrderExecutor` | place/modify/cancel (later phase) | — |
 | `IFileImporter` | CSV profiles → bars | CSV |
 
-Adding Upstox or another broker later = one adapter project + config. The instrument master maps each broker id
+Dhan is the only broker ([ADR 0009](../adr/0009-dhan-consent-flow-only.md)); another one means a new decision, one connector and one adapter project. Dhan API keys, secrets and tokens are kept in the encrypted broker vault (`accounts.broker_secrets`, doc 04 §1).
+The instrument master maps each broker id
 (Dhan `security_id` + segment) to a canonical symbol; mapping mismatches are quality issues, never guessed.
 
 ## 8. Accounts
@@ -149,6 +150,25 @@ the **primary Data account** (with automatic failover to a standby Data account 
 have mode (`paper` / `manual_live`; automated modes later), risk profile, allowed styles/instruments and capital source. Nightly sync reads funds, positions, holdings, trade
 history and ledger → feeds the **auto-journal** (fills matched to plan tickets) and **portfolio monitoring**
 ([doc 12](12-portfolio-monitoring.md)).
+
+### 8.1 Connecting: Dhan's consent flow
+
+From Dhan's own documentation (verified 2026-10-11; ADR 0008, 0009, specs P1-16c, P1-16d). The connector calls only the endpoints below (allow-list in
+the HTTP client: HTTPS, exact host and path, method; no redirects followed), with a 15-second timeout, no retries (codes are single-use) and no
+request logging (URLs and headers carry tokens and codes; the `tokenId` in the consume URL counts as a secret). Dhan error codes are kept
+only when they have Dhan's form (`DH-901`); message texts are never used.
+
+| Step | Dhan (API key & secret) |
+|------|-------------------------|
+| Start | `POST https://auth.dhan.co/app/generate-consent?client_id={clientId}`, headers `app_id`, `app_secret` → `consentAppId` (max 25 a day) |
+| Browser | `https://auth.dhan.co/login/consentApp-login?consentAppId=…` → redirect `?tokenId=…` (no state) |
+| Exchange | `POST https://auth.dhan.co/app/consumeApp-consent?tokenId=…`, headers `app_id`, `app_secret` → `accessToken`, `expiryTime`, `dhanClientId`, `dhanClientName`, `dhanClientUcc` |
+| Holder check | `dhanClientId` = the account's client id |
+| Expiry | `expiryTime` (ISO, India time unless an offset is given); otherwise 24 h after issue |
+| Disconnect | token deleted locally (Dhan has no logout for these tokens; no call) |
+
+A 4xx answer is a refusal (wrong key/secret, used or expired tokenId), anything else (5xx, 3xx, timeout, network, unreadable body)
+is "broker unavailable"; both surface as `502 accounts.broker_error` with a safe message. Expiry times are stored in UTC.
 
 ## 9. Storage
 

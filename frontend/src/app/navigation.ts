@@ -60,9 +60,9 @@ export const navigation: NavSection[] = [
   {
     title: 'System',
     items: [
-      { path: '/accounts', label: 'Accounts', icon: PeopleIcon, phase: 'P1' },
+      { path: '/accounts', label: 'Accounts', icon: PeopleIcon },
       { path: '/services', label: 'Services', icon: DnsIcon, phase: 'P1' },
-      { path: '/settings', label: 'Settings', icon: TuneIcon, phase: 'P1' },
+      { path: '/settings', label: 'Settings', icon: TuneIcon },
       { path: '/audit', label: 'Audit log', icon: HistoryIcon, phase: 'P1' },
       { path: '/system', label: 'System status', icon: MonitorHeartIcon },
     ],

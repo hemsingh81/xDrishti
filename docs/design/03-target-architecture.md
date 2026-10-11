@@ -167,7 +167,7 @@ can change without touching Planning or Learning.
 | **Data import** | CSV profiles, import jobs (preview, validate, upsert, undo), folder watcher |
 | **Catalog** | Instrument master, tracked instruments, baskets (manual / rule / system), membership history |
 | **Live** | Active-set computation, WebSocket subscriptions, live 1-minute bars, quote polling, live P&L & alerts |
-| **Brokers** | Adapters (Dhan in v1; Upstox later; NSE files) implementing `IMarketDataProvider`, `ILiveFeed`, `IAccountReader`, `ITokenProvider`, (later) `IOrderExecutor` |
+| **Brokers** | Adapters (Dhan in v1; others later; NSE files) implementing `IMarketDataProvider`, `ILiveFeed`, `IAccountReader`, `ITokenProvider`, (later) `IOrderExecutor` |
 | **Portfolio** | Transactions, FIFO lots, positions, buckets, valuations, returns, XIRR, benchmark, alerts |
 | **Indicators & Features** | Streaming indicators, multi-timeframe features, regime labels |
 | **Strategies** | Built-in strategies, DSL parser/compiler, plugin host |

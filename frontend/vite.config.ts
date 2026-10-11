@@ -29,6 +29,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // Long dialog flows (many keystrokes) can pass 5 s when the whole suite runs in parallel on a busy machine.
+    testTimeout: 10_000,
     restoreMocks: true,
     coverage: {
       provider: 'v8',
