@@ -2,6 +2,7 @@ import { Alert, Stack, Typography } from '@mui/material';
 import { formatDate, formatInr } from '@/shared/lib/format';
 import { dhanApp } from '../../lib/dhanApp';
 import { modeLabel, roleInfo } from '../../lib/labels';
+import { autoBucketNameOf } from '../../lib/portfolioForm';
 import { maskClientId, type WizardState } from '../../lib/wizardState';
 import { Facts, type Fact } from '@/shared/ui';
 import { FormAlert } from '../FormAlert';
@@ -43,7 +44,7 @@ function summary(state: WizardState): Fact[] {
     });
   }
   if (roles.portfolio) {
-    facts.push({ label: 'Portfolio bucket', value: state.portfolio.defaultBucket });
+    facts.push({ label: 'Portfolio bucket', value: state.portfolio.defaultBucket || autoBucketNameOf(identity.name) });
   }
   if (roles.data) {
     facts.push({ label: 'Live-feed budget', value: state.liveFeedBudget });

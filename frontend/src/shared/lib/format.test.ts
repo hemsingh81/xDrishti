@@ -1,4 +1,13 @@
-import { formatAgo, formatDate, formatDuration, formatHoursMinutes, formatInr, formatIstTimeAndDay } from './format';
+import {
+  formatAgo,
+  formatDate,
+  formatDuration,
+  formatHoursMinutes,
+  formatInr,
+  formatInrPrecise,
+  formatIstTimeAndDay,
+  formatPercent,
+} from './format';
 
 describe('formatDuration', () => {
   it.each([
@@ -24,6 +33,20 @@ describe('formatInr', () => {
   it('groups digits the Indian way', () => {
     expect(formatInr(200_000)).toBe('₹2,00,000');
     expect(formatInr(1_000)).toBe('₹1,000');
+  });
+});
+
+describe('formatInrPrecise', () => {
+  it('keeps the paise and groups the Indian way', () => {
+    expect(formatInrPrecise(2_456.3)).toBe('₹2,456.30');
+    expect(formatInrPrecise(12_34_567.891)).toBe('₹12,34,567.89');
+  });
+});
+
+describe('formatPercent', () => {
+  it('shows two decimals', () => {
+    expect(formatPercent(16.1)).toBe('16.10');
+    expect(formatPercent(1_234.5)).toBe('1,234.50');
   });
 });
 

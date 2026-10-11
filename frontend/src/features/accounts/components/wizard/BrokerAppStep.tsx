@@ -1,7 +1,7 @@
 import { Divider, Grid, Stack, TextField, Typography } from '@mui/material';
 import { dhanApp } from '../../lib/dhanApp';
 import type { FieldErrors } from '../../lib/fieldErrors';
-import { todayIso } from '../../lib/portfolioForm';
+import { istDayIso } from '@/shared/lib/format';
 import type { BrokerAppDraft } from '../../lib/wizardState';
 import { DhanSetupGuide } from '../DhanSetupGuide';
 import { SecretField } from '../SecretField';
@@ -55,7 +55,7 @@ export function BrokerAppStep({ app, errors, onChange }: BrokerAppStepProps) {
                 errors.apiKeyIssuedOn ??
                 `Valid for ${dhanApp.apiKeyValidityMonths} months; you are warned before it expires.`
               }
-              slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayIso() } }}
+              slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: istDayIso() } }}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>

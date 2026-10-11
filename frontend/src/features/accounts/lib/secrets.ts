@@ -1,8 +1,7 @@
 import type { SecretStatus, UpdateSecretsInput } from '@/shared/api';
 import { dhanApp } from './dhanApp';
-import { formatDate } from '@/shared/lib/format';
+import { formatDate, istDayIso } from '@/shared/lib/format';
 import type { FieldErrors } from './fieldErrors';
-import { todayIso } from './portfolioForm';
 
 /** Short names for status lines; `dhanApp` carries the long labels ("API key (app_id)"). */
 const secretNames: Record<string, string> = { apiKey: 'API key', apiSecret: 'API secret' };
@@ -28,7 +27,7 @@ export type KeyExpiry =
 export function keyExpiry(
   expiresOn: string,
   warningDays: number = dhanApp.apiKeyExpiryWarningDays,
-  today: string = todayIso(),
+  today: string = istDayIso(),
 ): KeyExpiry {
   const daysLeft = Math.round(dayNumber(expiresOn) - dayNumber(today));
   if (daysLeft <= 0) {
@@ -44,9 +43,9 @@ export interface SecretsFormState {
   apiKeyIssuedOn: string;
 }
 
-export const emptySecrets = (): SecretsFormState => ({ apiKey: '', apiSecret: '', apiKeyIssuedOn: todayIso() });
+export const emptySecrets = (): SecretsFormState => ({ apiKey: '', apiSecret: '', apiKeyIssuedOn: istDayIso() });
 
-export function validateIssuedOn(value: string, today: string = todayIso()): string | undefined {
+export function validateIssuedOn(value: string, today: string = istDayIso()): string | undefined {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && value <= today
     ? undefined
     : 'Pick the day the key was generated (up to today).';
@@ -80,7 +79,7 @@ export function effectiveIssuedOn(draft: ReplaceSecretsDraft, current: string): 
   if (draft.issuedOnTouched) {
     return draft.apiKeyIssuedOn;
   }
-  return draft.apiKey.trim() ? todayIso() : current;
+  return draft.apiKey.trim() ? istDayIso() : current;
 }
 
 export function toUpdateSecretsInput(draft: ReplaceSecretsDraft, current: string): UpdateSecretsInput {

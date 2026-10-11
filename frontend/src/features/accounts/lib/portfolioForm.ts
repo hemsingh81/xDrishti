@@ -1,47 +1,62 @@
-import type { AccountDetail, PortfolioInput } from '@/shared/api';
-import { istDayIso } from '@/shared/lib/format';
+import type { AccountDetail, PortfolioBucket, PortfolioInput } from '@/shared/api';
+import { validateAcquiredOn } from '@/shared/lib/dates';
 import type { FieldErrors } from './fieldErrors';
+import { autoRefreshFrom, toRefreshInput, validateAutoRefresh, type AutoRefreshState } from './autoRefresh';
 
 export interface PortfolioFormState {
+  /** Name of a custom bucket, or blank for the account's own default bucket. */
   defaultBucket: string;
-  /** yyyy-MM-dd or blank. */
-  historyFrom: string;
   includeInTotals: boolean;
+  /** How the holdings refresh by themselves. */
+  refresh: AutoRefreshState;
+  /** yyyy-MM-dd: the date the first import gives holdings that have no date of their own. */
+  firstImportDate: string;
 }
 
-export const earliestHistoryDate = '2000-01-01';
+/** Until the owner chooses another, the first import dates holdings 1 Jan 2025 (the server's default too). */
+export const defaultFirstImportDate = '2025-01-01';
 
-/** Today as yyyy-MM-dd on the Indian calendar (IST), which is what the server checks against. */
-export function todayIso(now: Date = new Date()): string {
-  return istDayIso(now);
-}
+/** The name of an account's own default bucket, as the server builds it ("{account name} · Portfolio"). */
+export const autoBucketNameOf = (accountName: string): string => `${accountName.trim() || 'Account name'} · Portfolio`;
 
-export function portfolioFormFrom(settings?: AccountDetail['portfolio'], defaultBucket = ''): PortfolioFormState {
+/** The settings as the form shows them; the account's own bucket is stored as "blank" so renames follow along. */
+export function portfolioFormFrom(settings?: AccountDetail['portfolio']): PortfolioFormState {
+  const own = settings?.defaultBucket === settings?.autoBucketName;
   return {
-    defaultBucket: settings?.defaultBucket ?? defaultBucket,
-    historyFrom: settings?.historyFrom ?? '',
+    defaultBucket: settings && !own ? settings.defaultBucket : '',
     includeInTotals: settings?.includeInTotals ?? true,
+    refresh: autoRefreshFrom(settings),
+    firstImportDate: settings?.firstImportDate ?? defaultFirstImportDate,
   };
 }
 
+/**
+ * The request for the account's Portfolio tab. The API keeps whatever is null or left out, so the account's own bucket
+ * is sent as an empty string (that is a choice), a custom bucket by name.
+ */
 export function toPortfolioInput(state: PortfolioFormState): PortfolioInput {
   return {
-    defaultBucket: state.defaultBucket || null,
-    historyFrom: state.historyFrom || null,
+    defaultBucket: state.defaultBucket,
     includeInTotals: state.includeInTotals,
+    ...toRefreshInput(state.refresh),
+    firstImportDate: state.firstImportDate,
   };
 }
 
-export function validatePortfolio(state: PortfolioFormState, today: string = todayIso()): FieldErrors {
-  const errors: Record<string, string> = {};
-  if (!state.defaultBucket) {
-    errors.defaultBucket = 'Choose a default bucket.';
-  }
-  if (state.historyFrom && (state.historyFrom < earliestHistoryDate || state.historyFrom > today)) {
-    errors.historyFrom = `Pick a date from ${earliestHistoryDate} up to today.`;
-  }
+/** Client-side checks of the portfolio settings, keyed like the API's fields; empty when valid. */
+export function validatePortfolio(state: PortfolioFormState): FieldErrors {
+  const errors: Record<string, string> = { ...validateAutoRefresh(state.refresh) };
+  const date = validateAcquiredOn(state.firstImportDate);
+  if (date) errors.firstImportDate = date;
   return errors;
 }
+
+/**
+ * The buckets that can be picked besides the account's own: custom ones only. Default buckets of accounts (this
+ * account's own is a separate option, other accounts' are never offered).
+ */
+export const customBuckets = (buckets: readonly PortfolioBucket[]): PortfolioBucket[] =>
+  buckets.filter((b) => !b.isAccountDefault);
 
 export const maxLiveFeedBudget = 5000;
 

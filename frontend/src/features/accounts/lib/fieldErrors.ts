@@ -53,3 +53,14 @@ export function problemMessage(error: unknown): string | undefined {
   }
   return error.problem?.title ?? 'The change could not be saved. Please try again.';
 }
+
+/**
+ * The messages of fields that the form has no place for (an API field the form does not show), joined; undefined when
+ * every message belongs to a field the form shows. Keeps a refusal from being swallowed.
+ */
+export function unplacedMessages(errors: FieldErrors, shown: readonly string[]): string | undefined {
+  const rest = Object.entries(errors)
+    .filter(([field]) => !shown.includes(field))
+    .map(([field, message]) => `${field}: ${message}`);
+  return rest.length > 0 ? rest.join(' ') : undefined;
+}

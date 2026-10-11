@@ -2,11 +2,11 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { externalNavigation } from '@/shared/lib/externalNavigation';
-import { buildAccountDetail, ids } from '@/test/fixtures';
+import { buildAccountDetail, buildBucket, buildBuckets, ids } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { createStepUpGate, dhanAuthorizeUrl, dhanRedirectUrl, problemResponse, server } from '@/test/server';
 import { AccountsPage } from './components/AccountsPage';
-import { todayIso } from './lib/portfolioForm';
+import { istDayIso } from '@/shared/lib/format';
 
 const newId = '00000000-0000-4000-8000-0000000000c3';
 // Made-up values that look nothing like real keys; tests check they never show up on screen.
@@ -87,7 +87,7 @@ describe('Add-account wizard', () => {
     expect(within(dialog).queryByRole('radio')).not.toBeInTheDocument();
     expect(within(dialog).getByText(/Access DhanHQ APIs/)).toBeInTheDocument();
     expect(await within(dialog).findByText(dhanRedirectUrl)).toBeInTheDocument();
-    expect(within(dialog).getByLabelText(/^API key generated on/)).toHaveValue(todayIso());
+    expect(within(dialog).getByLabelText(/^API key generated on/)).toHaveValue(istDayIso());
     await fillDhanApp(dialog);
 
     // Identity: the name is suggested.
@@ -101,7 +101,10 @@ describe('Add-account wizard', () => {
 
     expect(await within(dialog).findByRole('region', { name: 'Trading settings' })).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/^Risk profile/)).toHaveDisplayValue('Standard');
-    expect(within(dialog).getByLabelText(/^Default bucket/)).toHaveDisplayValue('Trading');
+    expect(within(dialog).getByLabelText(/^Default bucket/)).toHaveDisplayValue(
+      'Dhan · Main · Portfolio — account’s own bucket (created automatically)',
+    );
+    expect(within(dialog).queryByLabelText(/history/i)).not.toBeInTheDocument();
     await fillSettings(dialog);
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create account' }));
@@ -118,7 +121,7 @@ describe('Add-account wizard', () => {
         name: 'Dhan · Main',
         clientId: '1000000001',
         secrets: { apiKey: fakeKey, apiSecret: fakeSecret },
-        apiKeyIssuedOn: todayIso(),
+        apiKeyIssuedOn: istDayIso(),
         color: '#b45309', // the next colour in the palette after the two existing accounts
         notes: null,
         roles: {
@@ -135,10 +138,148 @@ describe('Add-account wizard', () => {
           instruments: { intraday: [], swingBuy: ['EQ_CNC'], swingSell: [] },
           overrides: { riskPerTradePct: null, maxNewEntriesPerDay: null, maxOpenPositions: null, dailyLossPct: null },
         },
-        portfolio: { defaultBucket: 'Trading', historyFrom: null, includeInTotals: true },
+        portfolio: {
+          defaultBucket: null,
+          includeInTotals: true,
+          refreshMode: 'off',
+          refreshDailyTimeIst: '16:00',
+          firstImportDate: '2025-01-01',
+        },
         data: { liveFeedBudget: 200 },
       },
     ]);
+  });
+
+  it('offers the own bucket and custom buckets only, with only the first import date (no list, no account yet)', async () => {
+    server.use(
+      http.get('/api/portfolio-buckets', () =>
+        HttpResponse.json([
+          ...buildBuckets(),
+          buildBucket({ id: '00000000-0000-4000-8000-0000000000b2', name: 'MyLongTerm' }),
+        ]),
+      ),
+    );
+    renderPage();
+    const dialog = await openWizard();
+    await fillDhanApp(dialog);
+    await next(dialog);
+    await next(dialog);
+
+    const select = await within(dialog).findByLabelText(/^Default bucket/);
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Dhan · Main · Portfolio — account’s own bucket (created automatically)', 'MyLongTerm']);
+    expect(within(select).queryByRole('option', { name: /Test Dhan Main/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText(/Import trade|history/i)).not.toBeInTheDocument();
+    // No account yet: only the date, and a note that the first sync imports.
+    expect(within(dialog).getByLabelText('First import date')).toHaveValue('2025-01-01');
+    expect(within(dialog).getByText(/the first sync imports every holding with this date/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole('table')).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('radio', { name: 'Off' })).toBeChecked();
+  });
+
+  it('follows the typed name in the own bucket and sends a chosen custom bucket without a date', async () => {
+    const gate = createStepUpGate();
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      gate.handler,
+      http.get('/api/portfolio-buckets', () =>
+        HttpResponse.json([buildBucket({ id: '00000000-0000-4000-8000-0000000000b2', name: 'MyLongTerm' })]),
+      ),
+      http.post('/api/accounts', async ({ request }) => {
+        const denied = gate.require();
+        if (denied) {
+          return denied;
+        }
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(created(), { status: 201 });
+      }),
+    );
+    renderPage();
+    const dialog = await openWizard();
+    await fillDhanApp(dialog);
+    const name = within(dialog).getByLabelText(/^Display name/);
+    await userEvent.clear(name);
+    await userEvent.type(name, 'My Dhan');
+    await next(dialog);
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Data' }));
+    await next(dialog);
+
+    const select = await within(dialog).findByLabelText(/^Default bucket/);
+    expect(select).toHaveDisplayValue('My Dhan · Portfolio — account’s own bucket (created automatically)');
+    await userEvent.selectOptions(select, 'MyLongTerm');
+    await next(dialog);
+    expect(await within(dialog).findByText('Check the details, then create the account.')).toBeInTheDocument();
+    expect(within(dialog).getByText('MyLongTerm')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create account' }));
+    const passwordDialog = await screen.findByRole('dialog', { name: 'Confirm your password' });
+    await userEvent.type(within(passwordDialog).getByLabelText(/Password/), 'correct-password');
+    await userEvent.click(within(passwordDialog).getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]?.portfolio).toEqual({
+      defaultBucket: 'MyLongTerm',
+      includeInTotals: true,
+      refreshMode: 'off',
+      refreshDailyTimeIst: '16:00',
+      firstImportDate: '2025-01-01',
+    });
+  });
+
+  it('sends the chosen auto refresh with the new account and checks the daily time on the way', async () => {
+    const gate = createStepUpGate();
+    const bodies: Record<string, unknown>[] = [];
+    server.use(
+      gate.handler,
+      http.post('/api/accounts', async ({ request }) => {
+        const denied = gate.require();
+        if (denied) {
+          return denied;
+        }
+        bodies.push((await request.json()) as Record<string, unknown>);
+        return HttpResponse.json(created(), { status: 201 });
+      }),
+    );
+    renderPage();
+    const dialog = await openWizard();
+    await fillDhanApp(dialog);
+    await next(dialog);
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Data' }));
+    await next(dialog);
+
+    await userEvent.click(await within(dialog).findByRole('radio', { name: 'Daily at' }));
+    await userEvent.clear(within(dialog).getByLabelText('Time of day (IST)'));
+    await next(dialog);
+    expect(await within(dialog).findByText('Enter a time as HH:MM, for example 16:00.')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText('Time of day (IST)'), '09:30');
+    await next(dialog);
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Create account' }));
+    const passwordDialog = await screen.findByRole('dialog', { name: 'Confirm your password' });
+    await userEvent.type(within(passwordDialog).getByLabelText(/Password/), 'correct-password');
+    await userEvent.click(within(passwordDialog).getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => {
+      expect(bodies).toHaveLength(1);
+    });
+    expect(bodies[0]?.portfolio).toEqual({
+      defaultBucket: null,
+      includeInTotals: true,
+      refreshMode: 'daily',
+      refreshDailyTimeIst: '09:30',
+      firstImportDate: '2025-01-01',
+    });
+  });
+
+  it('shows the own bucket name in the review', async () => {
+    renderPage();
+    const dialog = await openWizard();
+    await reachReview(dialog);
+
+    expect(within(dialog).getByText('Dhan · Main · Portfolio')).toBeInTheDocument();
   });
 
   it('asks Dhan for a client id, both secrets and the day the key was generated', async () => {

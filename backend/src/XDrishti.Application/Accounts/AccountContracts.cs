@@ -1,3 +1,5 @@
+using XDrishti.Application.Portfolio;
+
 namespace XDrishti.Application.Accounts;
 
 // Request and response shapes of the accounts API. Enum-like values travel as lowercase strings (see AccountCodes) and are
@@ -67,7 +69,24 @@ public sealed record TradingSettingsView(
     InstrumentsView Instruments,
     AccountOverrides Overrides);
 
-public sealed record PortfolioSettingsView(bool Enabled, string? DefaultBucket, DateOnly? HistoryFrom, bool IncludeInTotals);
+/// <summary>
+/// Portfolio configuration. DefaultBucket is the name of the bucket imports go to (the account's own default bucket unless a custom bucket was chosen);
+/// AutoBucketName is the name of the account's own default bucket ("{account name} · Portfolio") — the one that exists, or, while the account has none yet,
+/// the name it would get now (with a numeric suffix when the plain name is taken); it is chosen for real when the role is switched on.
+/// The holdings refresh by themselves according to RefreshMode: "off" (default) or "daily" (once a day from RefreshDailyTimeIst, "HH:mm" India time, default 16:00;
+/// the time is kept while the mode is off). FirstImportDate is the date holdings get when they are imported for the first time without a date of their own
+/// (2025-01-01 until the owner chooses another). HasHoldings is true once the account has any holding; the first import has happened then and
+/// FirstImportDate no longer affects existing holdings (ADR 0013).
+/// </summary>
+public sealed record PortfolioSettingsView(
+    bool Enabled,
+    string DefaultBucket,
+    string AutoBucketName,
+    bool IncludeInTotals,
+    string RefreshMode,
+    string RefreshDailyTimeIst,
+    DateOnly FirstImportDate,
+    bool HasHoldings);
 
 public sealed record DataSettingsView(bool Enabled, bool Primary, bool Standby, int LiveFeedBudget);
 
@@ -118,7 +137,48 @@ public sealed record TradingInput(
     InstrumentsInput? Instruments,
     AccountOverrides? Overrides);
 
-public sealed record PortfolioInput(string? DefaultBucket, DateOnly? HistoryFrom, bool? IncludeInTotals);
+/// <summary>
+/// The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of
+/// the bucket imports go to — a custom bucket's name; an empty string "" (or the name of the account's own "{account name} · Portfolio" bucket) selects the account's
+/// own default bucket; null or omitted keeps the current choice. IncludeInTotals: true or false; null keeps it. At account creation, omitted means the account's own
+/// bucket and true. The automatic holdings refresh: RefreshMode "off" or "daily"; RefreshDailyTimeIst "HH:mm" (India time); left out keeps the current value (a new
+/// account: off, 16:00). FirstImportDate (not in the future, not before 1990-01-01) is the date the first import gives holdings without a date of their own.
+/// FirstImport is honoured only when updating the portfolio settings of an account (it is ignored at account creation): see <see cref="FirstImportInput"/>.
+/// </summary>
+public sealed record PortfolioInput(
+    string? DefaultBucket,
+    bool? IncludeInTotals,
+    string? RefreshMode = null,
+    string? RefreshDailyTimeIst = null,
+    DateOnly? FirstImportDate = null,
+    FirstImportInput? FirstImport = null);
+
+/// <summary>
+/// The holdings to import when the portfolio settings are saved (ADR 0013). Rows are keys from <c>holdings/preview</c> with an optional acquisition date each
+/// (a row without one gets the first import date, flagged as such); at most 5000 rows. Used only when the account is connected to Dhan and has no holdings yet;
+/// an empty list imports nothing.
+/// </summary>
+public sealed record FirstImportInput(IReadOnlyList<ImportRowInput>? Rows);
+
+/// <summary>
+/// What a first import did. Status: "imported" (the chosen holdings were created; the counts say how many), "skipped" (the account already has holdings, nothing was
+/// imported), "deferred" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or
+/// "failed" (the settings were saved but the import was not: ErrorCode is <c>portfolio.import_failed</c>, Cause the code of the reason, for example
+/// <c>portfolio.not_connected</c>, <c>portfolio.sync_running</c>; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those
+/// among them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists.
+/// </summary>
+public sealed record FirstImportView(
+    string Status,
+    int Imported,
+    int DefaultDated,
+    int AlreadyImported,
+    int Unknown,
+    string? ErrorCode,
+    string? Cause,
+    string? Message);
+
+/// <summary>The answer of saving the portfolio settings: the account as saved and, when a first import was asked for, what it did (otherwise null).</summary>
+public sealed record PortfolioSaved(AccountDetail Account, FirstImportView? Import);
 
 public sealed record DataInput(int? LiveFeedBudget);
 

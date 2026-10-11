@@ -370,6 +370,15 @@ only when they have Dhan&#39;s form (<code>DH-901</code>); message texts are nev
 </tbody></table>
 <p>A 4xx answer is a refusal (wrong key/secret, used or expired tokenId), anything else (5xx, 3xx, timeout, network, unreadable body)
 is &quot;broker unavailable&quot;; both surface as <code>502 accounts.broker_error</code> with a safe message. Expiry times are stored in UTC.</p>
+<h3 id="82-reading-the-holdings-adr-0012-p2-01">8.2 Reading the holdings (ADR 0012, P2-01)<a class="hash" href="#82-reading-the-holdings-adr-0012-p2-01" aria-label="Link to this section">#</a></h3>
+<p><code>GET https://api.dhan.co/v2/holdings</code> with the header <code>access-token</code> (the account&#39;s stored token, read from the vault) answers an array of
+<code>{exchange, tradingSymbol, securityId, isin, totalQty, dpQty, t1Qty, mtf_t1_qty, mtf_qty, availableQty, collateralQty, avgCostPrice, lastTradedPrice}</code> — no purchase
+date and no previous close. xDrishti uses <code>exchange</code>, <code>tradingSymbol</code>, <code>securityId</code>, <code>isin</code>, <code>totalQty</code>, <code>avgCostPrice</code> and <code>lastTradedPrice</code>. It is the only <code>api.dhan.co</code>
+endpoint on the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB). A 401/403 means the saved token is expired or revoked
+(<code>409 portfolio.not_connected</code>, &quot;sign in to Dhan again&quot;); other 4xx and 5xx/timeouts are <code>502 accounts.broker_error</code>. An empty array (HTTP 200 <code>[]</code>) and Dhan&#39;s documented data error <code>DH-907</code> (&quot;incorrect parameters or no data present&quot;;
+this request has no parameters, so here it can only mean no data) both read as an empty list; <code>DH-1111</code> is not in Dhan&#39;s documentation and is only tolerated as an alias.
+An empty list is never trusted blindly: see the safeguard in <a href="12-portfolio-monitoring.html">doc 12</a> §3. Rows of one holding (same ISIN, or same security id and exchange) are added up (quantity summed, average cost weighted). Neither the token, the URL nor the
+raw answer is logged or returned.</p>
 <h2 id="9-storage">9. Storage<a class="hash" href="#9-storage" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -532,7 +541,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-11 12:29</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-11 17:24</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>
@@ -547,6 +556,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
 <a href="#71-instrument-master-sources-adr-0010-p1-03" class="d3">7.1 Instrument master sources (ADR 0010, P1-03)</a>
 <a href="#8-accounts" class="d2">8. Accounts</a>
 <a href="#81-connecting-dhan39s-consent-flow" class="d3">8.1 Connecting: Dhan&amp;#39;s consent flow</a>
+<a href="#82-reading-the-holdings-adr-0012-p2-01" class="d3">8.2 Reading the holdings (ADR 0012, P2-01)</a>
 <a href="#9-storage" class="d2">9. Storage</a>
 <a href="#10-data-quality" class="d2">10. Data quality</a>
 <a href="#10b-data-quality-window-validation-workbench" class="d3">10b. Data quality window (validation workbench)</a>

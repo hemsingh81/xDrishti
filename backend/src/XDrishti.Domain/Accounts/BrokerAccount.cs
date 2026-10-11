@@ -215,11 +215,6 @@ public sealed class BrokerAccount : Entity<Guid>
             errors.AddRange(Trading.CheckCanEnable());
         }
 
-        if (change.Portfolio == true)
-        {
-            errors.AddRange(Portfolio.CheckCanEnable());
-        }
-
         if (errors.HasErrors)
         {
             return Result.Failure(AccountErrors.Invalid(errors));
@@ -268,16 +263,12 @@ public sealed class BrokerAccount : Entity<Guid>
         return result;
     }
 
-    public Result ConfigurePortfolio(PortfolioSpec spec, DateOnly today, DateTimeOffset now)
+    /// <summary>Stores the portfolio settings. A default bucket in <paramref name="spec"/> must be a custom bucket (checked by the caller).</summary>
+    public void ConfigurePortfolio(PortfolioSpec spec, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(spec);
-        var result = Portfolio.Configure(spec, today);
-        if (result.IsSuccess)
-        {
-            UpdatedAt = now;
-        }
-
-        return result;
+        Portfolio.Configure(spec);
+        UpdatedAt = now;
     }
 
     public Result ConfigureData(int? liveFeedBudget, DateTimeOffset now)

@@ -12,6 +12,7 @@ export const accountsKeys = {
   dhanRedirect: ['accounts', 'dhan-redirect'] as const,
   riskProfiles: ['accounts', 'risk-profiles'] as const,
   buckets: ['accounts', 'buckets'] as const,
+  holdingsPreview: (id: string) => ['accounts', 'holdings-preview', id] as const,
 };
 
 export const accountsQuery = queryOptions({
@@ -56,3 +57,18 @@ export const dhanRedirectQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/brokers/dhan', { signal })),
   staleTime: 60 * 60_000,
 });
+
+/**
+ * What Dhan holds, for the first import in the portfolio settings (a POST that saves nothing). Fetched once while the
+ * form is open: never refetched on its own, so dates typed into the table are not disturbed, and dropped on leaving.
+ */
+export const holdingsPreviewQuery = (accountId: string) =>
+  queryOptions({
+    queryKey: accountsKeys.holdingsPreview(accountId),
+    queryFn: async ({ signal }) =>
+      unwrap(await api.POST('/api/accounts/{id}/holdings/preview', { params: { path: { id: accountId } }, signal })),
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });

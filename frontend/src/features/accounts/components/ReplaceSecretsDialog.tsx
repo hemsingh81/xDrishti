@@ -7,7 +7,7 @@ import { useUpdateSecrets } from '../api/accountMutations';
 import { dhanApp } from '../lib/dhanApp';
 import { fieldErrorsOf, problemMessage, type FieldErrors } from '../lib/fieldErrors';
 import { focusFirstInvalid } from '../lib/focus';
-import { todayIso } from '../lib/portfolioForm';
+import { istDayIso } from '@/shared/lib/format';
 import {
   effectiveIssuedOn,
   secretName,
@@ -117,7 +117,7 @@ export function ReplaceSecretsDialog({ account, onClose }: ReplaceSecretsDialogP
               errors.apiKeyIssuedOn ??
               `${dhanApp.name} API keys are valid for ${dhanApp.apiKeyValidityMonths} months from this day.`
             }
-            slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayIso() } }}
+            slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: istDayIso() } }}
             sx={{ maxWidth: 260 }}
           />
           <Alert role="status" severity="info">

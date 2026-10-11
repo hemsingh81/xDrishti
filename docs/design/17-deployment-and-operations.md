@@ -51,12 +51,13 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 | Egress allowed later | worker, feed, exec (broker/exchange hosts only) |
 
 *`xd-sandbox` has no egress and no access except its job inputs/outputs.
-`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)) and for the instrument master files ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md)): outbound only, no
+`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)), for the read of the account's holdings ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)) and for the instrument master files ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md)): outbound only, no
 published ports, no other member. The network itself does not filter hosts; the API's HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):
 
 | Client | Reaches only | Method | Limits |
 |--------|--------------|--------|--------|
 | Broker (Dhan sign-in) | `auth.dhan.co`: `/app/generate-consent`, `/app/consumeApp-consent` (doc 05 §8.1) | POST | 15 s, 256 KB; no order, position or funds endpoint is callable |
+| Broker (Dhan holdings) | `api.dhan.co`: `/v2/holdings` only, no query (doc 05 §8.2) | GET | 30 s, 5 MB; the stored access token goes in the `access-token` header and is never logged; nothing else of `api.dhan.co` is callable |
 | Instrument master — Dhan | `images.dhan.co`: `/api-data/api-scrip-master-detailed.csv` (doc 05 §7.1) | GET | 120 s, 100 MB |
 | Instrument master — NSE | `nsearchives.nseindia.com`: `/content/indices/ind_niftytotalmarket_list.csv` | GET | 30 s, 5 MB |
 

@@ -1,7 +1,7 @@
 import { ApiError } from '@/shared/api';
-import { fieldErrorsOf, problemMessage, scoped } from './fieldErrors';
+import { fieldErrorsOf, problemMessage, scoped, unplacedMessages } from './fieldErrors';
 import { draftOf, isPlanEmpty, planRoleChange, primaryBlockedMessage, type RoleDraft } from './roleChanges';
-import { todayIso } from './portfolioForm';
+import { istDayIso } from '@/shared/lib/format';
 import {
   keyExpiry,
   secretStatusText,
@@ -88,6 +88,16 @@ describe('field errors', () => {
   });
 });
 
+describe('unplaced field messages', () => {
+  it('lists the messages of fields the form does not show, and nothing when all are shown', () => {
+    const errors = { refreshMode: 'Bad.', includeInTotals: 'No.', other: 'Hmm.' };
+
+    expect(unplacedMessages(errors, ['refreshMode'])).toBe('includeInTotals: No. other: Hmm.');
+    expect(unplacedMessages(errors, ['refreshMode', 'includeInTotals', 'other'])).toBeUndefined();
+    expect(unplacedMessages({}, [])).toBeUndefined();
+  });
+});
+
 describe('wizard helpers', () => {
   it.each([
     ['clientId', 0],
@@ -168,7 +178,7 @@ describe('secrets', () => {
       apiSecret: 's',
       apiKeyIssuedOn: null,
     });
-    expect(toUpdateSecretsInput(draft({ apiKey: 'k' }), '2026-01-01').apiKeyIssuedOn).toBe(todayIso());
+    expect(toUpdateSecretsInput(draft({ apiKey: 'k' }), '2026-01-01').apiKeyIssuedOn).toBe(istDayIso());
     expect(
       toUpdateSecretsInput(draft({ apiKey: 'k', apiKeyIssuedOn: '2026-10-01', issuedOnTouched: true }), '2026-01-01')
         .apiKeyIssuedOn,

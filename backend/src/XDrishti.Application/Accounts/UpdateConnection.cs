@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -15,6 +16,7 @@ public sealed record UpdateConnectionCommand(Guid AccountId, ConnectionInput Inp
 
 internal sealed class UpdateConnectionHandler(
     IAccountStore accounts,
+    DefaultBuckets defaultBuckets,
     IAccountEventLog events,
     IAccountUnitOfWork unitOfWork,
     ConnectionWriter connection,
@@ -38,6 +40,15 @@ internal sealed class UpdateConnectionHandler(
         if (updated.IsFailure)
         {
             return Result.Failure<AccountDetail>(updated.Error);
+        }
+
+        if (before.Name != account.Name)
+        {
+            var followed = await defaultBuckets.FollowRenameAsync(account, command.Actor, now, cancellationToken);
+            if (followed.IsFailure)
+            {
+                return Result.Failure<AccountDetail>(followed.Error);
+            }
         }
 
         var clientIdChanged = before.ClientId != account.ClientId;

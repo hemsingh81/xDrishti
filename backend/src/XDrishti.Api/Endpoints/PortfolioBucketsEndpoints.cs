@@ -5,7 +5,7 @@ using XDrishti.Application.Accounts.Buckets;
 
 namespace XDrishti.Api.Endpoints;
 
-/// <summary>Portfolio buckets (named groups of holdings). Part of the accounts module.</summary>
+/// <summary>Portfolio buckets (named groups of holdings): custom ones and the automatic default bucket of each Portfolio account. Part of the accounts module.</summary>
 internal sealed class PortfolioBucketsEndpoints : IEndpointModule
 {
     public void Map(IEndpointRouteBuilder api)
@@ -14,11 +14,11 @@ internal sealed class PortfolioBucketsEndpoints : IEndpointModule
 
         group.MapGet("/", ListAsync)
             .WithName("ListPortfolioBuckets")
-            .WithSummary("All portfolio buckets (seeded: Trading, MyLongTerm, MyChoice)");
+            .WithSummary("Buckets to choose from: custom buckets and the default bucket of each account with the Portfolio role");
 
         group.MapPost("/", AddAsync)
             .WithName("AddPortfolioBucket")
-            .WithSummary("Add a portfolio bucket")
+            .WithSummary("Add a custom portfolio bucket")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status409Conflict);
     }

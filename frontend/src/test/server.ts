@@ -3,6 +3,11 @@ import { setupServer } from 'msw/node';
 import {
   buildAccountDetail,
   buildFacets,
+  buildLots,
+  buildSummary,
+  buildSyncStatus,
+  sampleHoldings,
+  searchHoldings,
   buildInstrumentDetail,
   buildRefreshStatus,
   sampleInstruments,
@@ -61,6 +66,18 @@ export const handlers = [
         )
       : problemResponse({ title: 'Instrument not found.', code: 'instruments.not_found' }, 404);
   }),
+  // Portfolio (read side): holdings are searched in memory; writes (import, sync, date edits) are mocked per test.
+  http.get('/api/holdings', ({ request }) =>
+    HttpResponse.json(searchHoldings(sampleHoldings, new URL(request.url).searchParams)),
+  ),
+  http.get('/api/holdings/summary', () => HttpResponse.json(buildSummary())),
+  http.get('/api/holdings/:id/lots', ({ params }) => {
+    const found = sampleHoldings.find((h) => h.id === params.id);
+    return found
+      ? HttpResponse.json(buildLots({ holdingId: found.id, symbol: found.symbol }))
+      : problemResponse({ title: 'The holding does not exist.', code: 'portfolio.not_found' }, 404);
+  }),
+  http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus())),
   // Connecting: the start answers with Dhan's page (tests replace the navigation).
   http.post('/api/accounts/:id/connect', () =>
     HttpResponse.json({ authorizeUrl: dhanAuthorizeUrl, expiresAt: '2026-10-11T10:10:00Z' }),

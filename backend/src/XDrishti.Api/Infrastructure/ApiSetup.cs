@@ -8,6 +8,7 @@ using Serilog;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
 using XDrishti.Api.Market;
+using XDrishti.Api.Portfolio;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -50,10 +51,14 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, RiskProfilesEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioBucketsEndpoints>();
         services.AddSingleton<IEndpointModule, InstrumentsEndpoints>();
+        services.AddSingleton<IEndpointModule, HoldingsEndpoints>();
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes, and the daily automatic refresh.
         services.AddHostedService<RefreshJobWorker>();
         services.AddHostedService<DailyRefreshService>();
+
+        // Holdings (ADR 0012): the automatic refresh of the accounts that switched it on.
+        services.AddHostedService<PortfolioRefreshService>();
         return services;
     }
 

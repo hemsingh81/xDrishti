@@ -19,4 +19,10 @@ public enum AccountEventType
     BrokerConnected,
     BrokerConnectFailed,
     BrokerDisconnected,
+    BucketCreated,
+    BucketRenamed,
+    HoldingsImported,
+    HoldingsSynced,
+    LotDateChanged,
+    PortfolioRefreshSettingsChanged,
 }

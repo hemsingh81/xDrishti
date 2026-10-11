@@ -1,25 +1,39 @@
 import { Checkbox, FormControlLabel, Grid, TextField } from '@mui/material';
 import type { PortfolioBucket } from '@/shared/api';
 import type { FieldErrors } from '../lib/fieldErrors';
-import { earliestHistoryDate, todayIso, type PortfolioFormState } from '../lib/portfolioForm';
+import { customBuckets, type PortfolioFormState } from '../lib/portfolioForm';
+import { AutoRefreshSettings } from './AutoRefreshSettings';
 
 interface PortfolioFieldsProps {
   idPrefix: string;
   state: PortfolioFormState;
   errors: FieldErrors;
   buckets: PortfolioBucket[];
+  /** Name of the account's own default bucket. */
+  ownBucketName: string;
+  /** The account does not exist yet (wizard): its own bucket is created automatically. */
+  ownBucketPending?: boolean;
   onChange: (patch: Partial<PortfolioFormState>) => void;
 }
 
-/** Default bucket, history start and "include in totals"; used by the Portfolio tab and the wizard. */
-export function PortfolioFields({ idPrefix, state, errors, buckets, onChange }: PortfolioFieldsProps) {
+/** Default bucket, "include in totals" and the auto refresh; used by the Portfolio tab and the wizard. The bucket always has a value. */
+export function PortfolioFields({
+  idPrefix,
+  state,
+  errors,
+  buckets,
+  ownBucketName,
+  ownBucketPending = false,
+  onChange,
+}: PortfolioFieldsProps) {
+  const custom = customBuckets(buckets);
+  const known = !state.defaultBucket || custom.some((b) => b.name === state.defaultBucket);
   return (
     <Grid container spacing={2} sx={{ alignItems: 'flex-start' }}>
-      <Grid size={{ xs: 12, sm: 4 }}>
+      <Grid size={{ xs: 12, sm: 8 }}>
         <TextField
           select
           fullWidth
-          required
           label="Default bucket"
           id={`${idPrefix}-bucket`}
           value={state.defaultBucket}
@@ -27,34 +41,21 @@ export function PortfolioFields({ idPrefix, state, errors, buckets, onChange }: 
             onChange({ defaultBucket: e.target.value });
           }}
           error={Boolean(errors.defaultBucket)}
-          helperText={errors.defaultBucket}
+          helperText={errors.defaultBucket ?? 'Where imported holdings go. Add more buckets below.'}
           slotProps={{ select: { native: true } }}
         >
-          <option value="">Choose…</option>
-          {buckets.map((bucket) => (
+          <option value="">
+            {ownBucketPending
+              ? `${ownBucketName} — account’s own bucket (created automatically)`
+              : `${ownBucketName} (default)`}
+          </option>
+          {!known && <option value={state.defaultBucket}>{state.defaultBucket}</option>}
+          {custom.map((bucket) => (
             <option key={bucket.id} value={bucket.name}>
               {bucket.name}
             </option>
           ))}
         </TextField>
-      </Grid>
-      <Grid size={{ xs: 12, sm: 4 }}>
-        <TextField
-          fullWidth
-          type="date"
-          label="Import trade history from"
-          id={`${idPrefix}-history`}
-          value={state.historyFrom}
-          onChange={(e) => {
-            onChange({ historyFrom: e.target.value });
-          }}
-          error={Boolean(errors.historyFrom)}
-          helperText={errors.historyFrom}
-          slotProps={{
-            inputLabel: { shrink: true },
-            htmlInput: { min: earliestHistoryDate, max: todayIso() },
-          }}
-        />
       </Grid>
       <Grid size={{ xs: 12, sm: 4 }}>
         <FormControlLabel
@@ -67,6 +68,16 @@ export function PortfolioFields({ idPrefix, state, errors, buckets, onChange }: 
               }}
             />
           }
+        />
+      </Grid>
+      <Grid size={12}>
+        <AutoRefreshSettings
+          idPrefix={idPrefix}
+          value={state.refresh}
+          errors={errors}
+          onChange={(patch) => {
+            onChange({ refresh: { ...state.refresh, ...patch } });
+          }}
         />
       </Grid>
     </Grid>

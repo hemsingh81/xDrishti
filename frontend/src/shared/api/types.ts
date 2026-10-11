@@ -40,3 +40,22 @@ export type BrokerId = Schemas['BrokerIdView'];
 export type RefreshRun = Schemas['RefreshRunView'];
 export type RefreshStatus = Schemas['RefreshStatusView'];
 export type AutoRefresh = Schemas['AutoRefreshView'];
+
+/** Profit/loss figures of a holding, a lot or a group: invested, value, P&L (₹ and %), XIRR and its state, realised P&L. */
+export type Returns = Schemas['ReturnsView'];
+export type HoldingRow = Schemas['HoldingRow'];
+export type HoldingPage = Schemas['HoldingPage'];
+export type HoldingsSummary = Schemas['HoldingsSummary'];
+export type HoldingLots = Schemas['HoldingLots'];
+export type LotRow = Schemas['LotRow'];
+/** One run of the holdings sync (manual, automatic or the import). */
+export type SyncRun = Schemas['SyncRunView'];
+/** The auto refresh of an account and its latest run. */
+export type SyncStatus = Schemas['SyncStatusView'];
+export type ImportPreview = Schemas['ImportPreview'];
+export type ImportPreviewRow = Schemas['PreviewRow'];
+/** The answer of saving the portfolio settings: the account and what the first import did (null when none was asked for). */
+export type PortfolioSaved = Schemas['PortfolioSaved'];
+export type FirstImportView = Schemas['FirstImportView'];
+export type FirstImportInput = Schemas['FirstImportInput'];
+export type ImportRowInput = Schemas['ImportRowInput'];

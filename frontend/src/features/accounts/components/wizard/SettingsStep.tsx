@@ -5,9 +5,10 @@ import { ErrorState, LoadingState } from '@/shared/ui';
 import { bucketsQuery, riskProfilesQuery } from '../../api/accountsQueries';
 import type { FieldErrors } from '../../lib/fieldErrors';
 import { scoped } from '../../lib/fieldErrors';
-import { maxLiveFeedBudget } from '../../lib/portfolioForm';
+import { autoBucketNameOf, maxLiveFeedBudget } from '../../lib/portfolioForm';
 import type { WizardState } from '../../lib/wizardState';
 import { BucketAdder } from '../BucketAdder';
+import { FirstImportSection } from '../firstImport/FirstImportSection';
 import { PortfolioFields } from '../PortfolioFields';
 import { TradingFields } from '../TradingFields';
 
@@ -50,14 +51,21 @@ export function SettingsStep({ state, errors, onChange }: SettingsStepProps) {
             state={state.portfolio}
             errors={scoped(errors, 'portfolio')}
             buckets={buckets.data}
+            ownBucketName={autoBucketNameOf(state.identity.name)}
+            ownBucketPending
             onChange={(patch) => {
               onChange({ portfolio: { ...state.portfolio, ...patch } });
             }}
           />
-          <BucketAdder
-            onAdded={(name) => {
-              onChange({ portfolio: { ...state.portfolio, defaultBucket: state.portfolio.defaultBucket || name } });
+          <BucketAdder />
+          <FirstImportSection
+            idPrefix="wizard-portfolio"
+            date={state.portfolio.firstImportDate}
+            dateError={scoped(errors, 'portfolio').firstImportDate}
+            onDateChange={(firstImportDate) => {
+              onChange({ portfolio: { ...state.portfolio, firstImportDate } });
             }}
+            hasHoldings={false}
           />
         </Section>
       )}

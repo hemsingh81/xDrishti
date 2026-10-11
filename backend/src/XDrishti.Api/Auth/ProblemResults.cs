@@ -40,6 +40,14 @@ internal static class ProblemResults
         }
 
         var problem = Create(status, error.Message, error.Code, error.RetryAfterSeconds);
+        if (error.Data is { } data)
+        {
+            foreach (var (name, value) in data)
+            {
+                problem.Extensions[name] = value;
+            }
+        }
+
         if (error.Fields is { Count: > 0 } fields)
         {
             // Same shape as ASP.NET Core validation problems: "errors": { "<field>": ["message", ...] }.

@@ -17,9 +17,18 @@ describe('app routes', () => {
   });
 
   it('shows the roadmap phase for screens that are not built yet', async () => {
+    renderRoutes(routes, { initialPath: '/baskets' });
+
+    expect(await screen.findByText('P1')).toBeInTheDocument();
+  });
+
+  it('opens the Portfolio screen (no longer a placeholder)', async () => {
     renderRoutes(routes, { initialPath: '/portfolio' });
 
-    expect(await screen.findByText('P2')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Portfolio' })).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: 'Holdings' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Sync now' })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
   });
 
   it('opens the Accounts screen (no longer a placeholder)', async () => {

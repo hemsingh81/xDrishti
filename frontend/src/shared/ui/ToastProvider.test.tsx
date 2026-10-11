@@ -22,6 +22,7 @@ describe('ToastProvider', () => {
   it.each([
     ['success', 'green'],
     ['info', 'indigo'],
+    ['warning', 'amber'],
     ['error', 'rose'],
   ] as const)('announces a %s toast with a %s status chip', async (severity, hue) => {
     render(

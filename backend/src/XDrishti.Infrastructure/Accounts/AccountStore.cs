@@ -10,6 +10,9 @@ internal sealed class AccountStore(XDrishtiDbContext db) : IAccountStore
     public async ValueTask<IReadOnlyList<BrokerAccount>> ListActiveAsync(CancellationToken cancellationToken) =>
         await db.BrokerAccounts.AsNoTracking().Where(x => x.ArchivedAt == null).OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).ToListAsync(cancellationToken);
 
+    public async ValueTask<IReadOnlyDictionary<Guid, string>> ListPortfolioAccountNamesAsync(CancellationToken cancellationToken) =>
+        await db.BrokerAccounts.AsNoTracking().Where(x => x.ArchivedAt == null && x.Portfolio.Enabled).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken);
+
     public async ValueTask<BrokerAccount?> FindReadOnlyAsync(Guid id, CancellationToken cancellationToken) =>
         await db.BrokerAccounts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.ArchivedAt == null, cancellationToken);
 

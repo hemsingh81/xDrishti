@@ -148,7 +148,7 @@ public sealed class AccountsSecretsTests(ApiFactory factory) : IAsyncLifetime
                 clientId: LeakClientId,
                 roles: new { data = new { enabled = true, kind = "primary" }, trading = new { enabled = true }, portfolio = new { enabled = true } },
                 trading: AccountsApi.Trading(AccountsApi.StandardProfileId),
-                portfolio: new { defaultBucket = "Trading" }),
+                portfolio: new { includeInTotals = true }),
             Ct));
         var id = (await created.ReadAsCreatedAsync<AccountDetail>(Ct)).Id;
         var second = await (await Record(client.PostJsonAsync("/api/accounts", AccountsApi.NewAccount("Example Two", clientId: "1000000002"), Ct))).ReadAsCreatedAsync<AccountDetail>(Ct);
@@ -159,7 +159,7 @@ public sealed class AccountsSecretsTests(ApiFactory factory) : IAsyncLifetime
         await Record(client.PutJsonAsync($"/api/accounts/{id}/secrets", new { apiKey = "two " + AccountsApi.Marker }, Ct)); // validation body
         await Record(client.PutJsonAsync($"/api/accounts/{second.Id}/secrets", new { apiSecret = NewSecret }, Ct));
         await Record(client.PutJsonAsync($"/api/accounts/{id}/trading", AccountsApi.Trading(AccountsApi.StandardProfileId, "manual_live"), Ct));
-        await Record(client.PutJsonAsync($"/api/accounts/{id}/portfolio", new { defaultBucket = "MyChoice" }, Ct));
+        await Record(client.PutJsonAsync($"/api/accounts/{id}/portfolio", new { includeInTotals = false }, Ct));
         await Record(client.PutJsonAsync($"/api/accounts/{id}/data", new { liveFeedBudget = 300 }, Ct));
         await Record(client.PutJsonAsync($"/api/accounts/{id}/roles", new { portfolio = new { enabled = false } }, Ct));
         await Record(client.GetAsync("/api/accounts", Ct));

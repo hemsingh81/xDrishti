@@ -11,6 +11,8 @@ import {
   type TradingInput,
   type UpdateSecretsInput,
 } from '@/shared/api';
+import { useToast } from '@/shared/ui/toastContext';
+import { savedNotice } from '../lib/savedNotice';
 import { accountsKeys } from './accountsQueries';
 import { useSecuredMutation } from './useSecuredMutation';
 
@@ -109,12 +111,26 @@ export function useArchiveAccount() {
 }
 
 // Portfolio and Data settings do not need a password check, so these are plain mutations.
+/**
+ * Saves the portfolio settings; the answer holds the account and what the first import did (when one was asked for).
+ * The import creates holdings, so the Portfolio screen's holdings, totals and sync status are marked stale too.
+ */
 export function useUpdatePortfolio() {
   const queryClient = useQueryClient();
+  const { notify } = useToast();
   return useMutation({
     mutationFn: async ({ id, body }: { id: string; body: PortfolioInput }) =>
       unwrap(await api.PUT('/api/accounts/{id}/portfolio', { ...path(id), body })),
-    onSuccess: (detail) => refreshAccount(queryClient, detail),
+    onSuccess: async (saved) => {
+      // Here, not in the form: saving changes the account, which may remount the form before a per-call callback runs.
+      const notice = savedNotice(saved);
+      notify(notice.message, notice.severity);
+      await Promise.all([
+        refreshAccount(queryClient, saved.account),
+        // The portfolio feature's keys all start with 'portfolio' (holdings, summary, lots, sync-status).
+        queryClient.invalidateQueries({ queryKey: ['portfolio'] }),
+      ]);
+    },
   });
 }
 

@@ -1,7 +1,8 @@
 namespace XDrishti.Domain.Common;
 
 /// <summary>A failure that is part of normal business flow (validation, not found, conflict). Not an exception.</summary>
-public sealed record Error(string Code, string Message, ErrorKind Kind = ErrorKind.Failure, int? RetryAfterSeconds = null, IReadOnlyList<FieldError>? Fields = null)
+/// <remarks><c>Data</c> carries named counts that the API passes on as extension members of the problem response (for example how many holdings a sync would close).</remarks>
+public sealed record Error(string Code, string Message, ErrorKind Kind = ErrorKind.Failure, int? RetryAfterSeconds = null, IReadOnlyList<FieldError>? Fields = null, IReadOnlyDictionary<string, int>? Data = null)
 {
     public static readonly Error None = new(string.Empty, string.Empty);
 

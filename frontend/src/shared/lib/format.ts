@@ -8,6 +8,13 @@ const calendarDate = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', tim
 const isoDay = /^\d{4}-\d{2}-\d{2}$/;
 const decimal = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
 const rupees = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+const rupeesPrecise = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const percent = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 // Broker token expiries are defined in India time (Dhan: 24 h after sign-in), so they are shown in IST whatever the viewer's zone.
 const istTimeAndDay = new Intl.DateTimeFormat('en-IN', {
@@ -43,6 +50,16 @@ export function formatNumber(value: number): string {
 /** Indian rupees with lakh/crore grouping: 200000 -> "₹2,00,000". */
 export function formatInr(value: number): string {
   return rupees.format(value);
+}
+
+/** Indian rupees with paise, for prices and unit costs: 2456.3 -> "₹2,456.30". */
+export function formatInrPrecise(value: number): string {
+  return rupeesPrecise.format(value);
+}
+
+/** A percentage with two decimals and Indian grouping: 16.1 -> "16.10". The caller adds the sign and the % sign. */
+export function formatPercent(value: number): string {
+  return percent.format(value);
 }
 
 /** "3 hours 5 minutes" style duration from seconds. */

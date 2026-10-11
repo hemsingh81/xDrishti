@@ -4,8 +4,8 @@ import { useToast } from '@/shared/ui/toastContext';
 import { useAddBucket } from '../api/accountMutations';
 import { fieldErrorsOf, problemMessage } from '../lib/fieldErrors';
 
-/** Adds a portfolio bucket. Not a <form>, so it can sit inside another form (the wizard). */
-export function BucketAdder({ onAdded }: { onAdded?: (name: string) => void }) {
+/** Adds a custom portfolio bucket. Not a <form>, so it can sit inside another form (the wizard). */
+export function BucketAdder() {
   const { notify } = useToast();
   const add = useAddBucket();
   const [name, setName] = useState('');
@@ -20,7 +20,6 @@ export function BucketAdder({ onAdded }: { onAdded?: (name: string) => void }) {
       onSuccess: (bucket) => {
         setName('');
         notify(`Bucket “${bucket.name}” added.`);
-        onAdded?.(bucket.name);
       },
     });
   }

@@ -11,6 +11,9 @@ public interface IAccountStore
     /// <summary>Active accounts in the order they were created. Not tracked: for reading only.</summary>
     ValueTask<IReadOnlyList<BrokerAccount>> ListActiveAsync(CancellationToken cancellationToken);
 
+    /// <summary>Id and name of every active account that has the Portfolio role. For reading only.</summary>
+    ValueTask<IReadOnlyDictionary<Guid, string>> ListPortfolioAccountNamesAsync(CancellationToken cancellationToken);
+
     /// <summary>One active account for reading only; null when it does not exist or is archived.</summary>
     ValueTask<BrokerAccount?> FindReadOnlyAsync(Guid id, CancellationToken cancellationToken);
 

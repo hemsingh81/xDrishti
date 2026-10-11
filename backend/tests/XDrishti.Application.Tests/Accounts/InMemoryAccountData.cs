@@ -39,6 +39,9 @@ internal sealed class InMemoryAccountData : IAccountStore, IRiskProfileStore, IB
     public ValueTask<IReadOnlyList<BrokerAccount>> ListActiveAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<BrokerAccount>>([.. Accounts.Where(a => a.ArchivedAt is null).OrderBy(a => a.CreatedAt).ThenBy(a => a.Id)]);
 
+    public ValueTask<IReadOnlyDictionary<Guid, string>> ListPortfolioAccountNamesAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<Guid, string>>(Accounts.Where(a => a.ArchivedAt is null && a.Portfolio.Enabled).ToDictionary(a => a.Id, a => a.Name));
+
     public ValueTask<BrokerAccount?> FindReadOnlyAsync(Guid id, CancellationToken cancellationToken) => FindAsync(id, cancellationToken);
 
     public ValueTask<BrokerAccount?> FindAsync(Guid id, CancellationToken cancellationToken) =>
@@ -96,10 +99,27 @@ internal sealed class InMemoryAccountData : IAccountStore, IRiskProfileStore, IB
     }
 
     ValueTask<IReadOnlyList<PortfolioBucket>> IBucketStore.ListAsync(CancellationToken cancellationToken) =>
-        ValueTask.FromResult<IReadOnlyList<PortfolioBucket>>([.. Buckets]);
+        ValueTask.FromResult<IReadOnlyList<PortfolioBucket>>([.. Buckets.Where(b => b.ArchivedAt is null).OrderBy(b => b.CreatedAt)]);
 
-    public ValueTask<string?> FindNameAsync(string name, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(Buckets.FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase))?.Name);
+    public ValueTask<PortfolioBucket?> FindByNameAsync(string name, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Buckets.FirstOrDefault(b => string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase)));
+
+    public ValueTask<bool> NameTakenAsync(string name, Guid? exceptBucketId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Buckets.Any(b => b.Id != exceptBucketId && string.Equals(b.Name, name, StringComparison.OrdinalIgnoreCase)));
+
+    public ValueTask<IReadOnlyList<string>> NamesStartingWithAsync(string prefix, Guid? exceptBucketId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<string>>([.. Buckets.Where(b => b.Id != exceptBucketId && b.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).Select(b => b.Name)]);
+
+    public ValueTask<PortfolioBucket?> FindDefaultForAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Buckets.FirstOrDefault(b => b.DefaultForAccountId == accountId));
+
+    public ValueTask<IReadOnlyDictionary<Guid, string>> NamesAsync(IReadOnlyCollection<Guid> bucketIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<Guid, string>>(Buckets.Where(b => bucketIds.Contains(b.Id)).ToDictionary(b => b.Id, b => b.Name));
+
+    public ValueTask<IReadOnlyDictionary<Guid, string>> DefaultNamesAsync(IReadOnlyCollection<Guid> accountIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<Guid, string>>(Buckets
+            .Where(b => b.DefaultForAccountId is { } id && accountIds.Contains(id))
+            .ToDictionary(b => b.DefaultForAccountId!.Value, b => b.Name));
 
     public void Add(PortfolioBucket bucket)
     {

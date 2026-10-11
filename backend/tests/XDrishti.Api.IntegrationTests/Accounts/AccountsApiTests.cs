@@ -27,7 +27,7 @@ public sealed class AccountsApiTests(ApiFactory factory) : IAsyncLifetime
         var body = AccountsApi.NewAccount(
             roles: new { data = new { enabled = true, kind = "primary" }, trading = new { enabled = true }, portfolio = new { enabled = true } },
             trading: AccountsApi.Trading(AccountsApi.StandardProfileId, "manual_live", 750_000m, new { riskPerTradePct = 0.25m, maxNewEntriesPerDay = 2 }),
-            portfolio: new { defaultBucket = "trading", historyFrom = "2024-04-01", includeInTotals = false },
+            portfolio: new { includeInTotals = false },
             data: new { liveFeedBudget = 400 });
 
         using var created = await client.PostJsonAsync("/api/accounts", body, Ct);
@@ -44,7 +44,7 @@ public sealed class AccountsApiTests(ApiFactory factory) : IAsyncLifetime
         detail.Trading.Styles.ShouldBe(["intraday"]);
         detail.Trading.Instruments.Intraday.ShouldBe(["EQ_MIS", "FUT"]);
         detail.Trading.Overrides.ShouldBe(new AccountOverrides(0.25m, 2, null, null));
-        detail.Portfolio.ShouldBe(new PortfolioSettingsView(true, "Trading", new DateOnly(2024, 4, 1), false));
+        detail.Portfolio.ShouldBe(new PortfolioSettingsView(true, "Example One · Portfolio", "Example One · Portfolio", false, "off", "16:00", new DateOnly(2025, 1, 1), false));
         detail.Data.LiveFeedBudget.ShouldBe(400);
         detail.TokenStatus.ShouldBe("not_connected");
         detail.Connection.ShouldBe(new ConnectionView("not_connected", null, null, null, null, null));
@@ -229,16 +229,19 @@ public sealed class AccountsApiTests(ApiFactory factory) : IAsyncLifetime
         var account = await client.CreateAccountAsync(AccountsApi.NewAccount(), Ct);
         var plain = (await factory.SignInAsync(Ct)).Client;
 
-        var portfolio = await (await plain.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { defaultBucket = "MYCHOICE", historyFrom = "2023-01-02", includeInTotals = true }, Ct)).ReadAsync<AccountDetail>(Ct);
+        using var custom = await plain.PostJsonAsync("/api/portfolio-buckets", new { name = "MyChoice" }, Ct);
+        custom.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var portfolio = (await (await plain.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { defaultBucket = "MYCHOICE", includeInTotals = true }, Ct)).ReadAsync<PortfolioSaved>(Ct)).Account;
         var data = await (await plain.PutJsonAsync($"/api/accounts/{account.Id}/data", new { liveFeedBudget = 900 }, Ct)).ReadAsync<AccountDetail>(Ct);
         using var badBucket = await plain.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { defaultBucket = "Nope" }, Ct);
-        using var future = await plain.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { defaultBucket = "Trading", historyFrom = "2999-01-01" }, Ct);
+        using var oldField = await plain.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { defaultBucket = "MyChoice", historyFrom = "2999-01-01" }, Ct);
         using var badBudget = await plain.PutJsonAsync($"/api/accounts/{account.Id}/data", new { liveFeedBudget = 99999 }, Ct);
 
-        portfolio.Portfolio.ShouldBe(new PortfolioSettingsView(false, "MyChoice", new DateOnly(2023, 1, 2), true));
+        portfolio.Portfolio.ShouldBe(new PortfolioSettingsView(false, "MyChoice", "Example One · Portfolio", true, "off", "16:00", new DateOnly(2025, 1, 1), false));
         data.Data.LiveFeedBudget.ShouldBe(900);
         (await badBucket.ReadFieldErrorsAsync(Ct)).Keys.ShouldBe(["defaultBucket"]);
-        (await future.ReadFieldErrorsAsync(Ct)).Keys.ShouldBe(["historyFrom"]);
+        oldField.StatusCode.ShouldBe(HttpStatusCode.OK); // historyFrom no longer exists: an unknown property is ignored
+        (await oldField.ReadAsync<PortfolioSaved>(Ct)).Account.Portfolio.DefaultBucket.ShouldBe("MyChoice");
         (await badBudget.ReadFieldErrorsAsync(Ct)).Keys.ShouldBe(["liveFeedBudget"]);
     }
 
@@ -299,7 +302,7 @@ public sealed class AccountsApiTests(ApiFactory factory) : IAsyncLifetime
         var client = signedIn.Client;
         var account = await client.CreateAccountAsync(AccountsApi.NewAccount(), Ct);
         await client.PutJsonAsync($"/api/accounts/{account.Id}/trading", AccountsApi.Trading(AccountsApi.StandardProfileId), Ct);
-        await client.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { defaultBucket = "Trading" }, Ct);
+        await client.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { includeInTotals = false }, Ct);
 
         var all = await (await client.GetAsync($"/api/accounts/{account.Id}/activity", Ct)).ReadAsync<List<AccountEventView>>(Ct);
         var latest = await (await client.GetAsync($"/api/accounts/{account.Id}/activity?take=1", Ct)).ReadAsync<List<AccountEventView>>(Ct);

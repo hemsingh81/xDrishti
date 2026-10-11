@@ -10,4 +10,6 @@ public static class Schemas
     public const string Accounts = "accounts";
 
     public const string Market = "market";
+
+    public const string Portfolio = "portfolio";
 }

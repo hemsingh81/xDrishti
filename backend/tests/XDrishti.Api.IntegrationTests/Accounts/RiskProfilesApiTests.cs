@@ -136,17 +136,19 @@ public sealed class RiskProfilesApiTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Buckets_are_seeded_and_new_ones_can_be_added_without_step_up()
+    public async Task There_are_no_preset_buckets_and_custom_ones_can_be_added_without_step_up()
     {
         var client = (await factory.SignInAsync(Ct)).Client;
 
-        var seeded = await (await client.GetAsync("/api/portfolio-buckets", Ct)).ReadAsync<List<BucketView>>(Ct);
+        var initial = await (await client.GetAsync("/api/portfolio-buckets", Ct)).ReadAsync<List<BucketView>>(Ct);
         using var added = await client.PostJsonAsync("/api/portfolio-buckets", new { name = "  Growth Ideas " }, Ct);
         using var duplicate = await client.PostJsonAsync("/api/portfolio-buckets", new { name = "growth ideas" }, Ct);
         using var invalid = await client.PostJsonAsync("/api/portfolio-buckets", new { name = "a/b" }, Ct);
 
-        seeded.Select(b => b.Name).ShouldBe(["Trading", "MyLongTerm", "MyChoice"], ignoreOrder: true);
-        (await added.ReadAsCreatedAsync<BucketView>(Ct)).Name.ShouldBe("Growth Ideas");
+        initial.ShouldBeEmpty();
+        var created = await added.ReadAsCreatedAsync<BucketView>(Ct);
+        created.ShouldBe(new BucketView(created.Id, "Growth Ideas", false, null, null));
+        (await (await client.GetAsync("/api/portfolio-buckets", Ct)).ReadAsync<List<BucketView>>(Ct)).ShouldBe([created]);
         duplicate.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         invalid.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
         (await invalid.ReadFieldErrorsAsync(Ct)).Keys.ShouldBe(["name"]);

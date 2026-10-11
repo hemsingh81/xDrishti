@@ -50,7 +50,7 @@ public sealed class CreateAccountHandlerTests
         var input = Inputs.Account(
             roles: Inputs.Roles(trading: true, portfolio: true, data: new DataRoleInput(true, "primary")),
             trading: Inputs.Trading(_fx.Standard.Id, "manual_live"),
-            portfolio: Inputs.Portfolio("trading", new DateOnly(2024, 4, 1)),
+            portfolio: Inputs.Portfolio(),
             data: new DataInput(300));
 
         var result = await CreateAsync(input);
@@ -60,10 +60,11 @@ public sealed class CreateAccountHandlerTests
         detail.Roles.Trading.ShouldBe(new TradingRoleView(true, "manual_live", "Standard"));
         detail.Trading.Styles.ShouldBe(["intraday"]);
         detail.Trading.Instruments.Intraday.ShouldBe(["EQ_MIS", "FUT"]);
-        detail.Portfolio.DefaultBucket.ShouldBe("Trading"); // stored with the bucket's own spelling
-        detail.Portfolio.HistoryFrom.ShouldBe(new DateOnly(2024, 4, 1));
+        detail.Portfolio.DefaultBucket.ShouldBe("Example One · Portfolio");
+        detail.Portfolio.AutoBucketName.ShouldBe("Example One · Portfolio");
         detail.Data.LiveFeedBudget.ShouldBe(300);
-        _fx.Data.Events.ShouldHaveSingleItem().Detail!.ShouldContain("data primary, trading on, portfolio on");
+        _fx.Data.Events.Select(e => e.Event).ShouldBe([AccountEventType.AccountCreated, AccountEventType.BucketCreated]);
+        _fx.Data.Events[0].Detail!.ShouldContain("data primary, trading on, portfolio on");
     }
 
     [Fact]
@@ -272,17 +273,5 @@ public sealed class CreateAccountHandlerTests
         result.Error.ShouldBe(AccountErrors.ConcurrentChange);
         _fx.Data.Accounts.ShouldBeEmpty();
         _fx.Data.Events.ShouldBeEmpty();
-    }
-
-    [Fact]
-    public async Task A_history_start_in_the_future_is_invalid_using_the_indian_calendar_date()
-    {
-        _fx.Clock.SetUtcNow(new DateTimeOffset(2026, 10, 10, 20, 0, 0, TimeSpan.Zero)); // already 11 Oct 01:30 in India
-
-        var today = await CreateAsync(Inputs.Account(portfolio: Inputs.Portfolio("Trading", new DateOnly(2026, 10, 11))));
-        var tomorrow = await CreateAsync(Inputs.Account(name: "Example Two", portfolio: Inputs.Portfolio("Trading", new DateOnly(2026, 10, 12))));
-
-        today.IsSuccess.ShouldBeTrue();
-        Fields(tomorrow).ShouldContain("portfolio.historyFrom");
     }
 }

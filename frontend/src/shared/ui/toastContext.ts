@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-export type ToastSeverity = 'success' | 'info' | 'error';
+export type ToastSeverity = 'success' | 'info' | 'warning' | 'error';
 
 export interface ToastApi {
   notify: (message: string, severity?: ToastSeverity) => void;

@@ -252,7 +252,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Replace the portfolio settings (default bucket, history start, include in totals) */
+    /** Save the portfolio settings (default bucket, include in totals, auto refresh off or daily at a time, first import date). With firstImport.rows, when the account is connected and has no holdings, the chosen holdings are imported in the same request; the settings are saved even when the import fails (import.status failed, import.errorCode portfolio.import_failed). Answer: {account, import} */
     put: operations['UpdateAccountPortfolio'];
     post?: never;
     delete?: never;
@@ -406,10 +406,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** All portfolio buckets (seeded: Trading, MyLongTerm, MyChoice) */
+    /** Buckets to choose from: custom buckets and the default bucket of each account with the Portfolio role */
     get: operations['ListPortfolioBuckets'];
     put?: never;
-    /** Add a portfolio bucket */
+    /** Add a custom portfolio bucket */
     post: operations['AddPortfolioBucket'];
     delete?: never;
     options?: never;
@@ -511,6 +511,125 @@ export interface paths {
     };
     /** The most recent refreshes, newest first (take 1 to 100, default 20) */
     get: operations['ListInstrumentRefreshes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Holdings with lots summary, profit/loss and XIRR: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort, page, pageSize (max 100) */
+    get: operations['ListHoldings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, counts, lots on the default date, last sync */
+    get: operations['GetHoldingsSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/{id}/lots': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The lots of a holding with the profit/loss and XIRR of each */
+    get: operations['GetHoldingLots'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/{id}/lots/{lotId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date */
+    put: operations['UpdateHoldingLotDate'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/holdings/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Fetch the account's holdings from Dhan for the first import in the portfolio settings, saving nothing; defaultDate (and each row's suggestedDate) is the account's first import date, 2025-01-01 until the owner chooses another */
+    post: operations['PreviewAccountHoldings'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/holdings/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sync now: bring the holdings in line with Dhan (an account without holdings is imported instead, every holding dated with its first import date and the run recorded as an import; new holdings dated today, quantity changes as lots, sales closed first-in first-out); optional body {confirm, expectedOpenHoldings, expectedWouldClose}; 409 portfolio.sync_running while a sync runs; 409 portfolio.confirmation_required (listedHoldings, openHoldings, wouldClose) when Dhan's answer would close all or most holdings, unless confirm is true with the numbers echoed back; 409 portfolio.confirmation_stale when the answer differs from the confirmed numbers */
+    post: operations['SyncAccountHoldings'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/holdings/sync-status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The account's refresh settings (mode, daily time, first import date, hasHoldings), the next scheduled run and the latest sync run */
+    get: operations['GetAccountHoldingsSyncStatus'];
     put?: never;
     post?: never;
     delete?: never;
@@ -622,14 +741,22 @@ export interface components {
       brokerId: string;
       segment: string;
     };
-    /** @description A new bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case. */
+    /** @description A new custom bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case. */
     BucketInput: {
       name: null | string;
     };
+    /**
+     * @description One bucket to pick from. IsAccountDefault is true for the automatic default bucket of an account that has the Portfolio role
+     *     (AccountId and AccountName name that account); custom buckets have neither.
+     */
     BucketView: {
       /** Format: uuid */
       id: string;
       name: string;
+      isAccountDefault: boolean;
+      /** Format: uuid */
+      accountId: null | string;
+      accountName: null | string;
     };
     /** @description Where to send the owner's browser to sign in at Dhan (same tab): Dhan's consent login page. The sign-in must come back before ExpiresAt. */
     ConnectStartView: {
@@ -720,6 +847,122 @@ export interface components {
       /** Format: int32 */
       count: number;
     };
+    /**
+     * @description The holdings to import when the portfolio settings are saved (ADR 0013). Rows are keys from `holdings/preview` with an optional acquisition date each
+     *     (a row without one gets the first import date, flagged as such); at most 5000 rows. Used only when the account is connected to Dhan and has no holdings yet;
+     *     an empty list imports nothing.
+     */
+    FirstImportInput: {
+      rows: null | components['schemas']['ImportRowInput'][];
+    };
+    /**
+     * @description What a first import did. Status: "imported" (the chosen holdings were created; the counts say how many), "skipped" (the account already has holdings, nothing was
+     *     imported), "deferred" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or
+     *     "failed" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example
+     *     `portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those
+     *     among them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists.
+     */
+    FirstImportView: {
+      status: string;
+      /** Format: int32 */
+      imported: number;
+      /** Format: int32 */
+      defaultDated: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      /** Format: int32 */
+      unknown: number;
+      errorCode: null | string;
+      cause: null | string;
+      message: null | string;
+    };
+    /** @description The lots of a holding, open lots first (oldest first), then closed ones. */
+    HoldingLots: {
+      /** Format: uuid */
+      holdingId: string;
+      symbol: string;
+      /** Format: double */
+      lastPrice: number;
+      /** Format: date */
+      valuationDate: string;
+      lots: components['schemas']['LotRow'][];
+    };
+    /** @description One page of holdings (Total counts all matches). */
+    HoldingPage: {
+      items: components['schemas']['HoldingRow'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /**
+     * @description One holding. Status is "open" or "closed". Mapped is false when the holding is not in the instrument master (InstrumentId and CanonicalSymbol are
+     *     then null). LotCount counts open lots; EarliestAcquiredOn is the oldest open lot's date; UsesDefaultDate is true when any open lot has the
+     *     import's default date. Returns cover all lots (closed lots add to RealisedPnl and to the XIRR).
+     */
+    HoldingRow: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      accountName: string;
+      /** Format: uuid */
+      bucketId: string;
+      bucketName: string;
+      /** Format: uuid */
+      instrumentId: null | string;
+      canonicalSymbol: null | string;
+      mapped: boolean;
+      exchange: string;
+      securityId: string;
+      isin: null | string;
+      symbol: string;
+      name: string;
+      /** Format: int64 */
+      qty: number;
+      /** Format: double */
+      avgCost: number;
+      /** Format: double */
+      lastPrice: number;
+      /** Format: date-time */
+      lastPriceAt: null | string;
+      status: string;
+      /** Format: date-time */
+      firstSeenAt: string;
+      /** Format: date-time */
+      closedAt: null | string;
+      /** Format: date-time */
+      syncedAt: string;
+      /** Format: int32 */
+      lotCount: number;
+      /** Format: date */
+      earliestAcquiredOn: null | string;
+      usesDefaultDate: boolean;
+      priced: boolean;
+      returns: components['schemas']['ReturnsView'];
+    };
+    /**
+     * @description Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that
+     *     still have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).
+     */
+    HoldingsSummary: {
+      returns: components['schemas']['ReturnsView'];
+      /** Format: int32 */
+      openCount: number;
+      /** Format: int32 */
+      closedCount: number;
+      /** Format: int32 */
+      unmappedCount: number;
+      /** Format: int32 */
+      unpricedCount: number;
+      /** Format: int32 */
+      defaultDateLots: number;
+      /** Format: date */
+      valuationDate: string;
+      lastSync: null | components['schemas']['SyncRunView'];
+    };
     HttpValidationProblemDetails: {
       type?: null | string;
       title?: null | string;
@@ -730,13 +973,40 @@ export interface components {
       errors?: {
         [key: string]: string[];
       };
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled. */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found. */
       code?: string;
       /**
        * Format: int32
        * @description Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.
        */
       retryAfterSeconds?: number;
+      /**
+       * Format: int32
+       * @description Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings the account has open.
+       */
+      openHoldings?: number;
+      /**
+       * Format: int32
+       * @description Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.
+       */
+      listedHoldings?: number;
+      /**
+       * Format: int32
+       * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
+       */
+      wouldClose?: number;
+    };
+    /** @description What Dhan holds for the account, nothing saved. DefaultDate is the account's first import date (2025-01-01 until the owner chooses another). */
+    ImportPreview: {
+      /** Format: date */
+      defaultDate: string;
+      rows: components['schemas']['PreviewRow'][];
+    };
+    /** @description One holding to import (a key from the preview). AcquiredOn left out means "use the first import date" (the lot is then flagged). */
+    ImportRowInput: {
+      key: null | string;
+      /** Format: date */
+      acquiredOn: null | string;
     };
     /** @description Everything the master list knows about an instrument. */
     InstrumentDetail: {
@@ -838,21 +1108,102 @@ export interface components {
       email: string;
       password: string;
     };
+    /** @description Sets the acquisition date of a lot (between 1990-01-01 and today, India). */
+    LotDateInput: {
+      /** Format: date */
+      acquiredOn: null | string;
+    };
+    /**
+     * @description A lot of a holding with its own figures: Invested is its cost, Value is its value now (open) or its sale proceeds (closed), Pnl the difference.
+     *     Status is "open" or "closed"; Source "import", "added" or "manual". Estimated: the sale price is the last price a sync saw.
+     */
+    LotRow: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date */
+      acquiredOn: string;
+      /** Format: int64 */
+      qty: number;
+      /** Format: double */
+      unitCost: number;
+      source: string;
+      usesDefaultDate: boolean;
+      status: string;
+      /** Format: date */
+      closedOn: null | string;
+      /** Format: double */
+      closePrice: null | number;
+      estimated: boolean;
+      returns: components['schemas']['ReturnsView'];
+    };
+    /**
+     * @description The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of
+     *     the bucket imports go to — a custom bucket's name; an empty string "" (or the name of the account's own "{account name} · Portfolio" bucket) selects the account's
+     *     own default bucket; null or omitted keeps the current choice. IncludeInTotals: true or false; null keeps it. At account creation, omitted means the account's own
+     *     bucket and true. The automatic holdings refresh: RefreshMode "off" or "daily"; RefreshDailyTimeIst "HH:mm" (India time); left out keeps the current value (a new
+     *     account: off, 16:00). FirstImportDate (not in the future, not before 1990-01-01) is the date the first import gives holdings without a date of their own.
+     *     FirstImport is honoured only when updating the portfolio settings of an account (it is ignored at account creation): see FirstImportInput.
+     */
     PortfolioInput: {
       defaultBucket: null | string;
-      /** Format: date */
-      historyFrom: null | string;
       includeInTotals: null | boolean;
+      refreshMode?: null | string;
+      refreshDailyTimeIst?: null | string;
+      /** Format: date */
+      firstImportDate?: null | string;
+      firstImport?: null | components['schemas']['FirstImportInput'];
     };
     PortfolioRoleView: {
       enabled: boolean;
     };
+    /** @description The answer of saving the portfolio settings: the account as saved and, when a first import was asked for, what it did (otherwise null). */
+    PortfolioSaved: {
+      account: components['schemas']['AccountDetail'];
+      import: null | components['schemas']['FirstImportView'];
+    };
+    /**
+     * @description Portfolio configuration. DefaultBucket is the name of the bucket imports go to (the account's own default bucket unless a custom bucket was chosen);
+     *     AutoBucketName is the name of the account's own default bucket ("{account name} · Portfolio") — the one that exists, or, while the account has none yet,
+     *     the name it would get now (with a numeric suffix when the plain name is taken); it is chosen for real when the role is switched on.
+     *     The holdings refresh by themselves according to RefreshMode: "off" (default) or "daily" (once a day from RefreshDailyTimeIst, "HH:mm" India time, default 16:00;
+     *     the time is kept while the mode is off). FirstImportDate is the date holdings get when they are imported for the first time without a date of their own
+     *     (2025-01-01 until the owner chooses another). HasHoldings is true once the account has any holding; the first import has happened then and
+     *     FirstImportDate no longer affects existing holdings (ADR 0013).
+     */
     PortfolioSettingsView: {
       enabled: boolean;
-      defaultBucket: null | string;
-      /** Format: date */
-      historyFrom: null | string;
+      defaultBucket: string;
+      autoBucketName: string;
       includeInTotals: boolean;
+      refreshMode: string;
+      refreshDailyTimeIst: string;
+      /** Format: date */
+      firstImportDate: string;
+      hasHoldings: boolean;
+    };
+    /**
+     * @description A holding Dhan reports, for the first import in the portfolio settings. Key identifies it in the import request (the ISIN, otherwise "securityId:EXCHANGE").
+     *     Mapped is false when it is not in the instrument master. AlreadyImported: the account has the holding (open) already.
+     *     SuggestedDate is the date to pre-fill: the first import date, or the oldest lot's date of an already imported holding.
+     */
+    PreviewRow: {
+      key: string;
+      symbol: string;
+      name: string;
+      exchange: string;
+      /** Format: int64 */
+      qty: number;
+      /** Format: double */
+      avgCost: number;
+      /** Format: double */
+      lastPrice: number;
+      /** Format: uuid */
+      instrumentId: null | string;
+      canonicalSymbol: null | string;
+      mapped: boolean;
+      alreadyImported: boolean;
+      /** Format: date */
+      suggestedDate: string;
     };
     ProblemDetails: {
       type?: null | string;
@@ -861,13 +1212,28 @@ export interface components {
       status?: null | number;
       detail?: null | string;
       instance?: null | string;
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled. */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found. */
       code?: string;
       /**
        * Format: int32
        * @description Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.
        */
       retryAfterSeconds?: number;
+      /**
+       * Format: int32
+       * @description Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings the account has open.
+       */
+      openHoldings?: number;
+      /**
+       * Format: int32
+       * @description Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.
+       */
+      listedHoldings?: number;
+      /**
+       * Format: int32
+       * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
+       */
+      wouldClose?: number;
     };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
@@ -923,6 +1289,23 @@ export interface components {
       autoRefresh: components['schemas']['AutoRefreshView'];
       /** Format: int32 */
       totalActive: number;
+    };
+    /** @description The profit/loss figures that every holding row, lot row and summary carries. */
+    ReturnsView: {
+      /** Format: double */
+      invested: number;
+      /** Format: double */
+      value: null | number;
+      /** Format: double */
+      pnl: null | number;
+      /** Format: double */
+      pnlPct: null | number;
+      /** Format: double */
+      xirr: null | number;
+      xirrState: string;
+      /** Format: double */
+      realisedPnl: number;
+      realisedEstimated: boolean;
     };
     /** @description The values of a risk profile to create or to replace an existing one with. Every value is required. */
     RiskProfileInput: {
@@ -1067,6 +1450,59 @@ export interface components {
        * @description End of the window in which sensitive actions are allowed.
        */
       elevatedUntil: string;
+    };
+    /**
+     * @description Body of "Sync now" (optional). Confirm: true applies an answer that would close all or most open holdings, which is otherwise refused with
+     *     `409 portfolio.confirmation_required` (the problem carries `listedHoldings`, `openHoldings` and `wouldClose`). With Confirm: true both
+     *     ExpectedOpenHoldings and ExpectedWouldClose are required (400 portfolio.invalid otherwise): the numbers the owner saw in the 409. If Dhan's answer differs
+     *     now, nothing is changed and the sync answers `409 portfolio.confirmation_stale` with the fresh numbers.
+     */
+    SyncInput: {
+      confirm: null | boolean;
+      /** Format: int32 */
+      expectedOpenHoldings?: null | number;
+      /** Format: int32 */
+      expectedWouldClose?: null | number;
+    };
+    /** @description A run of the holdings sync. Trigger "manual", "auto" or "import"; Status "running", "succeeded", "failed" or "skipped". Error is a short safe text. */
+    SyncRunView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      trigger: string;
+      status: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      /** Format: int32 */
+      newCount: number;
+      /** Format: int32 */
+      increasedCount: number;
+      /** Format: int32 */
+      decreasedCount: number;
+      /** Format: int32 */
+      closedCount: number;
+      /** Format: int32 */
+      unchangedCount: number;
+      error: null | string;
+    };
+    /**
+     * @description The refresh settings of an account and its latest run. Mode "off" or "daily"; NextRunAt is null when the mode is off. FirstImportDate is the date holdings
+     *     get when they are imported without a date of their own; HasHoldings is true once the account has any holding (the first import has happened). Running is
+     *     true while a sync or import of the account is in progress.
+     */
+    SyncStatusView: {
+      mode: string;
+      dailyTimeIst: string;
+      /** Format: date */
+      firstImportDate: string;
+      hasHoldings: boolean;
+      /** Format: date-time */
+      nextRunAt: null | string;
+      running: boolean;
+      last: null | components['schemas']['SyncRunView'];
     };
     SystemStatusResponse: {
       application: components['schemas']['ApplicationStatus'];
@@ -1816,7 +2252,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['AccountDetail'];
+          'application/json': components['schemas']['PortfolioSaved'];
         };
       };
       /** @description Bad Request */
@@ -2503,6 +2939,293 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RefreshRunView'][];
+        };
+      };
+    };
+  };
+  ListHoldings: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+        status?: string;
+        q?: string;
+        sort?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetHoldingsSummary: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingsSummary'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetHoldingLots: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingLots'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateHoldingLotDate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        lotId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LotDateInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LotRow'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PreviewAccountHoldings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportPreview'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Bad Gateway */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SyncAccountHoldings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['SyncInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncRunView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Bad Gateway */
+      502: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAccountHoldingsSyncStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SyncStatusView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

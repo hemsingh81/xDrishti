@@ -183,6 +183,17 @@ only when they have Dhan's form (`DH-901`); message texts are never used.
 A 4xx answer is a refusal (wrong key/secret, used or expired tokenId), anything else (5xx, 3xx, timeout, network, unreadable body)
 is "broker unavailable"; both surface as `502 accounts.broker_error` with a safe message. Expiry times are stored in UTC.
 
+### 8.2 Reading the holdings (ADR 0012, P2-01)
+
+`GET https://api.dhan.co/v2/holdings` with the header `access-token` (the account's stored token, read from the vault) answers an array of
+`{exchange, tradingSymbol, securityId, isin, totalQty, dpQty, t1Qty, mtf_t1_qty, mtf_qty, availableQty, collateralQty, avgCostPrice, lastTradedPrice}` — no purchase
+date and no previous close. xDrishti uses `exchange`, `tradingSymbol`, `securityId`, `isin`, `totalQty`, `avgCostPrice` and `lastTradedPrice`. It is the only `api.dhan.co`
+endpoint on the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB). A 401/403 means the saved token is expired or revoked
+(`409 portfolio.not_connected`, "sign in to Dhan again"); other 4xx and 5xx/timeouts are `502 accounts.broker_error`. An empty array (HTTP 200 `[]`) and Dhan's documented data error `DH-907` ("incorrect parameters or no data present";
+this request has no parameters, so here it can only mean no data) both read as an empty list; `DH-1111` is not in Dhan's documentation and is only tolerated as an alias.
+An empty list is never trusted blindly: see the safeguard in [doc 12](12-portfolio-monitoring.md) §3. Rows of one holding (same ISIN, or same security id and exchange) are added up (quantity summed, average cost weighted). Neither the token, the URL nor the
+raw answer is logged or returned.
+
 ## 9. Storage
 
 | Table | Type | Notes |

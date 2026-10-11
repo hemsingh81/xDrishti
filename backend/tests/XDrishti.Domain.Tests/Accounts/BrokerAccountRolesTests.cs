@@ -145,17 +145,6 @@ public sealed class BrokerAccountRolesTests
     }
 
     [Fact]
-    public void Portfolio_needs_a_default_bucket_before_it_is_switched_on()
-    {
-        var account = AccountData.New();
-
-        var result = ChangeRoles(account, new RolesChange(null, null, true));
-
-        result.Error.Fields!.Select(f => f.Field).ShouldContain("portfolio.defaultBucket");
-        account.Portfolio.Enabled.ShouldBeFalse();
-    }
-
-    [Fact]
     public void A_role_change_is_all_or_nothing()
     {
         var account = AccountData.New();

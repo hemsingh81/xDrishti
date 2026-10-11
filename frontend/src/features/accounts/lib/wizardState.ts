@@ -129,7 +129,10 @@ export function toCreateInput(state: WizardState): CreateAccountInput {
       portfolio: roles.portfolio ? { enabled: true } : null,
     },
     trading: roles.trading ? toTradingInput(state.trading) : null,
-    portfolio: roles.portfolio ? toPortfolioInput(state.portfolio) : null,
+    // At creation a missing bucket means the account's own one (the API creates it), so it is left out, not "".
+    portfolio: roles.portfolio
+      ? { ...toPortfolioInput(state.portfolio), defaultBucket: state.portfolio.defaultBucket || null }
+      : null,
     data: roles.data ? { liveFeedBudget: Number(state.liveFeedBudget) } : null,
   };
 }

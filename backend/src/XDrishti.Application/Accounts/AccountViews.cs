@@ -1,10 +1,11 @@
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Accounts;
 
 namespace XDrishti.Application.Accounts;
 
 /// <summary>Builds the response shapes from accounts (profile names, which secrets are set, connection). Shared by every handler that returns an account.</summary>
-internal sealed class AccountViews(IRiskProfileStore riskProfiles, IBrokerSecretVault vault, IBrokerConnectionStore connections, TimeProvider clock)
+internal sealed class AccountViews(IRiskProfileStore riskProfiles, IBucketStore buckets, IBrokerSecretVault vault, IBrokerConnectionStore connections, IHoldingStore holdings, TimeProvider clock)
 {
     public async ValueTask<IReadOnlyList<AccountSummary>> SummariesAsync(IReadOnlyList<BrokerAccount> accounts, CancellationToken cancellationToken)
     {
@@ -42,6 +43,8 @@ internal sealed class AccountViews(IRiskProfileStore riskProfiles, IBrokerSecret
         var connection = Connection(connected.GetValueOrDefault(account.Id), clock.GetUtcNow());
         var trading = account.Trading;
         var profileName = trading.RiskProfileId is { } id && names.TryGetValue(id, out var name) ? name : null;
+        var autoBucket = (await buckets.DefaultNamesAsync([account.Id], cancellationToken)).GetValueOrDefault(account.Id) ?? await NextDefaultNameAsync(account, cancellationToken);
+        var chosenBucket = account.Portfolio.DefaultBucketId is { } bucketId ? (await buckets.NamesAsync([bucketId], cancellationToken)).GetValueOrDefault(bucketId) : null;
 
         var styles = new List<string>(2);
         if (trading.Intraday)
@@ -83,8 +86,23 @@ internal sealed class AccountViews(IRiskProfileStore riskProfiles, IBrokerSecret
                     AccountCodes.Names(trading.SwingBuyInstruments),
                     AccountCodes.Names(trading.SwingSellInstruments)),
                 new AccountOverrides(trading.OverrideRiskPerTradePct, trading.OverrideMaxNewEntriesPerDay, trading.OverrideMaxOpenPositions, trading.OverrideDailyLossPct)),
-            new PortfolioSettingsView(account.Portfolio.Enabled, account.Portfolio.DefaultBucket, account.Portfolio.HistoryFrom, account.Portfolio.IncludeInTotals),
+            new PortfolioSettingsView(
+                account.Portfolio.Enabled,
+                chosenBucket ?? autoBucket,
+                autoBucket,
+                account.Portfolio.IncludeInTotals,
+                AccountCodes.Name(account.Portfolio.RefreshMode),
+                AccountCodes.Name(account.Portfolio.RefreshDailyTimeIst),
+                account.Portfolio.ImportDate,
+                await holdings.AnyForAccountAsync(account.Id, cancellationToken)),
             new DataSettingsView(account.DataEnabled, account.DataPrimary, account.DataStandby, account.LiveFeedBudget));
+    }
+
+    /// <summary>The name the default bucket of an account without one would get right now (a numeric suffix when its plain name is taken).</summary>
+    private async ValueTask<string> NextDefaultNameAsync(BrokerAccount account, CancellationToken cancellationToken)
+    {
+        var plain = PortfolioBucket.DefaultNameFor(account.Name);
+        return PortfolioBucket.FreeDefaultName(account.Name, await buckets.NamesStartingWithAsync(plain, null, cancellationToken)) ?? plain;
     }
 
     /// <summary>The connection as shown: status derived at <paramref name="now"/> (a passed expiry reads as expired), the holder's id masked.</summary>

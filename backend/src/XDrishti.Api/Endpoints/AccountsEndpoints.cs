@@ -65,7 +65,7 @@ internal sealed class AccountsEndpoints : IEndpointModule
 
         group.MapPut("/{id:guid}/portfolio", UpdatePortfolioAsync)
             .WithName("UpdateAccountPortfolio")
-            .WithSummary("Replace the portfolio settings (default bucket, history start, include in totals)")
+            .WithSummary("Save the portfolio settings (default bucket, include in totals, auto refresh off or daily at a time, first import date). With firstImport.rows, when the account is connected and has no holdings, the chosen holdings are imported in the same request; the settings are saved even when the import fails (import.status failed, import.errorCode portfolio.import_failed). Answer: {account, import}")
             .ProducesRejections(conflict: true);
 
         group.MapPut("/{id:guid}/data", UpdateDataAsync)
@@ -160,11 +160,11 @@ internal sealed class AccountsEndpoints : IEndpointModule
         CancellationToken cancellationToken) =>
         Respond(await handler.HandleAsync(new UpdateTradingCommand(id, input, http.GetActor()), cancellationToken), http);
 
-    private static async Task<Results<Ok<AccountDetail>, ProblemHttpResult>> UpdatePortfolioAsync(
+    private static async Task<Results<Ok<PortfolioSaved>, ProblemHttpResult>> UpdatePortfolioAsync(
         Guid id,
         PortfolioInput input,
         HttpContext http,
-        ICommandHandler<UpdatePortfolioCommand, AccountDetail> handler,
+        ICommandHandler<UpdatePortfolioCommand, PortfolioSaved> handler,
         CancellationToken cancellationToken) =>
         Respond(await handler.HandleAsync(new UpdatePortfolioCommand(id, input, http.GetActor()), cancellationToken), http);
 

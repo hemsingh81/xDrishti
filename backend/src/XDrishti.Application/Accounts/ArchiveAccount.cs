@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 
@@ -14,6 +15,7 @@ public sealed record ArchiveAccountCommand(Guid AccountId, string Actor) : IComm
 
 internal sealed class ArchiveAccountHandler(
     IAccountStore accounts,
+    DefaultBuckets defaultBuckets,
     IBrokerSecretVault vault,
     IBrokerConnectionStore connections,
     IPendingConnectStore pending,
@@ -45,8 +47,9 @@ internal sealed class ArchiveAccountHandler(
         }
 
         (await connections.FindAsync(account.Id, cancellationToken))?.Disconnect();
+        await defaultBuckets.ArchiveAsync(account, now, cancellationToken);
 
-        events.Record(AccountEvent.Record(AccountEventType.AccountArchived, account.Id, $"Account '{account.Name}' archived; history is kept, stored secrets deleted (tokens included), broker connection cleared", command.Actor, now));
+        events.Record(AccountEvent.Record(AccountEventType.AccountArchived, account.Id, $"Account '{account.Name}' archived; history is kept (default portfolio bucket archived), stored secrets deleted (tokens included), broker connection cleared", command.Actor, now));
         if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
         {
             AccountsLog.ChangeCollided(logger, account.Slug);

@@ -39,7 +39,7 @@ export const navigation: NavSection[] = [
       { path: '/suggestions', label: 'Suggestions', icon: AutoAwesomeIcon, phase: 'P9' },
     ],
   },
-  { title: 'Portfolio', items: [{ path: '/portfolio', label: 'Portfolio', icon: PieChartIcon, phase: 'P2' }] },
+  { title: 'Portfolio', items: [{ path: '/portfolio', label: 'Portfolio', icon: PieChartIcon }] },
   {
     title: 'Market',
     items: [

@@ -55,6 +55,35 @@ internal static class AccountCodes
         _ => throw new ArgumentOutOfRangeException(nameof(source)),
     };
 
+    public static string Name(PortfolioRefreshMode mode) => mode switch
+    {
+        PortfolioRefreshMode.Off => "off",
+        PortfolioRefreshMode.Daily => "daily",
+        _ => throw new ArgumentOutOfRangeException(nameof(mode)),
+    };
+
+    public static bool TryParseRefreshMode(string? text, out PortfolioRefreshMode mode)
+    {
+        switch (text?.Trim().ToLowerInvariant())
+        {
+            case "off":
+                mode = PortfolioRefreshMode.Off;
+                return true;
+            case "daily":
+                mode = PortfolioRefreshMode.Daily;
+                return true;
+            default:
+                mode = PortfolioRefreshMode.Off;
+                return false;
+        }
+    }
+
+    /// <summary>The time of day as shown and entered: <c>HH:mm</c>.</summary>
+    public static string Name(TimeOnly time) => time.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+
+    public static bool TryParseTime(string? text, out TimeOnly time) =>
+        TimeOnly.TryParseExact(text?.Trim(), "HH:mm", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out time);
+
     public static string Name(WeeklyLossAction action) => action switch
     {
         WeeklyLossAction.HalveSize => "halve_size",

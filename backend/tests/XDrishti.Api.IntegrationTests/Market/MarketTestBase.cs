@@ -33,11 +33,10 @@ public abstract class MarketTestBase(ApiFactory factory) : IAsyncLifetime
     /// <summary>Signs in again, for a test that moved the clock far enough to end the session.</summary>
     protected async Task ResignInAsync() => Owner = await Factory.SignInAsync(Ct);
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
-        Factory.Clock.Reset();
+        await Factory.ResetClockAsync();
         GC.SuppressFinalize(this);
-        return ValueTask.CompletedTask;
     }
 
     /// <summary>Registers a refresh (as the owner would by pressing the button) without running it yet.</summary>

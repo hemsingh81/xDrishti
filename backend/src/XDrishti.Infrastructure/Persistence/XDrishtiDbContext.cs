@@ -3,6 +3,7 @@ using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Auth;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Platform;
+using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Market;
 
@@ -35,6 +36,12 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     public DbSet<PendingConnect> PendingConnects => Set<PendingConnect>();
 
     public DbSet<RefreshRun> RefreshRuns => Set<RefreshRun>();
+
+    public DbSet<Holding> Holdings => Set<Holding>();
+
+    public DbSet<HoldingLot> HoldingLots => Set<HoldingLot>();
+
+    public DbSet<HoldingSync> HoldingSyncs => Set<HoldingSync>();
 
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
