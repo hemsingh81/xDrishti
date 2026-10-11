@@ -3,6 +3,7 @@ import LinkOffIcon from '@mui/icons-material/LinkOffOutlined';
 import ScheduleIcon from '@mui/icons-material/ScheduleOutlined';
 import { Chip, Stack, Typography, type ChipProps } from '@mui/material';
 import type { ReactElement } from 'react';
+import { numeric } from '@/theme';
 import type { BrokerConnection } from '@/shared/api';
 import { formatHoursMinutes, formatIstTimeAndDay } from '@/shared/lib/format';
 import { useConnectionState } from '../hooks/useConnectionState';
@@ -38,16 +39,12 @@ export function ConnectionStatus({ connection }: { connection: BrokerConnection 
         label={connectionStatusLabels[status]}
       />
       {expiry && (
-        <Typography component="span" variant="body2">
+        <Typography component="span" variant="body2" sx={numeric}>
           {expiry}
         </Typography>
       )}
       {secondsLeft !== null && (
-        <Typography
-          component="span"
-          variant="body2"
-          sx={{ color: 'warning.main', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
-        >
+        <Typography component="span" variant="body2" sx={{ color: 'warning.main', fontWeight: 600, ...numeric }}>
           {`expires in ${formatHoursMinutes(secondsLeft)}`}
         </Typography>
       )}

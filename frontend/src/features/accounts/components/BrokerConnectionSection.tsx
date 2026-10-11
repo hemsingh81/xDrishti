@@ -1,7 +1,9 @@
+import LinkIcon from '@mui/icons-material/LinkOutlined';
 import { Box, Stack, Typography } from '@mui/material';
 import { useId } from 'react';
 import type { AccountDetail } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
+import { IconChip } from '@/shared/ui';
 import { useConnectionState } from '../hooks/useConnectionState';
 import { dhanApp } from '../lib/dhanApp';
 import { ConnectionActions } from './ConnectionActions';
@@ -19,9 +21,12 @@ export function BrokerConnectionSection({ account }: { account: AccountDetail })
   return (
     <Box component="section" aria-labelledby={headingId}>
       <Stack spacing={2}>
-        <Typography id={headingId} variant="h3">
-          Broker connection
-        </Typography>
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <IconChip icon={LinkIcon} hue="sky" />
+          <Typography id={headingId} variant="h3">
+            Broker connection
+          </Typography>
+        </Stack>
         <Facts
           items={[
             { label: 'Status', value: <ConnectionStatus connection={connection} /> },

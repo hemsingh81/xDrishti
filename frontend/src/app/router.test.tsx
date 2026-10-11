@@ -47,7 +47,7 @@ describe('app routes', () => {
   it('shows the signed-in owner in the top bar', async () => {
     renderRoutes(routes);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Account menu' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Account menu/ }));
 
     expect(screen.getByText('example@invalid.test')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
@@ -61,7 +61,7 @@ describe('authentication', () => {
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
     expect(router.state.location.search).toBe('?next=%2Fsystem');
-    expect(screen.queryByRole('button', { name: 'Account menu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Account menu/ })).not.toBeInTheDocument();
   });
 
   it('sends the user to the login page when any API call answers 401', async () => {
@@ -85,7 +85,7 @@ describe('authentication', () => {
     const { router, client } = renderRoutes(routes, { initialPath: '/system' });
     expect(await screen.findByText('PostgreSQL 18.6')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Account menu/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('authentication', () => {
     );
     renderRoutes(routes, { initialPath: '/system' });
     await screen.findByText('PostgreSQL 18.6');
-    await userEvent.click(screen.getByRole('button', { name: 'Account menu' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Account menu/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
     await screen.findByRole('heading', { name: 'Sign in' });
 

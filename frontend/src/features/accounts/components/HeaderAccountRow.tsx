@@ -1,7 +1,9 @@
 import LoginIcon from '@mui/icons-material/Login';
+import PersonIcon from '@mui/icons-material/PersonOutlined';
 import { Box, Button, Link as MuiLink, Stack, Typography } from '@mui/material';
 import { Link } from 'react-router';
 import type { AccountSummary } from '@/shared/api';
+import { IconChip } from '@/shared/ui';
 import { useStartConnect } from '../api/connectionMutations';
 import { connectionProblem } from '../lib/connectErrors';
 import { appConfigured, connectLabel, type ConnectionStatusKey } from '../lib/connection';
@@ -29,6 +31,7 @@ export function HeaderAccountRow({ account, status, onNavigate }: HeaderAccountR
           // The account's colour is user data stored with the account, not a theme token.
           sx={{ width: 10, height: 10, borderRadius: '50%', flex: 'none', bgcolor: account.color }}
         />
+        <IconChip icon={PersonIcon} hue="accounts" />
         <Typography sx={{ fontWeight: 650, overflowWrap: 'anywhere' }}>{account.name}</Typography>
       </Stack>
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>

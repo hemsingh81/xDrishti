@@ -1,3 +1,4 @@
+import TuneIcon from '@mui/icons-material/TuneOutlined';
 import { Box, Tab, Tabs } from '@mui/material';
 import { useSearchParams } from 'react-router';
 import { RiskProfilesView, RoleMatrixView } from '@/features/accounts';
@@ -23,6 +24,8 @@ export function SettingsPage() {
     <ToastProvider>
       <PageHeader
         title="Settings"
+        icon={TuneIcon}
+        hue="settings"
         description="Risk profiles shared by Trading accounts, and which account is used for data, trading and portfolio. Changes ask for your password and apply from the next service run."
       />
       <Tabs

@@ -47,8 +47,14 @@ export function AppDialog({
       aria-labelledby={titleId}
       slotProps={{
         transition: {
-          onEntered: () => {
-            initialFocusRef?.current?.focus();
+          // Only while focus is still on the dialog itself: if another dialog opened on top in the meantime (e.g. the
+          // password prompt), or the owner already started typing in a field, moving focus here would pull the cursor
+          // out of the field they are typing in.
+          onEntered: (node: HTMLElement) => {
+            const active = document.activeElement;
+            if (active?.matches('[role="dialog"]') && node.contains(active)) {
+              initialFocusRef?.current?.focus();
+            }
           },
         },
       }}

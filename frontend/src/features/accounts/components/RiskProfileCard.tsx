@@ -1,5 +1,8 @@
+import ShieldIcon from '@mui/icons-material/ShieldOutlined';
 import { Box, Button, Card, CardActions, CardContent, Chip, Stack, Tooltip, Typography } from '@mui/material';
 import type { RiskProfile } from '@/shared/api';
+import { IconChip } from '@/shared/ui';
+import { numeric } from '@/theme';
 import { deleteBlockReason, riskFields } from '../lib/riskProfileForm';
 import { weeklyLossActionLabels } from '../lib/labels';
 
@@ -22,6 +25,7 @@ export function RiskProfileCard({ profile, onEdit, onDuplicate, onDelete }: Risk
     >
       <CardContent sx={{ flex: 1 }}>
         <Stack direction="row" sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+          <IconChip icon={ShieldIcon} hue="rose" />
           <Typography variant="h3" component="h3">
             {profile.name}
           </Typography>
@@ -41,7 +45,7 @@ export function RiskProfileCard({ profile, onEdit, onDuplicate, onDelete }: Risk
             columnGap: 2,
             rowGap: 0.5,
             '& dt': { color: 'text.secondary' },
-            '& dd': { m: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
+            '& dd': { m: 0, textAlign: 'right', ...numeric },
           }}
         >
           {riskFields.map(({ key, label, unit: u }) => (

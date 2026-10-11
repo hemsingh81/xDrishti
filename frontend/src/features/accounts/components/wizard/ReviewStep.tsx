@@ -11,7 +11,7 @@ function brokerFacts(state: WizardState): Fact[] {
   const { app } = state;
   return [
     { label: 'Broker', value: dhanApp.name },
-    { label: dhanApp.clientIdLabel, value: maskClientId(app.clientId.trim()) },
+    { label: dhanApp.clientIdLabel, value: <span className="mono">{maskClientId(app.clientId.trim())}</span> },
     { label: dhanApp.apiKeyLabel, value: app.apiKey.trim() ? '•••• set' : 'not set' },
     { label: dhanApp.apiSecretLabel, value: app.apiSecret.trim() ? '•••• set' : 'not set' },
     { label: 'API key generated on', value: formatDate(app.apiKeyIssuedOn) },

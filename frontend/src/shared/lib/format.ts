@@ -19,6 +19,14 @@ const istTimeAndDay = new Intl.DateTimeFormat('en-IN', {
   month: 'short',
 });
 
+// en-CA formats as yyyy-MM-dd.
+const istDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+
+/** The calendar day in India (IST) as yyyy-MM-dd: broker and API-key dates are Indian dates, whatever the viewer's zone. */
+export function istDayIso(value: Date | number = new Date()): string {
+  return istDay.format(value);
+}
+
 export function formatDateTime(value: string | Date): string {
   return dateTime.format(typeof value === 'string' ? new Date(value) : value);
 }

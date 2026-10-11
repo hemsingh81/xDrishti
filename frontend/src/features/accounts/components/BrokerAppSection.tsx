@@ -1,7 +1,9 @@
 import KeyIcon from '@mui/icons-material/KeyOutlined';
+import VpnKeyIcon from '@mui/icons-material/VpnKeyOutlined';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { useId, useState } from 'react';
 import type { AccountDetail } from '@/shared/api';
+import { IconChip } from '@/shared/ui';
 import { dhanApp } from '../lib/dhanApp';
 import { ApiKeyExpiry } from './ApiKeyExpiry';
 import { DhanSetupGuide } from './DhanSetupGuide';
@@ -17,13 +19,16 @@ export function BrokerAppSection({ account }: { account: AccountDetail }) {
   return (
     <Box component="section" aria-labelledby={headingId}>
       <Stack spacing={2}>
-        <Typography id={headingId} variant="h3">
-          Broker app
-        </Typography>
+        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+          <IconChip icon={VpnKeyIcon} hue="amber" />
+          <Typography id={headingId} variant="h3">
+            Broker app
+          </Typography>
+        </Stack>
         <Facts
           items={[
             { label: 'Broker', value: dhanApp.name },
-            { label: dhanApp.clientIdLabel, value: account.maskedClientId },
+            { label: dhanApp.clientIdLabel, value: <span className="mono">{account.maskedClientId}</span> },
             { label: 'Secrets', value: <SecretsStatus secrets={account.secrets} /> },
             { label: 'API key expiry', value: <ApiKeyExpiry expiresOn={account.apiKeyExpiresOn} /> },
           ]}

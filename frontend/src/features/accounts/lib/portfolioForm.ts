@@ -1,4 +1,5 @@
 import type { AccountDetail, PortfolioInput } from '@/shared/api';
+import { istDayIso } from '@/shared/lib/format';
 import type { FieldErrors } from './fieldErrors';
 
 export interface PortfolioFormState {
@@ -10,11 +11,9 @@ export interface PortfolioFormState {
 
 export const earliestHistoryDate = '2000-01-01';
 
-/** Today as yyyy-MM-dd in the viewer's calendar (the server checks against the Indian date). */
+/** Today as yyyy-MM-dd on the Indian calendar (IST), which is what the server checks against. */
 export function todayIso(now: Date = new Date()): string {
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
+  return istDayIso(now);
 }
 
 export function portfolioFormFrom(settings?: AccountDetail['portfolio'], defaultBucket = ''): PortfolioFormState {

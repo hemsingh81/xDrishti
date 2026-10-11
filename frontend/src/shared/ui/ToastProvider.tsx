@@ -1,5 +1,10 @@
 import { Alert, Snackbar } from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircleOutlined';
+import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined';
+import InfoIcon from '@mui/icons-material/InfoOutlined';
 import { useMemo, useState, type ReactNode } from 'react';
+import type { IconHueName } from '@/theme';
+import { IconChip } from './IconChip';
 import { ToastContext, type ToastApi, type ToastSeverity } from './toastContext';
 
 interface Toast {
@@ -7,6 +12,12 @@ interface Toast {
   message: string;
   severity: ToastSeverity;
 }
+
+const statusChip = {
+  success: { icon: CheckCircleIcon, hue: 'green' },
+  info: { icon: InfoIcon, hue: 'indigo' },
+  error: { icon: ErrorIcon, hue: 'rose' },
+} as const satisfies Record<ToastSeverity, { icon: typeof InfoIcon; hue: IconHueName }>;
 
 /** Owns one snackbar; descendants call `useToast().notify(...)`. Announced politely to screen readers. */
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -36,7 +47,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       >
         <Alert
           severity={toast?.severity ?? 'success'}
-          variant="filled"
+          variant="outlined"
+          icon={
+            <IconChip
+              icon={statusChip[toast?.severity ?? 'success'].icon}
+              hue={statusChip[toast?.severity ?? 'success'].hue}
+            />
+          }
+          sx={{ bgcolor: 'background.paper', color: 'text.primary', alignItems: 'center', boxShadow: 3 }}
           onClose={() => {
             setToast(null);
           }}

@@ -4,13 +4,20 @@ import { Box, Button, Divider, Link as MuiLink, Popover, Stack, Typography } fro
 import { useQuery } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
+import { numeric } from '@/theme';
 import { accountsQuery } from '../api/accountsQueries';
 import { useNow } from '../hooks/useNow';
 import { connectionState, needsClock } from '../lib/connection';
 import { HeaderAccountRow } from './HeaderAccountRow';
 
 /** Fixed width so the label arriving (or changing) does not move the other top-bar controls. */
-const triggerSx = { minWidth: { xs: 64, sm: 250 }, justifyContent: 'space-between', textTransform: 'none' } as const;
+const triggerSx = {
+  minWidth: { xs: 64, sm: 250 },
+  justifyContent: 'space-between',
+  textTransform: 'none',
+  // On phones the chevron goes, so icon + count fit in 64 px and the top bar stays within 360 px.
+  '& .MuiButton-endIcon': { display: { xs: 'none', sm: 'inherit' } },
+} as const;
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
@@ -65,7 +72,7 @@ export function HeaderAccounts() {
         }}
         sx={triggerSx}
       >
-        <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, flex: 1, textAlign: 'left' }}>
+        <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, flex: 1, textAlign: 'left', ...numeric }}>
           {label}
         </Box>
         <Box component="span" aria-hidden sx={{ display: { xs: 'inline', sm: 'none' }, flex: 1 }}>

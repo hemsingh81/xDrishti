@@ -1,6 +1,7 @@
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography } from '@mui/material';
 import { NavLink } from 'react-router';
-import { BrandMark } from '@/shared/ui';
+import { BrandMark, IconChip } from '@/shared/ui';
+import { navHue } from '@/theme';
 import { navigation } from '../navigation';
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
@@ -43,18 +44,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               to={path}
               end={path === '/'}
               onClick={onNavigate}
-              sx={{
-                borderRadius: 2,
-                mb: 0.25,
-                '&.active': {
-                  bgcolor: 'action.selected',
-                  color: 'primary.main',
-                  '& .MuiListItemIcon-root': { color: 'primary.main' },
-                },
-              }}
+              sx={{ mb: 0.25 }}
             >
-              <ListItemIcon sx={{ minWidth: 36 }}>
-                <Icon fontSize="small" />
+              <ListItemIcon sx={{ minWidth: 40 }}>
+                <IconChip icon={Icon} hue={navHue[path] ?? 'slate'} size="sm" />
               </ListItemIcon>
               <ListItemText
                 primary={label}

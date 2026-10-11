@@ -1,6 +1,11 @@
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import PaymentsIcon from '@mui/icons-material/PaymentsOutlined';
+import ShowChartIcon from '@mui/icons-material/ShowChartOutlined';
+import TrendingUpIcon from '@mui/icons-material/TrendingUpOutlined';
 import { Alert, Grid, Stack } from '@mui/material';
 import type { AccountDetail } from '@/shared/api';
 import { formatInr } from '@/shared/lib/format';
+import { hueForLabel } from '@/shared/lib/iconHue';
 import { StatTile } from '@/shared/ui';
 import { modeLabel } from '../lib/labels';
 import { ApiKeyExpiry } from './ApiKeyExpiry';
@@ -13,10 +18,10 @@ import { SecretsStatus } from './SecretsStatus';
 const notReady = 'Available once the broker adapter and portfolio sync are built (P1-04, P2).';
 
 const tiles = [
-  { label: 'Holdings value', hint: 'open positions: —' },
-  { label: 'Unrealised', hint: 'realised: —' },
-  { label: 'Day change', hint: undefined },
-  { label: 'Funds available', hint: 'used: —' },
+  { label: 'Holdings value', icon: AccountBalanceWalletIcon, hint: 'open positions: —' },
+  { label: 'Unrealised', icon: TrendingUpIcon, hint: 'realised: —' },
+  { label: 'Day change', icon: ShowChartIcon, hint: undefined },
+  { label: 'Funds available', icon: PaymentsIcon, hint: 'used: —' },
 ];
 
 function tradingSummary(account: AccountDetail): string {
@@ -73,7 +78,7 @@ export function OverviewTab({ account }: { account: AccountDetail }) {
       <Grid container spacing={2}>
         {tiles.map((tile) => (
           <Grid key={tile.label} size={{ xs: 6, md: 3 }}>
-            <StatTile label={tile.label} value="—" hint={tile.hint} />
+            <StatTile label={tile.label} value="—" hint={tile.hint} icon={tile.icon} hue={hueForLabel(tile.label)} />
           </Grid>
         ))}
       </Grid>

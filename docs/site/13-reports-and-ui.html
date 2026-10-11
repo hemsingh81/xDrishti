@@ -244,6 +244,297 @@ instrument, sector, weekday, month, decision) × metric (expectancy, total R, wi
 </tbody></table>
 <p>Rules: no horizontal page scroll at any width (wide tables scroll inside their card), fluid grids
 (<code>auto-fit</code>/<code>minmax</code>), charts resize with their containers, sidebar state remembered per device.</p>
+<h2 id="1e-visual-system-p1-19">1e. Visual system (P1-19)<a class="hash" href="#1e-visual-system-p1-19" aria-label="Link to this section">#</a></h2>
+<p>Calm, data-first, trustworthy: cool-neutral base, one deliberate accent. Tokens live in <code>frontend/src/theme/tokens.ts</code>
+and the prototype&#39;s <code>proto.css</code>; the MUI theme and the prototype read the same values. All text pairs meet WCAG AA
+(4.5:1), UI parts 3:1 — enforced by <code>theme/contrast.test.ts</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Light</th>
+<th>Dark</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>background</td>
+<td><code>#f4f6fa</code></td>
+<td><code>#0b1220</code></td>
+<td>app canvas (60 %)</td>
+</tr>
+<tr>
+<td>surface</td>
+<td><code>#ffffff</code></td>
+<td><code>#131c2e</code></td>
+<td>cards, dialogs, tables</td>
+</tr>
+<tr>
+<td>surfaceAlt</td>
+<td><code>#f1f4f9</code></td>
+<td><code>#182238</code></td>
+<td>dialog footer, table header, hover rows</td>
+</tr>
+<tr>
+<td>border</td>
+<td><code>#dfe3ea</code></td>
+<td><code>#26324a</code></td>
+<td>hairlines (cards, table rows, dividers)</td>
+</tr>
+<tr>
+<td>inputBorder</td>
+<td><code>#7b8798</code></td>
+<td><code>#5f6f8a</code></td>
+<td>input outlines, unchecked checkbox/radio, switch track (3:1+ on surface, surfaceAlt and background)</td>
+</tr>
+<tr>
+<td>text</td>
+<td><code>#0f172a</code></td>
+<td><code>#e6eaf2</code></td>
+<td>primary text</td>
+</tr>
+<tr>
+<td>textSecondary</td>
+<td><code>#475569</code></td>
+<td><code>#9aa7bd</code></td>
+<td>captions, helper text</td>
+</tr>
+<tr>
+<td>accent</td>
+<td><code>#4338ca</code></td>
+<td><code>#9aa5ff</code></td>
+<td>primary actions, links, selection, focus</td>
+</tr>
+<tr>
+<td>accentContrast</td>
+<td><code>#ffffff</code></td>
+<td><code>#0b1220</code></td>
+<td>text on accent fills</td>
+</tr>
+<tr>
+<td>accentSoft</td>
+<td><code>#eceefe</code></td>
+<td><code>#222a52</code></td>
+<td>dialog header band, selected nav/rows</td>
+</tr>
+<tr>
+<td>good / bad / warn / info</td>
+<td><code>#146c36</code> / <code>#b91c1c</code> / <code>#a35200</code> / <code>#0e7490</code></td>
+<td><code>#4ade80</code> / <code>#f87171</code> / <code>#fbbf24</code> / <code>#67e8f9</code></td>
+<td>gains / losses / warnings / information</td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>Type role</th>
+<th>Size / weight</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>h1 / h2 / h3</td>
+<td>24/700, 18/650, 15/650 (tracking -0.02 to -0.01em)</td>
+<td>page, section, card titles</td>
+</tr>
+<tr>
+<td>body1 / body2</td>
+<td>14/1.5, 13/1.45</td>
+<td>text, dense data</td>
+</tr>
+<tr>
+<td>caption / overline</td>
+<td>12/1.4, 11/600 uppercase +0.06em</td>
+<td>helper text, section labels</td>
+</tr>
+<tr>
+<td>button</td>
+<td>14/600</td>
+<td>actions</td>
+</tr>
+<tr>
+<td>numeric</td>
+<td>tabular-nums + <code>cv11</code>, <code>zero</code></td>
+<td>tables, stat tiles, countdowns, header counts</td>
+</tr>
+<tr>
+<td>mono</td>
+<td>JetBrains Mono Variable</td>
+<td>ids, URLs, code</td>
+</tr>
+</tbody></table>
+<p>Fonts: Inter Variable and JetBrains Mono Variable, self-hosted (latin + latin-ext), <code>font-display: swap</code>, metric-matched fallbacks.</p>
+<p>Rules:</p>
+<ul>
+<li><strong>60-30-10</strong>: 60 % neutral backgrounds, 30 % surfaces and text, at most 10 % accent. The accent is for primary actions, links, selection and focus - <strong>never for gain/loss</strong> (use good/bad plus a sign or arrow; status is never colour alone).</li>
+<li><strong>Tabular figures</strong> for every number column; right-align numbers.</li>
+<li><strong>Focus ring</strong>: 2 px accent outline, 2 px offset, on every interactive element.</li>
+<li><strong>Elevation</strong>: soft cool shadows in light, border-led in dark; <strong>motion</strong>: 120 ms (hover/press) and 200 ms (panels), honouring <code>prefers-reduced-motion</code>.</li>
+<li>Table rows 36 px, header on <code>surfaceAlt</code>; selected nav item on <code>accentSoft</code> with a 3 px accent marker.</li>
+</ul>
+<h3 id="icons-p1-20">Icons (P1-20)<a class="hash" href="#icons-p1-20" aria-label="Link to this section">#</a></h3>
+<p>Every icon sits in a <strong>chip</strong>: a rounded square tinted from its own colour pair, so colour carries meaning at a glance while the page stays calm (the accent still means &quot;action&quot;). Tokens: <code>iconHues</code>, <code>iconChip</code>, <code>navHue</code> in <code>tokens.ts</code>; the prototype reads the same pairs from <code>ui.js</code> (<code>NAVSTYLE</code>, <code>C</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Size</th>
+<th>Box / icon / radius</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>sm</td>
+<td>28 / 17 / 8 px</td>
+<td>sidebar items, page-header icon, card and section headers, header accounts menu rows, toasts</td>
+</tr>
+<tr>
+<td>md</td>
+<td>34 / 17 / 10 px</td>
+<td>stat tile (top right)</td>
+</tr>
+<tr>
+<td>lg</td>
+<td>40 / 22 / 12 px</td>
+<td>feature cards (lesson cards)</td>
+</tr>
+</tbody></table>
+<ul>
+<li>Icon colour: the hue&#39;s <strong>strong</strong> value in light mode, its <strong>light</strong> value in dark mode. Chip background: that colour at 12 % (light) / 16 % (dark) over the surface.</li>
+<li>Chips are decorative: the label always sits next to them; a chip has assistive text only when it stands alone.</li>
+<li>Selected sidebar item keeps the <code>accentSoft</code> row and accent marker; its chip keeps its own hue. Planned (coming soon) items are coloured too.</li>
+<li>Tile hues follow keywords: money/value indigo, cash/funds amber, gains/ok green, loss/risk rose, time/day sky, data/learning teal, returns violet, automation pink, history slate.</li>
+<li>Header chips reuse the <code>sm</code> size (28/17 px), and tile and header tints are unified at 12 % (light) / 16 % (dark): a deliberate deviation from the prototype&#39;s 26 px / 18 % header and 11 % / 15 % tile values.</li>
+<li>Toasts: success green, info indigo, error rose status chip on a neutral outlined surface (a deliberate deviation from the prototype&#39;s dark toast).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Hue</th>
+<th>Light value</th>
+<th>Strong value</th>
+<th>Hue</th>
+<th>Light value</th>
+<th>Strong value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>today</td>
+<td><code>#f59e0b</code></td>
+<td><code>#df6714</code>*</td>
+<td>reports</td>
+<td><code>#c4b5fd</code></td>
+<td><code>#7c3aed</code></td>
+</tr>
+<tr>
+<td>review</td>
+<td><code>#10b981</code></td>
+<td><code>#059669</code></td>
+<td>lab</td>
+<td><code>#f472b6</code></td>
+<td><code>#db2777</code></td>
+</tr>
+<tr>
+<td>suggestions</td>
+<td><code>#d946ef</code></td>
+<td><code>#8b5cf6</code></td>
+<td>learning</td>
+<td><code>#2dd4bf</code></td>
+<td><code>#6366f1</code></td>
+</tr>
+<tr>
+<td>portfolio</td>
+<td><code>#38bdf8</code></td>
+<td><code>#3b82f6</code></td>
+<td>accounts</td>
+<td><code>#60a5fa</code></td>
+<td><code>#2563eb</code></td>
+</tr>
+<tr>
+<td>instruments</td>
+<td><code>#818cf8</code></td>
+<td><code>#4f46e5</code></td>
+<td>services</td>
+<td><code>#38bdf8</code></td>
+<td><code>#6366f1</code></td>
+</tr>
+<tr>
+<td>baskets</td>
+<td><code>#fb923c</code></td>
+<td><code>#f43f5e</code></td>
+<td>settings</td>
+<td><code>#a1a1aa</code></td>
+<td><code>#52525b</code></td>
+</tr>
+<tr>
+<td>data</td>
+<td><code>#22d3ee</code></td>
+<td><code>#0d9488</code></td>
+<td>audit</td>
+<td><code>#fbbf24</code></td>
+<td><code>#b45309</code></td>
+</tr>
+<tr>
+<td>quality</td>
+<td><code>#a3e635</code></td>
+<td><code>#159f48</code>*</td>
+<td>system status</td>
+<td><code>#2dd4bf</code></td>
+<td><code>#0f766e</code></td>
+</tr>
+<tr>
+<td>indigo / green</td>
+<td><code>#818cf8</code> / <code>#34d399</code></td>
+<td><code>#4f46e5</code> / <code>#059669</code></td>
+<td>amber / rose</td>
+<td><code>#fbbf24</code> / <code>#fb7185</code></td>
+<td><code>#d07206</code>* / <code>#e11d48</code></td>
+</tr>
+<tr>
+<td>sky / violet</td>
+<td><code>#38bdf8</code> / <code>#c084fc</code></td>
+<td><code>#0284c7</code> / <code>#7c3aed</code></td>
+<td>teal / pink / slate</td>
+<td><code>#2dd4bf</code> / <code>#f472b6</code> / <code>#94a3b8</code></td>
+<td><code>#0d9488</code> / <code>#db2777</code> / <code>#475569</code></td>
+</tr>
+</tbody></table>
+<p>* Contrast-adjusted (icon on its own chip over the surface must be at least 3:1 in both modes; enforced by <code>theme/contrast.test.ts</code>). Darkened minimally, hue kept: today <code>#f97316</code> to <code>#df6714</code> (2.48 to 3.01), quality <code>#16a34a</code> to <code>#159f48</code> (2.89 to 3.00), amber <code>#d97706</code> to <code>#d07206</code> (2.81 to 3.01). The adjusted values are copied back into the prototype (<code>ui.js</code>). The prototype&#39;s navigation fallback (<code>#64748b</code>) is replaced by the tile <code>slate</code> (<code>#475569</code>) in the app. Dark-mode light values are all at least 4:1 on their chip (asserted in the test); no exceptions below 3:1.</p>
+<h3 id="top-bar-p1-21">Top bar (P1-21)<a class="hash" href="#top-bar-p1-21" aria-label="Link to this section">#</a></h3>
+<p>Left to right, as in the prototype: menu toggle (below <code>md</code>) · page title (from <code>sm</code>) · <strong>Search or jump to… (⌘K / Ctrl+K)</strong> · spacer · <strong>accounts control</strong> · <strong>notification bell</strong> · colour-mode toggle · <strong>user button</strong> (soft-indigo avatar with the owner&#39;s initials, name, chevron).</p>
+<table>
+<thead>
+<tr>
+<th>Element</th>
+<th>Behaviour</th>
+<th>Real now or later</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Search or jump to</td>
+<td>Palette dialog: <em>Pages</em> (every navigation item; planned ones marked with their phase), <em>Accounts</em>, <em>Actions</em> (toggle dark mode, go to Accounts / Settings); substring match, arrow keys, Enter, Esc; combobox + listbox semantics. Icon only below <code>lg</code>.</td>
+<td>Real. Instruments and baskets join with P1-11 / P1-12.</td>
+</tr>
+<tr>
+<td>Accounts control</td>
+<td>Summary of all accounts with Connect / Reconnect (P1-16d). Doubles as the status element until the pills below exist.</td>
+<td>Real</td>
+</tr>
+<tr>
+<td>Notification bell</td>
+<td>Unread badge (max &quot;9+&quot;) and a right-hand drawer: severity chip, text, relative time, <strong>Open</strong> link, &quot;Mark all read&quot;, empty state &quot;You&#39;re all caught up&quot;. Items are derived from real state only: account not connected, token expired, token expires within 2 h, API key expires within 30 days / expired. An item&#39;s id includes the situation (e.g. the expiry), so a changed situation is new and unread. Read state is a per-browser convenience (<code>localStorage</code>).</td>
+<td>Real for accounts; alerts, services and plan tickets feed it later (P2 / P1-13 / P7)</td>
+</tr>
+<tr>
+<td>User button</td>
+<td>Avatar (28 px, <code>accentSoft</code> background, <code>accent</code> 13 px bold initials), name (from <code>lg</code>), chevron; menu with name, email, Sign out.</td>
+<td>Real</td>
+</tr>
+<tr>
+<td>Market open + NIFTY pill, services-health pill</td>
+<td>Shown in the prototype.</td>
+<td><strong>Later</strong>: need market data (P1-11 / P1-12 / P2-07) and the service framework (P1-13); not faked.</td>
+</tr>
+</tbody></table>
 <h2 id="2-report-catalogue">2. Report catalogue<a class="hash" href="#2-report-catalogue" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -485,12 +776,15 @@ nightly; responses are chart-ready series.</li>
     <a class="prev" href="12-portfolio-monitoring.html"><small>← Previous  [</small>12 · Portfolio monitoring</a>
     <a class="next" href="14-ai-assistant.html"><small>Next  ] →</small>14 · AI assistant</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-11 08:45</footer>
+  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-11 10:15</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-screens" class="d2">1. Screens</a>
 <a href="#1b-clickable-prototype" class="d2">1b. Clickable prototype</a>
 <a href="#1c-reports-experience" class="d2">1c. Reports experience</a>
 <a href="#1d-responsive-design-all-monitors" class="d2">1d. Responsive design (all monitors)</a>
+<a href="#1e-visual-system-p1-19" class="d2">1e. Visual system (P1-19)</a>
+<a href="#icons-p1-20" class="d3">Icons (P1-20)</a>
+<a href="#top-bar-p1-21" class="d3">Top bar (P1-21)</a>
 <a href="#2-report-catalogue" class="d2">2. Report catalogue</a>
 <a href="#3-exports-delivery" class="d2">3. Exports &amp;amp; delivery</a>
 <a href="#4-implementation-notes" class="d2">4. Implementation notes</a></aside>

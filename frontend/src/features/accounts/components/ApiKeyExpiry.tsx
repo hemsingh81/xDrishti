@@ -11,9 +11,12 @@ export function ApiKeyExpiry({ expiresOn }: { expiresOn: string }) {
       : `API key valid until ${formatDate(expiry.expiresOn)}`;
   return (
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}>
-      <Typography component="span">{text}</Typography>
+      <Typography component="span" className="numeric">
+        {text}
+      </Typography>
       {expiry.state === 'soon' && (
         <Chip
+          className="numeric"
           size="small"
           color="warning"
           variant="outlined"

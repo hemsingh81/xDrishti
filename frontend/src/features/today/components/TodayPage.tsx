@@ -1,4 +1,5 @@
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import WbSunnyIcon from '@mui/icons-material/WbSunnyOutlined';
 import { Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import { useSystemStatus } from '@/features/system-status';
@@ -12,6 +13,8 @@ export function TodayPage() {
     <>
       <PageHeader
         title="Today"
+        icon={WbSunnyIcon}
+        hue="today"
         description="Your trading day at a glance — plan, live trades and portfolio arrive from Phase 1 onwards."
       />
       <Card>

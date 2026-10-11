@@ -82,6 +82,88 @@ title shows the current screen.
 Rules: no horizontal page scroll at any width (wide tables scroll inside their card), fluid grids
 (`auto-fit`/`minmax`), charts resize with their containers, sidebar state remembered per device.
 
+## 1e. Visual system (P1-19)
+
+Calm, data-first, trustworthy: cool-neutral base, one deliberate accent. Tokens live in `frontend/src/theme/tokens.ts`
+and the prototype's `proto.css`; the MUI theme and the prototype read the same values. All text pairs meet WCAG AA
+(4.5:1), UI parts 3:1 — enforced by `theme/contrast.test.ts`.
+
+| Token | Light | Dark | Role |
+|-------|-------|------|------|
+| background | `#f4f6fa` | `#0b1220` | app canvas (60 %) |
+| surface | `#ffffff` | `#131c2e` | cards, dialogs, tables |
+| surfaceAlt | `#f1f4f9` | `#182238` | dialog footer, table header, hover rows |
+| border | `#dfe3ea` | `#26324a` | hairlines (cards, table rows, dividers) |
+| inputBorder | `#7b8798` | `#5f6f8a` | input outlines, unchecked checkbox/radio, switch track (3:1+ on surface, surfaceAlt and background) |
+| text | `#0f172a` | `#e6eaf2` | primary text |
+| textSecondary | `#475569` | `#9aa7bd` | captions, helper text |
+| accent | `#4338ca` | `#9aa5ff` | primary actions, links, selection, focus |
+| accentContrast | `#ffffff` | `#0b1220` | text on accent fills |
+| accentSoft | `#eceefe` | `#222a52` | dialog header band, selected nav/rows |
+| good / bad / warn / info | `#146c36` / `#b91c1c` / `#a35200` / `#0e7490` | `#4ade80` / `#f87171` / `#fbbf24` / `#67e8f9` | gains / losses / warnings / information |
+
+| Type role | Size / weight | Use |
+|-----------|---------------|-----|
+| h1 / h2 / h3 | 24/700, 18/650, 15/650 (tracking -0.02 to -0.01em) | page, section, card titles |
+| body1 / body2 | 14/1.5, 13/1.45 | text, dense data |
+| caption / overline | 12/1.4, 11/600 uppercase +0.06em | helper text, section labels |
+| button | 14/600 | actions |
+| numeric | tabular-nums + `cv11`, `zero` | tables, stat tiles, countdowns, header counts |
+| mono | JetBrains Mono Variable | ids, URLs, code |
+
+Fonts: Inter Variable and JetBrains Mono Variable, self-hosted (latin + latin-ext), `font-display: swap`, metric-matched fallbacks.
+
+Rules:
+- **60-30-10**: 60 % neutral backgrounds, 30 % surfaces and text, at most 10 % accent. The accent is for primary actions, links, selection and focus - **never for gain/loss** (use good/bad plus a sign or arrow; status is never colour alone).
+- **Tabular figures** for every number column; right-align numbers.
+- **Focus ring**: 2 px accent outline, 2 px offset, on every interactive element.
+- **Elevation**: soft cool shadows in light, border-led in dark; **motion**: 120 ms (hover/press) and 200 ms (panels), honouring `prefers-reduced-motion`.
+- Table rows 36 px, header on `surfaceAlt`; selected nav item on `accentSoft` with a 3 px accent marker.
+
+### Icons (P1-20)
+
+Every icon sits in a **chip**: a rounded square tinted from its own colour pair, so colour carries meaning at a glance while the page stays calm (the accent still means "action"). Tokens: `iconHues`, `iconChip`, `navHue` in `tokens.ts`; the prototype reads the same pairs from `ui.js` (`NAVSTYLE`, `C`).
+
+| Size | Box / icon / radius | Where |
+|------|---------------------|-------|
+| sm | 28 / 17 / 8 px | sidebar items, page-header icon, card and section headers, header accounts menu rows, toasts |
+| md | 34 / 17 / 10 px | stat tile (top right) |
+| lg | 40 / 22 / 12 px | feature cards (lesson cards) |
+
+- Icon colour: the hue's **strong** value in light mode, its **light** value in dark mode. Chip background: that colour at 12 % (light) / 16 % (dark) over the surface.
+- Chips are decorative: the label always sits next to them; a chip has assistive text only when it stands alone.
+- Selected sidebar item keeps the `accentSoft` row and accent marker; its chip keeps its own hue. Planned (coming soon) items are coloured too.
+- Tile hues follow keywords: money/value indigo, cash/funds amber, gains/ok green, loss/risk rose, time/day sky, data/learning teal, returns violet, automation pink, history slate.
+- Header chips reuse the `sm` size (28/17 px), and tile and header tints are unified at 12 % (light) / 16 % (dark): a deliberate deviation from the prototype's 26 px / 18 % header and 11 % / 15 % tile values.
+- Toasts: success green, info indigo, error rose status chip on a neutral outlined surface (a deliberate deviation from the prototype's dark toast).
+
+| Hue | Light value | Strong value | Hue | Light value | Strong value |
+|-----|-------------|--------------|-----|-------------|--------------|
+| today | `#f59e0b` | `#df6714`* | reports | `#c4b5fd` | `#7c3aed` |
+| review | `#10b981` | `#059669` | lab | `#f472b6` | `#db2777` |
+| suggestions | `#d946ef` | `#8b5cf6` | learning | `#2dd4bf` | `#6366f1` |
+| portfolio | `#38bdf8` | `#3b82f6` | accounts | `#60a5fa` | `#2563eb` |
+| instruments | `#818cf8` | `#4f46e5` | services | `#38bdf8` | `#6366f1` |
+| baskets | `#fb923c` | `#f43f5e` | settings | `#a1a1aa` | `#52525b` |
+| data | `#22d3ee` | `#0d9488` | audit | `#fbbf24` | `#b45309` |
+| quality | `#a3e635` | `#159f48`* | system status | `#2dd4bf` | `#0f766e` |
+| indigo / green | `#818cf8` / `#34d399` | `#4f46e5` / `#059669` | amber / rose | `#fbbf24` / `#fb7185` | `#d07206`* / `#e11d48` |
+| sky / violet | `#38bdf8` / `#c084fc` | `#0284c7` / `#7c3aed` | teal / pink / slate | `#2dd4bf` / `#f472b6` / `#94a3b8` | `#0d9488` / `#db2777` / `#475569` |
+
+\* Contrast-adjusted (icon on its own chip over the surface must be at least 3:1 in both modes; enforced by `theme/contrast.test.ts`). Darkened minimally, hue kept: today `#f97316` to `#df6714` (2.48 to 3.01), quality `#16a34a` to `#159f48` (2.89 to 3.00), amber `#d97706` to `#d07206` (2.81 to 3.01). The adjusted values are copied back into the prototype (`ui.js`). The prototype's navigation fallback (`#64748b`) is replaced by the tile `slate` (`#475569`) in the app. Dark-mode light values are all at least 4:1 on their chip (asserted in the test); no exceptions below 3:1.
+
+### Top bar (P1-21)
+
+Left to right, as in the prototype: menu toggle (below `md`) · page title (from `sm`) · **Search or jump to… (⌘K / Ctrl+K)** · spacer · **accounts control** · **notification bell** · colour-mode toggle · **user button** (soft-indigo avatar with the owner's initials, name, chevron).
+
+| Element | Behaviour | Real now or later |
+|---------|-----------|-------------------|
+| Search or jump to | Palette dialog: *Pages* (every navigation item; planned ones marked with their phase), *Accounts*, *Actions* (toggle dark mode, go to Accounts / Settings); substring match, arrow keys, Enter, Esc; combobox + listbox semantics. Icon only below `lg`. | Real. Instruments and baskets join with P1-11 / P1-12. |
+| Accounts control | Summary of all accounts with Connect / Reconnect (P1-16d). Doubles as the status element until the pills below exist. | Real |
+| Notification bell | Unread badge (max "9+") and a right-hand drawer: severity chip, text, relative time, **Open** link, "Mark all read", empty state "You're all caught up". Items are derived from real state only: account not connected, token expired, token expires within 2 h, API key expires within 30 days / expired. An item's id includes the situation (e.g. the expiry), so a changed situation is new and unread. Read state is a per-browser convenience (`localStorage`). | Real for accounts; alerts, services and plan tickets feed it later (P2 / P1-13 / P7) |
+| User button | Avatar (28 px, `accentSoft` background, `accent` 13 px bold initials), name (from `lg`), chevron; menu with name, email, Sign out. | Real |
+| Market open + NIFTY pill, services-health pill | Shown in the prototype. | **Later**: need market data (P1-11 / P1-12 / P2-07) and the service framework (P1-13); not faked. |
+
 ## 2. Report catalogue
 
 | # | Report | Answers | Visuals |

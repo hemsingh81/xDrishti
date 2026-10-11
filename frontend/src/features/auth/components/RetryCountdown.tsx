@@ -4,7 +4,7 @@ import { formatCountdown, useCountdown } from '../hooks/useCountdown';
 export function RetryCountdown({ seconds, onElapsed }: { seconds: number; onElapsed: () => void }) {
   const remaining = useCountdown(seconds, onElapsed);
   return (
-    <strong aria-live="off" style={{ fontVariantNumeric: 'tabular-nums' }}>
+    <strong aria-live="off" className="numeric">
       {formatCountdown(remaining)}
     </strong>
   );

@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import PeopleIcon from '@mui/icons-material/PeopleOutlined';
 import { Button } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -52,6 +53,8 @@ export function AccountsPage() {
       <ConnectReturn />
       <PageHeader
         title="Accounts"
+        icon={PeopleIcon}
+        hue="accounts"
         description="All your broker accounts, what each is used for, and their trading, portfolio, data and connection settings. Shared risk profiles and the role matrix are under Settings."
         actions={
           <Button

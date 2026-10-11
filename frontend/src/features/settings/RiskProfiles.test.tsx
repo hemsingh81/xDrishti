@@ -143,7 +143,7 @@ describe('Risk profiles', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save profile' }));
 
     expect(await within(dialog).findByText('Use a value above 0 and at most 2.')).toBeInTheDocument();
-    expect(within(dialog).getByText('Use a whole number from 1 to 100.')).toBeInTheDocument();
+    expect(await within(dialog).findByText('Use a whole number from 1 to 100.')).toBeInTheDocument();
     expect(sent).toBe(false);
   });
 

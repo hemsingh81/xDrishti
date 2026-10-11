@@ -71,10 +71,12 @@
 
   /* ---------------- navigation colours ---------------- */
   const NAVSTYLE = {
-    today: ['sun', '#f59e0b', '#f97316'], review: ['checkCircle', '#10b981', '#059669'], suggestions: ['sparkles', '#d946ef', '#8b5cf6'],
+    today: ['sun', '#f59e0b', '#df6714'], review: ['checkCircle', '#10b981', '#059669'], suggestions: ['sparkles', '#d946ef', '#8b5cf6'],
     portfolio: ['pie', '#38bdf8', '#3b82f6'], instruments: ['list', '#818cf8', '#4f46e5'], baskets: ['basket', '#fb923c', '#f43f5e'],
-    data: ['database', '#22d3ee', '#0d9488'], quality: ['shieldCheck', '#a3e635', '#16a34a'], reports: ['barChart', '#c4b5fd', '#7c3aed'],
+    data: ['database', '#22d3ee', '#0d9488'], quality: ['shieldCheck', '#a3e635', '#159f48'], reports: ['barChart', '#c4b5fd', '#7c3aed'],
     lab: ['flask', '#f472b6', '#db2777'], learning: ['brain', '#2dd4bf', '#6366f1'], accounts: ['users', '#60a5fa', '#2563eb'],
+    // system status has no prototype page; the hue is used by the app's System-status nav item and page header
+    system: ['server', '#2dd4bf', '#0f766e'],
     services: ['server', '#38bdf8', '#6366f1'], settings: ['sliders', '#a1a1aa', '#52525b'], audit: ['history', '#fbbf24', '#b45309'],
   };
   BT.NAVSTYLE = NAVSTYLE;
@@ -83,7 +85,7 @@
   BT.navIcon = (id, cls = '') => { const [ic, a, b] = NAVSTYLE[id] || ['dot', '#94a3b8', '#64748b']; return `<span class="nav-ic ${cls}" style="--c1:${a};--c2:${b}">${BT.icon(ic)}</span>`; };
 
   /* ---------------- keyword → icon/colour for tiles and card headers ---------------- */
-  const C = { indigo: ['#818cf8', '#4f46e5'], green: ['#34d399', '#059669'], amber: ['#fbbf24', '#d97706'], rose: ['#fb7185', '#e11d48'],
+  const C = { indigo: ['#818cf8', '#4f46e5'], green: ['#34d399', '#059669'], amber: ['#fbbf24', '#d07206'], rose: ['#fb7185', '#e11d48'],
     sky: ['#38bdf8', '#0284c7'], violet: ['#c084fc', '#7c3aed'], teal: ['#2dd4bf', '#0d9488'], pink: ['#f472b6', '#db2777'], slate: ['#94a3b8', '#475569'] };
   const ROT = ['indigo', 'teal', 'amber', 'violet', 'sky', 'pink', 'green', 'rose'];
   const TILE_RULES = [

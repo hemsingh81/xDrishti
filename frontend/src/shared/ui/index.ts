@@ -1,4 +1,5 @@
 export { BrandMark } from './BrandMark';
+export { IconChip, type IconChipProps } from './IconChip';
 export { PageHeader } from './PageHeader';
 export { ErrorState, LoadingState } from './QueryState';
 export { StatTile } from './StatTile';
