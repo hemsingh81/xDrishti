@@ -88,7 +88,8 @@ export const elevation = {
 
 /** Focus ring: 2 px accent outline, 2 px offset, on every interactive element (`:focus-visible`). */
 /** Opacity of placeholder text (colour is `textSecondary`) and of disabled text / fills (`textSecondary` over the surface). */
-export const stateAlpha = { placeholder: 0.9, disabledText: 0.75, disabledFill: 0.12 } as const;
+/** `busy`: opacity of content that is stale (rows while the next page loads) or of a control that is busy. */
+export const stateAlpha = { placeholder: 0.9, disabledText: 0.75, disabledFill: 0.12, busy: 0.6 } as const;
 
 export const focusRing = { width: 2, offset: 2 } as const;
 
@@ -106,7 +107,7 @@ export const spacingUnit = 4;
 export const controlHeight = { small: 32, medium: 40 } as const;
 
 /** Table density (px) and the strength of the accent tint on hovered / selected rows. */
-export const table = { rowHeight: 36, hoverAlpha: 0.06, selectedAlpha: 0.12 } as const;
+export const table = { rowHeight: 36, rowHeightComfortable: 48, hoverAlpha: 0.06, selectedAlpha: 0.12 } as const;
 
 /** Sidebar: selected item sits on `accentSoft` with an accent marker of this width (px). */
 export const sidebar = { markerWidth: 3 } as const;

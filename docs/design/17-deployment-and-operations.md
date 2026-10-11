@@ -25,7 +25,7 @@ broker/exchange APIs.
 | `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health` (later `/hubs`, `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site) — both only for a signed-in owner (`forward_auth` to `/api/auth/verify`, otherwise redirect to `/login`); compression, security headers |
 | `xd-migrate` | API image, `migrate` | core | One-shot: applies migrations, provisions the owner account when none exists, then exits |
 | `xd-owner-reset` | API image, `owner-reset` | tools | On-demand one-shot (`xd-up.sh --owner-reset`): replaces the owner's password from the secrets, revokes all sessions |
-| `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (`BrokerVault__Key`, refuses to start without it); `Brokers__PublicBaseUrl` = `http://localhost:${XD_HTTP_PORT}` (broker redirect URLs); networks `back` + `egress` (broker sign-in) |
+| `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (`BrokerVault__Key`, refuses to start without it); `Brokers__PublicBaseUrl` = `http://localhost:${XD_HTTP_PORT}` (broker redirect URLs); background workers for the instrument master (manual and daily refresh, `Instruments__AutoRefresh__*`, [doc 06](06-instruments-and-baskets.md) §2.2); networks `back` + `egress` (broker sign-in, master files) |
 | `xd-worker` | .NET 10 + Hangfire | core | CSV import (watches `data/inbox`), EOD fetch, aggregation, account & portfolio sync, nightly pipeline, backtests, Lab runs, ML.NET training; scale replicas |
 | `xd-feed` | .NET 10 | core | Market hours: Dhan WebSocket for the active set, quote polling for holdings, live bars & alerts (later also depth recording) |
 | `xd-sandbox` | .NET 10 worker | core | User C# plugins; **no network**, read-only data, CPU/memory/time limits |
@@ -46,15 +46,21 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 |---------|---------|
 | `front` | proxy (the only published port), seq (ops) |
 | `back` (internal) | api, worker, sandbox*, db, llm, mcp, seq, feed, proxy (to reach the api) |
-| `egress` (not internal, nothing published) | **api only** (P1-16c) |
+| `egress` (not internal, nothing published) | **api only** (P1-16c, P1-03) |
 | `exec` (internal) | exec, db (later) |
 | Egress allowed later | worker, feed, exec (broker/exchange hosts only) |
 
 *`xd-sandbox` has no egress and no access except its job inputs/outputs.
-`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)): outbound only, no
-published ports, no other member. The network itself does not filter hosts; the API's broker HTTP client does — it reaches only the
-`generate-consent` and `consumeApp-consent` endpoints of `auth.dhan.co` (allow-list, HTTPS, no redirects, 15-second timeout;
-doc 05 §8.1). No order, position or funds endpoint is callable.
+`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)) and for the instrument master files ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md)): outbound only, no
+published ports, no other member. The network itself does not filter hosts; the API's HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):
+
+| Client | Reaches only | Method | Limits |
+|--------|--------------|--------|--------|
+| Broker (Dhan sign-in) | `auth.dhan.co`: `/app/generate-consent`, `/app/consumeApp-consent` (doc 05 §8.1) | POST | 15 s, 256 KB; no order, position or funds endpoint is callable |
+| Instrument master — Dhan | `images.dhan.co`: `/api-data/api-scrip-master-detailed.csv` (doc 05 §7.1) | GET | 120 s, 100 MB |
+| Instrument master — NSE | `nsearchives.nseindia.com`: `/content/indices/ind_niftytotalmarket_list.csv` | GET | 30 s, 5 MB |
+
+Nothing else is needed for the master: no published port, no volume (the file is streamed, never written to disk), no secret; `xd-api` stays within its 1 GB limit (the 35 MB file is read as a stream). The database image already includes `pg_trgm`, which the migration enables for the search indexes (created by `xd-migrate` as `xd_owner`).
 
 ## 4. Secrets
 

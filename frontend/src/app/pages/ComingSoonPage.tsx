@@ -15,7 +15,7 @@ export function ComingSoonPage() {
         icon={item?.icon}
         hue={item ? (navHue[item.path] ?? 'slate') : undefined}
       />
-      <Card>
+      <Card sx={{ maxWidth: 720 }}>
         <CardContent>
           <Typography>
             This screen is planned for roadmap phase <strong>{item?.phase ?? '—'}</strong>. See the clickable prototype

@@ -30,6 +30,15 @@ describe('app routes', () => {
     expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
   });
 
+  it('opens the Instruments screen (no longer a placeholder)', async () => {
+    renderRoutes(routes, { initialPath: '/instruments' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Instruments' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Refresh master list' })).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: 'Instruments' })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
+  });
+
   it('opens the Settings screen (no longer a placeholder)', async () => {
     renderRoutes(routes, { initialPath: '/settings' });
 

@@ -5,6 +5,8 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Refresh;
+using XDrishti.Application.Market.Search;
 using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Domain.Common;
@@ -30,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ResetOwnerPasswordCommand>, ResetOwnerPasswordHandler>();
 
         services.AddAccounts();
+        services.AddMarket();
 
         return services;
     }
@@ -65,5 +68,20 @@ public static class DependencyInjection
 
         services.AddScoped<IQueryHandler<ListBucketsQuery, IReadOnlyList<BucketView>>, ListBucketsHandler>();
         services.AddScoped<ICommandHandler<AddBucketCommand, BucketView>, AddBucketHandler>();
+    }
+
+    private static void AddMarket(this IServiceCollection services)
+    {
+        services.AddScoped<ICommandHandler<StartRefreshCommand, RefreshStarted>, StartRefreshHandler>();
+        services.AddScoped<ICommandHandler<ExecuteRefreshCommand>, ExecuteRefreshHandler>();
+        services.AddScoped<ICommandHandler<RecoverInterruptedRefreshesCommand>, RecoverInterruptedRefreshesHandler>();
+        services.AddScoped<IQueryHandler<GetRefreshStatusQuery, RefreshStatusView>, GetRefreshStatusHandler>();
+        services.AddScoped<IQueryHandler<ListRefreshHistoryQuery, IReadOnlyList<RefreshRunView>>, ListRefreshHistoryHandler>();
+        services.AddScoped<IQueryHandler<SearchInstrumentsQuery, Result<InstrumentPage>>, SearchInstrumentsHandler>();
+        services.AddScoped<IQueryHandler<GetInstrumentFacetsQuery, InstrumentFacets>, GetInstrumentFacetsHandler>();
+        services.AddScoped<IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>>, GetInstrumentHandler>();
+
+        // The daily schedule is a singleton: the API's hosted service runs it for the lifetime of the process.
+        services.AddSingleton<DailyRefreshRunner>();
     }
 }

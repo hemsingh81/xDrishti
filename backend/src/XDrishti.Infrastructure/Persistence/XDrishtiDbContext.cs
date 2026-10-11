@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Auth;
+using XDrishti.Domain.Market;
 using XDrishti.Domain.Platform;
 using XDrishti.Infrastructure.Accounts;
+using XDrishti.Infrastructure.Market;
 
 namespace XDrishti.Infrastructure.Persistence;
 
@@ -32,12 +34,20 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<PendingConnect> PendingConnects => Set<PendingConnect>();
 
+    public DbSet<RefreshRun> RefreshRuns => Set<RefreshRun>();
+
+    /// <summary>The master list; written only by bulk import, read by search.</summary>
+    internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
+
+    internal DbSet<InstrumentBrokerIdRecord> InstrumentBrokerIds => Set<InstrumentBrokerIdRecord>();
+
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("timescaledb");
+        modelBuilder.HasPostgresExtension("pg_trgm"); // trigram indexes for the instrument search (market schema)
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(XDrishtiDbContext).Assembly);
     }
 }

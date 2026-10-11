@@ -10,6 +10,9 @@ public sealed class AdjustableTimeProvider : TimeProvider
 
     public void Advance(TimeSpan by) => Interlocked.Add(ref _offsetTicks, by.Ticks);
 
+    /// <summary>Makes the clock read <paramref name="instant"/> now (and run on from there). Sign in after pinning: sessions are judged by this clock.</summary>
+    public void Pin(DateTimeOffset instant) => Interlocked.Exchange(ref _offsetTicks, (instant - base.GetUtcNow()).Ticks);
+
     public void Reset() => Interlocked.Exchange(ref _offsetTicks, 0);
 
     public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + TimeSpan.FromTicks(Interlocked.Read(ref _offsetTicks));

@@ -29,3 +29,14 @@ export type TradingSettings = Schemas['TradingSettingsView'];
 export type RiskProfile = Schemas['RiskProfileView'];
 export type RiskProfileInput = Schemas['RiskProfileInput'];
 export type PortfolioBucket = Schemas['BucketView'];
+
+export type InstrumentSummary = Schemas['InstrumentSummary'];
+export type InstrumentDetail = Schemas['InstrumentDetail'];
+export type InstrumentPage = Schemas['InstrumentPage'];
+export type InstrumentFacets = Schemas['InstrumentFacets'];
+export type FacetCount = Schemas['FacetCount'];
+export type BrokerId = Schemas['BrokerIdView'];
+/** One run of the master-list refresh (manual, daily or forced). */
+export type RefreshRun = Schemas['RefreshRunView'];
+export type RefreshStatus = Schemas['RefreshStatusView'];
+export type AutoRefresh = Schemas['AutoRefreshView'];

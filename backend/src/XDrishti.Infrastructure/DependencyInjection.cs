@@ -6,10 +6,12 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
+using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
+using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
 
@@ -76,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<IBrokerConnectionStore, BrokerConnectionStore>();
         services.AddScoped<IPendingConnectStore, PendingConnectStore>();
         services.AddDhanConnector();
+        services.AddInstrumentMaster(configuration);
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", HealthStatus.Unhealthy, ["ready"]);
@@ -96,6 +99,35 @@ public static class DependencyInjection
             .RemoveAllLoggers();
 
         services.AddScoped<IBrokerConnector, DhanConnector>();
+    }
+
+    /// <summary>
+    /// The instrument master (ADR 0010): its store, search, refresh queue and the two allow-listed download clients — no retries, no redirects, no
+    /// cookies or credentials, no request logging, and an allow-list guard in front of every request.
+    /// </summary>
+    private static void AddInstrumentMaster(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<InstrumentRefreshOptions>()
+            .Bind(configuration.GetSection(InstrumentRefreshOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(o => InstrumentRefreshOptions.IsValidTime(o.TimeIst), InstrumentRefreshOptions.InvalidTimeMessage)
+            .ValidateOnStart();
+        services.AddSingleton<IInstrumentRefreshSettings, InstrumentRefreshSettings>();
+        services.AddSingleton<IRefreshJobChannel, RefreshJobChannel>();
+        services.AddScoped<IRefreshRunStore, RefreshRunStore>();
+        services.AddScoped<IInstrumentCatalog, InstrumentCatalog>();
+        services.AddScoped<IInstrumentQueries, InstrumentQueries>();
+
+        services.AddTransient<MasterDataEndpointGuard>();
+        services.AddHttpClient(MasterDataHttpClientNames.Dhan, MasterDataHttp.ConfigureDhan)
+            .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<MasterDataEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddHttpClient(MasterDataHttpClientNames.Nse, MasterDataHttp.ConfigureNse)
+            .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<MasterDataEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddScoped<IInstrumentSource, HttpInstrumentSource>();
     }
 
     /// <summary>

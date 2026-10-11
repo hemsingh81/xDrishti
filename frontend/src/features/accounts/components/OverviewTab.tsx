@@ -6,12 +6,11 @@ import { Alert, Grid, Stack } from '@mui/material';
 import type { AccountDetail } from '@/shared/api';
 import { formatInr } from '@/shared/lib/format';
 import { hueForLabel } from '@/shared/lib/iconHue';
-import { StatTile } from '@/shared/ui';
+import { Facts, StatTile, type Fact } from '@/shared/ui';
 import { modeLabel } from '../lib/labels';
 import { ApiKeyExpiry } from './ApiKeyExpiry';
 import { ConnectionStatus } from './ConnectionStatus';
 import { DisabledActions } from './DisabledActions';
-import { Facts, type Fact } from './Facts';
 import { RoleChips } from './RoleChips';
 import { SecretsStatus } from './SecretsStatus';
 

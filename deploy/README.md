@@ -40,7 +40,7 @@ writes it as the secret file `broker_vault_key`, mounted **into `xd-api` only** 
 
 - **Never delete or replace the vault key**: the stored secrets can only be read with the key that encrypted them. If the Keychain item exists but
   cannot be read (locked Keychain, denied access), `xd-up.sh` stops instead of creating a new one. Back it up together with the database.
-- The redirect URL registered with the Dhan app is `http://localhost:${XD_HTTP_PORT:-8080}/api/brokers/dhan/callback` (`Brokers__PublicBaseUrl`; ADR 0009). `xd-api` reaches only `auth.dhan.co` (egress network).
+- The redirect URL registered with the Dhan app is `http://localhost:${XD_HTTP_PORT:-8080}/api/brokers/dhan/callback` (`Brokers__PublicBaseUrl`; ADR 0009). `xd-api` reaches only `auth.dhan.co` (egress network) and, for the instrument master (ADR 0010), the two public files `images.dhan.co/api-data/api-scrip-master-detailed.csv` and `nsearchives.nseindia.com/content/indices/ind_niftytotalmarket_list.csv` (allow-listed in the API; no credentials). The daily refresh is `XD_INSTRUMENTS_AUTO_REFRESH` (default `true`) at `XD_INSTRUMENTS_REFRESH_TIME_IST` (default `08:45`, India time).
 - The credential references of ADR 0007 (`scripts/broker-secrets.sh`, `secrets/brokers/`, `brokers.index`) are gone; `xd-up.sh` deletes leftover files.
   Old Keychain items `xdrishti/broker/<ref>/…` are no longer read and can be removed in Keychain Access.
 

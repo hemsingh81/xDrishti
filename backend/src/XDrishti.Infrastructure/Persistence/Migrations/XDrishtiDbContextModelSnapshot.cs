@@ -20,6 +20,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "timescaledb");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
@@ -540,6 +541,157 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("owner_accounts", "auth");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Market.RefreshRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Added")
+                        .HasColumnType("integer")
+                        .HasColumnName("added");
+
+                    b.Property<int>("Collisions")
+                        .HasColumnType("integer")
+                        .HasColumnName("collisions");
+
+                    b.Property<string>("DhanETag")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dhan_etag");
+
+                    b.Property<string>("DhanLastModified")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dhan_last_modified");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int>("FnoUnderlyings")
+                        .HasColumnType("integer")
+                        .HasColumnName("fno_underlyings");
+
+                    b.Property<bool>("Force")
+                        .HasColumnType("boolean")
+                        .HasColumnName("force");
+
+                    b.Property<string>("KeptByType")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("kept_by_type");
+
+                    b.Property<string>("Phase")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("phase");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("requested_by");
+
+                    b.Property<int>("Retired")
+                        .HasColumnType("integer")
+                        .HasColumnName("retired");
+
+                    b.Property<int>("Revived")
+                        .HasColumnType("integer")
+                        .HasColumnName("revived");
+
+                    b.Property<long>("RowsRead")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rows_read");
+
+                    b.Property<int>("RulesVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("rules_version");
+
+                    b.Property<string>("SectorETag")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sector_etag");
+
+                    b.Property<string>("SectorLastModified")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sector_last_modified");
+
+                    b.Property<int>("SectorMatched")
+                        .HasColumnType("integer")
+                        .HasColumnName("sector_matched");
+
+                    b.Property<int>("SectorUnmatched")
+                        .HasColumnType("integer")
+                        .HasColumnName("sector_unmatched");
+
+                    b.Property<bool>("SectorsApplied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sectors_applied");
+
+                    b.Property<int>("SkippedByScope")
+                        .HasColumnType("integer")
+                        .HasColumnName("skipped_by_scope");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalActive")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_active");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("trigger");
+
+                    b.Property<int>("Unchanged")
+                        .HasColumnType("integer")
+                        .HasColumnName("unchanged");
+
+                    b.Property<int>("Updated")
+                        .HasColumnType("integer")
+                        .HasColumnName("updated");
+
+                    b.Property<string>("Warnings")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("warnings");
+
+                    b.HasKey("Id")
+                        .HasName("pk_master_refreshes");
+
+                    b.HasIndex("StartedAt")
+                        .HasDatabaseName("ix_master_refreshes_started_at");
+
+                    b.HasIndex(new[] { "Status" }, "ux_master_refreshes_one_running")
+                        .IsUnique()
+                        .HasDatabaseName("ux_master_refreshes_one_running")
+                        .HasFilter("status = 'running'");
+
+                    b.ToTable("master_refreshes", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_master_refreshes_status", "status IN ('running', 'succeeded', 'unchanged', 'failed')");
+
+                            t.HasCheckConstraint("ck_master_refreshes_trigger", "trigger IN ('manual', 'daily', 'forced')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Platform.ServiceHeartbeat", b =>
                 {
                     b.Property<string>("Id")
@@ -601,6 +753,204 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasName("pk_broker_secrets");
 
                     b.ToTable("broker_secrets", "accounts");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentBrokerIdRecord", b =>
+                {
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("Broker")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("broker");
+
+                    b.Property<string>("BrokerId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("broker_id");
+
+                    b.Property<string>("Segment")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("segment");
+
+                    b.HasKey("InstrumentId", "Broker")
+                        .HasName("pk_instrument_broker_ids");
+
+                    b.HasIndex("Broker", "BrokerId", "Segment")
+                        .IsUnique()
+                        .HasDatabaseName("ix_instrument_broker_ids_broker_broker_id_segment");
+
+                    b.ToTable("instrument_broker_ids", "market");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AsmGsmCategory")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("asm_gsm_category");
+
+                    b.Property<string>("AsmGsmFlag")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("asm_gsm_flag");
+
+                    b.Property<string>("CanonicalSymbol")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("canonical_symbol");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Exchange")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("exchange");
+
+                    b.Property<string>("ExchangeSegment")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("exchange_segment");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry_date");
+
+                    b.Property<DateTimeOffset>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<bool>("FnoEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("fno_eligible");
+
+                    b.Property<long?>("FreezeQuantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("freeze_qty");
+
+                    b.Property<string>("Isin")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<int>("LotSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("lot_size");
+
+                    b.Property<decimal?>("MtfLeverage")
+                        .HasPrecision(12, 6)
+                        .HasColumnType("numeric(12,6)")
+                        .HasColumnName("mtf_leverage");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<string>("Sector")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sector");
+
+                    b.Property<string>("SectorSource")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("sector_source");
+
+                    b.Property<string>("Series")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("series");
+
+                    b.Property<decimal?>("TickSize")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)")
+                        .HasColumnName("tick_size");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("type");
+
+                    b.Property<string>("UnderlyingSymbol")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("underlying_symbol");
+
+                    b.HasKey("Id")
+                        .HasName("pk_instruments");
+
+                    b.HasIndex("FnoEligible")
+                        .HasDatabaseName("ix_instruments_fno_eligible");
+
+                    b.HasIndex("RetiredAt")
+                        .HasDatabaseName("ix_instruments_retired_at");
+
+                    b.HasIndex("Sector")
+                        .HasDatabaseName("ix_instruments_sector");
+
+                    b.HasIndex("Type")
+                        .HasDatabaseName("ix_instruments_type");
+
+                    b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol")
+                        .IsUnique()
+                        .HasDatabaseName("ix_instruments_canonical_symbol");
+
+                    b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol_trgm")
+                        .HasDatabaseName("ix_instruments_canonical_symbol_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "DisplayName" }, "ix_instruments_display_name_trgm")
+                        .HasDatabaseName("ix_instruments_display_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "DisplayName" }, "ix_instruments_display_name_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "DisplayName" }, "ix_instruments_display_name_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "Isin" }, "ix_instruments_isin_trgm")
+                        .HasDatabaseName("ix_instruments_isin_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Isin" }, "ix_instruments_isin_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Isin" }, "ix_instruments_isin_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "Name" }, "ix_instruments_name_trgm")
+                        .HasDatabaseName("ix_instruments_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Name" }, "ix_instruments_name_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Name" }, "ix_instruments_name_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.ToTable("instruments", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_instruments_type", "type IN ('share', 'etf', 'index', 'future')");
+                        });
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
@@ -790,6 +1140,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_broker_secrets_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentBrokerIdRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_instrument_broker_ids_instruments_instrument_id");
                 });
 #pragma warning restore 612, 618
         }

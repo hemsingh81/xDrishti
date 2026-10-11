@@ -3,12 +3,11 @@ import { Box, Stack, Typography } from '@mui/material';
 import { useId } from 'react';
 import type { AccountDetail } from '@/shared/api';
 import { formatDateTime } from '@/shared/lib/format';
-import { IconChip } from '@/shared/ui';
+import { Facts, IconChip } from '@/shared/ui';
 import { useConnectionState } from '../hooks/useConnectionState';
 import { dhanApp } from '../lib/dhanApp';
 import { ConnectionActions } from './ConnectionActions';
 import { ConnectionStatus } from './ConnectionStatus';
-import { Facts } from './Facts';
 
 const when = (value: string | null) => (value ? formatDateTime(value) : 'never');
 

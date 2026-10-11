@@ -7,6 +7,8 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Refresh;
+using XDrishti.Application.Market.Search;
 using XDrishti.Application.Platform.SystemStatus;
 
 namespace XDrishti.Api.Infrastructure;
@@ -40,6 +42,13 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<BucketView>))]
 [JsonSerializable(typeof(BucketView))]
 [JsonSerializable(typeof(BucketInput))]
+[JsonSerializable(typeof(InstrumentPage))]
+[JsonSerializable(typeof(InstrumentFacets))]
+[JsonSerializable(typeof(InstrumentDetail))]
+[JsonSerializable(typeof(StartRefreshRequest))]
+[JsonSerializable(typeof(RefreshStarted))]
+[JsonSerializable(typeof(RefreshStatusView))]
+[JsonSerializable(typeof(IReadOnlyList<RefreshRunView>))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSerializable(typeof(HttpValidationProblemDetails))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

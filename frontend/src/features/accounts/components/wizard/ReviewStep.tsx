@@ -3,7 +3,7 @@ import { formatDate, formatInr } from '@/shared/lib/format';
 import { dhanApp } from '../../lib/dhanApp';
 import { modeLabel, roleInfo } from '../../lib/labels';
 import { maskClientId, type WizardState } from '../../lib/wizardState';
-import { Facts, type Fact } from '../Facts';
+import { Facts, type Fact } from '@/shared/ui';
 import { FormAlert } from '../FormAlert';
 
 /** Secrets are summarised as "•••• set" — the review never shows a value, not even partly. */

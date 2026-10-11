@@ -417,6 +417,108 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/instruments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Search the master list: q (symbol, name, ISIN), type, sector, fno, asmGsm, series, includeRetired, sort, page, pageSize (max 100) */
+    get: operations['SearchInstruments'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/facets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Counts of the active instruments by type, series, F&O and ASM/GSM, and of the active shares by sector (incl. Unclassified), for the filters */
+    get: operations['GetInstrumentFacets'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One instrument with all fields and its broker ids */
+    get: operations['GetInstrument'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/refresh': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Refresh the master list from Dhan in the background (force: true skips the unchanged-file check); 409 instruments.refresh_running while one runs */
+    post: operations['StartInstrumentRefresh'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/refresh/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The refresh in progress (phase, rows read), the last finished one, the daily schedule and the number of active instruments */
+    get: operations['GetInstrumentRefreshStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/refresh/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The most recent refreshes, newest first (take 1 to 100, default 20) */
+    get: operations['ListInstrumentRefreshes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -506,6 +608,19 @@ export interface components {
       email: null | string;
       ip: null | string;
       userAgent: null | string;
+    };
+    /** @description The daily automatic refresh: whether it is on, at what India time, and when it runs next. */
+    AutoRefreshView: {
+      enabled: boolean;
+      timeIst: string;
+      /** Format: date-time */
+      nextRunAt: null | string;
+    };
+    /** @description The id a broker uses for the instrument (Dhan: security id + exchange segment). */
+    BrokerIdView: {
+      broker: string;
+      brokerId: string;
+      segment: string;
     };
     /** @description A new bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case. */
     BucketInput: {
@@ -599,6 +714,12 @@ export interface components {
     DhanRedirectView: {
       redirectUrl: string;
     };
+    /** @description A filter value and how many active instruments have it. */
+    FacetCount: {
+      value: string;
+      /** Format: int32 */
+      count: number;
+    };
     HttpValidationProblemDetails: {
       type?: null | string;
       title?: null | string;
@@ -616,6 +737,91 @@ export interface components {
        * @description Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.
        */
       retryAfterSeconds?: number;
+    };
+    /** @description Everything the master list knows about an instrument. */
+    InstrumentDetail: {
+      /** Format: uuid */
+      id: string;
+      symbol: string;
+      exchange: string;
+      exchangeSegment: string;
+      type: string;
+      name: string;
+      displayName: string;
+      isin: null | string;
+      series: null | string;
+      /** Format: int32 */
+      lotSize: number;
+      /** Format: double */
+      tickSize: null | number;
+      /** Format: date */
+      expiryDate: null | string;
+      underlyingSymbol: string;
+      sector: null | string;
+      sectorSource: null | string;
+      fnoEligible: boolean;
+      asmGsm: boolean;
+      asmGsmFlag: null | string;
+      asmGsmCategory: null | string;
+      /** Format: double */
+      mtfLeverage: null | number;
+      /** Format: int64 */
+      freezeQuantity: null | number;
+      /** Format: date-time */
+      firstSeenAt: string;
+      /** Format: date-time */
+      lastSeenAt: string;
+      /** Format: date-time */
+      retiredAt: null | string;
+      brokerIds: components['schemas']['BrokerIdView'][];
+    };
+    /**
+     * @description Counts of the active (not retired) instruments per filter value. Sectors are counted over shares only (only shares get one);
+     *     sector "Unclassified" = shares without a known sector, and filtering by it returns exactly those.
+     */
+    InstrumentFacets: {
+      /** Format: int32 */
+      total: number;
+      /** Format: int32 */
+      retired: number;
+      types: components['schemas']['FacetCount'][];
+      sectors: components['schemas']['FacetCount'][];
+      series: components['schemas']['FacetCount'][];
+      /** Format: int32 */
+      fnoEligible: number;
+      /** Format: int32 */
+      asmGsm: number;
+    };
+    /** @description One page of search results (`total` counts all matches). */
+    InstrumentPage: {
+      items: components['schemas']['InstrumentSummary'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description A row of the master list. `type`: share · etf · index · future. */
+    InstrumentSummary: {
+      /** Format: uuid */
+      id: string;
+      symbol: string;
+      name: string;
+      displayName: string;
+      type: string;
+      isin: null | string;
+      series: null | string;
+      sector: null | string;
+      /** Format: int32 */
+      lotSize: number;
+      /** Format: double */
+      tickSize: null | number;
+      /** Format: date */
+      expiryDate: null | string;
+      fnoEligible: boolean;
+      asmGsm: boolean;
+      retired: boolean;
     };
     InstrumentsInput: {
       intraday: null | string[];
@@ -662,6 +868,61 @@ export interface components {
        * @description Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.
        */
       retryAfterSeconds?: number;
+    };
+    /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
+    RefreshRunView: {
+      /** Format: uuid */
+      id: string;
+      trigger: string;
+      status: string;
+      phase: null | string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      requestedBy: string;
+      /** Format: int64 */
+      rowsRead: number;
+      /** Format: int32 */
+      added: number;
+      /** Format: int32 */
+      updated: number;
+      /** Format: int32 */
+      retired: number;
+      /** Format: int32 */
+      revived: number;
+      /** Format: int32 */
+      unchanged: number;
+      /** Format: int32 */
+      skippedByScope: number;
+      /** Format: int32 */
+      collisions: number;
+      /** Format: int32 */
+      sectorMatched: number;
+      /** Format: int32 */
+      sectorUnmatched: number;
+      /** Format: int32 */
+      fnoUnderlyings: number;
+      /** Format: int32 */
+      totalActive: number;
+      keptByType: {
+        [key: string]: number;
+      };
+      warnings: string[];
+      error: null | string;
+    };
+    /** @description The refresh that was registered; follow it with `GET /api/instruments/refresh/status`. */
+    RefreshStarted: {
+      /** Format: uuid */
+      refreshId: string;
+    };
+    /** @description Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active. */
+    RefreshStatusView: {
+      current: null | components['schemas']['RefreshRunView'];
+      last: null | components['schemas']['RefreshRunView'];
+      autoRefresh: components['schemas']['AutoRefreshView'];
+      /** Format: int32 */
+      totalActive: number;
     };
     /** @description The values of a risk profile to create or to replace an existing one with. Every value is required. */
     RiskProfileInput: {
@@ -790,6 +1051,11 @@ export interface components {
        * @description End of the step-up window (password re-entered); null when the session is not elevated right now.
        */
       elevatedUntil?: null | string;
+    };
+    /** @description Starts a refresh. `force` skips the "file unchanged" check. */
+    StartRefreshRequest: {
+      /** @default false */
+      force: boolean;
     };
     /** @description Body of `POST /api/auth/step-up`. */
     StepUpRequest: {
@@ -2071,6 +2337,172 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SearchInstruments: {
+    parameters: {
+      query?: {
+        q?: string;
+        type?: string;
+        sector?: string;
+        fno?: boolean;
+        asmGsm?: boolean;
+        series?: string;
+        includeRetired?: boolean;
+        sort?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InstrumentPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetInstrumentFacets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InstrumentFacets'];
+        };
+      };
+    };
+  };
+  GetInstrument: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InstrumentDetail'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartInstrumentRefresh: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['StartRefreshRequest'];
+      };
+    };
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RefreshStarted'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetInstrumentRefreshStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RefreshStatusView'];
+        };
+      };
+    };
+  };
+  ListInstrumentRefreshes: {
+    parameters: {
+      query?: {
+        take?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RefreshRunView'][];
         };
       };
     };

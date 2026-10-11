@@ -7,6 +7,7 @@ using Scalar.AspNetCore;
 using Serilog;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
+using XDrishti.Api.Market;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -48,6 +49,11 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, BrokersEndpoints>();
         services.AddSingleton<IEndpointModule, RiskProfilesEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioBucketsEndpoints>();
+        services.AddSingleton<IEndpointModule, InstrumentsEndpoints>();
+
+        // Instrument master (ADR 0010): the worker that carries out registered refreshes, and the daily automatic refresh.
+        services.AddHostedService<RefreshJobWorker>();
+        services.AddHostedService<DailyRefreshService>();
         return services;
     }
 

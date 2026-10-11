@@ -1504,6 +1504,276 @@
           }
         }
       }
+    },
+    "/api/instruments": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Search the master list: q (symbol, name, ISIN), type, sector, fno, asmGsm, series, includeRetired, sort, page, pageSize (max 100)",
+        "operationId": "SearchInstruments",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sector",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fno",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "asmGsm",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "series",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeRetired",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/facets": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Counts of the active instruments by type, series, F&O and ASM/GSM, and of the active shares by sector (incl. Unclassified), for the filters",
+        "operationId": "GetInstrumentFacets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentFacets"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/{id}": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "One instrument with all fields and its broker ids",
+        "operationId": "GetInstrument",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/refresh": {
+      "post": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Refresh the master list from Dhan in the background (force: true skips the unchanged-file check); 409 instruments.refresh_running while one runs",
+        "operationId": "StartInstrumentRefresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StartRefreshRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshStarted"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/refresh/status": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "The refresh in progress (phase, rows read), the last finished one, the daily schedule and the number of active instruments",
+        "operationId": "GetInstrumentRefreshStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/refresh/history": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "The most recent refreshes, newest first (take 1 to 100, default 20)",
+        "operationId": "ListInstrumentRefreshes",
+        "parameters": [
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RefreshRunView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1793,6 +2063,50 @@
             ]
           }
         }
+      },
+      "AutoRefreshView": {
+        "required": [
+          "enabled",
+          "timeIst",
+          "nextRunAt"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "timeIst": {
+            "type": "string"
+          },
+          "nextRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "The daily automatic refresh: whether it is on, at what India time, and when it runs next."
+      },
+      "BrokerIdView": {
+        "required": [
+          "broker",
+          "brokerId",
+          "segment"
+        ],
+        "type": "object",
+        "properties": {
+          "broker": {
+            "type": "string"
+          },
+          "brokerId": {
+            "type": "string"
+          },
+          "segment": {
+            "type": "string"
+          }
+        },
+        "description": "The id a broker uses for the instrument (Dhan: security id + exchange segment)."
       },
       "BucketInput": {
         "required": [
@@ -2165,6 +2479,23 @@
         },
         "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
       },
+      "FacetCount": {
+        "required": [
+          "value",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A filter value and how many active instruments have it."
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -2218,6 +2549,321 @@
             "format": "int32"
           }
         }
+      },
+      "InstrumentDetail": {
+        "required": [
+          "id",
+          "symbol",
+          "exchange",
+          "exchangeSegment",
+          "type",
+          "name",
+          "displayName",
+          "isin",
+          "series",
+          "lotSize",
+          "tickSize",
+          "expiryDate",
+          "underlyingSymbol",
+          "sector",
+          "sectorSource",
+          "fnoEligible",
+          "asmGsm",
+          "asmGsmFlag",
+          "asmGsmCategory",
+          "mtfLeverage",
+          "freezeQuantity",
+          "firstSeenAt",
+          "lastSeenAt",
+          "retiredAt",
+          "brokerIds"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "exchangeSegment": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "series": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lotSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tickSize": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "expiryDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "underlyingSymbol": {
+            "type": "string"
+          },
+          "sector": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sectorSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fnoEligible": {
+            "type": "boolean"
+          },
+          "asmGsm": {
+            "type": "boolean"
+          },
+          "asmGsmFlag": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "asmGsmCategory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mtfLeverage": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "freezeQuantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "firstSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retiredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "brokerIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BrokerIdView"
+            }
+          }
+        },
+        "description": "Everything the master list knows about an instrument."
+      },
+      "InstrumentFacets": {
+        "required": [
+          "total",
+          "retired",
+          "types",
+          "sectors",
+          "series",
+          "fnoEligible",
+          "asmGsm"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FacetCount"
+            }
+          },
+          "sectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FacetCount"
+            }
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FacetCount"
+            }
+          },
+          "fnoEligible": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "asmGsm": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Counts of the active (not retired) instruments per filter value. Sectors are counted over shares only (only shares get one);\nsector \"Unclassified\" = shares without a known sector, and filtering by it returns exactly those."
+      },
+      "InstrumentPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstrumentSummary"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of search results (`total` counts all matches)."
+      },
+      "InstrumentSummary": {
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "displayName",
+          "type",
+          "isin",
+          "series",
+          "sector",
+          "lotSize",
+          "tickSize",
+          "expiryDate",
+          "fnoEligible",
+          "asmGsm",
+          "retired"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "series": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sector": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lotSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tickSize": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "expiryDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "fnoEligible": {
+            "type": "boolean"
+          },
+          "asmGsm": {
+            "type": "boolean"
+          },
+          "retired": {
+            "type": "boolean"
+          }
+        },
+        "description": "A row of the master list. `type`: share · etf · index · future."
       },
       "InstrumentsInput": {
         "required": [
@@ -2414,6 +3060,185 @@
             "format": "int32"
           }
         }
+      },
+      "RefreshRunView": {
+        "required": [
+          "id",
+          "trigger",
+          "status",
+          "phase",
+          "startedAt",
+          "finishedAt",
+          "requestedBy",
+          "rowsRead",
+          "added",
+          "updated",
+          "retired",
+          "revived",
+          "unchanged",
+          "skippedByScope",
+          "collisions",
+          "sectorMatched",
+          "sectorUnmatched",
+          "fnoUnderlyings",
+          "totalActive",
+          "keptByType",
+          "warnings",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "phase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "rowsRead": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skippedByScope": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "collisions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sectorMatched": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sectorUnmatched": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fnoUnderlyings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalActive": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "keptByType": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving."
+      },
+      "RefreshStarted": {
+        "required": [
+          "refreshId"
+        ],
+        "type": "object",
+        "properties": {
+          "refreshId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "The refresh that was registered; follow it with `GET /api/instruments/refresh/status`."
+      },
+      "RefreshStatusView": {
+        "required": [
+          "current",
+          "last",
+          "autoRefresh",
+          "totalActive"
+        ],
+        "type": "object",
+        "properties": {
+          "current": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RefreshRunView"
+              }
+            ]
+          },
+          "last": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RefreshRunView"
+              }
+            ]
+          },
+          "autoRefresh": {
+            "$ref": "#/components/schemas/AutoRefreshView"
+          },
+          "totalActive": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active."
       },
       "RiskProfileInput": {
         "required": [
@@ -2811,6 +3636,16 @@
         },
         "description": "What the client needs to know about its session."
       },
+      "StartRefreshRequest": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "description": "Starts a refresh. `force` skips the \"file unchanged\" check."
+      },
       "StepUpRequest": {
         "required": [
           "password"
@@ -3083,6 +3918,9 @@
     },
     {
       "name": "Portfolio buckets"
+    },
+    {
+      "name": "Instruments"
     }
   ]
 }

@@ -377,6 +377,30 @@ fundamentals:  { enabled: false, quality_filter: { min_profit_quarters_of_last_4
 Broker API keys, secrets and tokens are not configuration: they are entered in the app and stored encrypted in the database (ADR 0008).
 <code>Brokers__PublicBaseUrl</code> (default <code>http://localhost:8080</code>, set from <code>XD_HTTP_PORT</code> in compose) is the base of the broker redirect URLs
 <code>/api/brokers/&lt;broker&gt;/callback</code>.</p>
+<h3 id="instrument-master-instruments-adr-0010-p1-03">Instrument master (<code>Instruments:*</code>, ADR 0010, P1-03)<a class="hash" href="#instrument-master-instruments-adr-0010-p1-03" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option (<code>appsettings</code> / environment)</th>
+<th>Meaning</th>
+<th>Default</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Instruments:AutoRefresh:Enabled</code> (<code>Instruments__AutoRefresh__Enabled</code>; compose: <code>XD_INSTRUMENTS_AUTO_REFRESH</code>)</td>
+<td>The API refreshes the master list from Dhan&#39;s public scrip master by itself once a day</td>
+<td><code>true</code></td>
+<td>boolean</td>
+</tr>
+<tr>
+<td><code>Instruments:AutoRefresh:TimeIst</code> (<code>Instruments__AutoRefresh__TimeIst</code>; compose: <code>XD_INSTRUMENTS_REFRESH_TIME_IST</code>)</td>
+<td>Time of the daily run as <code>HH:mm</code> (24-hour), <strong>India time</strong> (UTC+05:30, no daylight saving); Dhan publishes the file around 08:20</td>
+<td><code>08:45</code></td>
+<td>required, validated at start (<code>ValidateOnStart</code>): a wrong value stops the API with a message</td>
+</tr>
+</tbody></table>
+<p>The two source URLs are not configuration: they are fixed in the code and on the allow-list (<a href="05-data-and-brokers.html">doc 05</a> §7.1, <a href="17-deployment-and-operations.html">doc 17</a> §3). The manual &quot;Refresh list&quot; button works whether the daily run is on or off.</p>
 <h2 id="4-most-used-settings">4. Most-used settings<a class="hash" href="#4-most-used-settings" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -453,11 +477,12 @@ Broker API keys, secrets and tokens are not configuration: they are entered in t
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-11 10:15</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-11 12:29</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>
 <a href="#3-infrastructure-settings-appsettingsjson-excerpt" class="d2">3. Infrastructure settings (appsettings.json excerpt)</a>
+<a href="#instrument-master-instruments-adr-0010-p1-03" class="d3">Instrument master (Instruments:*, ADR 0010, P1-03)</a>
 <a href="#4-most-used-settings" class="d2">4. Most-used settings</a></aside>
 </div>
 <div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>

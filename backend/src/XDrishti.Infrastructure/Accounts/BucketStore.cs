@@ -12,7 +12,7 @@ internal sealed class BucketStore(XDrishtiDbContext db) : IBucketStore
 
     public async ValueTask<string?> FindNameAsync(string name, CancellationToken cancellationToken)
     {
-        return await db.PortfolioBuckets.AsNoTracking().Where(x => EF.Functions.ILike(x.Name, LikePattern.Escape(name))).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken);
+        return await db.PortfolioBuckets.AsNoTracking().Where(x => EF.Functions.ILike(x.Name, LikePattern.Escape(name), LikePattern.EscapeCharacter)).Select(x => x.Name).FirstOrDefaultAsync(cancellationToken);
     }
 
     public void Add(PortfolioBucket bucket) => db.PortfolioBuckets.Add(bucket);

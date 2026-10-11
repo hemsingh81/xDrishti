@@ -14,3 +14,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0007](0007-accounts-credential-references-and-step-up.md) | Accounts: credential references instead of secrets in the database, step-up (password re-entry), one primary Data account, archive instead of delete | Accepted (decision 1 superseded by 0008) |
 | [0008](0008-broker-credentials-vault-and-connection.md) | Broker credentials in an encrypted vault; broker-first accounts; connecting Dhan (consent) and Upstox (authorization code) | Accepted (narrowed by 0009) |
 | [0009](0009-dhan-consent-flow-only.md) | Accounts: Dhan only, API key & secret consent flow only; account status in the header | Accepted |
+| [0010](0010-instrument-master-sources-and-scope.md) | Instrument master: Dhan scrip master + NSE sector list, NSE shares/ETFs/indices/futures only, manual + daily refresh | Accepted |
