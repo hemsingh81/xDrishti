@@ -3,11 +3,10 @@ import VpnKeyIcon from '@mui/icons-material/VpnKeyOutlined';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { useId, useState } from 'react';
 import type { AccountDetail } from '@/shared/api';
-import { IconChip } from '@/shared/ui';
+import { Facts, IconChip } from '@/shared/ui';
 import { dhanApp } from '../lib/dhanApp';
 import { ApiKeyExpiry } from './ApiKeyExpiry';
 import { DhanSetupGuide } from './DhanSetupGuide';
-import { Facts } from './Facts';
 import { ReplaceSecretsDialog } from './ReplaceSecretsDialog';
 import { SecretsStatus } from './SecretsStatus';
 

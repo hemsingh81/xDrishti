@@ -95,8 +95,8 @@ not by your browser session.</li>
 </tr>
 <tr>
 <td><strong>Portfolio</strong></td>
-<td>Holdings, positions, trade history and ledger are synced and monitored</td>
-<td>Sync schedule, default bucket</td>
+<td>Holdings (and later positions, trades, ledger) are imported with acquisition dates, synced by hand or automatically and monitored (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>)</td>
+<td>Connected account; optional refresh schedule; gets its own default bucket automatically</td>
 </tr>
 </tbody></table>
 <p>One account can hold several roles at once, for example:</p>
@@ -210,6 +210,19 @@ vault show &quot;API key: not set&quot;.</p>
 <p><strong>Sensitive changes need password re-entry (step-up, 5 minutes):</strong> creating, changing the connection (name, client id, colour, notes), replacing broker secrets, connecting, disconnecting, changing roles or
 the primary Data account, changing trading settings, removing an account, and creating, editing or deleting risk profiles. Without a recent
 step-up these endpoints answer <code>403 auth.step_up_required</code>. Portfolio and Data settings and adding portfolio buckets do not need it.</p>
+<p><strong>Portfolio settings and the default bucket (P1-16e):</strong> an account with the Portfolio role always has exactly one default bucket named
+<code>&quot;{account name} · Portfolio&quot;</code> (middle dot with spaces), created in the same save that creates the account or switches the role on, renamed with the account,
+archived with it (and renamed &quot;… · Portfolio (archived)&quot;, so its name is free for a new account), and hidden from <code>GET /api/portfolio-buckets</code> while the role is off (it and its holdings are kept). <code>PUT /api/accounts/{id}/portfolio</code> takes
+<code>{defaultBucket?, includeInTotals?, refreshMode?, refreshDailyTimeIst?, firstImportDate?, firstImport?: {rows: [{key, acquiredOn?}]}}</code> — <strong>every field that is left out (or null) keeps its current value</strong>. <code>defaultBucket</code> is a
+custom bucket&#39;s name; <code>&quot;&quot;</code> (or the name of the account&#39;s own &quot;{name} · Portfolio&quot; bucket) selects the account&#39;s own bucket; at account creation, left out means the own bucket and <code>includeInTotals</code> true. Views return <code>defaultBucket</code> (name), <code>autoBucketName</code>, the refresh settings, <code>firstImportDate</code> and <code>hasHoldings</code>. <strong>Automatic holdings refresh and first import</strong> (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>, <a href="../adr/0013-portfolio-import-with-settings-and-daily-refresh.html">ADR 0013</a>):
+<code>refreshMode</code> <code>off</code> (default) | <code>daily</code>, <code>refreshDailyTimeIst</code> <code>HH:mm</code> (India time, default 16:00); <code>firstImportDate</code> (default 2025-01-01, not in the future, not before 1990-01-01) is the date holdings
+get when imported without a date of their own. A field that is left out keeps its current value, invalid values are <code>400 accounts.invalid</code> with the field name, a refresh change is audited (<code>PortfolioRefreshSettingsChanged</code>).
+<strong>The answer is <code>{account, import}</code></strong>: when the account has the Portfolio role, is connected and has no holdings, every holding Dhan lists is imported right after the settings are saved, dated <code>firstImportDate</code> (request, else stored, else 2025-01-01; optional <code>firstImport.rows</code> dates override per key)
+(<code>import.status</code> <code>imported</code> with <code>imported</code>/<code>defaultDated</code>/<code>alreadyImported</code>/<code>unknown</code>, <code>skipped</code> when the account already has holdings, <code>deferred</code> when it is not connected or the role is off — the first sync then imports everything dated
+<code>firstImportDate</code> —, or <code>failed</code> with <code>errorCode</code> <code>portfolio.import_failed</code>, <code>cause</code> and <code>message</code>: the settings stay saved); <code>import</code> is always present. At account creation <code>firstImportDate</code> is stored and <code>firstImport</code> is ignored (a new account is not connected).
+Details: <a href="12-portfolio-monitoring.html">doc 12</a> §3.
+There is no &quot;history from&quot; setting: acquisition dates are chosen by the owner at the first import (saving these settings) and can be edited per lot (<a href="12-portfolio-monitoring.html">doc 12</a> §3).
+The import, sync and lot-date edits are audited in the account&#39;s activity (<code>HoldingsImported</code>, <code>HoldingsSynced</code>, <code>LotDateChanged</code>: counts and dates only, never tokens or Dhan&#39;s payload).</p>
 <p><strong>Removing an account archives it:</strong> it disappears from lists and services, its history and audit trail (<code>accounts.account_events</code>, insert-only
 for the runtime role) stay, its name becomes free again and its stored broker secrets are deleted. The primary Data account cannot be removed or lose the
 Data role until another account has been made primary (an atomic swap; the old primary becomes the standby when that slot is free).</p>
@@ -223,7 +236,7 @@ Data role until another account has been made primary (an atomic swap; the old p
 </thead>
 <tbody><tr>
 <td><strong>Accounts</strong> (list + detail)</td>
-<td>Left: every account with roles, token health, holdings value. Right: tabs <strong>Overview</strong> (value, P&amp;L, funds, token, sync) · <strong>Roles</strong> · <strong>Trading</strong> (mode, risk profile, capital source/amount, styles, allowed instruments per style, per-account overrides of risk %, max entries, max open, daily loss) · <strong>Portfolio</strong> (default bucket, trade-history import start, include in totals, buckets) · <strong>Data</strong> (primary/standby, subscription &amp; renewal, live-feed budget, failover test) · <strong>Connection</strong> (client id masked, name, colour, notes; secret status — set / last changed, Dhan key expiry — with <em>Replace</em> (write-only dialog, step-up); Dhan&#39;s setup steps and redirect URL; connection status chip and expiry with <em>Connect / Reconnect</em> and <em>Disconnect</em>) · <strong>Activity</strong> (audit for this account)</td>
+<td>Left: every account with roles, token health, holdings value. Right: tabs <strong>Overview</strong> (value, P&amp;L, funds, token, sync) · <strong>Roles</strong> · <strong>Trading</strong> (mode, risk profile, capital source/amount, styles, allowed instruments per style, per-account overrides of risk %, max entries, max open, daily loss) · <strong>Portfolio</strong> (default bucket for imports — the account&#39;s own <em>&quot;{name} · Portfolio&quot;</em> bucket or a custom one —, include in totals, add bucket; auto refresh: Off / Daily at HH:MM IST, and the <em>First import</em> block: the first import date (default 1 Jan 2025) ; saving imports all holdings Dhan lists with that date, per-holding dates are edited later on the Portfolio screen. Later changes arrive with the refresh; the Portfolio screen only has <em>Sync now</em>) · <strong>Data</strong> (primary/standby, subscription &amp; renewal, live-feed budget, failover test) · <strong>Connection</strong> (client id masked, name, colour, notes; secret status — set / last changed, Dhan key expiry — with <em>Replace</em> (write-only dialog, step-up); Dhan&#39;s setup steps and redirect URL; connection status chip and expiry with <em>Connect / Reconnect</em> and <em>Disconnect</em>) · <strong>Activity</strong> (audit for this account)</td>
 </tr>
 <tr>
 <td><strong>Add account wizard</strong></td>
@@ -569,7 +582,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-11 10:15</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-11 18:10</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

@@ -6,5 +6,9 @@
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Real rows of Dhan's scrip master and NSE's sector list (see docs/specs/P1-03), embedded so unit tests never touch the disk. -->
+    <EmbeddedResource Include="Fixtures\*.csv" LogicalName="Fixtures/%(Filename)%(Extension)" />
+  </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>

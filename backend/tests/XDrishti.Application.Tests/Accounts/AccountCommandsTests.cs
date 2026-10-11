@@ -1,5 +1,6 @@
 using System.Text.Json;
 using XDrishti.Application.Accounts;
+using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 
@@ -61,7 +62,7 @@ public sealed class AccountCommandsTests
     [Fact]
     public async Task Roles_are_changed_and_the_change_is_audited_as_before_and_after()
     {
-        var account = await _fx.CreatedAsync(Inputs.Account(portfolio: Inputs.Portfolio("Trading")));
+        var account = await _fx.CreatedAsync();
 
         var result = await _fx.UpdateRoles().HandleAsync(
             new UpdateRolesCommand(account.Id, new RolesInput(new DataRoleInput(true, "primary"), null, new RoleToggleInput(true)), AccountsFixture.Actor), CancellationToken.None);
@@ -142,28 +143,66 @@ public sealed class AccountCommandsTests
     }
 
     [Fact]
-    public async Task Portfolio_settings_use_the_stored_spelling_of_the_bucket()
+    public async Task Portfolio_settings_use_the_stored_spelling_of_a_custom_bucket()
     {
         var account = await _fx.CreatedAsync();
+        await AddCustomBucketAsync("MyChoice");
 
         var result = await _fx.UpdatePortfolio().HandleAsync(
-            new UpdatePortfolioCommand(account.Id, Inputs.Portfolio("mychoice", new DateOnly(2023, 1, 2)), AccountsFixture.Actor), CancellationToken.None);
+            new UpdatePortfolioCommand(account.Id, Inputs.Portfolio("mychoice", includeInTotals: false), AccountsFixture.Actor), CancellationToken.None);
 
-        result.Value.Portfolio.DefaultBucket.ShouldBe("MyChoice");
-        EventsOf(account, AccountEventType.PortfolioUpdated).Single().Detail.ShouldBe("Portfolio (role off): default bucket MyChoice, history from 2023-01-02, included in totals");
+        result.Value.Account.Portfolio.DefaultBucket.ShouldBe("MyChoice");
+        account.Portfolio.DefaultBucketId.ShouldBe(_fx.Data.Buckets.Single(b => b.Name == "MyChoice").Id);
+        EventsOf(account, AccountEventType.PortfolioUpdated).Single().Detail.ShouldBe("Portfolio (role off): imports go to bucket MyChoice, excluded from totals");
     }
 
     [Fact]
-    public async Task Portfolio_with_an_unknown_bucket_or_a_future_start_is_invalid()
+    public async Task Without_a_chosen_bucket_imports_go_to_the_accounts_own_default_bucket()
+    {
+        var account = await _fx.CreatedAsync(Inputs.Account(name: "Dhan · Main".Replace("·", "-"), roles: Inputs.Roles(false, true)));
+
+        var result = await _fx.UpdatePortfolio().HandleAsync(
+            new UpdatePortfolioCommand(account.Id, new PortfolioInput(null, null), AccountsFixture.Actor), CancellationToken.None);
+
+        result.Value.Account.Portfolio.DefaultBucket.ShouldBe("Dhan - Main · Portfolio");
+        result.Value.Account.Portfolio.AutoBucketName.ShouldBe("Dhan - Main · Portfolio");
+        account.Portfolio.DefaultBucketId.ShouldBeNull();
+        account.Portfolio.IncludeInTotals.ShouldBeTrue();
+        EventsOf(account, AccountEventType.PortfolioUpdated).Single().Detail.ShouldBe("Portfolio (role on): imports go to the account's own bucket, included in totals");
+    }
+
+    [Theory]
+    [InlineData("Example One · Portfolio")]
+    [InlineData("example one · portfolio")]
+    public async Task Choosing_the_accounts_own_default_bucket_stores_no_custom_bucket(string name)
+    {
+        var account = await _fx.CreatedAsync(Inputs.Account(roles: Inputs.Roles(false, true)));
+        await AddCustomBucketAsync("Growth");
+        await _fx.UpdatePortfolio().HandleAsync(new UpdatePortfolioCommand(account.Id, Inputs.Portfolio("Growth"), AccountsFixture.Actor), CancellationToken.None);
+
+        var result = await _fx.UpdatePortfolio().HandleAsync(new UpdatePortfolioCommand(account.Id, Inputs.Portfolio(name), AccountsFixture.Actor), CancellationToken.None);
+
+        result.Value.Account.Portfolio.DefaultBucket.ShouldBe("Example One · Portfolio");
+        account.Portfolio.DefaultBucketId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task The_default_bucket_of_another_account_or_an_unknown_bucket_is_invalid()
     {
         var account = await _fx.CreatedAsync();
+        await _fx.CreatedAsync(Inputs.Account(name: "Example Two", clientId: "1000000002", roles: Inputs.Roles(false, true)));
 
         var unknown = await _fx.UpdatePortfolio().HandleAsync(new UpdatePortfolioCommand(account.Id, Inputs.Portfolio("Nope"), AccountsFixture.Actor), CancellationToken.None);
-        var future = await _fx.UpdatePortfolio().HandleAsync(new UpdatePortfolioCommand(account.Id, Inputs.Portfolio("Trading", new DateOnly(2030, 1, 1)), AccountsFixture.Actor), CancellationToken.None);
+        var foreign = await _fx.UpdatePortfolio().HandleAsync(new UpdatePortfolioCommand(account.Id, Inputs.Portfolio("Example Two · Portfolio"), AccountsFixture.Actor), CancellationToken.None);
 
-        Fields(unknown).ShouldContain("defaultBucket");
-        Fields(future).ShouldContain("historyFrom");
+        Fields(unknown).ShouldBe(["defaultBucket"]);
+        Fields(foreign).ShouldBe(["defaultBucket"]);
+        account.Portfolio.DefaultBucketId.ShouldBeNull();
+        EventsOf(account, AccountEventType.PortfolioUpdated).ShouldBeEmpty();
     }
+
+    private async Task AddCustomBucketAsync(string name) =>
+        (await _fx.AddBucket().HandleAsync(new AddBucketCommand(new BucketInput(name), AccountsFixture.Actor), CancellationToken.None)).IsSuccess.ShouldBeTrue();
 
     [Fact]
     public async Task The_live_feed_budget_is_changed_and_range_checked()

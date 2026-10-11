@@ -23,6 +23,12 @@ public sealed class FakeBrokers
 
     public IReadOnlyCollection<RecordedRequest> Requests => _requests;
 
+    /// <summary>What the fake Dhan reports at <c>GET /v2/holdings</c> (for a request that carries the fake access token).</summary>
+    public List<FakeHolding> Holdings { get; } = [];
+
+    /// <summary>Runs before the fake Dhan answers a holdings request (a test holds the answer back to make a sync slow).</summary>
+    public Func<Task>? BeforeHoldingsAnswer { get; set; }
+
     /// <summary>The client id Dhan reports for every token.</summary>
     public string DhanClientId { get; set; } = AccountsApi.ClientId;
 
@@ -36,6 +42,8 @@ public sealed class FakeBrokers
     {
         _requests.Clear();
         _overrides.Clear();
+        Holdings.Clear();
+        BeforeHoldingsAnswer = null;
         DhanClientId = AccountsApi.ClientId;
     }
 
@@ -59,8 +67,21 @@ public sealed class FakeBrokers
                 {"dhanClientId":"{{DhanClientId}}","dhanClientName":"Example Holder","dhanClientUcc":"ABCD1234","givenPowerOfAttorney":false,
                  "accessToken":"{{DhanAccessToken}}","expiryTime":"{{dhanExpiry.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture)}}"}
                 """),
+            "/v2/holdings" => request.Header("access-token") == DhanAccessToken
+                ? Json(HttpStatusCode.OK, HoldingsJson())
+                : Json(HttpStatusCode.Unauthorized, """{"errorType":"Invalid_Authentication","errorCode":"DH-901","errorMessage":"Client ID or user generated access token is invalid or expired."}"""),
             _ => Json(HttpStatusCode.NotFound, """{"errorCode":"NOT_FAKED"}"""),
         };
+    }
+
+    private string HoldingsJson() => "[" + string.Join(",", Holdings.ToArray().Select(h => h.ToJson())) + "]";
+
+    /// <summary>One holding as Dhan reports it (made-up values; Exchange "ALL" like the documentation's example).</summary>
+    public sealed record FakeHolding(string SecurityId, string Symbol, string? Isin, long Qty, decimal AvgCost, decimal Ltp, string Exchange = "ALL")
+    {
+        public string ToJson() => string.Create(CultureInfo.InvariantCulture, $$"""
+            {"exchange":"{{Exchange}}","tradingSymbol":"{{Symbol}}","securityId":"{{SecurityId}}","isin":{{(Isin is null ? "null" : $"\"{Isin}\"")}},"totalQty":{{Qty}},"dpQty":{{Qty}},"t1Qty":0,"mtf_t1_qty":0,"mtf_qty":0,"availableQty":{{Qty}},"collateralQty":0,"avgCostPrice":{{AvgCost}},"lastTradedPrice":{{Ltp}}}
+            """);
     }
 
     /// <summary>One request as Dhan saw it.</summary>
@@ -83,6 +104,11 @@ public sealed class FakeBrokers
 
             var recorded = new RecordedRequest(request.Method, request.RequestUri!, headers, body);
             brokers._requests.Enqueue(recorded);
+            if (recorded.Uri.AbsolutePath == "/v2/holdings" && brokers.BeforeHoldingsAnswer is { } wait)
+            {
+                await wait();
+            }
+
             return brokers.Answer(recorded);
         }
     }

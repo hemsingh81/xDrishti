@@ -40,12 +40,12 @@ accounts:
       trading:   { enabled: true, mode: paper, profile: standard, styles: [intraday, swing],
                    instruments: { intraday: [EQ_MIS], swing_buy: [EQ_CNC], swing_sell: [FUT] },
                    capital: { source: broker_funds, cap: 1000000 } }
-      portfolio: { enabled: true, default_bucket: Trading }
+      portfolio: { enabled: true, include_in_totals: true }   # default bucket "Dhan · Main · Portfolio" is created automatically
   - id: dhan_longterm
     broker: dhan
     client_id: "1000000002"
     roles:
-      portfolio: { enabled: true, default_bucket: MyLongTerm }
+      portfolio: { enabled: true, default_bucket: Long term }    # optional: a custom bucket for imports; omitted = the account's own bucket
   - id: dhan_swing
     broker: dhan
     client_id: "1000000003"
@@ -53,7 +53,7 @@ accounts:
       data:      { enabled: true, standby: true }   # failover if primary token/subscription fails
       trading:   { enabled: true, mode: manual_live, profile: conservative, styles: [swing],
                    capital: { source: fixed, amount: 300000 } }
-      portfolio: { enabled: true, default_bucket: Trading }
+      portfolio: { enabled: true }
 
 data_provider: { reconcile_with: nse_files }    # market data always from the primary Data account
 
@@ -138,11 +138,11 @@ live:
   persist_live_bars: true
 
 portfolio:
-  sync: { time: "16:30", trade_history_backfill_from: 2023-01-01 }
+  sync: { time: "16:30" }                  # nightly sync of trades/ledger (later); the holdings refresh is set per account in the app (off / every N minutes / daily); acquisition dates are chosen at import (ADR 0012), doc 12 §3
   lot_method: fifo
   include_charges_in_cost: true
-  default_bucket_for_plan_trades: Trading
-  buckets: [Trading, MyLongTerm, MyChoice]
+  default_bucket_for_plan_trades: account_default   # the Trading account's own "{name} · Portfolio" bucket, or a custom bucket name
+  custom_buckets: []                                # no preset buckets; each Portfolio account has its own default bucket, custom ones are added in the app
   benchmark: NIFTY 50
   min_days_for_xirr: 30
   alerts: { max_position_weight_pct: 15, bucket_drawdown_pct: 10, results_within_days: 3, day_move_pct: 5 }
@@ -300,6 +300,25 @@ Broker API keys, secrets and tokens are not configuration: they are entered in t
 `Brokers__PublicBaseUrl` (default `http://localhost:8080`, set from `XD_HTTP_PORT` in compose) is the base of the broker redirect URLs
 `/api/brokers/<broker>/callback`.
 
+### Instrument master (`Instruments:*`, ADR 0010, P1-03)
+
+| Option (`appsettings` / environment) | Meaning | Default | Check |
+|--------------------------------------|---------|---------|-------|
+| `Instruments:AutoRefresh:Enabled` (`Instruments__AutoRefresh__Enabled`; compose: `XD_INSTRUMENTS_AUTO_REFRESH`) | The API refreshes the master list from Dhan's public scrip master by itself once a day | `true` | boolean |
+| `Instruments:AutoRefresh:TimeIst` (`Instruments__AutoRefresh__TimeIst`; compose: `XD_INSTRUMENTS_REFRESH_TIME_IST`) | Time of the daily run as `HH:mm` (24-hour), **India time** (UTC+05:30, no daylight saving); Dhan publishes the file around 08:20 | `08:45` | required, validated at start (`ValidateOnStart`): a wrong value stops the API with a message |
+
+The two source URLs are not configuration: they are fixed in the code and on the allow-list ([doc 05](05-data-and-brokers.md) §7.1, [doc 17](17-deployment-and-operations.md) §3). The manual "Refresh list" button works whether the daily run is on or off.
+
+### Holdings refresh (`Portfolio:*`, ADR 0012, P2-01)
+
+| Option (`appsettings` / environment) | Meaning | Default | Check |
+|--------------------------------------|---------|---------|-------|
+| `Portfolio:AutoRefresh:Enabled` (`Portfolio__AutoRefresh__Enabled`; compose: `XD_PORTFOLIO_AUTO_REFRESH`) | The API looks once a minute at the accounts whose own refresh setting is on and runs the due ones; `false` switches every schedule off ("Sync now" keeps working) | `true` | boolean |
+
+Each account chooses its own schedule in the app (Accounts → Portfolio, and on the Portfolio screen): *Off* (default), *Every 5 / 15 / 30 / 60 minutes during market hours*
+(Monday–Friday 09:15–15:30 India time) or *Daily at HH:MM IST*; it is stored in `accounts.portfolio_settings`, not in this file ([doc 04](04-accounts-access-and-operations.md) §1, [doc 12](12-portfolio-monitoring.md) §3).
+The Dhan holdings endpoint (`GET https://api.dhan.co/v2/holdings`) is fixed in the code and on the allow-list ([doc 17](17-deployment-and-operations.md) §3).
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |
@@ -312,7 +331,7 @@ Broker API keys, secrets and tokens are not configuration: they are entered in t
 | `scan_scope` | Which baskets are scanned, with which styles/sides | Best stocks, MyChoice, MyLongTerm |
 | `data.csv_import.default_profile` | Column mapping for your CSV files | my_1min_files |
 | `live.max_ws_instruments` | Cap on live-streamed instruments (active set) | 200 |
-| `portfolio.min_days_for_xirr` | Below this, show absolute return instead of XIRR | 30 |
+| `portfolio.min_days_for_xirr` | Below this, show absolute return instead of XIRR (v1: fixed at 30 in `Xirr.MinDays`, not yet configurable) | 30 |
 | `selection.min_p_win` / `min_exp_R_lower` | Trade quality bar | 0.45 / +0.10R |
 | `learning.min_trades` | Evidence needed per cell | 30 |
 | `goals.max_drawdown_pct` | Halt-and-review threshold | 8% |

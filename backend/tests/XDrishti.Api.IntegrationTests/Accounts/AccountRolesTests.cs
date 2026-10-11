@@ -132,18 +132,15 @@ public sealed class AccountRolesTests(ApiFactory factory) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Portfolio_needs_a_default_bucket_before_the_role_can_be_switched_on()
+    public async Task The_portfolio_role_can_be_switched_on_without_choosing_a_bucket()
     {
         var client = (await factory.SignInElevatedAsync(Ct)).Client;
         var account = await client.CreateAccountAsync(AccountsApi.NewAccount(), Ct);
 
-        using var tooEarly = await client.PutJsonAsync($"/api/accounts/{account.Id}/roles", new { portfolio = new { enabled = true } }, Ct);
-        await client.PutJsonAsync($"/api/accounts/{account.Id}/portfolio", new { defaultBucket = "MyLongTerm" }, Ct);
         var on = await RolesAsync(client, account.Id, new { portfolio = new { enabled = true } });
 
-        tooEarly.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        (await tooEarly.ReadFieldErrorsAsync(Ct)).Keys.ShouldContain("portfolio.defaultBucket");
         on.Roles.Portfolio.Enabled.ShouldBeTrue();
+        on.Portfolio.DefaultBucket.ShouldBe("Example One · Portfolio");
     }
 
     private async Task AssertExactlyOnePrimaryAsync()

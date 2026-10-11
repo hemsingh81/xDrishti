@@ -6,7 +6,7 @@ using XDrishti.Domain.Common;
 
 namespace XDrishti.Application.Accounts.Buckets;
 
-/// <summary>Adds a portfolio bucket (the seeded ones are Trading, MyLongTerm and MyChoice).</summary>
+/// <summary>Adds a custom portfolio bucket (each account's default bucket is created automatically, see <see cref="DefaultBuckets"/>).</summary>
 public sealed record AddBucketCommand(BucketInput Input, string Actor) : ICommand;
 
 internal sealed class AddBucketHandler(
@@ -26,7 +26,7 @@ internal sealed class AddBucketHandler(
         }
 
         var bucket = created.Value;
-        if (await buckets.FindNameAsync(bucket.Name, cancellationToken) is not null)
+        if (await buckets.NameTakenAsync(bucket.Name, null, cancellationToken))
         {
             return Result.Failure<BucketView>(AccountErrors.Conflict($"A bucket named '{bucket.Name}' already exists."));
         }
@@ -40,6 +40,6 @@ internal sealed class AddBucketHandler(
         }
 
         AccountsLog.BucketAdded(logger, bucket.Name);
-        return Result.Success(new BucketView(bucket.Id, bucket.Name));
+        return Result.Success(new BucketView(bucket.Id, bucket.Name, false, null, null));
     }
 }

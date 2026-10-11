@@ -21,7 +21,6 @@ function RolesForm({ account, onNavigate }: { account: AccountDetail; onNavigate
   const [blocked, setBlocked] = useState<string | undefined>();
   const isPrimary = account.data.primary;
   const tradingIncomplete = !account.trading.enabled && account.trading.riskProfileId === null;
-  const portfolioIncomplete = !account.portfolio.enabled && account.portfolio.defaultBucket === null;
   const messages = [...allMessages(fieldErrorsOf(save.error))];
   const general = problemMessage(save.error);
 
@@ -99,8 +98,6 @@ function RolesForm({ account, onNavigate }: { account: AccountDetail; onNavigate
         <RoleToggle
           roleKey="portfolio"
           checked={draft.portfolio}
-          disabled={portfolioIncomplete}
-          note={portfolioIncomplete ? setupNote('portfolio', 'Portfolio') : undefined}
           onChange={(portfolio) => {
             change({ portfolio });
           }}

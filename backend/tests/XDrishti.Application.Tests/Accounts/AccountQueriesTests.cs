@@ -74,6 +74,7 @@ public sealed class AccountQueriesTests
     [Fact]
     public async Task The_detail_has_all_settings_and_no_full_client_id()
     {
+        _fx.Data.Buckets.Add(PortfolioBucket.Create("MyChoice", AccountsFixture.Start).Value);
         var account = await _fx.CreatedAsync(Inputs.Account(
             trading: Inputs.Trading(_fx.Standard.Id) with { Overrides = new AccountOverrides(0.25m, 2, 3, 1.0m) },
             portfolio: Inputs.Portfolio("MyChoice")));
@@ -84,6 +85,7 @@ public sealed class AccountQueriesTests
         detail.Trading.Overrides.ShouldBe(new AccountOverrides(0.25m, 2, 3, 1.0m));
         detail.Trading.RiskProfileName.ShouldBe("Standard");
         detail.Portfolio.DefaultBucket.ShouldBe("MyChoice");
+        detail.Portfolio.AutoBucketName.ShouldBe("Example One · Portfolio"); // not created yet: the role is off
         detail.Data.LiveFeedBudget.ShouldBe(BrokerAccount.DefaultLiveFeedBudget);
         JsonSerializer.Serialize(detail).ShouldNotContain(AccountsFixture.ClientId);
     }

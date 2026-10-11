@@ -248,7 +248,7 @@ they're pure and fully unit-testable.
 
 | Schema | Key tables |
 |--------|-----------|
-| `market` | `instruments`, `instrument_broker_ids`, `bars_1m` (hypertable, source csv/dhan), `bars_1m_live`, `bars_1d`, continuous aggregates `bars_5m…bars_1h`, `context_daily`, `calendar`, `corporate_actions`, (later) `ticks`, `depth` |
+| `market` | `instruments`, `instrument_broker_ids`, `master_refreshes`, `bars_1m` (hypertable, source csv/dhan), `bars_1m_live`, `bars_1d`, continuous aggregates `bars_5m…bars_1h`, `context_daily`, `calendar`, `corporate_actions`, (later) `ticks`, `depth` |
 | `catalog` | `tracked_instruments`, `baskets`, `basket_members` (valid_from/to), `index_membership` |
 | `data` | `import_profiles`, `import_jobs`, `import_issues` |
 | `portfolio` | `transactions`, `lots`, `lot_closures`, `positions`, `buckets`, `cash_flows`, `valuations_daily`, `corporate_action_adjustments` |

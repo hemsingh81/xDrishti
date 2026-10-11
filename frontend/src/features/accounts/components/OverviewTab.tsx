@@ -6,12 +6,11 @@ import { Alert, Grid, Stack } from '@mui/material';
 import type { AccountDetail } from '@/shared/api';
 import { formatInr } from '@/shared/lib/format';
 import { hueForLabel } from '@/shared/lib/iconHue';
-import { StatTile } from '@/shared/ui';
+import { Facts, StatTile, type Fact } from '@/shared/ui';
 import { modeLabel } from '../lib/labels';
 import { ApiKeyExpiry } from './ApiKeyExpiry';
 import { ConnectionStatus } from './ConnectionStatus';
 import { DisabledActions } from './DisabledActions';
-import { Facts, type Fact } from './Facts';
 import { RoleChips } from './RoleChips';
 import { SecretsStatus } from './SecretsStatus';
 
@@ -45,9 +44,7 @@ function facts(account: AccountDetail): Fact[] {
     const p = account.portfolio;
     list.push({
       label: 'Portfolio',
-      value: `default bucket ${p.defaultBucket ?? '—'} · history from ${p.historyFrom ?? 'the beginning'} · ${
-        p.includeInTotals ? 'included in totals' : 'excluded from totals'
-      }`,
+      value: `default bucket ${p.defaultBucket} · ${p.includeInTotals ? 'included in totals' : 'excluded from totals'}`,
     });
   }
   if (account.data.enabled) {

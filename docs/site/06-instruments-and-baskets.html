@@ -68,7 +68,7 @@
 <p>How you choose <strong>what the system works on</strong> and how you <strong>group and evaluate</strong> it.</p>
 <h2 id="1-concepts">1. Concepts<a class="hash" href="#1-concepts" aria-label="Link to this section">#</a></h2>
 <figure class="diagram"><pre class="mermaid">flowchart LR
-    M[&quot;Master list&lt;br/&gt;all instruments from Dhan&lt;br/&gt;(refreshed daily)&quot;] --&gt;|you add| T[&quot;Tracked instruments&lt;br/&gt;data collected · eligible for scans&quot;]
+    M[&quot;Master list&lt;br/&gt;NSE shares · ETFs · indices · futures&lt;br/&gt;from Dhan (refreshed daily)&quot;] --&gt;|you add| T[&quot;Tracked instruments&lt;br/&gt;data collected · eligible for scans&quot;]
     T --&gt;|you group| B[&quot;Baskets&lt;br/&gt;MyChoice · MyLongTerm · Best stocks · …&quot;]
     B --&gt; S[&quot;Scopes&lt;br/&gt;scan · Strategy Lab · reports · portfolio · live watch&quot;]</pre></figure>
 <table>
@@ -80,7 +80,7 @@
 </thead>
 <tbody><tr>
 <td><strong>Master list</strong></td>
-<td>Every instrument in Dhan&#39;s instrument (scrip) master — equities, indices, futures, options — refreshed nightly, mapped to canonical symbols (<a href="05-data-and-brokers.html">doc 05</a>)</td>
+<td>The instruments v1 works with from Dhan&#39;s instrument (scrip) master — NSE shares, ETFs, indices and futures (§2.1; options later) — refreshed every morning and on demand, mapped to canonical symbols (<a href="05-data-and-brokers.html">doc 05</a> §7)</td>
 </tr>
 <tr>
 <td><strong>Tracked instrument</strong></td>
@@ -96,9 +96,104 @@
 </tr>
 </tbody></table>
 <h2 id="2-master-list-tracked-instruments">2. Master list &amp; tracked instruments<a class="hash" href="#2-master-list-tracked-instruments" aria-label="Link to this section">#</a></h2>
+<h3 id="21-what-the-master-list-contains-adr-0010-p1-03">2.1 What the master list contains (ADR 0010, P1-03)<a class="hash" href="#21-what-the-master-list-contains-adr-0010-p1-03" aria-label="Link to this section">#</a></h3>
+<p>Dhan&#39;s detailed scrip master has about 207,000 rows (35 MB, republished daily around 08:20 IST); v1 keeps the <strong>≈ 4,400 NSE rows</strong> it works with and skips the rest on import:</p>
+<table>
+<thead>
+<tr>
+<th>Kept (type)</th>
+<th>Rule on Dhan&#39;s columns</th>
+<th>Real file, 2026-10-11</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Share</strong></td>
+<td><code>EXCH_ID = NSE</code>, <code>SEGMENT = E</code>, <code>INSTRUMENT_TYPE = ES</code> (any series: EQ, BE, SM, ST, …)</td>
+<td>3,204</td>
+</tr>
+<tr>
+<td><strong>ETF</strong></td>
+<td><code>NSE</code>, <code>E</code>, <code>INSTRUMENT_TYPE = ETF</code></td>
+<td>405</td>
+</tr>
+<tr>
+<td><strong>Index</strong></td>
+<td><code>NSE</code>, <code>SEGMENT = I</code>, <code>INSTRUMENT = INDEX</code> (NIFTY, BANKNIFTY, INDIA VIX, …)</td>
+<td>119</td>
+</tr>
+<tr>
+<td><strong>Future</strong></td>
+<td><code>NSE</code>, <code>SEGMENT = D</code>, <code>INSTRUMENT ∈ {FUTSTK, FUTIDX}</code> — stock futures (213 underlyings) and index futures</td>
+<td>653 (635 stock, 18 index)</td>
+</tr>
+</tbody></table>
+<p>Skipped: exchange test symbols (<code>*NSETEST*</code>), debt, bonds, mutual-fund units, REITs/InvITs, BSE, MCX, currency, commodity and options (options come with their phase, P14). Futures past their expiry date (India date) are not kept; one that was kept and has expired is retired.</p>
+<p><strong>Canonical symbols</strong> (exchange-qualified, independent of any broker; every other module uses them):</p>
+<table>
+<thead>
+<tr>
+<th>Type</th>
+<th>Canonical symbol</th>
+<th>Example</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Share, ETF</td>
+<td><code>NSE:{UNDERLYING_SYMBOL}</code> (the ticker)</td>
+<td><code>NSE:RELIANCE</code>, <code>NSE:SETFNIF50</code></td>
+</tr>
+<tr>
+<td>Index</td>
+<td><code>NSE:{SYMBOL_NAME}</code> upper-case, spaces as <code>_</code></td>
+<td><code>NSE:NIFTY</code>, <code>NSE:NIFTY_MIDCAP_150</code>, <code>NSE:INDIA_VIX</code></td>
+</tr>
+<tr>
+<td>Future</td>
+<td><code>NSE:{UNDERLYING}-{YYYY}-{MM}-FUT</code> (expiry month)</td>
+<td><code>NSE:RELIANCE-2026-10-FUT</code></td>
+</tr>
+</tbody></table>
+<p>A <strong>collision</strong> (two rows with the same canonical symbol, or one Dhan id for two symbols) is a data-quality problem: the first row is kept, the others are skipped, and every one is listed in the refresh result — never silently merged. The real file has none.</p>
+<p><strong>Flags and sector are derived, not guessed:</strong></p>
 <ul>
-<li><strong>Search &amp; add</strong> from the Instruments screen: filter the master list by name, symbol, exchange, segment,
-instrument type, sector, index membership, F&amp;O eligibility, price, turnover.</li>
+<li><em>F&amp;O eligible</em> = a share with an active stock future (213 in the real file); futures, indices and ETFs are never flagged.</li>
+<li><em>ASM/GSM</em> = Dhan&#39;s <code>ASM_GSM_FLAG</code> (anything but <code>N</code>) and category.</li>
+<li><em>Sector</em> = the industry of the share&#39;s ISIN in NSE&#39;s Nifty Total Market list (<code>ind_niftytotalmarket_list.csv</code>: 755 stocks in 22 industries; 748 are shares of the master, 3 are REITs outside the scope). Only shares get a sector, so the sector facet and filter work on shares: shares without a match show &quot;Unclassified&quot; (a facet value; filtering by it returns exactly those shares). If the list cannot be fetched or read, for whatever reason, the refresh still succeeds with a warning and keeps the sectors it has.</li>
+</ul>
+<h3 id="22-refresh">2.2 Refresh<a class="hash" href="#22-refresh" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>Behaviour</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Refresh list</strong> (Instruments screen, any signed-in session, no step-up — it only reads public files)</td>
+<td><code>POST /api/instruments/refresh</code> → 202 and a background run; progress phases <em>downloading → parsing → enriching → saving</em> with the number of rows read; <code>409 instruments.refresh_running</code> while one runs</td>
+</tr>
+<tr>
+<td><strong>Force refresh</strong></td>
+<td>Same with <code>force: true</code>: skips the &quot;file unchanged&quot; check and imports again</td>
+</tr>
+<tr>
+<td><strong>Daily automatic run</strong></td>
+<td>A hosted service in <code>xd-api</code> at <code>Instruments:AutoRefresh:TimeIst</code> India time (default 08:45, after Dhan&#39;s 08:20 publication); <code>Enabled</code> switches it off. It starts the same command as the button; the run is recorded as <em>daily</em>. It waits in slices of at most one minute and re-reads the clock, so a sleeping or adjusted machine still runs on time. <strong>Catch-up:</strong> when the API starts and no refresh has run since the most recent scheduled time (it was down, or the list was never loaded), it refreshes at once — one conditional request when nothing changed</td>
+</tr>
+</tbody></table>
+<p>Rules of a run:</p>
+<ul>
+<li><strong>One at a time</strong> across all instances (database advisory lock + a unique &quot;running&quot; row). When the API starts, a run still marked running from an earlier process is marked failed (interrupted) at once; a run that never ended is anyway treated as interrupted after 30 minutes.</li>
+<li><strong>Conditional download:</strong> the <code>ETag</code> / <code>Last-Modified</code> of the last good run are sent, and an unchanged file ends as <strong>unchanged</strong> without any work. The shortcut is not used when the list is empty, when the last good run could not apply the sector list, or when the last run worked under other importer rules (<code>RefreshRules.Version</code>, bumped whenever scope or parser rules change; recorded on every run).</li>
+<li><strong>Streamed and tolerant:</strong> the 35 MB file is streamed (never held as a string; a line over 64 KB is refused), columns are found by name. The run <strong>fails closed</strong> only on structural problems: unreadable header, a column the importer reads is missing, no in-scope rows, or too many unreadable rows (more than 50 or more than 1 % of the in-scope rows). Smaller problems are tolerated and listed in the run&#39;s warnings: extra or unused columns, and single in-scope rows that are malformed or do not fit the stored limits (series, ISIN, names, …) are skipped with a message naming the Dhan id (the first 10, then a count). The instrument of a skipped row is <strong>not retired</strong> because of it.</li>
+<li><strong>Tripwire:</strong> a file that would leave fewer than half of the currently active instruments is refused (the run fails with a plain message); a forced refresh applies it anyway.</li>
+<li><strong>All or nothing:</strong> the kept rows are copied into a temporary table (binary <code>COPY</code>) and merged in <strong>one transaction</strong>, so a failed run changes nothing. Instruments no longer in the file are <strong>retired</strong> (<code>retired_at</code>, hidden by default, never deleted) and <strong>revived</strong> when they come back.</li>
+<li><strong>Sectors are optional:</strong> whatever goes wrong with the NSE list (timeout, refusal, bad data) only adds a warning; the stored sectors stay and the next refresh does not skip the unchanged master.</li>
+<li><strong>Recorded:</strong> every run — succeeded, unchanged or failed — is a row in <code>market.master_refreshes</code> with counts (added / updated / retired / revived / unchanged / skipped by scope / collisions / sector matches / F&amp;O underlyings), source validators, rules version, warnings and error. The daily run moves into the service framework with P1-13.</li>
+</ul>
+<h3 id="23-searching-tracking-and-the-instrument-record">2.3 Searching, tracking and the instrument record<a class="hash" href="#23-searching-tracking-and-the-instrument-record" aria-label="Link to this section">#</a></h3>
+<ul>
+<li><strong>Search &amp; add</strong> from the Instruments screen: server-side search (partial symbol, name, display name or ISIN) and filters (type, sector, F&amp;O, ASM/GSM, series, retired), sortable and paginated (≤ 100 per page; <code>GET /api/instruments</code>, facets at <code>/api/instruments/facets</code>); later also exchange/segment, index membership, price and turnover.</li>
 <li><strong>Bulk add</strong> by pasting symbols, uploading a CSV list, or adding all members of an index/rule-based basket.</li>
 <li><strong>On activation</strong> the system backfills history: first from your CSV files if present, then gaps from the
 Dhan historical API (1-minute up to ~5 years, daily since listing), and builds all timeframes.</li>
@@ -118,27 +213,35 @@ Dhan historical API (1-minute up to ~5 years, daily since listing), and builds a
 </tr>
 <tr>
 <td>Broker ids</td>
-<td>Dhan <code>security_id</code> + segment</td>
+<td>Dhan <code>SECURITY_ID</code> + exchange segment (<code>NSE_EQ</code>, <code>IDX_I</code>, <code>NSE_FNO</code>) in <code>market.instrument_broker_ids</code></td>
 </tr>
 <tr>
 <td>Type / segment</td>
-<td>EQ / NSE_EQ (also IDX, FUT, OPT)</td>
+<td>share · etf · index · future / NSE_EQ · IDX_I · NSE_FNO (options later)</td>
+</tr>
+<tr>
+<td>Series</td>
+<td>EQ, BE, SM, ST, … (shares, ETFs)</td>
 </tr>
 <tr>
 <td>Sector / industry</td>
-<td>Metals</td>
+<td>Metals &amp; Mining</td>
 </tr>
 <tr>
 <td>Lot size, tick size</td>
-<td>1 / 0.05 (futures: contract lot size)</td>
+<td>1 / 0.05 (futures: contract lot size); expiry date for futures</td>
 </tr>
 <tr>
 <td>Flags</td>
-<td>F&amp;O eligible, ASM/GSM, in ban period</td>
+<td>F&amp;O eligible, ASM/GSM, MTF leverage, freeze quantity, retired</td>
+</tr>
+<tr>
+<td>First / last seen</td>
+<td>when the instrument first appeared in the file / last appeared</td>
 </tr>
 <tr>
 <td>Tracking</td>
-<td>active since 2026-10-15; data from 2021-10-01</td>
+<td>active since 2026-10-15; data from 2021-10-01 <em>(P1-05)</em></td>
 </tr>
 </tbody></table>
 <h2 id="3-baskets">3. Baskets<a class="hash" href="#3-baskets" aria-label="Link to this section">#</a></h2>
@@ -330,10 +433,13 @@ basket detail (members, performance by lens, benchmark, open positions).</li>
     <a class="prev" href="05-data-and-brokers.html"><small>← Previous  [</small>05 · Data &amp; brokers</a>
     <a class="next" href="07-strategies.html"><small>Next  ] →</small>07 · Strategies</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-11 10:15</footer>
+  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-11 18:10</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-concepts" class="d2">1. Concepts</a>
 <a href="#2-master-list-tracked-instruments" class="d2">2. Master list &amp;amp; tracked instruments</a>
+<a href="#21-what-the-master-list-contains-adr-0010-p1-03" class="d3">2.1 What the master list contains (ADR 0010, P1-03)</a>
+<a href="#22-refresh" class="d3">2.2 Refresh</a>
+<a href="#23-searching-tracking-and-the-instrument-record" class="d3">2.3 Searching, tracking and the instrument record</a>
 <a href="#3-baskets" class="d2">3. Baskets</a>
 <a href="#31-basket-types" class="d3">3.1 Basket types</a>
 <a href="#32-basket-attributes" class="d3">3.2 Basket attributes</a>

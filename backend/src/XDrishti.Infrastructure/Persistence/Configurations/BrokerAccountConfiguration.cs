@@ -60,14 +60,26 @@ internal sealed class BrokerAccountConfiguration : IEntityTypeConfiguration<Brok
 
         builder.OwnsOne(x => x.Portfolio, portfolio =>
         {
-            portfolio.ToTable("portfolio_settings", Schemas.Accounts);
+            portfolio.ToTable("portfolio_settings", Schemas.Accounts, t =>
+            {
+                t.HasCheckConstraint("ck_portfolio_settings_refresh_mode", "refresh_mode IN ('off', 'daily')");
+            });
             portfolio.WithOwner().HasForeignKey("AccountId");
             portfolio.HasKey("AccountId");
             portfolio.Property(x => x.Enabled).IsRequired();
-            portfolio.Property(x => x.DefaultBucket).HasMaxLength(PortfolioBucket.MaxNameLength);
-            portfolio.HasOne<PortfolioBucket>().WithMany().HasPrincipalKey(x => x.Name).HasForeignKey(x => x.DefaultBucket).OnDelete(DeleteBehavior.Restrict);
-            portfolio.Property(x => x.HistoryFrom);
+            portfolio.Property(x => x.DefaultBucketId);
+            portfolio.HasIndex(x => x.DefaultBucketId);
+            portfolio.HasOne<PortfolioBucket>().WithMany().HasForeignKey(x => x.DefaultBucketId).OnDelete(DeleteBehavior.Restrict);
             portfolio.Property(x => x.IncludeInTotals).IsRequired();
+
+            // The automatic holdings refresh (ADR 0012): off unless the owner turns it on. No EF default values (a default equal to the CLR default, such as 00:00, would be
+            // swallowed and stored as the database default); the migration gives the database defaults only to fill the rows that existed before.
+            portfolio.Property(x => x.RefreshMode).HasConversion(EnumConversions.Lowercase<PortfolioRefreshMode>()).HasMaxLength(8).IsRequired();
+            portfolio.Property(x => x.RefreshDailyTimeIst).IsRequired();
+
+            // The date a first import gives holdings without a date of their own (ADR 0013); null until the owner chooses one.
+            portfolio.Property(x => x.FirstImportDate);
+            portfolio.Ignore(x => x.ImportDate);
         });
         builder.Navigation(x => x.Portfolio).IsRequired();
 

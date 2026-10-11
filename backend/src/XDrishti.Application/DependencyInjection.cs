@@ -5,8 +5,12 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Refresh;
+using XDrishti.Application.Market.Search;
 using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.SystemStatus;
+using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Application;
@@ -30,6 +34,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ResetOwnerPasswordCommand>, ResetOwnerPasswordHandler>();
 
         services.AddAccounts();
+        services.AddMarket();
+        services.AddPortfolio();
 
         return services;
     }
@@ -37,6 +43,7 @@ public static class DependencyInjection
     private static void AddAccounts(this IServiceCollection services)
     {
         services.AddScoped<AccountViews>();
+        services.AddScoped<DefaultBuckets>();
 
         services.AddScoped<IQueryHandler<ListAccountsQuery, IReadOnlyList<AccountSummary>>, ListAccountsHandler>();
         services.AddScoped<IQueryHandler<GetAccountQuery, Result<AccountDetail>>, GetAccountHandler>();
@@ -47,7 +54,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<UpdateRolesCommand, AccountDetail>, UpdateRolesHandler>();
         services.AddScoped<ICommandHandler<MakePrimaryDataCommand, AccountDetail>, MakePrimaryDataHandler>();
         services.AddScoped<ICommandHandler<UpdateTradingCommand, AccountDetail>, UpdateTradingHandler>();
-        services.AddScoped<ICommandHandler<UpdatePortfolioCommand, AccountDetail>, UpdatePortfolioHandler>();
+        services.AddScoped<ICommandHandler<UpdatePortfolioCommand, PortfolioSaved>, UpdatePortfolioHandler>();
         services.AddScoped<ICommandHandler<UpdateDataCommand, AccountDetail>, UpdateDataHandler>();
         services.AddScoped<ICommandHandler<ArchiveAccountCommand>, ArchiveAccountHandler>();
 
@@ -65,5 +72,39 @@ public static class DependencyInjection
 
         services.AddScoped<IQueryHandler<ListBucketsQuery, IReadOnlyList<BucketView>>, ListBucketsHandler>();
         services.AddScoped<ICommandHandler<AddBucketCommand, BucketView>, AddBucketHandler>();
+    }
+
+    private static void AddMarket(this IServiceCollection services)
+    {
+        services.AddScoped<ICommandHandler<StartRefreshCommand, RefreshStarted>, StartRefreshHandler>();
+        services.AddScoped<ICommandHandler<ExecuteRefreshCommand>, ExecuteRefreshHandler>();
+        services.AddScoped<ICommandHandler<RecoverInterruptedRefreshesCommand>, RecoverInterruptedRefreshesHandler>();
+        services.AddScoped<IQueryHandler<GetRefreshStatusQuery, RefreshStatusView>, GetRefreshStatusHandler>();
+        services.AddScoped<IQueryHandler<ListRefreshHistoryQuery, IReadOnlyList<RefreshRunView>>, ListRefreshHistoryHandler>();
+        services.AddScoped<IQueryHandler<SearchInstrumentsQuery, Result<InstrumentPage>>, SearchInstrumentsHandler>();
+        services.AddScoped<IQueryHandler<GetInstrumentFacetsQuery, InstrumentFacets>, GetInstrumentFacetsHandler>();
+        services.AddScoped<IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>>, GetInstrumentHandler>();
+
+        // The daily schedule is a singleton: the API's hosted service runs it for the lifetime of the process.
+        services.AddSingleton<DailyRefreshRunner>();
+    }
+
+    private static void AddPortfolio(this IServiceCollection services)
+    {
+        services.AddScoped<HoldingsFetcher>();
+        services.AddScoped<SyncRuns>();
+        services.AddScoped<HoldingsImporter>();
+
+        services.AddScoped<IQueryHandler<PreviewHoldingsQuery, Result<ImportPreview>>, PreviewHoldingsHandler>();
+        services.AddScoped<ICommandHandler<SyncHoldingsCommand, SyncRunView>, SyncHoldingsHandler>();
+        services.AddScoped<ICommandHandler<RecoverInterruptedSyncsCommand>, RecoverInterruptedSyncsHandler>();
+        services.AddScoped<IQueryHandler<ListHoldingsQuery, Result<HoldingPage>>, ListHoldingsHandler>();
+        services.AddScoped<IQueryHandler<GetHoldingsSummaryQuery, Result<HoldingsSummary>>, GetHoldingsSummaryHandler>();
+        services.AddScoped<IQueryHandler<GetHoldingLotsQuery, Result<HoldingLots>>, GetHoldingLotsHandler>();
+        services.AddScoped<ICommandHandler<UpdateLotDateCommand, LotRow>, UpdateLotDateHandler>();
+        services.AddScoped<IQueryHandler<GetSyncStatusQuery, Result<SyncStatusView>>, GetSyncStatusHandler>();
+
+        // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
+        services.AddSingleton<PortfolioRefreshRunner>();
     }
 }

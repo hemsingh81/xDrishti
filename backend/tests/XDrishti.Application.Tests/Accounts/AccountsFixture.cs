@@ -5,6 +5,8 @@ using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
+using XDrishti.Application.Portfolio;
+using XDrishti.Application.Tests.Portfolio;
 using XDrishti.Domain.Accounts;
 
 namespace XDrishti.Application.Tests.Accounts;
@@ -38,15 +40,27 @@ internal sealed class AccountsFixture
 
     public AccountsFixture()
     {
+        PortfolioData = new InMemoryPortfolioData(Data);
         Standard = SeedProfile("Standard", AccountDataTestValues.Standard);
         Conservative = SeedProfile("Conservative", AccountDataTestValues.Standard with { RiskPerTradePct = 0.25m, MaxNewEntriesPerDay = 2, MaxOpenPositions = 3, DailyLossPct = 1.0m });
-        foreach (var name in new[] { "Trading", "MyLongTerm", "MyChoice" })
-        {
-            Data.Buckets.Add(PortfolioBucket.Create(name, Start).Value);
-        }
     }
 
-    public AccountViews Views => new(Data, Data, Connections, Clock);
+    /// <summary>The holdings persistence ports on the same accounts data (the portfolio handlers use them; the accounts views ask whether holdings exist).</summary>
+    public InMemoryPortfolioData PortfolioData { get; }
+
+    public FakeBrokerHoldings HoldingsDhan { get; } = new();
+
+    public FakeInstrumentMapper HoldingsInstruments { get; } = new();
+
+    public HoldingsFetcher Fetcher => new(Data, Data, Connections, Data, HoldingsDhan, HoldingsInstruments, Clock);
+
+    public SyncRuns Runs => new(PortfolioData, PortfolioData, Clock, NullLogger<SyncRuns>.Instance);
+
+    public HoldingsImporter Importer => new(Fetcher, Runs, PortfolioData, Data, Clock, NullLogger<HoldingsImporter>.Instance);
+
+    public AccountViews Views => new(Data, Data, Data, Connections, PortfolioData, Clock);
+
+    public DefaultBuckets DefaultBuckets => new(Data, Data);
 
     public ListAccountsHandler ListAccounts() => new(Data, Views);
 
@@ -54,26 +68,26 @@ internal sealed class AccountsFixture
 
     public GetAccountActivityHandler Activity() => new(Data, Data);
 
-    public CreateAccountHandler Create() => new(Data, Data, Data, Data, Data, Data, Views, Clock, NullLogger<CreateAccountHandler>.Instance);
+    public CreateAccountHandler Create() => new(Data, Data, DefaultBuckets, Data, Data, Data, Views, Clock, NullLogger<CreateAccountHandler>.Instance);
 
     public UpdateSecretsHandler UpdateSecrets() => new(Data, Data, Data, Data, Views, Clock, NullLogger<UpdateSecretsHandler>.Instance);
 
     public static GetDhanRedirectHandler DhanRedirect(string publicBaseUrl = PublicBaseUrl) => new(new FixedBrokerSettings(publicBaseUrl));
 
     public UpdateConnectionHandler UpdateConnection() =>
-        new(Data, Data, Data, new ConnectionWriter(Data, Connections, Data), Connections, Views, Clock, NullLogger<UpdateConnectionHandler>.Instance);
+        new(Data, DefaultBuckets, Data, Data, new ConnectionWriter(Data, Connections, Data), Connections, Views, Clock, NullLogger<UpdateConnectionHandler>.Instance);
 
-    public UpdateRolesHandler UpdateRoles() => new(Data, Data, Data, Views, Clock, NullLogger<UpdateRolesHandler>.Instance);
+    public UpdateRolesHandler UpdateRoles() => new(Data, DefaultBuckets, Data, Data, Views, Clock, NullLogger<UpdateRolesHandler>.Instance);
 
     public MakePrimaryDataHandler MakePrimary() => new(Data, Data, Data, Views, Clock, NullLogger<MakePrimaryDataHandler>.Instance);
 
     public UpdateTradingHandler UpdateTrading() => new(Data, Data, Data, Data, Views, Clock, NullLogger<UpdateTradingHandler>.Instance);
 
-    public UpdatePortfolioHandler UpdatePortfolio() => new(Data, Data, Data, Data, Views, Clock, NullLogger<UpdatePortfolioHandler>.Instance);
+    public UpdatePortfolioHandler UpdatePortfolio() => new(Data, DefaultBuckets, Fetcher, Importer, PortfolioData, Data, Data, Views, Clock, NullLogger<UpdatePortfolioHandler>.Instance);
 
     public UpdateDataHandler UpdateData() => new(Data, Data, Data, Views, Clock, NullLogger<UpdateDataHandler>.Instance);
 
-    public ArchiveAccountHandler Archive() => new(Data, Data, Connections, Connections, Data, Data, Clock, NullLogger<ArchiveAccountHandler>.Instance);
+    public ArchiveAccountHandler Archive() => new(Data, DefaultBuckets, Data, Connections, Connections, Data, Data, Clock, NullLogger<ArchiveAccountHandler>.Instance);
 
     public ListRiskProfilesHandler ListProfiles() => new(Data);
 
@@ -83,7 +97,7 @@ internal sealed class AccountsFixture
 
     public DeleteRiskProfileHandler DeleteProfile() => new(Data, Data, Data, Clock, NullLogger<DeleteRiskProfileHandler>.Instance);
 
-    public ListBucketsHandler ListBuckets() => new(Data);
+    public ListBucketsHandler ListBuckets() => new(Data, Data);
 
     public AddBucketHandler AddBucket() => new(Data, Data, Data, Clock, NullLogger<AddBucketHandler>.Instance);
 

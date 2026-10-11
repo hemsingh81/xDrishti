@@ -117,7 +117,7 @@ describe('Role matrix', () => {
             {
               title: 'Invalid',
               code: 'accounts.invalid',
-              errors: { 'roles.portfolio': ['Choose a default bucket before switching the role on.'] },
+              errors: { 'roles.portfolio': ['The account cannot be changed right now.'] },
             },
             400,
           );
@@ -135,9 +135,7 @@ describe('Role matrix', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirm' }));
 
     const swingRow = screen.getByRole('row', { name: /Test Dhan Swing/ });
-    expect(
-      await within(swingRow).findByText('Choose a default bucket before switching the role on.'),
-    ).toBeInTheDocument();
+    expect(await within(swingRow).findByText('The account cannot be changed right now.')).toBeInTheDocument();
     expect(bodies[ids.main]).toEqual({ data: null, trading: { enabled: false }, portfolio: null });
     expect(bodies[ids.swing]).toEqual({ data: null, trading: null, portfolio: { enabled: true } });
     expect(screen.queryByText(/Roles saved/)).not.toBeInTheDocument();

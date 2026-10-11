@@ -6,12 +6,16 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
+using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
+using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
+using XDrishti.Infrastructure.Portfolio;
 
 namespace XDrishti.Infrastructure;
 
@@ -76,6 +80,8 @@ public static class DependencyInjection
         services.AddScoped<IBrokerConnectionStore, BrokerConnectionStore>();
         services.AddScoped<IPendingConnectStore, PendingConnectStore>();
         services.AddDhanConnector();
+        services.AddInstrumentMaster(configuration);
+        services.AddPortfolio(configuration);
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", HealthStatus.Unhealthy, ["ready"]);
@@ -96,6 +102,57 @@ public static class DependencyInjection
             .RemoveAllLoggers();
 
         services.AddScoped<IBrokerConnector, DhanConnector>();
+
+        // The holdings read (ADR 0012) has its own client for its longer timeout and bigger answers; the same guard allows only its one path.
+        services.AddHttpClient(BrokerHttpClientNames.DhanHoldings, BrokerHttp.ConfigureHoldings)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddScoped<IBrokerHoldings, DhanHoldingsClient>();
+    }
+
+    /// <summary>The holdings module (ADR 0012): lots and returns inputs, sync records, the unit of work and the automatic refresh setting.</summary>
+    private static void AddPortfolio(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<PortfolioRefreshOptions>()
+            .Bind(configuration.GetSection(PortfolioRefreshOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IPortfolioRefreshSettings, PortfolioRefreshSettings>();
+        services.AddScoped<IHoldingStore, HoldingStore>();
+        services.AddScoped<IHoldingQueries, HoldingQueries>();
+        services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
+        services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
+        services.AddScoped<IInstrumentMapper, InstrumentMapper>();
+    }
+
+    /// <summary>
+    /// The instrument master (ADR 0010): its store, search, refresh queue and the two allow-listed download clients — no retries, no redirects, no
+    /// cookies or credentials, no request logging, and an allow-list guard in front of every request.
+    /// </summary>
+    private static void AddInstrumentMaster(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<InstrumentRefreshOptions>()
+            .Bind(configuration.GetSection(InstrumentRefreshOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(o => InstrumentRefreshOptions.IsValidTime(o.TimeIst), InstrumentRefreshOptions.InvalidTimeMessage)
+            .ValidateOnStart();
+        services.AddSingleton<IInstrumentRefreshSettings, InstrumentRefreshSettings>();
+        services.AddSingleton<IRefreshJobChannel, RefreshJobChannel>();
+        services.AddScoped<IRefreshRunStore, RefreshRunStore>();
+        services.AddScoped<IInstrumentCatalog, InstrumentCatalog>();
+        services.AddScoped<IInstrumentQueries, InstrumentQueries>();
+
+        services.AddTransient<MasterDataEndpointGuard>();
+        services.AddHttpClient(MasterDataHttpClientNames.Dhan, MasterDataHttp.ConfigureDhan)
+            .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<MasterDataEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddHttpClient(MasterDataHttpClientNames.Nse, MasterDataHttp.ConfigureNse)
+            .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<MasterDataEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddScoped<IInstrumentSource, HttpInstrumentSource>();
     }
 
     /// <summary>

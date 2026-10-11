@@ -81,9 +81,8 @@ describe('AccountsPage — list and detail', () => {
     expect(screen.getByText('API secret: set · updated 9 Oct 2026')).toBeInTheDocument();
     expect(screen.getByText('API key valid until 9 Oct 2027')).toBeInTheDocument();
     expect(screen.getByText(/paper · Standard profile · capital ₹2,00,000 · swing/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/default bucket Trading · history from 2024-04-01 · included in totals/),
-    ).toBeInTheDocument();
+    expect(screen.getByText('default bucket Test Dhan Main · Portfolio · included in totals')).toBeInTheDocument();
+    expect(screen.queryByText(/history from/)).not.toBeInTheDocument();
   });
 
   it('explains disabled actions instead of hiding them', async () => {

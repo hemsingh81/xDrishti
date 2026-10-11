@@ -824,7 +824,7 @@
         "tags": [
           "Accounts"
         ],
-        "summary": "Replace the portfolio settings (default bucket, history start, include in totals)",
+        "summary": "Save the portfolio settings (default bucket, include in totals, auto refresh off or daily at a time, first import date). When the account is connected, has the Portfolio role and has no holdings, every holding Dhan lists is imported in the same request, dated with the first import date (optional firstImport.rows override dates per key); the settings are saved even when the import fails (import.status failed, import.errorCode portfolio.import_failed). Answer: {account, import} (import always present)",
         "operationId": "UpdateAccountPortfolio",
         "parameters": [
           {
@@ -853,7 +853,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccountDetail"
+                  "$ref": "#/components/schemas/PortfolioSaved"
                 }
               }
             }
@@ -1437,7 +1437,7 @@
         "tags": [
           "Portfolio buckets"
         ],
-        "summary": "All portfolio buckets (seeded: Trading, MyLongTerm, MyChoice)",
+        "summary": "Buckets to choose from: custom buckets and the default bucket of each account with the Portfolio role",
         "operationId": "ListPortfolioBuckets",
         "responses": {
           "200": {
@@ -1459,7 +1459,7 @@
         "tags": [
           "Portfolio buckets"
         ],
-        "summary": "Add a portfolio bucket",
+        "summary": "Add a custom portfolio bucket",
         "operationId": "AddPortfolioBucket",
         "requestBody": {
           "content": {
@@ -1494,6 +1494,716 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Search the master list: q (symbol, name, ISIN), type, sector, fno, asmGsm, series, includeRetired, sort, page, pageSize (max 100)",
+        "operationId": "SearchInstruments",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sector",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fno",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "asmGsm",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "series",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeRetired",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/facets": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Counts of the active instruments by type, series, F&O and ASM/GSM, and of the active shares by sector (incl. Unclassified), for the filters",
+        "operationId": "GetInstrumentFacets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentFacets"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/{id}": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "One instrument with all fields and its broker ids",
+        "operationId": "GetInstrument",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/refresh": {
+      "post": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Refresh the master list from Dhan in the background (force: true skips the unchanged-file check); 409 instruments.refresh_running while one runs",
+        "operationId": "StartInstrumentRefresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StartRefreshRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshStarted"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/refresh/status": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "The refresh in progress (phase, rows read), the last finished one, the daily schedule and the number of active instruments",
+        "operationId": "GetInstrumentRefreshStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshStatusView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/refresh/history": {
+      "get": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "The most recent refreshes, newest first (take 1 to 100, default 20)",
+        "operationId": "ListInstrumentRefreshes",
+        "parameters": [
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RefreshRunView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings": {
+      "get": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "Holdings with lots summary, profit/loss and XIRR: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort, page, pageSize (max 100)",
+        "operationId": "ListHoldings",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/summary": {
+      "get": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, counts, lots on the default date, last sync",
+        "operationId": "GetHoldingsSummary",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingsSummary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/{id}/lots": {
+      "get": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "The lots of a holding with the profit/loss and XIRR of each",
+        "operationId": "GetHoldingLots",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingLots"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/{id}/lots/{lotId}": {
+      "put": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date",
+        "operationId": "UpdateHoldingLotDate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "lotId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LotDateInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LotRow"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/holdings/preview": {
+      "post": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "Fetch the account's holdings from Dhan for the first import in the portfolio settings, saving nothing; defaultDate (and each row's suggestedDate) is the account's first import date, 2025-01-01 until the owner chooses another",
+        "operationId": "PreviewAccountHoldings",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPreview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/holdings/sync": {
+      "post": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "Sync now: bring the holdings in line with Dhan (an account without holdings is imported instead, every holding dated with its first import date and the run recorded as an import; new holdings dated today, quantity changes as lots, sales closed first-in first-out); optional body {confirm, expectedOpenHoldings, expectedWouldClose}; 409 portfolio.sync_running while a sync runs; 409 portfolio.confirmation_required (listedHoldings, openHoldings, wouldClose) when Dhan's answer would close all or most holdings, unless confirm is true with the numbers echoed back; 409 portfolio.confirmation_stale when the answer differs from the confirmed numbers",
+        "operationId": "SyncAccountHoldings",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SyncInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncRunView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/holdings/sync-status": {
+      "get": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "The account's refresh settings (mode, daily time, first import date, hasHoldings), the next scheduled run and the latest sync run",
+        "operationId": "GetAccountHoldingsSyncStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatusView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1794,6 +2504,50 @@
           }
         }
       },
+      "AutoRefreshView": {
+        "required": [
+          "enabled",
+          "timeIst",
+          "nextRunAt"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "timeIst": {
+            "type": "string"
+          },
+          "nextRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "The daily automatic refresh: whether it is on, at what India time, and when it runs next."
+      },
+      "BrokerIdView": {
+        "required": [
+          "broker",
+          "brokerId",
+          "segment"
+        ],
+        "type": "object",
+        "properties": {
+          "broker": {
+            "type": "string"
+          },
+          "brokerId": {
+            "type": "string"
+          },
+          "segment": {
+            "type": "string"
+          }
+        },
+        "description": "The id a broker uses for the instrument (Dhan: security id + exchange segment)."
+      },
       "BucketInput": {
         "required": [
           "name"
@@ -1807,12 +2561,15 @@
             ]
           }
         },
-        "description": "A new bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case."
+        "description": "A new custom bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case."
       },
       "BucketView": {
         "required": [
           "id",
-          "name"
+          "name",
+          "isAccountDefault",
+          "accountId",
+          "accountName"
         ],
         "type": "object",
         "properties": {
@@ -1822,8 +2579,25 @@
           },
           "name": {
             "type": "string"
+          },
+          "isAccountDefault": {
+            "type": "boolean"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
-        }
+        },
+        "description": "One bucket to pick from. IsAccountDefault is true for the automatic default bucket of an account that has the Portfolio role\n(AccountId and AccountName name that account); custom buckets have neither."
       },
       "ConnectStartView": {
         "required": [
@@ -2165,6 +2939,354 @@
         },
         "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
       },
+      "FacetCount": {
+        "required": [
+          "value",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A filter value and how many active instruments have it."
+      },
+      "FirstImportInput": {
+        "required": [
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportRowInput"
+            }
+          }
+        },
+        "description": "Optional per-holding dates for the first import that happens when the portfolio settings are saved (ADR 0013). Without rows, every holding Dhan lists is\nimported dated with the first import date (flagged default-date); a row (key from `holdings/preview`, acquisition date) overrides the date of its holding.\nAt most 5000 rows. Used only when the account is connected to Dhan and has no holdings yet."
+      },
+      "FirstImportView": {
+        "required": [
+          "status",
+          "imported",
+          "defaultDated",
+          "alreadyImported",
+          "unknown",
+          "errorCode",
+          "cause",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defaultDated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "errorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cause": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What a first import did. Status: \"imported\" (the holdings were created; the counts say how many), \"skipped\" (the account already has holdings, nothing was\nimported), \"deferred\" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or\n\"failed\" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example\n`portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those\namong them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists."
+      },
+      "HoldingLots": {
+        "required": [
+          "holdingId",
+          "symbol",
+          "lastPrice",
+          "valuationDate",
+          "lots"
+        ],
+        "type": "object",
+        "properties": {
+          "holdingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "lastPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "valuationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "lots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LotRow"
+            }
+          }
+        },
+        "description": "The lots of a holding, open lots first (oldest first), then closed ones."
+      },
+      "HoldingPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldingRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of holdings (Total counts all matches)."
+      },
+      "HoldingRow": {
+        "required": [
+          "id",
+          "accountId",
+          "accountName",
+          "bucketId",
+          "bucketName",
+          "instrumentId",
+          "canonicalSymbol",
+          "mapped",
+          "exchange",
+          "securityId",
+          "isin",
+          "symbol",
+          "name",
+          "qty",
+          "avgCost",
+          "lastPrice",
+          "lastPriceAt",
+          "status",
+          "firstSeenAt",
+          "closedAt",
+          "syncedAt",
+          "lotCount",
+          "earliestAcquiredOn",
+          "usesDefaultDate",
+          "priced",
+          "returns"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "bucketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "bucketName": {
+            "type": "string"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "canonicalSymbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mapped": {
+            "type": "boolean"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "securityId": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "avgCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastPriceAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "firstSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "closedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lotCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "earliestAcquiredOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "usesDefaultDate": {
+            "type": "boolean"
+          },
+          "priced": {
+            "type": "boolean"
+          },
+          "returns": {
+            "$ref": "#/components/schemas/ReturnsView"
+          }
+        },
+        "description": "One holding. Status is \"open\" or \"closed\". Mapped is false when the holding is not in the instrument master (InstrumentId and CanonicalSymbol are\nthen null). LotCount counts open lots; EarliestAcquiredOn is the oldest open lot's date; UsesDefaultDate is true when any open lot has the\nimport's default date. Returns cover all lots (closed lots add to RealisedPnl and to the XIRR)."
+      },
+      "HoldingsSummary": {
+        "required": [
+          "returns",
+          "openCount",
+          "closedCount",
+          "unmappedCount",
+          "unpricedCount",
+          "defaultDateLots",
+          "valuationDate",
+          "lastSync"
+        ],
+        "type": "object",
+        "properties": {
+          "returns": {
+            "$ref": "#/components/schemas/ReturnsView"
+          },
+          "openCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "closedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unmappedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpricedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "defaultDateLots": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "valuationDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "lastSync": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SyncRunView"
+              }
+            ]
+          }
+        },
+        "description": "Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that\nstill have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India)."
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -2210,14 +3332,387 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found."
           },
           "retryAfterSeconds": {
             "type": "integer",
             "description": "Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.",
             "format": "int32"
+          },
+          "openHoldings": {
+            "type": "integer",
+            "description": "Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings the account has open.",
+            "format": "int32"
+          },
+          "listedHoldings": {
+            "type": "integer",
+            "description": "Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.",
+            "format": "int32"
+          },
+          "wouldClose": {
+            "type": "integer",
+            "description": "Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.",
+            "format": "int32"
           }
         }
+      },
+      "ImportPreview": {
+        "required": [
+          "defaultDate",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "defaultDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewRow"
+            }
+          }
+        },
+        "description": "What Dhan holds for the account, nothing saved. DefaultDate is the account's first import date (2025-01-01 until the owner chooses another)."
+      },
+      "ImportRowInput": {
+        "required": [
+          "key",
+          "acquiredOn"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "acquiredOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "One holding to import (a key from the preview). AcquiredOn left out means \"use the first import date\" (the lot is then flagged)."
+      },
+      "InstrumentDetail": {
+        "required": [
+          "id",
+          "symbol",
+          "exchange",
+          "exchangeSegment",
+          "type",
+          "name",
+          "displayName",
+          "isin",
+          "series",
+          "lotSize",
+          "tickSize",
+          "expiryDate",
+          "underlyingSymbol",
+          "sector",
+          "sectorSource",
+          "fnoEligible",
+          "asmGsm",
+          "asmGsmFlag",
+          "asmGsmCategory",
+          "mtfLeverage",
+          "freezeQuantity",
+          "firstSeenAt",
+          "lastSeenAt",
+          "retiredAt",
+          "brokerIds"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "exchangeSegment": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "series": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lotSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tickSize": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "expiryDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "underlyingSymbol": {
+            "type": "string"
+          },
+          "sector": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sectorSource": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fnoEligible": {
+            "type": "boolean"
+          },
+          "asmGsm": {
+            "type": "boolean"
+          },
+          "asmGsmFlag": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "asmGsmCategory": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mtfLeverage": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "freezeQuantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "firstSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retiredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "brokerIds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BrokerIdView"
+            }
+          }
+        },
+        "description": "Everything the master list knows about an instrument."
+      },
+      "InstrumentFacets": {
+        "required": [
+          "total",
+          "retired",
+          "types",
+          "sectors",
+          "series",
+          "fnoEligible",
+          "asmGsm"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FacetCount"
+            }
+          },
+          "sectors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FacetCount"
+            }
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FacetCount"
+            }
+          },
+          "fnoEligible": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "asmGsm": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Counts of the active (not retired) instruments per filter value. Sectors are counted over shares only (only shares get one);\nsector \"Unclassified\" = shares without a known sector, and filtering by it returns exactly those."
+      },
+      "InstrumentPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InstrumentSummary"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of search results (`total` counts all matches)."
+      },
+      "InstrumentSummary": {
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "displayName",
+          "type",
+          "isin",
+          "series",
+          "sector",
+          "lotSize",
+          "tickSize",
+          "expiryDate",
+          "fnoEligible",
+          "asmGsm",
+          "retired"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "series": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sector": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lotSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "tickSize": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "expiryDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "fnoEligible": {
+            "type": "boolean"
+          },
+          "asmGsm": {
+            "type": "boolean"
+          },
+          "retired": {
+            "type": "boolean"
+          }
+        },
+        "description": "A row of the master list. `type`: share · etf · index · future."
       },
       "InstrumentsInput": {
         "required": [
@@ -2300,10 +3795,89 @@
         },
         "description": "Body of `POST /api/auth/login`."
       },
+      "LotDateInput": {
+        "required": [
+          "acquiredOn"
+        ],
+        "type": "object",
+        "properties": {
+          "acquiredOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "Sets the acquisition date of a lot (between 1990-01-01 and today, India)."
+      },
+      "LotRow": {
+        "required": [
+          "id",
+          "acquiredOn",
+          "qty",
+          "unitCost",
+          "source",
+          "usesDefaultDate",
+          "status",
+          "closedOn",
+          "closePrice",
+          "estimated",
+          "returns"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "acquiredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unitCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "source": {
+            "type": "string"
+          },
+          "usesDefaultDate": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "closedOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "closePrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "estimated": {
+            "type": "boolean"
+          },
+          "returns": {
+            "$ref": "#/components/schemas/ReturnsView"
+          }
+        },
+        "description": "A lot of a holding with its own figures: Invested is its cost, Value is its value now (open) or its sale proceeds (closed), Pnl the difference.\nStatus is \"open\" or \"closed\"; Source \"import\", \"added\" or \"manual\". Estimated: the sale price is the last price a sync saw."
+      },
       "PortfolioInput": {
         "required": [
           "defaultBucket",
-          "historyFrom",
           "includeInTotals"
         ],
         "type": "object",
@@ -2314,20 +3888,43 @@
               "string"
             ]
           },
-          "historyFrom": {
+          "includeInTotals": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "refreshMode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "refreshDailyTimeIst": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "firstImportDate": {
             "type": [
               "null",
               "string"
             ],
             "format": "date"
           },
-          "includeInTotals": {
-            "type": [
-              "null",
-              "boolean"
+          "firstImport": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FirstImportInput"
+              }
             ]
           }
-        }
+        },
+        "description": "The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of\nthe bucket imports go to — a custom bucket's name; an empty string \"\" (or the name of the account's own \"{account name} · Portfolio\" bucket) selects the account's\nown default bucket; null or omitted keeps the current choice. IncludeInTotals: true or false; null keeps it. At account creation, omitted means the account's own\nbucket and true. The automatic holdings refresh: RefreshMode \"off\" or \"daily\"; RefreshDailyTimeIst \"HH:mm\" (India time); left out keeps the current value (a new\naccount: off, 16:00). FirstImportDate (not in the future, not before 1990-01-01) is the date the first import gives holdings without a date of their own.\nFirstImport is honoured only when updating the portfolio settings of an account (it is ignored at account creation): see FirstImportInput."
       },
       "PortfolioRoleView": {
         "required": [
@@ -2340,12 +3937,32 @@
           }
         }
       },
+      "PortfolioSaved": {
+        "required": [
+          "account",
+          "import"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AccountDetail"
+          },
+          "import": {
+            "$ref": "#/components/schemas/FirstImportView"
+          }
+        },
+        "description": "The answer of saving the portfolio settings: the account as saved and what the first import did (always present; see FirstImportView)."
+      },
       "PortfolioSettingsView": {
         "required": [
           "enabled",
           "defaultBucket",
-          "historyFrom",
-          "includeInTotals"
+          "autoBucketName",
+          "includeInTotals",
+          "refreshMode",
+          "refreshDailyTimeIst",
+          "firstImportDate",
+          "hasHoldings"
         ],
         "type": "object",
         "properties": {
@@ -2353,22 +3970,96 @@
             "type": "boolean"
           },
           "defaultBucket": {
+            "type": "string"
+          },
+          "autoBucketName": {
+            "type": "string"
+          },
+          "includeInTotals": {
+            "type": "boolean"
+          },
+          "refreshMode": {
+            "type": "string"
+          },
+          "refreshDailyTimeIst": {
+            "type": "string"
+          },
+          "firstImportDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "hasHoldings": {
+            "type": "boolean"
+          }
+        },
+        "description": "Portfolio configuration. DefaultBucket is the name of the bucket imports go to (the account's own default bucket unless a custom bucket was chosen);\nAutoBucketName is the name of the account's own default bucket (\"{account name} · Portfolio\") — the one that exists, or, while the account has none yet,\nthe name it would get now (with a numeric suffix when the plain name is taken); it is chosen for real when the role is switched on.\nThe holdings refresh by themselves according to RefreshMode: \"off\" (default) or \"daily\" (once a day from RefreshDailyTimeIst, \"HH:mm\" India time, default 16:00;\nthe time is kept while the mode is off). FirstImportDate is the date holdings get when they are imported for the first time without a date of their own\n(2025-01-01 until the owner chooses another). HasHoldings is true once the account has any holding; the first import has happened then and\nFirstImportDate no longer affects existing holdings (ADR 0013)."
+      },
+      "PreviewRow": {
+        "required": [
+          "key",
+          "symbol",
+          "name",
+          "exchange",
+          "qty",
+          "avgCost",
+          "lastPrice",
+          "instrumentId",
+          "canonicalSymbol",
+          "mapped",
+          "alreadyImported",
+          "suggestedDate"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "avgCost": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastPrice": {
+            "type": "number",
+            "format": "double"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "canonicalSymbol": {
             "type": [
               "null",
               "string"
             ]
           },
-          "historyFrom": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "includeInTotals": {
+          "mapped": {
             "type": "boolean"
+          },
+          "alreadyImported": {
+            "type": "boolean"
+          },
+          "suggestedDate": {
+            "type": "string",
+            "format": "date"
           }
-        }
+        },
+        "description": "A holding Dhan reports, for the first import in the portfolio settings. Key identifies it in the import request (the ISIN, otherwise \"securityId:EXCHANGE\").\nMapped is false when it is not in the instrument master. AlreadyImported: the account has the holding (open) already.\nSuggestedDate is the date to pre-fill: the first import date, or the oldest lot's date of an already imported holding."
       },
       "ProblemDetails": {
         "type": "object",
@@ -2406,14 +4097,266 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found."
           },
           "retryAfterSeconds": {
             "type": "integer",
             "description": "Present on auth.locked, auth.rate_limited and accounts.consent_limit: seconds until a new attempt may succeed.",
             "format": "int32"
+          },
+          "openHoldings": {
+            "type": "integer",
+            "description": "Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings the account has open.",
+            "format": "int32"
+          },
+          "listedHoldings": {
+            "type": "integer",
+            "description": "Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.",
+            "format": "int32"
+          },
+          "wouldClose": {
+            "type": "integer",
+            "description": "Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.",
+            "format": "int32"
           }
         }
+      },
+      "RefreshRunView": {
+        "required": [
+          "id",
+          "trigger",
+          "status",
+          "phase",
+          "startedAt",
+          "finishedAt",
+          "requestedBy",
+          "rowsRead",
+          "added",
+          "updated",
+          "retired",
+          "revived",
+          "unchanged",
+          "skippedByScope",
+          "collisions",
+          "sectorMatched",
+          "sectorUnmatched",
+          "fnoUnderlyings",
+          "totalActive",
+          "keptByType",
+          "warnings",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "phase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "rowsRead": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "revived": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skippedByScope": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "collisions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sectorMatched": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sectorUnmatched": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "fnoUnderlyings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalActive": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "keptByType": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving."
+      },
+      "RefreshStarted": {
+        "required": [
+          "refreshId"
+        ],
+        "type": "object",
+        "properties": {
+          "refreshId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "description": "The refresh that was registered; follow it with `GET /api/instruments/refresh/status`."
+      },
+      "RefreshStatusView": {
+        "required": [
+          "current",
+          "last",
+          "autoRefresh",
+          "totalActive"
+        ],
+        "type": "object",
+        "properties": {
+          "current": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RefreshRunView"
+              }
+            ]
+          },
+          "last": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RefreshRunView"
+              }
+            ]
+          },
+          "autoRefresh": {
+            "$ref": "#/components/schemas/AutoRefreshView"
+          },
+          "totalActive": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active."
+      },
+      "ReturnsView": {
+        "required": [
+          "invested",
+          "value",
+          "pnl",
+          "pnlPct",
+          "xirr",
+          "xirrState",
+          "realisedPnl",
+          "realisedEstimated"
+        ],
+        "type": "object",
+        "properties": {
+          "invested": {
+            "type": "number",
+            "format": "double"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnlPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "xirr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "xirrState": {
+            "type": "string"
+          },
+          "realisedPnl": {
+            "type": "number",
+            "format": "double"
+          },
+          "realisedEstimated": {
+            "type": "boolean"
+          }
+        },
+        "description": "The profit/loss figures that every holding row, lot row and summary carries."
       },
       "RiskProfileInput": {
         "required": [
@@ -2811,6 +4754,16 @@
         },
         "description": "What the client needs to know about its session."
       },
+      "StartRefreshRequest": {
+        "type": "object",
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "description": "Starts a refresh. `force` skips the \"file unchanged\" check."
+      },
       "StepUpRequest": {
         "required": [
           "password"
@@ -2835,6 +4788,154 @@
             "format": "date-time"
           }
         }
+      },
+      "SyncInput": {
+        "required": [
+          "confirm"
+        ],
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "expectedOpenHoldings": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "expectedWouldClose": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "Body of \"Sync now\" (optional). Confirm: true applies an answer that would close all or most open holdings, which is otherwise refused with\n`409 portfolio.confirmation_required` (the problem carries `listedHoldings`, `openHoldings` and `wouldClose`). With Confirm: true both\nExpectedOpenHoldings and ExpectedWouldClose are required (400 portfolio.invalid otherwise): the numbers the owner saw in the 409. If Dhan's answer differs\nnow, nothing is changed and the sync answers `409 portfolio.confirmation_stale` with the fresh numbers."
+      },
+      "SyncRunView": {
+        "required": [
+          "id",
+          "accountId",
+          "trigger",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "newCount",
+          "increasedCount",
+          "decreasedCount",
+          "closedCount",
+          "unchangedCount",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "newCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "increasedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "decreasedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "closedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchangedCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A run of the holdings sync. Trigger \"manual\", \"auto\" or \"import\"; Status \"running\", \"succeeded\", \"failed\" or \"skipped\". Error is a short safe text."
+      },
+      "SyncStatusView": {
+        "required": [
+          "mode",
+          "dailyTimeIst",
+          "firstImportDate",
+          "hasHoldings",
+          "nextRunAt",
+          "running",
+          "last"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "dailyTimeIst": {
+            "type": "string"
+          },
+          "firstImportDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "hasHoldings": {
+            "type": "boolean"
+          },
+          "nextRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "running": {
+            "type": "boolean"
+          },
+          "last": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SyncRunView"
+              }
+            ]
+          }
+        },
+        "description": "The refresh settings of an account and its latest run. Mode \"off\" or \"daily\"; NextRunAt is null when the mode is off. FirstImportDate is the date holdings\nget when they are imported without a date of their own; HasHoldings is true once the account has any holding (the first import has happened). Running is\ntrue while a sync or import of the account is in progress."
       },
       "SystemStatusResponse": {
         "required": [
@@ -3083,6 +5184,12 @@
     },
     {
       "name": "Portfolio buckets"
+    },
+    {
+      "name": "Instruments"
+    },
+    {
+      "name": "Holdings"
     }
   ]
 }

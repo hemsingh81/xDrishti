@@ -29,8 +29,13 @@ export function createGlobalStyles(theme: Theme) {
     // `:is()` takes the specificity of its most specific argument, so this beats MUI's `outline: 0` on ButtonBase.
     [`:is(${interactive}):focus-visible`]: { outline: ring, outlineOffset: focusRing.offset },
     [`:is(${packed}):focus-visible`]: { outlineOffset: -focusRing.width },
-    // Text fields show focus on their border instead (a 2 px accent border), so the inner input needs no extra ring.
-    '.MuiInputBase-input:focus-visible': { outline: 'none' },
+    // Text fields and selects show focus on their own border (a 2 px accent border), so the inner input / select box
+    // gets no extra ring — it would draw a second border over the floating label. The doubled class makes this rule at
+    // least as specific as the `:is()` ring above (whose specificity is that of `[tabindex]:not([tabindex])`), and it
+    // comes later, so it wins.
+    '.MuiInputBase-root .MuiInputBase-input:focus-visible, .MuiInputBase-root .MuiSelect-select:focus-visible': {
+      outline: 'none',
+    },
     // Numeric roles: aligned digits, slashed zero.
     '.numeric': { ...numeric },
     '.mono': { fontFamily: monoFontFamily },

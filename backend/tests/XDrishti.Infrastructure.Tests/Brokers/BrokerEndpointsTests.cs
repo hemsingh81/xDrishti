@@ -9,14 +9,28 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://auth.dhan.co/app/generate-consent?client_id=1000000001")]
     [InlineData("POST", "https://auth.dhan.co/app/consumeApp-consent?tokenId=abc")]
     [InlineData("POST", "https://AUTH.DHAN.CO/app/consumeApp-consent?tokenId=abc")]
-    public void The_documented_consent_endpoints_are_allowed(string method, string url) =>
+    [InlineData("GET", "https://api.dhan.co/v2/holdings")] // the one data endpoint (ADR 0012)
+    [InlineData("GET", "https://API.DHAN.CO/v2/holdings")]
+    public void The_documented_endpoints_are_allowed(string method, string url) =>
         BrokerEndpoints.IsAllowed(new HttpMethod(method), new Uri(url)).ShouldBeTrue();
 
     [Theory]
     [InlineData("GET", "https://api.dhan.co/v2/orders")] // orders
     [InlineData("POST", "https://api.dhan.co/v2/orders")]
     [InlineData("GET", "https://api.dhan.co/v2/positions")] // positions
-    [InlineData("GET", "https://api.dhan.co/v2/holdings")]
+    [InlineData("GET", "https://api.dhan.co/v2/holdings?x=1")] // holdings take no query
+    [InlineData("GET", "https://api.dhan.co/v2/holdings?")]
+    [InlineData("GET", "https://api.dhan.co/v2/holdings/")] // paths are exact
+    [InlineData("GET", "https://api.dhan.co/v2/Holdings")]
+    [InlineData("GET", "https://api.dhan.co/v2/holdings/1")]
+    [InlineData("POST", "https://api.dhan.co/v2/holdings")] // read only
+    [InlineData("DELETE", "https://api.dhan.co/v2/holdings")]
+    [InlineData("GET", "http://api.dhan.co/v2/holdings")] // not HTTPS
+    [InlineData("GET", "https://api.dhan.co:8443/v2/holdings")] // other port
+    [InlineData("GET", "https://user@api.dhan.co/v2/holdings")]
+    [InlineData("GET", "https://api.dhan.co.example.invalid/v2/holdings")] // other host
+    [InlineData("GET", "https://auth.dhan.co/v2/holdings")] // the path belongs to the API host only
+    [InlineData("GET", "https://api.dhan.co/v2/holdings#x")]
     [InlineData("GET", "https://api.dhan.co/v2/fundlimit")] // funds
     [InlineData("GET", "https://api.dhan.co/v2/profile")] // no longer used
     [InlineData("GET", "https://api.dhan.co/v2/RenewToken")] // no longer used

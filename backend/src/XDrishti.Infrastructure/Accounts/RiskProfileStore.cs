@@ -29,7 +29,7 @@ internal sealed class RiskProfileStore(XDrishtiDbContext db) : IRiskProfileStore
     public async ValueTask<bool> NameExistsAsync(string name, Guid? exceptProfileId, CancellationToken cancellationToken)
     {
         return await db.RiskProfiles.AsNoTracking().AnyAsync(
-            x => EF.Functions.ILike(x.Name, LikePattern.Escape(name)) && (exceptProfileId == null || x.Id != exceptProfileId), cancellationToken);
+            x => EF.Functions.ILike(x.Name, LikePattern.Escape(name), LikePattern.EscapeCharacter) && (exceptProfileId == null || x.Id != exceptProfileId), cancellationToken);
     }
 
     public async ValueTask<IReadOnlyDictionary<Guid, int>> CountUsageAsync(CancellationToken cancellationToken) =>

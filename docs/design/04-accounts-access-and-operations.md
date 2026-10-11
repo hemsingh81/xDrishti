@@ -16,7 +16,7 @@ You can register any number of broker accounts. Each account is given one or mor
 |------|------------------------------|--------------|
 | **Data** | Market data: instrument master, historical & end-of-day 1-minute data, live feed for the active set, quotes | Dhan Data API subscription on this account |
 | **Trading** | Receives next-day plan tickets (sized to its capital and risk profile); auto-journal of fills; later order execution | Risk profile, capital source, allowed styles/instruments |
-| **Portfolio** | Holdings, positions, trade history and ledger are synced and monitored | Sync schedule, default bucket |
+| **Portfolio** | Holdings (and later positions, trades, ledger) are imported with acquisition dates, synced by hand or automatically and monitored ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)) | Connected account; optional refresh schedule; gets its own default bucket automatically |
 
 One account can hold several roles at once, for example:
 
@@ -92,6 +92,20 @@ vault show "API key: not set".
 the primary Data account, changing trading settings, removing an account, and creating, editing or deleting risk profiles. Without a recent
 step-up these endpoints answer `403 auth.step_up_required`. Portfolio and Data settings and adding portfolio buckets do not need it.
 
+**Portfolio settings and the default bucket (P1-16e):** an account with the Portfolio role always has exactly one default bucket named
+`"{account name} · Portfolio"` (middle dot with spaces), created in the same save that creates the account or switches the role on, renamed with the account,
+archived with it (and renamed "… · Portfolio (archived)", so its name is free for a new account), and hidden from `GET /api/portfolio-buckets` while the role is off (it and its holdings are kept). `PUT /api/accounts/{id}/portfolio` takes
+`{defaultBucket?, includeInTotals?, refreshMode?, refreshDailyTimeIst?, firstImportDate?, firstImport?: {rows: [{key, acquiredOn?}]}}` — **every field that is left out (or null) keeps its current value**. `defaultBucket` is a
+custom bucket's name; `""` (or the name of the account's own "{name} · Portfolio" bucket) selects the account's own bucket; at account creation, left out means the own bucket and `includeInTotals` true. Views return `defaultBucket` (name), `autoBucketName`, the refresh settings, `firstImportDate` and `hasHoldings`. **Automatic holdings refresh and first import** ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md), [ADR 0013](../adr/0013-portfolio-import-with-settings-and-daily-refresh.md)):
+`refreshMode` `off` (default) | `daily`, `refreshDailyTimeIst` `HH:mm` (India time, default 16:00); `firstImportDate` (default 2025-01-01, not in the future, not before 1990-01-01) is the date holdings
+get when imported without a date of their own. A field that is left out keeps its current value, invalid values are `400 accounts.invalid` with the field name, a refresh change is audited (`PortfolioRefreshSettingsChanged`).
+**The answer is `{account, import}`**: when the account has the Portfolio role, is connected and has no holdings, every holding Dhan lists is imported right after the settings are saved, dated `firstImportDate` (request, else stored, else 2025-01-01; optional `firstImport.rows` dates override per key)
+(`import.status` `imported` with `imported`/`defaultDated`/`alreadyImported`/`unknown`, `skipped` when the account already has holdings, `deferred` when it is not connected or the role is off — the first sync then imports everything dated
+`firstImportDate` —, or `failed` with `errorCode` `portfolio.import_failed`, `cause` and `message`: the settings stay saved); `import` is always present. At account creation `firstImportDate` is stored and `firstImport` is ignored (a new account is not connected).
+Details: [doc 12](12-portfolio-monitoring.md) §3.
+There is no "history from" setting: acquisition dates are chosen by the owner at the first import (saving these settings) and can be edited per lot ([doc 12](12-portfolio-monitoring.md) §3).
+The import, sync and lot-date edits are audited in the account's activity (`HoldingsImported`, `HoldingsSynced`, `LotDateChanged`: counts and dates only, never tokens or Dhan's payload).
+
 **Removing an account archives it:** it disappears from lists and services, its history and audit trail (`accounts.account_events`, insert-only
 for the runtime role) stay, its name becomes free again and its stored broker secrets are deleted. The primary Data account cannot be removed or lose the
 Data role until another account has been made primary (an atomic swap; the old primary becomes the standby when that slot is free).
@@ -100,7 +114,7 @@ Data role until another account has been made primary (an atomic swap; the old p
 
 | View | Content |
 |------|---------|
-| **Accounts** (list + detail) | Left: every account with roles, token health, holdings value. Right: tabs **Overview** (value, P&L, funds, token, sync) · **Roles** · **Trading** (mode, risk profile, capital source/amount, styles, allowed instruments per style, per-account overrides of risk %, max entries, max open, daily loss) · **Portfolio** (default bucket, trade-history import start, include in totals, buckets) · **Data** (primary/standby, subscription & renewal, live-feed budget, failover test) · **Connection** (client id masked, name, colour, notes; secret status — set / last changed, Dhan key expiry — with *Replace* (write-only dialog, step-up); Dhan's setup steps and redirect URL; connection status chip and expiry with *Connect / Reconnect* and *Disconnect*) · **Activity** (audit for this account) |
+| **Accounts** (list + detail) | Left: every account with roles, token health, holdings value. Right: tabs **Overview** (value, P&L, funds, token, sync) · **Roles** · **Trading** (mode, risk profile, capital source/amount, styles, allowed instruments per style, per-account overrides of risk %, max entries, max open, daily loss) · **Portfolio** (default bucket for imports — the account's own *"{name} · Portfolio"* bucket or a custom one —, include in totals, add bucket; auto refresh: Off / Daily at HH:MM IST, and the *First import* block: the first import date (default 1 Jan 2025) ; saving imports all holdings Dhan lists with that date, per-holding dates are edited later on the Portfolio screen. Later changes arrive with the refresh; the Portfolio screen only has *Sync now*) · **Data** (primary/standby, subscription & renewal, live-feed budget, failover test) · **Connection** (client id masked, name, colour, notes; secret status — set / last changed, Dhan key expiry — with *Replace* (write-only dialog, step-up); Dhan's setup steps and redirect URL; connection status chip and expiry with *Connect / Reconnect* and *Disconnect*) · **Activity** (audit for this account) |
 | **Add account wizard** | 1 *Dhan app* (client id, API key and secret — masked, never pre-filled —, day the key was generated, setup steps, redirect URL with copy button) → 2 *Identity* → 3 *Roles* → 4 *Role settings* → 5 *Review & create* (secrets shown as "•••• set"; confirm with your password; *Create and connect* starts the Dhan login) |
 | **Header accounts menu** | Every account with colour dot, name and status chip (expiry when connected), and *Connect / Reconnect* for each account that is not connected ([P1-16d](../specs/P1-16d-dhan-consent-only-and-header-accounts.md)) |
 

@@ -5,7 +5,7 @@ import type { AccountDetail, AccountSummary } from '@/shared/api';
 import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/shared/ui/dialog';
 import { useToast } from '@/shared/ui/toastContext';
 import { useCreateAccount } from '../api/accountMutations';
-import { bucketsQuery, riskProfilesQuery } from '../api/accountsQueries';
+import { riskProfilesQuery } from '../api/accountsQueries';
 import { useStartConnect } from '../api/connectionMutations';
 import { connectionProblem } from '../lib/connectErrors';
 import { fieldErrorsOf, problemMessage, type FieldErrors } from '../lib/fieldErrors';
@@ -49,7 +49,6 @@ export function AddAccountWizard({ accounts, onClose, onCreated }: AddAccountWiz
   const busy = create.isPending || connect.isPending || connect.isSuccess;
   const [connectAfter, setConnectAfter] = useState(false);
   const profiles = useQuery(riskProfilesQuery);
-  const buckets = useQuery(bucketsQuery);
   const [state, setState] = useState<WizardState>(() => initialWizardState(accounts));
   const [step, setStep] = useState(0);
   const [clientErrors, setClientErrors] = useState<FieldErrors>({});
@@ -82,11 +81,6 @@ export function AddAccountWizard({ accounts, onClose, onCreated }: AddAccountWiz
       setState((s) => ({
         ...s,
         trading: { ...s.trading, riskProfileId: s.trading.riskProfileId || defaultProfileId(profiles.data ?? []) },
-        portfolio: {
-          ...s.portfolio,
-          defaultBucket:
-            s.portfolio.defaultBucket || (buckets.data?.some((b) => b.name === 'Trading') ? 'Trading' : ''),
-        },
       }));
     }
   }

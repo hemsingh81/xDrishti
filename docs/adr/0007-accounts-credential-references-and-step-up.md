@@ -1,6 +1,6 @@
 # 0007 — Accounts: credential references, step-up, one primary Data account, archive
 
-- **Status:** Accepted — decision 1 (credential references) superseded by [ADR 0008](0008-broker-credentials-vault-and-connection.md) on 2026-10-11
+- **Status:** Accepted — decision 1 (credential references) superseded by [ADR 0008](0008-broker-credentials-vault-and-connection.md) on 2026-10-11; seeded buckets amended by [ADR 0011](0011-default-portfolio-bucket-per-account.md) on 2026-10-11
 - **Date:** 2026-10-10
 
 ## Context
@@ -36,5 +36,5 @@ database, and that role changes need re-authentication. Implementing it needed f
 - The mounted folders must be readable by the container's non-root user, so `brokers/` and `<ref>/` are mode 755 and the files 644; privacy comes from the private (700) parent folder.
 - Step-up adds one round trip for sensitive actions; the UI retries the original action after the password dialog. The 5-minute window is global per session (not per action).
 - The primary Data account can never be removed directly, even when it is the only account: add or promote another account first.
-- Seeded data (risk profiles Standard and Conservative, buckets Trading/MyLongTerm/MyChoice) is inserted by the migration and is idempotent.
+- Seeded data (risk profiles Standard and Conservative) is inserted by the migration and is idempotent. *(Amended by [ADR 0011](0011-default-portfolio-bucket-per-account.md): the buckets Trading/MyLongTerm/MyChoice are no longer seeded; each Portfolio account gets its own default bucket.)*
 - Later: automated trading modes, token refresh/test and failover execution reuse these tables (P1-04, P1-12, P12).

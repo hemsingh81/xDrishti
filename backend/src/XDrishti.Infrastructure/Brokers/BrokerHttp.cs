@@ -16,6 +16,9 @@ internal static partial class BrokerHttp
     /// <summary>Upper bound for one broker call (the spec: 15 seconds).</summary>
     public static readonly TimeSpan Timeout = TimeSpan.FromSeconds(15);
 
+    /// <summary>Dhan's error code for an invalid or expired access token (documented authentication error).</summary>
+    public const string TokenRefusedCode = "DH-901";
+
     /// <summary>Broker answers are small; anything bigger is refused.</summary>
     public const int MaxResponseBytes = 256 * 1024;
 
@@ -27,6 +30,20 @@ internal static partial class BrokerHttp
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
+    /// <summary>Upper bound for the holdings read (the spec: 30 seconds).</summary>
+    public static readonly TimeSpan HoldingsTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>A list of holdings is bigger than a token answer, but anything beyond 5 MB is refused.</summary>
+    public const int MaxHoldingsResponseBytes = 5 * 1024 * 1024;
+
+    public static void ConfigureHoldings(HttpClient client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        client.Timeout = HoldingsTimeout;
+        client.MaxResponseContentBufferSize = MaxHoldingsResponseBytes;
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    }
+
     public static HttpMessageHandler CreatePrimaryHandler() => new SocketsHttpHandler
     {
         // A redirect would leave the allow-list unchecked (it is followed inside this handler): never follow one.
@@ -35,9 +52,12 @@ internal static partial class BrokerHttp
         PooledConnectionLifetime = TimeSpan.FromMinutes(5),
     };
 
-    /// <summary>The JSON body of a successful answer (a detached copy), or why there is none.</summary>
+    /// <summary>
+    /// The JSON body of a successful answer (a detached copy), or why there is none. With <paramref name="tokenCall"/> (a call that sends the
+    /// owner's access token) a 401 or 403, or any 4xx that carries Dhan's DH-901, is <see cref="BrokerFailureKind.Unauthorized"/>: the token is expired or revoked.
+    /// </summary>
     public static async ValueTask<BrokerResponse<JsonElement>> SendAsync(
-        HttpClient client, HttpRequestMessage request, string operation, ILogger logger, CancellationToken cancellationToken)
+        HttpClient client, HttpRequestMessage request, string operation, ILogger logger, CancellationToken cancellationToken, bool tokenCall = false)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(request);
@@ -58,8 +78,15 @@ internal static partial class BrokerHttp
             }
 
             var code = body is { } error ? ErrorCode(error) : null;
-            var kind = status is >= 400 and < 500 ? BrokerFailureKind.Rejected : BrokerFailureKind.Unavailable;
-            var outcome = kind == BrokerFailureKind.Rejected ? "refused" : "failed";
+            var kind = status switch
+            {
+                // Dhan also reports an invalid or expired token as DH-901 with other 4xx statuses (400 has been seen).
+                401 or 403 when tokenCall => BrokerFailureKind.Unauthorized,
+                >= 400 and < 500 when tokenCall && code == TokenRefusedCode => BrokerFailureKind.Unauthorized,
+                >= 400 and < 500 => BrokerFailureKind.Rejected,
+                _ => BrokerFailureKind.Unavailable,
+            };
+            var outcome = kind == BrokerFailureKind.Unavailable ? "failed" : "refused";
             LogFailed(logger, operation, status, outcome, code);
             return BrokerResponse.Fail<JsonElement>(kind, code);
         }

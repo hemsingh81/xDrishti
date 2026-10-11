@@ -297,13 +297,40 @@ connection. <code>live.max_ws_instruments</code> caps it (default 200).</li>
 <p>Dhan is the only broker (<a href="../adr/0009-dhan-consent-flow-only.html">ADR 0009</a>); another one means a new decision, one connector and one adapter project. Dhan API keys, secrets and tokens are kept in the encrypted broker vault (<code>accounts.broker_secrets</code>, doc 04 §1).
 The instrument master maps each broker id
 (Dhan <code>security_id</code> + segment) to a canonical symbol; mapping mismatches are quality issues, never guessed.</p>
+<h3 id="71-instrument-master-sources-adr-0010-p1-03">7.1 Instrument master sources (ADR 0010, P1-03)<a class="hash" href="#71-instrument-master-sources-adr-0010-p1-03" aria-label="Link to this section">#</a></h3>
+<p>The master list (<a href="06-instruments-and-baskets.html">doc 06</a> §2) is built from two <strong>public files</strong>; no credentials, cookies or account data are sent. The API&#39;s HTTP clients call them with an allow-list
+(<code>GET</code>, HTTPS, exact host and path, no query, no redirects followed, no cookies, <code>User-Agent: xDrishti/0.1 (personal use)</code>, no request logging beyond the source name and HTTP status), size caps and total timeouts:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>URL</th>
+<th>Size / cap / timeout</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Dhan detailed scrip master</td>
+<td><code>https://images.dhan.co/api-data/api-scrip-master-detailed.csv</code></td>
+<td>207,560 rows, 35 MB · 100 MB · 120 s</td>
+<td>Instruments: canonical symbols, <code>SECURITY_ID</code>, ISIN, series, lot and tick size, expiry, ASM/GSM, MTF leverage, freeze quantity. Serves <code>ETag</code> and <code>Last-Modified</code>; a conditional request returns <code>304</code> when unchanged</td>
+</tr>
+<tr>
+<td>NSE Nifty Total Market list</td>
+<td><code>https://nsearchives.nseindia.com/content/indices/ind_niftytotalmarket_list.csv</code></td>
+<td>49 KB, 755 stocks · 5 MB · 30 s</td>
+<td>Sector (NSE &quot;Industry&quot;, 22 values) by ISIN. NSE refuses clients without a <code>User-Agent</code> and ignores <code>If-None-Match</code>, so it is fetched in full on every changed master (it is small); a failure to get or read it never fails the refresh</td>
+</tr>
+</tbody></table>
+<p>Dhan&#39;s header has 33 columns (the last one empty). The importer finds the 17 columns it reads by name and <strong>fails closed</strong> with a plain message when one is missing or repeated; extra or no-longer-present unused columns, and single unreadable or oversize rows, are tolerated with a warning (doc 06 §2.2). Both files can change format without notice; a refused file leaves the previous list untouched.
+Using them follows the sources&#39; terms for personal use (<a href="19-risks-and-compliance.html">doc 19</a>).</p>
 <h2 id="8-accounts">8. Accounts<a class="hash" href="#8-accounts" aria-label="Link to this section">#</a></h2>
 <p>Any number of accounts (all your own), each with <strong>roles</strong> — Data, Trading, Portfolio — as described in
 <a href="04-accounts-access-and-operations.html">doc 04</a> §1. The market-data jobs and live feed in this document always use
 the <strong>primary Data account</strong> (with automatic failover to a standby Data account if configured). Trading accounts
 have mode (<code>paper</code> / <code>manual_live</code>; automated modes later), risk profile, allowed styles/instruments and capital source. Nightly sync reads funds, positions, holdings, trade
 history and ledger → feeds the <strong>auto-journal</strong> (fills matched to plan tickets) and <strong>portfolio monitoring</strong>
-(<a href="12-portfolio-monitoring.html">doc 12</a>).</p>
+(<a href="12-portfolio-monitoring.html">doc 12</a>). The instrument master needs no account: it comes from two public files (§7.1).</p>
 <h3 id="81-connecting-dhan39s-consent-flow">8.1 Connecting: Dhan&#39;s consent flow<a class="hash" href="#81-connecting-dhan39s-consent-flow" aria-label="Link to this section">#</a></h3>
 <p>From Dhan&#39;s own documentation (verified 2026-10-11; ADR 0008, 0009, specs P1-16c, P1-16d). The connector calls only the endpoints below (allow-list in
 the HTTP client: HTTPS, exact host and path, method; no redirects followed), with a 15-second timeout, no retries (codes are single-use) and no
@@ -343,6 +370,15 @@ only when they have Dhan&#39;s form (<code>DH-901</code>); message texts are nev
 </tbody></table>
 <p>A 4xx answer is a refusal (wrong key/secret, used or expired tokenId), anything else (5xx, 3xx, timeout, network, unreadable body)
 is &quot;broker unavailable&quot;; both surface as <code>502 accounts.broker_error</code> with a safe message. Expiry times are stored in UTC.</p>
+<h3 id="82-reading-the-holdings-adr-0012-p2-01">8.2 Reading the holdings (ADR 0012, P2-01)<a class="hash" href="#82-reading-the-holdings-adr-0012-p2-01" aria-label="Link to this section">#</a></h3>
+<p><code>GET https://api.dhan.co/v2/holdings</code> with the header <code>access-token</code> (the account&#39;s stored token, read from the vault) answers an array of
+<code>{exchange, tradingSymbol, securityId, isin, totalQty, dpQty, t1Qty, mtf_t1_qty, mtf_qty, availableQty, collateralQty, avgCostPrice, lastTradedPrice}</code> — no purchase
+date and no previous close. xDrishti uses <code>exchange</code>, <code>tradingSymbol</code>, <code>securityId</code>, <code>isin</code>, <code>totalQty</code>, <code>avgCostPrice</code> and <code>lastTradedPrice</code>. It is the only <code>api.dhan.co</code>
+endpoint on the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB). A 401/403 means the saved token is expired or revoked
+(<code>409 portfolio.not_connected</code>, &quot;sign in to Dhan again&quot;); other 4xx and 5xx/timeouts are <code>502 accounts.broker_error</code>. An empty array (HTTP 200 <code>[]</code>) and Dhan&#39;s documented data error <code>DH-907</code> (&quot;incorrect parameters or no data present&quot;;
+this request has no parameters, so here it can only mean no data) both read as an empty list; <code>DH-1111</code> is not in Dhan&#39;s documentation and is only tolerated as an alias.
+An empty list is never trusted blindly: see the safeguard in <a href="12-portfolio-monitoring.html">doc 12</a> §3. Rows of one holding (same ISIN, or same security id and exchange) are added up (quantity summed, average cost weighted). Neither the token, the URL nor the
+raw answer is logged or returned.</p>
 <h2 id="9-storage">9. Storage<a class="hash" href="#9-storage" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -353,6 +389,21 @@ is &quot;broker unavailable&quot;; both surface as <code>502 accounts.broker_err
 </tr>
 </thead>
 <tbody><tr>
+<td><code>market.instruments</code></td>
+<td>Table (P1-03)</td>
+<td>The master list: canonical symbol (unique), type, name, ISIN, series, lot/tick size, expiry, sector, flags, first/last seen, <code>retired_at</code>; trigram indexes for search</td>
+</tr>
+<tr>
+<td><code>market.instrument_broker_ids</code></td>
+<td>Table (P1-03)</td>
+<td>Dhan <code>SECURITY_ID</code> + exchange segment per instrument</td>
+</tr>
+<tr>
+<td><code>market.master_refreshes</code></td>
+<td>Table (P1-03)</td>
+<td>One row per refresh run: trigger, status, phase, counts, validators, warnings, error</td>
+</tr>
+<tr>
 <td><code>market.bars_1m</code></td>
 <td>Hypertable, compressed after 7 days</td>
 <td>(instrument_id, ts), source = csv / dhan_eod</td>
@@ -490,7 +541,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-11 10:15</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-11 18:10</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>
@@ -502,8 +553,10 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
 <a href="#5-real-time-data-the-active-set-only" class="d2">5. Real-time data — the active set only</a>
 <a href="#6-end-of-day-fetch-tier-b" class="d2">6. End-of-day fetch (Tier B)</a>
 <a href="#7-broker-abstraction" class="d2">7. Broker abstraction</a>
+<a href="#71-instrument-master-sources-adr-0010-p1-03" class="d3">7.1 Instrument master sources (ADR 0010, P1-03)</a>
 <a href="#8-accounts" class="d2">8. Accounts</a>
 <a href="#81-connecting-dhan39s-consent-flow" class="d3">8.1 Connecting: Dhan&amp;#39;s consent flow</a>
+<a href="#82-reading-the-holdings-adr-0012-p2-01" class="d3">8.2 Reading the holdings (ADR 0012, P2-01)</a>
 <a href="#9-storage" class="d2">9. Storage</a>
 <a href="#10-data-quality" class="d2">10. Data quality</a>
 <a href="#10b-data-quality-window-validation-workbench" class="d3">10b. Data quality window (validation workbench)</a>

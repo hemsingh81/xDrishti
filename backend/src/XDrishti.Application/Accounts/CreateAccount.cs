@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 
@@ -15,7 +16,7 @@ public sealed record CreateAccountCommand(CreateAccountInput Input, string Actor
 internal sealed class CreateAccountHandler(
     IAccountStore accounts,
     IRiskProfileStore riskProfiles,
-    IBucketStore buckets,
+    DefaultBuckets defaultBuckets,
     IBrokerSecretVault vault,
     IAccountEventLog events,
     IAccountUnitOfWork unitOfWork,
@@ -93,6 +94,12 @@ internal sealed class CreateAccountHandler(
             $"Account '{account.Name}' created ({AccountCodes.Name(account.Broker)}); {AccountSummaries.SecretsSet(secrets.Select(s => s.Key))}; {AccountSummaries.Roles(account)}",
             command.Actor,
             now));
+        var ensured = await defaultBuckets.EnsureAsync(account, command.Actor, now, cancellationToken);
+        if (ensured.IsFailure)
+        {
+            return Result.Failure<AccountDetail>(ensured.Error);
+        }
+
         if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
         {
             AccountsLog.ChangeCollided(logger, account.Slug);
@@ -121,15 +128,12 @@ internal sealed class CreateAccountHandler(
 
         if (input.Portfolio is not null)
         {
-            var spec = AccountInputs.ParsePortfolio(input.Portfolio);
-            var bucket = string.IsNullOrWhiteSpace(spec.DefaultBucket) ? null : await buckets.FindNameAsync(spec.DefaultBucket.Trim(), cancellationToken);
-            if (!string.IsNullOrWhiteSpace(spec.DefaultBucket) && bucket is null)
+            var custom = await defaultBuckets.ResolveChoiceAsync(account, input.Portfolio.DefaultBucket, errors, "portfolio.defaultBucket", cancellationToken);
+            var refresh = AccountInputs.ParseRefresh(input.Portfolio, account.Portfolio.Refresh, errors, "portfolio");
+            var firstImportDate = AccountInputs.ParseFirstImportDate(input.Portfolio, AccountTime.TodayInIndia(now), errors, "portfolio");
+            if (!errors.HasErrors)
             {
-                errors.Add("portfolio.defaultBucket", "Unknown bucket.");
-            }
-            else if (AccountInputs.Collect(account.ConfigurePortfolio(spec with { DefaultBucket = bucket }, AccountTime.TodayInIndia(now), now), errors, "portfolio") is { } portfolio)
-            {
-                return portfolio;
+                account.ConfigurePortfolio(new PortfolioSpec(custom?.Id, input.Portfolio.IncludeInTotals ?? true, refresh, firstImportDate), now);
             }
         }
 

@@ -8,8 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Serilog.Core;
 using Testcontainers.PostgreSql;
 using XDrishti.Api.Auth;
+using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Auth;
 using XDrishti.Infrastructure.Brokers;
+using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Infrastructure;
@@ -54,6 +56,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>A fake Dhan server: the API's broker HTTP client never reaches the internet in tests.</summary>
     public FakeBrokers Brokers { get; } = new();
 
+    /// <summary>Fake Dhan and NSE file servers: the API's master-data HTTP clients never reach the internet in tests.</summary>
+    public FakeMasterData MasterData { get; } = new();
+
+    /// <summary>Registered instrument refreshes wait here until a test runs them.</summary>
+    public ManualRefreshJobs RefreshJobs { get; } = new();
+
     /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
     public string AdminConnectionString => _database.GetConnectionString();
 
@@ -75,6 +83,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseEnvironment("Testing");
         builder.UseSetting("Database:ConnectionString", _database.GetConnectionString());
         builder.UseSetting("BrokerVault:Key", VaultKey);
+        builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
+        builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);
         builder.UseSetting("Auth:Owner:Password", OwnerPassword);
@@ -87,6 +97,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             // Only the innermost handler is replaced: the allow-list guard and the client settings stay as in production.
             services.AddHttpClient(BrokerHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
+            services.AddHttpClient(BrokerHttpClientNames.DhanHoldings).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
+
+            // Same for the instrument master's two file servers; refreshes are run by the tests, not by the background worker.
+            services.AddHttpClient(MasterDataHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
+            services.AddHttpClient(MasterDataHttpClientNames.Nse).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
+            services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
         });
     }
 
@@ -122,16 +138,50 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         return signedIn;
     }
 
-    /// <summary>Removes every account (its secrets go with it), its audit trail, and the profiles and buckets the tests added, so a test starts from the seeded state.</summary>
+    /// <summary>Removes every account (its secrets go with it), its holdings and syncs, its audit trail, and the buckets and profiles the tests added, so a test starts from the seeded state (two risk profiles, no buckets).</summary>
     public async Task ResetAccountsAsync()
     {
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM portfolio.holding_lots;
+                DELETE FROM portfolio.holdings;
+                DELETE FROM portfolio.holding_syncs;
                 DELETE FROM accounts.account_events;
+                UPDATE accounts.portfolio_settings SET default_bucket_id = NULL;
+                DELETE FROM accounts.portfolio_buckets;
                 DELETE FROM accounts.broker_accounts;
                 DELETE FROM accounts.risk_profiles WHERE NOT is_seeded;
-                DELETE FROM accounts.portfolio_buckets WHERE name NOT IN ('Trading', 'MyLongTerm', 'MyChoice');
+                """);
+            return 0;
+        });
+    }
+
+    /// <summary>
+    /// Puts the clock back to real time and removes the sign-in audit events that a test wrote while the clock was ahead of real time: they would otherwise
+    /// count as the "latest" events for every test that reads the audit trail afterwards.
+    /// </summary>
+    public async Task ResetClockAsync()
+    {
+        Clock.Reset();
+        await this.WithDbAsync(async db =>
+        {
+            await db.Database.ExecuteSqlRawAsync("DELETE FROM auth.audit_events WHERE at > now()");
+            return 0;
+        });
+    }
+
+    /// <summary>Empties the instrument master (instruments, broker ids and refresh records) and the fake file servers, so a test starts from nothing.</summary>
+    public async Task ResetInstrumentsAsync()
+    {
+        MasterData.Reset();
+        RefreshJobs.Clear();
+        await this.WithDbAsync(async db =>
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM market.instrument_broker_ids;
+                DELETE FROM market.instruments;
+                DELETE FROM market.master_refreshes;
                 """);
             return 0;
         });

@@ -85,6 +85,19 @@ describe.each(['light', 'dark'] as const)('%s theme', (mode) => {
     expect(css).toMatch(/\.MuiMenuItem-root\):focus-visible\{outline-offset:-2px/);
   });
 
+  it('keeps the ring off text-field inputs and select boxes (the field border shows focus), with enough specificity', () => {
+    renderThemed(mode, <span>x</span>);
+    const css = injectedCss();
+    // (The helper strips whitespace, so the descendant combinator reads `.a.b` here.)
+    // The global ring uses `:is()`, whose specificity is that of its strongest member (`[tabindex]:not([tabindex=...])`
+    // = 2 classes/attributes); the field rule must be at least that strong (3 with `:focus-visible`) and come later,
+    // otherwise a second border is drawn over the floating label.
+    const rule =
+      /\.MuiInputBase-root\.MuiInputBase-input:focus-visible,\.MuiInputBase-root\.MuiSelect-select:focus-visible\{outline:none/;
+    expect(css).toMatch(rule);
+    expect(css.search(rule)).toBeGreaterThan(css.indexOf(':focus-visible{outline:2pxsolid'));
+  });
+
   it('disables transitions and animations under prefers-reduced-motion', () => {
     renderThemed(mode, <span>x</span>);
     expect(injectedCss()).toMatch(/prefers-reduced-motion:reduce\)\{[^}]*\{[^}]*transition-duration:0\.01ms!important/);

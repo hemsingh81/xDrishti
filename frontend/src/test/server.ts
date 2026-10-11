@@ -2,6 +2,16 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import {
   buildAccountDetail,
+  buildFacets,
+  buildLots,
+  buildSummary,
+  buildSyncStatus,
+  sampleHoldings,
+  searchHoldings,
+  buildInstrumentDetail,
+  buildRefreshStatus,
+  sampleInstruments,
+  searchInstruments,
   buildBuckets,
   buildEvents,
   buildRiskProfiles,
@@ -33,6 +43,41 @@ export const handlers = [
   http.get('/api/brokers/dhan', () => HttpResponse.json({ redirectUrl: dhanRedirectUrl })),
   http.get('/api/risk-profiles', () => HttpResponse.json(buildRiskProfiles())),
   http.get('/api/portfolio-buckets', () => HttpResponse.json(buildBuckets())),
+  // Instruments: the search runs over a small in-memory list; refresh answers a finished run.
+  http.get('/api/instruments', ({ request }) =>
+    HttpResponse.json(searchInstruments(sampleInstruments, new URL(request.url).searchParams)),
+  ),
+  http.get('/api/instruments/facets', () => HttpResponse.json(buildFacets())),
+  http.get('/api/instruments/refresh/status', () => HttpResponse.json(buildRefreshStatus())),
+  http.get('/api/instruments/refresh/history', () => HttpResponse.json([])),
+  http.post('/api/instruments/refresh', () =>
+    HttpResponse.json({ refreshId: '00000000-0000-4000-8000-0000000003c3' }, { status: 202 }),
+  ),
+  http.get('/api/instruments/:id', ({ params }) => {
+    const found = sampleInstruments.find((i) => i.id === params.id);
+    return found
+      ? HttpResponse.json(
+          buildInstrumentDetail({
+            ...found,
+            underlyingSymbol: found.symbol.replace('NSE:', ''),
+            asmGsmFlag: found.asmGsm ? 'Y' : 'N',
+            asmGsmCategory: found.asmGsm ? 'ASM Stage 1' : null,
+          }),
+        )
+      : problemResponse({ title: 'Instrument not found.', code: 'instruments.not_found' }, 404);
+  }),
+  // Portfolio (read side): holdings are searched in memory; writes (import, sync, date edits) are mocked per test.
+  http.get('/api/holdings', ({ request }) =>
+    HttpResponse.json(searchHoldings(sampleHoldings, new URL(request.url).searchParams)),
+  ),
+  http.get('/api/holdings/summary', () => HttpResponse.json(buildSummary())),
+  http.get('/api/holdings/:id/lots', ({ params }) => {
+    const found = sampleHoldings.find((h) => h.id === params.id);
+    return found
+      ? HttpResponse.json(buildLots({ holdingId: found.id, symbol: found.symbol }))
+      : problemResponse({ title: 'The holding does not exist.', code: 'portfolio.not_found' }, 404);
+  }),
+  http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus())),
   // Connecting: the start answers with Dhan's page (tests replace the navigation).
   http.post('/api/accounts/:id/connect', () =>
     HttpResponse.json({ authorizeUrl: dhanAuthorizeUrl, expiresAt: '2026-10-11T10:10:00Z' }),

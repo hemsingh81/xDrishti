@@ -7,7 +7,7 @@ XIRR, and totals — grouped by basket, account, strategy or sector.
 
 | Source | What it provides | When |
 |--------|------------------|------|
-| Dhan **holdings** & **positions** APIs | Current holdings (delivery) and open positions (intraday/F&O) | On sync (nightly + on demand + market hours) |
+| Dhan **holdings** API (`GET /v2/holdings`) | Current holdings (delivery): quantity, average cost, last traded price, ISIN — **no purchase date** (P2-01) | On the first import (saving the account's Portfolio settings), "Sync now" and, per account, the daily automatic refresh (§3); positions API later |
 | Dhan **trade history** API | Every trade with date/time, price, quantity, side and full charge breakdown (paginated by date range) | Nightly incremental; one-time backfill |
 | Dhan **ledger** API | Cash credits/debits (funds added/withdrawn, dividends, charges) | Nightly |
 | **CSV import** | Older trades (before API history / other brokers), contract-note or tradebook exports | On demand |
@@ -15,8 +15,9 @@ XIRR, and totals — grouped by basket, account, strategy or sector.
 | Corporate actions | Splits, bonuses, dividends | Nightly |
 | Prices | Live quotes for open trades & holdings; EOD close for valuation ([doc 05](05-data-and-brokers.md) §5) | Market hours / EOD |
 
-**History depth (decision Q5):** start with what Dhan's trade-history API returns; older lots come from CSV / contract-note
-import (P2-03). Computed-vs-broker holdings are reconciled nightly, so gaps in history show up as differences.
+**History depth (decision Q5, amended by [ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)):** Dhan's holdings carry no purchase date, so the owner
+sets the acquisition date of each holding when the first import happens, in the account's Portfolio settings (§3 "Where acquisition dates come from"). Older lots can still be refined by CSV / contract-note
+import (P2-03) and a helper that derives dates from Dhan's trade history is a later, separate story.
 
 ## 2. Domain model
 
@@ -54,26 +55,109 @@ flowchart LR
 | Weight % | Share of portfolio (or bucket) value |
 | System trade info | Strategy, cell, entry plan, R-multiple, stop/target distance (if from a plan ticket) |
 
+### Where acquisition dates come from
+
+XIRR, % return and absolute return need the **date and size of every cash flow**. Dhan's `GET /v2/holdings` gives quantity, **average cost price**, last traded price
+and ISIN, but **no purchase date** (docs read 2026-10-11), so the dates are **set by the owner** ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md),
+[P2-01](../specs/P2-01-holdings-import-with-dates-and-auto-refresh.md)). This replaces the earlier idea (P1-16e) of deriving them from Dhan's trade and ledger APIs.
+
+**The first import is part of saving the account's Portfolio settings** ([ADR 0013](../adr/0013-portfolio-import-with-settings-and-daily-refresh.md),
+[P2-01a](../specs/P2-01a-portfolio-import-on-save-and-daily-refresh.md)); there is no separate import endpoint or dialog. The settings carry a **first import date**
+(`firstImportDate`, default **1 Jan 2025**, between 1990-01-01 and today India). When the account is connected, has the Portfolio role and has **no holdings** in the system,
+*Save* (`PUT /api/accounts/{id}/portfolio`) stores the settings and then imports in the same request, **without any per-holding list on the settings screen**: Dhan is fetched
+again inside one transaction, one holding with **one lot** (Dhan's quantity and average cost) is created for every holding Dhan lists, in the account's bucket (its own default
+bucket or the custom bucket chosen in the settings), dated with the first import date and flagged `uses_default_date` (counted on the Portfolio screen until its date is edited
+there). `firstImport.rows` = `[{key, acquiredOn?}]` is an optional API detail: a row's date overrides the default for its key. The run is recorded with the trigger `import`. The answer carries the result:
+`import.status` `imported` (counts `imported`, `defaultDated`, `alreadyImported`, `unknown`), `skipped` (the account already has holdings: nothing is imported, Dhan is not called),
+`deferred` (not connected, or role off: nothing is called) or `failed` (the **settings are still saved**; `import.errorCode` `portfolio.import_failed`, `import.cause` the reason code
+such as `portfolio.not_connected` or `portfolio.sync_running`; retry with Save again or Sync now). Invalid dates or rows are `400 accounts.invalid` (fields `firstImportDate`,
+`firstImport.rows[i].key`, `firstImport.rows[i].acquiredOn`) and nothing is saved.
+**An account that is not connected** keeps the stored first import date, and its **first sync** — manual or daily — performs the import: every holding
+Dhan lists gets one lot dated with the first import date (flagged as default, editable per lot) and the run is recorded as `import`. After that nothing imports again: saving the settings
+again or changing the first import date has no effect on existing holdings, and everything else arrives through the refresh below.
+
+**Lots.** A holding has lots `(acquired_on, qty, unit_cost)`; a closed lot also has `closed_on`, `close_price` and `estimated`. A partial sale splits a lot into a
+closed piece and an open remainder with the same date and cost, so every lot has one close price. The open quantities always add up to Dhan's quantity, and the
+holding's quantity and average cost are always Dhan's after a sync. Any lot's date can be edited later (`PUT /api/holdings/{id}/lots/{lotId}`); figures are computed on
+read, so they follow at once.
+
+**Sync rules** ("Sync now" and the daily refresh run the same command, for an account that already has holdings; one transaction per account, idempotent):
+
+| Dhan says | Result |
+|-----------|--------|
+| A holding the account does not have (or had closed) | New holding (or reopened) with one lot dated **today (India)**, unit cost = Dhan's average cost, source `added`, not flagged as default date |
+| Quantity increased by Δ | A lot dated today for Δ at the **implied cost** `max(0, (newQty × newAvg − oldQty × oldAvg) / Δ)`; when that is not positive, the last price (then the new average) |
+| Quantity decreased by Δ | Lots closed **oldest first (FIFO)** for Δ at the **last price**, marked `estimated` |
+| Holding missing | Same, for the whole quantity; the holding becomes `closed` (kept, with its realised result) |
+| Same quantity | Last price, price time and Dhan's average cost only |
+
+A run that fails leaves every holding untouched and is recorded (`portfolio.holding_syncs`: manual / auto / import, status, counts, a short safe error). One run per
+account at a time (advisory lock plus a unique "running" row; `409 portfolio.sync_running`); a run left running by a crashed process is ended when the API starts.
+**Safeguard against a false "Dhan lists nothing".** An empty answer (a `200 []` or Dhan's documented `DH-907` "no data") or a broken one can look like a sale of everything, and closing every
+holding then reopening it dated today would destroy the owner's acquisition dates. So a sync whose answer would close **all open holdings (empty answer) or more than half of them with at
+least 3** (exactly half does not count; fewer than 3 never counts unless the answer is empty) changes nothing unless confirmed:
+- a **manual** sync answers `409 portfolio.confirmation_required` with the numbers `listedHoldings`, `openHoldings` and `wouldClose` and a message such as "Dhan listed 0 holdings while 3 are open in
+  xDrishti" or "Dhan listed 2 holdings but 4 of your 6 open holdings are missing"; the UI shows them and repeats the request with `{"confirm": true, "expectedOpenHoldings": 6, "expectedWouldClose": 4}`
+  (both numbers are required with `confirm`; `400 portfolio.invalid` otherwise), which applies the closes by the rules above;
+- if Dhan's answer has changed since (the numbers differ), nothing is applied and the answer is `409 portfolio.confirmation_stale` with the fresh numbers;
+- an **automatic** run never confirms — it is recorded as `skipped` with the same reason text ("… — nothing was changed; press Sync now to confirm."), visible as `last` in the sync status, with at
+  most one skipped record per account and India day (the latest check replaces the earlier one).
+
+**Records are kept 90 days.** After an automatic run, finished `holding_syncs` rows older than 90 days that did not fail are deleted (at most 500 at a time); failed runs stay.
+
+A token Dhan refuses is `409 portfolio.not_connected` ("sign in to Dhan again"); Dhan being unreachable is `502 accounts.broker_error`. Sells between two syncs are
+estimated at the last price of the sync that noticed them; a possible corporate action (split, bonus) shows up as a quantity change.
+
+**Mapping to the instrument master.** By ISIN first (shares and ETFs, series EQ preferred), then by Dhan's security id within the NSE equity segment. Holdings that
+cannot be mapped (for example BSE only) are kept, flagged "not in master list" (`mapped = false`), and still get returns from Dhan's price.
+
+**Automatic refresh (per account, off by default, [ADR 0013](../adr/0013-portfolio-import-with-settings-and-daily-refresh.md)).** Portfolio settings: `refreshMode` `off` | `daily`
+(the interval mode no longer exists; existing interval settings were switched off by the migration) and `refreshDailyTimeIst` `HH:mm` (default 16:00, after the close). A hosted service
+in `xd-api` looks once a minute at every Portfolio-role account whose refresh is on and runs the same sync:
+
+- **daily**: once a day from the configured India time on, weekends included; if the time was missed (the application was down) it runs as soon as possible the same day; a failed or
+  skipped automatic attempt counts as that day's run, a manual run does not (the first automatic run of an account without holdings is recorded as `import` and counts too);
+- an account that is **not connected** (no token, expired) is not called: one `skipped` record per India day;
+- runs never overlap (accounts one after the other, one running row per account); "Sync now" works at any time; the whole mechanism is switched off with
+  `Portfolio:AutoRefresh:Enabled = false` ([doc 16](16-configuration.md)). `GET /api/accounts/{id}/holdings/sync-status` returns `refreshMode`, `refreshDailyTimeIst`, `firstImportDate`, `hasHoldings`, the next scheduled run, `running` and the last run.
+
+Not included in v1 (and stated in the UI): dividends, brokerage and taxes, corporate-action adjustments, a "day change" (needs the previous close, P2-07).
+
 ### Per group (basket / bucket / account / strategy / sector / total)
 Invested · current value · realised · unrealised · total return % · **XIRR** · day change · number of open
 positions · win rate & expectancy of closed trades · **benchmark XIRR** (same cash flows invested in Nifty 50)
 and **alpha** (XIRR − benchmark XIRR) · max drawdown of the group's value history.
 
-## 4. XIRR
+## 4. Returns and XIRR
 
-Cash flows: each buy = −(amount + charges); each sell = +(amount − charges); dividends = +amount; plus the
-**terminal value** = +current market value on the valuation date. XIRR is the rate *r* where
+Computed on read from the lots by pure functions (`XDrishti.Application/Portfolio/Returns`), valued on **today (India)** at the holding's last price:
+
+| Figure | Definition |
+|--------|------------|
+| Invested | Σ open lot qty × unit cost |
+| Value | Σ open lot qty × last price |
+| Unrealised P&L ₹ / % | value − invested; P&L / invested × 100 (null when nothing is invested) |
+| Realised P&L | Σ closed lot qty × (close price − unit cost); `realisedEstimated` when any sale price is a last-seen price |
+| Day change | "—" until a previous-close source exists (P2-07) |
+| Group (total / account / bucket) | Sums of the above; the group XIRR comes from the **union of all member cash flows**, never an average |
+
+**XIRR** cash flows: each lot −qty × unit cost on its `acquired_on`; each closed lot also +qty × close price on its `closed_on`; plus +current value on the valuation
+date. XIRR is the rate *r* where
 
 ```
 Σ  CFᵢ / (1 + r)^((dᵢ − d₀) / 365)  =  0
 ```
 
-- Solved with Newton–Raphson, falling back to bisection if it doesn't converge (Excel-compatible results).
-- Computed for any set of cash flows: one trade, a position, a bucket, a basket, an account, the total.
-- **Short periods:** annualising a few days' return gives misleading numbers; below `min_days_for_xirr`
-  (default 30) the UI shows absolute return and marks XIRR as "short period".
-- Example: buy ₹1,00,000 on 1 Jan; add ₹50,000 on 1 Apr; value ₹1,72,000 on 31 Dec → XIRR ≈ 16.1%
-  (absolute return 14.7%).
+- Newton–Raphson from a good first guess (growth of everything paid in into everything received over the money-weighted period); if it does not converge,
+  **bisection on [−0.9999, 100]** (when the ends have the same sign, on the sign change nearest the guess); tolerance 1e-9. It follows the definition of a spreadsheet's `XIRR` (days / 365
+  from the first date) and agrees to better than 1e-6 with reference values from an independent 60-digit decimal bisection written in Python — not with Excel itself — on the committed sample sets
+  ([`XirrTests`](../../backend/tests/XDrishti.Application.Tests/Portfolio/XirrTests.cs)).
+- States: `ok`; `no_price` (the holding has no usable price — a last price of 0 — so `priced` is false and value, P&L, P&L % and XIRR are null: its worth is unknown, it is **not** a total loss;
+  such holdings are left out of group and summary invested / value / P&L / XIRR and counted in `summary.unpricedCount`; realised results of their closed lots still count); `insufficient` (shown "—": no outflow or no inflow, **less than 30 days** between the first and the last flow, or no solution in the range);
+  `n_m` (shown "n/m": the rate is beyond ±1,000 % a year, also when it is above the solver's range); `no_data` (no flows).
+- Computed for any set of cash flows: one lot, a holding, a bucket, an account, the total. Percentages in the API are percent numbers (16.1 = 16.1 %).
+- Example: buy ₹1,00,000 on 1 Jan; add ₹50,000 on 1 Apr; value ₹1,72,000 on 31 Dec → XIRR ≈ 16.1% (absolute return 14.7%).
+- Later (not v1): dividends as inflows, charges in the cost, corporate-action adjustments, benchmark XIRR and alpha.
 
 ## 5. Grouping: baskets vs portfolio buckets
 
@@ -82,10 +166,16 @@ Cash flows: each buy = −(amount + charges); each sell = +(amount − charges);
 | **Instrument baskets** ([doc 06](06-instruments-and-baskets.md)) | An instrument can be in many baskets | Analysis lens — totals not additive |
 | **Portfolio bucket** | Each position belongs to exactly **one** bucket | Additive view — bucket totals sum to the portfolio |
 
-- A position's bucket defaults to the instrument's primary basket (e.g. MyLongTerm) and can be overridden per
-  trade — e.g. the same stock bought for long-term (bucket *MyLongTerm*) and for a swing trade (bucket *Trading*)
-  is tracked as two positions with separate lots, returns and XIRR.
-- System-plan trades default to bucket *Trading* (configurable).
+- **One default bucket per Portfolio account, no presets.** Every account that has the Portfolio role gets a bucket named
+  `"{account name} · Portfolio"` (e.g. *Dhan · Main · Portfolio*), created automatically when the role is switched on (or the account is created with it),
+  linked to the account (`default_for_account_id`, unique), renamed when the account is renamed, archived with the account (renamed *… · Portfolio (archived)* so the name is free again), and kept — but hidden from
+  pickers — while the role is off. A name collision gets a numeric suffix (*… · Portfolio 2*). It is where the account's imported holdings go unless
+  another bucket is chosen. There are no predefined buckets (the earlier *Trading / MyLongTerm / MyChoice* presets were removed in P1-16e).
+- **Custom buckets** can still be added (Accounts → Portfolio → *Add bucket*) and chosen as an account's default for imports; the account's own default
+  bucket is always available, so the selection is never empty.
+- A position's bucket defaults to the account's chosen bucket and can be overridden per trade — e.g. the same stock bought for long-term
+  (custom bucket *Long term*) and for a swing trade (the account's own bucket) is tracked as two positions with separate lots, returns and XIRR.
+- System-plan trades go to the Trading account's own default bucket unless a custom bucket is configured for plan trades.
 
 Views: **tree** — Total → Account → Bucket → Position → Lots/Transactions; **pivot** — rows by bucket,
 basket, account, strategy or sector with the metrics in §3.
@@ -114,6 +204,12 @@ move on a holding · data or token issue for an account.
 - Long-term holdings are not managed by the system's exits unless you assign a strategy/exit to them.
 
 ## 9. Data model (`portfolio` schema)
+
+**Built in P2-01 / P2-05 (migration `AddPortfolioHoldings`):** `portfolio.holdings` (account, bucket, optional instrument id, exchange, security id, ISIN, symbol, name,
+qty, avg cost, last price and time, status open/closed, first seen / closed / synced), `portfolio.holding_lots` (holding, acquired on, qty, unit cost, source
+import/added/manual, uses default date, closed on, close price, estimated), `portfolio.holding_syncs` (account, trigger manual/auto/import, status
+running/succeeded/failed/skipped, counts, error, requested by; one running row per account) and the refresh columns of `accounts.portfolio_settings`
+(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). The fuller target model below (transactions, cash flows, valuations) grows from here.
 
 | Table | Key columns |
 |-------|------------|

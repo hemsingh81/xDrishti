@@ -2,6 +2,7 @@ import { Alert, Snackbar } from '@mui/material';
 import CheckCircleIcon from '@mui/icons-material/CheckCircleOutlined';
 import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import InfoIcon from '@mui/icons-material/InfoOutlined';
+import WarningIcon from '@mui/icons-material/WarningAmberOutlined';
 import { useMemo, useState, type ReactNode } from 'react';
 import type { IconHueName } from '@/theme';
 import { IconChip } from './IconChip';
@@ -16,6 +17,7 @@ interface Toast {
 const statusChip = {
   success: { icon: CheckCircleIcon, hue: 'green' },
   info: { icon: InfoIcon, hue: 'indigo' },
+  warning: { icon: WarningIcon, hue: 'amber' },
   error: { icon: ErrorIcon, hue: 'rose' },
 } as const satisfies Record<ToastSeverity, { icon: typeof InfoIcon; hue: IconHueName }>;
 

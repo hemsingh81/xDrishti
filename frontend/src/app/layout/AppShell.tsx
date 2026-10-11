@@ -7,7 +7,7 @@ import { allNavItems } from '../navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
-/** Persistent layout: sidebar (permanent on desktop, drawer on mobile), top bar and the routed page. */
+/** Persistent layout: sidebar (permanent on desktop, drawer on mobile), top bar and the routed page (full width). */
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
@@ -15,7 +15,7 @@ export function AppShell() {
   const paper = { width: layout.sidebarWidth, boxSizing: 'border-box' as const };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100dvh', height: { md: '100dvh' } }}>
       <Box sx={{ width: { md: layout.sidebarWidth }, flexShrink: { md: 0 } }}>
         <Drawer
           variant="temporary"
@@ -35,14 +35,19 @@ export function AppShell() {
           <Sidebar />
         </Drawer>
       </Box>
-      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <TopBar
           title={title}
           onMenu={() => {
             setMobileOpen(true);
           }}
         />
-        <Box component="main" sx={{ p: { xs: 2, md: 3 }, maxWidth: 1560, width: '100%' }}>
+        {/* Full width: padding only. From `md` the page is the viewport height and `main` is the one scroll container, so
+            a screen can fill it (`height: 100%`) and scroll a region of its own; below `md` the document scrolls. */}
+        <Box
+          component="main"
+          sx={{ p: { xs: 2, md: 3 }, width: '100%', flex: 1, minHeight: 0, overflowY: { md: 'auto' } }}
+        >
           <Suspense fallback={<LoadingState />}>
             <Outlet />
           </Suspense>

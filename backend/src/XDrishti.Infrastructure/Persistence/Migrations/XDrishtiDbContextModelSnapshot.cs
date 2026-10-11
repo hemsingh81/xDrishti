@@ -20,6 +20,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "timescaledb");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
@@ -260,25 +261,30 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("DefaultForAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("default_for_account_id");
+
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
                         .HasColumnName("name");
 
                     b.HasKey("Id")
                         .HasName("pk_portfolio_buckets");
 
-                    b.HasAlternateKey("Name")
-                        .HasName("ak_portfolio_buckets_name");
-
-                    b.HasIndex("Name")
+                    b.HasIndex("DefaultForAccountId")
                         .IsUnique()
-                        .HasDatabaseName("ix_portfolio_buckets_name");
+                        .HasDatabaseName("ux_portfolio_buckets_default_for_account");
 
                     b.ToTable("portfolio_buckets", "accounts");
                 });
@@ -540,6 +546,157 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("owner_accounts", "auth");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Market.RefreshRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Added")
+                        .HasColumnType("integer")
+                        .HasColumnName("added");
+
+                    b.Property<int>("Collisions")
+                        .HasColumnType("integer")
+                        .HasColumnName("collisions");
+
+                    b.Property<string>("DhanETag")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dhan_etag");
+
+                    b.Property<string>("DhanLastModified")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("dhan_last_modified");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int>("FnoUnderlyings")
+                        .HasColumnType("integer")
+                        .HasColumnName("fno_underlyings");
+
+                    b.Property<bool>("Force")
+                        .HasColumnType("boolean")
+                        .HasColumnName("force");
+
+                    b.Property<string>("KeptByType")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("kept_by_type");
+
+                    b.Property<string>("Phase")
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("phase");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("requested_by");
+
+                    b.Property<int>("Retired")
+                        .HasColumnType("integer")
+                        .HasColumnName("retired");
+
+                    b.Property<int>("Revived")
+                        .HasColumnType("integer")
+                        .HasColumnName("revived");
+
+                    b.Property<long>("RowsRead")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rows_read");
+
+                    b.Property<int>("RulesVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("rules_version");
+
+                    b.Property<string>("SectorETag")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sector_etag");
+
+                    b.Property<string>("SectorLastModified")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sector_last_modified");
+
+                    b.Property<int>("SectorMatched")
+                        .HasColumnType("integer")
+                        .HasColumnName("sector_matched");
+
+                    b.Property<int>("SectorUnmatched")
+                        .HasColumnType("integer")
+                        .HasColumnName("sector_unmatched");
+
+                    b.Property<bool>("SectorsApplied")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sectors_applied");
+
+                    b.Property<int>("SkippedByScope")
+                        .HasColumnType("integer")
+                        .HasColumnName("skipped_by_scope");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<int>("TotalActive")
+                        .HasColumnType("integer")
+                        .HasColumnName("total_active");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("trigger");
+
+                    b.Property<int>("Unchanged")
+                        .HasColumnType("integer")
+                        .HasColumnName("unchanged");
+
+                    b.Property<int>("Updated")
+                        .HasColumnType("integer")
+                        .HasColumnName("updated");
+
+                    b.Property<string>("Warnings")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("warnings");
+
+                    b.HasKey("Id")
+                        .HasName("pk_master_refreshes");
+
+                    b.HasIndex("StartedAt")
+                        .HasDatabaseName("ix_master_refreshes_started_at");
+
+                    b.HasIndex(new[] { "Status" }, "ux_master_refreshes_one_running")
+                        .IsUnique()
+                        .HasDatabaseName("ux_master_refreshes_one_running")
+                        .HasFilter("status = 'running'");
+
+                    b.ToTable("master_refreshes", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_master_refreshes_status", "status IN ('running', 'succeeded', 'unchanged', 'failed')");
+
+                            t.HasCheckConstraint("ck_master_refreshes_trigger", "trigger IN ('manual', 'daily', 'forced')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Platform.ServiceHeartbeat", b =>
                 {
                     b.Property<string>("Id")
@@ -573,6 +730,268 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("service_heartbeats", "platform");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("AvgCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("avg_cost");
+
+                    b.Property<Guid>("BucketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bucket_id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<string>("Exchange")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("exchange");
+
+                    b.Property<DateTimeOffset>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<Guid?>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("Isin")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<decimal>("LastPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("last_price");
+
+                    b.Property<DateTimeOffset?>("LastPriceAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_price_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("Qty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qty");
+
+                    b.Property<string>("SecurityId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("security_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("SyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("synced_at");
+
+                    b.Property<string>("TradingSymbol")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trading_symbol");
+
+                    b.HasKey("Id")
+                        .HasName("pk_holdings");
+
+                    b.HasIndex("BucketId")
+                        .HasDatabaseName("ix_holdings_bucket_id");
+
+                    b.HasIndex("InstrumentId")
+                        .HasDatabaseName("ix_holdings_instrument_id");
+
+                    b.HasIndex("AccountId", "Status")
+                        .HasDatabaseName("ix_holdings_account_status");
+
+                    b.HasIndex("AccountId", "SecurityId", "Exchange")
+                        .IsUnique()
+                        .HasDatabaseName("ux_holdings_account_security");
+
+                    b.ToTable("holdings", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_holdings_qty", "qty >= 0");
+
+                            t.HasCheckConstraint("ck_holdings_status", "status IN ('open', 'closed')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.HoldingLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("AcquiredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("acquired_on");
+
+                    b.Property<decimal?>("ClosePrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("close_price");
+
+                    b.Property<DateOnly?>("ClosedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("closed_on");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Estimated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("estimated");
+
+                    b.Property<Guid>("HoldingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holding_id");
+
+                    b.Property<long>("Qty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qty");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_cost");
+
+                    b.Property<bool>("UsesDefaultDate")
+                        .HasColumnType("boolean")
+                        .HasColumnName("uses_default_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_holding_lots");
+
+                    b.HasIndex("HoldingId")
+                        .HasDatabaseName("ix_holding_lots_holding_id");
+
+                    b.ToTable("holding_lots", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_holding_lots_closed", "(closed_on IS NULL) = (close_price IS NULL)");
+
+                            t.HasCheckConstraint("ck_holding_lots_closed_after_acquired", "closed_on IS NULL OR closed_on >= acquired_on");
+
+                            t.HasCheckConstraint("ck_holding_lots_qty", "qty > 0");
+
+                            t.HasCheckConstraint("ck_holding_lots_source", "source IN ('import', 'added', 'manual')");
+
+                            t.HasCheckConstraint("ck_holding_lots_unit_cost", "unit_cost >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.HoldingSync", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<int>("ClosedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("closed_count");
+
+                    b.Property<int>("DecreasedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("decreased_count");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<int>("IncreasedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("increased_count");
+
+                    b.Property<int>("NewCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("new_count");
+
+                    b.Property<string>("RequestedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("requested_by");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("trigger");
+
+                    b.Property<int>("UnchangedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("unchanged_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_holding_syncs");
+
+                    b.HasIndex("AccountId", "StartedAt")
+                        .HasDatabaseName("ix_holding_syncs_account_started");
+
+                    b.HasIndex(new[] { "AccountId", "Trigger", "StartedAt" }, "ix_holding_syncs_account_trigger_started")
+                        .HasDatabaseName("ix_holding_syncs_account_trigger_started");
+
+                    NpgsqlIndexBuilderExtensions.IncludeProperties(b.HasIndex(new[] { "AccountId", "Trigger", "StartedAt" }, "ix_holding_syncs_account_trigger_started"), new[] { "Status" });
+
+                    b.HasIndex(new[] { "AccountId" }, "ux_holding_syncs_one_running")
+                        .IsUnique()
+                        .HasDatabaseName("ux_holding_syncs_one_running")
+                        .HasFilter("status = 'running'");
+
+                    b.ToTable("holding_syncs", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_holding_syncs_status", "status IN ('running', 'succeeded', 'failed', 'skipped')");
+
+                            t.HasCheckConstraint("ck_holding_syncs_trigger", "trigger IN ('manual', 'auto', 'import')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Accounts.BrokerSecretRecord", b =>
                 {
                     b.Property<Guid>("AccountId")
@@ -603,6 +1022,204 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("broker_secrets", "accounts");
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentBrokerIdRecord", b =>
+                {
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("Broker")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("broker");
+
+                    b.Property<string>("BrokerId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("broker_id");
+
+                    b.Property<string>("Segment")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("segment");
+
+                    b.HasKey("InstrumentId", "Broker")
+                        .HasName("pk_instrument_broker_ids");
+
+                    b.HasIndex("Broker", "BrokerId", "Segment")
+                        .IsUnique()
+                        .HasDatabaseName("ix_instrument_broker_ids_broker_broker_id_segment");
+
+                    b.ToTable("instrument_broker_ids", "market");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AsmGsmCategory")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("asm_gsm_category");
+
+                    b.Property<string>("AsmGsmFlag")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("asm_gsm_flag");
+
+                    b.Property<string>("CanonicalSymbol")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("canonical_symbol");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Exchange")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("exchange");
+
+                    b.Property<string>("ExchangeSegment")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("exchange_segment");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry_date");
+
+                    b.Property<DateTimeOffset>("FirstSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_seen_at");
+
+                    b.Property<bool>("FnoEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("fno_eligible");
+
+                    b.Property<long?>("FreezeQuantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("freeze_qty");
+
+                    b.Property<string>("Isin")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<DateTimeOffset>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at");
+
+                    b.Property<int>("LotSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("lot_size");
+
+                    b.Property<decimal?>("MtfLeverage")
+                        .HasPrecision(12, 6)
+                        .HasColumnType("numeric(12,6)")
+                        .HasColumnName("mtf_leverage");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("retired_at");
+
+                    b.Property<string>("Sector")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sector");
+
+                    b.Property<string>("SectorSource")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("sector_source");
+
+                    b.Property<string>("Series")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("series");
+
+                    b.Property<decimal?>("TickSize")
+                        .HasPrecision(14, 4)
+                        .HasColumnType("numeric(14,4)")
+                        .HasColumnName("tick_size");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("type");
+
+                    b.Property<string>("UnderlyingSymbol")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("underlying_symbol");
+
+                    b.HasKey("Id")
+                        .HasName("pk_instruments");
+
+                    b.HasIndex("FnoEligible")
+                        .HasDatabaseName("ix_instruments_fno_eligible");
+
+                    b.HasIndex("RetiredAt")
+                        .HasDatabaseName("ix_instruments_retired_at");
+
+                    b.HasIndex("Sector")
+                        .HasDatabaseName("ix_instruments_sector");
+
+                    b.HasIndex("Type")
+                        .HasDatabaseName("ix_instruments_type");
+
+                    b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol")
+                        .IsUnique()
+                        .HasDatabaseName("ix_instruments_canonical_symbol");
+
+                    b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol_trgm")
+                        .HasDatabaseName("ix_instruments_canonical_symbol_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "CanonicalSymbol" }, "ix_instruments_canonical_symbol_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "DisplayName" }, "ix_instruments_display_name_trgm")
+                        .HasDatabaseName("ix_instruments_display_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "DisplayName" }, "ix_instruments_display_name_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "DisplayName" }, "ix_instruments_display_name_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "Isin" }, "ix_instruments_isin_trgm")
+                        .HasDatabaseName("ix_instruments_isin_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Isin" }, "ix_instruments_isin_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Isin" }, "ix_instruments_isin_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "Name" }, "ix_instruments_name_trgm")
+                        .HasDatabaseName("ix_instruments_name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Name" }, "ix_instruments_name_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Name" }, "ix_instruments_name_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.ToTable("instruments", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_instruments_type", "type IN ('share', 'etf', 'index', 'future')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -620,30 +1237,42 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("account_id");
 
-                            b1.Property<string>("DefaultBucket")
-                                .HasMaxLength(40)
-                                .HasColumnType("character varying(40)")
-                                .HasColumnName("default_bucket");
+                            b1.Property<Guid?>("DefaultBucketId")
+                                .HasColumnType("uuid")
+                                .HasColumnName("default_bucket_id");
 
                             b1.Property<bool>("Enabled")
                                 .HasColumnType("boolean")
                                 .HasColumnName("enabled");
 
-                            b1.Property<DateOnly?>("HistoryFrom")
+                            b1.Property<DateOnly?>("FirstImportDate")
                                 .HasColumnType("date")
-                                .HasColumnName("history_from");
+                                .HasColumnName("first_import_date");
 
                             b1.Property<bool>("IncludeInTotals")
                                 .HasColumnType("boolean")
                                 .HasColumnName("include_in_totals");
 
+                            b1.Property<TimeOnly>("RefreshDailyTimeIst")
+                                .HasColumnType("time without time zone")
+                                .HasColumnName("refresh_daily_time_ist");
+
+                            b1.Property<string>("RefreshMode")
+                                .IsRequired()
+                                .HasMaxLength(8)
+                                .HasColumnType("character varying(8)")
+                                .HasColumnName("refresh_mode");
+
                             b1.HasKey("AccountId")
                                 .HasName("pk_portfolio_settings");
 
-                            b1.HasIndex("DefaultBucket")
-                                .HasDatabaseName("ix_portfolio_settings_default_bucket");
+                            b1.HasIndex("DefaultBucketId")
+                                .HasDatabaseName("ix_portfolio_settings_default_bucket_id");
 
-                            b1.ToTable("portfolio_settings", "accounts");
+                            b1.ToTable("portfolio_settings", "accounts", t =>
+                                {
+                                    t.HasCheckConstraint("ck_portfolio_settings_refresh_mode", "refresh_mode IN ('off', 'daily')");
+                                });
 
                             b1.WithOwner()
                                 .HasForeignKey("AccountId")
@@ -651,10 +1280,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                             b1.HasOne("XDrishti.Domain.Accounts.PortfolioBucket", null)
                                 .WithMany()
-                                .HasForeignKey("DefaultBucket")
-                                .HasPrincipalKey("Name")
+                                .HasForeignKey("DefaultBucketId")
                                 .OnDelete(DeleteBehavior.Restrict)
-                                .HasConstraintName("fk_portfolio_settings_portfolio_buckets_default_bucket");
+                                .HasConstraintName("fk_portfolio_settings_portfolio_buckets_default_bucket_id");
                         });
 
                     b.OwnsOne("XDrishti.Domain.Accounts.TradingSettings", "Trading", b1 =>
@@ -772,6 +1400,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_pending_connects_broker_accounts_account_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Accounts.PortfolioBucket", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("DefaultForAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_portfolio_buckets_broker_accounts_default_for_account_id");
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Auth.AuthSession", b =>
                 {
                     b.HasOne("XDrishti.Domain.Auth.OwnerAccount", null)
@@ -782,6 +1419,43 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sessions_owner_accounts_owner_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_holdings_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Accounts.PortfolioBucket", null)
+                        .WithMany()
+                        .HasForeignKey("BucketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_holdings_portfolio_buckets_bucket_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.HoldingLot", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Portfolio.Holding", null)
+                        .WithMany("Lots")
+                        .HasForeignKey("HoldingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_holding_lots_holdings_holding_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.HoldingSync", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_holding_syncs_broker_accounts_account_id");
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Accounts.BrokerSecretRecord", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -790,6 +1464,21 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_broker_secrets_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.InstrumentBrokerIdRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_instrument_broker_ids_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
+                {
+                    b.Navigation("Lots");
                 });
 #pragma warning restore 612, 618
         }

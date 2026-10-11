@@ -7,7 +7,10 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Refresh;
+using XDrishti.Application.Market.Search;
 using XDrishti.Application.Platform.SystemStatus;
+using XDrishti.Application.Portfolio;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -30,6 +33,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(RolesInput))]
 [JsonSerializable(typeof(TradingInput))]
 [JsonSerializable(typeof(PortfolioInput))]
+[JsonSerializable(typeof(PortfolioSaved))]
 [JsonSerializable(typeof(DataInput))]
 [JsonSerializable(typeof(ConnectStartView))]
 [JsonSerializable(typeof(DhanRedirectView))]
@@ -40,6 +44,22 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<BucketView>))]
 [JsonSerializable(typeof(BucketView))]
 [JsonSerializable(typeof(BucketInput))]
+[JsonSerializable(typeof(InstrumentPage))]
+[JsonSerializable(typeof(InstrumentFacets))]
+[JsonSerializable(typeof(InstrumentDetail))]
+[JsonSerializable(typeof(StartRefreshRequest))]
+[JsonSerializable(typeof(RefreshStarted))]
+[JsonSerializable(typeof(RefreshStatusView))]
+[JsonSerializable(typeof(IReadOnlyList<RefreshRunView>))]
+[JsonSerializable(typeof(HoldingPage))]
+[JsonSerializable(typeof(HoldingsSummary))]
+[JsonSerializable(typeof(HoldingLots))]
+[JsonSerializable(typeof(LotRow))]
+[JsonSerializable(typeof(LotDateInput))]
+[JsonSerializable(typeof(ImportPreview))]
+[JsonSerializable(typeof(SyncInput))]
+[JsonSerializable(typeof(SyncRunView))]
+[JsonSerializable(typeof(SyncStatusView))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSerializable(typeof(HttpValidationProblemDetails))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

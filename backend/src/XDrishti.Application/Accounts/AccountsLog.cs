@@ -64,4 +64,7 @@ internal static partial class AccountsLog
 
     [LoggerMessage(EventId = 2013, Level = LogLevel.Warning, Message = "A change to {Subject} was refused: it collided with a concurrent change or a uniqueness rule")]
     public static partial void ChangeCollided(ILogger logger, string subject);
+
+    [LoggerMessage(EventId = 2021, Level = LogLevel.Warning, Message = "The first import of account {Slug} failed ({Code}); its portfolio settings were saved")]
+    public static partial void FirstImportFailed(ILogger logger, string slug, string code);
 }

@@ -98,14 +98,21 @@ services:
       <<: *dotnet-env
       # Where the owner's browser reaches the app; Dhan redirects back to <this>/api/brokers/dhan/callback (ADR 0008, 0009).
       Brokers__PublicBaseUrl: http://localhost:${XD_HTTP_PORT:-8080}
+      # Instrument master (ADR 0010): the API refreshes it from Dhan's public scrip master every day at this India time (HH:mm); false switches it off.
+      Instruments__AutoRefresh__Enabled: ${XD_INSTRUMENTS_AUTO_REFRESH:-true}
+      Instruments__AutoRefresh__TimeIst: ${XD_INSTRUMENTS_REFRESH_TIME_IST:-08:45}
+      # Holdings (ADR 0012): whether the API looks once a minute at the accounts whose own automatic refresh (Off / Every N minutes / Daily, set in the app,
+      # off by default) is due; false disables every schedule. "Sync now" always works.
+      Portfolio__AutoRefresh__Enabled: ${XD_PORTFOLIO_AUTO_REFRESH:-true}
     secrets:
       - source: db_app_password
         target: Database__Password
       # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API gets it: the API refuses to start without it.
       - source: broker_vault_key
         target: BrokerVault__Key
-    # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009).
-    # The API's broker clients refuse every other endpoint (allow-list); nothing is published on this network.
+    # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009), the read of the account's holdings (GET api.dhan.co/v2/holdings
+    # with the stored access token; ADR 0012) and the two public instrument-master files (images.dhan.co, nsearchives.nseindia.com; ADR 0010).
+    # The API's HTTP clients refuse every other endpoint (allow-lists); nothing is published on this network.
     networks: [back, egress]
     mem_limit: 1g
     depends_on:
@@ -178,7 +185,7 @@ networks:
   front: {}
   back:
     internal: true
-  # Outbound internet for xd-api only (Dhan sign-in, ADR 0008, 0009). Not internal, no published ports, no other member.
+  # Outbound internet for xd-api only (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010). Not internal, no published ports, no other member.
   egress: {}
 
 volumes:

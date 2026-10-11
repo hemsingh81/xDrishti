@@ -157,16 +157,18 @@ public sealed class RiskProfileHandlerTests
         var added = await _fx.AddBucket().HandleAsync(new AddBucketCommand(new BucketInput("  Growth  "), AccountsFixture.Actor), CancellationToken.None);
         var list = await _fx.ListBuckets().HandleAsync(new ListBucketsQuery(), CancellationToken.None);
 
-        added.Value.Name.ShouldBe("Growth");
-        list.Select(b => b.Name).ShouldBe(["Trading", "MyLongTerm", "MyChoice", "Growth"]);
+        added.Value.ShouldBe(new BucketView(added.Value.Id, "Growth", false, null, null));
+        list.ShouldBe([added.Value]);
         _fx.Data.Events.ShouldHaveSingleItem().Event.ShouldBe(AccountEventType.BucketAdded);
     }
 
     [Theory]
-    [InlineData("trading")]
-    [InlineData("MYCHOICE")]
+    [InlineData("growth")]
+    [InlineData("GROWTH")]
     public async Task A_bucket_name_that_exists_ignoring_case_is_a_conflict(string name)
     {
+        _fx.Data.Buckets.Add(PortfolioBucket.Create("Growth", AccountsFixture.Start).Value);
+
         var result = await _fx.AddBucket().HandleAsync(new AddBucketCommand(new BucketInput(name), AccountsFixture.Actor), CancellationToken.None);
 
         result.Error.Code.ShouldBe(AccountErrors.ConflictCode);

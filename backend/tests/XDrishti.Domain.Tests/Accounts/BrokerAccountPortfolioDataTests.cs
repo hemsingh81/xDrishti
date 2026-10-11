@@ -4,49 +4,57 @@ namespace XDrishti.Domain.Tests.Accounts;
 
 public sealed class BrokerAccountPortfolioDataTests
 {
-    private static readonly DateOnly Today = new(2026, 10, 10);
+    private static readonly Guid Growth = Guid.Parse("00000000-0000-7000-8000-0000000000c1");
 
     [Fact]
-    public void Portfolio_settings_are_stored_and_the_role_can_then_be_switched_on()
+    public void Portfolio_settings_are_stored_and_the_role_can_be_switched_on_at_any_time()
     {
         var account = AccountData.New();
 
-        account.ConfigurePortfolio(new PortfolioSpec(" Trading ", new DateOnly(2024, 4, 1), false), Today, AccountData.T0).IsSuccess.ShouldBeTrue();
+        account.ConfigurePortfolio(new PortfolioSpec(Growth, false), AccountData.T0);
         account.ChangeRoles(new RolesChange(null, null, true), null, null, AccountData.T0).IsSuccess.ShouldBeTrue();
 
-        account.Portfolio.DefaultBucket.ShouldBe("Trading");
-        account.Portfolio.HistoryFrom.ShouldBe(new DateOnly(2024, 4, 1));
+        account.Portfolio.DefaultBucketId.ShouldBe(Growth);
         account.Portfolio.IncludeInTotals.ShouldBeFalse();
         account.Portfolio.Enabled.ShouldBeTrue();
     }
 
     [Fact]
-    public void An_enabled_portfolio_cannot_lose_its_bucket()
+    public void The_role_can_be_switched_on_without_any_portfolio_settings()
     {
         var account = AccountData.New();
-        account.ConfigurePortfolio(new PortfolioSpec("Trading", null, true), Today, AccountData.T0);
-        account.ChangeRoles(new RolesChange(null, null, true), null, null, AccountData.T0);
 
-        var result = account.ConfigurePortfolio(new PortfolioSpec(null, null, true), Today, AccountData.T0);
+        account.ChangeRoles(new RolesChange(null, null, true), null, null, AccountData.T0).IsSuccess.ShouldBeTrue();
 
-        result.Error.Fields!.ShouldContain(f => f.Field == "defaultBucket");
-        account.Portfolio.DefaultBucket.ShouldBe("Trading");
+        account.Portfolio.Enabled.ShouldBeTrue();
+        account.Portfolio.DefaultBucketId.ShouldBeNull(); // null: the account's own default bucket
+        account.Portfolio.IncludeInTotals.ShouldBeTrue();
     }
 
-    [Theory]
-    [InlineData("2000-01-01", true)]
-    [InlineData("2026-10-10", true)]
-    [InlineData("1999-12-31", false)]
-    [InlineData("2026-10-11", false)]
-    public void The_history_start_is_between_2000_and_today(string date, bool valid) =>
-        AccountData.New().ConfigurePortfolio(new PortfolioSpec("Trading", DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture), true), Today, AccountData.T0).IsSuccess.ShouldBe(valid);
+    [Fact]
+    public void No_chosen_bucket_means_the_accounts_own()
+    {
+        var account = AccountData.New();
+        account.ConfigurePortfolio(new PortfolioSpec(Growth, true), AccountData.T0);
 
-    [Theory]
-    [InlineData("My Choice", true)]
-    [InlineData("a_b-c", true)]
-    [InlineData("a/b", false)]
-    public void The_bucket_name_must_be_well_formed(string name, bool valid) =>
-        AccountData.New().ConfigurePortfolio(new PortfolioSpec(name, null, true), Today, AccountData.T0).IsSuccess.ShouldBe(valid);
+        account.ConfigurePortfolio(new PortfolioSpec(null, true), AccountData.T0);
+
+        account.Portfolio.DefaultBucketId.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Settings_are_kept_when_the_role_is_switched_off()
+    {
+        var account = AccountData.New();
+        account.ConfigurePortfolio(new PortfolioSpec(Growth, false), AccountData.T0);
+        account.ChangeRoles(new RolesChange(null, null, true), null, null, AccountData.T0);
+
+        account.ChangeRoles(new RolesChange(null, null, false), null, null, AccountData.T0);
+
+        account.Portfolio.Enabled.ShouldBeFalse();
+        account.Portfolio.DefaultBucketId.ShouldBe(Growth);
+        account.Portfolio.IncludeInTotals.ShouldBeFalse();
+    }
 
     [Theory]
     [InlineData(0, true)]

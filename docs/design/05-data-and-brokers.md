@@ -142,6 +142,19 @@ Dhan is the only broker ([ADR 0009](../adr/0009-dhan-consent-flow-only.md)); ano
 The instrument master maps each broker id
 (Dhan `security_id` + segment) to a canonical symbol; mapping mismatches are quality issues, never guessed.
 
+### 7.1 Instrument master sources (ADR 0010, P1-03)
+
+The master list ([doc 06](06-instruments-and-baskets.md) §2) is built from two **public files**; no credentials, cookies or account data are sent. The API's HTTP clients call them with an allow-list
+(`GET`, HTTPS, exact host and path, no query, no redirects followed, no cookies, `User-Agent: xDrishti/0.1 (personal use)`, no request logging beyond the source name and HTTP status), size caps and total timeouts:
+
+| File | URL | Size / cap / timeout | Used for |
+|------|-----|----------------------|----------|
+| Dhan detailed scrip master | `https://images.dhan.co/api-data/api-scrip-master-detailed.csv` | 207,560 rows, 35 MB · 100 MB · 120 s | Instruments: canonical symbols, `SECURITY_ID`, ISIN, series, lot and tick size, expiry, ASM/GSM, MTF leverage, freeze quantity. Serves `ETag` and `Last-Modified`; a conditional request returns `304` when unchanged |
+| NSE Nifty Total Market list | `https://nsearchives.nseindia.com/content/indices/ind_niftytotalmarket_list.csv` | 49 KB, 755 stocks · 5 MB · 30 s | Sector (NSE "Industry", 22 values) by ISIN. NSE refuses clients without a `User-Agent` and ignores `If-None-Match`, so it is fetched in full on every changed master (it is small); a failure to get or read it never fails the refresh |
+
+Dhan's header has 33 columns (the last one empty). The importer finds the 17 columns it reads by name and **fails closed** with a plain message when one is missing or repeated; extra or no-longer-present unused columns, and single unreadable or oversize rows, are tolerated with a warning (doc 06 §2.2). Both files can change format without notice; a refused file leaves the previous list untouched.
+Using them follows the sources' terms for personal use ([doc 19](19-risks-and-compliance.md)).
+
 ## 8. Accounts
 
 Any number of accounts (all your own), each with **roles** — Data, Trading, Portfolio — as described in
@@ -149,7 +162,7 @@ Any number of accounts (all your own), each with **roles** — Data, Trading, Po
 the **primary Data account** (with automatic failover to a standby Data account if configured). Trading accounts
 have mode (`paper` / `manual_live`; automated modes later), risk profile, allowed styles/instruments and capital source. Nightly sync reads funds, positions, holdings, trade
 history and ledger → feeds the **auto-journal** (fills matched to plan tickets) and **portfolio monitoring**
-([doc 12](12-portfolio-monitoring.md)).
+([doc 12](12-portfolio-monitoring.md)). The instrument master needs no account: it comes from two public files (§7.1).
 
 ### 8.1 Connecting: Dhan's consent flow
 
@@ -170,10 +183,24 @@ only when they have Dhan's form (`DH-901`); message texts are never used.
 A 4xx answer is a refusal (wrong key/secret, used or expired tokenId), anything else (5xx, 3xx, timeout, network, unreadable body)
 is "broker unavailable"; both surface as `502 accounts.broker_error` with a safe message. Expiry times are stored in UTC.
 
+### 8.2 Reading the holdings (ADR 0012, P2-01)
+
+`GET https://api.dhan.co/v2/holdings` with the header `access-token` (the account's stored token, read from the vault) answers an array of
+`{exchange, tradingSymbol, securityId, isin, totalQty, dpQty, t1Qty, mtf_t1_qty, mtf_qty, availableQty, collateralQty, avgCostPrice, lastTradedPrice}` — no purchase
+date and no previous close. xDrishti uses `exchange`, `tradingSymbol`, `securityId`, `isin`, `totalQty`, `avgCostPrice` and `lastTradedPrice`. It is the only `api.dhan.co`
+endpoint on the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB). A 401/403 means the saved token is expired or revoked
+(`409 portfolio.not_connected`, "sign in to Dhan again"); other 4xx and 5xx/timeouts are `502 accounts.broker_error`. An empty array (HTTP 200 `[]`) and Dhan's documented data error `DH-907` ("incorrect parameters or no data present";
+this request has no parameters, so here it can only mean no data) both read as an empty list; `DH-1111` is not in Dhan's documentation and is only tolerated as an alias.
+An empty list is never trusted blindly: see the safeguard in [doc 12](12-portfolio-monitoring.md) §3. Rows of one holding (same ISIN, or same security id and exchange) are added up (quantity summed, average cost weighted). Neither the token, the URL nor the
+raw answer is logged or returned.
+
 ## 9. Storage
 
 | Table | Type | Notes |
 |-------|------|-------|
+| `market.instruments` | Table (P1-03) | The master list: canonical symbol (unique), type, name, ISIN, series, lot/tick size, expiry, sector, flags, first/last seen, `retired_at`; trigram indexes for search |
+| `market.instrument_broker_ids` | Table (P1-03) | Dhan `SECURITY_ID` + exchange segment per instrument |
+| `market.master_refreshes` | Table (P1-03) | One row per refresh run: trigger, status, phase, counts, validators, warnings, error |
 | `market.bars_1m` | Hypertable, compressed after 7 days | (instrument_id, ts), source = csv / dhan_eod |
 | `market.bars_1m_live` | Hypertable, short retention | Live bars for the active set |
 | `market.bars_5m … bars_1h` | Continuous aggregates | 09:15-anchored |

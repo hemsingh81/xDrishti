@@ -1,5 +1,6 @@
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Application.Accounts;
 
@@ -56,8 +57,61 @@ internal static class AccountInputs
         return new TradingSpec(mode, input?.RiskProfileId, source, input?.CapitalAmount, intraday, swing, intradayInstruments, swingBuy, swingSell, overrides);
     }
 
-    public static PortfolioSpec ParsePortfolio(PortfolioInput? input) =>
-        new(input?.DefaultBucket, input?.HistoryFrom, input?.IncludeInTotals ?? true);
+    /// <summary>
+    /// The automatic refresh of a request: values that are left out keep those of <paramref name="current"/>. Null (nothing to change) when none is given;
+    /// null with errors (<c>refreshMode</c>, <c>refreshDailyTimeIst</c>) when a value is not valid.
+    /// </summary>
+    public static PortfolioRefresh? ParseRefresh(PortfolioInput? input, PortfolioRefresh current, FieldErrors errors, string prefix = "")
+    {
+        if (input is null || (input.RefreshMode is null && input.RefreshDailyTimeIst is null))
+        {
+            return null;
+        }
+
+        var local = new FieldErrors();
+        var mode = current.Mode;
+        if (input.RefreshMode is not null && !AccountCodes.TryParseRefreshMode(input.RefreshMode, out mode))
+        {
+            local.Add("refreshMode", "Use off or daily.");
+        }
+
+        var time = current.DailyTimeIst;
+        if (input.RefreshDailyTimeIst is not null && !AccountCodes.TryParseTime(input.RefreshDailyTimeIst, out time))
+        {
+            local.Add("refreshDailyTimeIst", "Use a time like 16:00 (HH:mm, India time).");
+        }
+
+        var created = PortfolioRefresh.Create(mode, time);
+        if (created.IsFailure)
+        {
+            Collect(created, local);
+        }
+
+        if (local.HasErrors)
+        {
+            errors.AddRange(local, prefix);
+            return null;
+        }
+
+        return created.Value;
+    }
+
+    /// <summary>
+    /// The first import date of a request (ADR 0013): null when none is given (keep the current one); a date in the future or before 1990-01-01 is the field
+    /// error <c>firstImportDate</c>.
+    /// </summary>
+    public static DateOnly? ParseFirstImportDate(PortfolioInput? input, DateOnly today, FieldErrors errors, string prefix = "")
+    {
+        if (input?.FirstImportDate is not { } date)
+        {
+            return null;
+        }
+
+        var local = new FieldErrors();
+        HoldingRules.CheckDate(local, "firstImportDate", date, today);
+        errors.AddRange(local, prefix);
+        return local.HasErrors ? null : date;
+    }
 
     /// <summary>The roles of a request. Null (with errors) when a code is unknown.</summary>
     public static RolesChange? ParseRoles(RolesInput? input, FieldErrors errors)

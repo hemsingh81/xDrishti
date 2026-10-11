@@ -34,9 +34,9 @@ public sealed class AccountTableGrantsTests(ApiFactory factory)
             await connection.OpenAsync(Ct);
             await ExecuteAsync(connection, "SET ROLE xd_app");
 
-            // Seeded rows are readable.
+            // Seeded rows are readable (profiles only: there are no seeded buckets).
             (await ScalarAsync(connection, "SELECT count(*) FROM accounts.risk_profiles")).ShouldBe(2L);
-            (await ScalarAsync(connection, "SELECT count(*) FROM accounts.portfolio_buckets")).ShouldBe(3L);
+            (await ScalarAsync(connection, "SELECT count(*) FROM accounts.portfolio_buckets")).ShouldBe(0L);
 
             // Accounts and their settings: full DML.
             await ExecuteAsync(connection, """
@@ -73,6 +73,9 @@ public sealed class AccountTableGrantsTests(ApiFactory factory)
             await ExecuteAsync(connection, "DELETE FROM accounts.pending_connects");
             await ExecuteAsync(connection, "INSERT INTO accounts.portfolio_buckets (id, name, created_at) VALUES (gen_random_uuid(), 'Probe Bucket', now())");
             await ExecuteAsync(connection, "DELETE FROM accounts.portfolio_buckets WHERE name = 'Probe Bucket'");
+            // The default bucket of an account is created, renamed and archived at runtime.
+            await ExecuteAsync(connection, "INSERT INTO accounts.portfolio_buckets (id, name, created_at, default_for_account_id) VALUES (gen_random_uuid(), 'Probe · Portfolio', now(), '00000000-0000-7000-8000-00000000f001')");
+            await ExecuteAsync(connection, "UPDATE accounts.portfolio_buckets SET name = 'Probe 2 · Portfolio', archived_at = now() WHERE default_for_account_id = '00000000-0000-7000-8000-00000000f001'");
 
             // The audit trail: insert and read only.
             await ExecuteAsync(connection, "INSERT INTO accounts.account_events (id, at, account_id, event, detail, actor) VALUES (gen_random_uuid(), now(), '00000000-0000-7000-8000-00000000f001', 'AccountCreated', 'probe', 'owner@example.invalid')");

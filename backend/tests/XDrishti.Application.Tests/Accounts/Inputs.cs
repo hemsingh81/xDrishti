@@ -29,7 +29,7 @@ internal static class Inputs
     public static TradingInput Trading(Guid? profileId, string mode = "paper", decimal? amount = 500_000m) => new(
         mode, profileId, "fixed", amount, [AccountCodes.Intraday], new InstrumentsInput(["EQ_MIS", "FUT"], null, null), null);
 
-    public static PortfolioInput Portfolio(string? bucket = "Trading", DateOnly? from = null) => new(bucket, from, true);
+    public static PortfolioInput Portfolio(string? bucket = null, bool includeInTotals = true) => new(bucket, includeInTotals);
 
     public static ConnectionInput Connection(string name = "Example One", string? clientId = null) =>
         new(name, clientId, null, null);

@@ -45,6 +45,14 @@ public sealed class AccountsDatabaseRulesTests(ApiFactory factory) : IAsyncLifet
             """,
             ("slug", slug), ("primary", primary), ("standby", standby), ("enabled", enabled || primary || standby), ("archived", archived));
 
+    private Task InsertBucketAsync(string name, bool linked) =>
+        ExecuteAsync(
+            """
+            INSERT INTO accounts.portfolio_buckets (id, name, created_at, default_for_account_id)
+            VALUES (gen_random_uuid(), @name, now(), CASE WHEN @linked THEN (SELECT id FROM accounts.broker_accounts WHERE slug = 'owner-of-buckets') END)
+            """,
+            ("name", name), ("linked", linked));
+
     private static async Task ShouldViolateAsync(Func<Task> action, string sqlState, string constraint)
     {
         var error = await Should.ThrowAsync<PostgresException>(action);
@@ -153,14 +161,15 @@ public sealed class AccountsDatabaseRulesTests(ApiFactory factory) : IAsyncLifet
                 """),
             PostgresErrorCodes.UniqueViolation,
             "ux_risk_profiles_name_lower");
+        await ExecuteAsync("INSERT INTO accounts.portfolio_buckets (id, name, created_at) VALUES (gen_random_uuid(), 'Growth', now())");
         await ShouldViolateAsync(
-            () => ExecuteAsync("INSERT INTO accounts.portfolio_buckets (id, name, created_at) VALUES (gen_random_uuid(), 'trading', now())"),
+            () => ExecuteAsync("INSERT INTO accounts.portfolio_buckets (id, name, created_at) VALUES (gen_random_uuid(), 'growth', now())"),
             PostgresErrorCodes.UniqueViolation,
             "ux_portfolio_buckets_name_lower");
     }
 
     [Fact]
-    public async Task The_migration_seeds_the_standard_and_conservative_profiles_and_the_three_buckets()
+    public async Task The_migrations_seed_the_standard_and_conservative_profiles_and_no_buckets()
     {
         var profiles = await factory.WithDbAsync(db => db.RiskProfiles.AsNoTracking().OrderBy(p => p.Name).ToListAsync(Ct));
         var buckets = await factory.WithDbAsync(db => db.PortfolioBuckets.AsNoTracking().Select(b => b.Name).ToListAsync(Ct));
@@ -177,7 +186,40 @@ public sealed class AccountsDatabaseRulesTests(ApiFactory factory) : IAsyncLifet
         (conservative.RiskPerTradePct, conservative.MaxNewEntriesPerDay, conservative.MaxOpenPositions, conservative.DailyLossPct)
             .ShouldBe((0.25m, 2, 3, 1.0m));
         (conservative.MaxCapitalPerTradePct, conservative.MaxTotalRiskPct, conservative.DailyLossR).ShouldBe((25m, 3.0m, 2m)); // inherited from Standard
-        buckets.ShouldBe(["Trading", "MyLongTerm", "MyChoice"], ignoreOrder: true);
+        buckets.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task An_account_has_at_most_one_default_bucket_and_custom_buckets_may_repeat_the_empty_link()
+    {
+        await InsertAccountAsync("owner-of-buckets");
+
+        await InsertBucketAsync("Owner · Portfolio", linked: true);
+        await ShouldViolateAsync(() => InsertBucketAsync("Another name", linked: true), PostgresErrorCodes.UniqueViolation, "ux_portfolio_buckets_default_for_account");
+        await InsertBucketAsync("Custom one", linked: false);
+        await InsertBucketAsync("Custom two", linked: false);
+
+        (await ScalarAsync("SELECT count(*) FROM accounts.portfolio_buckets")).ShouldBe(3L);
+    }
+
+    [Fact]
+    public async Task A_default_bucket_must_belong_to_an_existing_account_and_keeps_it_from_being_deleted()
+    {
+        await ShouldViolateAsync(
+            () => ExecuteAsync("INSERT INTO accounts.portfolio_buckets (id, name, created_at, default_for_account_id) VALUES (gen_random_uuid(), 'Orphan · Portfolio', now(), gen_random_uuid())"),
+            PostgresErrorCodes.ForeignKeyViolation,
+            "fk_portfolio_buckets_broker_accounts_default_for_account_id");
+        await InsertAccountAsync("goes-away");
+        await ExecuteAsync("INSERT INTO accounts.portfolio_buckets (id, name, created_at, default_for_account_id) SELECT gen_random_uuid(), 'Goes · Portfolio', now(), id FROM accounts.broker_accounts WHERE slug = 'goes-away'");
+
+        await ShouldViolateAsync(
+            () => ExecuteAsync("DELETE FROM accounts.broker_accounts WHERE slug = 'goes-away'"),
+            PostgresErrorCodes.RestrictViolation,
+            "fk_portfolio_buckets_broker_accounts_default_for_account_id");
+        await ExecuteAsync("DELETE FROM accounts.portfolio_buckets WHERE name = 'Goes · Portfolio'");
+        await ExecuteAsync("DELETE FROM accounts.broker_accounts WHERE slug = 'goes-away'");
+
+        (await ScalarAsync("SELECT count(*) FROM accounts.broker_accounts WHERE slug = 'goes-away'")).ShouldBe(0L);
     }
 
     [Fact]

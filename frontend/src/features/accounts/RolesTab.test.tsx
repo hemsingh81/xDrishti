@@ -90,14 +90,31 @@ describe('Roles tab', () => {
     expect(await screen.findByText('Nothing to change.')).toBeInTheDocument();
   });
 
-  it('asks to complete the settings before a role can be switched on', async () => {
+  it('switches Portfolio on right away: the account’s own bucket needs no set-up', async () => {
+    const gate = createStepUpGate();
+    const bodies: unknown[] = [];
+    server.use(
+      gate.handler,
+      http.put('/api/accounts/:id/roles', async ({ request }) => {
+        const denied = gate.require();
+        if (denied) {
+          return denied;
+        }
+        bodies.push(await request.json());
+        return HttpResponse.json(buildAccountDetail());
+      }),
+    );
     renderRoles(ids.swing);
 
     const portfolio = await screen.findByRole('checkbox', { name: 'Portfolio' });
-    expect(portfolio).toBeDisabled();
-    await userEvent.click(screen.getByRole('button', { name: 'open Portfolio settings' }));
+    expect(portfolio).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'open Portfolio settings' })).not.toBeInTheDocument();
+    await userEvent.click(portfolio);
+    await userEvent.click(screen.getByRole('button', { name: 'Save roles' }));
+    await confirmPassword();
 
-    expect(await screen.findByRole('tab', { name: 'Portfolio', selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/Roles saved/)).toBeInTheDocument();
+    expect(bodies).toEqual([{ data: null, trading: null, portfolio: { enabled: true } }]);
   });
 
   it('shows the server message when a change is refused', async () => {

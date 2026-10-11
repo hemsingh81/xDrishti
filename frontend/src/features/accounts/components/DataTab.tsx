@@ -6,7 +6,7 @@ import { useUpdateData } from '../api/accountMutations';
 import { fieldErrorsOf, problemMessage, scoped } from '../lib/fieldErrors';
 import { maxLiveFeedBudget, validateLiveFeedBudget } from '../lib/portfolioForm';
 import { DisabledActions } from './DisabledActions';
-import { Facts } from './Facts';
+import { Facts } from '@/shared/ui';
 import { FormAlert } from './FormAlert';
 import { RoleOffNotice } from './RoleOffNotice';
 

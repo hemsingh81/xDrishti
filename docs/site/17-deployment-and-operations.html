@@ -114,7 +114,7 @@ power, wired network, small UPS recommended.</li>
 <td><code>xd-api</code></td>
 <td>.NET 10 ASP.NET Core</td>
 <td>core</td>
-<td>REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (<code>BrokerVault__Key</code>, refuses to start without it); <code>Brokers__PublicBaseUrl</code> = <code>http://localhost:${XD_HTTP_PORT}</code> (broker redirect URLs); networks <code>back</code> + <code>egress</code> (broker sign-in)</td>
+<td>REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (<code>BrokerVault__Key</code>, refuses to start without it); <code>Brokers__PublicBaseUrl</code> = <code>http://localhost:${XD_HTTP_PORT}</code> (broker redirect URLs); background workers for the instrument master (manual and daily refresh, <code>Instruments__AutoRefresh__*</code>, <a href="06-instruments-and-baskets.html">doc 06</a> §2.2); networks <code>back</code> + <code>egress</code> (broker sign-in, master files)</td>
 </tr>
 <tr>
 <td><code>xd-worker</code></td>
@@ -197,7 +197,7 @@ power, wired network, small UPS recommended.</li>
 </tr>
 <tr>
 <td><code>egress</code> (not internal, nothing published)</td>
-<td><strong>api only</strong> (P1-16c)</td>
+<td><strong>api only</strong> (P1-16c, P1-03)</td>
 </tr>
 <tr>
 <td><code>exec</code> (internal)</td>
@@ -209,10 +209,43 @@ power, wired network, small UPS recommended.</li>
 </tr>
 </tbody></table>
 <p>*<code>xd-sandbox</code> has no egress and no access except its job inputs/outputs.
-<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>): outbound only, no
-published ports, no other member. The network itself does not filter hosts; the API&#39;s broker HTTP client does — it reaches only the
-<code>generate-consent</code> and <code>consumeApp-consent</code> endpoints of <code>auth.dhan.co</code> (allow-list, HTTPS, no redirects, 15-second timeout;
-doc 05 §8.1). No order, position or funds endpoint is callable.</p>
+<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>), for the read of the account&#39;s holdings (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>) and for the instrument master files (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>): outbound only, no
+published ports, no other member. The network itself does not filter hosts; the API&#39;s HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):</p>
+<table>
+<thead>
+<tr>
+<th>Client</th>
+<th>Reaches only</th>
+<th>Method</th>
+<th>Limits</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Broker (Dhan sign-in)</td>
+<td><code>auth.dhan.co</code>: <code>/app/generate-consent</code>, <code>/app/consumeApp-consent</code> (doc 05 §8.1)</td>
+<td>POST</td>
+<td>15 s, 256 KB; no order, position or funds endpoint is callable</td>
+</tr>
+<tr>
+<td>Broker (Dhan holdings)</td>
+<td><code>api.dhan.co</code>: <code>/v2/holdings</code> only, no query (doc 05 §8.2)</td>
+<td>GET</td>
+<td>30 s, 5 MB; the stored access token goes in the <code>access-token</code> header and is never logged; nothing else of <code>api.dhan.co</code> is callable</td>
+</tr>
+<tr>
+<td>Instrument master — Dhan</td>
+<td><code>images.dhan.co</code>: <code>/api-data/api-scrip-master-detailed.csv</code> (doc 05 §7.1)</td>
+<td>GET</td>
+<td>120 s, 100 MB</td>
+</tr>
+<tr>
+<td>Instrument master — NSE</td>
+<td><code>nsearchives.nseindia.com</code>: <code>/content/indices/ind_niftytotalmarket_list.csv</code></td>
+<td>GET</td>
+<td>30 s, 5 MB</td>
+</tr>
+</tbody></table>
+<p>Nothing else is needed for the master: no published port, no volume (the file is streamed, never written to disk), no secret; <code>xd-api</code> stays within its 1 GB limit (the 35 MB file is read as a stream). The database image already includes <code>pg_trgm</code>, which the migration enables for the search indexes (created by <code>xd-migrate</code> as <code>xd_owner</code>).</p>
 <h2 id="4-secrets">4. Secrets<a class="hash" href="#4-secrets" aria-label="Link to this section">#</a></h2>
 <ol>
 <li>Source of truth: <strong>macOS Keychain</strong> (<code>xdrishti/&lt;area&gt;/&lt;name&gt;</code>: DB passwords, owner sign-in, broker vault key, backup key). Broker API keys,
@@ -343,7 +376,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-11 10:15</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-11 18:10</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>
