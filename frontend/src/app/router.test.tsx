@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildProblem, buildSystemStatus } from '@/test/fixtures';
@@ -14,6 +14,19 @@ describe('app routes', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
     expect(await screen.findByRole('navigation', { name: 'Main' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'System status' })).toBeInTheDocument();
+  });
+
+  it('shows the accounts badge in the navigation drawer too, so a phone user sees what to reconnect', async () => {
+    renderRoutes(routes);
+    await userEvent.click(await screen.findByRole('button', { name: 'Open navigation' }));
+
+    const navs = await screen.findAllByRole('navigation', { name: 'Main' });
+    const drawer = navs[navs.length - 1];
+    if (!drawer) {
+      throw new Error('The navigation drawer did not open.');
+    }
+    // The default accounts: one connected, one never connected.
+    expect(await within(drawer).findByRole('link', { name: 'Accounts, 1 needs reconnecting' })).toBeVisible();
   });
 
   it('shows the roadmap phase for screens that are not built yet', async () => {

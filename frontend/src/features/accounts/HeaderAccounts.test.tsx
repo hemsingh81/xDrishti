@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Suspense } from 'react';
@@ -88,6 +88,96 @@ describe('Header accounts', () => {
 
     expect(within(menu).getByText('Expired')).toBeInTheDocument();
     expect(within(menu).getByRole('button', { name: 'Reconnect Test Dhan Main' })).toBeInTheDocument();
+  });
+
+  it('names the accounts that need reconnecting in the accessible name, and in a tooltip with the state in words', async () => {
+    serveAccounts(
+      withConnection(buildAccountDetail(), buildConnected({ status: 'expired' })),
+      buildSwingAccount(),
+      buildAccountDetail({ id: '00000000-0000-4000-8000-0000000000aa', name: 'Fine Account' }),
+    );
+    renderHeader();
+
+    const trigger = await screen.findByRole('button', {
+      name: 'Accounts: 3 accounts · 2 needs connecting — needs reconnecting: Test Dhan Main: expired; Test Dhan Swing: not connected',
+    });
+
+    await userEvent.hover(trigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Test Dhan Main: expired; Test Dhan Swing: not connected',
+    );
+  });
+
+  it('adds nothing to the accessible name when every account is connected', async () => {
+    serveAccounts(buildAccountDetail());
+    renderHeader();
+
+    const trigger = await screen.findByRole('button', { name: /1 account · all connected/ });
+
+    expect(trigger).toHaveAccessibleName('Accounts: 1 account · all connected');
+  });
+
+  it('tells the owner what to do at the top of the menu, and what is wrong in each row', async () => {
+    serveAccounts(withConnection(buildAccountDetail(), buildConnected({ status: 'expired' })), swingWithSecrets());
+    renderHeader();
+
+    const menu = await open(/needs connecting/);
+
+    expect(within(menu).getByText('Reconnect to keep holdings and data up to date.')).toBeInTheDocument();
+    const [expired, notConnected] = within(menu).getAllByRole('listitem');
+    expect(within(expired!).getByText('Expired')).toBeInTheDocument();
+    expect(within(expired!).getByText('The Dhan session has expired — reconnect to continue.')).toBeInTheDocument();
+    expect(within(expired!).getByRole('button', { name: 'Reconnect Test Dhan Main' })).toBeInTheDocument();
+    expect(
+      within(notConnected!).getByText('Not signed in to Dhan — connect to import holdings and data.'),
+    ).toBeInTheDocument();
+    expect(within(notConnected!).getByRole('button', { name: 'Connect Test Dhan Swing' })).toBeInTheDocument();
+  });
+
+  it('asks for the API key and secret first when they are not stored', async () => {
+    serveAccounts(buildSwingAccount());
+    renderHeader();
+
+    const menu = await open(/needs connecting/);
+
+    expect(within(menu).getByText('Add the API key & secret, then connect to Dhan.')).toBeInTheDocument();
+  });
+
+  it('shows neither the hint nor next steps when everything is connected', async () => {
+    serveAccounts(buildAccountDetail());
+    renderHeader();
+
+    const menu = await open(/all connected/);
+
+    expect(within(menu).queryByText(/Reconnect to keep holdings/)).not.toBeInTheDocument();
+    expect(within(menu).queryByText(/reconnect to continue|connect to import/)).not.toBeInTheDocument();
+  });
+
+  it('turns to needing a reconnect when a connected token passes its expiry, without refetching', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let fetches = 0;
+      server.use(
+        http.get('/api/accounts', () => {
+          fetches += 1;
+          const expiresAt = new Date(Date.now() + 60_000).toISOString();
+          return HttpResponse.json([summaryOf(buildAccountDetail({ connection: buildConnected({ expiresAt }) }))]);
+        }),
+      );
+      renderHeader();
+      expect(await screen.findByRole('button', { name: /1 account · all connected/ })).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(90_000);
+      });
+
+      expect(
+        await screen.findByRole('button', { name: /1 account · 1 needs connecting.*Test Dhan Main: expired/ }),
+      ).toBeInTheDocument();
+      expect(fetches).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('starts the Dhan sign-in from the header after the password, then opens its page', async () => {

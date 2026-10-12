@@ -1,13 +1,12 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PeopleIcon from '@mui/icons-material/PeopleOutlined';
-import { Box, Button, Divider, Link as MuiLink, Popover, Stack, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { Badge, Box, Button, Divider, Link as MuiLink, Popover, Stack, Tooltip, Typography } from '@mui/material';
 import { useId, useState } from 'react';
 import { Link } from 'react-router';
 import { numeric } from '@/theme';
-import { accountsQuery } from '../api/accountsQueries';
-import { useNow } from '../hooks/useNow';
-import { connectionState, needsClock } from '../lib/connection';
+import { useAccountStates } from '../hooks/useAccountStates';
+import { connectionStatusLabels } from '../lib/connection';
+import { accountsNeedingAction } from '../lib/needingAction';
 import { HeaderAccountRow } from './HeaderAccountRow';
 
 /** Fixed width so the label arriving (or changing) does not move the other top-bar controls. */
@@ -27,16 +26,13 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
  * loading and on errors: the trigger keeps its size and says so in small text.
  */
 export function HeaderAccounts() {
-  const { data: accounts, error, isPending, refetch } = useQuery(accountsQuery);
+  const {
+    query: { data: accounts, error, isPending, refetch },
+    states: rows,
+  } = useAccountStates();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const popoverId = useId();
-  const connections = accounts?.map((a) => a.connection) ?? [];
-  const now = useNow(connections.some(needsClock), connections.map((c) => c.expiresAt ?? '').join('|'));
-  const rows = (accounts ?? []).map((account) => ({
-    account,
-    status: connectionState(account.connection, now).status,
-  }));
-  const needing = rows.filter((row) => row.status !== 'connected').length;
+  const { count: needing, expired, items } = accountsNeedingAction(rows);
 
   let label = 'Accounts';
   let short = '…';
@@ -51,34 +47,54 @@ export function HeaderAccounts() {
       label = `${plural(accounts.length, 'account')} · ${needing > 0 ? `${needing} needs connecting` : 'all connected'}`;
     }
   }
+  // The label cannot fit the names, so they go in the accessible name and the tooltip, with the state in words.
+  const details = items.map((i) => `${i.name}: ${connectionStatusLabels[i.status].toLowerCase()}`).join('; ');
   const close = () => {
     setAnchor(null);
   };
 
   return (
     <>
-      <Button
-        color="inherit"
-        size="small"
-        startIcon={<PeopleIcon />}
-        endIcon={<ExpandMoreIcon />}
-        disabled={isPending}
-        aria-haspopup="dialog"
-        aria-expanded={anchor !== null}
-        aria-controls={anchor ? popoverId : undefined}
-        aria-label={`Accounts: ${label}`}
-        onClick={(event) => {
-          setAnchor(event.currentTarget);
-        }}
-        sx={triggerSx}
-      >
-        <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, flex: 1, textAlign: 'left', ...numeric }}>
-          {label}
-        </Box>
-        <Box component="span" aria-hidden sx={{ display: { xs: 'inline', sm: 'none' }, flex: 1 }}>
-          {short}
-        </Box>
-      </Button>
+      <Tooltip title={details} describeChild>
+        <Button
+          color="inherit"
+          size="small"
+          startIcon={
+            <Badge variant="dot" color={expired ? 'error' : 'warning'} invisible={needing === 0} overlap="circular">
+              <PeopleIcon />
+            </Badge>
+          }
+          endIcon={<ExpandMoreIcon />}
+          disabled={isPending}
+          aria-haspopup="dialog"
+          aria-expanded={anchor !== null}
+          aria-controls={anchor ? popoverId : undefined}
+          aria-label={`Accounts: ${label}${needing > 0 ? ` — needs reconnecting: ${details}` : ''}`}
+          onClick={(event) => {
+            setAnchor(event.currentTarget);
+          }}
+          sx={triggerSx}
+        >
+          <Box
+            component="span"
+            sx={{
+              display: { xs: 'none', sm: 'block' },
+              flex: 1,
+              minWidth: 0,
+              textAlign: 'left',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              ...numeric,
+            }}
+          >
+            {label}
+          </Box>
+          <Box component="span" aria-hidden sx={{ display: { xs: 'inline', sm: 'none' }, flex: 1 }}>
+            {short}
+          </Box>
+        </Button>
+      </Tooltip>
       <Popover
         id={popoverId}
         open={anchor !== null}
@@ -91,6 +107,11 @@ export function HeaderAccounts() {
         }}
       >
         <Stack sx={{ p: 2 }}>
+          {needing > 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ pb: 1 }}>
+              Reconnect to keep holdings and data up to date.
+            </Typography>
+          )}
           {error && (
             <Stack spacing={1} sx={{ alignItems: 'flex-start' }}>
               <Typography variant="body2" role="alert">

@@ -6,7 +6,7 @@ import type { AccountSummary } from '@/shared/api';
 import { IconChip } from '@/shared/ui';
 import { useStartConnect } from '../api/connectionMutations';
 import { connectionProblem } from '../lib/connectErrors';
-import { appConfigured, connectLabel, type ConnectionStatusKey } from '../lib/connection';
+import { appConfigured, connectLabel, nextStepHint, type ConnectionStatusKey } from '../lib/connection';
 import { ConnectionStatus } from './ConnectionStatus';
 
 interface HeaderAccountRowProps {
@@ -22,6 +22,7 @@ export function HeaderAccountRow({ account, status, onNavigate }: HeaderAccountR
   const connect = useStartConnect();
   const message = connectionProblem(connect.error);
   const needsConnecting = status !== 'connected';
+  const hint = nextStepHint(status, appConfigured(account));
 
   return (
     <Stack spacing={0.75} component="li" sx={{ py: 1.25 }}>
@@ -34,6 +35,11 @@ export function HeaderAccountRow({ account, status, onNavigate }: HeaderAccountR
         <IconChip icon={PersonIcon} hue="accounts" />
         <Typography sx={{ fontWeight: 650, overflowWrap: 'anywhere' }}>{account.name}</Typography>
       </Stack>
+      {hint && (
+        <Typography variant="body2" color="text.secondary">
+          {hint}
+        </Typography>
+      )}
       <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
         <ConnectionStatus connection={account.connection} />
         {needsConnecting &&

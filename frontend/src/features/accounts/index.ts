@@ -4,6 +4,8 @@ import { lazy } from 'react';
 // Read-only pieces other features (notifications, the search palette) build on.
 export { accountsQuery, bucketsQuery } from './api/accountsQueries';
 export { useNow } from './hooks/useNow';
+export { useAccountsNeedingAction } from './hooks/useAccountsNeedingAction';
+export type { AccountNeedingAction, AccountsNeedingAction } from './lib/needingAction';
 export { connectionState } from './lib/connection';
 export { keyExpiry } from './lib/secrets';
 export { AccountsPage } from './components/AccountsPage';
