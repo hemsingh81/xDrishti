@@ -5,7 +5,7 @@ using XDrishti.Infrastructure.Market;
 
 namespace XDrishti.Infrastructure.Tests.Market;
 
-/// <summary>The two master-data hosts behind the real allow-list guard and client settings: records every request that got through and answers as configured.</summary>
+/// <summary>The master-data hosts (the two file servers and NSE's JSON API) behind the real allow-list guard and client settings: records every request that got through and answers as configured.</summary>
 internal sealed class StubMasterData : HttpMessageHandler, IHttpClientFactory
 {
     public List<(HttpMethod Method, Uri Uri, Dictionary<string, string> Headers)> Requests { get; } = [];
@@ -39,6 +39,10 @@ internal sealed class StubMasterData : HttpMessageHandler, IHttpClientFactory
         if (name == MasterDataHttpClientNames.Dhan)
         {
             MasterDataHttp.ConfigureDhan(client);
+        }
+        else if (name == MasterDataHttpClientNames.NseApi)
+        {
+            MasterDataHttp.ConfigureNseApi(client);
         }
         else
         {

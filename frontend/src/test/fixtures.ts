@@ -1,5 +1,24 @@
 import type {
   AccountDetail,
+  AggregatePhase,
+  AggregatesOverview,
+  BarRow,
+  BarsOverview,
+  CalendarDay,
+  CsvOverview,
+  CsvPhase,
+  DataCoveragePage,
+  DataCoverageRow,
+  DataJob,
+  DataOverview,
+  DataNotice,
+  EodOverview,
+  EodRun,
+  GapRow,
+  DhanOverview,
+  DhanPhase,
+  InstrumentBars,
+  TimeframeStat,
   AccountEvent,
   AccountSummary,
   Basket,
@@ -1060,3 +1079,499 @@ export const buildInstrumentBasket = (overrides: Partial<InstrumentBasket> = {})
   since: '2026-10-11T04:00:00Z',
   ...overrides,
 });
+
+// ---- Data & import (made-up bars, files and jobs) -------------------------------------------------------------------
+
+export const dataRowId = (n: number) => `00000000-0000-4000-8000-0000000007${String(n).padStart(2, '0')}`;
+export const dataJobId = (n: number) => `00000000-0000-4000-8000-0000000008${String(n).padStart(2, '0')}`;
+
+/** The last session's closing bar and the first bar of the sample data, as the API sends them (+05:30). */
+export const lastTickAt = '2026-10-12T15:29:00+05:30';
+export const firstBarAt = '2024-04-01T09:15:00+05:30';
+
+export const buildCsvPhase = (overrides: Partial<CsvPhase> = {}): CsvPhase => ({
+  status: 'succeeded',
+  startedAt: '2026-10-12T09:00:00+05:30',
+  finishedAt: '2026-10-12T09:10:00+05:30',
+  done: 214,
+  total: 214,
+  message: null,
+  code: null,
+  filesLoaded: 214,
+  filesUnchanged: 0,
+  filesSkipped: 0,
+  filesFailed: 0,
+  rows: 41_234_567,
+  inserted: 41_234_567,
+  updated: 0,
+  unchanged: 0,
+  keptDhan: 0,
+  repaired: 39,
+  rejected: 0,
+  rejections: {},
+  rejectionExamples: [],
+  unknownSymbols: [],
+  ambiguousSymbols: [],
+  failedFiles: [],
+  instrumentsTracked: 214,
+  ...overrides,
+});
+
+export const buildDhanPhase = (overrides: Partial<DhanPhase> = {}): DhanPhase => ({
+  status: 'succeeded',
+  startedAt: '2026-10-12T09:10:00+05:30',
+  finishedAt: '2026-10-12T09:20:00+05:30',
+  done: 214,
+  total: 214,
+  message: null,
+  code: null,
+  accountName: 'Dhan · Main',
+  instrumentsFetched: 214,
+  instrumentsFailed: 0,
+  requests: 214,
+  bars: 4_500,
+  inserted: 4_500,
+  updated: 0,
+  unchanged: 0,
+  repaired: 0,
+  rejected: 0,
+  overlapCompared: 1_000,
+  overlapMismatched: 0,
+  errors: [],
+  gapsFound: 0,
+  gapsFilled: 0,
+  gapsUnfillable: 0,
+  ...overrides,
+});
+
+export const buildAggregatePhase = (overrides: Partial<AggregatePhase> = {}): AggregatePhase => ({
+  status: 'succeeded',
+  startedAt: '2026-10-12T09:20:00+05:30',
+  finishedAt: '2026-10-12T09:30:00+05:30',
+  done: 214,
+  total: 214,
+  message: null,
+  code: null,
+  full: false,
+  buckets: 12_345_678,
+  bucketsByTimeframe: { '5m': 8_000_000, '15m': 4_000_000 },
+  ...overrides,
+});
+
+/** A finished job that ran all three steps. */
+export const buildDataJob = (overrides: Partial<DataJob> = {}): DataJob => ({
+  id: dataJobId(1),
+  status: 'succeeded',
+  requestedBy: 'example@invalid.test',
+  startedAt: '2026-10-12T09:00:00+05:30',
+  finishedAt: '2026-10-12T09:30:00+05:30',
+  steps: ['csv', 'dhan', 'aggregate'],
+  forceCsv: false,
+  rebuildAll: false,
+  currentPhase: null,
+  csv: buildCsvPhase(),
+  dhan: buildDhanPhase(),
+  aggregate: buildAggregatePhase(),
+  warnings: [],
+  error: null,
+  trigger: 'manual',
+  refetchGaps: false,
+  ...overrides,
+});
+
+/** A scheduled run that did not start (the reason is `error`; finished when it started; every step not requested). */
+export const buildSkippedJob = (overrides: Partial<DataJob> = {}): DataJob => {
+  const notRun = {
+    status: 'notRequested',
+    startedAt: null,
+    finishedAt: null,
+    done: 0,
+    total: 0,
+    message: null,
+    code: null,
+  };
+  return buildDataJob({
+    id: dataJobId(3),
+    status: 'skipped',
+    requestedBy: 'system',
+    startedAt: '2026-10-12T15:50:00+05:30',
+    finishedAt: '2026-10-12T15:50:00+05:30',
+    trigger: 'daily',
+    error: 'The Data account is not connected.',
+    csv: buildCsvPhase({ ...notRun, rows: 0, inserted: 0, repaired: 0, filesLoaded: 0 }),
+    dhan: buildDhanPhase({ ...notRun, bars: 0, inserted: 0, instrumentsFetched: 0 }),
+    aggregate: buildAggregatePhase({ ...notRun, buckets: 0 }),
+    ...overrides,
+  });
+};
+
+/** A job that has just started: the first requested step is running, the others wait. */
+export const buildRunningJob = (overrides: Partial<DataJob> = {}): DataJob =>
+  buildDataJob({
+    id: dataJobId(2),
+    status: 'running',
+    finishedAt: null,
+    currentPhase: 'csv',
+    csv: buildCsvPhase({
+      status: 'running',
+      finishedAt: null,
+      done: 3,
+      total: 214,
+      message: 'Loading RELIANCE_1m.csv.gz',
+      rows: 120_000,
+    }),
+    dhan: { ...buildDhanPhase(), status: 'pending', startedAt: null, finishedAt: null, done: 0, total: 0, bars: 0 },
+    aggregate: {
+      ...buildAggregatePhase(),
+      status: 'pending',
+      startedAt: null,
+      finishedAt: null,
+      done: 0,
+      total: 0,
+      buckets: 0,
+    },
+    ...overrides,
+  });
+
+export const buildTimeframeStats = (): TimeframeStat[] =>
+  [
+    ['5m', 8_234_000],
+    ['10m', 4_117_000],
+    ['15m', 2_745_000],
+    ['30m', 1_373_000],
+    ['1h', 740_000],
+    ['1D', 107_000],
+    ['1W', 23_000],
+    ['1M', 5_000],
+  ].map(([timeframe, bars]) => ({ timeframe: String(timeframe), bars: Number(bars), lastBucket: lastTickAt }));
+
+export const buildCsvOverview = (overrides: Partial<CsvOverview> = {}): CsvOverview => ({
+  folder: '/data/csv',
+  folderExists: true,
+  filesTotal: 214,
+  filesLoaded: 214,
+  filesPending: 0,
+  rows: 41_234_567,
+  lastLoadAt: '2026-10-12T09:10:00+05:30',
+  ...overrides,
+});
+
+export const buildDhanOverview = (overrides: Partial<DhanOverview> = {}): DhanOverview => ({
+  account: { id: ids.main, name: 'Dhan · Main', status: 'connected' },
+  canFetch: true,
+  reason: null,
+  reasonCode: null,
+  initialDays: 365,
+  requestsPerSecond: 4,
+  lastFetchAt: '2026-10-12T09:20:00+05:30',
+  lastFetchBars: 4_500,
+  ...overrides,
+});
+
+export const buildAggregatesOverview = (overrides: Partial<AggregatesOverview> = {}): AggregatesOverview => ({
+  timeframes: buildTimeframeStats(),
+  lastBuiltAt: '2026-10-12T09:30:00+05:30',
+  instrumentsPending: 0,
+  ...overrides,
+});
+
+/** Up to date: the last bar is the close of the last session. */
+export const buildBarsOverview = (overrides: Partial<BarsOverview> = {}): BarsOverview => ({
+  instruments: 214,
+  instrumentsBehind: 0,
+  instrumentsEmpty: 0,
+  totalBars: 41_234_567,
+  firstBar: firstBarAt,
+  lastBar: lastTickAt,
+  expectedSession: '2026-10-12',
+  daysBehind: 0,
+  stale: false,
+  ...overrides,
+});
+
+export const buildEodRun = (overrides: Partial<EodRun> = {}): EodRun => ({
+  jobId: dataJobId(4),
+  startedAt: '2026-10-12T15:50:00+05:30',
+  finishedAt: '2026-10-12T15:52:00+05:30',
+  status: 'succeeded',
+  trigger: 'daily',
+  message: null,
+  ...overrides,
+});
+
+/** The scheduled run is on at 15:50 IST; the next one is tomorrow's, the last one (today's) succeeded. */
+export const buildEodOverview = (overrides: Partial<EodOverview> = {}): EodOverview => ({
+  enabled: true,
+  timeIst: '15:50',
+  nextRunAt: '2026-10-13T15:50:00+05:30',
+  lastRun: buildEodRun(),
+  ...overrides,
+});
+
+/** Everything loaded and current; the last job of every step is the sample job. */
+export const buildDataOverview = (overrides: Partial<DataOverview> = {}): DataOverview => ({
+  csv: buildCsvOverview(),
+  dhan: buildDhanOverview(),
+  aggregates: buildAggregatesOverview(),
+  bars: buildBarsOverview(),
+  runningJob: null,
+  lastJobs: { csv: buildDataJob(), dhan: buildDataJob(), aggregate: buildDataJob() },
+  nextHoliday: null,
+  calendarProposals: 0,
+  gaps: { open: 0, unfillable: 0, filled: 0, lastDetectedAt: null },
+  eod: buildEodOverview(),
+  pendingCorporateActions: 0,
+  ...overrides,
+});
+
+// ---- Trading calendar (P1-11a) ----------------------------------------------------------------------------------
+
+/** A confirmed holiday by default (a weekday with no session). */
+export const buildCalendarDay = (overrides: Partial<CalendarDay> = {}): CalendarDay => ({
+  date: '2026-10-20',
+  kind: 'holiday',
+  sessionFrom: null,
+  sessionTo: null,
+  minutes: null,
+  source: 'nse',
+  status: 'confirmed',
+  note: 'Diwali Laxmi Pujan',
+  updatedAt: '2026-10-12T09:00:00Z',
+  ...overrides,
+});
+
+/** A special session: an evening window by default (a Muhurat-like hour). */
+export const buildSpecialDay = (overrides: Partial<CalendarDay> = {}): CalendarDay =>
+  buildCalendarDay({
+    date: '2026-11-08',
+    kind: 'special',
+    sessionFrom: '18:00',
+    sessionTo: '19:00',
+    minutes: 60,
+    source: 'manual',
+    note: 'Muhurat trading',
+    ...overrides,
+  });
+
+/** The confirmed days of the sample calendar, by date: an NSE holiday, a manual special session, a manual holiday. */
+export const sampleCalendarDays: readonly CalendarDay[] = [
+  buildCalendarDay(),
+  buildSpecialDay(),
+  buildCalendarDay({ date: '2026-12-25', source: 'manual', note: 'Christmas' }),
+];
+
+/** Proposals found in the stored bars: a holiday (no bars on a weekday) and a Saturday session. */
+export const sampleCalendarProposals: readonly CalendarDay[] = [
+  buildCalendarDay({ date: '2026-10-02', source: 'observed', status: 'proposed', note: null }),
+  buildSpecialDay({
+    date: '2026-09-12',
+    sessionFrom: '09:15',
+    sessionTo: '15:30',
+    minutes: 375,
+    source: 'observed',
+    status: 'proposed',
+    note: null,
+  }),
+];
+
+/** Nothing loaded yet: no bars, no jobs, three files waiting. */
+export const buildEmptyDataOverview = (): DataOverview =>
+  buildDataOverview({
+    csv: buildCsvOverview({ filesLoaded: 0, filesPending: 214, rows: 0, lastLoadAt: null }),
+    dhan: buildDhanOverview({ lastFetchAt: null, lastFetchBars: null }),
+    aggregates: buildAggregatesOverview({ timeframes: [], lastBuiltAt: null }),
+    bars: buildBarsOverview({
+      instruments: 0,
+      totalBars: 0,
+      firstBar: null,
+      lastBar: null,
+      daysBehind: null,
+    }),
+    lastJobs: { csv: null, dhan: null, aggregate: null },
+  });
+
+export const buildCoverageRow = (overrides: Partial<DataCoverageRow> = {}): DataCoverageRow => ({
+  id: dataRowId(1),
+  symbol: 'NSE:RELIANCE',
+  name: 'RELIANCE INDUSTRIES LTD',
+  type: 'share',
+  tracked: true,
+  firstBar: firstBarAt,
+  lastBar: lastTickAt,
+  bars: 187_500,
+  source: 'csv',
+  status: 'current',
+  daysBehind: 0,
+  openGaps: 0,
+  ...overrides,
+});
+
+/** Five instruments: three current (one with Dhan bars), one behind by two sessions, one tracked without bars. */
+export const sampleCoverage: DataCoverageRow[] = [
+  buildCoverageRow(),
+  buildCoverageRow({
+    id: dataRowId(2),
+    symbol: 'NSE:TCS',
+    name: 'TATA CONSULTANCY SERVICES LTD',
+    bars: 187_400,
+    source: 'mixed',
+  }),
+  buildCoverageRow({ id: dataRowId(3), symbol: 'NSE:HDFCBANK', name: 'HDFC BANK LTD', bars: 187_450, source: 'dhan' }),
+  buildCoverageRow({
+    id: dataRowId(4),
+    symbol: 'NSE:INFY',
+    name: 'INFOSYS LTD',
+    bars: 150_000,
+    lastBar: '2026-10-08T15:29:00+05:30',
+    status: 'behind',
+    daysBehind: 2,
+    openGaps: 3,
+  }),
+  buildCoverageRow({
+    id: dataRowId(5),
+    symbol: 'NSE:NEWCO',
+    name: 'NEW COMPANY LTD',
+    bars: 0,
+    firstBar: null,
+    lastBar: null,
+    source: null,
+    status: 'empty',
+    daysBehind: null,
+  }),
+];
+
+const coverageKeys: Record<string, (r: DataCoverageRow) => string | number> = {
+  symbol: (r) => r.symbol,
+  name: (r) => r.name,
+  firstBar: (r) => (r.firstBar ? Date.parse(r.firstBar) : Number.POSITIVE_INFINITY),
+  lastBar: (r) => (r.lastBar ? Date.parse(r.lastBar) : Number.NEGATIVE_INFINITY),
+  bars: (r) => r.bars,
+};
+
+/** The coverage endpoint over an in-memory list: search, status filter, sort (prefix - = descending) and paging. */
+export function searchCoverage(items: readonly DataCoverageRow[], params: URLSearchParams): DataCoveragePage {
+  const q = params.get('q')?.toLowerCase();
+  const status = params.get('status');
+  const sort = params.get('sort') ?? 'symbol';
+  const descending = sort.startsWith('-');
+  const key = coverageKeys[descending ? sort.slice(1) : sort] ?? coverageKeys.symbol!;
+  const page = Number(params.get('page') ?? 1);
+  const pageSize = Number(params.get('pageSize') ?? 50);
+  const matches = items
+    .filter((r) => !q || r.symbol.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
+    .filter((r) => !status || r.status === status)
+    .filter((r) => params.get('hasGaps') !== 'true' || r.openGaps > 0)
+    .sort((a, b) => {
+      const [x, y] = [key(a), key(b)];
+      const order = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
+      return descending ? -order : order;
+    });
+  return { items: matches.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: matches.length };
+}
+
+export const buildBarRow = (overrides: Partial<BarRow> = {}): BarRow => ({
+  ts: lastTickAt,
+  open: 2_456.3,
+  high: 2_460,
+  low: 2_455.15,
+  close: 2_458.9,
+  volume: 12_345,
+  bars: 1,
+  complete: true,
+  source: 'csv',
+  ...overrides,
+});
+
+/** Latest bars of an instrument: day timeframes are stamped with India midnight, the others step back by minutes. */
+export function buildInstrumentBars(symbol: string, timeframe: string, count = 3): InstrumentBars {
+  const day = timeframe === '1D' || timeframe === '1W' || timeframe === '1M';
+  const step = { '1m': 1, '5m': 5, '10m': 10, '15m': 15, '30m': 30, '1h': 60 }[timeframe] ?? 0;
+  const items = Array.from({ length: count }, (_, i) =>
+    day
+      ? buildBarRow({
+          ts: `2026-10-${String(12 - i).padStart(2, '0')}T00:00:00+05:30`,
+          bars: 375,
+          complete: i !== 1,
+          source: null,
+        })
+      : buildBarRow({
+          ts: new Date(Date.parse(lastTickAt) - i * step * 60_000).toISOString(),
+          bars: step,
+          complete: true,
+          source: timeframe === '1m' ? 'csv' : null,
+        }),
+  );
+  return { instrumentId: dataRowId(1), symbol, name: 'RELIANCE INDUSTRIES LTD', timeframe, items };
+}
+
+// ---- Gaps and data notices (P1-12a) ----------------------------------------------------------------------------------
+
+export const buildGapRow = (overrides: Partial<GapRow> = {}): GapRow => ({
+  instrumentId: dataRowId(4),
+  symbol: 'NSE:INFY',
+  name: 'INFOSYS LTD',
+  date: '2026-10-08',
+  expected: 375,
+  found: 360,
+  attempts: 1,
+  status: 'open',
+  lastAttemptAt: '2026-10-09T15:52:00+05:30',
+  detectedAt: '2026-10-09T15:52:00+05:30',
+  ...overrides,
+});
+
+/** Five gaps, newest day first: three open (INFY), one unfillable (TCS), one filled (RELIANCE). */
+export const sampleGaps: readonly GapRow[] = [
+  buildGapRow({ date: '2026-10-09', found: 120 }),
+  buildGapRow({ date: '2026-10-08' }),
+  buildGapRow({ date: '2026-10-07', found: 0, attempts: 0, lastAttemptAt: null }),
+  buildGapRow({
+    instrumentId: dataRowId(2),
+    symbol: 'NSE:TCS',
+    name: 'TATA CONSULTANCY SERVICES LTD',
+    date: '2026-10-05',
+    found: 300,
+    attempts: 2,
+    status: 'unfillable',
+  }),
+  buildGapRow({
+    instrumentId: dataRowId(1),
+    symbol: 'NSE:RELIANCE',
+    name: 'RELIANCE INDUSTRIES LTD',
+    date: '2026-09-30',
+    found: 375,
+    attempts: 1,
+    status: 'filled',
+  }),
+];
+
+/** The gaps endpoint over an in-memory list: status, instrumentId and paging (the list is already newest first). */
+export function searchGaps(items: readonly GapRow[], params: URLSearchParams) {
+  const status = params.get('status');
+  const instrumentId = params.get('instrumentId');
+  const page = Number(params.get('page') ?? 1);
+  const pageSize = Number(params.get('pageSize') ?? 50);
+  const matches = items
+    .filter((g) => !status || g.status === status)
+    .filter((g) => !instrumentId || g.instrumentId === instrumentId);
+  return { items: matches.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: matches.length };
+}
+
+export const buildDataNotice = (overrides: Partial<DataNotice> = {}): DataNotice => ({
+  id: 'data:gaps_open:1760266320:4',
+  kind: 'data_gaps_open',
+  severity: 'warn',
+  text: '4 sessions have missing 1-minute bars',
+  at: '2026-10-12T15:52:00+05:30',
+  ...overrides,
+});
+
+export const buildRunFailedNotice = (overrides: Partial<DataNotice> = {}): DataNotice =>
+  buildDataNotice({
+    id: `data:run_failed:${dataJobId(5)}`,
+    kind: 'data_run_failed',
+    severity: 'error',
+    text: 'The automatic update of 12 Oct failed: Dhan refused the access token.',
+    at: '2026-10-12T15:51:00+05:30',
+    ...overrides,
+  });

@@ -2,8 +2,16 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Suspense } from 'react';
-import type { AccountDetail } from '@/shared/api';
-import { buildAccountDetail, buildConnected, buildSwingAccount, summaryOf } from '@/test/fixtures';
+import { dataNoticesPollMs, type AccountDetail } from '@/shared/api';
+import { buildActionsNotice, buildQualityNotice } from '@/test/actionFixtures';
+import {
+  buildAccountDetail,
+  buildConnected,
+  buildDataNotice,
+  buildRunFailedNotice,
+  buildSwingAccount,
+  summaryOf,
+} from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
 import { NotificationBell } from './components/NotificationBell';
@@ -20,6 +28,9 @@ class FakeStorage implements ReadStorage {
 
 const serve = (...accounts: AccountDetail[]) => {
   server.use(http.get('/api/accounts', () => HttpResponse.json(accounts.map(summaryOf))));
+};
+const serveNotices = (...items: ReturnType<typeof buildDataNotice>[]) => {
+  server.use(http.get('/api/data/notices', () => HttpResponse.json({ items })));
 };
 const day = 86_400_000;
 const keyExpiring = (days: number) => new Date(Date.now() + days * day).toISOString().slice(0, 10);
@@ -170,5 +181,123 @@ describe('Notification bell', () => {
       },
     ]);
     expect(await screen.findByRole('button', { name: 'Notifications, 2 unread' })).toBeInTheDocument();
+  });
+});
+
+describe('Notification bell: data notices', () => {
+  it('shows the data notices with the account ones, errors first, newest first within a level', async () => {
+    serve(...twoProblems());
+    serveNotices(buildDataNotice(), buildRunFailedNotice());
+    renderBell();
+
+    const drawer = await openDrawer('Notifications, 4 unread');
+    const items = within(within(drawer).getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
+    expect(items).toHaveLength(4);
+    // Error first (the failed run), then the warnings by time: the gaps (12 Oct) before the account (never connected).
+    expect(items[0]).toHaveTextContent('Error: unread,');
+    expect(items[0]).toHaveTextContent('The automatic update of 12 Oct failed: Dhan refused the access token.');
+    expect(items[1]).toHaveTextContent('Warning: unread,');
+    expect(items[1]).toHaveTextContent('4 sessions have missing 1-minute bars');
+    expect(items[2]).toHaveTextContent('Test Dhan Swing is not connected');
+  });
+
+  it('links the failed run to the Data screen and the gaps to their list', async () => {
+    serve(buildAccountDetail());
+    serveNotices(buildDataNotice(), buildRunFailedNotice());
+    renderBell();
+
+    const drawer = await openDrawer('Notifications, 2 unread');
+
+    expect(
+      within(drawer).getByRole('link', {
+        name: 'Open: The automatic update of 12 Oct failed: Dhan refused the access token.',
+      }),
+    ).toHaveAttribute('href', '/data');
+    expect(within(drawer).getByRole('link', { name: 'Open: 4 sessions have missing 1-minute bars' })).toHaveAttribute(
+      'href',
+      '/data?gaps=open',
+    );
+  });
+
+  it('shows the failed quality checks and the suggested corporate actions, with where Open leads', async () => {
+    serve(buildAccountDetail());
+    serveNotices(buildActionsNotice(), buildQualityNotice());
+    renderBell();
+
+    const drawer = await openDrawer('Notifications, 2 unread');
+
+    const items = within(within(drawer).getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Error: unread,');
+    expect(items[0]).toHaveTextContent('3 instruments fail the data quality checks; the nightly plan is blocked');
+    expect(items[1]).toHaveTextContent('Warning: unread,');
+    expect(items[1]).toHaveTextContent('2 suggested corporate actions wait for your decision');
+    expect(
+      within(drawer).getByRole('link', {
+        name: 'Open: 3 instruments fail the data quality checks; the nightly plan is blocked',
+      }),
+    ).toHaveAttribute('href', '/quality');
+    expect(
+      within(drawer).getByRole('link', { name: 'Open: 2 suggested corporate actions wait for your decision' }),
+    ).toHaveAttribute('href', '/data?section=actions&actions=suggested');
+  });
+
+  it('marks a data notice read, and shows a changed situation (a new id) as unread again', async () => {
+    const storage = new FakeStorage();
+    serve(buildAccountDetail());
+    serveNotices(buildDataNotice());
+    const first = renderBell(storage);
+    const drawer = await openDrawer('Notifications, 1 unread');
+    await userEvent.click(within(drawer).getByRole('button', { name: 'Mark all read' }));
+    expect(await bellNamed('Notifications')).toBeInTheDocument();
+    first.unmount();
+
+    serveNotices(buildDataNotice());
+    const same = renderBell(storage);
+    expect(await screen.findByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+    same.unmount();
+
+    serveNotices(buildDataNotice({ id: 'data:gaps_open:1760266320:7', text: '7 sessions have missing 1-minute bars' }));
+    renderBell(storage);
+    expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument();
+  });
+
+  it('adds nothing when there are no data notices', async () => {
+    serve(buildAccountDetail({ connection: buildConnected() }));
+    renderBell();
+
+    const drawer = await openDrawer('Notifications');
+    expect(within(drawer).getByText("You're all caught up")).toBeInTheDocument();
+  });
+
+  it('keeps the account notifications when the data notices cannot be read', async () => {
+    serve(...twoProblems());
+    server.use(http.get('/api/data/notices', () => HttpResponse.json({ title: 'down' }, { status: 500 })));
+    renderBell();
+
+    const drawer = await openDrawer('Notifications, 2 unread');
+    expect(within(drawer).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(drawer).queryByText('Could not load the notifications.')).not.toBeInTheDocument();
+  });
+
+  it('asks for the data notices again when the poll interval passes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let reads = 0;
+      server.use(
+        http.get('/api/data/notices', () => {
+          reads += 1;
+          return HttpResponse.json({ items: reads > 1 ? [buildRunFailedNotice()] : [] });
+        }),
+      );
+      serve(buildAccountDetail({ connection: buildConnected() }));
+      renderBell();
+      expect(await screen.findByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+
+      await vi.advanceTimersByTimeAsync(dataNoticesPollMs + 1_000);
+
+      expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

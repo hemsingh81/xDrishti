@@ -1,9 +1,9 @@
 import { Box } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import { bucketsQuery, useNow } from '@/features/accounts';
 import type { AccountSummary } from '@/shared/api';
-import { holdingsQuery, summaryQuery } from '../api/portfolioQueries';
+import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
+import { holdingsList, summaryQuery } from '../api/portfolioQueries';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
 import { activeFilterCount } from '../lib/filters';
@@ -30,15 +30,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
 
   const buckets = useQuery(bucketsQuery);
   const summary = useQuery(summaryQuery(filters));
-  const holdings = useQuery(holdingsQuery(filters));
-
-  // An old link can point past the last page; step back to it instead of showing an empty list.
-  const page = holdings.data;
-  useEffect(() => {
-    if (page?.items.length === 0 && page.total > 0 && filters.page > 1) {
-      update({ page: Math.ceil(page.total / page.pageSize) }, { replace: true });
-    }
-  }, [page, filters.page, update]);
+  const holdings = useInfiniteRows(holdingsList(filters));
 
   if (portfolio.length === 0) {
     return (
@@ -91,7 +83,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
       />
       <HoldingDrawer
         id={openId}
-        holding={holdings.data?.items.find((h) => h.id === openId)}
+        holding={holdings.rows.find((h) => h.id === openId)}
         onClose={() => {
           open(null);
         }}

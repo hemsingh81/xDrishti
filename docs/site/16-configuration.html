@@ -208,7 +208,7 @@ data:
     daily_source: official                   # official | derived
     keep_partial_last_bar: true
     min_completeness_pct: 80
-  adjust: { splits_bonus: true, dividends: false }
+  adjust: { splits_bonus: true, dividends: false }   # bars stay raw; applied splits/bonus adjust on read (adjusted=true), dividends never (05 §4.2)
   quality: { max_missing_bar_pct: 2.0, spike_atr_mult: 8, stop_if_index_bad: true }
 
 live:
@@ -497,7 +497,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-12 07:06</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-12 17:51</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

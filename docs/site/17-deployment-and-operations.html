@@ -209,7 +209,7 @@ power, wired network, small UPS recommended.</li>
 </tr>
 </tbody></table>
 <p>*<code>xd-sandbox</code> has no egress and no access except its job inputs/outputs.
-<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>), for the read of the account&#39;s holdings (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>) and for the instrument master files (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>): outbound only, no
+<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>), for the read of the account&#39;s holdings (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>), for the 1-minute chart data of the Data API (<a href="../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.html">ADR 0016</a>) and for the instrument master files and NSE&#39;s trading-holiday list (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>, <a href="../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.html">ADR 0017</a>): outbound only, no
 published ports, no other member. The network itself does not filter hosts; the API&#39;s HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):</p>
 <table>
 <thead>
@@ -233,6 +233,12 @@ published ports, no other member. The network itself does not filter hosts; the 
 <td>30 s, 5 MB; the stored access token goes in the <code>access-token</code> header and is never logged; nothing else of <code>api.dhan.co</code> is callable</td>
 </tr>
 <tr>
+<td>Broker (Dhan chart data)</td>
+<td><code>api.dhan.co</code>: <code>/v2/charts/intraday</code> only, no query (doc 05 §6; ADR 0016)</td>
+<td>POST</td>
+<td>15 s, 16 MB; one request at a time, at most <code>Data__Dhan__RequestsPerSecond</code> (4) per second, one retry on 429/5xx; the Data account&#39;s access token goes in the <code>access-token</code> header and is never logged; no other chart, order, position or funds path is callable</td>
+</tr>
+<tr>
 <td>Instrument master — Dhan</td>
 <td><code>images.dhan.co</code>: <code>/api-data/api-scrip-master-detailed.csv</code> (doc 05 §7.1)</td>
 <td>GET</td>
@@ -243,6 +249,12 @@ published ports, no other member. The network itself does not filter hosts; the 
 <td><code>nsearchives.nseindia.com</code>: <code>/content/indices/ind_niftytotalmarket_list.csv</code></td>
 <td>GET</td>
 <td>30 s, 5 MB</td>
+</tr>
+<tr>
+<td>Trading calendar — NSE holidays</td>
+<td><code>www.nseindia.com</code>: <code>/api/holiday-master</code> with the query exactly <code>type=trading</code> (the only allow-listed URL that has a query; doc 05 §4.1, ADR 0017)</td>
+<td>GET</td>
+<td>20 s, 1 MB; browser-like <code>User-Agent</code> and <code>Accept: application/json</code>, <strong>no cookie</strong> (none is kept or sent, and nothing from a stored secret), no redirects; a refusal is only a warning</td>
 </tr>
 </tbody></table>
 <p>Nothing else is needed for the master: no published port, no volume (the file is streamed, never written to disk), no secret; <code>xd-api</code> stays within its 1 GB limit (the 35 MB file is read as a stream). The database image already includes <code>pg_trgm</code>, which the migration enables for the search indexes (created by <code>xd-migrate</code> as <code>xd_owner</code>).</p>
@@ -290,7 +302,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 </tr>
 <tr>
 <td>Database migrations</td>
-<td>EF Core migrations applied by the one-shot <code>xd-migrate</code> service (API image, <code>migrate</code> command, as <code>xd_owner</code>) before <code>xd-api</code>/<code>xd-worker</code> start; apps connect as least-privilege <code>xd_app</code></td>
+<td>EF Core migrations applied by the one-shot <code>xd-migrate</code> service (API image, <code>migrate</code> command, as <code>xd_owner</code>) before <code>xd-api</code>/<code>xd-worker</code> start; apps connect as least-privilege <code>xd_app</code>; the migrations create <code>market.undo_csv_bars</code>, the one <code>SECURITY DEFINER</code> function (owned by <code>xd_owner</code>, executable by <code>xd_app</code> only) through which the app removes bars when the owner undoes a CSV load (<a href="05-data-and-brokers.html">doc 05</a> §9)</td>
 </tr>
 <tr>
 <td>Start / stop</td>
@@ -323,6 +335,10 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 <tr>
 <td>CSV inbox</td>
 <td>Host folder <code>data/inbox/</code> bind-mounted into <code>xd-worker</code>; processed files moved to <code>data/processed/&lt;job-id&gt;/</code></td>
+</tr>
+<tr>
+<td>CSV folder (P1-17a)</td>
+<td>Host folder <code>data/Stocks_CSV/</code> (<code>XD_CSV_DIR</code>) bind-mounted <strong>read-only</strong> at <code>/data/csv</code> into <code>xd-api</code> (<code>Data__CsvFolder</code>); <code>xd-up.sh</code> creates it when missing; nothing is written there (<a href="../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.html">ADR 0016</a>)</td>
 </tr>
 <tr>
 <td>Market hours</td>
@@ -376,7 +392,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-12 07:06</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-12 17:51</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

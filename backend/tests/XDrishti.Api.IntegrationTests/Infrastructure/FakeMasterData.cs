@@ -14,6 +14,8 @@ public sealed class FakeMasterData
 
     public const string NsePath = "/content/indices/ind_niftytotalmarket_list.csv";
 
+    public const string HolidayPath = "/api/holiday-master";
+
     private readonly ConcurrentQueue<RecordedRequest> _requests = new();
 
     public FakeMasterData() => Reset();
@@ -31,9 +33,20 @@ public sealed class FakeMasterData
 
     public Func<RecordedRequest, HttpResponseMessage?>? SectorOverride { get; set; }
 
+    /// <summary>NSE's trading-holiday list as JSON (by default an empty cash-market segment, so a data job's daily attempt adds nothing).</summary>
+    public string HolidayJson { get; set; } = string.Empty;
+
+    public Func<RecordedRequest, HttpResponseMessage?>? HolidayOverride { get; set; }
+
     public IEnumerable<RecordedRequest> MasterRequests => _requests.Where(r => r.Uri.AbsolutePath == DhanPath);
 
     public IEnumerable<RecordedRequest> SectorRequests => _requests.Where(r => r.Uri.AbsolutePath == NsePath);
+
+    public IEnumerable<RecordedRequest> HolidayRequests => _requests.Where(r => r.Uri.AbsolutePath == HolidayPath);
+
+    /// <summary>The list as NSE serves it: the cash-market segment with a date and a description per holiday.</summary>
+    public static string HolidaysOf(params (string Date, string Description)[] cm) =>
+        "{\"CM\":[" + string.Join(',', cm.Select(h => $"{{\"Sequence\":1,\"tradingDate\":\"{h.Date}\",\"weekDay\":\"x\",\"description\":\"{h.Description}\",\"morning_session\":\"\",\"evening_session\":\"\"}}")) + "],\"FO\":[]}";
 
     public static string Fixture(string name)
     {
@@ -51,6 +64,8 @@ public sealed class FakeMasterData
         MasterETag = "\"dhan-v1\"";
         MasterOverride = null;
         SectorOverride = null;
+        HolidayJson = HolidaysOf();
+        HolidayOverride = null;
     }
 
     public HttpMessageHandler CreateHandler() => new Handler(this);
@@ -84,6 +99,13 @@ public sealed class FakeMasterData
             var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(SectorCsv, Encoding.UTF8, "text/csv") };
             response.Headers.ETag = new System.Net.Http.Headers.EntityTagHeaderValue("\"49439-1\"", isWeak: true);
             return response;
+        }
+
+        if (request.Uri.AbsolutePath == HolidayPath)
+        {
+            return HolidayOverride?.Invoke(request) is { } custom
+                ? custom
+                : new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(HolidayJson, Encoding.UTF8, "application/json") };
         }
 
         return new HttpResponseMessage(HttpStatusCode.NotFound);

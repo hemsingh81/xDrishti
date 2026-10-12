@@ -9,6 +9,7 @@ using Serilog.Core;
 using Testcontainers.PostgreSql;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Auth;
 using XDrishti.Domain.Market.Baskets;
 using XDrishti.Infrastructure.Brokers;
@@ -63,6 +64,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Registered instrument refreshes wait here until a test runs them.</summary>
     public ManualRefreshJobs RefreshJobs { get; } = new();
 
+    /// <summary>Registered data jobs wait here until a test runs them.</summary>
+    public ManualDataJobs DataJobs { get; } = new();
+
+    /// <summary>The folder the API reads CSV files from (<c>Data:CsvFolder</c>): a private temporary folder, emptied by <see cref="ResetInstrumentsAsync"/>.</summary>
+    public string CsvFolder { get; } = Directory.CreateTempSubdirectory("xd-csv-").FullName;
+
+    /// <summary>Stands in for the Dhan Data API and the Data account when a test sets them; otherwise the real placeholders answer.</summary>
+    public FakeDhan Dhan { get; } = new();
+
     /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
     public string AdminConnectionString => _database.GetConnectionString();
 
@@ -77,6 +87,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         await base.DisposeAsync();
         await _database.DisposeAsync();
+        if (Directory.Exists(CsvFolder))
+        {
+            Directory.Delete(CsvFolder, recursive: true);
+        }
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -86,6 +100,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("BrokerVault:Key", VaultKey);
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
+        builder.UseSetting("Data:Eod:Enabled", "false"); // tests ask the end-of-day runner themselves, with the clock pinned
+        builder.UseSetting("Data:CsvFolder", CsvFolder);
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);
         builder.UseSetting("Auth:Owner:Password", OwnerPassword);
@@ -99,11 +115,17 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             // Only the innermost handler is replaced: the allow-list guard and the client settings stay as in production.
             services.AddHttpClient(BrokerHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanHoldings).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
+            services.AddHttpClient(BrokerHttpClientNames.DhanChart).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
 
-            // Same for the instrument master's two file servers; refreshes are run by the tests, not by the background worker.
+            // Same for the instrument master's two file servers and NSE's holiday list; refreshes are run by the tests, not by the background worker.
             services.AddHttpClient(MasterDataHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddHttpClient(MasterDataHttpClientNames.Nse).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
+            services.AddHttpClient(MasterDataHttpClientNames.NseApi).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
+            services.AddSingleton<IDataJobChannel>(DataJobs);
+
+            // The Dhan Data API source and the Data account: the real ones answer (over the fake Dhan server above) unless a test puts a fake in (FakeDhan).
+            Dhan.Wrap(services);
         });
     }
 
@@ -180,13 +202,30 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         MasterData.Reset();
         RefreshJobs.Clear();
+        DataJobs.Clear();
+        Dhan.Reset();
+        foreach (var file in Directory.EnumerateFileSystemEntries(CsvFolder))
+        {
+            File.Delete(file);
+        }
+
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM market.data_jobs;
+                DELETE FROM market.quality_results;
+                DELETE FROM market.quality_runs;
+                DELETE FROM market.bar_gaps;
+                DELETE FROM market.corporate_actions;
+                DELETE FROM market.trading_days;
+                DELETE FROM market.csv_files;
+                DELETE FROM market.bars_agg;
+                DELETE FROM market.bars_1m;
+                DELETE FROM market.bar_coverage;
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
-                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%';
+                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%';
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;

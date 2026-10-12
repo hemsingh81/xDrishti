@@ -10,8 +10,25 @@ import {
   searchInstruments,
 } from '@/test/fixtures';
 import { appliedCss } from '@/test/css';
+import { scrollToEnd } from '@/test/intersection';
 import { server } from '@/test/server';
+import { smallPage, threePages } from '@/test/smallPages';
 import { renderInstruments } from './testing';
+
+// Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
+vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
+  (await import('@/test/smallPages')).withSmallPages(await importOriginal()),
+);
+
+const shown = (count: number, total = threePages) => `Showing ${String(count)} of ${String(total)}`;
+
+const manyInstruments = (count: number, base: number, prefix: string) =>
+  Array.from({ length: count }, (_, n) =>
+    buildInstrument({
+      id: `00000000-0000-4000-8000-00000000${String(base + n)}`,
+      symbol: `NSE:${prefix}${String(n).padStart(3, '0')}`,
+    }),
+  );
 
 const symbolsShown = () =>
   within(screen.getByRole('grid', { name: 'Instruments' }))
@@ -44,32 +61,34 @@ describe('Instruments page: results', () => {
     expect(within(screen.getByRole('row', { name: /NSE:YESBANK/ })).getByText('ASM/GSM')).toBeInTheDocument();
   });
 
-  it('shows the "from–to of total" count and pages through the results (page and size are in the URL)', async () => {
-    const all = Array.from({ length: 120 }, (_, n) =>
-      buildInstrument({
-        id: `00000000-0000-4000-8000-00000000${String(1000 + n)}`,
-        symbol: `NSE:S${String(n).padStart(3, '0')}`,
-      }),
-    );
+  it('shows "Showing N of total" and loads the next page each time the list is scrolled to its end', async () => {
+    const all = manyInstruments(threePages, 1000, 'S');
+    const pages: string[] = [];
     server.use(
-      http.get('/api/instruments', ({ request }) =>
-        HttpResponse.json(searchInstruments(all, new URL(request.url).searchParams)),
-      ),
+      http.get('/api/instruments', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        pages.push(`${params.get('page') ?? ''}/${params.get('pageSize') ?? ''}`);
+        return HttpResponse.json(searchInstruments(all, params));
+      }),
     );
     const { router } = renderInstruments();
 
-    await screen.findByText('1–50 of 120');
-    await userEvent.click(screen.getByRole('button', { name: 'Go to next page' }));
+    await screen.findByText(shown(smallPage));
+    expect(screen.queryByRole('combobox', { name: 'Rows per page' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Go to next page' })).not.toBeInTheDocument();
 
-    await screen.findByText('51–100 of 120');
-    expect(router.state.location.search).toBe('?page=2');
-    expect(screen.getByRole('gridcell', { name: 'NSE:S050' })).toBeInTheDocument();
+    scrollToEnd();
+    await screen.findByText(shown(smallPage * 2));
+    expect(
+      screen.getByRole('gridcell', { name: `NSE:S${String(smallPage * 2 - 1).padStart(3, '0')}` }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'NSE:S000' })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('combobox', { name: 'Rows per page' }));
-    await userEvent.click(screen.getByRole('option', { name: '100' }));
-
-    await screen.findByText('1–100 of 120');
-    expect(router.state.location.search).toBe('?size=100');
+    scrollToEnd();
+    await screen.findByText(shown(threePages));
+    expect(screen.getByRole('grid', { name: 'Instruments' })).toHaveAttribute('aria-rowcount', String(threePages + 1));
+    expect(pages).toEqual([1, 2, 3].map((page) => `${String(page)}/${String(smallPage)}`)); // every page once
+    expect(router.state.location.search).toBe(''); // no page or size in the URL
   });
 
   it('formats large totals with digit grouping', async () => {
@@ -80,14 +99,22 @@ describe('Instruments page: results', () => {
     );
     renderInstruments();
 
-    expect(await screen.findByText('1–50 of 3,204')).toBeInTheDocument();
+    expect(await screen.findByText('Showing 2 of 3,204')).toBeInTheDocument();
   });
 
-  it('steps back to the last page when a link points past the end', async () => {
-    const { router } = renderInstruments('?page=9');
+  it('ignores the page and size of an old link: the list always starts at the top, a full page of rows', async () => {
+    const asked: string[] = [];
+    server.use(
+      http.get('/api/instruments', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        asked.push(`${params.get('page') ?? ''}/${params.get('pageSize') ?? ''}`);
+        return HttpResponse.json(searchInstruments(sampleInstruments, params));
+      }),
+    );
+    renderInstruments('?page=9&size=50');
 
     await screen.findByRole('gridcell', { name: 'NSE:RELIANCE' });
-    expect(router.state.location.search).toBe('');
+    expect(asked).toEqual([`1/${String(smallPage)}`]);
   });
 
   it('shows skeleton rows on the first load', async () => {
@@ -99,43 +126,72 @@ describe('Instruments page: results', () => {
     expect(document.querySelectorAll('.MuiSkeleton-root').length).toBeGreaterThan(0);
   });
 
-  it('keeps the old rows, dimmed, while the next page loads', async () => {
-    const all = Array.from({ length: 120 }, (_, n) =>
-      buildInstrument({
-        id: `00000000-0000-4000-8000-00000000${String(2000 + n)}`,
-        symbol: `NSE:P${String(n).padStart(3, '0')}`,
-      }),
-    );
+  it('keeps the old rows, dimmed, while a new sort order loads, and then starts the new list from its top', async () => {
+    const all = manyInstruments(threePages, 2000, 'P');
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+    const asked: string[] = [];
     server.use(
       http.get('/api/instruments', async ({ request }) => {
         const params = new URL(request.url).searchParams;
-        if (params.get('page') === '2') await gate;
+        asked.push(`${params.get('sort') ?? ''}:${params.get('page') ?? ''}`);
+        if (params.get('sort') === '-symbol') await gate;
         return HttpResponse.json(searchInstruments(all, params));
       }),
     );
     renderInstruments();
     await screen.findByRole('gridcell', { name: 'NSE:P000' });
+    scrollToEnd();
+    await screen.findByText(shown(smallPage * 2));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Go to next page' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Symbol' }));
 
-    // Page 2 is on its way: page 1 is still there, the grid says it is busy and the list is dimmed.
+    // The new order is on its way: the old rows are still there, the grid says it is busy and the list is dimmed.
     await vi.waitFor(() => {
       expect(screen.getByRole('grid', { name: 'Instruments' })).toHaveAttribute('aria-busy', 'true');
     });
     expect(screen.getByRole('gridcell', { name: 'NSE:P000' })).toBeInTheDocument();
-    expect(screen.getByRole('gridcell', { name: 'NSE:P049' })).toBeInTheDocument();
     expect(screen.getByRole('grid', { name: 'Instruments' }).parentElement).toHaveStyle({ opacity: '0.6' });
     expect(document.querySelectorAll('.MuiSkeleton-root')).toHaveLength(0);
+    scrollToEnd(); // more of the old list is not requested
+    expect(asked.filter((a) => a.endsWith(':3'))).toEqual([]);
 
     release();
-    await screen.findByRole('gridcell', { name: 'NSE:P050' });
+    await screen.findByRole('gridcell', { name: `NSE:P${String(threePages - 1).padStart(3, '0')}` });
+    expect(screen.getByText(shown(smallPage))).toBeInTheDocument(); // a new list: its first page only
     expect(screen.queryByRole('gridcell', { name: 'NSE:P000' })).not.toBeInTheDocument();
     expect(screen.getByRole('grid', { name: 'Instruments' })).toHaveAttribute('aria-busy', 'false');
     expect(screen.getByRole('grid', { name: 'Instruments' }).parentElement).toHaveStyle({ opacity: '1' });
+  });
+
+  it('keeps the loaded rows and offers a retry when a further page cannot be loaded', async () => {
+    const all = manyInstruments(threePages, 3000, 'E');
+    let fail = true;
+    server.use(
+      http.get('/api/instruments', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        return params.get('page') === '2' && fail
+          ? HttpResponse.json({ title: 'Search is unavailable' }, { status: 503 })
+          : HttpResponse.json(searchInstruments(all, params));
+      }),
+    );
+    renderInstruments();
+    await screen.findByText(shown(smallPage));
+
+    scrollToEnd();
+
+    expect(await screen.findByText('Could not load more rows')).toBeInTheDocument();
+    expect(
+      screen.getByRole('gridcell', { name: `NSE:E${String(smallPage - 1).padStart(3, '0')}` }),
+    ).toBeInTheDocument();
+    scrollToEnd(); // no automatic retry
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await screen.findByText(shown(smallPage * 2));
+    expect(screen.queryByText('Could not load more rows')).not.toBeInTheDocument();
   });
 
   it('hides Series and Sector (and Tick) on narrow screens; the detail drawer still shows them', async () => {

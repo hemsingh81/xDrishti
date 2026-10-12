@@ -1,8 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { searchQuery } from './instrumentsQueries';
+import { searchPageQuery, searchPageSize as pageSize } from './instrumentsQueries';
 import type { InstrumentFilters } from '../lib/filters';
 
-const pageSize = 100;
 /** Pages fetched at the same time. */
 const parallel = 6;
 
@@ -14,14 +13,14 @@ export function useSelectAllIds() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ filters, total }: { filters: InstrumentFilters; total: number }): Promise<string[]> => {
-      const base: InstrumentFilters = { ...filters, sort: { field: 'symbol', descending: false }, pageSize };
+      const base: InstrumentFilters = { ...filters, sort: { field: 'symbol', descending: false } };
       const pages = Array.from({ length: Math.ceil(total / pageSize) }, (_, index) => index + 1);
       const ids: string[] = [];
       for (let start = 0; start < pages.length; start += parallel) {
         const batch = await Promise.all(
           pages
             .slice(start, start + parallel)
-            .map((page) => queryClient.query({ ...searchQuery({ ...base, page }), staleTime: 0 })),
+            .map((page) => queryClient.query({ ...searchPageQuery(base, page), staleTime: 0 })),
         );
         for (const result of batch) ids.push(...result.items.map((item) => item.id));
       }

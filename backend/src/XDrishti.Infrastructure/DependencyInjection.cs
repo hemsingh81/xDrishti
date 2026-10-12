@@ -7,12 +7,21 @@ using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Abstractions.Market.Actions;
+using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Calendar;
+using XDrishti.Application.Abstractions.Market.Quality;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Market;
+using XDrishti.Infrastructure.Market.Actions;
+using XDrishti.Infrastructure.Market.Bars;
+using XDrishti.Infrastructure.Market.Calendar;
+using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
@@ -81,6 +90,7 @@ public static class DependencyInjection
         services.AddScoped<IPendingConnectStore, PendingConnectStore>();
         services.AddDhanConnector();
         services.AddInstrumentMaster(configuration);
+        services.AddMarketData(configuration);
         services.AddPortfolio(configuration);
 
         services.AddHealthChecks()
@@ -109,6 +119,12 @@ public static class DependencyInjection
             .AddHttpMessageHandler<BrokerEndpointGuard>()
             .RemoveAllLoggers();
         services.AddScoped<IBrokerHoldings, DhanHoldingsClient>();
+
+        // The 1-minute chart data of the Data API (ADR 0016 §7): 15-second timeout, answers up to 16 MB; the guard allows only POST /v2/charts/intraday.
+        services.AddHttpClient(BrokerHttpClientNames.DhanChart, BrokerHttp.ConfigureChart)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
     }
 
     /// <summary>The holdings module (ADR 0012): lots and returns inputs, sync records, the unit of work and the automatic refresh setting.</summary>
@@ -127,7 +143,7 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// The instrument master (ADR 0010): its store, search, refresh queue and the two allow-listed download clients — no retries, no redirects, no
+    /// The instrument master (ADR 0010): its store, search, refresh queue and the allow-listed download clients (the two master files and NSE's holiday list) — no retries, no redirects, no
     /// cookies or credentials, no request logging, and an allow-list guard in front of every request.
     /// </summary>
     private static void AddInstrumentMaster(this IServiceCollection services, IConfiguration configuration)
@@ -157,7 +173,52 @@ public static class DependencyInjection
             .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
             .AddHttpMessageHandler<MasterDataEndpointGuard>()
             .RemoveAllLoggers();
-        services.AddScoped<IInstrumentSource, HttpInstrumentSource>();
+        services.AddHttpClient(MasterDataHttpClientNames.NseApi, MasterDataHttp.ConfigureNseApi)
+            .ConfigurePrimaryHttpMessageHandler(MasterDataHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<MasterDataEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddScoped<HttpInstrumentSource>();
+        services.AddScoped<IInstrumentSource>(sp => sp.GetRequiredService<HttpInstrumentSource>());
+        services.AddScoped<IHolidaySource>(sp => sp.GetRequiredService<HttpInstrumentSource>());
+    }
+
+    /// <summary>
+    /// The market data pipeline (ADR 0016): the stored bars and aggregates, the data job records and queue, the CSV folder and the settings of the Dhan fetch.
+    /// Dhan's bars come from <see cref="DhanIntradayBarSource"/> (one request at a time, shared throttle of <c>Data:Dhan:RequestsPerSecond</c>) behind <see cref="IIntradayBarSource"/>.
+    /// </summary>
+    private static void AddMarketData(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<DataOptions>()
+            .Bind(configuration.GetSection(DataOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(DataOptions.IsValid, DataOptions.InvalidMessage)
+            .ValidateOnStart();
+        services.AddSingleton<IDataSettings, DataSettings>();
+        services.AddSingleton<ICsvFolder, CsvFolder>();
+        services.AddSingleton<IDataJobChannel, DataJobChannel>();
+        services.AddScoped<IDataJobStore, DataJobStore>();
+        services.AddScoped<ICsvFileLog, CsvFileLog>();
+        services.AddScoped<IBarStore, BarStore>();
+        services.AddScoped<IBarComparison, BarComparer>();
+        services.AddScoped<ICsvUndo, CsvUndo>();
+        services.AddScoped<IBarAggregates, BarAggregates>();
+        services.AddScoped<IBarQueries, BarQueries>();
+        services.AddScoped<IBarGaps, BarGapStore>();
+        services.AddScoped<IBarDayCounts, BarDayCounts>();
+        services.AddScoped<IQualityData, QualityData>();
+        services.AddScoped<IQualityRuns, QualityRunStore>();
+        services.AddScoped<IQualityQueries, QualityQueries>();
+        services.AddScoped<IListedInstruments, ListedInstruments>();
+        services.AddScoped<ITradingDayStore, TradingDayStore>();
+        services.AddScoped<ICorporateActionStore, CorporateActionStore>();
+        services.AddScoped<ICorporateActionQueries, CorporateActionQueries>();
+        services.AddScoped<IDailySeries, DailySeries>();
+        services.AddScoped<IObservedDays, ObservedDays>();
+        services.AddScoped<IFetchTargets, FetchTargets>();
+        services.AddScoped<IDataAccountStatus, DataAccountStatus>();
+        services.AddSingleton(sp => new RequestThrottle(sp.GetRequiredService<IDataSettings>().DhanRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
+        services.AddScoped<DhanIntradayChartClient>();
+        services.AddScoped<IIntradayBarSource, DhanIntradayBarSource>();
     }
 
     /// <summary>

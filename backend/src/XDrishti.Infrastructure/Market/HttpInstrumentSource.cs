@@ -2,25 +2,32 @@ using System.Net;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Domain.Market;
 
 namespace XDrishti.Infrastructure.Market;
 
 /// <summary>
-/// Downloads the two public master files. GET only, to the allow-listed URLs (<see cref="MasterDataEndpoints"/>), no credentials, no redirects, size and
-/// time caps. Only the source's name, the HTTP status and a short outcome are logged — never URLs or content.
+/// Downloads the two public master files and NSE's public trading-holiday list (also the <see cref="IHolidaySource"/>: the same allow-list, caps and rules). GET only,
+/// to the allow-listed URLs (<see cref="MasterDataEndpoints"/>), no credentials or cookies, no redirects, size and time caps. Only the source's name, the HTTP status and
+/// a short outcome are logged — never URLs or content.
 /// </summary>
-internal sealed partial class HttpInstrumentSource(IHttpClientFactory clients, TimeProvider clock, ILogger<HttpInstrumentSource> logger) : IInstrumentSource
+internal sealed partial class HttpInstrumentSource(IHttpClientFactory clients, TimeProvider clock, ILogger<HttpInstrumentSource> logger) : IInstrumentSource, IHolidaySource
 {
     private const string DhanName = "Dhan's instrument file";
 
     private const string NseName = "NSE's sector list";
+
+    private const string HolidayName = "NSE's holiday list";
 
     public ValueTask<SourceDownload> OpenMasterAsync(SourceStamp? known, CancellationToken cancellationToken) =>
         OpenAsync(MasterDataHttpClientNames.Dhan, MasterDataEndpoints.DhanScripMaster, known, MasterDataHttp.DhanMaxBytes, MasterDataHttp.DhanTimeout, DhanName, cancellationToken);
 
     public ValueTask<SourceDownload> OpenSectorsAsync(CancellationToken cancellationToken) =>
         OpenAsync(MasterDataHttpClientNames.Nse, MasterDataEndpoints.NseTotalMarketList, null, MasterDataHttp.NseMaxBytes, MasterDataHttp.NseTimeout, NseName, cancellationToken);
+
+    public ValueTask<SourceDownload> OpenHolidaysAsync(CancellationToken cancellationToken) =>
+        OpenAsync(MasterDataHttpClientNames.NseApi, MasterDataEndpoints.NseHolidayMaster, null, MasterDataHttp.HolidayMaxBytes, MasterDataHttp.HolidayTimeout, HolidayName, cancellationToken);
 
     private async ValueTask<SourceDownload> OpenAsync(
         string clientName, Uri url, SourceStamp? known, long maxBytes, TimeSpan timeout, string what, CancellationToken cancellationToken)

@@ -240,6 +240,92 @@ public sealed class HttpInstrumentSourceTests : IDisposable
     }
 
     [Fact]
+    public async Task The_holiday_list_is_one_plain_GET_with_the_query_a_browser_like_agent_and_no_cookie_or_credentials()
+    {
+        _stub.Respond = _ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"CM\":[]}", System.Text.Encoding.UTF8, "application/json") };
+
+        await using var download = await Source.OpenHolidaysAsync(Ct);
+
+        download.Kind.ShouldBe(SourceDownloadKind.Content);
+        (await ReadAllAsync(download)).ShouldBe("{\"CM\":[]}");
+        var (method, uri, headers) = _stub.Requests.ShouldHaveSingleItem();
+        (method, uri.ToString()).ShouldBe((HttpMethod.Get, "https://www.nseindia.com/api/holiday-master?type=trading"));
+        headers["User-Agent"].ShouldBe(MasterDataHttp.BrowserUserAgent);
+        headers["Accept"].ShouldStartWith("application/json");
+        headers.Keys.ShouldNotContain(k => k == "Authorization" || k == "Cookie" || k == "Proxy-Authorization" || k == "access-token" || k == "client-id");
+        headers.ShouldNotContainKey("If-None-Match");
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, "401")]
+    [InlineData(HttpStatusCode.Forbidden, "403")]
+    [InlineData(HttpStatusCode.TooManyRequests, "429")]
+    [InlineData(HttpStatusCode.InternalServerError, "500")]
+    [InlineData(HttpStatusCode.Found, "302")] // redirects are never followed
+    public async Task A_refused_holiday_request_is_a_failure_that_names_the_status_and_the_list(HttpStatusCode status, string code)
+    {
+        _stub.Respond = _ => new HttpResponseMessage(status);
+
+        await using var download = await Source.OpenHolidaysAsync(Ct);
+
+        download.Kind.ShouldBe(SourceDownloadKind.Failed);
+        download.Failure.ShouldBe($"NSE's holiday list answered HTTP {code}.");
+    }
+
+    [Fact]
+    public async Task A_holiday_list_that_cannot_be_reached_is_reported_without_the_address()
+    {
+        _stub.Respond = _ => throw new HttpRequestException("connection to https://www.nseindia.com/api/holiday-master?type=trading failed");
+
+        await using var download = await Source.OpenHolidaysAsync(Ct);
+
+        download.Failure.ShouldBe("NSE's holiday list could not be reached.");
+    }
+
+    [Fact]
+    public async Task A_holiday_list_over_the_cap_is_refused_without_reading()
+    {
+        _stub.Respond = _ =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("x") };
+            response.Content.Headers.ContentLength = MasterDataHttp.HolidayMaxBytes + 1;
+            return response;
+        };
+
+        await using var download = await Source.OpenHolidaysAsync(Ct);
+
+        download.Failure.ShouldBe("NSE's holiday list is larger than the allowed 1 MB.");
+    }
+
+    [Fact]
+    public async Task A_holiday_server_that_never_answers_ends_with_a_failure_at_its_deadline()
+    {
+        _stub.RespondAsync = async (_, token) =>
+        {
+            await Task.Delay(Timeout.Infinite, token);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        };
+        var opening = Source.OpenHolidaysAsync(Ct).AsTask();
+
+        _stub.Clock.Advance(MasterDataHttp.HolidayTimeout);
+        await using var download = await opening;
+
+        download.Failure.ShouldBe("NSE's holiday list did not answer in time.");
+    }
+
+    [Fact]
+    public void The_holiday_client_leaves_the_http_client_timeout_open_and_asks_for_json()
+    {
+        using var client = new HttpClient();
+
+        MasterDataHttp.ConfigureNseApi(client);
+
+        client.Timeout.ShouldBe(Timeout.InfiniteTimeSpan);
+        client.DefaultRequestHeaders.UserAgent.ToString().ShouldBe(MasterDataHttp.BrowserUserAgent);
+        client.DefaultRequestHeaders.Accept.ToString().ShouldStartWith("application/json");
+    }
+
+    [Fact]
     public void The_options_accept_a_24_hour_clock_time_only()
     {
         InstrumentRefreshOptions.IsValidTime("08:45").ShouldBeTrue();

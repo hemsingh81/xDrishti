@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { accountsQuery, useNow } from '@/features/accounts';
-import { deriveNotifications, type AppNotification } from '../lib/deriveNotifications';
+import { dataNoticesQuery } from '@/shared/api';
+import { deriveDataNotifications } from '../lib/deriveDataNotifications';
+import { compareNotifications, deriveNotifications, type AppNotification } from '../lib/deriveNotifications';
 
 export interface NotificationsState {
   notifications: AppNotification[];
@@ -12,11 +14,22 @@ export interface NotificationsState {
   now: number;
 }
 
-/** All current notifications. Today they come from the accounts; other sources are merged in here. */
+/**
+ * All current notifications: the accounts' (derived here from their state) and the data notices (derived by the API),
+ * most urgent first. The data notices are polled lightly; when they cannot be read the account notifications still show.
+ */
 export function useNotifications(): NotificationsState {
   const { data, isPending, isError, refetch } = useQuery(accountsQuery);
   const now = useNow(true, data ? data.map((a) => a.connection.expiresAt ?? '').join('|') : null);
-  const notifications = useMemo(() => deriveNotifications(data ?? [], now), [data, now]);
+  const notices = useQuery(dataNoticesQuery);
+  const noticeItems = notices.data?.items;
+  const notifications = useMemo(
+    () =>
+      [...deriveNotifications(data ?? [], now), ...deriveDataNotifications(noticeItems ?? [])].sort(
+        compareNotifications,
+      ),
+    [data, now, noticeItems],
+  );
   return {
     notifications,
     isPending,

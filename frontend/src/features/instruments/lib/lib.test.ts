@@ -11,9 +11,7 @@ describe('filters in the URL', () => {
 
   it('reads every parameter', () => {
     expect(
-      parse(
-        'tab=tracked&q=tcs&type=etf&sector=Banking&series=EQ&fno=1&asm=1&retired=1&untracked=1&sort=-lot&page=3&size=100',
-      ),
+      parse('tab=tracked&q=tcs&type=etf&sector=Banking&series=EQ&fno=1&asm=1&retired=1&untracked=1&sort=-lot'),
     ).toEqual({
       tab: 'tracked',
       q: 'tcs',
@@ -25,20 +23,16 @@ describe('filters in the URL', () => {
       includeRetired: true,
       untracked: true,
       sort: { field: 'lot', descending: true },
-      page: 3,
-      pageSize: 100,
     });
   });
 
   it('ignores unknown or malformed values', () => {
-    expect(parse('type=bond&sort=colour&page=-2&size=7&fno=yes&sector=')).toEqual(emptyFilters);
-    expect(parse('page=abc').page).toBe(1);
-    expect(parse('page=1.5').page).toBe(1);
+    expect(parse('type=bond&sort=colour&fno=yes&sector=')).toEqual(emptyFilters);
   });
 
   it('writes only what differs from the default and round-trips', () => {
     expect(toParams(emptyFilters).toString()).toBe('');
-    const filters = parse('q=tcs&type=share&sort=-name&page=2&size=100&fno=1');
+    const filters = parse('q=tcs&type=share&sort=-name&fno=1');
     expect(parse(toParams(filters).toString())).toEqual(filters);
     expect(toParams({ ...emptyFilters, q: '  tcs  ' }).get('q')).toBe('tcs');
   });
@@ -49,6 +43,12 @@ describe('filters in the URL', () => {
     expect(next.get('type')).toBe('etf');
   });
 
+  it('drops the page and page size of an old link: the list loads as the owner scrolls', () => {
+    expect(parse('type=etf&page=3&size=100')).toEqual({ ...emptyFilters, type: 'etf' });
+    const next = toParams({ ...emptyFilters, type: 'etf' }, new URLSearchParams('page=3&size=100&id=abc'));
+    expect(next.toString()).toBe('id=abc&type=etf');
+  });
+
   it('reads a descending sort and ignores unknown columns', () => {
     expect(parseSort('-tick')).toEqual({ field: 'tick', descending: true });
     expect(parseSort('bogus')).toEqual(defaultSort);
@@ -56,7 +56,7 @@ describe('filters in the URL', () => {
 
   it('counts the narrowing filters', () => {
     expect(activeFilterCount(emptyFilters)).toBe(0);
-    expect(activeFilterCount({ ...emptyFilters, q: ' ', sort: { field: 'lot', descending: true }, page: 4 })).toBe(0);
+    expect(activeFilterCount({ ...emptyFilters, q: ' ', sort: { field: 'lot', descending: true } })).toBe(0);
     expect(activeFilterCount({ ...emptyFilters, q: 'a', type: 'etf', fno: true })).toBe(3);
   });
 });

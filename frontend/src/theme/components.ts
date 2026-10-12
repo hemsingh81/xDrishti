@@ -73,6 +73,8 @@ export function createComponents(theme: Theme, mode: ColorMode): Components<Them
           borderRadius: shape.radiusSmall,
           ...(ownerState.variant === 'outlined' && ownerState.color === 'default' ? { borderColor: p.border } : {}),
         }),
+        // Room to the left of the icon, so the icon does not sit on the chip's edge.
+        icon: ({ ownerState }) => ({ marginLeft: ownerState.size === 'small' ? 6 : 8, marginRight: -2 }),
       },
     },
     MuiTabs: {

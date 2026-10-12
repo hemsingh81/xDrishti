@@ -1,8 +1,15 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
+import { scrollToEnd } from '@/test/intersection';
 import { problemResponse, server } from '@/test/server';
+import { smallPage } from '@/test/smallPages';
 import { manyInstruments, renderTracking } from './trackingTestkit';
+
+// Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
+vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
+  (await import('@/test/smallPages')).withSmallPages(await importOriginal()),
+);
 
 const bulkButton = (name: string) => screen.getByRole('button', { name });
 const rowBox = (symbol: string) => screen.getByRole('checkbox', { name: `Select ${symbol}` });
@@ -123,46 +130,48 @@ describe('Instruments page: selection and the bulk bar', () => {
 });
 
 describe('Instruments page: selecting across pages', () => {
-  const items = manyInstruments(120);
+  const total = smallPage * 1.5; // two pages, the second one half full
+  const items = manyInstruments(total);
 
-  it('selects the whole page, offers all results, and keeps the selection while paging', async () => {
+  it('selects the loaded rows, offers all results, and keeps the selection while more rows load', async () => {
     renderTracking(items);
-    await screen.findByText('1–50 of 120');
+    await screen.findByText(`Showing ${String(smallPage)} of ${String(total)}`);
 
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
-    expect(screen.getByText('50 selected')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
+    expect(screen.getByText(`${String(smallPage)} selected`)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Go to next page' }));
-    await screen.findByText('51–100 of 120');
-    expect(screen.getByText('50 selected')).toBeInTheDocument();
-    expect(rowBox('NSE:M0050')).not.toBeChecked();
-    await userEvent.click(rowBox('NSE:M0050'));
-    expect(screen.getByText('51 selected')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Go to previous page' }));
-    await screen.findByText('1–50 of 120');
+    scrollToEnd();
+    await screen.findByText(`Showing ${String(total)} of ${String(total)}`);
+    expect(screen.getByText(`${String(smallPage)} selected`)).toBeInTheDocument();
     expect(rowBox('NSE:M0000')).toBeChecked();
+    expect(rowBox(`NSE:M${String(smallPage).padStart(4, '0')}`)).not.toBeChecked();
+    await userEvent.click(rowBox(`NSE:M${String(smallPage).padStart(4, '0')}`));
+    expect(screen.getByText(`${String(smallPage + 1)} selected`)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select all loaded rows' })).toHaveAttribute(
+      'data-indeterminate',
+      'true',
+    );
   });
 
   it('selects all N results by reading every page, and tracks them in one call', async () => {
     const { fake } = renderTracking(items);
-    await screen.findByText('1–50 of 120');
+    await screen.findByText(`Showing ${String(smallPage)} of ${String(total)}`);
 
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Select all 120 results' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
+    await userEvent.click(screen.getByRole('button', { name: `Select all ${String(total)} results` }));
 
-    expect(await screen.findByText('All 120 results are selected')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Select all 120/ })).not.toBeInTheDocument();
-    await userEvent.click(bulkButton('Track (120)'));
+    expect(await screen.findByText(`All ${String(total)} results are selected`)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: new RegExp(`Select all ${String(total)}`) })).not.toBeInTheDocument();
+    await userEvent.click(bulkButton(`Track (${String(total)})`));
 
-    expect(await screen.findByText('Tracked 120 instruments (120 new)')).toBeInTheDocument();
-    expect(fake.calls.track.map((ids) => ids.length)).toEqual([120]);
+    expect(await screen.findByText(`Tracked ${String(total)} instruments (${String(total)} new)`)).toBeInTheDocument();
+    expect(fake.calls.track.map((ids) => ids.length)).toEqual([total]);
   });
 
   it('sends more than 500 ids in calls of at most 500', async () => {
     const { fake } = renderTracking(manyInstruments(1_150));
-    await screen.findByText('1–50 of 1,150');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
+    await screen.findByText(`Showing ${String(smallPage)} of 1,150`);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
     await userEvent.click(screen.getByRole('button', { name: 'Select all 1,150 results' }));
     await screen.findByText('All 1,150 results are selected');
 
@@ -175,19 +184,19 @@ describe('Instruments page: selecting across pages', () => {
 
   it('says so when not all results could be selected, and keeps what was selected', async () => {
     renderTracking(items);
-    await screen.findByText('1–50 of 120');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
+    await screen.findByText(`Showing ${String(smallPage)} of ${String(total)}`);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
     server.use(
       http.get('/api/instruments', ({ request }) =>
-        new URL(request.url).searchParams.get('pageSize') === '100'
+        new URL(request.url).searchParams.get('pageSize') === String(smallPage)
           ? problemResponse({ title: 'Reading failed.' }, 500)
           : undefined,
       ),
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Select all 120 results' }));
+    await userEvent.click(screen.getByRole('button', { name: `Select all ${String(total)} results` }));
 
     expect(await screen.findByText('Reading failed.')).toBeInTheDocument();
-    expect(screen.getByText('50 selected')).toBeInTheDocument();
+    expect(screen.getByText(`${String(smallPage)} selected`)).toBeInTheDocument();
   });
 });

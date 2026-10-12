@@ -51,15 +51,17 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 | Egress allowed later | worker, feed, exec (broker/exchange hosts only) |
 
 *`xd-sandbox` has no egress and no access except its job inputs/outputs.
-`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)), for the read of the account's holdings ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)) and for the instrument master files ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md)): outbound only, no
+`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)), for the read of the account's holdings ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)), for the 1-minute chart data of the Data API ([ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)) and for the instrument master files and NSE's trading-holiday list ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md), [ADR 0017](../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md)): outbound only, no
 published ports, no other member. The network itself does not filter hosts; the API's HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):
 
 | Client | Reaches only | Method | Limits |
 |--------|--------------|--------|--------|
 | Broker (Dhan sign-in) | `auth.dhan.co`: `/app/generate-consent`, `/app/consumeApp-consent` (doc 05 §8.1) | POST | 15 s, 256 KB; no order, position or funds endpoint is callable |
 | Broker (Dhan holdings) | `api.dhan.co`: `/v2/holdings` only, no query (doc 05 §8.2) | GET | 30 s, 5 MB; the stored access token goes in the `access-token` header and is never logged; nothing else of `api.dhan.co` is callable |
+| Broker (Dhan chart data) | `api.dhan.co`: `/v2/charts/intraday` only, no query (doc 05 §6; ADR 0016) | POST | 15 s, 16 MB; one request at a time, at most `Data__Dhan__RequestsPerSecond` (4) per second, one retry on 429/5xx; the Data account's access token goes in the `access-token` header and is never logged; no other chart, order, position or funds path is callable |
 | Instrument master — Dhan | `images.dhan.co`: `/api-data/api-scrip-master-detailed.csv` (doc 05 §7.1) | GET | 120 s, 100 MB |
 | Instrument master — NSE | `nsearchives.nseindia.com`: `/content/indices/ind_niftytotalmarket_list.csv` | GET | 30 s, 5 MB |
+| Trading calendar — NSE holidays | `www.nseindia.com`: `/api/holiday-master` with the query exactly `type=trading` (the only allow-listed URL that has a query; doc 05 §4.1, ADR 0017) | GET | 20 s, 1 MB; browser-like `User-Agent` and `Accept: application/json`, **no cookie** (none is kept or sent, and nothing from a stored secret), no redirects; a refusal is only a warning |
 
 Nothing else is needed for the master: no published port, no volume (the file is streamed, never written to disk), no secret; `xd-api` stays within its 1 GB limit (the 35 MB file is read as a stream). The database image already includes `pg_trgm`, which the migration enables for the search indexes (created by `xd-migrate` as `xd_owner`).
 
@@ -92,7 +94,7 @@ Nothing else is needed for the master: no published port, no volume (the file is
 | Start at boot | launchd agent → `podman machine start` → `xd-up.sh`; services run with **no user logged in to the app** |
 | Missed schedules | On start, services catch up missed runs (e.g. EOD fetch while the Mac slept) and reconcile desired state |
 | Schedules | Stored in the database (`ops.service_schedules`), edited on the Services screen with dependency validation; applied to Hangfire recurring jobs in `xd-worker` without restart |
-| Database migrations | EF Core migrations applied by the one-shot `xd-migrate` service (API image, `migrate` command, as `xd_owner`) before `xd-api`/`xd-worker` start; apps connect as least-privilege `xd_app` |
+| Database migrations | EF Core migrations applied by the one-shot `xd-migrate` service (API image, `migrate` command, as `xd_owner`) before `xd-api`/`xd-worker` start; apps connect as least-privilege `xd_app`; the migrations create `market.undo_csv_bars`, the one `SECURITY DEFINER` function (owned by `xd_owner`, executable by `xd_app` only) through which the app removes bars when the owner undoes a CSV load ([doc 05](05-data-and-brokers.md) §9) |
 | Start / stop | `deploy/xd-up.sh` (secrets → build → start → wait healthy → print URLs), `deploy/xd-down.sh` (`--purge` deletes data) |
 | URLs (local) | App http://localhost:8080 · API docs `/api/docs` · Seq http://localhost:5341 · PostgreSQL `localhost:5433` (dev override) |
 | Upgrades | Versioned image tags; roll back by switching tag |
@@ -101,6 +103,7 @@ Nothing else is needed for the master: no published port, no volume (the file is
 | Logs | Serilog → Seq; container log rotation |
 | Disk | Timescale compression; tick data (later) ~50–100 GB/year → external SSD volume |
 | CSV inbox | Host folder `data/inbox/` bind-mounted into `xd-worker`; processed files moved to `data/processed/<job-id>/` |
+| CSV folder (P1-17a) | Host folder `data/Stocks_CSV/` (`XD_CSV_DIR`) bind-mounted **read-only** at `/data/csv` into `xd-api` (`Data__CsvFolder`); `xd-up.sh` creates it when missing; nothing is written there ([ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)) |
 | Market hours | `xd-feed` starts 09:00 and stops 15:35 on trading days (scheduled); Mac must be awake |
 | Remote access | Off by default; optional WireGuard on home router |
 | Dev loop | `dotnet watch` and Vite dev server on the host against containerised db/llm/ml; same images for "prod" |

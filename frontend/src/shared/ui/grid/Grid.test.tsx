@@ -2,8 +2,9 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { appliedCss } from '@/test/css';
+import { observedCount, observerMargins, scrollToEnd } from '@/test/intersection';
 import { AppThemeProvider } from '@/theme';
-import { Grid, type GridColumn, type GridProps, type GridSort } from '.';
+import { Grid, type GridColumn, type GridInfinite, type GridProps, type GridSort } from '.';
 
 interface Row {
   id: string;
@@ -40,7 +41,12 @@ function view(props: Props = {}) {
 }
 
 const grid = () => screen.getByRole('grid', { name: 'Things' });
-const dataRows = () => within(grid()).getAllByRole('row').slice(1);
+// The rows of data: not the header, nor the status row of an infinite list.
+const dataRows = () =>
+  within(grid())
+    .getAllByRole('row')
+    .slice(1)
+    .filter((row) => row.hasAttribute('data-grid-row'));
 const symbols = () => dataRows().map((r) => within(r).getAllByRole('gridcell')[0]?.textContent);
 
 /** A grid that keeps the sort and the selection in state, as a screen would. */
@@ -134,7 +140,7 @@ describe('Grid: selection', () => {
 
   it('ticks rows, and select-all-on-page ticks and clears the page (indeterminate in between)', async () => {
     render(<Stateful />);
-    const all = screen.getByRole('checkbox', { name: 'Select all rows on this page' });
+    const all = screen.getByRole('checkbox', { name: 'Select all rows' });
 
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select BRAVO' }));
     expect(dataRows()[1]).toHaveAttribute('aria-selected', 'true');
@@ -169,7 +175,7 @@ describe('Grid: selection', () => {
     const onSelectionChange = vi.fn();
     render(view({ selectedIds: new Set(['elsewhere']), onSelectionChange }));
 
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows' }));
 
     expect(onSelectionChange).toHaveBeenCalledWith(new Set(['elsewhere', 'a', 'b', 'c', 'd', 'e']));
   });
@@ -229,40 +235,182 @@ describe('Grid: rows and keyboard', () => {
   });
 });
 
-describe('Grid: pagination', () => {
-  const pagination = (over: Partial<NonNullable<Props['pagination']>> = {}) => ({
-    page: 2,
-    pageSize: 50,
-    pageSizeOptions: [50, 100] as const,
+describe('Grid: infinite scroll', () => {
+  const infinite = (over: Partial<GridInfinite> = {}): GridInfinite => ({
     total: 3204,
-    onPageChange: vi.fn(),
-    onPageSizeChange: vi.fn(),
+    hasMore: true,
+    loadingMore: false,
+    onLoadMore: vi.fn(),
+    onRetryMore: vi.fn(),
     ...over,
   });
+  const more: Row[] = [
+    { id: 'f', symbol: 'FOXTROT', name: 'Foxtrot Ltd', lot: 6 },
+    { id: 'g', symbol: 'GOLF', name: 'Golf Ltd', lot: 7 },
+  ];
 
-  it('shows "from–to of total" with digit grouping and reports page and size changes (1-based)', async () => {
-    const p = pagination();
-    render(view({ pagination: p }));
+  it('shows "Showing N of total" with digit grouping, politely announced, and no pager', () => {
+    render(view({ infinite: infinite() }));
 
-    expect(screen.getByText('51–100 of 3,204')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Go to next page' }));
-    expect(p.onPageChange).toHaveBeenCalledWith(3);
-    await userEvent.click(screen.getByRole('button', { name: 'Go to previous page' }));
-    expect(p.onPageChange).toHaveBeenCalledWith(1);
-
-    await userEvent.click(screen.getByRole('combobox', { name: 'Rows per page' }));
-    await userEvent.click(screen.getByRole('option', { name: '100' }));
-    expect(p.onPageSizeChange).toHaveBeenCalledWith(100);
-  });
-
-  it('says "0 results" for an empty list', () => {
-    render(view({ rows: [], pagination: pagination({ page: 1, total: 0 }) }));
-    expect(screen.getByText('0 results')).toBeInTheDocument();
-  });
-
-  it('has no footer without pagination', () => {
-    render(view());
+    const status = screen.getByText('Showing 5 of 3,204');
+    expect(status).toHaveAttribute('aria-live', 'polite');
     expect(screen.queryByText(/Rows per page/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /next page/i })).not.toBeInTheDocument();
+    expect(grid().parentElement!.contains(status)).toBe(false); // the footer is outside the scroll area
+  });
+
+  it('says "0 results" for an empty list and shows the same total once everything is loaded', () => {
+    const { unmount } = render(view({ rows: [], infinite: infinite({ total: 0, hasMore: false }) }));
+    expect(screen.getByText('0 results')).toBeInTheDocument();
+    unmount();
+
+    render(view({ infinite: infinite({ total: 5, hasMore: false }) }));
+    expect(screen.getByText('Showing 5 of 5')).toBeInTheDocument();
+    expect(observedCount()).toBe(0); // nothing left to load: no sentinel is watched
+  });
+
+  it('asks for the next page once when the end of the rows nears the viewport', () => {
+    const props = infinite();
+    render(view({ infinite: props }));
+    expect(observerMargins()).toContain('400px 0px');
+    expect(props.onLoadMore).not.toHaveBeenCalled();
+
+    scrollToEnd();
+    scrollToEnd(); // a second report before the parent has reacted does not ask twice
+
+    expect(props.onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks again after the page arrived (a first page that does not fill the viewport keeps loading)', () => {
+    const props = infinite();
+    const { rerender } = render(view({ infinite: props }));
+    scrollToEnd();
+    rerender(view({ infinite: { ...props, loadingMore: true } }));
+    rerender(view({ infinite: { ...props, loadingMore: false }, rows: [...rows, ...more] }));
+    expect(observedCount()).toBe(1); // armed again, and the browser reports a visible sentinel at once
+
+    scrollToEnd();
+
+    expect(props.onLoadMore).toHaveBeenCalledTimes(2);
+    expect(symbols()).toHaveLength(7);
+    expect(screen.getByText('Showing 7 of 3,204')).toBeInTheDocument();
+  });
+
+  it('does not ask while a page is loading, and shows a spinner row instead', () => {
+    const props = infinite({ loadingMore: true });
+    render(view({ infinite: props }));
+
+    scrollToEnd();
+
+    expect(props.onLoadMore).not.toHaveBeenCalled();
+    expect(observedCount()).toBe(0);
+    expect(screen.getByRole('progressbar', { name: 'Loading more rows' })).toBeInTheDocument();
+  });
+
+  it('does not ask for more of a stale list that is being replaced', () => {
+    const props = infinite();
+    render(view({ infinite: props, loading: true }));
+
+    scrollToEnd();
+
+    expect(props.onLoadMore).not.toHaveBeenCalled();
+    expect(grid()).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('shows "Could not load more rows" with Retry, and stops loading until it is pressed', async () => {
+    const props = infinite({ error: 'The instruments could not be loaded.' });
+    render(view({ infinite: props }));
+
+    scrollToEnd();
+    expect(props.onLoadMore).not.toHaveBeenCalled();
+    expect(symbols()).toHaveLength(5); // the loaded rows stay
+    expect(screen.getByText('Could not load more rows')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(props.onRetryMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('numbers the rows against the whole list: aria-rowcount is the total, rows are numbered from the top', () => {
+    render(view({ infinite: infinite({ total: 500 }) }));
+
+    expect(grid()).toHaveAttribute('aria-rowcount', '501'); // the header is row 1
+    expect(dataRows().map((r) => r.getAttribute('aria-rowindex'))).toEqual(['2', '3', '4', '5', '6']);
+  });
+
+  it('names the select-all box for the loaded rows and keeps selections when more rows arrive', async () => {
+    const { rerender } = render(<Stateful infinite={infinite()} />);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
+    expect(screen.getAllByRole('checkbox', { checked: true })).toHaveLength(6);
+
+    rerender(<Stateful infinite={infinite()} rows={[...rows, ...more]} />);
+
+    expect(screen.getByRole('checkbox', { name: 'Select ALPHA' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select FOXTROT' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select all loaded rows' })).toHaveAttribute(
+      'data-indeterminate',
+      'true',
+    );
+  });
+
+  describe('keyboard', () => {
+    it.each(['{PageDown}', '{End}', '{ArrowDown}'])('%s at the last loaded row asks for more', async (key) => {
+      const props = infinite();
+      render(view({ infinite: props, onRowClick: vi.fn() }));
+      dataRows()[4]!.focus();
+
+      await userEvent.keyboard(key);
+
+      expect(props.onLoadMore).toHaveBeenCalledTimes(1);
+      expect(dataRows()[4]).toHaveFocus();
+    });
+
+    it('does not ask when it is not at the end, when everything is loaded, or while loading', async () => {
+      const props = infinite();
+      const { rerender } = render(view({ infinite: props, onRowClick: vi.fn() }));
+      dataRows()[0]!.focus();
+      await userEvent.keyboard('{ArrowDown}{PageUp}{Home}');
+      expect(props.onLoadMore).not.toHaveBeenCalled();
+
+      dataRows()[4]!.focus();
+      rerender(view({ infinite: { ...props, hasMore: false }, onRowClick: vi.fn() }));
+      await userEvent.keyboard('{End}');
+      rerender(view({ infinite: { ...props, loadingMore: true }, onRowClick: vi.fn() }));
+      await userEvent.keyboard('{End}');
+      expect(props.onLoadMore).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a new list', () => {
+    function spyOnScroll() {
+      const set = vi.fn();
+      Object.defineProperty(grid().parentElement!, 'scrollTop', { configurable: true, get: () => 300, set });
+      return set;
+    }
+
+    it('scrolls to the top and makes the first row the tab stop when resetKey changes, not when rows are added', () => {
+      const props = infinite();
+      const { rerender } = render(view({ infinite: props, resetKey: 'a', onRowClick: vi.fn() }));
+      dataRows()[3]!.focus();
+      const set = spyOnScroll();
+
+      rerender(view({ infinite: props, resetKey: 'a', rows: [...rows, ...more], onRowClick: vi.fn() }));
+      expect(set).not.toHaveBeenCalled();
+      expect(dataRows().map((r) => r.tabIndex)).toEqual([-1, -1, -1, 0, -1, -1, -1]);
+
+      rerender(view({ infinite: props, resetKey: 'b', rows: more, onRowClick: vi.fn() }));
+      expect(set).toHaveBeenCalledWith(0);
+      expect(dataRows().map((r) => r.tabIndex)).toEqual([0, -1]);
+    });
+
+    it('does the same when the sort order changes', () => {
+      const props = infinite();
+      const { rerender } = render(view({ infinite: props, sort: { columnId: 'symbol', descending: false } }));
+      const set = spyOnScroll();
+
+      rerender(view({ infinite: props, sort: { columnId: 'symbol', descending: true } }));
+
+      expect(set).toHaveBeenCalledWith(0);
+    });
   });
 });
 
@@ -304,21 +452,10 @@ describe('Grid: scroll structure', () => {
   const scroller = () => grid().parentElement!;
 
   it('scrolls the body in its own container, with the footer outside it', () => {
-    render(
-      view({
-        pagination: {
-          page: 1,
-          pageSize: 50,
-          pageSizeOptions: [50],
-          total: 5,
-          onPageChange: vi.fn(),
-          onPageSizeChange: vi.fn(),
-        },
-      }),
-    );
+    render(view({ infinite: { total: 5, hasMore: false, loadingMore: false, onLoadMore: vi.fn() } }));
 
     expect(scroller()).toHaveStyle({ overflow: 'auto', minHeight: '0px' });
-    const footer = screen.getByText('1–5 of 5');
+    const footer = screen.getByText('Showing 5 of 5');
     expect(scroller().contains(footer)).toBe(false);
     expect(scroller().parentElement!.contains(footer)).toBe(true);
     // The grid root is a flex item that can shrink, so a parent with a height makes the body scroll.
@@ -348,15 +485,8 @@ describe('Grid: scroll structure', () => {
 });
 
 describe('Grid: new list resets position', () => {
-  const pagination = (page: number) => ({
-    page,
-    pageSize: 50,
-    pageSizeOptions: [50] as const,
-    total: 500,
-    onPageChange: vi.fn(),
-    onPageSizeChange: vi.fn(),
-  });
-  const pageTwo: Row[] = [
+  const infinite: GridInfinite = { total: 500, hasMore: true, loadingMore: false, onLoadMore: vi.fn() };
+  const otherList: Row[] = [
     { id: 'f', symbol: 'FOXTROT', name: 'Foxtrot Ltd', lot: 6 },
     { id: 'g', symbol: 'GOLF', name: 'Golf Ltd', lot: 7 },
   ];
@@ -369,35 +499,46 @@ describe('Grid: new list resets position', () => {
     return set;
   }
 
-  it('scrolls back to the top and makes the first row the tab stop on a new page', () => {
-    const { rerender } = render(view({ pagination: pagination(1), onRowClick: vi.fn() }));
+  it('scrolls back to the top and makes the first row the tab stop when the resetKey changes', () => {
+    const { rerender } = render(view({ infinite, resetKey: 'all', onRowClick: vi.fn() }));
     dataRows()[3]!.focus();
     expect(dataRows().map((r) => r.tabIndex)).toEqual([-1, -1, -1, 0, -1]);
     const set = spyOnScroll();
 
-    rerender(view({ pagination: pagination(2), rows: pageTwo, onRowClick: vi.fn() }));
+    rerender(view({ infinite, resetKey: 'banks', rows: otherList, onRowClick: vi.fn() }));
 
     expect(set).toHaveBeenCalledWith(0);
     expect(dataRows().map((r) => r.tabIndex)).toEqual([0, -1]);
   });
 
-  it('does the same when the page size or the sort order changes, and not for unrelated renders', () => {
-    const { rerender } = render(view({ pagination: pagination(1), sort: { columnId: 'symbol', descending: false } }));
+  it('does the same when the sort order changes, and not for unrelated renders or more rows arriving', () => {
+    const { rerender } = render(view({ infinite, resetKey: 'all', sort: { columnId: 'symbol', descending: false } }));
     dataRows()[2]!.focus();
     const set = spyOnScroll();
 
     rerender(
-      view({ pagination: pagination(1), sort: { columnId: 'symbol', descending: false }, density: 'comfortable' }),
+      view({ infinite, resetKey: 'all', sort: { columnId: 'symbol', descending: false }, density: 'comfortable' }),
     );
     expect(set).not.toHaveBeenCalled();
     expect(dataRows().map((r) => r.tabIndex)).toEqual([-1, -1, 0, -1, -1]);
 
-    rerender(view({ pagination: pagination(1), sort: { columnId: 'symbol', descending: true } }));
+    rerender(
+      view({
+        infinite,
+        resetKey: 'all',
+        rows: [...rows, ...otherList],
+        sort: { columnId: 'symbol', descending: false },
+      }),
+    );
+    expect(set).not.toHaveBeenCalled();
+    expect(dataRows()[2]!.tabIndex).toBe(0);
+
+    rerender(view({ infinite, resetKey: 'all', sort: { columnId: 'symbol', descending: true } }));
     expect(set).toHaveBeenCalledTimes(1);
     expect(dataRows().map((r) => r.tabIndex)).toEqual([0, -1, -1, -1, -1]);
 
     dataRows()[2]!.focus();
-    rerender(view({ pagination: { ...pagination(1), pageSize: 100 }, sort: { columnId: 'symbol', descending: true } }));
+    rerender(view({ infinite, resetKey: 'banks', sort: { columnId: 'symbol', descending: true } }));
     expect(set).toHaveBeenCalledTimes(2);
     expect(dataRows()[0]!.tabIndex).toBe(0);
   });
@@ -482,7 +623,7 @@ describe('Grid: tab order and attributes with selection', () => {
     await userEvent.tab();
     expect(screen.getByRole('button', { name: 'before' })).toHaveFocus();
     await userEvent.tab();
-    expect(screen.getByRole('checkbox', { name: 'Select all rows on this page' })).toHaveFocus();
+    expect(screen.getByRole('checkbox', { name: 'Select all rows' })).toHaveFocus();
     await userEvent.tab();
     expect(dataRows()[0]).toHaveFocus();
     await userEvent.tab();
@@ -490,25 +631,14 @@ describe('Grid: tab order and attributes with selection', () => {
     expect(screen.getByRole('checkbox', { name: 'Select BRAVO' })).toHaveAttribute('tabindex', '-1');
   });
 
-  it('numbers rows and columns for assistive technology (position in the whole list, header is row 1)', () => {
-    render(
-      <Stateful
-        pagination={{
-          page: 3,
-          pageSize: 50,
-          pageSizeOptions: [50],
-          total: 500,
-          onPageChange: vi.fn(),
-          onPageSizeChange: vi.fn(),
-        }}
-      />,
-    );
+  it('numbers rows and columns for assistive technology (header is row 1, the total of an infinite list is the row count)', () => {
+    render(<Stateful infinite={{ total: 500, hasMore: true, loadingMore: false, onLoadMore: vi.fn() }} />);
 
     expect(grid()).toHaveAttribute('aria-multiselectable', 'true');
     expect(grid()).toHaveAttribute('aria-colcount', '5'); // checkbox + four columns
     expect(grid()).toHaveAttribute('aria-rowcount', '501');
     expect(within(grid()).getAllByRole('row')[0]).toHaveAttribute('aria-rowindex', '1');
-    expect(dataRows().map((r) => r.getAttribute('aria-rowindex'))).toEqual(['102', '103', '104', '105', '106']);
+    expect(dataRows().map((r) => r.getAttribute('aria-rowindex'))).toEqual(['2', '3', '4', '5', '6']);
     expect(
       within(dataRows()[0]!)
         .getAllByRole('gridcell')

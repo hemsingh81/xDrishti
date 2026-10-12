@@ -50,8 +50,15 @@ export const enabledRoles = (account: Pick<AccountSummary, 'roles'>): RoleKey[] 
 export const accountSubtitle = (account: Pick<AccountSummary, 'maskedClientId'>): string =>
   `${dhanApp.name} · ${account.maskedClientId}`;
 
-/** "AccountCreated" -> "Account created". */
+/** Events whose name does not read well when split into words (an abbreviation inside). */
+const eventLabels: Readonly<Record<string, string>> = {
+  CalendarRefreshedFromNse: 'Calendar refreshed from NSE',
+};
+
+/** "AccountCreated" -> "Account created"; "CorporateActionConfirmed" -> "Corporate action confirmed". */
 export function humanizeEvent(event: string): string {
+  const known = eventLabels[event];
+  if (known) return known;
   const words = event.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

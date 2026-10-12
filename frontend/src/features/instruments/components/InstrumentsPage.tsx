@@ -2,9 +2,10 @@ import ListAltIcon from '@mui/icons-material/ListAltOutlined';
 import { Box } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState } from 'react';
+import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { PageHeader } from '@/shared/ui';
 import { ToastProvider } from '@/shared/ui/ToastProvider';
-import { facetsQuery, searchQuery } from '../api/instrumentsQueries';
+import { facetsQuery, searchList } from '../api/instrumentsQueries';
 import { useInstrumentFilters } from '../hooks/useInstrumentFilters';
 import { useRefreshWatch } from '../hooks/useRefreshWatch';
 import { EmptyMaster } from './EmptyMaster';
@@ -16,7 +17,7 @@ import { TrackingActionsProvider } from './TrackingActionsProvider';
 
 /**
  * The Instruments screen. From `md` up it fills the viewport under the top bar: header and filters stay put, the list
- * scrolls inside its own card and the pagination footer stays at the bottom; below `md` the page scrolls normally.
+ * scrolls inside its own card (further pages load as it is scrolled) and the "Showing N of total" footer stays at the bottom; below `md` the page scrolls normally.
  * The refresh details are hidden until the owner asks for them. Search state and the open instrument live in the URL.
  */
 export function InstrumentsPage() {
@@ -34,7 +35,7 @@ function InstrumentsContent() {
   const facets = useQuery(facetsQuery);
   // The list loads in parallel with the refresh status, not after it.
   const filterState = useInstrumentFilters();
-  const results = useQuery(searchQuery(filterState.filters));
+  const results = useInfiniteRows(searchList(filterState.filters));
   const [panelOpen, setPanelOpen] = useState(false);
   const panelId = useId();
   const refreshButton = useRef<HTMLButtonElement>(null);

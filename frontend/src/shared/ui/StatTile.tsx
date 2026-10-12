@@ -42,7 +42,7 @@ export function StatTile({ label, value, hint, tone = 'default', icon, hue }: St
           {value}
         </Typography>
         {hint && (
-          <Typography variant="body2" color="text.secondary">
+          <Typography component="div" variant="body2" color="text.secondary">
             {hint}
           </Typography>
         )}

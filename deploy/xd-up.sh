@@ -38,6 +38,14 @@ if ! podman info >/dev/null 2>&1; then
   podman machine start >/dev/null
 fi
 
+# 1b) The folder with the 1-minute CSV files (ADR 0016), mounted read-only into xd-api as /data/csv. Created world-readable when missing (the
+#     container user is not you); put the <SYMBOL>_1m.csv.gz files there and press "Update data" in the app.
+export XD_CSV_DIR="${XD_CSV_DIR:-../data/Stocks_CSV}"
+if [ ! -d "$XD_CSV_DIR" ]; then
+  (umask 022; mkdir -p "$XD_CSV_DIR")
+  say "Created the CSV folder $XD_CSV_DIR (put the <SYMBOL>_1m.csv.gz files there)."
+fi
+
 # 2) Secrets: macOS Keychain is the source of truth.
 secret() { # secret <keychain-service> → prints the value, creating it on first use
   local service="$1" value

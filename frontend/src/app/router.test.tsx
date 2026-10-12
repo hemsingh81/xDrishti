@@ -1,6 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { createDataFake } from '@/test/dataFake';
+import { createQualityFake } from '@/test/qualityFake';
 import { buildProblem, buildSystemStatus } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
@@ -30,9 +32,33 @@ describe('app routes', () => {
   });
 
   it('shows the roadmap phase for screens that are not built yet', async () => {
-    renderRoutes(routes, { initialPath: '/data' });
+    renderRoutes(routes, { initialPath: '/services' });
 
     expect(await screen.findByText('P1')).toBeInTheDocument();
+  });
+
+  it('opens the Data quality screen (no longer a placeholder) and marks it in the navigation', async () => {
+    server.use(...createQualityFake().handlers);
+    renderRoutes(routes, { initialPath: '/quality' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Data quality' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Quality summary' })).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: 'Instruments' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run checks' })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
+    const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!;
+    expect(within(nav).getByRole('link', { name: 'Data quality' })).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('opens the Data & import screen (no longer a placeholder)', async () => {
+    server.use(...createDataFake().handlers);
+    renderRoutes(routes, { initialPath: '/data' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Data & import' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Data status' })).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: 'Coverage' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update data' })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
   });
 
   it('opens the Baskets screen (no longer a placeholder)', async () => {

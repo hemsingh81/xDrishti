@@ -3073,6 +3073,1511 @@
           }
         }
       }
+    },
+    "/api/data/overview": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The CSV folder (files loaded and pending), the Dhan Data account and whether a fetch can run, the aggregates per timeframe, the stored bars with the last bar (last tick) and how many trading days (by the trading calendar) it is behind, the job in progress, the last job of each phase, the next holiday, how many calendar days await confirmation, the gaps in the bars (open, unfillable, filled), the scheduled end-of-day run (enabled, time, next run, last automatic run) and pendingCorporateActions (suggested splits or bonus issues waiting for a decision)",
+        "operationId": "GetDataOverview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/instruments": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The tracked instruments and the ones with bars, with first bar, last bar, 1-minute bars, source (csv|dhan|mixed), status (current|behind|empty) and the open gaps: q, status, hasGaps (true keeps instruments with open gaps), sort (symbol|name|firstBar|lastBar|bars, '-' for descending), page, pageSize (max 200)",
+        "operationId": "ListDataInstruments",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "hasGaps",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataInstrumentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/instruments/{id}/bars": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The latest bars of an instrument, newest first: timeframe 1m|5m|10m|15m|30m|1h|1D|1W|1M (default 1D), take 1 to 1000 (default 100), adjusted (default false = raw prices; true adjusts prices and volume for the applied corporate actions on read — each bar by the factor of its India date, a week or month bar by the first day of its bucket — and adds the adjustment block: applied, factor, actions)",
+        "operationId": "GetInstrumentBars",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "adjusted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentBars"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/refresh": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Start a data update in the background: steps (any of csv, dhan, aggregate, quality; default csv, dhan and aggregate, always in that order; quality checks the data after the others, see /data/quality), forceCsv loads unchanged CSV files again, refetchGaps also retries the sessions the Dhan phase gave up on (unfillable), csvFiles (1 to 214 file names of the CSV folder, only with the csv step; see /data/csv/files) loads only those files - an empty list or a name the folder does not have is 400 data.invalid naming it. 202 with the job; 409 data.job_running while one runs, 409 data.master_missing without an instrument list",
+        "operationId": "StartDataRefresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StartDataJobRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/jobs": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The most recent data updates, newest first (take 1 to 100, default 20)",
+        "operationId": "ListDataJobs",
+        "parameters": [
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataJobView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/gaps": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The sessions of tracked instruments with missing 1-minute bars (ADR 0017 §3), newest first: status (open|filled|unfillable), instrumentId, page, pageSize (max 200)",
+        "operationId": "ListDataGaps",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instrumentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/notices": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "What the owner should know about the data for the notification bell: the last scheduled run failed (data_run_failed), sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending)",
+        "operationId": "GetDataNotices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataNotices"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/calendar": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The trading calendar: confirmed holidays and special sessions from..to (yyyy-MM-dd, default today and a year on, at most 3660 days), every proposed day (from the stored bars, also a proposal next to a confirmed day: replaces names that day's kind) and the next holiday",
+        "operationId": "GetTradingCalendar",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Add a holiday (a weekday) or a special session (sessionFrom/sessionTo HH:mm India time; both left out means 09:15 to 15:30) as confirmed, replacing what the date had. 201 for a new date, 200 when it replaced a row; 400 data.invalid with the field",
+        "operationId": "AddCalendarDay",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AddCalendarDayRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarDayView"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarDayView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/calendar/refresh": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Read NSE's public holiday list now (best effort, one request). Always 200: succeeded=false with the reason when NSE refused or the list could not be read; add holidays by hand then",
+        "operationId": "RefreshTradingCalendar",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarRefreshResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/calendar/{date}/confirm": {
+      "put": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Confirm a proposed day (idempotent; a proposal next to a confirmed day replaces it); 404 data.calendar_day_not_found when the date has no row or was dismissed, 400 data.invalid for a date that cannot be read",
+        "operationId": "ConfirmCalendarDay",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarDayView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/calendar/{date}": {
+      "delete": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Take a day off the calendar, or dismiss a proposal: the owner's own entry is deleted; a proposal from the stored bars or a day from NSE's list stays as dismissed so it is not proposed again (removing a dismissed day deletes it); a date with a proposal next to a confirmed day dismisses only the proposal (remove again to take the day off). 204; 404 data.calendar_day_not_found",
+        "operationId": "RemoveCalendarDay",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "One data update with the progress and result of each phase",
+        "operationId": "GetDataJob",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/overview": {
+      "get": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "The latest run over every instrument, the counts (checked, passed, warnings, failed, never checked) and the mean score of the current results, the gate, the window of sessions and the limits in force",
+        "operationId": "GetDataQualityOverview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/instruments": {
+      "get": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "The tracked instruments with bars and the current result of their checks: q, status (pass|warning|fail|notChecked), sort (symbol|name|status|score|coverage|barsChecked|missingMinutes|checkedAt, '-' for descending), page, pageSize (max 200)",
+        "operationId": "ListDataQualityInstruments",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityInstrumentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/instruments/{id}": {
+      "get": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "Every check of one instrument, its missing minutes (at most 500 listed, with the total) and the stored buckets of the window next to the ones recomputed from the 1-minute bars now: differencesOnly, timeframe (5m|10m|15m|30m|1h|1D|1W|1M)",
+        "operationId": "GetDataQualityInstrument",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "differencesOnly",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityInstrumentDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/runs": {
+      "get": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "The most recent quality runs, newest first (take 1 to 100, default 20)",
+        "operationId": "ListDataQualityRuns",
+        "parameters": [
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QualityRunView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/gate": {
+      "get": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "The fail-closed gate for the nightly plan: blocked when no finished run exists, the last finished run failed or is older than 3 trading days, or more than Data:Quality:MaxFailedPercent of the checked instruments fail (a running run is no verdict); ok when not blocked and none fails; reasons say why",
+        "operationId": "GetDataQualityGate",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityGateView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/run": {
+      "post": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "Run the checks in the background (a data job with the step quality): instrumentId limits it to one instrument. 202 with the job; 409 data.job_running while any data job runs, 404 data.instrument_not_found",
+        "operationId": "StartDataQualityRun",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StartQualityRunRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/instruments/{id}/refetch": {
+      "post": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "Fix action: fetch the instrument's missing bars from Dhan again (gap days, including unfillable ones), rebuild its aggregates and check it again, as one data job. 202 with the job; 409 data.job_running, data.dhan_not_connected or data.dhan_not_available; 404 data.instrument_not_found",
+        "operationId": "RefetchDataQualityInstrument",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/quality/instruments/{id}/refresh-aggregates": {
+      "post": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "Fix action: rebuild the instrument's derived timeframes over the window from its 1-minute bars and check it again, as one data job. 202 with the job; 409 data.job_running; 404 data.instrument_not_found",
+        "operationId": "RefreshDataQualityAggregates",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/csv/files": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The files of the CSV folder: state (pending|loaded|changed - loaded, but size or modified time differ now), size, modified time, the symbol parsed from the name, the instrument it maps to or why not (unknown|ambiguous|invalidName), and rows, firstBar, lastBar, loadedAt and overlapsWith (other loaded files of the instrument covering part of the same time) for loaded files. No file is opened, so hundreds of files list at once. Changed and pending first, then loaded, by name: q (name or symbol), state, page, pageSize (max 200)",
+        "operationId": "ListCsvFiles",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsvFilePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/csv/preview": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Dry run of the real reader, row rules and session check over up to 20 files of the folder (names from the listing; anything else is that file's error), nothing written: rows, first and last bar, trading days, repaired and rejected with up to 10 examples, the verdict (pass or the refusal message), the symbol mapping, the first 5 accepted rows and what loading would do to the stored bars (would insert, update, keep existing Dhan bars, unchanged; a spread sample past 1 million lookups per request, flagged sampled). A request reads at most 2 times the per-file limits of Data:Csv and works for at most 60 seconds",
+        "operationId": "PreviewCsvFiles",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PreviewCsvFilesRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsvPreviewResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/csv/files/{name}/undo": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Undo the load of one CSV file as a data job: removes the file's csv-source bars of its instrument within the file's recorded first-to-last bar (Dhan bars stay), makes the file pending again, then rebuilds the instrument's aggregates; audited. Values an earlier load overwrote are NOT restored (no history is kept). The removal is by instrument and range: bars of another loaded file in the overlap go too, and the job warns. 202 with the job; 409 data.job_running while any data job runs; 404 data.csv_file_not_found when the file was never loaded",
+        "operationId": "UndoCsvLoad",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/corporate-actions": {
+      "get": {
+        "tags": [
+          "Corporate actions"
+        ],
+        "summary": "The splits and bonus issues, newest ex-date first: status (suggested|applied|ignored), instrumentId, page, pageSize (max 200); pending is the number of suggestions waiting, whatever the filter",
+        "operationId": "ListCorporateActions",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "instrumentId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorporateActionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Corporate actions"
+        ],
+        "summary": "Add a split (numerator:denominator = old shares : new shares, 1:5 gives a factor of 0.2) or a bonus (bonus shares : shares held, 1:1 gives 0.5) as applied. 201; 400 data.invalid with the field; 404 data.instrument_not_found; 409 data.corporate_action_exists, 409 data.corporate_action_conflicts_same_day (an applied action of the other kind is on that ex-date), 409 data.csv_already_adjusted (the ex-date is on or before csvAdjustedThrough: the loaded CSV files are adjusted at source; send acknowledgeCsvAdjusted=true, in the body or the query, to add it anyway)",
+        "operationId": "AddCorporateAction",
+        "parameters": [
+          {
+            "name": "acknowledgeCsvAdjusted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AddCorporateActionRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorporateActionView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/corporate-actions/{id}": {
+      "put": {
+        "tags": [
+          "Corporate actions"
+        ],
+        "summary": "Confirm a suggestion (an empty body confirms it as it is), change the ex-date, kind, ratio or note, or bring back an ignored action: the result is applied. Fields left out keep their value. 200; 400 data.invalid; 404 data.corporate_action_not_found; 409 data.corporate_action_exists, 409 data.corporate_action_conflicts_same_day, 409 data.csv_already_adjusted (as when adding; acknowledgeCsvAdjusted=true in the body or the query)",
+        "operationId": "UpdateCorporateAction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "acknowledgeCsvAdjusted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UpdateCorporateActionRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorporateActionView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/corporate-actions/{id}/ignore": {
+      "post": {
+        "tags": [
+          "Corporate actions"
+        ],
+        "summary": "Decline an action: it stays in the list as ignored (nothing is deleted) and is not suggested again. Idempotent. 200; 404 data.corporate_action_not_found",
+        "operationId": "IgnoreCorporateAction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorporateActionView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/corporate-actions/detect": {
+      "post": {
+        "tags": [
+          "Corporate actions"
+        ],
+        "summary": "Look for splits and bonus issues in the stored day bars of every share and ETF now; new candidates become suggested actions, nothing is applied and repeating it finds nothing new. 200 with the counts",
+        "operationId": "DetectCorporateActions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectionResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/corporate-actions/import": {
+      "post": {
+        "tags": [
+          "Corporate actions"
+        ],
+        "summary": "Import actions from CSV (header symbol,exDate,kind,numerator,denominator; RELIANCE or NSE:RELIANCE; at most 5,000 lines) sent as the text/csv or text/plain body, or as the first file of a multipart/form-data upload; they are applied. preview=true writes nothing and returns the counts. Unknown symbols are listed, never guessed; duplicates (any status) are skipped; bad lines (also a kind that clashes with an applied one on the same day) are reported and skipped. Lines with an ex-date on or before the date the loaded CSV files reach (adjusted at source) are counted in adjustsCsvTwice and listed in warnings; importing them needs acknowledgeCsvAdjusted=true. 200; 400 data.invalid; 409 data.csv_already_adjusted (with adjustsCsvTwice and instruments)",
+        "operationId": "ImportCorporateActions",
+        "parameters": [
+          {
+            "name": "preview",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "acknowledgeCsvAdjusted",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/csv": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportCorporateActionsResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3293,6 +4798,105 @@
         },
         "description": "One row of the accounts list. Broker is \"dhan\"; MaskedClientId shows the first four and last two characters; Secrets lists the\nsecret fields with set / not set; ApiKeyExpiresOn is the first day the Dhan API key is no longer valid; TokenStatus repeats\nConnection.Status (for the list's health dot)."
       },
+      "AddCalendarDayRequest": {
+        "required": [
+          "date",
+          "kind"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sessionFrom": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sessionTo": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Adds a day to the calendar, confirmed (source manual), replacing what the date had before. `date` is `yyyy-MM-dd`; `kind` is holiday (a weekday,\nno session window) or special (`sessionFrom` and `sessionTo` as `HH:mm` India time, from before to; both left out means the regular 09:15 to 15:30);\n`note` is free text up to 200 characters."
+      },
+      "AddCorporateActionRequest": {
+        "required": [
+          "instrumentId",
+          "exDate",
+          "kind",
+          "numerator",
+          "denominator",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "exDate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "numerator": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "denominator": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "acknowledgeCsvAdjusted": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "A corporate action to add by hand (it is applied at once). `exDate``yyyy-MM-dd` (2000-01-01 to a year ahead); `kind` split|bonus; `numerator` and `denominator` whole numbers 1 to 100000\n(a split 1:1 changes nothing and is refused); `note` at most 200 characters. `acknowledgeCsvAdjusted` true says the owner knows the loaded CSV files are adjusted up to `csvAdjustedThrough`\nand wants an ex-date on or before it anyway (otherwise 409 `data.csv_already_adjusted`)."
+      },
       "AddMembersInput": {
         "required": [
           "instrumentIds",
@@ -3351,6 +4955,183 @@
           }
         },
         "description": "What an add did (counts of distinct instruments): `added` became members, `alreadyMembers` were members already, `newlyTracked` of the added\nones were not tracked and are now. `memberCount` = members now."
+      },
+      "AdjustmentActionView": {
+        "required": [
+          "exDate",
+          "kind",
+          "ratio",
+          "factor"
+        ],
+        "type": "object",
+        "properties": {
+          "exDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "ratio": {
+            "type": "string"
+          },
+          "factor": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "One applied action in the `adjustment` block of a bars read: the ex-date, kind, ratio and the factor of the action itself."
+      },
+      "AdjustmentView": {
+        "required": [
+          "applied",
+          "factor",
+          "actions"
+        ],
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "factor": {
+            "type": "number",
+            "format": "double"
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdjustmentActionView"
+            }
+          }
+        },
+        "description": "What an adjusted read applied: `applied` is the number of applied actions that changed the bars returned (those with an ex-date after the oldest bar), `factor` the cumulative factor of the oldest bar\nreturned (the strongest; newer bars have a factor closer to 1) and `actions` those actions, oldest ex-date first."
+      },
+      "AggregatePhase": {
+        "required": [
+          "status",
+          "startedAt",
+          "finishedAt",
+          "done",
+          "total",
+          "message",
+          "code",
+          "full",
+          "buckets",
+          "bucketsByTimeframe"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "full": {
+            "type": "boolean"
+          },
+          "buckets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bucketsByTimeframe": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        },
+        "description": "The aggregate phase of a data job (ADR 0016 §6): `Done` of `Total` are instruments. `Buckets` counts the bars written (new or changed),\nby timeframe; `Full` is true when everything was rebuilt rather than the ranges touched by this job. Part of the API (the job's `aggregate` block)."
+      },
+      "AggregatesCheck": {
+        "required": [
+          "status",
+          "compared",
+          "differences",
+          "byTimeframe"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "compared": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "differences": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byTimeframe": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TimeframeCheck"
+            }
+          }
+        },
+        "description": "Aggregates against the 1-minute bars: every stored 5m, 10m, 15m, 30m, 1h, 1D, 1W and 1M bucket in the window recomputed independently and compared exactly (OHLC, volume, bar count)."
+      },
+      "AggregatesOverview": {
+        "required": [
+          "timeframes",
+          "lastBuiltAt",
+          "instrumentsPending"
+        ],
+        "type": "object",
+        "properties": {
+          "timeframes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeframeStat"
+            }
+          },
+          "lastBuiltAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "instrumentsPending": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The derived timeframes: per timeframe, when they were last built and how many instruments have changes that are not aggregated yet."
       },
       "ApplicationStatus": {
         "required": [
@@ -3445,6 +5226,138 @@
           }
         },
         "description": "The daily automatic refresh: whether it is on, at what India time, and when it runs next."
+      },
+      "BadBar": {
+        "required": [
+          "ts",
+          "problem"
+        ],
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "problem": {
+            "type": "string"
+          }
+        },
+        "description": "A bar that broke a row rule: its start and what is wrong with it."
+      },
+      "BarRow": {
+        "required": [
+          "ts",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "bars",
+          "complete",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "open": {
+            "type": "number",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "format": "double"
+          },
+          "low": {
+            "type": "number",
+            "format": "double"
+          },
+          "close": {
+            "type": "number",
+            "format": "double"
+          },
+          "volume": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One bar. Times of the day timeframes (`1D 1W 1M`) are India midnight of the first day of the bucket. `bars` counts the 1-minute bars in it; `complete` says none was missing. `source` (1m only): csv · dhan."
+      },
+      "BarsOverview": {
+        "required": [
+          "instruments",
+          "instrumentsBehind",
+          "instrumentsEmpty",
+          "totalBars",
+          "firstBar",
+          "lastBar",
+          "expectedSession",
+          "daysBehind",
+          "stale"
+        ],
+        "type": "object",
+        "properties": {
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instrumentsBehind": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instrumentsEmpty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalBars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "expectedSession": {
+            "type": "string",
+            "format": "date"
+          },
+          "daysBehind": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "stale": {
+            "type": "boolean"
+          }
+        },
+        "description": "The stored 1-minute bars: instruments with bars, the first bar and the last bar (the \"last tick\"), how many trading days (by the trading calendar: weekdays without the holidays, with the special sessions) the last bar is behind the last\nclosed session (`expectedSession`: 15:30 India time, or the end of a special session, has passed), `stale` (behind) and how many instruments are behind or still empty (tracked without bars)."
       },
       "BasketHistory": {
         "required": [
@@ -3833,6 +5746,199 @@
         },
         "description": "One bucket to pick from. IsAccountDefault is true for the automatic default bucket of an account that has the Portfolio role\n(AccountId and AccountName name that account); custom buckets have neither."
       },
+      "CalendarDayView": {
+        "required": [
+          "date",
+          "kind",
+          "sessionFrom",
+          "sessionTo",
+          "minutes",
+          "source",
+          "status",
+          "note",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "sessionFrom": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sessionTo": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "minutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "replaces": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A date of the trading calendar (ADR 0017 §1). `kind`: holiday · special. A special session has `sessionFrom` and `sessionTo` (`HH:mm`, India time,\nthe end exclusive) and `minutes` (its length, the 1-minute bars a complete session has); a holiday has none of the three. `source`: manual · observed · nse.\n`status`: confirmed · proposed (`dismissed` days are not listed). `replaces`: set only on a proposal that lies next to a confirmed day (a session seen on a listed\nholiday, say) and names that day's kind: the confirmed day stays in force until the owner confirms the proposal (which replaces it) or dismisses it."
+      },
+      "CalendarRefreshResult": {
+        "required": [
+          "succeeded",
+          "message",
+          "added",
+          "updated",
+          "unchanged",
+          "skipped",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "succeeded": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "The answer of a refresh from NSE's public holiday list. It never fails the request: `succeeded` false means the list could not be fetched or read (`message` says why,\nnothing changed). Otherwise the counts of the list's holidays that were added, updated, already known and left out (weekends, dates out of range, days the owner\ndecided or the stored bars contradict)."
+      },
+      "CalendarView": {
+        "required": [
+          "from",
+          "to",
+          "days",
+          "proposals",
+          "nextHoliday"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarDayView"
+            }
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarDayView"
+            }
+          },
+          "nextHoliday": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CalendarDayView"
+              }
+            ]
+          }
+        },
+        "description": "The trading calendar. `days`: the confirmed holidays and special sessions from `from` to `to` (India dates, both included; default today and a\nyear on), by date. `proposals`: every proposed day, whatever its date, waiting for Confirm or Dismiss (including proposals that lie next to a confirmed day, marked `replaces`). `nextHoliday`: the first confirmed holiday\ntoday or later (null when none is known)."
+      },
+      "CompletenessCheck": {
+        "required": [
+          "status",
+          "expectedMinutes",
+          "foundMinutes",
+          "missingMinutes",
+          "missingPercent",
+          "unfillableMinutes",
+          "sessions"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "expectedMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "foundMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missingPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "unfillableMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionCompleteness"
+            }
+          }
+        },
+        "description": "Completeness: the 1-minute bars the trading calendar expects in the window against the ones stored. `missingPercent` is of the expected minutes; `unfillableMinutes` are missing\nminutes of sessions a refetch could not fill (a halt, a circuit-locked day): they are a warning, never a failure."
+      },
       "ConnectStartView": {
         "required": [
           "authorizeUrl",
@@ -3935,6 +6041,137 @@
         },
         "description": "The account's connection to Dhan. Status is \"not_connected\", \"connected\", \"expired\" (the expiry has passed — derived when read,\nno broker call needed). ExpiresAt is when the token stops working (as Dhan states, otherwise 24 hours after sign-in).\nBrokerUserName and BrokerUserId (masked like the client id) are what Dhan reported for the token. LastError is a short safe text (at most\nDhan's error code). The token itself is never returned."
       },
+      "CorporateActionPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total",
+          "pending"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorporateActionView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A page of corporate actions, newest ex-date first. `pending` is the number of suggestions waiting for a decision over all instruments, whatever the filter."
+      },
+      "CorporateActionView": {
+        "required": [
+          "id",
+          "instrumentId",
+          "symbol",
+          "name",
+          "exDate",
+          "kind",
+          "numerator",
+          "denominator",
+          "ratio",
+          "factor",
+          "status",
+          "source",
+          "note",
+          "createdAt",
+          "decidedAt",
+          "decidedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "exDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "numerator": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "denominator": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ratio": {
+            "type": "string"
+          },
+          "factor": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "decidedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "csvAdjustedThrough": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "A split or bonus issue of an instrument (ADR 0017 §5). `kind`: split · bonus. `numerator:denominator` (`ratio`): for a split old shares : new shares (1:5 is one share into five), for a bonus\nbonus shares : shares held (1:1 is one bonus share for each held). `factor` is the price multiplier for the bars before `exDate` (a 1:5 split 0.2, a 1:1 bonus 0.5). `status`: suggested\n(found by the detection, changes nothing yet) · applied (adjusted reads use it) · ignored (declined, kept so it is not suggested again). `source`: manual · detected · csv.\n`decidedAt` and `decidedBy` are set once the owner decided (not while suggested). `csvAdjustedThrough`: the date the instrument's loaded CSV files reach (their last bar, in India time; null when\nnone is loaded). Those files are already adjusted at source, so an action with an ex-date on or before it would adjust their prices twice."
+      },
       "CreateAccountInput": {
         "required": [
           "name",
@@ -4034,6 +6271,640 @@
         },
         "description": "A new Dhan account. ClientId and Secrets (API key and secret) are required. ApiKeyIssuedOn is the day the API key was generated\n(default today, India time)."
       },
+      "CsvFileCounts": {
+        "required": [
+          "total",
+          "pending",
+          "loaded",
+          "changed",
+          "unmapped"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "loaded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "changed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unmapped": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The files by state over the whole folder (not narrowed by `state`, but by `q`), and how many cannot be loaded (`unmapped`: unknown, ambiguous or invalid name)."
+      },
+      "CsvFilePage": {
+        "required": [
+          "folder",
+          "folderExists",
+          "items",
+          "page",
+          "pageSize",
+          "total",
+          "counts"
+        ],
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string"
+          },
+          "folderExists": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CsvFileRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CsvFileCounts"
+          }
+        },
+        "description": "A page of the folder's files: changed and pending first, then loaded, by name; `total` is the number after the filters."
+      },
+      "CsvFilePreview": {
+        "required": [
+          "name",
+          "verdict",
+          "message",
+          "state",
+          "symbol",
+          "mapping",
+          "instrument",
+          "wouldLoad",
+          "rows",
+          "accepted",
+          "repaired",
+          "rejected",
+          "firstBar",
+          "lastBar",
+          "tradingDays",
+          "rejections",
+          "examples",
+          "firstRows",
+          "comparison"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mapping": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrument": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CsvInstrumentRef"
+              }
+            ]
+          },
+          "wouldLoad": {
+            "type": "boolean"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "accepted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repaired": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "tradingDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "firstRows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CsvPreviewBar"
+            }
+          },
+          "comparison": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CsvPreviewComparison"
+              }
+            ]
+          }
+        },
+        "description": "The dry run of the real reader over one file, nothing written. `verdict`: pass · refused · error (see `message`). `rows` are the data rows, `accepted` the ones that would be stored (`repaired` among them),\n`rejected` the others, counted by reason in `rejections` with up to 10 `examples` (line numbers and reasons, never row values). `tradingDays` counts the distinct India dates of the accepted bars.\n`wouldLoad`: passes and maps to exactly one instrument. `firstRows`: the first 5 accepted bars. `comparison` is null when the file does not pass or does not map."
+      },
+      "CsvFileRow": {
+        "required": [
+          "name",
+          "state",
+          "size",
+          "modifiedAt",
+          "symbol",
+          "mapping",
+          "instrument",
+          "rows",
+          "firstBar",
+          "lastBar",
+          "loadedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mapping": {
+            "type": "string"
+          },
+          "instrument": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CsvInstrumentRef"
+              }
+            ]
+          },
+          "rows": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "firstBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "loadedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "overlapsWith": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "One file of the CSV folder. `state`: pending · loaded · changed (loaded, but size or modified time differ now). `symbol` is parsed from the name (null for an invalid name),\n`mapping`: mapped · unknown · ambiguous · invalidName, `instrument` is set when mapped. `rows`, `firstBar`, `lastBar` (null for a file loaded before the range was recorded) and\n`loadedAt` are set for loaded and changed files. `overlapsWith` (loaded and changed files; null for pending ones): the names of the other loaded files of the same instrument that cover part\nof the same time — undoing either removes the instrument's CSV bars in the overlap, whichever file wrote them."
+      },
+      "CsvInstrumentRef": {
+        "required": [
+          "id",
+          "symbol"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        },
+        "description": "The instrument a file maps to: its id and canonical symbol (`NSE:ABB`)."
+      },
+      "CsvOverview": {
+        "required": [
+          "folder",
+          "folderExists",
+          "filesTotal",
+          "filesLoaded",
+          "filesPending",
+          "rows",
+          "lastLoadAt"
+        ],
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string"
+          },
+          "folderExists": {
+            "type": "boolean"
+          },
+          "filesTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesLoaded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesPending": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastLoadAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "The CSV folder: the files that match `&lt;SYMBOL&gt;_1m.csv[.gz]`, how many are loaded (unchanged since they were loaded) or pending, the rows loaded so far and when the last file was loaded."
+      },
+      "CsvPhase": {
+        "required": [
+          "status",
+          "startedAt",
+          "finishedAt",
+          "done",
+          "total",
+          "message",
+          "code",
+          "filesLoaded",
+          "filesUnchanged",
+          "filesSkipped",
+          "filesFailed",
+          "rows",
+          "inserted",
+          "updated",
+          "unchanged",
+          "keptDhan",
+          "repaired",
+          "rejected",
+          "rejections",
+          "rejectionExamples",
+          "unknownSymbols",
+          "ambiguousSymbols",
+          "failedFiles",
+          "instrumentsTracked"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filesLoaded": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "filesUnchanged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "filesSkipped": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "filesFailed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inserted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "keptDhan": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repaired": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "rejectionExamples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unknownSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ambiguousSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "instrumentsTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "barsRemoved": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "The CSV phase of a data job (ADR 0016 §4): `Done` of `Total` are files. Rows are counted over all files read in this job. Part of the API\n(the job's `csv` block) and stored with the job. `BarsRemoved` is set only by the job that undoes the load of one file (ADR 0017 §6): the CSV bars it removed (null for every other job)."
+      },
+      "CsvPreviewBar": {
+        "required": [
+          "time",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "open": {
+            "type": "number",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "format": "double"
+          },
+          "low": {
+            "type": "number",
+            "format": "double"
+          },
+          "close": {
+            "type": "number",
+            "format": "double"
+          },
+          "volume": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "An accepted bar, as the load would store it (after repair), with its start in India time."
+      },
+      "CsvPreviewComparison": {
+        "required": [
+          "wouldInsert",
+          "wouldUpdate",
+          "keepExistingDhan",
+          "unchanged",
+          "comparedRows",
+          "sampled"
+        ],
+        "type": "object",
+        "properties": {
+          "wouldInsert": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wouldUpdate": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "keepExistingDhan": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "comparedRows": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sampled": {
+            "type": "boolean"
+          }
+        },
+        "description": "What loading the file would do to the stored bars of its instrument, in bars: `wouldInsert` (minute not stored yet), `wouldUpdate` (a CSV bar of that minute with other values),\n`keepExistingDhan` (a Dhan bar of that minute is kept: CSV never overwrites Dhan) and `unchanged` (same values). Counted over `comparedRows` accepted rows; when the file has more\naccepted rows than the request may compare (`sampled`), a spread sample of whole batches is compared and the counts are of that sample, not scaled."
+      },
+      "CsvPreviewResult": {
+        "required": [
+          "files",
+          "rowsRead",
+          "comparedRows"
+        ],
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CsvFilePreview"
+            }
+          },
+          "rowsRead": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "comparedRows": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "The previews in the order the files were asked for; `rowsRead` and `comparedRows` are the totals of the request (its limits are in the summary of the endpoint)."
+      },
+      "DataAccountView": {
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "description": "The primary Data account. `status`: connected · expired · notConnected."
+      },
       "DataInput": {
         "required": [
           "liveFeedBudget"
@@ -4048,6 +6919,345 @@
             "format": "int32"
           }
         }
+      },
+      "DataInstrumentPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataInstrumentRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DataInstrumentRow": {
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "type",
+          "tracked",
+          "firstBar",
+          "lastBar",
+          "bars",
+          "source",
+          "status",
+          "daysBehind",
+          "openGaps"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "firstBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "daysBehind": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "openGaps": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "An instrument's coverage. `source`: csv · dhan · mixed (null without bars). `status`: current · behind · empty (tracked, no bars).\n`daysBehind` counts trading days (null without bars). `openGaps`: sessions in the last weeks with missing bars that a refetch may still add."
+      },
+      "DataJobView": {
+        "required": [
+          "id",
+          "status",
+          "requestedBy",
+          "startedAt",
+          "finishedAt",
+          "steps",
+          "forceCsv",
+          "rebuildAll",
+          "currentPhase",
+          "csv",
+          "dhan",
+          "aggregate",
+          "warnings",
+          "error",
+          "trigger",
+          "refetchGaps"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forceCsv": {
+            "type": "boolean"
+          },
+          "rebuildAll": {
+            "type": "boolean"
+          },
+          "currentPhase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "csv": {
+            "$ref": "#/components/schemas/CsvPhase"
+          },
+          "dhan": {
+            "$ref": "#/components/schemas/DhanPhase"
+          },
+          "aggregate": {
+            "$ref": "#/components/schemas/AggregatePhase"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "refetchGaps": {
+            "type": "boolean"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "quality": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QualityPhase"
+              }
+            ]
+          },
+          "csvFiles": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "undoCsvFile": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One data job (a run of the pipeline, ADR 0016). `status`: running · succeeded · failed · skipped (a scheduled run that did not start; `error` says why). `trigger`: manual · daily (the scheduled end-of-day run).\n`refetchGaps`: the Dhan phase also retried the gaps it had given up on. `currentPhase` (while running): csv · dhan · aggregate · quality. `instrumentId` is set when the job is\nabout one instrument (a fix action of the Data quality screen). `csvFiles`: the files the CSV step was asked to load (null: every file of the folder). `undoCsvFile`: the file whose load this job undoes\n(its `csv` block then reports `barsRemoved` and the message \"CSV load of … undone, N bars removed\"; the `aggregate` block rebuilds the instrument). `quality` is the data quality phase, present only when the job asked for the step (`runId` names its quality run).\nEach phase block has `status` (notRequested · pending · running · succeeded · skipped · failed), `done` of `total` (files, instruments,\ninstruments), `message` and `code` (why it was skipped or failed) and its counts."
+      },
+      "DataNotice": {
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "text",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "Something about the data pipeline the owner should know, derived from the stored state like the account notices of the bell. `id` includes the situation (a new failed\nrun or a changed number of open gaps is a new notice, hence unread again). `kind`: data_run_failed · data_gaps_open · data_quality_failed (instruments fail the data quality checks: warn within the allowed share, error when the gate blocks the nightly plan) · data_corporate_actions_pending (suggested splits or bonus issues wait for a decision; warn). `severity`: error · warn."
+      },
+      "DataNotices": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataNotice"
+            }
+          }
+        }
+      },
+      "DataOverview": {
+        "required": [
+          "csv",
+          "dhan",
+          "aggregates",
+          "bars",
+          "runningJob",
+          "lastJobs",
+          "nextHoliday",
+          "calendarProposals",
+          "gaps",
+          "eod"
+        ],
+        "type": "object",
+        "properties": {
+          "csv": {
+            "$ref": "#/components/schemas/CsvOverview"
+          },
+          "dhan": {
+            "$ref": "#/components/schemas/DhanOverview"
+          },
+          "aggregates": {
+            "$ref": "#/components/schemas/AggregatesOverview"
+          },
+          "bars": {
+            "$ref": "#/components/schemas/BarsOverview"
+          },
+          "runningJob": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          },
+          "lastJobs": {
+            "$ref": "#/components/schemas/LastDataJobs"
+          },
+          "nextHoliday": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CalendarDayView"
+              }
+            ]
+          },
+          "calendarProposals": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "gaps": {
+            "$ref": "#/components/schemas/GapsOverview"
+          },
+          "eod": {
+            "$ref": "#/components/schemas/EodOverview"
+          },
+          "pendingCorporateActions": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          }
+        },
+        "description": "Everything the Data &amp; import screen shows above the table: the three phases, the stored bars and the job in progress. `nextHoliday`: the first confirmed\nholiday of the trading calendar today or later (null when none is known); `calendarProposals`: how many calendar days wait for the owner to confirm or dismiss them;\n`gaps`: the sessions with missing bars by state; `eod`: the scheduled end-of-day run (switched on, time, next run, last automatic run);\n`pendingCorporateActions`: the suggested splits and bonus issues waiting for the owner (ADR 0017 §5)."
       },
       "DataRoleInput": {
         "required": [
@@ -4161,6 +7371,233 @@
           }
         }
       },
+      "DetectionResult": {
+        "required": [
+          "instruments",
+          "candidates",
+          "suggested",
+          "pending"
+        ],
+        "type": "object",
+        "properties": {
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "candidates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "suggested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What a detection run did: `instruments` looked at, `candidates` found, `suggested` new suggestions stored (the others were known already, ignored ones included) and `pending` suggestions now waiting."
+      },
+      "DhanOverview": {
+        "required": [
+          "account",
+          "canFetch",
+          "reason",
+          "reasonCode",
+          "initialDays",
+          "requestsPerSecond",
+          "lastFetchAt",
+          "lastFetchBars"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataAccountView"
+              }
+            ]
+          },
+          "canFetch": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initialDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestsPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastFetchAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastFetchBars": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "The Dhan Data API phase: the primary Data account (null when there is none), whether a fetch can run now (`canFetch`) and, when not, why\n(`reason` in words, `reasonCode` data.dhan_not_available · data.dhan_not_connected), the settings, and the last successful fetch (time and bars added)."
+      },
+      "DhanPhase": {
+        "required": [
+          "status",
+          "startedAt",
+          "finishedAt",
+          "done",
+          "total",
+          "message",
+          "code",
+          "accountName",
+          "instrumentsFetched",
+          "instrumentsFailed",
+          "requests",
+          "bars",
+          "inserted",
+          "updated",
+          "unchanged",
+          "repaired",
+          "rejected",
+          "overlapCompared",
+          "overlapMismatched",
+          "errors",
+          "gapsFound",
+          "gapsFilled",
+          "gapsUnfillable"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrumentsFetched": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "instrumentsFailed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inserted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repaired": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "overlapCompared": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "overlapMismatched": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "gapsFound": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gapsFilled": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gapsUnfillable": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "The Dhan phase of a data job (ADR 0016 §2, §7): `Done` of `Total` are instruments. `Bars` are the 1-minute bars Dhan returned;\n`Rejected` are bars that did not lie on an IST minute inside a session or broke the row rules; `OverlapCompared` and\n`OverlapMismatched` compare the overlap with the bars already stored (tolerance 0.05 %). `GapsFound` counts the instrument-sessions with missing bars\nthis phase planned to refetch or found still incomplete, `GapsFilled` those that now have all their bars and `GapsUnfillable` those a refetch added nothing to\n(ADR 0017 §3). Part of the API (the job's `dhan` block)."
+      },
       "DhanRedirectView": {
         "required": [
           "redirectUrl"
@@ -4172,6 +7609,82 @@
           }
         },
         "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
+      },
+      "EodOverview": {
+        "required": [
+          "enabled",
+          "timeIst",
+          "nextRunAt",
+          "lastRun"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "timeIst": {
+            "type": "string"
+          },
+          "nextRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastRun": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EodRunView"
+              }
+            ]
+          }
+        },
+        "description": "The scheduled end-of-day run (ADR 0017 §2): `enabled` (`Data:Eod:Enabled`), `timeIst` (`HH:mm`, India time), `nextRunAt` (the next trading day's run;\nnull when switched off) and `lastRun` (the latest automatic run, null before the first)."
+      },
+      "EodRunView": {
+        "required": [
+          "jobId",
+          "startedAt",
+          "finishedAt",
+          "status",
+          "trigger",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "An automatic (scheduled) run as the Data screen shows it. `status`: running · succeeded · failed · skipped; `message` is the reason a run failed or was skipped\n(for example the Data account was not connected). `trigger` is always `daily` here."
       },
       "FacetCount": {
         "required": [
@@ -4270,6 +7783,154 @@
           }
         },
         "description": "What a first import did. Status: \"imported\" (the holdings were created; the counts say how many), \"skipped\" (the account already has holdings, nothing was\nimported), \"deferred\" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or\n\"failed\" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example\n`portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those\namong them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists. Redated counts the lots that\nfollowed a changed first import date (imported lots still on the default date; they stay flagged as such), RedateSkipped the ones that could not follow\nbecause they were closed before the new date; both are 0 when the date did not change or the account has no holdings (ADR 0015)."
+      },
+      "FreshnessCheck": {
+        "required": [
+          "status",
+          "lastBar",
+          "expectedSession",
+          "daysBehind"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "expectedSession": {
+            "type": "string",
+            "format": "date"
+          },
+          "daysBehind": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Freshness against the trading calendar: the last bar and the last closed session; `daysBehind` counts trading days."
+      },
+      "GapPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GapRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "GapRow": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "date",
+          "expected",
+          "found",
+          "attempts",
+          "status",
+          "lastAttemptAt",
+          "detectedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "expected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "found": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "lastAttemptAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "A session of an instrument with missing 1-minute bars (ADR 0017 §3). `date` is the India date, `expected` the bars a complete session has (from the trading\ncalendar), `found` what is stored, `attempts` how often a refetch was made. `status`: open · filled · unfillable (a refetch added nothing).\n`lastAttemptAt` is the latest refetch (null before the first), `detectedAt` when the gap was found."
+      },
+      "GapsOverview": {
+        "required": [
+          "open",
+          "unfillable",
+          "filled",
+          "lastDetectedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unfillable": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filled": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastDetectedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "How many instrument-sessions are in each state (the Dhan phase's gap table): `open` (missing bars a refetch may still add), `unfillable` (a refetch added\nnothing), `filled`; `lastDetectedAt` is when a gap was last found (null while there never was one)."
       },
       "HoldingLots": {
         "required": [
@@ -4600,6 +8261,121 @@
           }
         }
       },
+      "ImportCorporateActionsResult": {
+        "required": [
+          "preview",
+          "lines",
+          "importable",
+          "imported",
+          "duplicates",
+          "invalid",
+          "unknownSymbols",
+          "errors"
+        ],
+        "type": "object",
+        "properties": {
+          "preview": {
+            "type": "boolean"
+          },
+          "lines": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "importable": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invalid": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unknownSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportLineError"
+            }
+          },
+          "adjustsCsvTwice": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "warnings": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/ImportLineWarning"
+            }
+          }
+        },
+        "description": "The outcome of a CSV import (or its preview). `lines`: data lines read; `importable`: new valid actions; `imported`: written (0 for a preview); `duplicates`: lines that repeat an action\nthat exists (any status) or an earlier line; `invalid`: lines with a problem (the first 50 in `errors`, among them lines that clash with an applied action of the other kind on the same day);\n`unknownSymbols`: symbols that match no listed instrument (never guessed). `adjustsCsvTwice`: how many of the importable lines have an ex-date on or before the date their instrument's loaded\nCSV files reach, listed in `warnings` (the first 50); an import (not a preview) with such lines needs `acknowledgeCsvAdjusted=true`, else 409 `data.csv_already_adjusted`."
+      },
+      "ImportLineError": {
+        "required": [
+          "line",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "A line of an imported text that could not be used, with the reason (no free text from the file is repeated)."
+      },
+      "ImportLineWarning": {
+        "required": [
+          "line",
+          "symbol",
+          "exDate",
+          "csvAdjustedThrough",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "exDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "csvAdjustedThrough": {
+            "type": "string",
+            "format": "date"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "A valid line whose ex-date is on or before the date the instrument's loaded CSV files reach (`csvAdjustedThrough`): importing it would adjust those already adjusted prices twice.\n`symbol` is the canonical symbol (`NSE:ABB`)."
+      },
       "ImportPreview": {
         "required": [
           "defaultDate",
@@ -4642,6 +8418,48 @@
           }
         },
         "description": "One holding to import (a key from the preview). AcquiredOn left out means \"use the first import date\" (the lot is then flagged)."
+      },
+      "InstrumentBars": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "timeframe",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timeframe": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BarRow"
+            }
+          },
+          "adjustment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AdjustmentView"
+              }
+            ]
+          }
+        },
+        "description": "The latest bars of an instrument and timeframe, newest first. `adjustment` is set only when the read asked for adjusted prices (`adjusted=true`): the bars then have the open, high, low and close multiplied by\nthe cumulative factor of the corporate actions applied after their date, rounded to 4 decimals, and the volume divided by it; the block says which actions and what factor (see AdjustmentView)."
       },
       "InstrumentBasketView": {
         "required": [
@@ -5076,6 +8894,47 @@
           }
         }
       },
+      "LastDataJobs": {
+        "required": [
+          "csv",
+          "dhan",
+          "aggregate"
+        ],
+        "type": "object",
+        "properties": {
+          "csv": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          },
+          "dhan": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          },
+          "aggregate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          }
+        },
+        "description": "The latest job in which each phase ran to an end (null when none did yet)."
+      },
       "LoginRequest": {
         "required": [
           "email",
@@ -5190,6 +9049,39 @@
           }
         },
         "description": "Every member of the basket exactly once, in the wanted order."
+      },
+      "MissingMinute": {
+        "required": [
+          "date",
+          "time"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "time": {
+            "type": "string"
+          }
+        },
+        "description": "A missing minute: the India date and the minute (`HH:mm`)."
+      },
+      "OfficialDailyCheck": {
+        "required": [
+          "status",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "description": "The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched."
       },
       "PortfolioInput": {
         "required": [
@@ -5309,6 +9201,24 @@
           }
         },
         "description": "Portfolio configuration. DefaultBucket is the name of the bucket imports go to (the account's own default bucket unless a custom bucket was chosen);\nAutoBucketName is the name of the account's own default bucket (\"{account name} · Portfolio\") — the one that exists, or, while the account has none yet,\nthe name it would get now (with a numeric suffix when the plain name is taken); it is chosen for real when the role is switched on.\nThe holdings refresh by themselves according to RefreshMode: \"off\" (default) or \"daily\" (once a day from RefreshDailyTimeIst, \"HH:mm\" India time, default 16:00;\nthe time is kept while the mode is off). FirstImportDate is the date holdings get when they are imported for the first time without a date of their own\n(2025-01-01 until the owner chooses another). HasHoldings is true once the account has any holding; the first import has happened then and\nFirstImportDate no longer affects existing holdings (ADR 0013)."
+      },
+      "PreviewCsvFilesRequest": {
+        "required": [
+          "files"
+        ],
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The files to preview: names from the folder listing, at most int PreviewCsvFilesHandler.MaxFiles."
       },
       "PreviewRow": {
         "required": [
@@ -5436,6 +9346,801 @@
             "format": "int32"
           }
         }
+      },
+      "QualityBucketRow": {
+        "required": [
+          "timeframe",
+          "ts",
+          "stored",
+          "recomputed",
+          "differs",
+          "fields"
+        ],
+        "type": "object",
+        "properties": {
+          "timeframe": {
+            "type": "string"
+          },
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "stored": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QualityBucketValues"
+              }
+            ]
+          },
+          "recomputed": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QualityBucketValues"
+              }
+            ]
+          },
+          "differs": {
+            "type": "boolean"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "A bucket stored and recomputed side by side; `fields` name what differs (open, high, low, close, volume, bars) or `missing` / `unexpected`; `stored` or `recomputed` is null when there is none."
+      },
+      "QualityBucketValues": {
+        "required": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "bars"
+        ],
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "number",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "format": "double"
+          },
+          "low": {
+            "type": "number",
+            "format": "double"
+          },
+          "close": {
+            "type": "number",
+            "format": "double"
+          },
+          "volume": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The values of a bucket: open, high, low, close, volume and the number of 1-minute bars in it."
+      },
+      "QualityBuckets": {
+        "required": [
+          "computedAt",
+          "total",
+          "differences",
+          "truncated",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "computedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "differences": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityBucketRow"
+            }
+          }
+        },
+        "description": "The stored and the recomputed buckets of the window, computed when asked (`computedAt`), so they show the state now, whatever the last run saw. `total` and `differences` count all buckets of the\nrequest's timeframe filter; `items` are cut at 2000 (`truncated`); with `differencesOnly` only the differing ones are listed."
+      },
+      "QualityCheckResults": {
+        "required": [
+          "completeness",
+          "sanity",
+          "spikes",
+          "aggregates",
+          "freshness",
+          "officialDaily"
+        ],
+        "type": "object",
+        "properties": {
+          "completeness": {
+            "$ref": "#/components/schemas/CompletenessCheck"
+          },
+          "sanity": {
+            "$ref": "#/components/schemas/SanityCheck"
+          },
+          "spikes": {
+            "$ref": "#/components/schemas/SpikeCheck"
+          },
+          "aggregates": {
+            "$ref": "#/components/schemas/AggregatesCheck"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessCheck"
+          },
+          "officialDaily": {
+            "$ref": "#/components/schemas/OfficialDailyCheck"
+          }
+        },
+        "description": "The checks of one instrument as the last run found them (without the long lists, which the detail gives separately)."
+      },
+      "QualityCheckStatuses": {
+        "required": [
+          "completeness",
+          "sanity",
+          "spikes",
+          "aggregates",
+          "freshness",
+          "officialDaily"
+        ],
+        "type": "object",
+        "properties": {
+          "completeness": {
+            "type": "string"
+          },
+          "sanity": {
+            "type": "string"
+          },
+          "spikes": {
+            "type": "string"
+          },
+          "aggregates": {
+            "type": "string"
+          },
+          "freshness": {
+            "type": "string"
+          },
+          "officialDaily": {
+            "type": "string"
+          }
+        },
+        "description": "The status of each check of an instrument: pass · warning · fail · notAvailable (`officialDaily`)."
+      },
+      "QualityCounts": {
+        "required": [
+          "tracked",
+          "checked",
+          "passed",
+          "warned",
+          "failed",
+          "notChecked",
+          "score"
+        ],
+        "type": "object",
+        "properties": {
+          "tracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "checked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notChecked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The current results over the tracked instruments that have bars: how many there are (`tracked`), how many were `checked` (have a result), the counts by result, `notChecked`, and the mean score\nof the results (null before the first run). The current result of an instrument is the one of the latest run that checked it."
+      },
+      "QualityGateView": {
+        "required": [
+          "ok",
+          "blocked",
+          "reasons",
+          "checkedInstruments",
+          "failedInstruments",
+          "failedPercent",
+          "maxFailedPercent",
+          "lastRunAt"
+        ],
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "blocked": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "checkedInstruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failedInstruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failedPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxFailedPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "lastRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "The gate for the nightly plan (fail-closed). `blocked`: no run yet, the last run over every instrument failed, or more than `maxFailedPercent` of the checked instruments fail;\n`ok`: not blocked and no instrument fails; `reasons` says why it is not ok. Instruments that fail individually are skipped by the scan whatever the gate says."
+      },
+      "QualityInstrumentDetail": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "type",
+          "tracked",
+          "source",
+          "firstBar",
+          "lastBar",
+          "status",
+          "score",
+          "barsChecked",
+          "runId",
+          "checkedAt",
+          "checks",
+          "missing",
+          "buckets"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "firstBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "score": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "barsChecked": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "checkedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "checks": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QualityCheckResults"
+              }
+            ]
+          },
+          "missing": {
+            "$ref": "#/components/schemas/QualityMissing"
+          },
+          "buckets": {
+            "$ref": "#/components/schemas/QualityBuckets"
+          }
+        },
+        "description": "One instrument's quality: the current result (`status` pass · warning · fail · notChecked, `score`, `checks` from the run `runId` at `checkedAt`), the missing minutes of that run\nand the stored-vs-recomputed buckets as they are now."
+      },
+      "QualityInstrumentPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualityInstrumentRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "QualityInstrumentRow": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "type",
+          "status",
+          "score",
+          "coverage",
+          "barsChecked",
+          "missingMinutes",
+          "checks",
+          "aggregates",
+          "issues",
+          "source",
+          "checkedAt",
+          "runId"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "score": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "coverage": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "barsChecked": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "missingMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "checks": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QualityCheckStatuses"
+              }
+            ]
+          },
+          "aggregates": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "checkedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "An instrument in the quality table. `status`: pass · warning · fail · notChecked (never checked). `coverage` is the share of the expected minutes that are stored (percent); `aggregates` gives the status\nof each timeframe (5m … 1M); `checks` the status of each check; `issues` says in words what is wrong; `source`: csv · dhan · mixed."
+      },
+      "QualityMissing": {
+        "required": [
+          "total",
+          "truncated",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MissingMinute"
+            }
+          }
+        },
+        "description": "The missing minutes of the window: `total` of them, and the first `items` (at most 500; `truncated` when there are more)."
+      },
+      "QualityOverview": {
+        "required": [
+          "lastRun",
+          "counts",
+          "gate",
+          "window",
+          "spikeMultiple",
+          "maxMissingPercent"
+        ],
+        "type": "object",
+        "properties": {
+          "lastRun": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/QualityRunView"
+              }
+            ]
+          },
+          "counts": {
+            "$ref": "#/components/schemas/QualityCounts"
+          },
+          "gate": {
+            "$ref": "#/components/schemas/QualityGateView"
+          },
+          "window": {
+            "$ref": "#/components/schemas/QualityWindowView"
+          },
+          "spikeMultiple": {
+            "type": "number",
+            "format": "double"
+          },
+          "maxMissingPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "pendingCorporateActions": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          }
+        },
+        "description": "What the Data quality screen shows above the table: `lastRun` (the latest run over every instrument, null before the first), the `counts` of the current results with the mean `score`,\nthe `gate`, the `window`, the limits in force (`spikeMultiple`, `maxMissingPercent`) and `pendingCorporateActions`: the suggested splits and bonus issues waiting for the owner (ADR 0017 §5)."
+      },
+      "QualityPhase": {
+        "required": [
+          "status",
+          "startedAt",
+          "finishedAt",
+          "done",
+          "total",
+          "message",
+          "code",
+          "runId",
+          "passed",
+          "warned",
+          "failed"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "runId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warned": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "The quality phase of a data job (P1-14a): `Done` of `Total` are instruments checked. `RunId` is the quality run it recorded\n(`/api/data/quality/runs`); `Passed`, `Warned` and `Failed` count the instruments by result so far. Part of the API (the job's\n`quality` block, present only when the job asked for the step)."
+      },
+      "QualityRunView": {
+        "required": [
+          "id",
+          "trigger",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "sessions",
+          "instruments",
+          "passed",
+          "warned",
+          "failed",
+          "score",
+          "error",
+          "instrumentId",
+          "jobId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "passed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "warned": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "score": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "jobId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "One run of the data quality checks. `trigger`: manual · daily (the scheduled end-of-day run) · after_job (a data job the owner started with the quality step). `status`: running · succeeded · failed.\n`instruments` is how many the run checks, `passed`, `warned` and `failed` how many it has checked so far with that result; `score` is the mean (0–100, once it ended).\n`instrumentId` is set when the run checked one instrument only (a fix action); `jobId` is the data job it belongs to."
+      },
+      "QualityWindowView": {
+        "required": [
+          "sessions",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The window of the checks: how many closed sessions, from which date to which (the ones a run started now would look at)."
       },
       "RefreshRunView": {
         "required": [
@@ -6094,6 +10799,35 @@
           }
         }
       },
+      "SanityCheck": {
+        "required": [
+          "status",
+          "barsChecked",
+          "badBars",
+          "examples"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "barsChecked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "badBars": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BadBar"
+            }
+          }
+        },
+        "description": "Bar sanity: low ≤ open and close ≤ high, prices positive and finite, volume not negative. `examples` holds the first few bad bars."
+      },
       "SecretStatusView": {
         "required": [
           "name",
@@ -6173,6 +10907,38 @@
           }
         }
       },
+      "SessionCompleteness": {
+        "required": [
+          "date",
+          "expected",
+          "found",
+          "missing",
+          "unfillable"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "expected": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "found": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "missing": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unfillable": {
+            "type": "boolean"
+          }
+        },
+        "description": "One trading session of the window as completeness sees it: the minutes the calendar expects, the ones stored, and whether a refetch already proved the day unfillable (`bar_gaps`)."
+      },
       "SessionInfo": {
         "required": [
           "user",
@@ -6210,6 +10976,116 @@
           }
         },
         "description": "What the client needs to know about its session."
+      },
+      "SpikeCheck": {
+        "required": [
+          "status",
+          "spikes",
+          "largeMoves",
+          "medianMovePercent",
+          "thresholdPercent",
+          "examples"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "spikes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "largeMoves": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "medianMovePercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "thresholdPercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "examples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpikeExample"
+            }
+          }
+        },
+        "description": "Spikes: a 1-minute move greater than `spikeMultiple` times the median move and greater than 1 %. One the next bar takes back (at least half) is a spike (a warning); one that is not\ntaken back is a `largeMove`, a real jump, only reported. `thresholdPercent` is the move a bar needed to count."
+      },
+      "SpikeExample": {
+        "required": [
+          "ts",
+          "movePercent",
+          "reversed"
+        ],
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "movePercent": {
+            "type": "number",
+            "format": "double"
+          },
+          "reversed": {
+            "type": "boolean"
+          }
+        },
+        "description": "A close-to-close move that was far above the median: `movePercent` is signed; `reversed` says the next bar took at least half of it back (a bad tick, not a real move)."
+      },
+      "StartDataJobRequest": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "forceCsv": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "refetchGaps": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "csvFiles": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Starts a data job. `steps`: any of csv · dhan · aggregate · quality (default csv, dhan and aggregate; always run in that order); `forceCsv` loads CSV files again that were loaded already\nand have not changed; `refetchGaps` makes the Dhan phase also retry the sessions it gave up on (status `unfillable`); `csvFiles` (at most 214 names from the CSV folder, only with the csv step) loads only\nthose files, still skipping the ones that are unchanged unless `forceCsv` — a name the folder does not have, or a list that is empty, is `data.invalid` (400)."
+      },
+      "StartQualityRunRequest": {
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "The body of \"Run checks\": the one instrument to check (null: every tracked instrument with bars)."
       },
       "StartRefreshRequest": {
         "type": "object",
@@ -6424,6 +11300,53 @@
             "format": "date-time"
           }
         }
+      },
+      "TimeframeCheck": {
+        "required": [
+          "status",
+          "compared",
+          "differences"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "compared": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "differences": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The aggregates of one timeframe compared with the recomputed ones: `compared` buckets (stored or recomputed), `differences` among them."
+      },
+      "TimeframeStat": {
+        "required": [
+          "timeframe",
+          "bars",
+          "lastBucket"
+        ],
+        "type": "object",
+        "properties": {
+          "timeframe": {
+            "type": "string"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastBucket": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "A derived timeframe (`5m 10m 15m 30m 1h 1D 1W 1M`): the bars stored and the start of the newest one."
       },
       "TrackResult": {
         "required": [
@@ -6824,6 +11747,57 @@
         },
         "description": "What an untrack call did: `untracked` were tracked, `notTracked` were not (nothing to do). `totalTracked` is the number tracked now."
       },
+      "UpdateCorporateActionRequest": {
+        "required": [
+          "exDate",
+          "kind",
+          "numerator",
+          "denominator",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "exDate": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "numerator": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "denominator": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "acknowledgeCsvAdjusted": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "Changes an action and makes it applied (confirming a suggestion, bringing back an ignored one). Every field is optional and keeps its current value when left out (an empty body confirms as it is);\n`note` left out keeps the note, an empty text clears it. `acknowledgeCsvAdjusted` as when adding: needed when the result is applied with an ex-date on or before `csvAdjustedThrough`."
+      },
       "UpdateSecretsInput": {
         "required": [
           "apiKey",
@@ -6898,6 +11872,15 @@
     },
     {
       "name": "Holdings"
+    },
+    {
+      "name": "Data"
+    },
+    {
+      "name": "Data quality"
+    },
+    {
+      "name": "Corporate actions"
     }
   ]
 }

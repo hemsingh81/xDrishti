@@ -39,8 +39,9 @@ function PortfolioContent() {
 
 /**
  * The Portfolio screen. From `md` up it fills the viewport under the top bar: the header, filters, totals and sync bar
- * stay put, the holdings scroll inside their own card and the pagination footer stays at the bottom. Account, bucket,
- * status, search, sort, page and the open holding live in the URL.
+ * stay put, the holdings scroll inside their own card (further pages load as the end comes into view) and the
+ * "Showing N of total" footer stays at the bottom. Account, bucket, status, search, sort and the open holding live in
+ * the URL.
  */
 export function PortfolioPage() {
   return (

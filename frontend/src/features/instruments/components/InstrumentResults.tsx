@@ -1,14 +1,15 @@
 import { Card, Divider } from '@mui/material';
-import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import type { InstrumentPage, InstrumentSummary } from '@/shared/api';
+import type { InstrumentSummary } from '@/shared/api';
+import type { InfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { Grid, type GridSort } from '@/shared/ui/grid';
-import { isSortField, pageSizes, type InstrumentFilters } from '../lib/filters';
+import { searchParamsOf } from '../api/instrumentsQueries';
+import { isSortField, type InstrumentFilters } from '../lib/filters';
 import { problemText } from '../lib/errors';
 import { columnsFor } from './instrumentColumns';
 
 interface InstrumentResultsProps {
-  result: UseQueryResult<InstrumentPage>;
+  result: InfiniteRows<InstrumentSummary>;
   filters: InstrumentFilters;
   openId: string | null;
   selectedIds: ReadonlySet<string>;
@@ -24,7 +25,8 @@ interface InstrumentResultsProps {
 const getRowId = (item: InstrumentSummary) => item.id;
 const getRowLabel = (item: InstrumentSummary) => item.symbol;
 
-/** The results card: fills the space under the filters; the list scrolls inside it between the toolbar and the footer. */
+/** The results card: fills the space under the filters; the list scrolls inside it between the toolbar and the footer and
+ * loads further pages as the end comes into view. */
 export function InstrumentResults({
   result,
   filters,
@@ -36,8 +38,7 @@ export function InstrumentResults({
   onChange,
   onOpen,
 }: InstrumentResultsProps) {
-  const { data, isPending, isError, isPlaceholderData, error } = result;
-  const failed = isError && !data;
+  const { rows, isPending, isError, isPlaceholderData, error, loadMoreError } = result;
   const sort: GridSort = { columnId: filters.sort.field, descending: filters.sort.descending };
 
   return (
@@ -47,7 +48,7 @@ export function InstrumentResults({
       <Grid
         label={filters.tab === 'tracked' ? 'Tracked instruments' : 'Instruments'}
         columns={columnsFor(filters.tab)}
-        rows={data?.items ?? []}
+        rows={rows}
         getRowId={getRowId}
         getRowLabel={getRowLabel}
         selectedIds={selectedIds}
@@ -61,26 +62,17 @@ export function InstrumentResults({
         }}
         activeRowId={openId}
         loading={isPending || isPlaceholderData}
-        error={failed ? problemText(error, 'The instruments could not be loaded.') : null}
-        onRetry={() => {
-          void result.refetch();
+        error={isError ? problemText(error, 'The instruments could not be loaded.') : null}
+        onRetry={result.refetch}
+        resetKey={JSON.stringify(searchParamsOf(filters))}
+        infinite={{
+          total: result.total,
+          hasMore: result.hasMore,
+          loadingMore: result.isFetchingNextPage,
+          onLoadMore: result.loadMore,
+          error: loadMoreError ? problemText(loadMoreError, 'The next instruments could not be loaded.') : null,
+          onRetryMore: result.retryMore,
         }}
-        pagination={
-          failed
-            ? undefined
-            : {
-                page: filters.page,
-                pageSize: filters.pageSize,
-                pageSizeOptions: pageSizes,
-                total: data?.total ?? 0,
-                onPageChange: (page) => {
-                  onChange({ page });
-                },
-                onPageSizeChange: (pageSize) => {
-                  onChange({ pageSize });
-                },
-              }
-        }
         emptyState={emptyState}
       />
     </Card>

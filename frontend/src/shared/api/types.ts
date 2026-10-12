@@ -81,3 +81,94 @@ export type TransferInput = Schemas['TransferInput'];
 export type TransferResult = Schemas['TransferResult'];
 /** A basket that holds an instrument now. */
 export type InstrumentBasket = Schemas['InstrumentBasketView'];
+
+/** Data & import: what is stored, the pipeline (CSV → Dhan → aggregates) and the job in progress. */
+export type DataOverview = Schemas['DataOverview'];
+export type CsvOverview = Schemas['CsvOverview'];
+export type DhanOverview = Schemas['DhanOverview'];
+export type AggregatesOverview = Schemas['AggregatesOverview'];
+/** The stored 1-minute bars: instruments, first and last bar (the last tick), how far behind. */
+export type BarsOverview = Schemas['BarsOverview'];
+export type DataCoveragePage = Schemas['DataInstrumentPage'];
+export type DataCoverageRow = Schemas['DataInstrumentRow'];
+/** One run of the pipeline with a block per phase. */
+export type DataJob = Schemas['DataJobView'];
+export type CsvPhase = Schemas['CsvPhase'];
+/** The CSV folder's files (P1-07a): one page, a file's row with state and mapping, the counts by state. */
+export type CsvFilePage = Schemas['CsvFilePage'];
+export type CsvFileRow = Schemas['CsvFileRow'];
+export type CsvFileCounts = Schemas['CsvFileCounts'];
+export type CsvInstrumentRef = Schemas['CsvInstrumentRef'];
+/** The dry run over some files: a verdict per file, the first rows and what loading would do to the stored bars. */
+export type CsvPreviewResult = Schemas['CsvPreviewResult'];
+export type CsvFilePreview = Schemas['CsvFilePreview'];
+export type CsvPreviewBar = Schemas['CsvPreviewBar'];
+export type CsvPreviewComparison = Schemas['CsvPreviewComparison'];
+export type DhanPhase = Schemas['DhanPhase'];
+export type AggregatePhase = Schemas['AggregatePhase'];
+export type TimeframeStat = Schemas['TimeframeStat'];
+/** The latest bars of an instrument and timeframe, newest first. */
+export type InstrumentBars = Schemas['InstrumentBars'];
+export type BarRow = Schemas['BarRow'];
+export type StartDataJobInput = Schemas['StartDataJobRequest'];
+/** What an adjusted bars read applied (null for raw prices): the number of actions, the cumulative factor and the actions. */
+export type BarsAdjustment = Schemas['AdjustmentView'];
+export type BarsAdjustmentAction = Schemas['AdjustmentActionView'];
+
+/** Corporate actions (P1-10a): a split or bonus issue, status suggested · applied · ignored, source manual · detected · csv. */
+export type CorporateAction = Schemas['CorporateActionView'];
+export type CorporateActionPage = Schemas['CorporateActionPage'];
+export type CorporateActionInput = Schemas['AddCorporateActionRequest'];
+/** A partial change: `{}` confirms a suggestion as it is; the result is always applied. */
+export type CorporateActionUpdate = Schemas['UpdateCorporateActionRequest'];
+/** What a detection run did: instruments looked at, candidates found, new suggestions, suggestions waiting now. */
+export type DetectionResult = Schemas['DetectionResult'];
+/** The outcome of a CSV import or its preview: counts, unknown symbols and the first line errors. */
+export type ActionsImportResult = Schemas['ImportCorporateActionsResult'];
+export type ImportLineError = Schemas['ImportLineError'];
+/** An importable line whose ex-date is on or before the date its instrument's loaded CSV files reach. */
+export type ImportLineWarning = Schemas['ImportLineWarning'];
+
+/** The trading calendar: confirmed holidays and special sessions, proposals waiting for the owner, the next holiday. */
+export type CalendarView = Schemas['CalendarView'];
+/** A date of the calendar: kind holiday | special, source manual | observed | nse, status confirmed | proposed. */
+export type CalendarDay = Schemas['CalendarDayView'];
+export type CalendarDayInput = Schemas['AddCalendarDayRequest'];
+/** What a refresh from NSE's holiday list did (never an error: `succeeded` false says why in `message`). */
+export type CalendarRefreshResult = Schemas['CalendarRefreshResult'];
+
+/** The scheduled end-of-day run: switched on, time (IST), next run and the latest automatic run. */
+export type EodOverview = Schemas['EodOverview'];
+/** An automatic run: status running | succeeded | failed | skipped, with the reason of a failure or skip in `message`. */
+export type EodRun = Schemas['EodRunView'];
+/** Sessions with missing 1-minute bars by state: open, unfillable, filled. */
+export type GapsOverview = Schemas['GapsOverview'];
+export type GapRow = Schemas['GapRow'];
+export type GapPage = Schemas['GapPage'];
+/** What the owner should know about the data (a failed scheduled run, open gaps), for the notification bell. */
+export type DataNotice = Schemas['DataNotice'];
+export type DataNotices = Schemas['DataNotices'];
+
+/** Data quality (P1-14a): the checks over the last sessions of every tracked instrument with bars. */
+export type QualityOverview = Schemas['QualityOverview'];
+export type QualityCounts = Schemas['QualityCounts'];
+/** The fail-closed gate for the nightly plan: blocked or ok, with the reasons in words. */
+export type QualityGate = Schemas['QualityGateView'];
+/** One run of the checks: trigger manual · daily · after_job, status running · succeeded · failed. */
+export type QualityRun = Schemas['QualityRunView'];
+/** The quality block of a data job: instruments checked so far and the counts by result. */
+export type QualityPhase = Schemas['QualityPhase'];
+export type QualityInstrumentPage = Schemas['QualityInstrumentPage'];
+export type QualityInstrumentRow = Schemas['QualityInstrumentRow'];
+export type QualityInstrumentDetail = Schemas['QualityInstrumentDetail'];
+export type QualityCheckResults = Schemas['QualityCheckResults'];
+export type QualityBucketRow = Schemas['QualityBucketRow'];
+export type QualityBucketValues = Schemas['QualityBucketValues'];
+export type QualityBuckets = Schemas['QualityBuckets'];
+export type QualityMissing = Schemas['QualityMissing'];
+export type CompletenessCheck = Schemas['CompletenessCheck'];
+export type SanityCheck = Schemas['SanityCheck'];
+export type SpikeCheck = Schemas['SpikeCheck'];
+export type AggregatesCheck = Schemas['AggregatesCheck'];
+export type FreshnessCheck = Schemas['FreshnessCheck'];
+export type OfficialDailyCheck = Schemas['OfficialDailyCheck'];

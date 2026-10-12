@@ -5,8 +5,7 @@ import { emptyFilters, parseFilters, toParams, type InstrumentFilters } from '..
 type Patch = Partial<InstrumentFilters>;
 
 /**
- * The page state (search, filters, sort, page, open instrument) kept in the URL. Changing a filter returns to page 1;
- * typing replaces the history entry, every other change adds one so Back steps through the views.
+ * The page state (search, filters, sort, open instrument) kept in the URL. Typing replaces the history entry, every other change adds one so Back steps through the views.
  */
 export function useInstrumentFilters() {
   const [params, setParams] = useSearchParams();
@@ -18,8 +17,7 @@ export function useInstrumentFilters() {
       setParams(
         (previous) => {
           const current = parseFilters(previous);
-          const next = toParams({ ...current, page: 1, ...patch }, previous);
-          return next;
+          return toParams({ ...current, ...patch }, previous);
         },
         { replace: options.replace ?? false },
       );
@@ -28,8 +26,8 @@ export function useInstrumentFilters() {
   );
 
   const clear = useCallback(() => {
-    update({ ...emptyFilters, tab: filters.tab, sort: filters.sort, pageSize: filters.pageSize });
-  }, [update, filters.tab, filters.sort, filters.pageSize]);
+    update({ ...emptyFilters, tab: filters.tab, sort: filters.sort });
+  }, [update, filters.tab, filters.sort]);
 
   const open = useCallback(
     (id: string | null) => {

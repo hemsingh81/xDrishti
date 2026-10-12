@@ -14,6 +14,7 @@ const rupeesPrecise = new Intl.NumberFormat('en-IN', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+const price = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percent = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 // Broker token expiries are defined in India time (Dhan: 24 h after sign-in), so they are shown in IST whatever the viewer's zone.
@@ -25,6 +26,26 @@ const istTimeAndDay = new Intl.DateTimeFormat('en-IN', {
   day: 'numeric',
   month: 'short',
 });
+
+const istWeekdayDayTime = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+// Market data is stamped in India time: a bar of 15:29 is 15:29 whatever the viewer's zone.
+const istDateTime = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  hourCycle: 'h23',
+});
+const istDate = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' });
+const compact = new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 });
 
 // en-CA formats as yyyy-MM-dd.
 const istDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -43,8 +64,30 @@ export function formatDate(value: string): string {
   return isoDay.test(value) ? calendarDate.format(new Date(`${value}T00:00:00Z`)) : date.format(new Date(value));
 }
 
+const calendarWeekday = new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' });
+
+/** "Tue 20 Oct 2026": a calendar date (yyyy-MM-dd) with its weekday. */
+export function formatWeekdayDate(value: string): string {
+  return `${calendarWeekday.format(new Date(`${value}T00:00:00Z`))} ${formatDate(value)}`;
+}
+
 export function formatNumber(value: number): string {
   return decimal.format(value);
+}
+
+/** Large counts in short form with Indian units: 41234567 -> "4.1Cr", 8234 -> "8.2K". */
+export function formatCompact(value: number): string {
+  return compact.format(value);
+}
+
+/** "12 Oct 2026, 15:29 IST": a moment in India time, whatever the viewer's zone. */
+export function formatIstDateTime(value: string | Date): string {
+  return `${istDateTime.format(typeof value === 'string' ? new Date(value) : value)} IST`;
+}
+
+/** "12 Oct 2026": the calendar day of a moment in India time. */
+export function formatIstDate(value: string | Date): string {
+  return istDate.format(typeof value === 'string' ? new Date(value) : value);
 }
 
 /** Indian rupees with lakh/crore grouping: 200000 -> "₹2,00,000". */
@@ -55,6 +98,11 @@ export function formatInr(value: number): string {
 /** Indian rupees with paise, for prices and unit costs: 2456.3 -> "₹2,456.30". */
 export function formatInrPrecise(value: number): string {
   return rupeesPrecise.format(value);
+}
+
+/** A price with two decimals and no currency sign, for tables of bars: 2456.3 -> "2,456.30". */
+export function formatPrice(value: number): string {
+  return price.format(value);
 }
 
 /** A percentage with two decimals and Indian grouping: 16.1 -> "16.10". The caller adds the sign and the % sign. */
@@ -89,6 +137,14 @@ export function formatIstTimeAndDay(value: string | Date): string {
   const parts = istTimeAndDay.formatToParts(typeof value === 'string' ? new Date(value) : value);
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('hour')}:${part('minute')}, ${part('day')} ${part('month')}`;
+}
+
+/** "Tue 13 Oct 15:50" (`weekday` false: "13 Oct 15:50") — a moment in India time, for schedules and last runs. */
+export function formatIstDayAndTime(value: string | Date, { weekday = true }: { weekday?: boolean } = {}): string {
+  const parts = istWeekdayDayTime.formatToParts(typeof value === 'string' ? new Date(value) : value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  const day = `${part('day')} ${part('month')} ${part('hour')}:${part('minute')}`;
+  return weekday ? `${part('weekday')} ${day}` : day;
 }
 
 /** A wait in words, rounded up to the minute: "1 h 20 min", "45 min", "2 h"; under a minute "less than a minute". */

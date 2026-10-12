@@ -1,8 +1,12 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query';
-import { api, queryRoots, unwrap } from '@/shared/api';
+import { queryOptions } from '@tanstack/react-query';
+import { api, queryRoots, unwrap, type InstrumentSummary } from '@/shared/api';
+import { defaultInfinitePageSize, type InfiniteRowsOptions } from '@/shared/lib/useInfiniteRows';
 import { formatSort, type InstrumentFilters } from '../lib/filters';
 
-/** Query keys: ['instruments', resource, …]. Invalidate `instrumentsKeys.lists` to reload search results and counts. */
+/**
+ * Query keys: ['instruments', resource, …]. Invalidate `instrumentsKeys.search` to reload the search results (the list
+ * and the pages "select all N results" reads); `facets` for the counts.
+ */
 export const instrumentsKeys = {
   all: queryRoots.instruments,
   search: ['instruments', 'search'] as const,
@@ -12,7 +16,7 @@ export const instrumentsKeys = {
   refreshStatus: ['instruments', 'refresh', 'status'] as const,
 };
 
-/** The API parameters for a page state; defaults are left out. */
+/** The API parameters for a page state (without the page); defaults are left out. */
 export function searchParamsOf(f: InstrumentFilters) {
   const tracked = f.tab === 'tracked' ? true : f.untracked ? false : undefined;
   return {
@@ -26,18 +30,32 @@ export function searchParamsOf(f: InstrumentFilters) {
     includeRetired: (f.tab === 'master' && f.includeRetired) || undefined,
     tracked,
     sort: formatSort(f.sort),
-    page: f.page,
-    pageSize: f.pageSize,
   };
 }
 
-export const searchQuery = (filters: InstrumentFilters) => {
+/** The API maximum; the list and "select all N results" read pages of this size. */
+export const searchPageSize = defaultInfinitePageSize;
+
+const getRowId = (item: InstrumentSummary) => item.id;
+
+/** The list the grid shows: pages of 100 loaded as the owner scrolls (see `useInfiniteRows`). */
+export const searchList = (filters: InstrumentFilters): InfiniteRowsOptions<InstrumentSummary> => {
   const query = searchParamsOf(filters);
+  return {
+    queryKey: [...instrumentsKeys.search, 'list', query],
+    pageSize: searchPageSize,
+    getRowId,
+    fetchPage: async (page, { pageSize, signal }) =>
+      unwrap(await api.GET('/api/instruments', { params: { query: { ...query, page, pageSize } }, signal })),
+  };
+};
+
+/** One page, read through the query cache ("select all N results" reads every page of a filter). */
+export const searchPageQuery = (filters: InstrumentFilters, page: number) => {
+  const query = { ...searchParamsOf(filters), page, pageSize: searchPageSize };
   return queryOptions({
-    queryKey: [...instrumentsKeys.search, query] as const,
+    queryKey: [...instrumentsKeys.search, 'page', query] as const,
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/instruments', { params: { query }, signal })),
-    // While the next page or filter loads, keep showing the old rows instead of a blank table.
-    placeholderData: keepPreviousData,
   });
 };
 

@@ -125,7 +125,7 @@ data:
     daily_source: official                   # official | derived
     keep_partial_last_bar: true
     min_completeness_pct: 80
-  adjust: { splits_bonus: true, dividends: false }
+  adjust: { splits_bonus: true, dividends: false }   # bars stay raw; applied splits/bonus adjust on read (adjusted=true), dividends never (05 §4.2)
   quality: { max_missing_bar_pct: 2.0, spike_atr_mult: 8, stop_if_index_bad: true }
 
 live:

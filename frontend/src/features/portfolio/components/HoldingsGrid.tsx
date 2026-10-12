@@ -1,14 +1,15 @@
 import { Button, Card, Stack, Typography } from '@mui/material';
-import type { UseQueryResult } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import type { HoldingPage, HoldingRow } from '@/shared/api';
+import type { HoldingRow } from '@/shared/api';
+import type { InfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { Grid, type GridSort } from '@/shared/ui/grid';
 import { problemText } from '../lib/errors';
-import { isSortField, pageSizes, type PortfolioFilters } from '../lib/filters';
+import { holdingsParams } from '../api/portfolioQueries';
+import { isSortField, type PortfolioFilters } from '../lib/filters';
 import { holdingColumns, holdingColumnsWithAccount } from './holdingColumns';
 
 interface HoldingsGridProps {
-  result: UseQueryResult<HoldingPage>;
+  result: InfiniteRows<HoldingRow>;
   filters: PortfolioFilters;
   openId: string | null;
   /** More than one account's holdings are listed: show the account column. */
@@ -22,7 +23,8 @@ interface HoldingsGridProps {
 const getRowId = (holding: HoldingRow) => holding.id;
 const getRowLabel = (holding: HoldingRow) => holding.symbol;
 
-/** The holdings card: fills the space under the tiles; the rows scroll inside it between the header and the footer. */
+/** The holdings card: fills the space under the tiles; the rows scroll inside it between the header and the footer
+ * and further pages load as the end comes into view. */
 export function HoldingsGrid({
   result,
   filters,
@@ -32,8 +34,7 @@ export function HoldingsGrid({
   onChange,
   onOpen,
 }: HoldingsGridProps) {
-  const { data, isPending, isError, isPlaceholderData, error } = result;
-  const failed = isError && !data;
+  const { rows, isPending, isError, isPlaceholderData, error, loadMoreError } = result;
   const sort: GridSort = { columnId: filters.sort.field, descending: filters.sort.descending };
 
   return (
@@ -41,7 +42,7 @@ export function HoldingsGrid({
       <Grid
         label="Holdings"
         columns={showAccount ? holdingColumnsWithAccount : holdingColumns}
-        rows={data?.items ?? []}
+        rows={rows}
         getRowId={getRowId}
         getRowLabel={getRowLabel}
         sort={sort}
@@ -53,26 +54,17 @@ export function HoldingsGrid({
         }}
         activeRowId={openId}
         loading={isPending || isPlaceholderData}
-        error={failed ? problemText(error, 'The holdings could not be loaded.') : null}
-        onRetry={() => {
-          void result.refetch();
+        error={isError ? problemText(error, 'The holdings could not be loaded.') : null}
+        onRetry={result.refetch}
+        resetKey={JSON.stringify(holdingsParams(filters))}
+        infinite={{
+          total: result.total,
+          hasMore: result.hasMore,
+          loadingMore: result.isFetchingNextPage,
+          onLoadMore: result.loadMore,
+          error: loadMoreError ? problemText(loadMoreError, 'The next holdings could not be loaded.') : null,
+          onRetryMore: result.retryMore,
         }}
-        pagination={
-          failed
-            ? undefined
-            : {
-                page: filters.page,
-                pageSize: filters.pageSize,
-                pageSizeOptions: pageSizes,
-                total: data?.total ?? 0,
-                onPageChange: (page) => {
-                  onChange({ page });
-                },
-                onPageSizeChange: (pageSize) => {
-                  onChange({ pageSize });
-                },
-              }
-        }
         emptyState={emptyState}
       />
     </Card>

@@ -11,6 +11,8 @@ interface GridHeaderProps<Row> {
     allOnPage: boolean;
     someOnPage: boolean;
     disabled: boolean;
+    /** Accessible name of the select-all box. */
+    label: string;
     onChange: (checked: boolean) => void;
   } | null;
 }
@@ -42,7 +44,7 @@ export function GridHeader<Row>({ columns, sort, onSortChange, stickyFirstColumn
               onChange={(event) => {
                 selection.onChange(event.target.checked);
               }}
-              slotProps={{ input: { 'aria-label': 'Select all rows on this page' } }}
+              slotProps={{ input: { 'aria-label': selection.label } }}
             />
           </TableCell>
         )}

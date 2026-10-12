@@ -1,10 +1,10 @@
 import { Box } from '@mui/material';
-import type { UseQueryResult } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import type { InfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { useScopedSelection } from '@/shared/lib/useScopedSelection';
 import { AddToBasketDialog } from '@/features/baskets';
 import { useToast } from '@/shared/ui/toastContext';
-import type { InstrumentFacets, InstrumentPage } from '@/shared/api';
+import type { InstrumentFacets, InstrumentSummary } from '@/shared/api';
 import { useSelectAllIds } from '../api/selectAllMutation';
 import type { useInstrumentFilters } from '../hooks/useInstrumentFilters';
 import { useTrackingActions } from '../hooks/trackingActionsContext';
@@ -25,7 +25,7 @@ interface InstrumentsWorkspaceProps {
   filterState: ReturnType<typeof useInstrumentFilters>;
   /** Undefined while loading or when the counts could not be loaded. */
   facets: InstrumentFacets | undefined;
-  results: UseQueryResult<InstrumentPage>;
+  results: InfiniteRows<InstrumentSummary>;
 }
 
 /** Tabs, filters, bulk bar, list, drawer and the paste dialog: everything under the page header. */
@@ -38,16 +38,7 @@ export function InstrumentsWorkspace({ filterState, facets, results }: Instrumen
   const [pasteOpen, setPasteOpen] = useState(false);
   const [basketsOpen, setBasketsOpen] = useState(false);
 
-  // An old link can point past the last page; step back to it instead of showing an empty list.
-  const page = results.data;
-  useEffect(() => {
-    if (page?.items.length === 0 && page.total > 0 && filters.page > 1) {
-      update({ page: Math.ceil(page.total / page.pageSize) }, { replace: true });
-    }
-  }, [page, filters.page, update]);
-
-  const rows = page?.items ?? [];
-  const total = page?.total ?? 0;
+  const { rows, total } = results;
   const allOnPage = rows.length > 0 && rows.every((row) => selection.ids.has(row.id));
   const selectedIds = [...selection.ids];
   const count = selectedIds.length;
@@ -86,7 +77,7 @@ export function InstrumentsWorkspace({ filterState, facets, results }: Instrumen
         sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0 }}
       >
         <FilterBar filters={filters} facets={facets} onChange={update} onClear={clear} />
-        {filters.tab === 'tracked' && <TrackedNote items={page?.items} />}
+        {filters.tab === 'tracked' && <TrackedNote items={rows} />}
         <InstrumentResults
           result={results}
           filters={filters}
