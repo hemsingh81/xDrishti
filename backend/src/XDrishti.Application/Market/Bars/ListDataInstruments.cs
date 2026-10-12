@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
@@ -8,11 +9,11 @@ namespace XDrishti.Application.Market.Bars;
 
 /// <summary>
 /// The coverage of the instruments that are tracked or have bars: first bar, last bar, 1-minute bars, source and how far behind. <c>q</c> (symbol, name), <c>status</c>
-/// (<c>current|behind|empty</c>), <c>sort</c> (<c>symbol|name|firstBar|lastBar|bars</c>, prefix <c>-</c> for descending), <c>page</c> from 1, <c>pageSize</c> up to 200.
+/// (<c>current|behind|empty</c>), <c>hasGaps</c> (only instruments with open gaps), <c>sort</c> (<c>symbol|name|firstBar|lastBar|bars</c>, prefix <c>-</c> for descending), <c>page</c> from 1, <c>pageSize</c> up to 200.
 /// </summary>
 public sealed record ListDataInstrumentsQuery(DataInstrumentRequest Request) : IQuery<Result<DataInstrumentPage>>;
 
-internal sealed class ListDataInstrumentsHandler(IBarQueries queries, TimeProvider clock) : IQueryHandler<ListDataInstrumentsQuery, Result<DataInstrumentPage>>
+internal sealed class ListDataInstrumentsHandler(IBarQueries queries, ITradingCalendar tradingCalendar, TimeProvider clock) : IQueryHandler<ListDataInstrumentsQuery, Result<DataInstrumentPage>>
 {
     public async ValueTask<Result<DataInstrumentPage>> HandleAsync(ListDataInstrumentsQuery query, CancellationToken cancellationToken)
     {
@@ -22,9 +23,10 @@ internal sealed class ListDataInstrumentsHandler(IBarQueries queries, TimeProvid
             return Result.Failure<DataInstrumentPage>(search.Error);
         }
 
-        var expected = DataFreshness.LastClosedSession(clock.GetUtcNow());
+        var calendar = await tradingCalendar.GetAsync(cancellationToken);
+        var expected = calendar.LastClosedSession(clock.GetUtcNow());
         var expectedStart = new DateTimeOffset(expected.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset);
-        return Result.Success(await queries.ListInstrumentsAsync(search.Value, expectedStart, expected, cancellationToken));
+        return Result.Success(await queries.ListInstrumentsAsync(search.Value, expectedStart, expected, calendar, cancellationToken));
     }
 
     internal static Result<DataInstrumentSearch> Check(DataInstrumentRequest r)
@@ -73,7 +75,7 @@ internal sealed class ListDataInstrumentsHandler(IBarQueries queries, TimeProvid
 
         return errors.HasErrors
             ? Result.Failure<DataInstrumentSearch>(errors.ToError(DataErrors.InvalidCode, "Some values are not valid."))
-            : Result.Success(new DataInstrumentSearch(string.IsNullOrEmpty(text) ? null : text, status, field, descending, page, pageSize));
+            : Result.Success(new DataInstrumentSearch(string.IsNullOrEmpty(text) ? null : text, status, field, descending, page, pageSize, r.HasGaps ?? false));
     }
 
     private static bool TrySort(string text, out DataSortField field, out bool descending)

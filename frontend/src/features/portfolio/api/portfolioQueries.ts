@@ -1,5 +1,6 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query';
-import { api, unwrap } from '@/shared/api';
+import { queryOptions } from '@tanstack/react-query';
+import { api, unwrap, type HoldingRow } from '@/shared/api';
+import type { InfiniteRowsOptions } from '@/shared/lib/useInfiniteRows';
 import { formatSort, type PortfolioFilters } from '../lib/filters';
 
 /** Query keys: ['portfolio', resource, …]. After a write, `invalidatePortfolio` marks them stale. */
@@ -13,7 +14,7 @@ export const portfolioKeys = {
   syncStatus: (accountId: string) => ['portfolio', 'sync-status', accountId] as const,
 };
 
-/** The API parameters for a page state; defaults are left out. */
+/** The API parameters for a page state (without the page); defaults are left out. */
 export function holdingsParams(f: PortfolioFilters) {
   return {
     accountId: f.account ?? undefined,
@@ -21,19 +22,20 @@ export function holdingsParams(f: PortfolioFilters) {
     status: f.status === 'open' ? undefined : f.status,
     q: f.q.trim() || undefined,
     sort: formatSort(f.sort),
-    page: f.page,
-    pageSize: f.pageSize,
   };
 }
 
-export const holdingsQuery = (filters: PortfolioFilters) => {
+const getRowId = (holding: HoldingRow) => holding.id;
+
+/** The holdings the grid shows: pages of 100 (the API maximum) loaded as the owner scrolls (see `useInfiniteRows`). */
+export const holdingsList = (filters: PortfolioFilters): InfiniteRowsOptions<HoldingRow> => {
   const query = holdingsParams(filters);
-  return queryOptions({
-    queryKey: [...portfolioKeys.holdings, query] as const,
-    queryFn: async ({ signal }) => unwrap(await api.GET('/api/holdings', { params: { query }, signal })),
-    // While the next page, sort or filter loads, keep showing the old rows instead of a blank table.
-    placeholderData: keepPreviousData,
-  });
+  return {
+    queryKey: [...portfolioKeys.holdings, query],
+    getRowId,
+    fetchPage: async (page, { pageSize, signal }) =>
+      unwrap(await api.GET('/api/holdings', { params: { query: { ...query, page, pageSize } }, signal })),
+  };
 };
 
 /** The totals follow the account and bucket only (not the search, status or page). */

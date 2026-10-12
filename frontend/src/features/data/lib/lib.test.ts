@@ -18,10 +18,11 @@ describe('filters', () => {
     expect(parseFilters(new URLSearchParams('q=tcs&status=behind&sort=-bars&page=3&size=50'))).toEqual({
       q: 'tcs',
       status: 'behind',
+      hasGaps: false,
       sort: { field: 'bars', descending: true },
-      page: 3,
-      pageSize: 50,
     });
+    expect(parseFilters(new URLSearchParams('hasGaps=true'))).toEqual({ ...emptyFilters, hasGaps: true });
+    expect(parseFilters(new URLSearchParams('hasGaps=yes')).hasGaps).toBe(false);
     expect(parseFilters(new URLSearchParams('status=odd&sort=colour&page=0&size=7'))).toEqual(emptyFilters);
   });
 
@@ -32,14 +33,18 @@ describe('filters', () => {
         ...emptyFilters,
         q: ' tcs ',
         status: 'empty',
+        hasGaps: true,
         sort: { field: 'lastBar', descending: false },
-        page: 2,
-        pageSize: 100,
       },
       new URLSearchParams('id=abc'),
     );
-    expect(next.toString()).toBe('id=abc&q=tcs&status=empty&sort=lastBar&page=2&size=100');
+    expect(next.toString()).toBe('id=abc&q=tcs&status=empty&hasGaps=true&sort=lastBar');
     expect(formatSort({ field: 'name', descending: true })).toBe('-name');
+  });
+
+  it('drops the page and size of an older link: the list loads further rows by scrolling', () => {
+    const next = toParams(emptyFilters, new URLSearchParams('page=3&size=50&id=abc'));
+    expect(next.toString()).toBe('id=abc');
   });
 });
 

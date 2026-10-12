@@ -9,8 +9,6 @@ export type InstrumentTab = (typeof instrumentTabs)[number];
 export const sortFields = ['symbol', 'name', 'type', 'series', 'sector', 'lot', 'tick'] as const;
 export type SortField = (typeof sortFields)[number];
 
-export const pageSizes = [50, 100] as const;
-
 export interface SortState {
   field: SortField;
   descending: boolean;
@@ -28,12 +26,9 @@ export interface InstrumentFilters {
   /** Master list only: the instruments that are not tracked. */
   untracked: boolean;
   sort: SortState;
-  page: number;
-  pageSize: number;
 }
 
 export const defaultSort: SortState = { field: 'symbol', descending: false };
-export const defaultPageSize = 50;
 
 export const emptyFilters: InstrumentFilters = {
   tab: 'master',
@@ -46,8 +41,6 @@ export const emptyFilters: InstrumentFilters = {
   includeRetired: false,
   untracked: false,
   sort: defaultSort,
-  page: 1,
-  pageSize: defaultPageSize,
 };
 
 const isTab = (value: string | null): value is InstrumentTab => instrumentTabs.some((t) => t === value);
@@ -65,16 +58,10 @@ export const formatSort = (sort: SortState): string => `${sort.descending ? '-' 
 
 const nonEmpty = (value: string | null): string | null => (value === null || value === '' ? null : value);
 
-function positiveInt(value: string | null, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= 1 ? parsed : fallback;
-}
-
 /** Reads the page state from URL parameters; anything unknown or malformed falls back to the default. */
 export function parseFilters(params: URLSearchParams): InstrumentFilters {
   const type = params.get('type');
   const tab = params.get('tab');
-  const size = positiveInt(params.get('size'), defaultPageSize);
   return {
     tab: isTab(tab) ? tab : 'master',
     q: params.get('q') ?? '',
@@ -86,8 +73,6 @@ export function parseFilters(params: URLSearchParams): InstrumentFilters {
     includeRetired: params.get('retired') === '1',
     untracked: params.get('untracked') === '1',
     sort: parseSort(params.get('sort')),
-    page: positiveInt(params.get('page'), 1),
-    pageSize: pageSizes.some((s) => s === size) ? size : defaultPageSize,
   };
 }
 
@@ -108,8 +93,9 @@ export function toParams(filters: InstrumentFilters, extra: URLSearchParams = ne
   set('retired', filters.includeRetired ? '1' : null);
   set('untracked', filters.untracked ? '1' : null);
   set('sort', formatSort(filters.sort) === formatSort(defaultSort) ? null : formatSort(filters.sort));
-  set('page', filters.page > 1 ? String(filters.page) : null);
-  set('size', filters.pageSize !== defaultPageSize ? String(filters.pageSize) : null);
+  // The list loads as the owner scrolls: an old link's page and size are dropped.
+  set('page', null);
+  set('size', null);
   return next;
 }
 
@@ -122,6 +108,6 @@ export function activeFilterCount(f: InstrumentFilters): number {
   return [f.q.trim() !== '', f.type, f.sector, f.series, f.fno, f.asmGsm, ...masterOnly].filter(Boolean).length;
 }
 
-/** Identifies the list a selection was made in: the tab and the narrowing filters (not page, page size or sort). */
+/** Identifies the list a selection was made in: the tab and the narrowing filters (not the sort). */
 export const selectionScope = (f: InstrumentFilters): string =>
   JSON.stringify([f.tab, f.q.trim(), f.type, f.sector, f.series, f.fno, f.asmGsm, f.includeRetired, f.untracked]);

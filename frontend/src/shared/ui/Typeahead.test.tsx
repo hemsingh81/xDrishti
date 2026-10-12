@@ -189,4 +189,22 @@ describe('Typeahead', () => {
       'true',
     );
   });
+
+  it('with onSearch reports what is typed and shows the options it is given without filtering them again', async () => {
+    const searched: string[] = [];
+    render(
+      <Harness
+        options={[options[0]!, options[3]!]}
+        onSearch={(text) => {
+          searched.push(text);
+        }}
+      />,
+    );
+
+    await userEvent.type(box(), 'zz');
+
+    expect(searched).toEqual(['z', 'zz']);
+    // The server decides what matches: the options stay, whatever was typed.
+    expect(optionNames()).toEqual(['Financial Services 1,204', 'Unclassified 3,630']);
+  });
 });

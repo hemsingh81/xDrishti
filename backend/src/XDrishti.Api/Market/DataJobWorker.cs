@@ -7,15 +7,16 @@ namespace XDrishti.Api.Market;
 
 /// <summary>
 /// Runs the data jobs registered by the API, one after the other, in the background; first it ends the jobs an earlier process left "running". All logic is in
-/// the command handlers.
+/// the command handlers. Once the recovery is over (whatever its outcome) it tells <see cref="DataJobRecovery"/>, which the end-of-day run waits for.
 /// </summary>
-internal sealed partial class DataJobWorker(IDataJobChannel jobs, IServiceScopeFactory scopes, IApplicationInfo application, ILogger<DataJobWorker> logger) : BackgroundService
+internal sealed partial class DataJobWorker(IDataJobChannel jobs, DataJobRecovery recovery, IServiceScopeFactory scopes, IApplicationInfo application, ILogger<DataJobWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
             await RecoverAsync(stoppingToken);
+            recovery.MarkCompleted();
             await foreach (var ticket in jobs.ReadAllAsync(stoppingToken))
             {
                 try

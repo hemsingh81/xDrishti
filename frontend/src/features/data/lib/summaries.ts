@@ -1,5 +1,6 @@
 import type { AggregatePhase, CsvPhase, DataJob, DhanPhase } from '@/shared/api';
 import { formatCompact, formatNumber } from '@/shared/lib/format';
+import { runGapsText } from './gaps';
 
 const plural = (count: number, one: string, many: string) => `${formatNumber(count)} ${count === 1 ? one : many}`;
 
@@ -30,8 +31,14 @@ export const aggregateResult = (aggregate: AggregatePhase): string =>
 /** The key counts of a finished job for the runs list ("214 files, 4.1Cr rows · 4,500 bars from Dhan · …"). */
 export function jobCounts(job: DataJob): string[] {
   const counts: string[] = [];
-  if (job.csv.status === 'succeeded') counts.push(csvResult(job.csv));
-  if (job.dhan.status === 'succeeded') counts.push(dhanResult(job.dhan));
+  if (job.undoCsvFile && job.csv.status === 'succeeded') {
+    counts.push(plural(job.csv.barsRemoved ?? 0, 'bar removed', 'bars removed'));
+  } else if (job.csv.status === 'succeeded') counts.push(csvResult(job.csv));
+  if (job.dhan.status === 'succeeded') {
+    counts.push(dhanResult(job.dhan));
+    const gaps = runGapsText(job.dhan);
+    if (gaps) counts.push(`gaps ${gaps}`);
+  }
   if (job.aggregate.status === 'succeeded') counts.push(aggregateResult(job.aggregate));
   return counts;
 }

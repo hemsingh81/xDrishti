@@ -70,11 +70,12 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
 
     private const string RecordFile =
         """
-        INSERT INTO market.csv_files (file_name, size_bytes, modified_at, instrument_id, rows, inserted, updated, repaired, rejected, loaded_at)
-        VALUES (@name, @size, @modified, @id, @rows, @inserted, @updated, @repaired, @rejected, @now)
+        INSERT INTO market.csv_files (file_name, size_bytes, modified_at, instrument_id, rows, inserted, updated, repaired, rejected, loaded_at, first_bar, last_bar, undone_at)
+        VALUES (@name, @size, @modified, @id, @rows, @inserted, @updated, @repaired, @rejected, @now, @firstBar, @lastBar, NULL)
         ON CONFLICT (file_name) DO UPDATE SET
             size_bytes = EXCLUDED.size_bytes, modified_at = EXCLUDED.modified_at, instrument_id = EXCLUDED.instrument_id, rows = EXCLUDED.rows,
-            inserted = EXCLUDED.inserted, updated = EXCLUDED.updated, repaired = EXCLUDED.repaired, rejected = EXCLUDED.rejected, loaded_at = EXCLUDED.loaded_at
+            inserted = EXCLUDED.inserted, updated = EXCLUDED.updated, repaired = EXCLUDED.repaired, rejected = EXCLUDED.rejected, loaded_at = EXCLUDED.loaded_at,
+            first_bar = EXCLUDED.first_bar, last_bar = EXCLUDED.last_bar, undone_at = NULL
         """;
 
     public async ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken)
@@ -206,6 +207,8 @@ internal sealed class BarStore(NpgsqlDataSource dataSource, TimeProvider clock) 
                 record.Parameters.AddWithValue("repaired", file.Repaired);
                 record.Parameters.AddWithValue("rejected", file.Rejected);
                 record.Parameters.AddWithValue("now", now);
+                record.Parameters.AddWithValue("firstBar", NpgsqlDbType.TimestampTz, (object?)file.FirstBar ?? DBNull.Value);
+                record.Parameters.AddWithValue("lastBar", NpgsqlDbType.TimestampTz, (object?)file.LastBar ?? DBNull.Value);
                 await record.ExecuteNonQueryAsync(cancellationToken);
             }
 

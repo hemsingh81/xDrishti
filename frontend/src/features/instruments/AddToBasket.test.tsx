@@ -4,7 +4,13 @@ import { http } from 'msw';
 import { createBasketsFake } from '@/test/basketsFake';
 import { basketIds, buildPortfolioBasket } from '@/test/fixtures';
 import { problemResponse, server } from '@/test/server';
+import { smallPage } from '@/test/smallPages';
 import { manyInstruments, renderTracking, trackedSample } from './trackingTestkit';
+
+// Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
+vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
+  (await import('@/test/smallPages')).withSmallPages(await importOriginal()),
+);
 
 const bulkButton = (name: string) => screen.getByRole('button', { name });
 const rowBox = (symbol: string) => screen.getByRole('checkbox', { name: `Select ${symbol}` });
@@ -76,8 +82,8 @@ describe('Instruments page: Add to basket', () => {
 
   it('sends more than 500 instruments in calls of at most 500', async () => {
     const { baskets } = renderWithBaskets(manyInstruments(1_150));
-    await screen.findByText('1–50 of 1,150');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
+    await screen.findByText(`Showing ${String(smallPage)} of 1,150`);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
     await userEvent.click(screen.getByRole('button', { name: 'Select all 1,150 results' }));
     await screen.findByText('All 1,150 results are selected');
 
@@ -96,8 +102,8 @@ describe('Instruments page: Add to basket', () => {
     const { baskets } = renderWithBaskets(items, '', {
       [basketIds.myChoice]: items.slice(0, 1_000).map((i) => i.symbol),
     });
-    await screen.findByText('1–50 of 1,150');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
+    await screen.findByText(`Showing ${String(smallPage)} of 1,150`);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
     await userEvent.click(screen.getByRole('button', { name: 'Select all 1,150 results' }));
     await screen.findByText('All 1,150 results are selected');
 
@@ -116,8 +122,8 @@ describe('Instruments page: Add to basket', () => {
 
   it('says what was added before an error stopped a long add, and reloads the counts', async () => {
     const { baskets } = renderWithBaskets(manyInstruments(1_150));
-    await screen.findByText('1–50 of 1,150');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
+    await screen.findByText(`Showing ${String(smallPage)} of 1,150`);
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all loaded rows' }));
     await userEvent.click(screen.getByRole('button', { name: 'Select all 1,150 results' }));
     await screen.findByText('All 1,150 results are selected');
     await userEvent.click(bulkButton('Add to basket (1,150)'));

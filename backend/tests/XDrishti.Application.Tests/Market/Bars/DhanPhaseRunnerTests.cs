@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Market.Bars.Gaps;
 using XDrishti.Application.Market.Bars.Pipeline;
+using XDrishti.Application.Tests.Market.Calendar;
 using XDrishti.Domain.Market.Bars;
 
 namespace XDrishti.Application.Tests.Market.Bars;
@@ -19,6 +21,8 @@ public sealed class DhanPhaseRunnerTests
     private readonly FakeBarStore _bars = new();
     private readonly FakeDataJobStore _jobs = new();
     private readonly FakeDataSettings _settings = new();
+    private readonly FixedCalendar _calendar = new();
+    private readonly FakeBarGaps _gaps = new();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -31,11 +35,11 @@ public sealed class DhanPhaseRunnerTests
 
     private static Bar Good(int minute) => new(Open + minute * 60L, 100, 101, 99, 100.5, 10);
 
-    private async Task<(DhanPhase Phase, DataJob Job)> RunAsync()
+    private async Task<(DhanPhase Phase, DataJob Job)> RunAsync(Guid? instrumentId = null)
     {
-        var job = DataJob.Start([DataSteps.Dhan], false, "owner", Now);
+        var job = DataJob.Start([DataSteps.Dhan], false, "owner", Now, instrumentId: instrumentId);
         _jobs.Jobs[job.Id] = job;
-        var runner = new DhanPhaseRunner(_source, _account, _targets, _bars, _settings, _clock, NullLogger<DhanPhaseRunner>.Instance);
+        var runner = new DhanPhaseRunner(_source, _account, _targets, _bars, _settings, _calendar, new GapBackfill(new FakeBarDayCounts(_bars), _gaps, _settings, _clock), _clock, NullLogger<DhanPhaseRunner>.Instance);
         return (await runner.RunAsync(new JobReporter(job, _jobs, _clock), Ct), job);
     }
 
@@ -189,5 +193,29 @@ public sealed class DhanPhaseRunnerTests
 
         (phase.Status, phase.Done, phase.Bars).ShouldBe((PhaseStatus.Succeeded, 0, 0));
         _bars.Sessions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_job_about_one_instrument_fetches_only_that_instrument()
+    {
+        Target("ABB");
+        var tcs = Target("TCS");
+        _source.Respond = t => new IntradayResult(t.InstrumentId, [Good(0)], 1);
+
+        var (phase, _) = await RunAsync(tcs.InstrumentId);
+
+        _source.Plans.Single().Targets.Select(t => t.InstrumentId).ShouldBe([tcs.InstrumentId]);
+        (phase.Total, phase.InstrumentsFetched).ShouldBe((1, 1));
+    }
+
+    [Fact]
+    public async Task A_job_about_an_instrument_that_cannot_be_fetched_is_skipped_with_nothing_to_fetch()
+    {
+        Target("ABB");
+
+        var (phase, _) = await RunAsync(Guid.NewGuid());
+
+        (phase.Status, phase.Message).ShouldBe((PhaseStatus.Skipped, "No tracked share, ETF or index has a Dhan id: nothing to fetch."));
+        _source.Plans.ShouldBeEmpty();
     }
 }

@@ -13,16 +13,14 @@ describe('filters', () => {
   });
 
   it('reads every part of the view and ignores what it does not know', () => {
-    expect(parse('account=a1&bucket=b1&status=all&q=tcs&sort=-pnl&page=3&size=100')).toEqual({
+    expect(parse('account=a1&bucket=b1&status=all&q=tcs&sort=-pnl')).toEqual({
       account: 'a1',
       bucket: 'b1',
       status: 'all',
       q: 'tcs',
       sort: { field: 'pnl', descending: true },
-      page: 3,
-      pageSize: 100,
     });
-    expect(parse('status=weird&sort=nonsense&page=-2&size=7')).toEqual(emptyFilters);
+    expect(parse('status=weird&sort=nonsense')).toEqual(emptyFilters);
   });
 
   it('writes only what differs from the defaults and keeps other parameters', () => {
@@ -33,12 +31,15 @@ describe('filters', () => {
         status: 'closed',
         q: ' tcs ',
         sort: { field: 'xirr', descending: true },
-        page: 2,
-        pageSize: 25,
       },
       new URLSearchParams('holding=h1'),
     );
-    expect(next.toString()).toBe('holding=h1&status=closed&q=tcs&sort=-xirr&page=2&size=25');
+    expect(next.toString()).toBe('holding=h1&status=closed&q=tcs&sort=-xirr');
+  });
+
+  it('drops the page and page size of an old link: the list loads as the owner scrolls', () => {
+    expect(parse('status=all&page=3&size=100')).toEqual({ ...emptyFilters, status: 'all' });
+    expect(toParams(emptyFilters, new URLSearchParams('page=3&size=25&holding=h1')).toString()).toBe('holding=h1');
   });
 
   it('formats and reads a sort', () => {

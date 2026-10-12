@@ -9,6 +9,9 @@
  * insensitive substring) and highlights the match. A value that is not among the options (no rows right now) stays
  * selected and visible. No free text: the choice is always one of the options.
  *
+ * Searching on the server: give `onSearch` (called with the typed text) and keep `options` to what the server found for
+ * it; the options are then not filtered again here, only highlighted.
+ *
  * Semantics: combobox with a listbox of options (arrow keys, Enter to choose, Escape to close or, when closed, clear),
  * named by `label`; emptying the text clears the value too.
  */
@@ -38,6 +41,8 @@ export interface TypeaheadProps {
   getOptionDisabled?: (option: TypeaheadOption) => boolean;
   /** Width of the field in px (it never gets narrower than this). */
   minWidth?: number;
+  /** The options come from a search on the server: called as the owner types (and with '' when cleared). */
+  onSearch?: (text: string) => void;
 }
 
 /** Case-insensitive substring on the label, ignoring leading/trailing spaces of the typed text; accents count. */
@@ -93,6 +98,7 @@ export function Typeahead({
   noOptionsText = 'No matches',
   getOptionDisabled,
   minWidth = 220,
+  onSearch,
 }: TypeaheadProps) {
   const known = options.find((o) => o.value === value);
   const kept: TypeaheadOption | null = value === null ? null : (known ?? { value, label: value });
@@ -111,7 +117,10 @@ export function Typeahead({
       clearText={`Clear ${label}`}
       openText={`Open ${label}`}
       closeText={`Close ${label}`}
-      filterOptions={filterOptions}
+      filterOptions={onSearch ? (found) => found : filterOptions}
+      onInputChange={(_event, text, reason) => {
+        if (onSearch && (reason === 'input' || reason === 'clear')) onSearch(text);
+      }}
       isOptionEqualToValue={(a, b) => a.value === b.value}
       getOptionLabel={(option) => option.label}
       getOptionDisabled={(option) => option.disabled === true || (getOptionDisabled?.(option) ?? false)}

@@ -1,3 +1,4 @@
+import GapsIcon from '@mui/icons-material/PlaylistRemoveOutlined';
 import { Box, Chip } from '@mui/material';
 import type { DataCoverageRow } from '@/shared/api';
 import { formatIstDateTime, formatNumber } from '@/shared/lib/format';
@@ -11,8 +12,8 @@ type Column = GridColumn<DataCoverageRow>;
 
 /**
  * Ids of the sortable columns are the API's sort fields. The last bar is the point of the table: bold and in the warning
- * colour when behind (the status chip says it in words too). Name, first bar, bars and source are hidden on narrow
- * screens; the drawer shows what a row hides.
+ * colour when behind (the status chip says it in words too). The first bar is the tooltip of the symbol. The last bar is
+ * hidden below `sm`, name and bars below `md`, source and gaps below `lg`; the drawer shows what a row hides.
  */
 export const coverageColumns: readonly Column[] = [
   {
@@ -20,7 +21,11 @@ export const coverageColumns: readonly Column[] = [
     header: columnLabels.symbol,
     sortable: true,
     render: (row) => (
-      <Box component="span" sx={{ fontFamily: monoFontFamily, fontWeight: 600 }}>
+      <Box
+        component="span"
+        title={row.firstBar ? `First bar ${formatIstDateTime(row.firstBar)}` : 'No bars yet'}
+        sx={{ fontFamily: monoFontFamily, fontWeight: 600 }}
+      >
         {row.symbol}
       </Box>
     ),
@@ -33,13 +38,6 @@ export const coverageColumns: readonly Column[] = [
     minWidth: 160,
     hideBelow: 'md',
     accessor: (r) => r.name,
-  },
-  {
-    id: 'firstBar',
-    header: columnLabels.firstBar,
-    sortable: true,
-    hideBelow: 'lg',
-    accessor: (r) => (r.firstBar ? formatIstDateTime(r.firstBar) : dash),
   },
   {
     id: 'lastBar',
@@ -68,6 +66,23 @@ export const coverageColumns: readonly Column[] = [
     header: 'Source',
     hideBelow: 'lg',
     render: (r) => (r.source ? <Chip size="small" variant="outlined" label={sourceLabel(r.source)} /> : dash),
+  },
+  {
+    id: 'gaps',
+    header: 'Gaps',
+    hideBelow: 'lg',
+    render: (r) =>
+      r.openGaps > 0 ? (
+        <Chip
+          size="small"
+          variant="outlined"
+          color="warning"
+          icon={<GapsIcon />}
+          label={`${formatNumber(r.openGaps)} open`}
+        />
+      ) : (
+        dash
+      ),
   },
   { id: 'status', header: 'Status', minWidth: 130, render: (row) => <RowStatus row={row} /> },
 ];

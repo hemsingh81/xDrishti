@@ -1,11 +1,24 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { Alert, Box, Button, Drawer, IconButton, MenuItem, Stack, TextField, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  Drawer,
+  FormControlLabel,
+  IconButton,
+  MenuItem,
+  Stack,
+  Switch,
+  TextField,
+  Typography,
+} from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingState } from '@/shared/ui';
 import { monoFontFamily } from '@/theme';
 import { barsQuery } from '../api/dataQueries';
 import { problemText } from '../lib/errors';
 import { isTimeframe, timeframeLabels, timeframes, type Timeframe } from '../lib/timeframes';
+import { AdjustmentSummary } from './AdjustmentSummary';
 import { BarsTable } from './BarsTable';
 
 interface BarsDrawerProps {
@@ -13,12 +26,18 @@ interface BarsDrawerProps {
   id: string | null;
   timeframe: Timeframe;
   onTimeframeChange: (timeframe: Timeframe) => void;
+  /** Prices adjusted for the applied corporate actions (raw prices by default). */
+  adjusted: boolean;
+  onAdjustedChange: (adjusted: boolean) => void;
   onClose: () => void;
 }
 
-/** Side panel with the latest bars of one instrument in a timeframe of the owner's choice. */
-export function BarsDrawer({ id, timeframe, onTimeframeChange, onClose }: BarsDrawerProps) {
-  const query = useQuery({ ...barsQuery(id ?? '', timeframe), enabled: id !== null });
+/**
+ * Side panel with the latest bars of one instrument in a timeframe of the owner's choice. Prices are raw, as loaded,
+ * unless the "Adjusted prices" switch is on; then the applied corporate actions and their factor are said under it.
+ */
+export function BarsDrawer({ id, timeframe, onTimeframeChange, adjusted, onAdjustedChange, onClose }: BarsDrawerProps) {
+  const query = useQuery({ ...barsQuery(id ?? '', timeframe, adjusted), enabled: id !== null });
   const { data, isPending, isError, error } = query;
 
   return (
@@ -56,6 +75,19 @@ export function BarsDrawer({ id, timeframe, onTimeframeChange, onClose }: BarsDr
             </MenuItem>
           ))}
         </TextField>
+        <FormControlLabel
+          sx={{ ml: 0 }}
+          control={
+            <Switch
+              checked={adjusted}
+              onChange={(event) => {
+                onAdjustedChange(event.target.checked);
+              }}
+            />
+          }
+          label="Adjusted prices"
+        />
+        {adjusted && data?.adjustment && <AdjustmentSummary adjustment={data.adjustment} />}
         {id !== null && isPending && <LoadingState label="Loading bars" />}
         {isError && (
           <Alert

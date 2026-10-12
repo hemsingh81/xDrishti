@@ -60,7 +60,7 @@ public sealed class CsvPhaseRunnerTests
         (phase.Done, phase.Total, phase.FilesLoaded, phase.Rows, phase.Inserted, phase.InstrumentsTracked).ShouldBe((2, 2, 2, 8, 8, 2));
         _bars.Sessions.Select(s => s.InstrumentId).ShouldBe([abb, tcs]);
         _bars.Sessions.ShouldAllBe(s => s.Source == BarSource.Csv && s.Completed);
-        _bars.Sessions[0].Mark.ShouldBe(new CsvFileMark("ABB_1m.csv.gz", fileA.Size, fileA.ModifiedAt, 5, 0, 0));
+        _bars.Sessions[0].Mark.ShouldBe(new CsvFileMark("ABB_1m.csv.gz", fileA.Size, fileA.ModifiedAt, 5, 0, 0, DateTimeOffset.FromUnixTimeSeconds(1_711_943_100), DateTimeOffset.FromUnixTimeSeconds(1_711_943_100 + 4 * 60)));
         _bars.Sessions[1].Mark!.Size.ShouldBe(fileB.Size);
         _tracking.Tracked.Select(t => t.Id).ShouldBe([abb, tcs], ignoreOrder: true);
         _tracking.Events.ShouldHaveSingleItem().Detail!.ShouldContain("via CSV load");

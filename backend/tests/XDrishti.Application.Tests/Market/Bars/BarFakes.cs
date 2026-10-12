@@ -26,9 +26,13 @@ internal sealed class FakeCsvFolder : ICsvFolder
             ? throw failure
             : ValueTask.FromResult<IReadOnlyList<CsvFileInfo>>([.. _files.Select(f => new CsvFileInfo(f.Key, f.Value.Content.Length, f.Value.Modified))]);
 
+    /// <summary>Runs when a file is opened: what happens meanwhile (a test moves the clock).</summary>
+    public Action<string>? OnOpen { get; set; }
+
     public Stream Open(string name)
     {
         Opened.Add(name);
+        OnOpen?.Invoke(name);
         return new MemoryStream(_files[name].Content);
     }
 
@@ -161,8 +165,12 @@ internal sealed class FakeDataJobStore : IDataJobStore
 
     public Dictionary<string, DataJob> Last { get; } = [];
 
+    /// <summary>Runs at the start of every <see cref="TryStartAsync"/>: what a concurrent request would have done meanwhile.</summary>
+    public Action? OnTryStart { get; set; }
+
     public ValueTask<bool> TryStartAsync(DataJob job, TimeSpan staleAfter, DateTimeOffset now, CancellationToken cancellationToken)
     {
+        OnTryStart?.Invoke();
         if (Jobs.Values.Any(j => j.IsRunning))
         {
             return ValueTask.FromResult(false);
@@ -207,6 +215,24 @@ internal sealed class FakeDataJobStore : IDataJobStore
 
     public ValueTask<IReadOnlyList<DataJob>> ListAsync(int take, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<DataJob>>([.. Jobs.Values.OrderByDescending(j => j.StartedAt).Take(take)]);
+
+    /// <summary>The jobs recorded as skipped (they are in <see cref="Jobs"/> too).</summary>
+    public List<DataJob> Skipped { get; } = [];
+
+    /// <summary>When set, reading the latest job of a trigger throws it (the database is down).</summary>
+    public Exception? LastByTriggerFailure { get; set; }
+
+    public ValueTask<DataJob?> GetLastByTriggerAsync(DataJobTrigger trigger, CancellationToken cancellationToken) =>
+        LastByTriggerFailure is { } failure
+            ? throw failure
+            : ValueTask.FromResult(Jobs.Values.Where(j => j.Trigger == trigger).OrderByDescending(j => j.StartedAt).FirstOrDefault());
+
+    public ValueTask RecordSkippedAsync(DataJob skipped, CancellationToken cancellationToken)
+    {
+        Jobs[skipped.Id] = skipped;
+        Skipped.Add(skipped);
+        return ValueTask.CompletedTask;
+    }
 }
 
 internal sealed class FakeDataSettings : IDataSettings
@@ -222,6 +248,20 @@ internal sealed class FakeDataSettings : IDataSettings
     public long CsvMaxBytesPerFile { get; set; } = 1L << 30;
 
     public int CsvMaxSpanDays { get; set; } = 3_700;
+
+    public int GapLookbackSessions { get; set; } = 30;
+
+    public bool EodEnabled { get; set; } = true;
+
+    public TimeOnly EodTimeIst { get; set; } = new(15, 50);
+
+    public int QualitySessions { get; set; } = 5;
+
+    public double QualitySpikeMultiple { get; set; } = 20;
+
+    public double QualityMaxMissingPercent { get; set; } = 1;
+
+    public double QualityMaxFailedPercent { get; set; } = 5;
 }
 
 internal sealed class FakeFetchTargets : IFetchTargets
@@ -284,6 +324,15 @@ internal sealed class FakeAggregates : IBarAggregates
         return ValueTask.FromResult(Dirty.Count);
     }
 
+    /// <summary>The instruments marked dirty from a time on, as the quality fix action does.</summary>
+    public List<(Guid InstrumentId, DateTimeOffset From)> MarkedDirty { get; } = [];
+
+    public ValueTask<bool> MarkDirtyAsync(Guid instrumentId, DateTimeOffset from, CancellationToken cancellationToken)
+    {
+        MarkedDirty.Add((instrumentId, from));
+        return ValueTask.FromResult(true);
+    }
+
     public ValueTask<IReadOnlyList<DirtyInstrument>> ListDirtyAsync(CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<DirtyInstrument>>([.. Dirty]);
 
     public ValueTask<AggregatesBuilt> BuildAsync(DirtyInstrument target, CancellationToken cancellationToken)
@@ -295,5 +344,100 @@ internal sealed class FakeAggregates : IBarAggregates
 
         Built.Add(target);
         return ValueTask.FromResult(new AggregatesBuilt(new Dictionary<string, long> { ["5m"] = 10, ["1D"] = 1 }));
+    }
+}
+
+/// <summary>The gap records in memory.</summary>
+internal sealed class FakeBarGaps : IBarGaps
+{
+    public Dictionary<(Guid Instrument, DateOnly Date), BarGap> Rows { get; } = [];
+
+    public List<IReadOnlyCollection<BarGap>> Saves { get; } = [];
+
+    public ValueTask<IReadOnlyList<BarGap>> ListForAsync(Guid instrumentId, DateOnly since, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<BarGap>>([.. Rows.Values.Where(g => g.InstrumentId == instrumentId && (g.Status != GapStatus.Filled || g.Date >= since)).OrderBy(g => g.Date)]);
+
+    public ValueTask SaveAsync(IReadOnlyCollection<BarGap> gaps, CancellationToken cancellationToken)
+    {
+        Saves.Add([.. gaps]);
+        foreach (var gap in gaps)
+        {
+            Rows[(gap.InstrumentId, gap.Date)] = gap;
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<GapSummary> GetSummaryAsync(CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new GapSummary(
+            Rows.Values.Count(g => g.Status == GapStatus.Open),
+            Rows.Values.Count(g => g.Status == GapStatus.Unfillable),
+            Rows.Values.Count(g => g.Status == GapStatus.Filled),
+            Rows.Count == 0 ? null : Rows.Values.Max(g => g.DetectedAt)));
+
+    public ValueTask<XDrishti.Application.Market.Bars.Gaps.GapPage> ListAsync(XDrishti.Application.Market.Bars.Gaps.GapSearch search, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(new XDrishti.Application.Market.Bars.Gaps.GapPage([], search.Page, search.PageSize, 0));
+}
+
+/// <summary>
+/// Bars per day: what a test presets (<see cref="Preset"/>, as the daily aggregates would hold) plus the bars that the fake bar store has merged since, counted by India day.
+/// </summary>
+internal sealed class FakeBarDayCounts(FakeBarStore store) : IBarDayCounts
+{
+    public Dictionary<Guid, Dictionary<DateOnly, int>> Preset { get; } = [];
+
+    public List<(Guid Instrument, DateOnly From, DateOnly To)> Asked { get; } = [];
+
+    public ValueTask<IReadOnlyDictionary<DateOnly, int>> CountAsync(Guid instrumentId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        Asked.Add((instrumentId, from, to));
+        var counts = new Dictionary<DateOnly, int>(Preset.GetValueOrDefault(instrumentId) ?? []);
+        foreach (var day in store.Stored.GetValueOrDefault(instrumentId, []).Select(b => SessionClock.DateOf(b.EpochSeconds)).GroupBy(d => d))
+        {
+            counts[day.Key] = counts.GetValueOrDefault(day.Key) + day.Count();
+        }
+
+        return ValueTask.FromResult<IReadOnlyDictionary<DateOnly, int>>(counts.Where(c => c.Key >= from && c.Key <= to).ToDictionary(c => c.Key, c => c.Value));
+    }
+}
+
+/// <summary>The undo of a CSV load in memory: a file is "loaded" when a test adds it; undoing it removes it and reports the bars the test said it wrote.</summary>
+internal sealed class FakeCsvUndo : ICsvUndo
+{
+    public Dictionary<string, CsvUndoResult> Loaded { get; } = new(StringComparer.Ordinal);
+
+    public List<string> Undone { get; } = [];
+
+    /// <summary>When set, undoing throws it (the database refused).</summary>
+    public Exception? Failure { get; set; }
+
+    public ValueTask<CsvUndoResult?> UndoAsync(string fileName, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        if (Failure is { } failure)
+        {
+            throw failure;
+        }
+
+        if (!Loaded.Remove(fileName, out var result))
+        {
+            return ValueTask.FromResult<CsvUndoResult?>(null);
+        }
+
+        Undone.Add(fileName);
+        return ValueTask.FromResult<CsvUndoResult?>(result);
+    }
+}
+
+/// <summary>The comparison against stored bars in memory: what the test presets per instrument, the same for every batch (or computed by <see cref="Respond"/>).</summary>
+internal sealed class FakeBarComparison : IBarComparison
+{
+    public Func<Guid, ReadOnlyMemory<Bar>, BarComparisonResult> Respond { get; set; } = (_, bars) => new BarComparisonResult(bars.Length, 0, 0, 0);
+
+    public List<(Guid InstrumentId, int Bars)> Asked { get; } = [];
+
+    public ValueTask<BarComparisonResult> CompareAsync(Guid instrumentId, ReadOnlyMemory<Bar> bars, CancellationToken cancellationToken)
+    {
+        Asked.Add((instrumentId, bars.Length));
+        return ValueTask.FromResult(Respond(instrumentId, bars));
     }
 }

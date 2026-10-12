@@ -9,7 +9,7 @@ using XDrishti.Domain.Market.Bars;
 namespace XDrishti.Application.Market.Bars.Pipeline;
 
 /// <summary>
-/// The CSV phase (ADR 0016 §4, §5): for each <c>&lt;SYMBOL&gt;_1m.csv[.gz]</c> in the folder that is new or changed (or all, when forced), finds the instrument
+/// The CSV phase (ADR 0016 §4, §5): for each <c>&lt;SYMBOL&gt;_1m.csv[.gz]</c> in the folder (only the ones the job names, when it was started with <c>csvFiles</c>) that is new or changed (or all, when forced), finds the instrument
 /// (<c>NSE:&lt;SYMBOL&gt;</c>, a share or ETF that is not retired; unknown and ambiguous symbols are listed and skipped, never guessed), streams the file through the
 /// row rules into the store, merges it in one transaction (CSV never overwrites Dhan) and records the file; at the end the instruments that
 /// have bars from CSV files (loaded now or in an earlier run, so a tracking that failed is tried again) are tracked, unless they have ever had a tracking row: an
@@ -45,18 +45,28 @@ internal sealed class CsvPhaseRunner(
             return End(phase, PhaseStatus.Failed, DataErrors.MasterMissingCode, DataErrors.MasterMissing.Message);
         }
 
-        var files = (await folder.ListAsync(cancellationToken))
+        var all = (await folder.ListAsync(cancellationToken))
             .Where(f => CsvFileName.TryParse(f.Name, out _))
             .OrderBy(f => f.Name, StringComparer.Ordinal)
             .ToList();
-        phase = phase with { Total = files.Count };
-        if (files.Count == 0)
+        if (all.Count == 0)
         {
-            return End(phase, PhaseStatus.Succeeded, null, $"There are no <SYMBOL>_1m.csv files in {folder.Path}.");
+            return End(phase with { Total = 0 }, PhaseStatus.Succeeded, null, $"There are no <SYMBOL>_1m.csv files in {folder.Path}.");
         }
 
+        // A job started with csvFiles loads only those; ambiguity (two files for one symbol) is still judged over the whole folder, as for a full load.
+        var files = job.CsvFiles is { } chosen ? all.Where(f => chosen.Contains(f.Name, StringComparer.Ordinal)).ToList() : all;
+        var failed = new List<string>();
+        if (job.CsvFiles is { } wanted)
+        {
+            var present = files.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
+            failed.AddRange(wanted.Where(n => !present.Contains(n)).Select(n => $"{n}: the file is no longer in the folder"));
+        }
+
+        phase = phase with { Total = files.Count + failed.Count, Done = failed.Count, FilesFailed = failed.Count, FailedFiles = [.. failed.Take(CsvPhase.MaxExamples)] };
+
         var loaded = await log.ListAsync(cancellationToken);
-        var symbolOf = files.ToDictionary(f => f.Name, f => CsvFileName.Canonical(CsvFileName.TryParse(f.Name, out var s) ? s : f.Name), StringComparer.Ordinal);
+        var symbolOf = all.ToDictionary(f => f.Name, f => CsvFileName.Canonical(CsvFileName.TryParse(f.Name, out var s) ? s : f.Name), StringComparer.Ordinal);
         var matches = await listed.FindAsync([.. symbolOf.Values.Distinct(StringComparer.Ordinal)], cancellationToken);
         var filesPerSymbol = symbolOf.Values.GroupBy(s => s, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
 
@@ -64,7 +74,6 @@ internal sealed class CsvPhaseRunner(
         var examples = new List<string>();
         var unknown = new List<string>();
         var ambiguous = new List<string>();
-        var failed = new List<string>();
         var withBars = new HashSet<Guid>();
 
         foreach (var file in files)
@@ -172,7 +181,15 @@ internal sealed class CsvPhaseRunner(
                     return new FileOutcome(summary.FileError, null, null);
                 }
 
-                var mark = new CsvFileMark(file.Name, file.Size, file.ModifiedAt, summary.Rows, summary.Repaired, summary.Rejected);
+                var mark = new CsvFileMark(
+                    file.Name,
+                    file.Size,
+                    file.ModifiedAt,
+                    summary.Rows,
+                    summary.Repaired,
+                    summary.Rejected,
+                    summary.FirstEpoch is { } firstEpoch ? DateTimeOffset.FromUnixTimeSeconds(firstEpoch) : null,
+                    summary.LastEpoch is { } lastEpoch ? DateTimeOffset.FromUnixTimeSeconds(lastEpoch) : null);
                 var merge = await session.CompleteAsync(mark, cancellationToken);
                 DataLog.CsvFileLoaded(logger, file.Name, summary.Rows, merge.Inserted, merge.Updated, merge.Unchanged, summary.Repaired, summary.Rejected);
                 return new FileOutcome(null, summary, merge);

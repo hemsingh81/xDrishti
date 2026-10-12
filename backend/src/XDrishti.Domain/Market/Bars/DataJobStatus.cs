@@ -10,4 +10,7 @@ public enum DataJobStatus
 
     /// <summary>A phase failed, or the job crashed or was interrupted.</summary>
     Failed,
+
+    /// <summary>The job never started: a scheduled run found another job running or the Data account not connected (the reason is the job's error).</summary>
+    Skipped,
 }

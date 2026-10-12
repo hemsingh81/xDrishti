@@ -7,8 +7,14 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
+using XDrishti.Application.Market.Bars.Eod;
+using XDrishti.Application.Market.Bars.Gaps;
+using XDrishti.Application.Market.Bars.Review;
 using XDrishti.Application.Market.Baskets;
+using XDrishti.Application.Market.Calendar;
+using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
@@ -77,8 +83,29 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DataJobView))]
 [JsonSerializable(typeof(IReadOnlyList<DataJobView>))]
 [JsonSerializable(typeof(DataOverview))]
+[JsonSerializable(typeof(CsvFilePage))]
+[JsonSerializable(typeof(PreviewCsvFilesRequest))]
+[JsonSerializable(typeof(CsvPreviewResult))]
 [JsonSerializable(typeof(DataInstrumentPage))]
+[JsonSerializable(typeof(GapPage))]
+[JsonSerializable(typeof(DataNotices))]
 [JsonSerializable(typeof(InstrumentBars))]
+[JsonSerializable(typeof(StartQualityRunRequest))]
+[JsonSerializable(typeof(QualityOverview))]
+[JsonSerializable(typeof(QualityInstrumentPage))]
+[JsonSerializable(typeof(QualityInstrumentDetail))]
+[JsonSerializable(typeof(QualityGateView))]
+[JsonSerializable(typeof(IReadOnlyList<QualityRunView>))]
+[JsonSerializable(typeof(CalendarView))]
+[JsonSerializable(typeof(CalendarDayView))]
+[JsonSerializable(typeof(AddCalendarDayRequest))]
+[JsonSerializable(typeof(CalendarRefreshResult))]
+[JsonSerializable(typeof(CorporateActionPage))]
+[JsonSerializable(typeof(CorporateActionView))]
+[JsonSerializable(typeof(AddCorporateActionRequest))]
+[JsonSerializable(typeof(UpdateCorporateActionRequest))]
+[JsonSerializable(typeof(DetectionResult))]
+[JsonSerializable(typeof(ImportCorporateActionsResult))]
 [JsonSerializable(typeof(HoldingPage))]
 [JsonSerializable(typeof(HoldingsSummary))]
 [JsonSerializable(typeof(HoldingLots))]

@@ -1,4 +1,5 @@
 import type { DataCoverageRow, DataJob } from '@/shared/api';
+import { formatNumber } from '@/shared/lib/format';
 import { jobCounts } from './summaries';
 import type { CoverageStatus, SortField } from './filters';
 
@@ -29,7 +30,14 @@ export function rowStatusText(row: Pick<DataCoverageRow, 'status' | 'daysBehind'
 
 /** The sentence for the toast and the screen reader when a job ends. */
 export function outcomeText(job: DataJob): string {
+  // An undo says what it did in its own words: "CSV load of X undone, N bars removed".
+  if (job.undoCsvFile && job.status === 'succeeded') {
+    return (
+      job.csv.message ?? `CSV load of ${job.undoCsvFile} undone, ${formatNumber(job.csv.barsRemoved ?? 0)} bars removed`
+    );
+  }
   if (job.status === 'failed') return `The update failed: ${job.error ?? 'see Recent runs for the reason.'}`;
+  if (job.status === 'skipped') return `The update was skipped: ${job.error ?? 'no reason was recorded.'}`;
   const counts = jobCounts(job);
   return counts.length > 0 ? `Data updated: ${counts.join(' · ')}` : 'Data updated.';
 }

@@ -8,9 +8,11 @@ import {
   formatCompact,
   formatIstDate,
   formatIstDateTime,
+  formatIstDayAndTime,
   formatIstTimeAndDay,
   formatPercent,
   formatPrice,
+  formatWeekdayDate,
 } from './format';
 
 describe('formatDuration', () => {
@@ -64,10 +66,25 @@ describe('formatDate', () => {
   });
 });
 
+describe('formatWeekdayDate', () => {
+  it('adds the weekday to a calendar date, without shifting it by the time zone', () => {
+    expect(formatWeekdayDate('2026-10-20')).toBe('Tue 20 Oct 2026');
+    expect(formatWeekdayDate('2026-11-14')).toBe('Sat 14 Nov 2026');
+  });
+});
+
 describe('formatIstTimeAndDay', () => {
   it("shows the time and day in India time, whatever the viewer's zone", () => {
     expect(formatIstTimeAndDay('2026-10-10T22:00:00Z')).toBe('03:30, 11 Oct');
     expect(formatIstTimeAndDay('2026-10-11T06:30:00Z')).toBe('12:00, 11 Oct');
+  });
+});
+
+describe('formatIstDayAndTime', () => {
+  it("shows the weekday, day and time in India time, whatever the viewer's zone", () => {
+    expect(formatIstDayAndTime('2026-10-13T10:20:00Z')).toBe('Tue 13 Oct 15:50');
+    expect(formatIstDayAndTime('2026-10-12T15:52:00+05:30', { weekday: false })).toBe('12 Oct 15:52');
+    expect(formatIstDayAndTime('2026-10-12T19:00:00Z', { weekday: false })).toBe('13 Oct 00:30');
   });
 });
 

@@ -8,6 +8,7 @@ internal sealed class CsvFileLog(XDrishtiDbContext db) : ICsvFileLog
 {
     public async ValueTask<IReadOnlyDictionary<string, LoadedCsvFile>> ListAsync(CancellationToken cancellationToken) =>
         await db.CsvFiles.AsNoTracking()
-            .Select(x => new LoadedCsvFile(x.FileName, x.SizeBytes, x.ModifiedAt, x.InstrumentId, x.Rows, x.Inserted, x.Updated, x.Repaired, x.Rejected, x.LoadedAt))
+            .Where(x => x.UndoneAt == null)
+            .Select(x => new LoadedCsvFile(x.FileName, x.SizeBytes, x.ModifiedAt, x.InstrumentId, x.Rows, x.Inserted, x.Updated, x.Repaired, x.Rejected, x.LoadedAt, x.FirstBar, x.LastBar))
             .ToDictionaryAsync(x => x.Name, StringComparer.Ordinal, cancellationToken);
 }

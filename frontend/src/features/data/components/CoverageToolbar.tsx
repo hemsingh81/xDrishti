@@ -1,49 +1,66 @@
-import { Button, MenuItem, Stack, TextField } from '@mui/material';
+import { Box, Button, Chip } from '@mui/material';
+import type { BarsOverview } from '@/shared/api';
 import { SearchField } from '@/shared/ui/SearchField';
-import { activeFilterCount, coverageStatuses, type CoverageFilters, type CoverageStatus } from '../lib/filters';
+import { activeFilterCount, type CoverageFilters, type CoverageStatus } from '../lib/filters';
 import { statusLabels } from '../lib/labels';
+import { FilterChips, type ChipOption } from './FilterChips';
 
 interface CoverageToolbarProps {
   filters: CoverageFilters;
+  /** The counts behind the status chips (all instruments, whatever the other filters). */
+  bars: BarsOverview;
   onChange: (patch: Partial<CoverageFilters>, options?: { replace?: boolean }) => void;
   onClear: () => void;
 }
 
-const all = 'all';
-const isStatus = (value: string): value is CoverageStatus => coverageStatuses.some((s) => s === value);
+type StatusChoice = CoverageStatus | 'all';
 
-/** Search box and the status filter of the coverage table; each change goes to the URL through `onChange`. */
-export function CoverageToolbar({ filters, onChange, onClear }: CoverageToolbarProps) {
+function optionsOf(bars: BarsOverview): ChipOption<StatusChoice>[] {
+  const current = Math.max(0, bars.instruments - bars.instrumentsBehind);
+  return [
+    { value: 'all', label: 'All', count: bars.instruments + bars.instrumentsEmpty },
+    { value: 'current', label: statusLabels.current, count: current },
+    { value: 'behind', label: statusLabels.behind, count: bars.instrumentsBehind },
+    { value: 'empty', label: statusLabels.empty, count: bars.instrumentsEmpty },
+  ];
+}
+
+/** Search box, the status chips with their counts, the "Has gaps" toggle and Clear; each change goes to the URL. */
+export function CoverageToolbar({ filters, bars, onChange, onClear }: CoverageToolbarProps) {
   return (
-    <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
-      <SearchField
-        value={filters.q}
-        onCommit={(q) => {
-          onChange({ q }, { replace: true });
-        }}
-        label="Search coverage"
-        placeholder="Search symbol or name"
-      />
-      <TextField
-        select
-        size="small"
+    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, alignItems: 'center', px: 1.5, py: 1 }}>
+      <Box sx={{ width: { xs: '100%', sm: 320 } }}>
+        <SearchField
+          value={filters.q}
+          onCommit={(q) => {
+            onChange({ q }, { replace: true });
+          }}
+          label="Search coverage"
+          placeholder="Search symbol or name"
+        />
+      </Box>
+      <FilterChips
         label="Status"
-        value={filters.status ?? all}
-        onChange={(event) => {
-          onChange({ status: isStatus(event.target.value) ? event.target.value : null });
+        value={filters.status ?? 'all'}
+        options={optionsOf(bars)}
+        onChange={(value) => {
+          onChange({ status: value === 'all' ? null : value });
         }}
-        sx={{ minWidth: 160 }}
-      >
-        <MenuItem value={all}>All statuses</MenuItem>
-        {coverageStatuses.map((status) => (
-          <MenuItem key={status} value={status}>
-            {statusLabels[status]}
-          </MenuItem>
-        ))}
-      </TextField>
+      />
+      <Chip
+        clickable
+        size="small"
+        aria-pressed={filters.hasGaps}
+        color={filters.hasGaps ? 'primary' : 'default'}
+        variant={filters.hasGaps ? 'filled' : 'outlined'}
+        label="Has gaps"
+        onClick={() => {
+          onChange({ hasGaps: !filters.hasGaps });
+        }}
+      />
       <Button size="small" disabled={activeFilterCount(filters) === 0} onClick={onClear} sx={{ ml: { sm: 'auto' } }}>
         Clear filters
       </Button>
-    </Stack>
+    </Box>
   );
 }

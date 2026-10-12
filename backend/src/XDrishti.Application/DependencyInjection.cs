@@ -1,13 +1,20 @@
 using Microsoft.Extensions.DependencyInjection;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
+using XDrishti.Application.Market.Bars.Eod;
+using XDrishti.Application.Market.Bars.Gaps;
 using XDrishti.Application.Market.Bars.Pipeline;
+using XDrishti.Application.Market.Bars.Review;
 using XDrishti.Application.Market.Baskets;
+using XDrishti.Application.Market.Calendar;
+using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
@@ -119,8 +126,11 @@ public static class DependencyInjection
     private static void AddMarketData(this IServiceCollection services)
     {
         services.AddScoped<CsvPhaseRunner>();
+        services.AddScoped<CsvUndoRunner>();
         services.AddScoped<DhanPhaseRunner>();
         services.AddScoped<AggregatePhaseRunner>();
+        services.AddScoped<GapBackfill>();
+        services.AddScoped<QualityPhaseRunner>();
 
         services.AddScoped<ICommandHandler<StartDataJobCommand, DataJobView>, StartDataJobHandler>();
         services.AddScoped<ICommandHandler<ExecuteDataJobCommand>, ExecuteDataJobHandler>();
@@ -130,6 +140,51 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetInstrumentBarsQuery, Result<InstrumentBars>>, GetInstrumentBarsHandler>();
         services.AddScoped<IQueryHandler<ListDataJobsQuery, IReadOnlyList<DataJobView>>, ListDataJobsHandler>();
         services.AddScoped<IQueryHandler<GetDataJobQuery, Result<DataJobView>>, GetDataJobHandler>();
+        services.AddScoped<IQueryHandler<ListBarGapsQuery, Result<GapPage>>, ListBarGapsHandler>();
+        services.AddScoped<IQueryHandler<GetDataNoticesQuery, DataNotices>, GetDataNoticesHandler>();
+
+        // The review step of the CSV load (ADR 0017 §6, P1-07a): the folder's files, the dry run of the real reader, and the undo of a load (a data job).
+        services.AddScoped<CsvFileCatalog>();
+        services.AddScoped<CsvFilePreviewer>();
+        services.AddScoped<IQueryHandler<ListCsvFilesQuery, Result<CsvFilePage>>, ListCsvFilesHandler>();
+        services.AddScoped<IQueryHandler<PreviewCsvFilesQuery, Result<CsvPreviewResult>>, PreviewCsvFilesHandler>();
+        services.AddScoped<ICommandHandler<UndoCsvLoadCommand, DataJobView>, UndoCsvLoadHandler>();
+
+        // The data quality checks (ADR 0017 §4, P1-14a): the phase runs inside a data job; the rest are its reads and fix actions.
+        services.AddScoped<IQueryHandler<GetQualityOverviewQuery, QualityOverview>, GetQualityOverviewHandler>();
+        services.AddScoped<IQueryHandler<GetQualityGateQuery, QualityGateView>, GetQualityGateHandler>();
+        services.AddScoped<IQueryHandler<ListQualityInstrumentsQuery, Result<QualityInstrumentPage>>, ListQualityInstrumentsHandler>();
+        services.AddScoped<IQueryHandler<GetQualityInstrumentQuery, Result<QualityInstrumentDetail>>, GetQualityInstrumentHandler>();
+        services.AddScoped<IQueryHandler<ListQualityRunsQuery, IReadOnlyList<QualityRunView>>, ListQualityRunsHandler>();
+        services.AddScoped<ICommandHandler<StartQualityRunCommand, DataJobView>, StartQualityRunHandler>();
+        services.AddScoped<ICommandHandler<RefetchQualityInstrumentCommand, DataJobView>, RefetchQualityInstrumentHandler>();
+        services.AddScoped<ICommandHandler<RefreshQualityAggregatesCommand, DataJobView>, RefreshQualityAggregatesHandler>();
+
+        // The scheduled end-of-day run (ADR 0017 §2) is a singleton: the API's hosted service runs it for the lifetime of the process.
+        services.AddSingleton<DataJobRecovery>();
+        services.AddSingleton<DataEodRunner>();
+
+        // The trading calendar (ADR 0017 §1): the scoped snapshot other slices read, the use cases of its endpoints and the upkeep that follows every data job.
+        services.AddScoped<ITradingCalendar, TradingCalendarProvider>();
+        services.AddSingleton<HolidayFetchGate>();
+        services.AddScoped<NseCalendarRefresher>();
+        services.AddScoped<ObservedCalendarRunner>();
+        services.AddScoped<ICalendarUpkeep, CalendarUpkeep>();
+        services.AddScoped<IQueryHandler<GetCalendarQuery, Result<CalendarView>>, GetCalendarHandler>();
+        services.AddScoped<ICommandHandler<AddCalendarDayCommand, AddedCalendarDay>, AddCalendarDayHandler>();
+        services.AddScoped<ICommandHandler<ConfirmCalendarDayCommand, CalendarDayView>, ConfirmCalendarDayHandler>();
+        services.AddScoped<ICommandHandler<RemoveCalendarDayCommand>, RemoveCalendarDayHandler>();
+        services.AddScoped<ICommandHandler<RefreshCalendarCommand, CalendarRefreshResult>, RefreshCalendarHandler>();
+
+        // Corporate actions and price adjustments (ADR 0017 §5, P1-10a): the detection runs after the aggregate phase and on request; adjusted reads use the factors of the applied actions.
+        services.AddScoped<CorporateActionDetection>();
+        services.AddScoped<IAdjustmentFactors, AdjustmentFactorsProvider>();
+        services.AddScoped<IQueryHandler<ListCorporateActionsQuery, Result<CorporateActionPage>>, ListCorporateActionsHandler>();
+        services.AddScoped<ICommandHandler<AddCorporateActionCommand, CorporateActionView>, AddCorporateActionHandler>();
+        services.AddScoped<ICommandHandler<UpdateCorporateActionCommand, CorporateActionView>, UpdateCorporateActionHandler>();
+        services.AddScoped<ICommandHandler<IgnoreCorporateActionCommand, CorporateActionView>, IgnoreCorporateActionHandler>();
+        services.AddScoped<ICommandHandler<DetectCorporateActionsCommand, DetectionResult>, DetectCorporateActionsHandler>();
+        services.AddScoped<ICommandHandler<ImportCorporateActionsCommand, ImportCorporateActionsResult>, ImportCorporateActionsHandler>();
     }
 
     private static void AddPortfolio(this IServiceCollection services)

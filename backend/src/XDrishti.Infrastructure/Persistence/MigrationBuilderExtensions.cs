@@ -64,4 +64,20 @@ internal static class MigrationBuilderExtensions
                 END IF;
             END $$;
             """);
+
+    /// <summary>
+    /// Lets only the runtime role (and the function's owner) execute a function: <c>EXECUTE</c> is taken from <c>PUBLIC</c> (where PostgreSQL grants it by default) and given to the runtime role. For the
+    /// narrow <c>SECURITY DEFINER</c> functions that do what the runtime role may not do itself. <paramref name="signature"/> is the function with its argument types, for example
+    /// <c>market.undo_csv_bars(uuid, timestamptz, timestamptz)</c>. The revoke always runs; the grant is a no-op when the role does not exist (e.g. integration-test databases).
+    /// </summary>
+    public static void RestrictFunctionToAppRole(this MigrationBuilder migrationBuilder, string signature) =>
+        migrationBuilder.Sql($"""
+            REVOKE ALL ON FUNCTION {signature} FROM PUBLIC;
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{AppRole}') THEN
+                    GRANT EXECUTE ON FUNCTION {signature} TO {AppRole};
+                END IF;
+            END $$;
+            """);
 }

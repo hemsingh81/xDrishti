@@ -100,6 +100,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("BrokerVault:Key", VaultKey);
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
+        builder.UseSetting("Data:Eod:Enabled", "false"); // tests ask the end-of-day runner themselves, with the clock pinned
         builder.UseSetting("Data:CsvFolder", CsvFolder);
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);
@@ -116,9 +117,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(BrokerHttpClientNames.DhanHoldings).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanChart).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
 
-            // Same for the instrument master's two file servers; refreshes are run by the tests, not by the background worker.
+            // Same for the instrument master's two file servers and NSE's holiday list; refreshes are run by the tests, not by the background worker.
             services.AddHttpClient(MasterDataHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddHttpClient(MasterDataHttpClientNames.Nse).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
+            services.AddHttpClient(MasterDataHttpClientNames.NseApi).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
             services.AddSingleton<IDataJobChannel>(DataJobs);
 
@@ -211,6 +213,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         {
             await db.Database.ExecuteSqlRawAsync("""
                 DELETE FROM market.data_jobs;
+                DELETE FROM market.quality_results;
+                DELETE FROM market.quality_runs;
+                DELETE FROM market.bar_gaps;
+                DELETE FROM market.corporate_actions;
+                DELETE FROM market.trading_days;
                 DELETE FROM market.csv_files;
                 DELETE FROM market.bars_agg;
                 DELETE FROM market.bars_1m;
@@ -218,7 +225,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
-                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%';
+                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%';
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;

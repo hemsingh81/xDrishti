@@ -36,6 +36,13 @@ export function currentPhase<K extends PhaseKey>(overview: DataOverview, key: K)
   return overview.lastJobs[key]?.[key] ?? null;
 }
 
+/** The job `currentPhase` takes the phase from (the running one that asked for it, else the latest that ran it). */
+export function phaseJob(overview: DataOverview, key: PhaseKey): DataJob | null {
+  const live = overview.runningJob;
+  if (live && live[key].status !== 'notRequested') return live;
+  return overview.lastJobs[key] ?? null;
+}
+
 /** done / total as a percentage, 0 when the total is not known yet. */
 export const percentDone = (done: number, total: number): number =>
   total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;

@@ -27,6 +27,16 @@ const istTimeAndDay = new Intl.DateTimeFormat('en-IN', {
   month: 'short',
 });
 
+const istWeekdayDayTime = new Intl.DateTimeFormat('en-IN', {
+  timeZone: 'Asia/Kolkata',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
 // Market data is stamped in India time: a bar of 15:29 is 15:29 whatever the viewer's zone.
 const istDateTime = new Intl.DateTimeFormat('en-IN', {
   timeZone: 'Asia/Kolkata',
@@ -52,6 +62,13 @@ export function formatDateTime(value: string | Date): string {
 /** "11 Oct 2026": a calendar date (yyyy-MM-dd) as written, or the viewer's day of a timestamp. */
 export function formatDate(value: string): string {
   return isoDay.test(value) ? calendarDate.format(new Date(`${value}T00:00:00Z`)) : date.format(new Date(value));
+}
+
+const calendarWeekday = new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' });
+
+/** "Tue 20 Oct 2026": a calendar date (yyyy-MM-dd) with its weekday. */
+export function formatWeekdayDate(value: string): string {
+  return `${calendarWeekday.format(new Date(`${value}T00:00:00Z`))} ${formatDate(value)}`;
 }
 
 export function formatNumber(value: number): string {
@@ -120,6 +137,14 @@ export function formatIstTimeAndDay(value: string | Date): string {
   const parts = istTimeAndDay.formatToParts(typeof value === 'string' ? new Date(value) : value);
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
   return `${part('hour')}:${part('minute')}, ${part('day')} ${part('month')}`;
+}
+
+/** "Tue 13 Oct 15:50" (`weekday` false: "13 Oct 15:50") — a moment in India time, for schedules and last runs. */
+export function formatIstDayAndTime(value: string | Date, { weekday = true }: { weekday?: boolean } = {}): string {
+  const parts = istWeekdayDayTime.formatToParts(typeof value === 'string' ? new Date(value) : value);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  const day = `${part('day')} ${part('month')} ${part('hour')}:${part('minute')}`;
+  return weekday ? `${part('weekday')} ${day}` : day;
 }
 
 /** A wait in words, rounded up to the minute: "1 h 20 min", "45 min", "2 h"; under a minute "less than a minute". */

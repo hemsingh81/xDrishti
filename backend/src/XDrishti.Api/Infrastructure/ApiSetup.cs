@@ -54,6 +54,9 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, BasketsEndpoints>();
         services.AddSingleton<IEndpointModule, HoldingsEndpoints>();
         services.AddSingleton<IEndpointModule, DataEndpoints>();
+        services.AddSingleton<IEndpointModule, DataQualityEndpoints>();
+        services.AddSingleton<IEndpointModule, DataCsvEndpoints>();
+        services.AddSingleton<IEndpointModule, CorporateActionEndpoints>();
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes, and the daily automatic refresh.
         services.AddHostedService<RefreshJobWorker>();
@@ -61,6 +64,9 @@ internal static class ApiSetup
 
         // Market data (ADR 0016): the worker that carries out registered data jobs (CSV load, Dhan fetch, aggregates).
         services.AddHostedService<DataJobWorker>();
+
+        // The scheduled end-of-day run (ADR 0017 §2): starts the data job on trading days at Data:Eod:TimeIst.
+        services.AddHostedService<DataEodService>();
 
         // Holdings (ADR 0012): the automatic refresh of the accounts that switched it on.
         services.AddHostedService<PortfolioRefreshService>();

@@ -121,7 +121,7 @@ internal static class CsvBarReader
                 await sink(reader.TakeBatch(), cancellationToken);
             }
 
-            return reader.Summary();
+            return reader.Summary(bytesRead);
         }
         finally
         {
@@ -165,7 +165,17 @@ internal static class CsvBarReader
             return batch;
         }
 
-        public CsvReadSummary Summary() => new(_rows, _accepted, _repaired, _rejected, _rejections, _examples, _fileError ?? (_roles is null ? null : BadTimes() ?? _probe.Problem()));
+        public CsvReadSummary Summary(long bytesRead) => new(
+            _rows,
+            _accepted,
+            _repaired,
+            _rejected,
+            _rejections,
+            _examples,
+            _fileError ?? (_roles is null ? null : BadTimes() ?? _probe.Problem()),
+            _accepted > 0 ? _earliest : null,
+            _accepted > 0 ? _latest : null,
+            bytesRead);
 
         public void Line(byte[] buffer, int offset, int length)
         {

@@ -18,9 +18,19 @@ import {
   withConnection,
   buildConnection,
 } from '@/test/fixtures';
+import { scrollToEnd } from '@/test/intersection';
 import { problemResponse, server } from '@/test/server';
+import { smallPage, threePages } from '@/test/smallPages';
 import { noHoldingsHandlers, renderPortfolio, twoPortfolioAccounts } from './testing';
 
+// Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
+vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
+  (await import('@/test/smallPages')).withSmallPages(await importOriginal()),
+);
+
+const twoPages = smallPage * 1.5; // the second page half full
+const shown = (count: number, total: number) => `Showing ${String(count)} of ${String(total)}`;
+const symbolOf = (n: number) => `S${String(n).padStart(3, '0')}`;
 const gridName = 'Holdings';
 
 const symbolsShown = () =>
@@ -338,8 +348,8 @@ describe('Portfolio page: holdings', () => {
     expect(screen.getByRole('columnheader', { name: 'Qty' })).toHaveAttribute('aria-sort', 'descending');
   });
 
-  it('pages through long lists (page and size are in the URL)', async () => {
-    const many = Array.from({ length: 120 }, (_, n) =>
+  it('shows "Showing N of total" and loads the next page when the list is scrolled to its end', async () => {
+    const many = Array.from({ length: threePages }, (_, n) =>
       buildHolding({
         id: `00000000-0000-4000-8000-00000000${String(7000 + n)}`,
         symbol: `S${String(n).padStart(3, '0')}`,
@@ -352,19 +362,71 @@ describe('Portfolio page: holdings', () => {
     );
     const { router } = renderPortfolio();
 
-    await screen.findByText('1–50 of 120');
-    await userEvent.click(screen.getByRole('button', { name: 'Go to next page' }));
-    await screen.findByText('51–100 of 120');
-    expect(router.state.location.search).toBe('?page=2');
-    expect(screen.getByRole('gridcell', { name: 'S050' })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('combobox', { name: 'Rows per page' }));
-    await userEvent.click(screen.getByRole('option', { name: '100' }));
-    await screen.findByText('1–100 of 120');
-    expect(router.state.location.search).toBe('?size=100');
+    await screen.findByText(shown(smallPage, threePages));
+    expect(screen.queryByRole('button', { name: 'Go to next page' })).not.toBeInTheDocument();
+    scrollToEnd();
+    await screen.findByText(shown(smallPage * 2, threePages));
+    expect(screen.getByRole('gridcell', { name: symbolOf(smallPage * 2 - 1) })).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: 'S000' })).toBeInTheDocument();
+    scrollToEnd();
+    await screen.findByText(shown(threePages, threePages));
+    expect(router.state.location.search).toBe(''); // no page or size in the URL
   });
 
-  it('sends the paging, sort, search and status to the API', async () => {
+  it('starts a new list at the top when the sort order changes, and keeps the totals', async () => {
+    const many = Array.from({ length: twoPages }, (_, n) =>
+      buildHolding({
+        id: `00000000-0000-4000-8000-00000000${String(7000 + n)}`,
+        symbol: `S${String(n).padStart(3, '0')}`,
+      }),
+    );
+    server.use(
+      http.get('/api/holdings', ({ request }) =>
+        HttpResponse.json(searchHoldings(many, new URL(request.url).searchParams)),
+      ),
+    );
+    renderPortfolio();
+    await screen.findByText(shown(smallPage, twoPages));
+    scrollToEnd();
+    await screen.findByText(shown(twoPages, twoPages));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Symbol' }));
+
+    await screen.findByRole('gridcell', { name: symbolOf(twoPages - 1) });
+    expect(screen.getByText(shown(smallPage, twoPages))).toBeInTheDocument();
+    expect(screen.queryByRole('gridcell', { name: symbolOf(twoPages - smallPage - 1) })).not.toBeInTheDocument();
+    expect(screen.getByText('Current value')).toBeInTheDocument(); // the summary tiles stay
+  });
+
+  it('keeps the loaded rows and offers a retry when a further page cannot be loaded', async () => {
+    const many = Array.from({ length: twoPages }, (_, n) =>
+      buildHolding({
+        id: `00000000-0000-4000-8000-00000000${String(7000 + n)}`,
+        symbol: `S${String(n).padStart(3, '0')}`,
+      }),
+    );
+    let fail = true;
+    server.use(
+      http.get('/api/holdings', ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        return params.get('page') === '2' && fail
+          ? problemResponse({ title: 'Holdings are unavailable.', code: 'x.y' }, 500)
+          : HttpResponse.json(searchHoldings(many, params));
+      }),
+    );
+    renderPortfolio();
+    await screen.findByText(shown(smallPage, twoPages));
+
+    scrollToEnd();
+
+    expect(await screen.findByText('Could not load more rows')).toBeInTheDocument();
+    expect(screen.getByRole('gridcell', { name: symbolOf(smallPage - 1) })).toBeInTheDocument();
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await screen.findByText(shown(twoPages, twoPages));
+  });
+
+  it('sends the sort, search, status and a page of rows to the API', async () => {
     const seen: URLSearchParams[] = [];
     server.use(
       http.get('/api/holdings', ({ request }) => {
@@ -373,15 +435,15 @@ describe('Portfolio page: holdings', () => {
         return HttpResponse.json(searchHoldings(sampleHoldings, params));
       }),
     );
-    renderPortfolio('?status=closed&q=old&sort=-pnl&page=1&size=25');
+    renderPortfolio('?status=closed&q=old&sort=-pnl&page=3&size=25');
 
     await screen.findByRole('gridcell', { name: /^OLDCO/ });
     expect(Object.fromEntries(seen.at(-1) ?? [])).toEqual({
       status: 'closed',
       q: 'old',
       sort: '-pnl',
-      page: '1',
-      pageSize: '25',
+      page: '1', // the page and size of an old link are ignored
+      pageSize: String(smallPage),
     });
   });
 
@@ -404,13 +466,6 @@ describe('Portfolio page: holdings', () => {
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('gridcell', { name: 'RELIANCE' })).toBeInTheDocument();
-  });
-
-  it('steps back to the last page when a link points past the end', async () => {
-    const { router } = renderPortfolio('?page=9');
-
-    await screen.findByRole('gridcell', { name: 'RELIANCE' });
-    expect(router.state.location.search).toBe('');
   });
 
   it('says so when nothing matches, and clears the filters', async () => {

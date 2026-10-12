@@ -94,6 +94,11 @@
 <td>Free official bhavcopy / corporate actions / holidays for reconciliation</td>
 <td>₹0</td>
 </tr>
+<tr>
+<td>Corporate actions (splits, bonus)</td>
+<td>Not from a feed: detected in the stored day bars and <strong>confirmed by you</strong>, typed in, or imported from CSV text (§4.2). Bars stay raw; adjusted reads apply them</td>
+<td>₹0</td>
+</tr>
 </tbody></table>
 <h2 id="2-three-data-tiers">2. Three data tiers<a class="hash" href="#2-three-data-tiers" aria-label="Link to this section">#</a></h2>
 <figure class="diagram"><pre class="mermaid">flowchart TB
@@ -128,8 +133,8 @@ the folder <code>Data:CsvFolder</code> (mounted read-only at <code>/data/csv</co
 one transaction; a file already loaded and unchanged (name, size, modified time in <code>market.csv_files</code>) is skipped unless forced. Rules: an inconsistent high/low (the opening bar when the open
 is the pre-open price) is <strong>repaired</strong> (high = max, low = min of open/high/low/close) and counted; unparseable rows, prices not above zero, negative volume, a minute twice (the first is
 kept) and a time that is not a whole minute are <strong>rejected</strong> and counted with the first ten reasons; zero volume and special sessions (Muhurat) are kept. <code>CSV never overwrites Dhan</code>;
-Dhan overwrites CSV. <code>&lt;SYMBOL&gt;</code> ↦ <code>NSE:&lt;SYMBOL&gt;</code> (shares and ETFs that are not retired); unknown or ambiguous symbols are listed and skipped. Preview, undo, profiles and the watched
-folder stay with P1-07/P1-08.</p>
+Dhan overwrites CSV. <code>&lt;SYMBOL&gt;</code> ↦ <code>NSE:&lt;SYMBOL&gt;</code> (shares and ETFs that are not retired); unknown or ambiguous symbols are listed and skipped. Profiles and the watched
+folder stay with P1-07/P1-08; the <strong>review step and the undo</strong> are built (below).</p>
 <p><strong>A file is refused as a whole, before anything of it is merged</strong> (nothing stored, the file is not recorded as loaded, the reason is in the job&#39;s <code>failedFiles</code>) when</p>
 <ul>
 <li>its <strong>clock is wrong</strong>: most bars lie outside the regular session (India time) but nearly all (≥ 99 %) fit a session after adding or subtracting 5 h 30 min (the message names the shift), or most lie outside
@@ -141,6 +146,29 @@ gzip bomb stops), <code>Data:Csv:MaxSpanDays</code> (default 3 700 days ≈ 120 
 </ul>
 <p><strong>Tracking after a load.</strong> After the files, the instruments that have bars from CSV files — loaded in this run <em>or in an earlier one</em>, so a tracking that failed is tried again by the next run even for unchanged
 files — are tracked, <strong>but only those that have never had a tracking row</strong> (active or not). An instrument the owner untracked is never tracked again behind their back, by a changed file or a forced load.</p>
+</blockquote>
+<blockquote>
+<p><strong>Review step and undo (P1-07a, <a href="../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.html">ADR 0017</a> §6).</strong></p>
+<ul>
+<li><strong><code>GET /api/data/csv/files</code></strong> lists the folder from its directory entries and the log of loaded files only (no file is opened, so 214 files list at once): per file <code>state</code> — <code>pending</code> (never loaded, or its load was undone) ·
+<code>loaded</code> (size and modified time are what they were when it was loaded) · <code>changed</code> (loaded, but size or modified time differ now) —, size, modified time, the <code>symbol</code> parsed from the name, the <code>instrument</code> it maps to
+or <code>mapping</code> <code>unknown</code> · <code>ambiguous</code> (several instruments, or several files, claim the symbol) · <code>invalidName</code> (a <code>.csv</code>/<code>.csv.gz</code> that is not <code>&lt;SYMBOL&gt;_1m.csv[.gz]</code>; other extensions are not listed), and for loaded files
+<code>rows</code>, <code>firstBar</code>, <code>lastBar</code> (null for a file loaded before the range was recorded), <code>loadedAt</code> and <code>overlapsWith</code> (the names of the other loaded files of the same instrument whose first-to-last range intersects this one&#39;s — a file renamed after its load is loaded twice; a file without a recorded range counts as covering everything; null for pending files). Changed and pending files first, then loaded, each by name; <code>q</code>, <code>state</code>, <code>page</code>, <code>pageSize</code> (≤ 200); counts by state.</li>
+<li><strong><code>POST /api/data/csv/preview {files[≤ 20]}</code></strong> is a <strong>dry run of the real reader</strong>, the same row rules, limits and session check as a load, writing nothing: per file the rows, accepted, repaired and rejected counts
+(rejections by reason and up to 10 examples, line numbers only), first and last bar (India time), trading days (distinct India dates), the verdict — <code>pass</code>, or <code>refused</code> with the load&#39;s own refusal message (wrong clock, wrong time unit,
+a limit, no usable header) — the symbol mapping, the first 5 accepted rows and <strong>what loading would do to the stored bars</strong>: would insert, would update, keep existing Dhan bars, unchanged, counted by primary-key lookups of the file&#39;s
+minutes against <code>market.bars_1m</code> (the same classification as the merge, so the counts equal what the load then reports). A request looks up at most 1 million stored bars; beyond that a <strong>spread sample of whole batches</strong> is compared and the file&#39;s
+comparison says <code>sampled</code> with the rows it compared. A request also reads at most <strong>2 ×</strong> the per-file limits of <code>Data:Csv</code> (rows and bytes) and works for at most <strong>60 seconds</strong>; the files after either limit, and the one being read when the time runs out, are <code>error</code> with the reason. Names are checked against the folder listing: a path, a traversal,
+a name with control characters or a file that is gone is that file&#39;s <code>error</code>, never a failure of the request.</li>
+<li><strong><code>POST /api/data/refresh {csvFiles}</code></strong> loads only the named files (≤ 214, each in the folder listing with a loadable name, else <code>400 data.invalid</code> naming it; only with the csv step; unchanged files are still skipped unless <code>forceCsv</code>).
+The job keeps the list (<code>csvFiles</code>).</li>
+<li><strong><code>POST /api/data/csv/files/{name}/undo</code></strong> (session and CSRF, no step-up) starts a job that removes the file&#39;s <strong><code>csv</code>-source bars of its instrument within the file&#39;s recorded first-to-last bar</strong> — never Dhan bars, never another
+instrument, never a CSV bar outside the range — and then rebuilds the instrument&#39;s aggregates; the file is pending again and the audit trail says <code>CSV load of &lt;file&gt; undone, N bars removed</code> (no row data). <strong>Values that
+an earlier load had overwritten are not restored</strong> (no history of replaced bars is kept): loading the file again writes its current values. <strong>The removal is by instrument and range, not by file:</strong> when another loaded file of the instrument overlaps the range (<code>overlapsWith</code>), its bars in the overlap go too; the job then carries a warning naming those files (&quot;…cover the same time (a.csv, b.csv): the undo removed their bars in the overlap too. They stay loaded; load them again with force…&quot;). <code>404 data.csv_file_not_found</code> (never loaded or undone already), <code>409 data.job_running</code>. The
+app role has no DELETE on bars (§9), so the removal is <code>market.undo_csv_bars(instrument, from, to)</code>, one <code>SECURITY DEFINER</code> function owned by the migrating role (<code>xd_owner</code>) with a pinned search path, executable by <code>xd_app</code> only (§9).</li>
+<li><strong>The real files are already adjusted.</strong> The 214 CSV files of the owner are split- and bonus-adjusted <strong>at the source</strong> (checked on HDFC Bank&#39;s 2025 bonus and Bajaj Finance&#39;s 2025 split: prices are continuous across the ex-dates), so
+corporate actions (§4.2) only matter for ex-dates <strong>after</strong> the CSV data ends; entering the historical ones would adjust the history twice.</li>
+</ul>
 </blockquote>
 <h3 id="31-how-files-arrive">3.1 How files arrive<a class="hash" href="#31-how-files-arrive" aria-label="Link to this section">#</a></h3>
 <ul>
@@ -174,7 +202,7 @@ negative volume, no duplicate timestamps; bar-end labels shifted to bar-start.</
 CSV &gt; live; conflicts beyond tolerance are logged, not silently overwritten.</li>
 <li><strong>Refresh aggregates</strong> for the affected instrument/date range.</li>
 <li><strong>Report</strong>: rows imported/updated/rejected per file, coverage before/after, quality issues — stored as an
-import job you can review and undo (by job id).</li>
+import job you can review and undo. Built (P1-07a): the job&#39;s report per file, the preview before the load and the undo <strong>per file</strong> (see the notes above); undo by job id is not built.</li>
 </ol>
 <p>Instruments in the files are auto-added to the <strong>tracked</strong> list (configurable), so they are kept up to date by
 Tier B afterwards.</p>
@@ -209,7 +237,7 @@ Tier B afterwards.</p>
 </tr>
 <tr>
 <td>Special sessions</td>
-<td>Holidays skipped; special sessions (e.g. Muhurat) are kept as they come; the calendar (P1-11) will name them</td>
+<td>Holidays skipped; special sessions (e.g. Muhurat, a Saturday session) are kept as they come, and the trading calendar (below) names them: a special session has its own window, a 1D bar of a Muhurat evening is complete when every minute between its first and last bar is there</td>
 </tr>
 <tr>
 <td>Implementation</td>
@@ -261,10 +289,117 @@ and a test recomputes every bucket with an independent implementation over fixtu
 <td>every day with bars is complete</td>
 </tr>
 </tbody></table>
+<h3 id="41-trading-calendar-adr-0017-1-p1-11a">4.1 Trading calendar (ADR 0017 §1, P1-11a)<a class="hash" href="#41-trading-calendar-adr-0017-1-p1-11a" aria-label="Link to this section">#</a></h3>
+<p>What a session is comes from one place, <code>market.trading_days</code> (one row per date that is <strong>not</strong> an ordinary weekday session; nothing is seeded), read through the pure domain type <code>TradingCalendar</code> and, for any slice, the application port <code>ITradingCalendar</code> (the confirmed days are read once per request or job and kept as an in-memory snapshot; changing the calendar invalidates it).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>date</code> (PK)</td>
+<td>the India date</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>holiday</code> (a weekday without a session) · <code>special</code> (a session of its own on any date: a Saturday session, the Muhurat evening)</td>
+</tr>
+<tr>
+<td><code>session_from</code>, <code>session_to</code></td>
+<td>India time, <code>to</code> exclusive; only for <code>special</code> (a holiday has none)</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>manual</code> (the owner) · <code>observed</code> (derived from the stored bars) · <code>nse</code> (NSE&#39;s public holiday list)</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>confirmed</code> (counts) · <code>proposed</code> (waits for the owner) · <code>dismissed</code> (declined; kept so it is not proposed or listed again)</td>
+</tr>
+<tr>
+<td><code>note</code>, <code>updated_at</code></td>
+<td>free text up to 200 characters, last change</td>
+</tr>
+<tr>
+<td><code>proposal_status</code>, <code>proposed_kind</code>, <code>proposed_from</code>, <code>proposed_to</code>, <code>proposed_note</code></td>
+<td>a <strong>proposal next to a confirmed row</strong> (P1-11a review): what the stored bars show when it contradicts a confirmed day, e.g. a session on an NSE-listed holiday. <code>proposal_status</code> <code>proposed</code> (waits) · <code>dismissed</code> (declined; remembered so it is not proposed again) · null. The confirmed row keeps deciding what a session is; the proposal changes nothing until the owner confirms it</td>
+</tr>
+<tr>
+<td><code>xmin</code></td>
+<td>PostgreSQL&#39;s row version, mapped as the optimistic-concurrency token: a save based on a row someone changed meanwhile is refused, never overwriting or deleting the newer row</td>
+</tr>
+</tbody></table>
+<p><code>TradingCalendar</code> answers <code>IsTradingDay(date)</code> (a weekday that is not a confirmed holiday, or a confirmed special session), <code>SessionOf(date)</code> (09:15–15:30 India time, or the special window), <code>ExpectedMinutes(date)</code> (375, the window&#39;s length, 0 when closed), <code>LastClosedSession(now)</code> (today once its session is over — 15:29:59 is still before the close, 15:30:00 is after it, a Muhurat day closes at its own end —, otherwise the trading day before) and <code>TradingDaysBetween(after, upTo)</code> (trading days after the first date up to and including the second). Only <em>confirmed</em> days count; a proposal changes nothing until the owner confirms it.</p>
+<p><strong>&quot;Behind&quot;</strong> is the last bar&#39;s date against the last closed session, counted in trading days — the Data screen&#39;s status ribbon, the overview&#39;s <code>expectedSession</code>/<code>daysBehind</code>/<code>stale</code> and every coverage row&#39;s <code>status</code> (<code>current</code>/<code>behind</code>/<code>empty</code>) and <code>daysBehind</code>. A long weekend with a holiday on the Friday is therefore not &quot;behind&quot;. The overview also carries <code>nextHoliday</code> (the first confirmed holiday today or later) and <code>calendarProposals</code> (how many days wait for confirmation).</p>
+<p><strong>Sources and trust (manual &gt; observed &gt; NSE).</strong> The owner adds a holiday or a special session (<code>POST /api/data/calendar</code>: confirmed at once, replacing whatever the date had), confirms a proposal (<code>PUT /api/data/calendar/{date}/confirm</code>) or removes a day (<code>DELETE /api/data/calendar/{date}</code>: the owner&#39;s own entry is deleted; a proposal or an NSE day becomes <code>dismissed</code>, so it comes back neither as a proposal nor from the list; removing a dismissed day deletes it; <strong>a date with a proposal next to a confirmed day dismisses only that proposal and leaves the confirmed day — remove the date again to take the day itself off</strong>). Changes are audited (<a href="04-accounts-access-and-operations.html">doc 04</a> §2: <code>CalendarDayAdded</code>, <code>CalendarDayConfirmed</code>, <code>CalendarDayRemoved</code>, <code>CalendarRefreshedFromNse</code>: the date, kind and window — never the note).</p>
+<ul>
+<li><strong>Observed proposals</strong> are computed after every data job, from the daily aggregates (so the bars must be aggregated; while any instrument has changes that are not, nothing is concluded). A <strong>weekday</strong> on which fewer than <strong>5 %</strong> of the instruments that have bars before <em>and</em> after it have any bar is a suspected <strong>holiday</strong> (a day with normal coverage, or one on which a handful of instruments lack their files, is nowhere near; a day on which only 3 of 214 instruments have bars is suspected, however it came about). A <strong>weekend</strong> date with bars from at least 5 % of the instruments, or a weekday whose bars lie in the evening window (17:30–20:00), is a <strong>special</strong> session with the window most instruments share (first bar to the minute after the last): the 2024-11-01 Muhurat evening (60 bars from 18:15) and the Saturday sessions of the real files come out this way. So is any <strong>weekday that is a confirmed holiday</strong> (NSE&#39;s list, say) on which at least 5 % of the instruments have bars, whatever their window — a holiday that was moved or called off trades a regular session (09:15–15:30), a Muhurat session on a listed Diwali holiday is in the evening. Proposals are refreshed on every run (a proposal the bars no longer support, because the day was filled in later, is withdrawn) and <strong>never confirmed</strong> by the system. One window per date: a Saturday with two separate sessions gets one window around both.</li>
+<li><strong>NSE&#39;s list</strong> (<code>GET https://www.nseindia.com/api/holiday-master?type=trading</code>, the <code>CM</code> segment, entries <code>tradingDate</code> <code>dd-MMM-yyyy</code> and <code>description</code>) is fetched best effort, once a day after a data job and on request (<code>POST /api/data/calendar/refresh</code>, always 200: <code>succeeded</code> false with the reason and nothing changed when NSE refuses — it often wants a browser-like client and a cookie from its home page, which are not sent — or the format has changed). A failure is only a warning of the job; manual add is the path that always works. New weekday holidays are stored confirmed (<code>nse</code>). <strong>A session seen on a confirmed NSE holiday does not replace it:</strong> the observation is attached to the confirmed row as a proposal (<code>GET /api/data/calendar</code> lists it under <code>proposals</code> with <code>replaces</code> = the kind of the confirmed day, and the overview counts it in <code>calendarProposals</code>), the date stays a holiday for gaps, quality and &quot;behind&quot; until the owner confirms the proposal (<code>PUT …/confirm</code> turns the day into the special session, source <code>observed</code>) or dismisses it (<code>DELETE</code>). The proposal is refreshed with every run and withdrawn when the bars no longer support it or agree with the holiday. NSE&#39;s list never overrides the owner&#39;s rows or days the owner dismissed. Withdrawing a proposal deletes the proposal row only if it has not changed since the pass read it (row version): a proposal the owner confirms at the same moment is never deleted. The endpoint is on the master-data allow-list (<a href="17-deployment-and-operations.html">doc 17</a> §3, ADR 0010).</li>
+</ul>
 <p><code>complete</code> for 1W and 1M means that every <em>day that has bars</em> is complete — not that the week or month is over: the running week or month is <code>complete</code> as long as the days so far are; use the last bucket&#39;s
 date, not the flag, to tell an unfinished period.</p>
 <p><code>ts</code> of every bar is a UTC instant; the API shows it with the India offset (<code>+05:30</code>). The days, weeks and months are built from the day bars, the day bars and the intraday bars from the 1-minute bars.
-Prices are raw (adjustments come with P1-10).</p>
+Prices are raw by default; <code>adjusted=true</code> on the bars read applies the owner&#39;s confirmed splits and bonus issues on read (§4.2).</p>
+<h3 id="42-corporate-actions-and-price-adjustments-adr-0017-5-p1-10a">4.2 Corporate actions and price adjustments (ADR 0017 §5, P1-10a)<a class="hash" href="#42-corporate-actions-and-price-adjustments-adr-0017-5-p1-10a" aria-label="Link to this section">#</a></h3>
+<p>Bars are stored <strong>raw</strong>. A split or bonus issue changes the share count and so the price level; <code>market.corporate_actions</code> records them, and <strong>adjusted reads</strong> (<code>GET /api/data/instruments/{id}/bars?...&amp;adjusted=true</code>, and the reusable application service <code>IAdjustmentFactors</code> for later research reads) multiply the older prices on read. Plans and anything about tradable levels use raw prices. Dividends are not adjusted (<code>adjust.dividends: false</code>; <code>adjust.splits_bonus: true</code> in <a href="16-configuration.html">doc 16</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code>, <code>instrument_id</code></td>
+<td>the action and its instrument (unique per <code>instrument_id</code>, <code>ex_date</code>, <code>kind</code>)</td>
+</tr>
+<tr>
+<td><code>ex_date</code></td>
+<td>the India date the price level changes: the first session at the new level</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td><code>split</code> · <code>bonus</code></td>
+</tr>
+<tr>
+<td><code>numerator</code>, <code>denominator</code></td>
+<td>whole numbers 1 to 100000. <strong>Split <code>n:d</code> = old shares : new shares</strong> — <code>1:5</code> turns one share into five (a <code>5:1</code> is a consolidation). <strong>Bonus <code>a:b</code> = bonus shares : shares held</strong> — <code>1:1</code> is one bonus share for each held, <code>1:2</code> one for every two</td>
+</tr>
+<tr>
+<td><code>factor</code></td>
+<td>the price multiplier for the bars <strong>before</strong> the ex-date, derived and stored (12 decimals): split <code>n / d</code> (<code>1:5</code> → 0.2), bonus <code>b / (a + b)</code> (<code>1:1</code> → 0.5, <code>1:2</code> → 2/3, <code>1:3</code> → 0.75). A split <code>1:1</code> changes nothing and is refused</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>suggested</code> (found by the detection; changes nothing) · <code>applied</code> (counts) · <code>ignored</code> (declined; kept so it is not suggested again). Rows are never deleted: <code>xd_app</code> has no DELETE</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>manual</code> · <code>detected</code> · <code>csv</code></td>
+</tr>
+<tr>
+<td><code>note</code>, <code>created_at</code>, <code>decided_at</code>, <code>decided_by</code></td>
+<td>a note up to 200 characters, when it was created, when and by whom (the owner&#39;s e-mail) it was confirmed, edited or ignored (null while suggested)</td>
+</tr>
+<tr>
+<td><code>detected_ex_date</code></td>
+<td>the ex-date the detection first found the action on (null for actions nobody detected); it stays when the owner corrects the ex-date, so the detection does not suggest the old date again</td>
+</tr>
+</tbody></table>
+<p><strong>Adjustment</strong> (pure <code>AdjustmentFactors</code>): a bar whose India date is <strong>strictly before</strong> an action&#39;s ex-date is multiplied by its factor; the ex-date itself and later are not. Several actions multiply (order does not matter). Open, high, low and close are multiplied and rounded to <strong>4 decimals only at the output</strong>; volume is <strong>divided</strong> by the cumulative factor (more shares before a split) and rounded to whole shares. It works for every timeframe: each bar uses the factor of its own start date — a 1m or intraday bar its India date, a 1D bar its day. A <strong>1W or 1M bar is built from the adjusted day bars when its bucket contains an ex-date after its first day</strong> (open of the first day, highest high, lowest low, close of the last day, volumes added, with the same bucket rules as the aggregates: weeks from Monday, calendar months); a bucket lying wholly before or after the ex-dates has one factor for all its days and is adjusted like a day bar, one that starts on the ex-date is not adjusted. Without an applied action the adjusted weeks and months equal the raw ones. (An earlier version applied the first day&#39;s factor to the whole bucket, which was wrong for the days from the ex-date on.) The response carries <code>adjustment {applied, factor, actions[{exDate, kind, ratio, factor}]}</code>: <code>applied</code> is the number of applied actions that changed the bars returned (ex-date after the oldest bar returned), <code>factor</code> the cumulative factor of the oldest bar, <code>actions</code> those actions oldest first. Without <code>adjusted=true</code> the prices are raw and <code>adjustment</code> is <code>null</code>.</p>
+<p><strong>Detection</strong> (pure <code>ActionDetector</code>, over the day bars <code>bars_agg</code> <code>1D</code>; suggestions only, never applied). A day <code>d</code> is a candidate when</p>
+<ol>
+<li>its <strong>open</strong>, or else its <strong>close</strong>, is within <strong>2.5 %</strong> of one of the common price factors <strong>1/2, 1/3, 1/4, 1/5, 1/10, 1/20, 2/3, 3/4</strong> of the previous close;</li>
+<li>its volume is at least <strong>1.5 ×</strong> the median volume of the 20 sessions before it (at least 10 must exist; the volume must be above 0);</li>
+<li>the move is <strong>not reversed</strong>: neither the close of <code>d</code> nor the closes of the next 3 sessions that exist come back above <code>previousClose × √factor</code> (the middle between the old level and the new, in log terms). A candidate on the newest day is judged on the sessions there are.</li>
+</ol>
+<p>Reverse splits (a price rise) are not looked for. The ratio found maps to <strong>one</strong> reading, with a note naming the other: 1/2 → split 1:2 (also bonus 1:1), 1/3 → split 1:3 (bonus 2:1), 1/4 → split 1:4 (bonus 3:1), 1/5 → split 1:5 (bonus 4:1), 1/10 → split 1:10 (bonus 9:1), 1/20 → split 1:20 (bonus 19:1), 2/3 → bonus 1:2 (split 2:3), 3/4 → bonus 1:3 (split 3:4). The owner edits the kind or ratio when confirming. A date on which the instrument has <strong>any</strong> action (any kind, any status, ignored included), or on which an action was first <strong>detected</strong> (<code>detected_ex_date</code>, also after the owner moved it to another ex-date), is never suggested again, and the store ignores a suggestion that exists, so running the detection again suggests nothing new. It runs <strong>after the aggregate phase</strong> of every data job (only the days that job changed, with the sessions before them as context; a failure is logged and never fails the phase; the phase message says how many were suggested) and <strong>on request</strong> (<code>POST /api/data/corporate-actions/detect</code>, the whole history of every share and ETF with day bars).</p>
+<p><strong>Owner decisions</strong> (<code>/api/data/corporate-actions</code>): <code>GET</code> (filters <code>status</code>, <code>instrumentId</code>, <code>page</code>, <code>pageSize</code>; the page also carries <code>pending</code>), <code>POST</code> (add by hand: applied at once), <code>PUT /{id}</code> (confirm a suggestion — an empty body confirms it as it is — or change the ex-date, kind, ratio or note; fields left out keep their value; the result is applied, also for an ignored one), <code>POST /{id}/ignore</code>, <code>POST /import</code> (CSV text <code>symbol,exDate,kind,numerator,denominator</code>, as the request body or the first file of a multipart upload; <code>preview=true</code> writes nothing; at most 5,000 lines; unknown symbols are listed and never guessed; lines that repeat an existing action of any status are skipped; bad lines are reported and skipped). Errors: <code>data.invalid</code> (fields), <code>data.instrument_not_found</code>, <code>data.corporate_action_not_found</code>, <code>data.corporate_action_exists</code>, <code>data.corporate_action_conflicts_same_day</code>, <code>data.csv_already_adjusted</code> (below). Each add, confirmation, edit, ignore and import is audited (<a href="04-accounts-access-and-operations.html">doc 04</a>).</p>
+<p><strong>A split and a bonus on one day.</strong> Applying one kind (add, confirm, edit, import) while the instrument has the other kind on that ex-date: a still-pending <em>suggestion</em> of the other kind is declined by itself (it was only a guess; audited as <code>CorporateActionIgnored</code>), an <em>applied</em> one blocks with <code>409 data.corporate_action_conflicts_same_day</code> until it is ignored first. Ignored actions do not count. In an import such a line (or one that clashes with an earlier line of the same text) is a problem line — reported in <code>errors</code>, skipped — and the rest is imported.</p>
+<p><strong>The owner&#39;s CSV files are already adjusted — double-adjustment protection.</strong> <code>csvAdjustedThrough</code> (a date, or null) is, per instrument, the date of the last bar of its loaded CSV files that are not undone (<code>max(csv_files.last_bar)</code> in India time); it is on every item of <code>GET /api/data/corporate-actions</code> and on the views the add/edit/ignore return. An action with an ex-date <strong>on or before</strong> it would adjust those prices a second time, so adding it, confirming or editing a suggestion into it (when the result is applied and its ex-date, kind or ratio changes — not a note change of an applied action) and importing it is refused with <code>409 data.csv_already_adjusted</code> (the problem carries <code>adjustsCsvTwice</code> and <code>instruments</code>) <strong>unless the owner consents</strong>: <code>acknowledgeCsvAdjusted=true</code> in the JSON body or the query of POST/PUT, and as the query <code>acknowledgeCsvAdjusted=true</code> of the import. The import preview (<code>preview=true</code>, never refused) returns <code>adjustsCsvTwice</code> (the importable lines that fall into the adjusted part) and <code>warnings[{line, symbol, exDate, csvAdjustedThrough, message}]</code> (the first 50); an import with such lines needs the acknowledgement. Duplicates that are skipped do not count. The UI shows its confirm dialog and then sends the flag.</p>
+<p><strong>Where it shows.</strong> <code>pendingCorporateActions</code> (the suggestions waiting) on the Data overview and the Data quality overview, and the bell notice <code>data_corporate_actions_pending</code> (warn) in <code>GET /api/data/notices</code>. Measured on the 214 CSV files of the owner (two years of 1-minute bars, which are <strong>already adjusted</strong> by their source: prices are continuous across HDFC Bank&#39;s 2025 bonus and Bajaj Finance&#39;s 2025 split — so corporate actions only apply to ex-dates <strong>after</strong> the CSV data ends; adding an earlier one would adjust the history twice) the detection suggested 4 actions in 214 × ~500 sessions, all of them real one-day price collapses (Adani Enterprises 21 Nov 2024, REC 4 Jun 2024, PGEL 8 Aug 2025) or a restructuring (Siemens 7 Apr 2025) that fall in the 2/3 and 3/4 bands and none in the split bands: the owner ignores them. Recall on those series with the adjustment undone synthetically (a split or bonus at three points of each of the 214 series): 1/10 and 1/5 99 %, 1/4 97 %, 1/3 90 %, 1/2 64 %, 2/3 41 %, 3/4 32 % — the 1.5 × volume rule is what a 1:2 split (volume ×2), a 1:2 bonus (×1.5) and a 1:3 bonus (×1.33) rarely clear, so those are the actions to add by hand or by CSV.</p>
 <h2 id="5-real-time-data-the-active-set-only">5. Real-time data — the active set only<a class="hash" href="#5-real-time-data-the-active-set-only" aria-label="Link to this section">#</a></h2>
 <p>To keep the system fast and within limits, live data is streamed only for the <strong>active set</strong>:</p>
 <table>
@@ -314,8 +449,8 @@ connection. <code>live.max_ws_instruments</code> caps it (default 200).</li>
 <ol>
 <li>Refresh Dhan token; refresh instrument master (new listings, lot sizes, expiries).</li>
 <li>For every tracked instrument: fetch today&#39;s 1-minute candles and daily candle (throttled, chunked, resumable).</li>
-<li>Detect gaps for recent days and backfill; corporate actions; calendar.</li>
-<li>Quality checks (§9); reconcile with NSE files if enabled.</li>
+<li>Detect gaps for recent days and backfill (§6.1); corporate actions (§4.2: the detection follows the aggregate phase and only suggests); calendar (§4.1: NSE&#39;s holiday list and the observed proposals follow every data job).</li>
+<li>Quality checks (§10b, the last step of the same job); reconcile with NSE files if enabled.</li>
 <li>Refresh aggregates; then the nightly pipeline starts (<a href="03-target-architecture.html">doc 03</a> §7).</li>
 </ol>
 <p>Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for gaps).</p>
@@ -359,6 +494,68 @@ two days before the instrument&#39;s last stored bar (the overlap proves the tim
 <td>only the HTTP status and a well-formed Dhan error code (<code>DH-905</code>) are logged or shown; never the token, the URL, the request body or the text of Dhan&#39;s answer</td>
 </tr>
 </tbody></table>
+</blockquote>
+<h3 id="61-scheduled-run-and-gap-backfill-adr-0017-23-p1-12a">6.1 Scheduled run and gap backfill (ADR 0017 §2–§3, P1-12a)<a class="hash" href="#61-scheduled-run-and-gap-backfill-adr-0017-23-p1-12a" aria-label="Link to this section">#</a></h3>
+<blockquote>
+<p><strong>Built (P1-12a, <a href="../specs/P1-12a-scheduled-end-of-day-run-and-gap-backfill.html">spec</a>):</strong> the schedule and the gap backfill, in <code>xd-api</code> until the services framework (P1-13) takes over.</p>
+<p><strong>The scheduled run.</strong> A hosted service (<code>DataEodService</code>, the shape of the daily instrument refresh) waits, in slices of at most one minute that read the clock again, for the next
+run time and then starts the ordinary data job with the steps <code>dhan, aggregate, quality</code> (every step of the pipeline but <code>csv</code>, which is for history the owner brings by hand; the quality checks of P1-14a are §10b) and trigger <code>daily</code>, requested by <code>system:data-eod</code>. The run time is <code>Data:Eod:TimeIst</code> (<code>HH:mm</code> India time, default <strong>15:50</strong>) on <strong>trading days of the calendar</strong>
+(§4.1: no weekends or holidays, special sessions included) and never before that day&#39;s session has closed — a special evening session such as Muhurat moves the day&#39;s run to its end.
+<code>Data:Eod:Enabled</code> (default true) switches it off. <strong>Catch-up:</strong> when the application starts on a trading day after the run time and no automatic run exists for the day, it runs at once.
+<strong>At most one automatic run per day.</strong> When another data job is running, or the primary Data account cannot fetch (no account, not connected, expired) or the Dhan fetch is not
+available, no job starts: a <strong>skipped run</strong> is recorded (job status <code>skipped</code>, the reason as its error, no phase ran) and nothing is retried that day; the owner runs &quot;Update data&quot; by hand. A
+failure to read the database at the run time is retried a few times a minute apart.
+Jobs carry <code>trigger</code> (<code>manual</code> | <code>daily</code>); the overview&#39;s <code>eod</code> block gives <code>enabled</code>, <code>timeIst</code>, <code>nextRunAt</code> (null when switched off) and <code>lastRun</code> (the latest automatic run: id, start, end, status, trigger, reason).</p>
+<p><strong>Gap detection and backfill</strong> (the Dhan phase of every job, scheduled or not). For each tracked instrument with bars, the sessions of the last <code>Data:Gaps:LookbackSessions</code> (default <strong>30</strong>, 1 to 250)
+trading days of the calendar that have <strong>closed</strong> (never today&#39;s open session) and that lie <strong>after the day of the instrument&#39;s first bar</strong> are counted. The bars of a day come from the daily
+aggregate&#39;s <code>bars</code> column — one cheap read of a month of days; only the days of the instrument&#39;s not-yet-aggregated range (the dirty range) are counted in the 1-minute table, by its primary key —
+and compared with the calendar&#39;s <strong>expected minutes</strong>: 375 for a regular session, the window&#39;s length for a special one, none for a holiday or weekend (never a gap). A session with fewer bars
+is a <strong>gap</strong> in <code>market.bar_gaps (instrument_id, date, expected, found, attempts, last_attempt_at, status, detected_at)</code>, status <code>open</code> | <code>filled</code> | <code>unfillable</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>What happens</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A gap older than the ordinary window (two days before the last bar)</td>
+<td>Recorded <code>open</code> and fetched in extra windows: gap sessions that follow each other in the calendar share a window, windows are cut at 90 days (the planner of §6 above); the bars go through the same merge, precedence and dirty-range path as every fetch, so the aggregates are rebuilt</td>
+</tr>
+<tr>
+<td>A partial session inside the ordinary window</td>
+<td>Fetched anyway; recorded as a gap only if the fetch does not complete it</td>
+</tr>
+<tr>
+<td>After the fetch: all expected bars there</td>
+<td><code>filled</code></td>
+</tr>
+<tr>
+<td>After the fetch: more bars than before, but not all</td>
+<td>stays <code>open</code> (found updated, attempts + 1); asked for again by the next run</td>
+</tr>
+<tr>
+<td>After the fetch: no more bars than before (a halt, a circuit-locked day)</td>
+<td><code>unfillable</code>, attempts + 1; <strong>scheduled and ordinary runs leave it alone</strong>; &quot;Re-fetch gaps&quot; (<code>refetchGaps: true</code>) asks again</td>
+</tr>
+<tr>
+<td>The instrument&#39;s fetch fails</td>
+<td>nothing is decided and no attempt is counted: it is retried by the next run</td>
+</tr>
+<tr>
+<td>A known gap complete by other means (a CSV file)</td>
+<td><code>filled</code> without a fetch; a <code>filled</code> session that lost bars (an undone file) opens again</td>
+</tr>
+<tr>
+<td>A gap older than the lookback that is still <code>open</code></td>
+<td>still retried until it is filled or unfillable</td>
+</tr>
+</tbody></table>
+<p><strong>Which gaps count.</strong> The records are kept for every instrument, but the overview, <code>GET /api/data/gaps</code>, the <code>hasGaps</code> filter and the bell notice count only the gaps of <strong>tracked, not retired</strong> instruments (the quality universe): untracking or retiring an instrument takes its open gaps out of sight, tracking it again brings them back.</p>
+<p><strong>Start-up.</strong> The catch-up at start waits for the data worker&#39;s recovery of jobs a previous process left <code>running</code> (<code>DataJobRecovery</code>, at most two minutes), so such a job is not mistaken for a running one; when a start fails because a job runs, the day&#39;s automatic jobs are looked at again before a skipped run is recorded (a run of the day that appeared meanwhile is not followed by a skipped row), and the wait slices are clamped at zero so a clock that jumped cannot make a delay negative.</p>
+<p>The phase reports <code>gapsFound</code>, <code>gapsFilled</code> and <code>gapsUnfillable</code> (sessions it asked for or found incomplete) and warns when some stay open. <strong>Notices</strong> for the bell
+(<code>GET /api/data/notices</code>, derived from state like the account notices, with an id that includes the situation): the latest automatic run <strong>failed</strong> (<code>data_run_failed</code>, error), and sessions are left with <strong>open gaps</strong>
+(<code>data_gaps_open</code>, warning; unfillable sessions raise nothing — they are listed, not alarming); P1-14a adds <code>data_quality_failed</code> (§10b).</p>
 </blockquote>
 <h2 id="7-broker-abstraction">7. Broker abstraction<a class="hash" href="#7-broker-abstraction" aria-label="Link to this section">#</a></h2>
 <table>
@@ -531,13 +728,23 @@ raw answer is logged or returned.</p>
 </tr>
 <tr>
 <td><code>market.csv_files</code></td>
-<td>Table (P1-17a)</td>
-<td>The CSV files loaded: name, size, modified time, instrument, rows / inserted / updated / repaired / rejected, loaded at (written in the transaction of the file&#39;s bars)</td>
+<td>Table (P1-17a, P1-07a)</td>
+<td>The CSV files loaded: name, size, modified time, instrument, rows / inserted / updated / repaired / rejected, loaded at (written in the transaction of the file&#39;s bars), <code>first_bar</code>/<code>last_bar</code> (the range its undo works on; null for files loaded before they were recorded), <code>undone_at</code> (set by the undo: the file is pending again; a new load clears it). <code>xd_app</code>: no DELETE</td>
 </tr>
 <tr>
 <td><code>market.data_jobs</code></td>
 <td>Table (P1-17a)</td>
-<td>One row per run of the data pipeline (CSV → Dhan → aggregates): steps, status, and per phase its progress and counts (JSON); at most one row <code>running</code> (unique partial index + advisory lock); history is kept</td>
+<td>One row per run of the data pipeline (CSV → Dhan → aggregates → quality checks): steps, status, the one instrument a fix action is about (<code>instrument_id</code>, else null), the files a job was asked to load (<code>csv_files</code>, JSON, null = all), the file whose load it undoes (<code>undo_csv_file</code>), and per phase its progress and counts (JSON); at most one row <code>running</code> (unique partial index + advisory lock); history is kept</td>
+</tr>
+<tr>
+<td><code>market.undo_csv_bars(p_instrument uuid, p_from timestamptz, p_to timestamptz) → bigint</code></td>
+<td>Function (P1-07a)</td>
+<td><code>SECURITY DEFINER</code>, owned by the migrating role (<code>xd_owner</code>), <code>SET search_path = pg_catalog, market, pg_temp</code>, every object schema-qualified. In one call: deletes the <code>source = &#39;csv&#39;</code> rows of that instrument with <code>p_from ≤ ts ≤ p_to</code> from <code>bars_1m</code> (Dhan rows and other instruments never), the <code>bars_agg</code> buckets (all timeframes, India-time days, weeks from Monday, months) that overlap the range, then brings <code>bar_coverage</code> up to date with the range added to its changed range (<code>dirty_from</code>/<code>dirty_to</code>) — or deletes the coverage row when no bar is left. Returns the bars removed. <code>EXECUTE</code> revoked from PUBLIC, granted to <code>xd_app</code> only; <code>xd_app</code> cannot replace or alter it. Compressed chunks: see below</td>
+</tr>
+<tr>
+<td><code>market.quality_runs</code>, <code>market.quality_results</code></td>
+<td>Tables (P1-14a)</td>
+<td>One row per data quality run (trigger, window, counts by result, mean score, the data job it belongs to, the one instrument it is about for a fix action; at most one <code>running</code>) and one row per run and instrument (status, score, bars checked, missing minutes, the checks as <code>jsonb</code>); <code>xd_app</code>: no DELETE (§10b)</td>
 </tr>
 <tr>
 <td><code>market.bars_1m_live</code></td>
@@ -560,9 +767,9 @@ raw answer is logged or returned.</p>
 <td>CSV import config, history, rejected rows</td>
 </tr>
 <tr>
-<td>Adjustment factors</td>
-<td>Table</td>
-<td>Research reads adjusted views; plans use raw prices</td>
+<td><code>market.corporate_actions</code></td>
+<td>Table (P1-10a)</td>
+<td>Splits and bonus issues per instrument and ex-date: ratio, derived price <code>factor</code>, <code>status</code> (suggested · applied · ignored), <code>source</code>, note, decision time and by whom (§4.2). Unique (instrument, ex-date, kind). <code>xd_app</code>: no DELETE (a declined action is <code>ignored</code>). Research reads apply the applied ones on read (<code>adjusted=true</code>, <code>IAdjustmentFactors</code>); plans use raw prices</td>
 </tr>
 </tbody></table>
 <p>Size: ~200 instruments × 8 years of 1-minute data ≈ 150 M rows → ~5–10 GB compressed.</p>
@@ -571,6 +778,12 @@ so the missing DELETE on <code>market.bars_1m</code> would mean little if <code>
 hypertable (<code>xd_app</code> has <code>SELECT, INSERT, UPDATE</code> on them, no DELETE, TRUNCATE, REFERENCES or TRIGGER), and the default privileges that grant DELETE on new tables do not override that. This is verified by
 <code>DataTableGrantsTests</code> against the real extension as the real role (privilege check and an attempted <code>DELETE</code>/<code>TRUNCATE</code> on a chunk created after the migrations and on a compressed chunk), so no extra migration
 or event trigger is needed; a TimescaleDB upgrade that changed it fails that test.</p>
+<p><strong>Residual risk (accepted).</strong> <code>xd_app</code> has <code>UPDATE</code> on <code>bars_1m</code> (the merge needs it), including its <code>source</code> column, so a bug or an attacker with the app&#39;s database credentials could relabel Dhan bars as <code>csv</code>, after which <code>undo_csv_bars</code> could remove them. The DELETE protection is therefore only as strong as the app&#39;s honesty about <code>source</code>; a column-level privilege would break the merge&#39;s upsert, and the risk is accepted for a single-owner local system. <code>undo_csv_bars</code> does not reject <code>±infinity</code> as a range end (<code>date_bin</code> passes it through): called directly with one, it would remove <strong>all</strong> <code>csv</code>-source bars of that one instrument and the matching aggregates — still inside the function&#39;s scope (one instrument, CSV source, never Dhan), and the application only ever calls it with the recorded first and last bar of a file. An explicit check would mean replacing the whole function in a further migration; it was left out and is documented here instead.</p>
+<p><strong>The one door for removing bars (P1-07a).</strong> <code>market.undo_csv_bars</code> is the only way <code>xd_app</code> can remove bars, and <code>DataTableGrantsTests</code> proves its narrowness as <code>xd_app</code> against the real extension: a direct <code>DELETE</code>/<code>TRUNCATE</code> is still refused;
+the function deletes only CSV rows of the one instrument within the range (ends included) and nothing for a wrong instrument or a range without CSV bars; Dhan rows survive; another role cannot execute it (and a <code>GRANT … TO PUBLIC</code> by <code>xd_app</code> grants nothing); <code>xd_app</code> cannot
+<code>CREATE OR REPLACE</code>, <code>ALTER</code> or <code>DROP</code> it; a caller&#39;s hostile <code>search_path</code> (a schema with decoy tables, an always-true <code>&gt;=</code> operator, failing <code>date_bin</code>/<code>now</code> functions, a temp table of the same name) is never picked up. On
+<strong>compressed chunks</strong> the delete works (TimescaleDB decompresses the batches the delete touches, with the function owner&#39;s rights): the chunk is then <em>partially compressed</em> (status <code>compressed + partial</code>), all rows remain readable, and the compression policy — or
+<code>compress_chunk(…, if_not_compressed =&gt; true)</code> — packs it again. Verified on TimescaleDB 2.30 (the version of the compose stack).</p>
 <h2 id="10-data-quality">10. Data quality<a class="hash" href="#10-data-quality" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -601,7 +814,7 @@ or event trigger is needed; a TimescaleDB upgrade that changed it fails that tes
 </tr>
 <tr>
 <td>Unapplied corporate action</td>
-<td>Alert</td>
+<td>Alert: the suggestion (§4.2) shows as <code>pendingCorporateActions</code> on the Data and Data quality screens and as the bell notice <code>data_corporate_actions_pending</code> until confirmed, edited or ignored</td>
 </tr>
 <tr>
 <td>Rename / merger / delisting</td>
@@ -658,6 +871,87 @@ checked, missing minutes, per-timeframe aggregate status, official-daily status 
 data quality score. <strong>Inspect</strong> shows each check, a side-by-side table of stored vs recomputed buckets (with
 &quot;differences only&quot;), the chart built from 1-minute data and the missing minutes. <strong>Re-fetch</strong> / <strong>Refresh
 aggregates</strong> repair an instrument and re-validate it automatically; every run is kept in a history.</p>
+<blockquote>
+<p><strong>Built (P1-14a, <a href="../specs/P1-14a-data-quality-checks-and-screen.html">spec</a>, ADR 0017 §4):</strong> the backend of the window above, without the official-daily comparison (reported <code>notAvailable</code> until official daily candles are fetched).</p>
+<p><strong>Where it runs.</strong> The quality run is the <strong>fourth step of the data job</strong> (<code>csv</code>, <code>dhan</code>, <code>aggregate</code>, <code>quality</code>, always in that order), recorded in <code>market.quality_runs</code> / <code>market.quality_results</code>. A job therefore shares everything a data job has: the single
+one-at-a-time rule (a quality run and a data job <strong>exclude each other</strong>, <code>409 data.job_running</code>), the worker, the progress (the job&#39;s <code>quality</code> block: <code>done</code> of <code>total</code> instruments, <code>passed</code>/<code>warned</code>/<code>failed</code>, <code>runId</code>) and the recovery at start-up (a run still <code>running</code> that began before the process is marked <code>failed</code>;
+a run whose data job ended is failed when the next one starts). Without <code>steps</code> &quot;Update data&quot; still runs <code>csv, dhan, aggregate</code> — the quality step is only run when the request lists it (<code>trigger</code> of the run: <code>after_job</code>). The scheduled end-of-day run is <code>dhan, aggregate, quality</code> (<code>daily</code>).
+<code>POST /api/data/quality/run {instrumentId?}</code> is a job with the single step <code>quality</code>; the fix actions are jobs about one instrument (<code>instrumentId</code> on the job): <strong>Re-fetch</strong> = <code>dhan</code> (the instrument only, <code>refetchGaps</code> so unfillable days are asked for again) → <code>aggregate</code> → <code>quality</code>;
+<strong>Refresh aggregates</strong> = <code>aggregate</code> (the instrument&#39;s window marked changed and rebuilt) → <code>quality</code>. A job about one instrument is not counted as the last run of a phase on the Data screen and runs no calendar upkeep.</p>
+<p><strong>The window.</strong> The last <code>Data:Quality:Sessions</code> (default 5, 1 to 60) trading sessions of the calendar that have closed (never today&#39;s open one), the same for every instrument. Instruments: tracked, not retired, with bars. For every instrument the 1-minute bars are read once, by the primary key, from the earlier of the
+Monday and the 1st of the month of the window&#39;s first session (the week and month buckets reach back that far) to now, and the stored aggregates from <code>bars_agg</code> by its primary key. About 560,000 rows for 214 instruments; measured <strong>1.7 s</strong> for the whole run on generated data (TimescaleDB in a container).</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Rule as built</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Completeness</td>
+<td>For every window session <strong>after the day of the instrument&#39;s first bar</strong>: the minutes the calendar expects (375, or the special session&#39;s length; none on a holiday) against the stored minutes of the session. Missing minutes are listed as ranges (≤ 500 ranges kept; the totals are exact). <code>warning</code> when the missing share of the window is above <code>Data:Quality:MaxMissingPercent</code> (default 1) <strong>or</strong> a session <code>bar_gaps</code> marks <code>unfillable</code> still lacks minutes (<code>unfillableMinutes</code>); never <code>fail</code></td>
+</tr>
+<tr>
+<td>Bar sanity</td>
+<td>Every window bar: prices finite and positive, low ≤ open, close ≤ high, volume ≥ 0. Any bad bar = <code>fail</code> (first 10 listed). Duplicate timestamps cannot occur (the primary key) and are not checked</td>
+</tr>
+<tr>
+<td>Spikes</td>
+<td>Close-to-close move of consecutive bars <strong>of the same session</strong> (overnight gaps are never moves) as a fraction of the previous close; excessive = more than <code>Data:Quality:SpikeMultiple</code> (default 20, 2 to 1000) times the median move of the window <strong>and</strong> more than 1 %. Excessive and the next bar takes back <strong>at least half</strong> (</td>
+</tr>
+<tr>
+<td>Aggregates vs 1-minute</td>
+<td><code>MinuteAggregator</code> (domain, in memory, integer calendar arithmetic, nothing shared with the SQL that builds <code>bars_agg</code>) recomputes every 5m, 10m, 15m, 30m, 1h, 1D, 1W and 1M bucket from the bars read; every <strong>stored</strong> bucket from the window&#39;s first day on (week buckets from the Monday, month buckets from the 1st) and every recomputed one is compared <strong>exactly</strong> on open, high, low, close, volume and bar count (<code>complete</code> is not compared). A bucket the bars give that is not stored is <code>missing</code>, a stored one the bars do not give is <code>unexpected</code>. Any difference = <code>fail</code>; the result names the differing buckets (first 200) and the timeframes that differ</td>
+</tr>
+<tr>
+<td>Freshness</td>
+<td>The last bar&#39;s date against the calendar&#39;s last closed session, counted in trading days (the rule of the Data screen: a long weekend or a holiday on the last weekday is not behind); behind or no bars = <code>fail</code></td>
+</tr>
+<tr>
+<td>Official daily</td>
+<td><code>notAvailable</code> (not counted)</td>
+</tr>
+</tbody></table>
+<p><strong>Verdict.</strong> Status = the worst of completeness, sanity, spikes, aggregates and freshness (<code>pass</code> · <code>warning</code> · <code>fail</code>). <strong>Score</strong> 0–100 = completeness 30 × (share of expected minutes stored) + aggregates 25 + sanity 20 + freshness 15 + spikes 10, where a failed check earns nothing and a spike warning half
+(so a stale instrument scores 85, one with a tampered aggregate 75). An instrument whose checks crash is recorded as <code>fail</code> with score 0 (fail-closed; the reason is in the log). The run&#39;s <code>score</code> is the mean of its instruments.</p>
+<p><strong>Results.</strong> An instrument&#39;s <em>current</em> result is the one of the latest run that checked it (a fix action&#39;s run replaces it, so the table always shows the latest state); the overview&#39;s counts and the gate read the current results of the tracked instruments with bars. Results are saved every 20 instruments, so progress is visible and an interrupted run keeps what it did.
+<code>market.quality_results.checks</code> is the stored <code>jsonb</code> of all checks with the long lists under <code>details</code> (missing ranges, differing buckets), which the table query leaves out.</p>
+<p><strong>Gate</strong> (<code>GET /api/data/quality/gate</code>, fail-closed, no consumer yet): judges the latest <strong>finished</strong> run over every instrument — a run that is still running is no verdict, so it neither hides a failed finished run (the gate stays blocked while the next run is underway) nor clears the gate. <code>blocked</code> when no finished run over every instrument exists, the latest finished one <code>failed</code>, it is <strong>older than 3 trading days</strong> of the calendar (stale; the reason names the age), or more than <code>Data:Quality:MaxFailedPercent</code> (default 5) of the checked instruments currently <code>fail</code>; <code>ok</code> when not blocked and no instrument fails; <code>reasons</code> in words. Individually failing instruments are skipped by the scan whatever the gate says. Missing index data is out of scope.
+<strong>Notice</strong> (<code>GET /api/data/notices</code>, additive): <code>data_quality_failed</code> when instruments fail after at least one run — <code>warn</code> within the allowed share, <code>error</code> when the gate blocks — with an id that includes the run and the number failing.</p>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Answer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /api/data/quality/overview</code></td>
+<td><code>lastRun</code> (latest run over every instrument), <code>counts</code> {tracked, checked, passed, warned, failed, notChecked, score}, <code>gate</code>, <code>window</code> {sessions, from, to}, <code>spikeMultiple</code>, <code>maxMissingPercent</code></td>
+</tr>
+<tr>
+<td><code>GET /api/data/quality/instruments?status&amp;q&amp;sort&amp;page&amp;pageSize</code></td>
+<td>page of rows: <code>status</code> (pass · warning · fail · notChecked), <code>score</code>, <code>coverage</code> (%), <code>barsChecked</code>, <code>missingMinutes</code>, <code>checks</code> {completeness, sanity, spikes, aggregates, freshness, officialDaily}, <code>aggregates</code> {5m … 1M → status}, <code>issues</code>, <code>source</code> (csv · dhan · mixed), <code>checkedAt</code>, <code>runId</code>. Sort: symbol · name · status (severity) · score · coverage · barsChecked · missingMinutes · checkedAt, <code>-</code> for descending</td>
+</tr>
+<tr>
+<td><code>GET /api/data/quality/instruments/{id}?differencesOnly&amp;timeframe</code></td>
+<td><code>checks</code> (every check in full), <code>missing</code> {total, truncated, items [{date, time}] ≤ 500}, <code>buckets</code> {computedAt, total, differences, truncated, items [{timeframe, ts, stored, recomputed, differs, fields}] ≤ 2000} — the buckets are recomputed when asked, so they show the state now; <code>notChecked</code> for an instrument never checked</td>
+</tr>
+<tr>
+<td><code>GET /api/data/quality/runs?take</code></td>
+<td>runs, newest first (1 to 100, default 20)</td>
+</tr>
+<tr>
+<td><code>GET /api/data/quality/gate</code></td>
+<td><code>{ok, blocked, reasons[], checkedInstruments, failedInstruments, failedPercent, maxFailedPercent, lastRunAt}</code></td>
+</tr>
+<tr>
+<td><code>POST /api/data/quality/run {instrumentId?}</code> · <code>POST …/instruments/{id}/refetch</code> · <code>POST …/instruments/{id}/refresh-aggregates</code></td>
+<td><code>202</code> with the data job (<code>Location: /api/data/jobs/{id}</code>; progress there). <code>409 data.job_running</code>, <code>404 data.instrument_not_found</code>; re-fetch also <code>409 data.dhan_not_available</code> / <code>data.dhan_not_connected</code> (Dhan cannot be asked, or the instrument has no Dhan id) before any job is started</td>
+</tr>
+</tbody></table>
+<p>Errors are RFC 7807 problems with the <code>data.*</code> codes above, <code>400 data.invalid</code> (with the field) for a bad <code>status</code>, <code>sort</code>, <code>page</code>, <code>pageSize</code>, <code>q</code> or <code>timeframe</code>. Every route needs a session; the three POSTs also the CSRF token; none needs a step-up.</p>
+</blockquote>
 <h2 id="11-biases-avoided">11. Biases avoided<a class="hash" href="#11-biases-avoided" aria-label="Link to this section">#</a></h2>
 <p>Survivorship (historical index membership incl. delisted stocks), look-ahead (closed bars only; higher-TF from
 last closed bar; point-in-time regime), selection (basket rules are dated; point-in-time membership available).</p>
@@ -667,7 +961,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-12 11:15</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-12 17:51</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>
@@ -676,8 +970,11 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
 <a href="#32-import-profiles-column-mapping" class="d3">3.2 Import profiles (column mapping)</a>
 <a href="#33-import-pipeline" class="d3">3.3 Import pipeline</a>
 <a href="#4-aggregation-to-other-timeframes" class="d2">4. Aggregation to other timeframes</a>
+<a href="#41-trading-calendar-adr-0017-1-p1-11a" class="d3">4.1 Trading calendar (ADR 0017 §1, P1-11a)</a>
+<a href="#42-corporate-actions-and-price-adjustments-adr-0017-5-p1-10a" class="d3">4.2 Corporate actions and price adjustments (ADR 0017 §5, P1-10a)</a>
 <a href="#5-real-time-data-the-active-set-only" class="d2">5. Real-time data — the active set only</a>
 <a href="#6-end-of-day-fetch-tier-b" class="d2">6. End-of-day fetch (Tier B)</a>
+<a href="#61-scheduled-run-and-gap-backfill-adr-0017-23-p1-12a" class="d3">6.1 Scheduled run and gap backfill (ADR 0017 §2–§3, P1-12a)</a>
 <a href="#7-broker-abstraction" class="d2">7. Broker abstraction</a>
 <a href="#71-instrument-master-sources-adr-0010-p1-03" class="d3">7.1 Instrument master sources (ADR 0010, P1-03)</a>
 <a href="#8-accounts" class="d2">8. Accounts</a>

@@ -30,4 +30,10 @@ public interface IDataJobStore
     ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, CancellationToken cancellationToken);
 
     ValueTask<IReadOnlyList<DataJob>> ListAsync(int take, CancellationToken cancellationToken);
+
+    /// <summary>The latest job that was started by the trigger (finished, running or skipped); null when there is none.</summary>
+    ValueTask<DataJob?> GetLastByTriggerAsync(DataJobTrigger trigger, CancellationToken cancellationToken);
+
+    /// <summary>Records a run that did not start (<see cref="DataJob.Skipped"/>). It never counts as the running job.</summary>
+    ValueTask RecordSkippedAsync(DataJob skipped, CancellationToken cancellationToken);
 }

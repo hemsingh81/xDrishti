@@ -17,10 +17,10 @@ public enum DataSortField
 }
 
 /// <summary>The coverage list as received (query string values, unchecked).</summary>
-public sealed record DataInstrumentRequest(string? Q, string? Status, string? Sort, int? Page, int? PageSize);
+public sealed record DataInstrumentRequest(string? Q, string? Status, string? Sort, int? Page, int? PageSize, bool? HasGaps = null);
 
-/// <summary>A checked coverage search: text matches symbol and name (substring, case-insensitive); the status filters; the order is stable.</summary>
-public sealed record DataInstrumentSearch(string? Text, DataInstrumentStatus? Status, DataSortField SortField, bool Descending, int Page, int PageSize)
+/// <summary>A checked coverage search: text matches symbol and name (substring, case-insensitive); the status filters; the order is stable; <c>HasGaps</c> keeps only instruments with open gaps.</summary>
+public sealed record DataInstrumentSearch(string? Text, DataInstrumentStatus? Status, DataSortField SortField, bool Descending, int Page, int PageSize, bool HasGaps = false)
 {
     public const int MaxPageSize = 200;
 

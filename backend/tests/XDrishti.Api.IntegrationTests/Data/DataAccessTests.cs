@@ -24,11 +24,72 @@ public sealed class DataAccessTests(ApiFactory factory)
         { "POST", "/api/data/refresh" },
         { "GET", "/api/data/jobs" },
         { "GET", $"/api/data/jobs/{Id}" },
+        { "GET", "/api/data/calendar" },
+        { "GET", "/api/data/calendar?from=2026-10-01&to=2026-12-31" },
+        { "POST", "/api/data/calendar" },
+        { "POST", "/api/data/calendar/refresh" },
+        { "PUT", "/api/data/calendar/2026-10-02/confirm" },
+        { "DELETE", "/api/data/calendar/2026-10-02" },
+        { "GET", "/api/data/gaps" },
+        { "GET", "/api/data/notices" },
+        { "GET", "/api/data/quality/overview" },
+        { "GET", "/api/data/quality/instruments" },
+        { "GET", "/api/data/quality/instruments?status=fail&q=abb&sort=-score&page=2&pageSize=10" },
+        { "GET", $"/api/data/quality/instruments/{Id}" },
+        { "GET", $"/api/data/quality/instruments/{Id}?differencesOnly=true&timeframe=15m" },
+        { "GET", "/api/data/quality/runs" },
+        { "GET", "/api/data/quality/gate" },
+        { "GET", "/api/data/corporate-actions" },
+        { "GET", $"/api/data/corporate-actions?status=suggested&instrumentId={Id}&page=2&pageSize=10" },
+        { "POST", "/api/data/corporate-actions" },
+        { "PUT", $"/api/data/corporate-actions/{Id}" },
+        { "POST", $"/api/data/corporate-actions/{Id}/ignore" },
+        { "POST", "/api/data/corporate-actions/detect" },
+        { "POST", "/api/data/corporate-actions/import" },
+        { "POST", "/api/data/corporate-actions/import?preview=true" },
+        { "GET", $"/api/data/instruments/{Id}/bars?adjusted=true" },
+        { "POST", "/api/data/quality/run" },
+        { "POST", $"/api/data/quality/instruments/{Id}/refetch" },
+        { "POST", $"/api/data/quality/instruments/{Id}/refresh-aggregates" },
+        { "GET", "/api/data/csv/files" },
+        { "GET", "/api/data/csv/files?q=abb&state=pending&page=2&pageSize=10" },
+        { "POST", "/api/data/csv/preview" },
+        { "POST", "/api/data/csv/files/ABB_1m.csv.gz/undo" },
+    };
+
+    public static TheoryData<string, string> CsvReviewChanges => new()
+    {
+        { "POST", "/api/data/csv/preview" },
+        { "POST", "/api/data/csv/files/ABB_1m.csv.gz/undo" },
+    };
+
+    public static TheoryData<string, string> QualityStarts => new()
+    {
+        { "POST", "/api/data/quality/run" },
+        { "POST", $"/api/data/quality/instruments/{Id}/refetch" },
+        { "POST", $"/api/data/quality/instruments/{Id}/refresh-aggregates" },
+    };
+
+    public static TheoryData<string, string> CorporateActionChanges => new()
+    {
+        { "POST", "/api/data/corporate-actions" },
+        { "PUT", $"/api/data/corporate-actions/{Id}" },
+        { "POST", $"/api/data/corporate-actions/{Id}/ignore" },
+        { "POST", "/api/data/corporate-actions/detect" },
+        { "POST", "/api/data/corporate-actions/import" },
+    };
+
+    public static TheoryData<string, string> CalendarChanges => new()
+    {
+        { "POST", "/api/data/calendar" },
+        { "POST", "/api/data/calendar/refresh" },
+        { "PUT", "/api/data/calendar/2026-10-02/confirm" },
+        { "DELETE", "/api/data/calendar/2026-10-02" },
     };
 
     private static HttpRequestMessage Request(string method, string path) => new(new HttpMethod(method), new Uri(path, UriKind.Relative))
     {
-        Content = method == "POST" ? new StringContent("{}", Encoding.UTF8, "application/json") : null,
+        Content = method is "POST" or "PUT" ? new StringContent("{}", Encoding.UTF8, "application/json") : null,
     };
 
     [Theory]
@@ -56,9 +117,83 @@ public sealed class DataAccessTests(ApiFactory factory)
     }
 
     [Theory]
+    [MemberData(nameof(CsvReviewChanges))]
+    public async Task A_preview_or_an_undo_without_the_CSRF_token_is_refused_and_with_it_needs_no_step_up(string method, string path)
+    {
+        var signedIn = await factory.SignInAsync(Ct);
+        var withoutToken = factory.CreateAnonymousClient();
+        withoutToken.DefaultRequestHeaders.Add("Cookie", signedIn.CookieHeader);
+
+        using var refused = await withoutToken.SendAsync(Request(method, path), Ct);
+        using var allowed = await signedIn.Client.SendAsync(Request(method, path), Ct);
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        allowed.StatusCode.ShouldBeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound); // no files named / never loaded: not 403 (step-up) and not 401
+        factory.DataJobs.PendingCount.ShouldBe(0);
+    }
+
+    [Theory]
+    [MemberData(nameof(CalendarChanges))]
+    public async Task A_calendar_change_without_the_CSRF_token_is_refused_and_with_it_needs_no_step_up(string method, string path)
+    {
+        var signedIn = await factory.SignInAsync(Ct);
+        var withoutToken = factory.CreateAnonymousClient();
+        withoutToken.DefaultRequestHeaders.Add("Cookie", signedIn.CookieHeader);
+
+        using var refused = await withoutToken.SendAsync(Request(method, path), Ct);
+        using var allowed = await signedIn.Client.SendAsync(Request(method, path), Ct);
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        allowed.StatusCode.ShouldNotBe(HttpStatusCode.Forbidden, "a step-up would answer 403 auth.step_up_required");
+        allowed.StatusCode.ShouldNotBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [MemberData(nameof(CorporateActionChanges))]
+    public async Task A_corporate_action_change_without_the_CSRF_token_is_refused_and_with_it_needs_no_step_up(string method, string path)
+    {
+        var signedIn = await factory.SignInAsync(Ct);
+        var withoutToken = factory.CreateAnonymousClient();
+        withoutToken.DefaultRequestHeaders.Add("Cookie", signedIn.CookieHeader);
+
+        using var refused = await withoutToken.SendAsync(Request(method, path), Ct);
+        using var allowed = await signedIn.Client.SendAsync(Request(method, path), Ct);
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        allowed.StatusCode.ShouldNotBe(HttpStatusCode.Forbidden, "a step-up would answer 403 auth.step_up_required");
+        allowed.StatusCode.ShouldNotBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [MemberData(nameof(QualityStarts))]
+    public async Task Starting_a_quality_run_or_a_fix_action_without_the_CSRF_token_is_refused_and_with_it_needs_no_step_up(string method, string path)
+    {
+        var signedIn = await factory.SignInAsync(Ct);
+        var withoutToken = factory.CreateAnonymousClient();
+        withoutToken.DefaultRequestHeaders.Add("Cookie", signedIn.CookieHeader);
+        using var unknown = new StringContent($$"""{"instrumentId":"{{Id}}"}""", Encoding.UTF8, "application/json");
+
+        using var refused = await withoutToken.SendAsync(Request(method, path), Ct);
+        using var allowed = await signedIn.Client.SendAsync(new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative)) { Content = unknown }, Ct);
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        allowed.StatusCode.ShouldBe(HttpStatusCode.NotFound, "an unknown instrument: not 403 (step-up) and not 401");
+        factory.DataJobs.PendingCount.ShouldBe(0);
+    }
+
+    [Theory]
     [InlineData("/api/data/overview")]
     [InlineData("/api/data/instruments")]
     [InlineData("/api/data/jobs")]
+    [InlineData("/api/data/calendar")]
+    [InlineData("/api/data/gaps")]
+    [InlineData("/api/data/notices")]
+    [InlineData("/api/data/quality/overview")]
+    [InlineData("/api/data/quality/instruments")]
+    [InlineData("/api/data/quality/runs")]
+    [InlineData("/api/data/quality/gate")]
+    [InlineData("/api/data/corporate-actions")]
+    [InlineData("/api/data/csv/files")]
     public async Task With_a_session_the_reads_work_without_step_up(string path)
     {
         var signedIn = await factory.SignInAsync(Ct);

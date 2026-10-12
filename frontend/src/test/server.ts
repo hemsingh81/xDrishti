@@ -87,6 +87,8 @@ export const handlers = [
       : problemResponse({ title: 'The holding does not exist.', code: 'portfolio.not_found' }, 404);
   }),
   http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus())),
+  // Data notices (bell): none by default; the Data fake and the bell tests bring their own.
+  http.get('/api/data/notices', () => HttpResponse.json({ items: [] })),
   // Connecting: the start answers with Dhan's page (tests replace the navigation).
   http.post('/api/accounts/:id/connect', () =>
     HttpResponse.json({ authorizeUrl: dhanAuthorizeUrl, expiresAt: '2026-10-11T10:10:00Z' }),

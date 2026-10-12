@@ -40,6 +40,25 @@ public sealed class CsvBarReaderTests
     }
 
     [Fact]
+    public async Task The_summary_names_the_earliest_and_latest_accepted_minute_and_the_bytes_read()
+    {
+        var text = $"{Header}\n{Row(T0 + 120)}\n{Row(T0)}\n{Row(T0 + 60)}\n{Row(T0 + 600, open: "0")}\n";
+
+        var (summary, _, _) = await ReadAsync(text);
+
+        (summary.FirstEpoch, summary.LastEpoch, summary.Accepted, summary.Rejected).ShouldBe((T0, T0 + 120, 3, 1));
+        summary.BytesRead.ShouldBe(Encoding.UTF8.GetByteCount(text));
+    }
+
+    [Fact]
+    public async Task A_file_without_accepted_rows_has_no_first_or_last_minute()
+    {
+        var (summary, _, _) = await ReadAsync($"{Header}\n{Row(T0, open: "0")}\n");
+
+        (summary.FirstEpoch, summary.LastEpoch).ShouldBe((null, null));
+    }
+
+    [Fact]
     public async Task Columns_are_found_by_name_in_any_order_and_case_and_the_others_are_ignored()
     {
         var text = "Extra,VOLUME, Close ,\"low\",High,open,TIME,tail\r\nx,7,5,1,9,2,1711943100,y\r\n";

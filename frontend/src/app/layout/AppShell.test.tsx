@@ -68,7 +68,7 @@ describe('Instruments layout', () => {
     expect(declares(appliedCss(scroller).base, 'min-height: 0px')).toBe(true);
     expect(scroller.contains(screen.getByRole('heading', { level: 1, name: 'Instruments' }))).toBe(false);
     expect(scroller.contains(screen.getByRole('searchbox', { name: 'Search instruments' }))).toBe(false);
-    expect(scroller.contains(screen.getByText(/^1–\d+ of \d+$/))).toBe(false);
+    expect(scroller.contains(screen.getByText(/^Showing \d+ of \d+$/))).toBe(false);
     expect(screen.getByRole('columnheader', { name: 'Symbol' }).closest('[class*="MuiTableContainer"]')).toBeNull();
     expect(scroller.contains(screen.getByRole('columnheader', { name: 'Symbol' }))).toBe(true);
 

@@ -3,10 +3,18 @@ using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Quality;
+using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
+using XDrishti.Application.Market.Bars.Gaps;
 using XDrishti.Application.Market.Bars.Pipeline;
+using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.Tests.Market.Actions;
+using XDrishti.Application.Tests.Market.Calendar;
+using XDrishti.Application.Tests.Market.Quality;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Quality;
 
 namespace XDrishti.Application.Tests.Market.Bars;
 
@@ -23,24 +31,31 @@ public sealed class DataJobHandlersTests
     private readonly FakeCsvFileLog _log = new();
     private readonly FakeListedInstruments _listed = new();
     private readonly FakeBarStore _bars = new();
+    private readonly FakeCsvUndo _undo = new();
     private readonly InMemoryTrackingData _tracking = new();
     private readonly FakeIntradaySource _source = new();
     private readonly FakeAccountStatus _account = FakeAccountStatus.Connected();
     private readonly FakeFetchTargets _targets = new();
     private readonly FakeAggregates _aggregates = new();
     private readonly FakeDataSettings _settings = new();
+    private readonly FakeCalendarUpkeep _calendar = new();
+    private readonly FakeQualityData _qualityData = new();
+    private readonly FakeQualityRuns _qualityRuns = new();
 
     public DataJobHandlersTests() => _catalog.CountActiveAsync(Arg.Any<CancellationToken>()).Returns(10);
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private StartDataJobHandler Start => new(_jobs, _queue, _catalog, _clock, NullLogger<StartDataJobHandler>.Instance);
+    private StartDataJobHandler Start => new(_jobs, _queue, _catalog, _folder, _clock, NullLogger<StartDataJobHandler>.Instance);
 
     private ExecuteDataJobHandler Execute => new(
         _jobs,
         new CsvPhaseRunner(_folder, _log, _listed, _bars, _catalog, new InstrumentTracking(_tracking, _tracking), _tracking, _settings, _clock, NullLogger<CsvPhaseRunner>.Instance),
-        new DhanPhaseRunner(_source, _account, _targets, _bars, _settings, _clock, NullLogger<DhanPhaseRunner>.Instance),
-        new AggregatePhaseRunner(_aggregates, _clock, NullLogger<AggregatePhaseRunner>.Instance),
+        new CsvUndoRunner(_undo, new FakeCsvFileLog(), _tracking, _tracking, _clock, NullLogger<CsvUndoRunner>.Instance),
+        new DhanPhaseRunner(_source, _account, _targets, _bars, _settings, new FixedCalendar(), new GapBackfill(new FakeBarDayCounts(_bars), new FakeBarGaps(), _settings, _clock), _clock, NullLogger<DhanPhaseRunner>.Instance),
+        new AggregatePhaseRunner(_aggregates, new FixedCalendar(), _settings, new CorporateActionDetection(new FakeDailySeries(), new InMemoryActionData(), new InMemoryActionData(), _clock), _clock, NullLogger<AggregatePhaseRunner>.Instance),
+        new QualityPhaseRunner(_qualityData, _qualityRuns, _bars, new FakeBarGaps(), new FixedCalendar(), _settings, _clock, NullLogger<QualityPhaseRunner>.Instance),
+        _calendar,
         _clock,
         NullLogger<ExecuteDataJobHandler>.Instance);
 
@@ -120,6 +135,34 @@ public sealed class DataJobHandlersTests
     }
 
     [Fact]
+    public async Task A_job_started_by_the_endpoint_is_manual_and_the_view_says_so()
+    {
+        var view = await StartedAsync("dhan");
+
+        (view.Trigger, view.RefetchGaps).ShouldBe(("manual", false));
+    }
+
+    [Fact]
+    public async Task Re_fetching_gaps_is_kept_on_the_job_only_with_the_dhan_step()
+    {
+        var withDhan = await Start.HandleAsync(new StartDataJobCommand(new StartDataJobRequest(["dhan", "aggregate"], null, true), "owner"), Ct);
+        _jobs.Jobs.Clear();
+        var withoutDhan = await Start.HandleAsync(new StartDataJobCommand(new StartDataJobRequest(["aggregate"], null, true), "owner"), Ct);
+
+        withDhan.Value.RefetchGaps.ShouldBeTrue();
+        withoutDhan.Value.RefetchGaps.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_scheduled_run_starts_the_same_job_with_the_daily_trigger()
+    {
+        var result = await Start.HandleAsync(new StartDataJobCommand(new StartDataJobRequest(["dhan", "aggregate"]), "system:data-eod", DataJobTrigger.Daily), Ct);
+
+        (result.Value.Trigger, result.Value.RequestedBy, result.Value.Status).ShouldBe(("daily", "system:data-eod", "running"));
+        _jobs.Started.ShouldHaveSingleItem().Trigger.ShouldBe(DataJobTrigger.Daily);
+    }
+
+    [Fact]
     public async Task Executing_runs_the_requested_phases_in_order_and_ends_the_job_with_the_result()
     {
         var abb = _tracking.AddInstrument("NSE:ABB");
@@ -138,6 +181,49 @@ public sealed class DataJobHandlersTests
         (job.Csv.Rows, job.Aggregate.Done).ShouldBe((4, 1));
         job.FinishedAt.ShouldBe(Now);
         _jobs.Published[^1].Status.ShouldBe(DataJobStatus.Succeeded);
+    }
+
+    [Fact]
+    public async Task The_calendar_upkeep_runs_after_the_phases_and_before_the_job_ends_and_its_warnings_join_the_jobs()
+    {
+        var view = await StartedAsync("aggregate");
+        _calendar.Action = async reporter =>
+        {
+            _jobs.Jobs[view.Id].Aggregate.Status.ShouldBe(PhaseStatus.Succeeded);
+            _jobs.Jobs[view.Id].IsRunning.ShouldBeTrue();
+            await reporter.WarnAsync("Trading calendar: NSE's holiday list answered HTTP 403.", Ct);
+        };
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        _calendar.Runs.ShouldBe(1);
+        var job = _jobs.Jobs[view.Id];
+        job.Status.ShouldBe(DataJobStatus.Succeeded);
+        job.Warnings.ShouldBe(["Trading calendar: NSE's holiday list answered HTTP 403."]);
+    }
+
+    [Fact]
+    public async Task The_calendar_upkeep_also_runs_after_a_job_whose_phase_failed()
+    {
+        var view = await StartedAsync("dhan");
+        _source.Respond = _ => throw new InvalidOperationException("boom");
+        _targets.Targets.Add(new FetchTarget(Guid.NewGuid(), "NSE:ABB", "share", "1", "NSE_EQ", null));
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        _calendar.Runs.ShouldBe(1);
+        _jobs.Jobs[view.Id].Status.ShouldBe(DataJobStatus.Failed);
+    }
+
+    [Fact]
+    public async Task A_job_ended_elsewhere_gets_no_calendar_upkeep()
+    {
+        var view = await StartedAsync("aggregate");
+        _jobs.EndedElsewhere.Add(view.Id);
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        _calendar.Runs.ShouldBe(0);
     }
 
     [Fact]
@@ -211,7 +297,7 @@ public sealed class DataJobHandlersTests
     public async Task Recovery_fails_the_jobs_that_began_before_the_process_and_leaves_the_others()
     {
         var old = await StartedAsync();
-        var recover = new RecoverInterruptedDataJobsHandler(_jobs, _clock, NullLogger<RecoverInterruptedDataJobsHandler>.Instance);
+        var recover = new RecoverInterruptedDataJobsHandler(_jobs, _qualityRuns, _clock, NullLogger<RecoverInterruptedDataJobsHandler>.Instance);
 
         await recover.HandleAsync(new RecoverInterruptedDataJobsCommand(Now), Ct);
         _jobs.Jobs[old.Id].IsRunning.ShouldBeTrue(); // began exactly when the process did: not before
@@ -237,5 +323,128 @@ public sealed class DataJobHandlersTests
         one.Select(j => j.Id).ShouldBe([second.Id]);
         (await get.HandleAsync(new GetDataJobQuery(first.Id), Ct)).Value.Steps.ShouldBe(["aggregate"]);
         (await get.HandleAsync(new GetDataJobQuery(Guid.NewGuid()), Ct)).Error.Code.ShouldBe("data.job_not_found");
+    }
+
+    private QualityTarget QualityInstrument(string symbol = "NSE:ABB")
+    {
+        var bars = QualityBars.FullWindow();
+        var target = new QualityTarget(Guid.CreateVersion7(), symbol, DateTimeOffset.FromUnixTimeSeconds(bars[0].EpochSeconds).AddDays(-60), DateTimeOffset.FromUnixTimeSeconds(bars[^1].EpochSeconds));
+        _qualityData.Targets.Add(target);
+        _bars.Stored[target.InstrumentId] = bars;
+        _qualityData.Stored[target.InstrumentId] = [.. MinuteAggregator.Build(bars).Select(b => new StoredBucket(b.Key.Timeframe, b.Key.Start, b.Value.Open, b.Value.High, b.Value.Low, b.Value.Close, b.Value.Volume, b.Value.Bars))];
+        return target;
+    }
+
+    [Fact]
+    public async Task The_quality_step_is_accepted_and_its_phase_is_in_the_view_only_when_it_was_asked_for()
+    {
+        var withQuality = await StartedAsync("quality");
+        _jobs.Jobs.Clear();
+        var without = await StartedAsync("dhan");
+
+        withQuality.Quality!.Status.ShouldBe(PhaseStatus.Pending);
+        without.Quality.ShouldBeNull();
+        withQuality.Steps.ShouldBe(["quality"]);
+    }
+
+    [Fact]
+    public async Task Without_steps_the_job_does_not_include_the_quality_checks()
+    {
+        var view = await StartedAsync();
+
+        view.Steps.ShouldNotContain("quality");
+        view.Quality.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task The_message_for_unknown_steps_names_all_four()
+    {
+        var result = await Start.HandleAsync(new StartDataJobCommand(new StartDataJobRequest(["bogus"]), "owner"), Ct);
+
+        result.Error.Fields!.Single().Message.ShouldBe("Use csv, dhan, aggregate and quality.");
+    }
+
+    [Fact]
+    public async Task A_job_about_one_instrument_carries_it_in_the_view()
+    {
+        var id = Guid.NewGuid();
+
+        var result = await Start.HandleAsync(new StartDataJobCommand(new StartDataJobRequest(["quality"]), "owner", DataJobTrigger.Manual, id), Ct);
+
+        result.Value.InstrumentId.ShouldBe(id);
+        _jobs.Started.Single().InstrumentId.ShouldBe(id);
+    }
+
+    [Fact]
+    public async Task The_quality_phase_runs_after_the_aggregates_and_the_job_succeeds_with_the_run_in_its_phase()
+    {
+        QualityInstrument();
+        var abb = _tracking.AddInstrument("NSE:ABB");
+        _aggregates.Dirty.Add(new DirtyInstrument(abb.Id, "NSE:ABB", Now, Now));
+        var view = await StartedAsync("aggregate", "quality");
+        _calendar.Action = _ =>
+        {
+            _jobs.Jobs[view.Id].Quality.Status.ShouldBe(PhaseStatus.Succeeded);
+            return ValueTask.CompletedTask;
+        };
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        var job = _jobs.Jobs[view.Id];
+        (job.Status, job.Aggregate.Status, job.Quality.Status).ShouldBe((DataJobStatus.Succeeded, PhaseStatus.Succeeded, PhaseStatus.Succeeded));
+        (job.Quality.Done, job.Quality.Passed, job.Quality.RunId).ShouldBe((1L, 1L, _qualityRuns.Runs.Keys.Single()));
+        _qualityRuns.Runs.Values.Single().Trigger.ShouldBe(QualityTrigger.AfterJob);
+        _calendar.Runs.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_job_that_only_checks_the_quality_runs_no_calendar_upkeep()
+    {
+        QualityInstrument();
+        var view = await StartedAsync("quality");
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        _jobs.Jobs[view.Id].Quality.Status.ShouldBe(PhaseStatus.Succeeded);
+        _calendar.Runs.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_job_about_one_instrument_runs_no_calendar_upkeep_either()
+    {
+        var target = QualityInstrument();
+        var started = await Start.HandleAsync(new StartDataJobCommand(new StartDataJobRequest(["aggregate", "quality"]), "owner", DataJobTrigger.Manual, target.InstrumentId), Ct);
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(started.Value.Id), Ct);
+
+        _calendar.Runs.ShouldBe(0);
+        _jobs.Jobs[started.Value.Id].Quality.Total.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_quality_phase_that_crashes_is_failed_with_a_generic_message_and_the_job_fails()
+    {
+        QualityInstrument();
+        _qualityRuns.SaveFailure = new InvalidOperationException("password=hunter2 leaked");
+        var view = await StartedAsync("quality");
+
+        await Execute.HandleAsync(new ExecuteDataJobCommand(view.Id), Ct);
+
+        var job = _jobs.Jobs[view.Id];
+        (job.Status, job.Quality.Status, job.Quality.Message).ShouldBe((DataJobStatus.Failed, PhaseStatus.Failed, "The update failed unexpectedly. See the API log."));
+        job.Error!.ShouldNotContain("hunter2");
+        _qualityRuns.Runs.Values.Single().Status.ShouldBe(QualityRunStatus.Failed);
+    }
+
+    [Fact]
+    public async Task Recovery_also_fails_the_quality_runs_that_began_before_the_process()
+    {
+        var run = QualityRun.Start(QualityTrigger.Daily, 5, 214, null, null, Now.AddHours(-1));
+        _qualityRuns.Runs[run.Id] = run;
+        var recover = new RecoverInterruptedDataJobsHandler(_jobs, _qualityRuns, _clock, NullLogger<RecoverInterruptedDataJobsHandler>.Instance);
+
+        await recover.HandleAsync(new RecoverInterruptedDataJobsCommand(Now), Ct);
+
+        run.Status.ShouldBe(QualityRunStatus.Failed);
     }
 }

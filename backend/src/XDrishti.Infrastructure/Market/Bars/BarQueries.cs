@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Calendar;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Infrastructure.Market.Bars;
@@ -53,15 +54,19 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
         return new AggregateTotals(stats, overallReader.IsDBNull(0) ? null : overallReader.GetFieldValue<DateTimeOffset>(0), (int)overallReader.GetInt64(1));
     }
 
-    public async ValueTask<DataInstrumentPage> ListInstrumentsAsync(DataInstrumentSearch search, DateTimeOffset expectedStart, DateOnly expectedSession, CancellationToken cancellationToken)
+    public async ValueTask<DataInstrumentPage> ListInstrumentsAsync(DataInstrumentSearch search, DateTimeOffset expectedStart, DateOnly expectedSession, TradingCalendar calendar, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(search);
+        ArgumentNullException.ThrowIfNull(calendar);
         const string From =
             """
             FROM market.instruments i
             LEFT JOIN market.bar_coverage c ON c.instrument_id = i.id
             LEFT JOIN market.tracked_instruments t ON t.instrument_id = i.id
+            LEFT JOIN (SELECT instrument_id, count(*)::int AS open_gaps FROM market.bar_gaps WHERE status = 'open' GROUP BY instrument_id) g
+                   ON g.instrument_id = i.id AND t.active IS TRUE AND i.retired_at IS NULL
             WHERE (c.instrument_id IS NOT NULL OR t.active IS TRUE)
+              AND (NOT @hasGaps OR g.open_gaps > 0)
               AND (@pattern IS NULL OR i.canonical_symbol ILIKE @pattern ESCAPE '\' OR i.name ILIKE @pattern ESCAPE '\' OR i.display_name ILIKE @pattern ESCAPE '\')
               AND (@status IS NULL
                    OR (@status = 'empty' AND c.instrument_id IS NULL)
@@ -84,6 +89,7 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
             command.Parameters.AddWithValue("pattern", NpgsqlTypes.NpgsqlDbType.Text, search.Text is null ? DBNull.Value : $"%{LikePattern.Escape(search.Text)}%");
             command.Parameters.AddWithValue("status", NpgsqlTypes.NpgsqlDbType.Text, search.Status is { } s ? s.ToString().ToLowerInvariant() : DBNull.Value);
             command.Parameters.AddWithValue("expectedStart", expectedStart.ToUniversalTime());
+            command.Parameters.AddWithValue("hasGaps", search.HasGaps);
         }
 
         int total;
@@ -96,7 +102,7 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
 #pragma warning disable CA2100 // the ORDER BY comes from two fixed switches above, the values are parameters
         await using var command = dataSource.CreateCommand(
             $"""
-            SELECT i.id, i.canonical_symbol, i.name, i.type, t.active IS TRUE, c.first_bar, c.last_bar, COALESCE(c.bars, 0), COALESCE(c.csv_bars, 0), COALESCE(c.dhan_bars, 0)
+            SELECT i.id, i.canonical_symbol, i.name, i.type, t.active IS TRUE, c.first_bar, c.last_bar, COALESCE(c.bars, 0), COALESCE(c.csv_bars, 0), COALESCE(c.dhan_bars, 0), COALESCE(g.open_gaps, 0)
             {From}
             ORDER BY {order} {direction} NULLS LAST, i.canonical_symbol
             OFFSET @offset LIMIT @limit
@@ -114,7 +120,7 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
             DateTimeOffset? last = reader.IsDBNull(6) ? null : IndiaTime.ToIst(reader.GetFieldValue<DateTimeOffset>(6));
             var csv = reader.GetInt64(8);
             var dhan = reader.GetInt64(9);
-            int? behind = last is { } l ? DataFreshness.SessionsBehind(IndiaTime.Today(l), expectedSession) : null;
+            int? behind = last is { } l ? calendar.TradingDaysBetween(IndiaTime.Today(l), expectedSession) : null;
             items.Add(new DataInstrumentRow(
                 reader.GetGuid(0),
                 reader.GetString(1),
@@ -126,7 +132,8 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
                 reader.GetInt64(7),
                 last is null ? null : csv > 0 && dhan > 0 ? "mixed" : dhan > 0 ? "dhan" : "csv",
                 last is null ? "empty" : behind > 0 ? "behind" : "current",
-                behind));
+                behind,
+                reader.GetInt32(10)));
         }
 
         return new DataInstrumentPage(items, search.Page, search.PageSize, total);
@@ -167,6 +174,32 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
                 reader.GetInt32(6),
                 reader.GetBoolean(7),
                 reader.IsDBNull(8) ? null : reader.GetString(8)));
+        }
+
+        return rows;
+    }
+
+    public async ValueTask<IReadOnlyList<BarRow>> ReadDailyBarsAsync(Guid instrumentId, DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT ts, open, high, low, close, volume, bars, complete, NULL::text FROM market.bars_agg WHERE instrument_id = @id AND timeframe = '1D' AND ts >= @from AND ts < @to ORDER BY ts");
+        command.Parameters.AddWithValue("id", instrumentId);
+        command.Parameters.AddWithValue("from", new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime());
+        command.Parameters.AddWithValue("to", new DateTimeOffset(toExclusive.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset).ToUniversalTime());
+        var rows = new List<BarRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new BarRow(
+                IndiaTime.ToIst(reader.GetFieldValue<DateTimeOffset>(0)),
+                reader.GetDouble(1),
+                reader.GetDouble(2),
+                reader.GetDouble(3),
+                reader.GetDouble(4),
+                reader.GetInt64(5),
+                reader.GetInt32(6),
+                reader.GetBoolean(7),
+                null));
         }
 
         return rows;

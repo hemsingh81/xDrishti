@@ -5,8 +5,11 @@ namespace XDrishti.Application.Abstractions.Market.Bars;
 /// <summary>What merging a set of bars did, in bars (minutes). <c>KeptDhan</c> are CSV bars that were not stored because a Dhan bar is there already.</summary>
 public sealed record BarMergeResult(long Inserted, long Updated, long Unchanged, long KeptDhan);
 
-/// <summary>The file a merge came from, recorded with it (and the merge's counts): <see cref="ICsvFileLog"/> then lists it.</summary>
-public sealed record CsvFileMark(string Name, long Size, DateTimeOffset ModifiedAt, long Rows, long Repaired, long Rejected);
+/// <summary>
+/// The file a merge came from, recorded with it (and the merge's counts): <see cref="ICsvFileLog"/> then lists it. <paramref name="FirstBar"/> and <paramref name="LastBar"/> are the first and last bar
+/// start of the file's accepted rows: the range an undo of the load works on.
+/// </summary>
+public sealed record CsvFileMark(string Name, long Size, DateTimeOffset ModifiedAt, long Rows, long Repaired, long Rejected, DateTimeOffset? FirstBar = null, DateTimeOffset? LastBar = null);
 
 /// <summary>
 /// The stored 1-minute bars. Prices are raw. Merging follows the precedence of ADR 0016 §3: a Dhan bar replaces a CSV or Dhan bar of the same minute, a CSV

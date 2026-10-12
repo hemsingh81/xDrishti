@@ -130,11 +130,9 @@ describe('tabs in the URL', () => {
     expect(activeFilterCount({ ...emptyFilters, tab: 'tracked', includeRetired: true, untracked: true })).toBe(0);
   });
 
-  it('scopes a selection to the tab and the filters, not to page, size or sort', () => {
+  it('scopes a selection to the tab and the filters, not to the sort', () => {
     const base = selectionScope(emptyFilters);
-    expect(selectionScope({ ...emptyFilters, page: 3, pageSize: 100, sort: { field: 'lot', descending: true } })).toBe(
-      base,
-    );
+    expect(selectionScope({ ...emptyFilters, sort: { field: 'lot', descending: true } })).toBe(base);
     expect(selectionScope({ ...emptyFilters, q: ' tcs ' })).toBe(selectionScope({ ...emptyFilters, q: 'tcs' }));
     expect(selectionScope({ ...emptyFilters, q: 'tcs' })).not.toBe(base);
     expect(selectionScope({ ...emptyFilters, tab: 'tracked' })).not.toBe(base);

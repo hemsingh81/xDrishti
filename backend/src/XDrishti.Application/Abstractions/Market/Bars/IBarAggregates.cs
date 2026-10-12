@@ -12,6 +12,9 @@ public interface IBarAggregates
     /// <summary>Marks every instrument with bars as changed over its whole range (a full rebuild); returns how many.</summary>
     ValueTask<int> MarkAllDirtyAsync(CancellationToken cancellationToken);
 
+    /// <summary>Marks the instrument's bars from <paramref name="from"/> to its last bar as changed (widening a range already marked), so the next build rebuilds them; false when it has no bars.</summary>
+    ValueTask<bool> MarkDirtyAsync(Guid instrumentId, DateTimeOffset from, CancellationToken cancellationToken);
+
     /// <summary>The instruments with changes not aggregated yet, by symbol.</summary>
     ValueTask<IReadOnlyList<DirtyInstrument>> ListDirtyAsync(CancellationToken cancellationToken);
 

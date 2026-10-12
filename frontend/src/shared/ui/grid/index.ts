@@ -4,7 +4,7 @@ export type {
   GridBreakpoint,
   GridColumn,
   GridDensity,
-  GridPagination,
+  GridInfinite,
   GridProps,
   GridRowExtras,
   GridSort,

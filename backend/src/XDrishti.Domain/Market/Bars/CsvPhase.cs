@@ -2,7 +2,7 @@ namespace XDrishti.Domain.Market.Bars;
 
 /// <summary>
 /// The CSV phase of a data job (ADR 0016 §4): <c>Done</c> of <c>Total</c> are files. Rows are counted over all files read in this job. Part of the API
-/// (the job's <c>csv</c> block) and stored with the job.
+/// (the job's <c>csv</c> block) and stored with the job. <c>BarsRemoved</c> is set only by the job that undoes the load of one file (ADR 0017 §6): the CSV bars it removed (null for every other job).
 /// </summary>
 public sealed record CsvPhase(
     string Status,
@@ -28,7 +28,8 @@ public sealed record CsvPhase(
     IReadOnlyList<string> UnknownSymbols,
     IReadOnlyList<string> AmbiguousSymbols,
     IReadOnlyList<string> FailedFiles,
-    int InstrumentsTracked) : IDataPhase
+    int InstrumentsTracked,
+    long? BarsRemoved = null) : IDataPhase
 {
     /// <summary>How many examples of rejected rows, unknown symbols and failed files are kept.</summary>
     public const int MaxExamples = 10;

@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Bars.Pipeline;
+using XDrishti.Application.Market.Calendar;
+using XDrishti.Application.Market.Quality;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
 
@@ -13,8 +15,11 @@ public sealed record ExecuteDataJobCommand(Guid JobId) : ICommand;
 internal sealed class ExecuteDataJobHandler(
     IDataJobStore jobs,
     CsvPhaseRunner csv,
+    CsvUndoRunner csvUndo,
     DhanPhaseRunner dhan,
     AggregatePhaseRunner aggregate,
+    QualityPhaseRunner quality,
+    ICalendarUpkeep calendar,
     TimeProvider clock,
     ILogger<ExecuteDataJobHandler> logger) : ICommandHandler<ExecuteDataJobCommand>
 {
@@ -59,11 +64,17 @@ internal sealed class ExecuteDataJobHandler(
             {
                 switch (step)
                 {
+                    case DataSteps.Csv when job.UndoCsvFile is not null:
+                        await reporter.ReportAsync(await csvUndo.RunAsync(job, reporter, cancellationToken), cancellationToken, publishNow: true);
+                        break;
                     case DataSteps.Csv:
                         await reporter.ReportAsync(await csv.RunAsync(job, reporter, cancellationToken), cancellationToken, publishNow: true);
                         break;
                     case DataSteps.Dhan:
                         await reporter.ReportAsync(await dhan.RunAsync(reporter, cancellationToken), cancellationToken, publishNow: true);
+                        break;
+                    case DataSteps.Quality:
+                        await reporter.ReportAsync(await quality.RunAsync(job, reporter, cancellationToken), cancellationToken, publishNow: true);
                         break;
                     default:
                         await reporter.ReportAsync(await aggregate.RunAsync(job, reporter, cancellationToken), cancellationToken, publishNow: true);
@@ -89,6 +100,18 @@ internal sealed class ExecuteDataJobHandler(
             }
         }
 
+        // The stored bars may have shown new holidays or special sessions, and NSE's list is tried once a day (ADR 0017 §1); only ever warnings. A job about one instrument, or one
+        // that only checks the data, brings in nothing the calendar could learn from.
+        if (job.InstrumentId is null && job.Steps.Any(step => step != DataSteps.Quality))
+        {
+            await calendar.RunAsync(reporter, cancellationToken);
+            if (reporter.Ended)
+            {
+                DataLog.JobEndedElsewhere(logger, job.Id);
+                return;
+            }
+        }
+
         job.Finish(clock.GetUtcNow());
         if (!await jobs.PublishAsync(job, CancellationToken.None))
         {
@@ -107,6 +130,7 @@ internal sealed class ExecuteDataJobHandler(
         {
             DataSteps.Csv => job.Csv with { Status = PhaseStatus.Failed, FinishedAt = now, Message = Unexpected },
             DataSteps.Dhan => job.Dhan with { Status = PhaseStatus.Failed, FinishedAt = now, Message = Unexpected },
+            DataSteps.Quality => job.Quality with { Status = PhaseStatus.Failed, FinishedAt = now, Message = Unexpected },
             _ => job.Aggregate with { Status = PhaseStatus.Failed, FinishedAt = now, Message = Unexpected },
         };
     }

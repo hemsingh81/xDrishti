@@ -1,6 +1,6 @@
 namespace XDrishti.Domain.Market.Bars;
 
-/// <summary>The NSE cash session in India time (a fixed UTC+05:30 offset, <see cref="IndiaTime"/>): 09:15 to 15:30, 375 one-minute bars. Calendar-free until the holiday calendar (P1-11).</summary>
+/// <summary>The NSE cash session in India time (a fixed UTC+05:30 offset, <see cref="IndiaTime"/>): 09:15 to 15:30, 375 one-minute bars.</summary>
 public static class SessionClock
 {
     public const int OpenMinute = 9 * 60 + 15;

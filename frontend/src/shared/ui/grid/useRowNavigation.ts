@@ -6,21 +6,25 @@ export const rowAttribute = 'data-grid-row';
 export const selectAttribute = 'data-grid-select';
 
 const pageStep = 10;
+const downKeys: ReadonlySet<string> = new Set(['ArrowDown', 'PageDown', 'End']);
 
 interface Options {
   rowCount: number;
   onActivate: (index: number) => void;
   onToggle: (index: number) => void;
+  /** Infinite lists: a key that moves down reached the last loaded row, so more rows are wanted. */
+  onReachEnd?: () => void;
 }
 
 /**
  * Keyboard model of the rows: one tab stop (roving tabindex, kept in the DOM so a key press does not re-render the
  * table), Up/Down/Home/End/PageUp/PageDown move between rows, Enter activates the focused row and Space toggles its
- * selection. Only events whose target is the row itself (or, for arrows, its selection checkbox) are handled, and never
- * with Ctrl/Meta/Alt or when something already handled them: drag handles, inline editors, buttons and inputs inside
- * cells keep their own keys.
+ * selection. A downward key that lands on the last loaded row calls `onReachEnd` (infinite lists load more). Only
+ * events whose target is the row itself (or, for arrows, its selection checkbox) are handled, and never with
+ * Ctrl/Meta/Alt or when something already handled them: drag handles, inline editors, buttons and inputs inside cells
+ * keep their own keys.
  */
-export function useRowNavigation({ rowCount, onActivate, onToggle }: Options) {
+export function useRowNavigation({ rowCount, onActivate, onToggle, onReachEnd }: Options) {
   const bodyRef = useRef<HTMLTableSectionElement>(null);
   const focused = useRef(0);
 
@@ -70,6 +74,7 @@ export function useRowNavigation({ rowCount, onActivate, onToggle }: Options) {
     if (next !== undefined) {
       event.preventDefault();
       moveTo(next);
+      if (next >= rowCount - 1 && downKeys.has(event.key)) onReachEnd?.();
     } else if (onRow && event.key === 'Enter') {
       event.preventDefault();
       onActivate(index);

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Market.Bars;
 
@@ -16,4 +17,18 @@ internal sealed class DataSettings(IOptions<DataOptions> options) : IDataSetting
     public long CsvMaxBytesPerFile => options.Value.Csv.MaxBytesPerFile;
 
     public int CsvMaxSpanDays => options.Value.Csv.MaxSpanDays;
+
+    public int GapLookbackSessions => options.Value.Gaps.LookbackSessions;
+
+    public bool EodEnabled => options.Value.Eod.Enabled;
+
+    public TimeOnly EodTimeIst => TimeOnly.ParseExact(options.Value.Eod.TimeIst, EodDataOptions.TimeFormat, CultureInfo.InvariantCulture);
+
+    public int QualitySessions => options.Value.Quality.Sessions;
+
+    public double QualitySpikeMultiple => options.Value.Quality.SpikeMultiple;
+
+    public double QualityMaxMissingPercent => options.Value.Quality.MaxMissingPercent;
+
+    public double QualityMaxFailedPercent => options.Value.Quality.MaxFailedPercent;
 }

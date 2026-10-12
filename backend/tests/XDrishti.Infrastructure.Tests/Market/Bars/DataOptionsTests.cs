@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using XDrishti.Infrastructure.Market.Bars;
 
 namespace XDrishti.Infrastructure.Tests.Market.Bars;
@@ -59,5 +60,104 @@ public sealed class DataOptionsTests
     public void The_csv_limits_themselves_are_fine(int rows, long bytes, int spanDays)
     {
         DataOptions.IsValid(new DataOptions { Csv = new CsvDataOptions { MaxRowsPerFile = rows, MaxBytesPerFile = bytes, MaxSpanDays = spanDays } }).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_gap_lookback_defaults_to_30_sessions_and_the_end_of_day_run_to_15_50_switched_on()
+    {
+        var options = new DataOptions();
+
+        (options.Gaps.LookbackSessions, options.Eod.Enabled, options.Eod.TimeIst).ShouldBe((30, true, "15:50"));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(251)]
+    public void A_gap_lookback_outside_1_to_250_is_refused(int sessions)
+    {
+        DataOptions.IsValid(new DataOptions { Gaps = new GapDataOptions { LookbackSessions = sessions } }).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(250)]
+    public void The_gap_lookback_limits_themselves_are_fine(int sessions)
+    {
+        DataOptions.IsValid(new DataOptions { Gaps = new GapDataOptions { LookbackSessions = sessions } }).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("00:00")]
+    [InlineData("15:50")]
+    [InlineData("23:59")]
+    public void A_time_as_hh_mm_is_a_valid_end_of_day_time(string time)
+    {
+        DataOptions.IsValid(new DataOptions { Eod = new EodDataOptions { TimeIst = time } }).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("3:50 pm")]
+    [InlineData("15:5")]
+    [InlineData("24:00")]
+    [InlineData("15:60")]
+    [InlineData("15.50")]
+    [InlineData("15:50:00")]
+    public void Anything_else_is_refused_as_an_end_of_day_time(string time)
+    {
+        DataOptions.IsValid(new DataOptions { Eod = new EodDataOptions { TimeIst = time } }).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_settings_read_the_options_as_the_pipeline_asks_for_them()
+    {
+        var settings = new DataSettings(Options.Create(new DataOptions { Gaps = new GapDataOptions { LookbackSessions = 12 }, Eod = new EodDataOptions { Enabled = false, TimeIst = "16:05" } }));
+
+        (settings.GapLookbackSessions, settings.EodEnabled, settings.EodTimeIst).ShouldBe((12, false, new TimeOnly(16, 5)));
+    }
+
+    [Fact]
+    public void The_quality_checks_default_to_5_sessions_a_spike_multiple_of_20_1_percent_missing_and_5_percent_failed()
+    {
+        var options = new DataOptions().Quality;
+
+        (options.Sessions, options.SpikeMultiple, options.MaxMissingPercent, options.MaxFailedPercent).ShouldBe((5, 20.0, 1.0, 5.0));
+        DataOptions.IsValid(new DataOptions()).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(0, 20, 1, 5)]
+    [InlineData(61, 20, 1, 5)]
+    [InlineData(5, 1.9, 1, 5)]
+    [InlineData(5, 1001, 1, 5)]
+    [InlineData(5, 20, -0.1, 5)]
+    [InlineData(5, 20, 100.1, 5)]
+    [InlineData(5, 20, 1, -1)]
+    [InlineData(5, 20, 1, 101)]
+    public void Quality_settings_outside_their_ranges_are_refused(int sessions, double spikeMultiple, double maxMissing, double maxFailed)
+    {
+        DataOptions.IsValid(new DataOptions { Quality = new QualityDataOptions { Sessions = sessions, SpikeMultiple = spikeMultiple, MaxMissingPercent = maxMissing, MaxFailedPercent = maxFailed } }).ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(1, 2, 0, 0)]
+    [InlineData(60, 1000, 100, 100)]
+    public void The_quality_limits_themselves_are_fine(int sessions, double spikeMultiple, double maxMissing, double maxFailed)
+    {
+        DataOptions.IsValid(new DataOptions { Quality = new QualityDataOptions { Sessions = sessions, SpikeMultiple = spikeMultiple, MaxMissingPercent = maxMissing, MaxFailedPercent = maxFailed } }).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void The_settings_read_the_quality_options()
+    {
+        var settings = new DataSettings(Options.Create(new DataOptions { Quality = new QualityDataOptions { Sessions = 7, SpikeMultiple = 12, MaxMissingPercent = 2.5, MaxFailedPercent = 10 } }));
+
+        (settings.QualitySessions, settings.QualitySpikeMultiple, settings.QualityMaxMissingPercent, settings.QualityMaxFailedPercent).ShouldBe((7, 12.0, 2.5, 10.0));
+    }
+
+    [Fact]
+    public void The_invalid_message_names_the_quality_settings()
+    {
+        DataOptions.InvalidMessage.ShouldContain("Data:Quality:Sessions");
     }
 }

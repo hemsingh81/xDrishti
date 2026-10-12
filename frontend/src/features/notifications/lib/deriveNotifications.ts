@@ -2,7 +2,16 @@ import type { AccountSummary } from '@/shared/api';
 import { formatDate, formatHoursMinutes, istDayIso } from '@/shared/lib/format';
 import { connectionState, keyExpiry } from '@/features/accounts';
 
-export type NotificationKind = 'not_connected' | 'token_expired' | 'token_expiring' | 'key_expiring' | 'key_expired';
+export type NotificationKind =
+  | 'not_connected'
+  | 'token_expired'
+  | 'token_expiring'
+  | 'key_expiring'
+  | 'key_expired'
+  | 'data_run_failed'
+  | 'data_gaps_open'
+  | 'data_quality_failed'
+  | 'data_corporate_actions_pending';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 export interface AppNotification {
@@ -10,9 +19,12 @@ export interface AppNotification {
   id: string;
   kind: NotificationKind;
   severity: NotificationSeverity;
-  accountId: string;
-  accountName: string;
+  /** The account the notice is about; null for notices that are not about one (the data pipeline). */
+  accountId: string | null;
+  accountName: string | null;
   text: string;
+  /** Where "Open" leads (an in-app path). */
+  href: string;
   /** When it happened or will happen (ms since epoch); null when unknown. Shown as a relative time. */
   at: number | null;
 }
@@ -23,7 +35,11 @@ const urgentKeyDays = 7;
 const rank: Record<NotificationSeverity, number> = { error: 2, warn: 1, info: 0 };
 
 function forAccount(account: AccountSummary, nowMs: number): AppNotification[] {
-  const base = { accountId: account.id, accountName: account.name };
+  const base = {
+    accountId: account.id,
+    accountName: account.name,
+    href: `/accounts?account=${account.id}&tab=connection`,
+  };
   const make = (
     kind: NotificationKind,
     severity: NotificationSeverity,

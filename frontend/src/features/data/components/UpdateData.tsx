@@ -10,7 +10,7 @@ interface UpdateDataProps {
   onStart: (body: StartDataJobInput) => void;
 }
 
-/** "Update data" runs all three steps; the menu runs one step alone or loads every CSV file again. */
+/** "Update data" runs all three steps; the menu runs one step alone, fetches the gaps again or loads every CSV file again. */
 export function UpdateData({ busy, disabled, onStart }: UpdateDataProps) {
   return (
     <SplitButton
@@ -46,6 +46,14 @@ export function UpdateData({ busy, disabled, onStart }: UpdateDataProps) {
           description: 'Build 5m to 1M bars from the 1-minute bars',
           onSelect: () => {
             onStart({ steps: ['aggregate'] });
+          },
+        },
+        {
+          id: 'refetch-gaps',
+          label: 'Re-fetch gaps',
+          description: 'Fetch the sessions with missing bars again, unfillable ones too, then rebuild the aggregates',
+          onSelect: () => {
+            onStart({ steps: ['dhan', 'aggregate'], refetchGaps: true });
           },
         },
         {

@@ -5,8 +5,8 @@ namespace XDrishti.Application.Market.Bars;
 /// <summary>Structured log events of the market data pipeline (event ids 3301 to 3399: unique across the solution, asserted by the architecture tests). Counts, phases and file names only: never tokens, URLs or the broker's answers.</summary>
 internal static partial class DataLog
 {
-    [LoggerMessage(EventId = 3301, Level = LogLevel.Information, Message = "Data job {JobId} started by the owner: steps {Steps}, force CSV {ForceCsv}")]
-    public static partial void JobStarted(ILogger logger, Guid jobId, string steps, bool forceCsv);
+    [LoggerMessage(EventId = 3301, Level = LogLevel.Information, Message = "Data job {JobId} started ({Trigger}): steps {Steps}, force CSV {ForceCsv}")]
+    public static partial void JobStarted(ILogger logger, Guid jobId, string steps, bool forceCsv, string trigger);
 
     [LoggerMessage(EventId = 3302, Level = LogLevel.Information, Message = "Data job {JobId} {Status}")]
     public static partial void JobFinished(ILogger logger, Guid jobId, string status);
@@ -49,4 +49,37 @@ internal static partial class DataLog
 
     [LoggerMessage(EventId = 3315, Level = LogLevel.Warning, Message = "Data job {JobId} was ended elsewhere (marked failed as interrupted) while its worker was still running; the worker stops reporting")]
     public static partial void JobEndedElsewhere(ILogger logger, Guid jobId);
+
+    [LoggerMessage(EventId = 3316, Level = LogLevel.Error, Message = "Dhan fetch for {Symbol}: missing bars could not be looked for")]
+    public static partial void GapPlanFailed(ILogger logger, string symbol, Exception exception);
+
+    [LoggerMessage(EventId = 3317, Level = LogLevel.Error, Message = "Dhan fetch for {Symbol}: the gap records could not be updated")]
+    public static partial void GapCompleteFailed(ILogger logger, string symbol, Exception exception);
+
+    [LoggerMessage(EventId = 3318, Level = LogLevel.Information, Message = "The end-of-day update is switched off (Data:Eod:Enabled)")]
+    public static partial void EodOff(ILogger logger);
+
+    [LoggerMessage(EventId = 3319, Level = LogLevel.Information, Message = "The next end-of-day update is at {Next:yyyy-MM-dd HH:mm} India time")]
+    public static partial void EodScheduled(ILogger logger, DateTimeOffset next);
+
+    [LoggerMessage(EventId = 3320, Level = LogLevel.Information, Message = "The end-of-day update of today was missed (the application was not running): updating now")]
+    public static partial void EodCatchUp(ILogger logger);
+
+    [LoggerMessage(EventId = 3321, Level = LogLevel.Information, Message = "Scheduled end-of-day data job {JobId} started")]
+    public static partial void EodStarted(ILogger logger, Guid jobId);
+
+    [LoggerMessage(EventId = 3322, Level = LogLevel.Warning, Message = "The scheduled end-of-day update was skipped: {Reason}")]
+    public static partial void EodSkipped(ILogger logger, string reason);
+
+    [LoggerMessage(EventId = 3323, Level = LogLevel.Error, Message = "The scheduled end-of-day update could not be started")]
+    public static partial void EodCrashed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 3390, Level = LogLevel.Warning, Message = "The cleanup of interrupted data jobs did not finish in time; the end-of-day catch-up goes on without it")]
+    public static partial void EodRecoveryTimedOut(ILogger logger);
+
+    [LoggerMessage(EventId = 3324, Level = LogLevel.Information, Message = "CSV load of {File} undone: {Bars} bars removed")]
+    public static partial void CsvLoadUndone(ILogger logger, string file, long bars);
+
+    [LoggerMessage(EventId = 3325, Level = LogLevel.Error, Message = "The undo of a CSV load could not be written to the activity log")]
+    public static partial void CsvUndoAuditFailed(ILogger logger, Exception exception);
 }

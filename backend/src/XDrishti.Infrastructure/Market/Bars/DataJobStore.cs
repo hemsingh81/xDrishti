@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Infrastructure.Persistence;
@@ -52,23 +53,7 @@ internal sealed class DataJobStore(XDrishtiDbContext db, NpgsqlDataSource dataSo
 
         try
         {
-            await using var insert = new NpgsqlCommand(
-                """
-                INSERT INTO market.data_jobs
-                    (id, requested_by, started_at, status, steps, force_csv, rebuild_all, current_phase, csv, dhan, aggregate, warnings)
-                VALUES
-                    (@id, @requestedBy, @startedAt, 'running', @steps::jsonb, @forceCsv, @rebuildAll, NULL, @csv::jsonb, @dhan::jsonb, @aggregate::jsonb, '[]'::jsonb)
-                """, connection, transaction);
-            insert.Parameters.AddWithValue("id", job.Id);
-            insert.Parameters.AddWithValue("requestedBy", job.RequestedBy);
-            insert.Parameters.AddWithValue("startedAt", job.StartedAt);
-            insert.Parameters.AddWithValue("steps", System.Text.Json.JsonSerializer.Serialize(job.Steps, DataJobConfiguration.Json));
-            insert.Parameters.AddWithValue("forceCsv", job.ForceCsv);
-            insert.Parameters.AddWithValue("rebuildAll", job.RebuildAll);
-            insert.Parameters.AddWithValue("csv", System.Text.Json.JsonSerializer.Serialize(job.Csv, DataJobConfiguration.Json));
-            insert.Parameters.AddWithValue("dhan", System.Text.Json.JsonSerializer.Serialize(job.Dhan, DataJobConfiguration.Json));
-            insert.Parameters.AddWithValue("aggregate", System.Text.Json.JsonSerializer.Serialize(job.Aggregate, DataJobConfiguration.Json));
-            await insert.ExecuteNonQueryAsync(cancellationToken);
+            await InsertAsync(connection, transaction, job, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return true;
         }
@@ -76,6 +61,49 @@ internal sealed class DataJobStore(XDrishtiDbContext db, NpgsqlDataSource dataSo
         {
             return false; // the one-running-job index caught a concurrent start
         }
+    }
+
+    public async ValueTask RecordSkippedAsync(DataJob skipped, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(skipped);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await InsertAsync(connection, transaction, skipped, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    public async ValueTask<DataJob?> GetLastByTriggerAsync(DataJobTrigger trigger, CancellationToken cancellationToken) =>
+        await db.DataJobs.AsNoTracking().Where(x => x.Trigger == trigger).OrderByDescending(x => x.StartedAt).FirstOrDefaultAsync(cancellationToken);
+
+    /// <summary>Inserts the job as it is: running for a started job (the one-running-job index applies), ended for a skipped one.</summary>
+    private static async Task InsertAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, DataJob job, CancellationToken cancellationToken)
+    {
+        await using var insert = new NpgsqlCommand(
+            """
+            INSERT INTO market.data_jobs
+                (id, requested_by, trigger, started_at, finished_at, status, steps, force_csv, refetch_gaps, rebuild_all, current_phase, csv, dhan, aggregate, quality, instrument_id, csv_files, undo_csv_file, warnings, error)
+            VALUES
+                (@id, @requestedBy, @trigger, @startedAt, @finishedAt, @status, @steps::jsonb, @forceCsv, @refetchGaps, @rebuildAll, NULL, @csv::jsonb, @dhan::jsonb, @aggregate::jsonb, @quality::jsonb, @instrumentId, @csvFiles::jsonb, @undoCsvFile, '[]'::jsonb, @error)
+            """, connection, transaction);
+        insert.Parameters.AddWithValue("id", job.Id);
+        insert.Parameters.AddWithValue("requestedBy", job.RequestedBy);
+        insert.Parameters.AddWithValue("trigger", job.Trigger.ToCode());
+        insert.Parameters.AddWithValue("startedAt", job.StartedAt);
+        insert.Parameters.AddWithValue("finishedAt", NpgsqlDbType.TimestampTz, (object?)job.FinishedAt ?? DBNull.Value);
+        insert.Parameters.AddWithValue("status", job.Status.ToString().ToLowerInvariant());
+        insert.Parameters.AddWithValue("steps", System.Text.Json.JsonSerializer.Serialize(job.Steps, DataJobConfiguration.Json));
+        insert.Parameters.AddWithValue("forceCsv", job.ForceCsv);
+        insert.Parameters.AddWithValue("refetchGaps", job.RefetchGaps);
+        insert.Parameters.AddWithValue("rebuildAll", job.RebuildAll);
+        insert.Parameters.AddWithValue("csv", System.Text.Json.JsonSerializer.Serialize(job.Csv, DataJobConfiguration.Json));
+        insert.Parameters.AddWithValue("dhan", System.Text.Json.JsonSerializer.Serialize(job.Dhan, DataJobConfiguration.Json));
+        insert.Parameters.AddWithValue("aggregate", System.Text.Json.JsonSerializer.Serialize(job.Aggregate, DataJobConfiguration.Json));
+        insert.Parameters.AddWithValue("quality", System.Text.Json.JsonSerializer.Serialize(job.Quality, DataJobConfiguration.Json));
+        insert.Parameters.AddWithValue("instrumentId", NpgsqlDbType.Uuid, (object?)job.InstrumentId ?? DBNull.Value);
+        insert.Parameters.AddWithValue("csvFiles", NpgsqlDbType.Text, job.CsvFiles is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(job.CsvFiles, DataJobConfiguration.Json));
+        insert.Parameters.AddWithValue("undoCsvFile", NpgsqlDbType.Varchar, (object?)job.UndoCsvFile ?? DBNull.Value);
+        insert.Parameters.AddWithValue("error", NpgsqlDbType.Varchar, (object?)job.Error ?? DBNull.Value);
+        await insert.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async ValueTask<DataJob?> GetAsync(Guid id, CancellationToken cancellationToken) =>
@@ -90,6 +118,7 @@ internal sealed class DataJobStore(XDrishtiDbContext db, NpgsqlDataSource dataSo
         var csv = job.Csv;
         var dhan = job.Dhan;
         var aggregate = job.Aggregate;
+        var quality = job.Quality;
         var warnings = job.Warnings;
         var error = job.Error;
 
@@ -103,6 +132,7 @@ internal sealed class DataJobStore(XDrishtiDbContext db, NpgsqlDataSource dataSo
                     .SetProperty(x => x.Csv, csv)
                     .SetProperty(x => x.Dhan, dhan)
                     .SetProperty(x => x.Aggregate, aggregate)
+                    .SetProperty(x => x.Quality, quality)
                     .SetProperty(x => x.Warnings, warnings)
                     .SetProperty(x => x.Error, error),
                 cancellationToken);
@@ -120,12 +150,13 @@ internal sealed class DataJobStore(XDrishtiDbContext db, NpgsqlDataSource dataSo
             DataSteps.Csv => "csv",
             DataSteps.Dhan => "dhan",
             DataSteps.Aggregate => "aggregate",
+            DataSteps.Quality => "quality",
             _ => throw new ArgumentOutOfRangeException(nameof(step)),
         };
 
-        // The column name comes from the three constants above; the statuses are parameters.
-#pragma warning disable EF1002 // not user input: one of three constant column names
-        return await db.DataJobs.FromSqlRaw($"SELECT * FROM market.data_jobs WHERE {column} ->> 'status' = ANY ({{0}}) ORDER BY started_at DESC LIMIT 1", (object)statuses.ToArray())
+        // The column name comes from the constants above; the statuses are parameters. A job about one instrument (a fix action) is not the last run of a phase.
+#pragma warning disable EF1002 // not user input: one of the constant column names
+        return await db.DataJobs.FromSqlRaw($"SELECT * FROM market.data_jobs WHERE instrument_id IS NULL AND {column} ->> 'status' = ANY ({{0}}) ORDER BY started_at DESC LIMIT 1", (object)statuses.ToArray())
             .AsNoTracking()
             .FirstOrDefaultAsync(cancellationToken);
 #pragma warning restore EF1002

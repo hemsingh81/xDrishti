@@ -1,5 +1,6 @@
 using XDrishti.Application.Market.Bars;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Calendar;
 
 namespace XDrishti.Application.Abstractions.Market.Bars;
 
@@ -20,11 +21,14 @@ public interface IBarQueries
 
     ValueTask<AggregateTotals> GetAggregateTotalsAsync(CancellationToken cancellationToken);
 
-    /// <summary>The tracked instruments and the ones that have bars, with their coverage.</summary>
-    ValueTask<DataInstrumentPage> ListInstrumentsAsync(DataInstrumentSearch search, DateTimeOffset expectedStart, DateOnly expectedSession, CancellationToken cancellationToken);
+    /// <summary>The tracked instruments and the ones that have bars, with their coverage; how far behind each is counts the trading days of <paramref name="calendar"/> up to <paramref name="expectedSession"/>.</summary>
+    ValueTask<DataInstrumentPage> ListInstrumentsAsync(DataInstrumentSearch search, DateTimeOffset expectedStart, DateOnly expectedSession, TradingCalendar calendar, CancellationToken cancellationToken);
 
     ValueTask<BarsInstrument?> FindInstrumentAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>The newest <paramref name="take"/> bars of the timeframe, newest first.</summary>
     ValueTask<IReadOnlyList<BarRow>> ReadBarsAsync(Guid instrumentId, Timeframe timeframe, int take, CancellationToken cancellationToken);
+
+    /// <summary>The day bars (<c>1D</c>) of the India dates from <paramref name="from"/> up to, not including, <paramref name="toExclusive"/>, oldest first.</summary>
+    ValueTask<IReadOnlyList<BarRow>> ReadDailyBarsAsync(Guid instrumentId, DateOnly from, DateOnly toExclusive, CancellationToken cancellationToken);
 }

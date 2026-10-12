@@ -23,25 +23,27 @@ export function StepProgress({ title, status, done, total, unit, message }: Step
     );
   }
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       {total > 0 ? (
         <LinearProgress
           variant="determinate"
           value={percentDone(done, total)}
           aria-label={`${title} progress`}
-          sx={{ my: 1, borderRadius: 1 }}
+          sx={{ my: 0.5, borderRadius: 1 }}
         />
       ) : (
-        <LinearProgress aria-label={`${title} progress`} sx={{ my: 1, borderRadius: 1 }} />
+        <LinearProgress aria-label={`${title} progress`} sx={{ my: 0.5, borderRadius: 1 }} />
       )}
-      <Typography variant="body2" sx={{ fontWeight: 600, ...numeric }}>
-        {total > 0 ? `${formatNumber(done)} of ${formatNumber(total)} ${unit}` : 'Starting…'}
-      </Typography>
-      {message && (
-        <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
-          {message}
+      <Box sx={{ display: 'flex', gap: 1, minWidth: 0 }}>
+        <Typography variant="caption" sx={{ fontWeight: 600, flexShrink: 0, ...numeric }}>
+          {total > 0 ? `${formatNumber(done)} of ${formatNumber(total)} ${unit}` : 'Starting…'}
         </Typography>
-      )}
+        {message && (
+          <Typography variant="caption" color="text.secondary" noWrap title={message} sx={{ minWidth: 0 }}>
+            {message}
+          </Typography>
+        )}
+      </Box>
     </Box>
   );
 }

@@ -97,4 +97,12 @@ internal sealed class CsvFileRecord
     public long Rejected { get; set; }
 
     public DateTimeOffset LoadedAt { get; set; }
+
+    /// <summary>The first and last bar start of the file's accepted rows: the range an undo of the load works on. Null for a file loaded before they were recorded.</summary>
+    public DateTimeOffset? FirstBar { get; set; }
+
+    public DateTimeOffset? LastBar { get; set; }
+
+    /// <summary>When the load of this file was undone (ADR 0017 §6); null while it is loaded. An undone file is pending again; loading it again clears this.</summary>
+    public DateTimeOffset? UndoneAt { get; set; }
 }

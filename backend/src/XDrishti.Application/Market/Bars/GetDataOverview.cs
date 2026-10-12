@@ -1,12 +1,17 @@
+using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Bars.Csv;
+using XDrishti.Application.Market.Bars.Eod;
+using XDrishti.Application.Market.Bars.Gaps;
+using XDrishti.Application.Market.Calendar;
 using XDrishti.Domain.Market;
 using XDrishti.Domain.Market.Bars;
 
 namespace XDrishti.Application.Market.Bars;
 
-/// <summary>Everything the Data &amp; import screen shows above the table: the CSV folder, the Dhan account and whether a fetch can run, the aggregates, the stored bars with their freshness, the job in progress and the last job of each phase.</summary>
+/// <summary>Everything the Data &amp; import screen shows above the table: the CSV folder, the Dhan account and whether a fetch can run, the aggregates, the stored bars with their freshness (by the trading calendar), the job in progress, the last job of each phase, the next holiday, the calendar days awaiting confirmation, the gaps in the bars, the scheduled end-of-day run and the corporate actions waiting for a decision.</summary>
 public sealed record GetDataOverviewQuery : IQuery<DataOverview>;
 
 internal sealed class GetDataOverviewHandler(
@@ -16,7 +21,11 @@ internal sealed class GetDataOverviewHandler(
     IDataAccountStatus account,
     IDataSettings settings,
     IBarQueries queries,
+    IBarGaps gaps,
     IDataJobStore jobs,
+    ITradingCalendar tradingCalendar,
+    ITradingDayStore tradingDays,
+    ICorporateActionQueries corporateActions,
     TimeProvider clock) : IQueryHandler<GetDataOverviewQuery, DataOverview>
 {
     private static readonly string[] Ended = [PhaseStatus.Succeeded, PhaseStatus.Failed, PhaseStatus.Skipped];
@@ -29,10 +38,11 @@ internal sealed class GetDataOverviewHandler(
         var csv = await CsvAsync(cancellationToken);
         var dhan = await DhanAsync(cancellationToken);
 
-        var expected = DataFreshness.LastClosedSession(now);
+        var calendar = await tradingCalendar.GetAsync(cancellationToken);
+        var expected = calendar.LastClosedSession(now);
         var expectedStart = new DateTimeOffset(expected.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset);
         var totals = await queries.GetBarTotalsAsync(expectedStart, cancellationToken);
-        int? behind = totals.LastBar is { } last ? DataFreshness.SessionsBehind(IndiaTime.Today(last), expected) : null;
+        int? behind = totals.LastBar is { } last ? calendar.TradingDaysBetween(IndiaTime.Today(last), expected) : null;
         var bars = new BarsOverview(totals.Instruments, totals.InstrumentsBehind, totals.InstrumentsEmpty, totals.Bars, totals.FirstBar, totals.LastBar, expected, behind, behind > 0);
 
         var stats = await queries.GetAggregateTotalsAsync(cancellationToken);
@@ -50,7 +60,24 @@ internal sealed class GetDataOverviewHandler(
         var lastFetch = await jobs.GetLastWithPhaseAsync(DataSteps.Dhan, SucceededOnly, cancellationToken);
         dhan = dhan with { LastFetchAt = lastFetch?.Dhan.FinishedAt, LastFetchBars = lastFetch?.Dhan.Inserted };
 
-        return new DataOverview(csv, dhan, aggregates, bars, View(running), last3);
+        var nextHoliday = calendar.NextHoliday(IndiaTime.Today(now));
+        var proposals = await tradingDays.CountProposedAsync(cancellationToken);
+
+        var gapCounts = GapsOverview.From(await gaps.GetSummaryAsync(cancellationToken));
+        var eod = await EodAsync(calendar, now, cancellationToken);
+        var pending = await corporateActions.GetPendingAsync(cancellationToken);
+
+        return new DataOverview(csv, dhan, aggregates, bars, View(running), last3, nextHoliday is null ? null : CalendarDayView.From(nextHoliday), proposals, gapCounts, eod, pending.Count);
+    }
+
+    private async ValueTask<EodOverview> EodAsync(Domain.Market.Calendar.TradingCalendar calendar, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var last = await jobs.GetLastByTriggerAsync(DataJobTrigger.Daily, cancellationToken);
+        return new EodOverview(
+            settings.EodEnabled,
+            settings.EodTimeIst.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
+            settings.EodEnabled ? DataEodSchedule.NextRun(now, settings.EodTimeIst, calendar) : null,
+            last is null ? null : EodRunView.From(last));
     }
 
     private static DataJobView? View(DataJob? job) => job is null ? null : DataJobView.From(job);

@@ -8,7 +8,7 @@ import {
   sampleCoverage,
 } from '@/test/fixtures';
 import { createDataFake, failureCode, failureMessage, type DataFake } from '@/test/dataFake';
-import { renderData } from './testing';
+import { openStep, openTab, ready, renderData } from './testing';
 
 // Poll fast so a whole update fits in a test.
 vi.mock('./lib/polling', () => ({ dataPollMs: 25 }));
@@ -35,7 +35,6 @@ afterEach(() => {
 const updateButton = () => screen.getByRole('button', { name: 'Update data' });
 const pipeline = () => screen.getByRole('region', { name: 'Pipeline' });
 const step = (name: RegExp) => within(pipeline()).getByRole('listitem', { name });
-const ready = () => screen.findByRole('region', { name: 'Data freshness' });
 
 /** Runs the job in progress to its end, one step at a time. */
 async function finish(fake: DataFake) {
@@ -76,7 +75,8 @@ describe('Update data: the run', () => {
     await waitFor(() => {
       expect(screen.getByRole('row', { name: /NSE:INFY/ })).toHaveTextContent('Current');
     });
-    expect(within(screen.getByRole('list', { name: 'Recent runs' })).getAllByRole('listitem')).toHaveLength(2);
+    await openTab('Runs');
+    expect(within(await screen.findByRole('list', { name: 'Recent runs' })).getAllByRole('listitem')).toHaveLength(2);
   });
 
   it('shows each step in turn: counts and message while it runs, waiting for the ones after, the result when done', async () => {
@@ -88,7 +88,9 @@ describe('Update data: the run', () => {
 
     const csv = await screen.findByRole('progressbar', { name: 'CSV files progress' });
     expect(csv).toHaveAttribute('aria-valuenow', '0');
-    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Update in progress, loading the CSV files.');
+    expect(screen.getByRole('status', { name: 'Update progress' })).toHaveTextContent(
+      'Update in progress, loading the CSV files.',
+    );
     expect(within(step(/Dhan Data API/)).getByText('Waiting for the earlier steps')).toBeInTheDocument();
     expect(within(step(/Aggregates/)).getByText('Waiting for the earlier steps')).toBeInTheDocument();
     expect(within(step(/CSV files/)).getByText('Running')).toBeInTheDocument();
@@ -101,7 +103,9 @@ describe('Update data: the run', () => {
     fake.advance();
     expect(await screen.findByRole('progressbar', { name: 'Dhan Data API progress' })).toBeInTheDocument();
     expect(screen.queryByRole('progressbar', { name: 'CSV files progress' })).not.toBeInTheDocument();
-    expect(screen.getByRole('status', { name: '' })).toHaveTextContent('fetching from the Dhan Data API');
+    expect(screen.getByRole('status', { name: 'Update progress' })).toHaveTextContent(
+      'fetching from the Dhan Data API',
+    );
     expect(within(step(/CSV files/)).getByText('Succeeded')).toBeInTheDocument();
     expect(within(step(/Aggregates/)).getByText('Waiting for the earlier steps')).toBeInTheDocument();
 
@@ -151,6 +155,7 @@ describe('Update data: the menu', () => {
     ['Load CSV files only', { steps: ['csv'] }],
     ['Fetch from Dhan only', { steps: ['dhan'] }],
     ['Rebuild aggregates only', { steps: ['aggregate'] }],
+    ['Re-fetch gaps', { steps: ['dhan', 'aggregate'], refetchGaps: true }],
     ['Re-import all CSV files', { steps: ['csv'], forceCsv: true }],
   ])('"%s" starts the right job', async (name, body) => {
     const fake = createDataFake({ autoAdvance: false });
@@ -177,6 +182,9 @@ describe('Update data: the menu', () => {
     expect(screen.getByText('Add the 1-minute bars missing since the last bar')).toBeInTheDocument();
     expect(screen.getByText('Build 5m to 1M bars from the 1-minute bars')).toBeInTheDocument();
     expect(screen.getByText('Load every file again, even if unchanged (CSV step only)')).toBeInTheDocument();
+    expect(
+      screen.getByText('Fetch the sessions with missing bars again, unfillable ones too, then rebuild the aggregates'),
+    ).toBeInTheDocument();
   });
 });
 
@@ -228,9 +236,12 @@ describe('Update data: problems', () => {
     const dhan = step(/Dhan Data API/);
     expect(await within(dhan).findByText('Failed')).toBeInTheDocument();
     expect(within(dhan).getByText(failureMessage)).toBeInTheDocument();
-    expect(within(dhan).getByText(`Code ${failureCode}`)).toBeInTheDocument();
     expect(within(step(/Aggregates/)).getByText('Skipped')).toBeInTheDocument();
     expect(within(step(/Aggregates/)).getByText('An earlier step failed.')).toBeInTheDocument();
+    // The code is in the step's details.
+    expect(within(await openStep('Dhan Data API')).getByText(`Code ${failureCode}`)).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await openTab('Runs');
     await waitFor(() => {
       const [latest] = within(screen.getByRole('list', { name: 'Recent runs' })).getAllByRole('listitem');
       expect(latest).toHaveTextContent('Failed');
@@ -253,6 +264,6 @@ describe('Update data: problems', () => {
     await screen.findByText(/^Data updated/);
     const dhan = step(/Dhan Data API/);
     expect(await within(dhan).findByText('Skipped')).toBeInTheDocument();
-    expect(within(dhan).getByText(reason, { selector: 'div' })).toBeInTheDocument();
+    expect(within(dhan).getByText(reason)).toBeInTheDocument();
   });
 });

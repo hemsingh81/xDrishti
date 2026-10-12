@@ -87,6 +87,21 @@ internal sealed class BarAggregates(NpgsqlDataSource dataSource, TimeProvider cl
         return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async ValueTask<bool> MarkDirtyAsync(Guid instrumentId, DateTimeOffset from, CancellationToken cancellationToken)
+    {
+        // The window runs from the first minute of the day to the instrument's last bar; a range already marked is only widened.
+        await using var command = dataSource.CreateCommand(
+            """
+            UPDATE market.bar_coverage SET
+                dirty_from = LEAST(COALESCE(dirty_from, GREATEST(@from, first_bar)), GREATEST(@from, first_bar)),
+                dirty_to = GREATEST(COALESCE(dirty_to, last_bar), last_bar)
+            WHERE instrument_id = @id
+            """);
+        command.Parameters.AddWithValue("id", instrumentId);
+        command.Parameters.AddWithValue("from", from);
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
     public async ValueTask<IReadOnlyList<DirtyInstrument>> ListDirtyAsync(CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand(

@@ -10,7 +10,7 @@ internal sealed class FetchTargets(NpgsqlDataSource dataSource) : IFetchTargets
     {
         await using var command = dataSource.CreateCommand(
             """
-            SELECT i.id, i.canonical_symbol, i.type, b.broker_id, b.segment, c.last_bar
+            SELECT i.id, i.canonical_symbol, i.type, b.broker_id, b.segment, c.last_bar, c.first_bar
             FROM market.tracked_instruments t
             JOIN market.instruments i ON i.id = t.instrument_id
             JOIN market.instrument_broker_ids b ON b.instrument_id = i.id AND b.broker = 'dhan'
@@ -24,7 +24,8 @@ internal sealed class FetchTargets(NpgsqlDataSource dataSource) : IFetchTargets
         {
             targets.Add(new FetchTarget(
                 reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5)));
+                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
+                reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6)));
         }
 
         return targets;

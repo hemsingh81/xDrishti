@@ -36,14 +36,20 @@ export interface GridSort {
   descending: boolean;
 }
 
-export interface GridPagination {
-  /** 1-based. */
-  page: number;
-  pageSize: number;
-  pageSizeOptions: readonly number[];
+/** Infinite-scroll mode: the caller owns the loaded rows and appends the next page when asked. */
+export interface GridInfinite {
+  /** Rows in the whole list (all pages); drives "Showing N of total" and `aria-rowcount`. */
   total: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
+  /** More rows can be loaded. Keep it false while the rows shown are a stale list of another filter. */
+  hasMore: boolean;
+  /** The next page is being fetched: shows the spinner row and pauses auto-loading. */
+  loadingMore: boolean;
+  /** Asked when the end of the loaded rows nears the viewport, or End / PageDown / Arrow Down reaches the last row. */
+  onLoadMore: () => void;
+  /** The last "load more" failed: an inline "Could not load more rows — Retry" row replaces the spinner. */
+  error?: string | null;
+  /** Retry button of that row; the grid stops auto-loading until it is pressed. */
+  onRetryMore?: () => void;
 }
 
 /** What a caller can add to one row element (P1-15: a drag-and-drop sortable ref and styles; tests: data attributes). */
@@ -83,7 +89,15 @@ export interface GridProps<Row> {
   /** The row that is open elsewhere (a drawer): highlighted and marked `aria-current`. */
   activeRowId?: string | null;
 
-  pagination?: GridPagination;
+  /**
+   * Identifies the list (filters, search, sort): when it changes the grid scrolls back to the top and the first row
+   * becomes the tab stop again. A change of `sort` does this too, so only pass what is not the sort. Not the rows: more
+   * rows arriving, or a refresh, must not move the reader.
+   */
+  resetKey?: string | number;
+
+  /** Infinite-scroll mode: the list loads further rows as it is scrolled. Without it the list is plain. */
+  infinite?: GridInfinite;
 
   /** First load: skeleton rows. While rows are already shown (next page) they stay, dimmed. */
   loading?: boolean;

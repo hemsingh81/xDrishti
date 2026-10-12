@@ -4,12 +4,17 @@ import type {
   AggregatesOverview,
   BarRow,
   BarsOverview,
+  CalendarDay,
   CsvOverview,
   CsvPhase,
   DataCoveragePage,
   DataCoverageRow,
   DataJob,
   DataOverview,
+  DataNotice,
+  EodOverview,
+  EodRun,
+  GapRow,
   DhanOverview,
   DhanPhase,
   InstrumentBars,
@@ -1077,7 +1082,7 @@ export const buildInstrumentBasket = (overrides: Partial<InstrumentBasket> = {})
 
 // ---- Data & import (made-up bars, files and jobs) -------------------------------------------------------------------
 
-const dataRowId = (n: number) => `00000000-0000-4000-8000-0000000007${String(n).padStart(2, '0')}`;
+export const dataRowId = (n: number) => `00000000-0000-4000-8000-0000000007${String(n).padStart(2, '0')}`;
 export const dataJobId = (n: number) => `00000000-0000-4000-8000-0000000008${String(n).padStart(2, '0')}`;
 
 /** The last session's closing bar and the first bar of the sample data, as the API sends them (+05:30). */
@@ -1133,6 +1138,9 @@ export const buildDhanPhase = (overrides: Partial<DhanPhase> = {}): DhanPhase =>
   overlapCompared: 1_000,
   overlapMismatched: 0,
   errors: [],
+  gapsFound: 0,
+  gapsFilled: 0,
+  gapsUnfillable: 0,
   ...overrides,
 });
 
@@ -1166,8 +1174,36 @@ export const buildDataJob = (overrides: Partial<DataJob> = {}): DataJob => ({
   aggregate: buildAggregatePhase(),
   warnings: [],
   error: null,
+  trigger: 'manual',
+  refetchGaps: false,
   ...overrides,
 });
+
+/** A scheduled run that did not start (the reason is `error`; finished when it started; every step not requested). */
+export const buildSkippedJob = (overrides: Partial<DataJob> = {}): DataJob => {
+  const notRun = {
+    status: 'notRequested',
+    startedAt: null,
+    finishedAt: null,
+    done: 0,
+    total: 0,
+    message: null,
+    code: null,
+  };
+  return buildDataJob({
+    id: dataJobId(3),
+    status: 'skipped',
+    requestedBy: 'system',
+    startedAt: '2026-10-12T15:50:00+05:30',
+    finishedAt: '2026-10-12T15:50:00+05:30',
+    trigger: 'daily',
+    error: 'The Data account is not connected.',
+    csv: buildCsvPhase({ ...notRun, rows: 0, inserted: 0, repaired: 0, filesLoaded: 0 }),
+    dhan: buildDhanPhase({ ...notRun, bars: 0, inserted: 0, instrumentsFetched: 0 }),
+    aggregate: buildAggregatePhase({ ...notRun, buckets: 0 }),
+    ...overrides,
+  });
+};
 
 /** A job that has just started: the first requested step is running, the others wait. */
 export const buildRunningJob = (overrides: Partial<DataJob> = {}): DataJob =>
@@ -1253,6 +1289,25 @@ export const buildBarsOverview = (overrides: Partial<BarsOverview> = {}): BarsOv
   ...overrides,
 });
 
+export const buildEodRun = (overrides: Partial<EodRun> = {}): EodRun => ({
+  jobId: dataJobId(4),
+  startedAt: '2026-10-12T15:50:00+05:30',
+  finishedAt: '2026-10-12T15:52:00+05:30',
+  status: 'succeeded',
+  trigger: 'daily',
+  message: null,
+  ...overrides,
+});
+
+/** The scheduled run is on at 15:50 IST; the next one is tomorrow's, the last one (today's) succeeded. */
+export const buildEodOverview = (overrides: Partial<EodOverview> = {}): EodOverview => ({
+  enabled: true,
+  timeIst: '15:50',
+  nextRunAt: '2026-10-13T15:50:00+05:30',
+  lastRun: buildEodRun(),
+  ...overrides,
+});
+
 /** Everything loaded and current; the last job of every step is the sample job. */
 export const buildDataOverview = (overrides: Partial<DataOverview> = {}): DataOverview => ({
   csv: buildCsvOverview(),
@@ -1261,8 +1316,63 @@ export const buildDataOverview = (overrides: Partial<DataOverview> = {}): DataOv
   bars: buildBarsOverview(),
   runningJob: null,
   lastJobs: { csv: buildDataJob(), dhan: buildDataJob(), aggregate: buildDataJob() },
+  nextHoliday: null,
+  calendarProposals: 0,
+  gaps: { open: 0, unfillable: 0, filled: 0, lastDetectedAt: null },
+  eod: buildEodOverview(),
+  pendingCorporateActions: 0,
   ...overrides,
 });
+
+// ---- Trading calendar (P1-11a) ----------------------------------------------------------------------------------
+
+/** A confirmed holiday by default (a weekday with no session). */
+export const buildCalendarDay = (overrides: Partial<CalendarDay> = {}): CalendarDay => ({
+  date: '2026-10-20',
+  kind: 'holiday',
+  sessionFrom: null,
+  sessionTo: null,
+  minutes: null,
+  source: 'nse',
+  status: 'confirmed',
+  note: 'Diwali Laxmi Pujan',
+  updatedAt: '2026-10-12T09:00:00Z',
+  ...overrides,
+});
+
+/** A special session: an evening window by default (a Muhurat-like hour). */
+export const buildSpecialDay = (overrides: Partial<CalendarDay> = {}): CalendarDay =>
+  buildCalendarDay({
+    date: '2026-11-08',
+    kind: 'special',
+    sessionFrom: '18:00',
+    sessionTo: '19:00',
+    minutes: 60,
+    source: 'manual',
+    note: 'Muhurat trading',
+    ...overrides,
+  });
+
+/** The confirmed days of the sample calendar, by date: an NSE holiday, a manual special session, a manual holiday. */
+export const sampleCalendarDays: readonly CalendarDay[] = [
+  buildCalendarDay(),
+  buildSpecialDay(),
+  buildCalendarDay({ date: '2026-12-25', source: 'manual', note: 'Christmas' }),
+];
+
+/** Proposals found in the stored bars: a holiday (no bars on a weekday) and a Saturday session. */
+export const sampleCalendarProposals: readonly CalendarDay[] = [
+  buildCalendarDay({ date: '2026-10-02', source: 'observed', status: 'proposed', note: null }),
+  buildSpecialDay({
+    date: '2026-09-12',
+    sessionFrom: '09:15',
+    sessionTo: '15:30',
+    minutes: 375,
+    source: 'observed',
+    status: 'proposed',
+    note: null,
+  }),
+];
 
 /** Nothing loaded yet: no bars, no jobs, three files waiting. */
 export const buildEmptyDataOverview = (): DataOverview =>
@@ -1292,6 +1402,7 @@ export const buildCoverageRow = (overrides: Partial<DataCoverageRow> = {}): Data
   source: 'csv',
   status: 'current',
   daysBehind: 0,
+  openGaps: 0,
   ...overrides,
 });
 
@@ -1314,6 +1425,7 @@ export const sampleCoverage: DataCoverageRow[] = [
     lastBar: '2026-10-08T15:29:00+05:30',
     status: 'behind',
     daysBehind: 2,
+    openGaps: 3,
   }),
   buildCoverageRow({
     id: dataRowId(5),
@@ -1348,6 +1460,7 @@ export function searchCoverage(items: readonly DataCoverageRow[], params: URLSea
   const matches = items
     .filter((r) => !q || r.symbol.toLowerCase().includes(q) || r.name.toLowerCase().includes(q))
     .filter((r) => !status || r.status === status)
+    .filter((r) => params.get('hasGaps') !== 'true' || r.openGaps > 0)
     .sort((a, b) => {
       const [x, y] = [key(a), key(b)];
       const order = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y));
@@ -1390,3 +1503,75 @@ export function buildInstrumentBars(symbol: string, timeframe: string, count = 3
   );
   return { instrumentId: dataRowId(1), symbol, name: 'RELIANCE INDUSTRIES LTD', timeframe, items };
 }
+
+// ---- Gaps and data notices (P1-12a) ----------------------------------------------------------------------------------
+
+export const buildGapRow = (overrides: Partial<GapRow> = {}): GapRow => ({
+  instrumentId: dataRowId(4),
+  symbol: 'NSE:INFY',
+  name: 'INFOSYS LTD',
+  date: '2026-10-08',
+  expected: 375,
+  found: 360,
+  attempts: 1,
+  status: 'open',
+  lastAttemptAt: '2026-10-09T15:52:00+05:30',
+  detectedAt: '2026-10-09T15:52:00+05:30',
+  ...overrides,
+});
+
+/** Five gaps, newest day first: three open (INFY), one unfillable (TCS), one filled (RELIANCE). */
+export const sampleGaps: readonly GapRow[] = [
+  buildGapRow({ date: '2026-10-09', found: 120 }),
+  buildGapRow({ date: '2026-10-08' }),
+  buildGapRow({ date: '2026-10-07', found: 0, attempts: 0, lastAttemptAt: null }),
+  buildGapRow({
+    instrumentId: dataRowId(2),
+    symbol: 'NSE:TCS',
+    name: 'TATA CONSULTANCY SERVICES LTD',
+    date: '2026-10-05',
+    found: 300,
+    attempts: 2,
+    status: 'unfillable',
+  }),
+  buildGapRow({
+    instrumentId: dataRowId(1),
+    symbol: 'NSE:RELIANCE',
+    name: 'RELIANCE INDUSTRIES LTD',
+    date: '2026-09-30',
+    found: 375,
+    attempts: 1,
+    status: 'filled',
+  }),
+];
+
+/** The gaps endpoint over an in-memory list: status, instrumentId and paging (the list is already newest first). */
+export function searchGaps(items: readonly GapRow[], params: URLSearchParams) {
+  const status = params.get('status');
+  const instrumentId = params.get('instrumentId');
+  const page = Number(params.get('page') ?? 1);
+  const pageSize = Number(params.get('pageSize') ?? 50);
+  const matches = items
+    .filter((g) => !status || g.status === status)
+    .filter((g) => !instrumentId || g.instrumentId === instrumentId);
+  return { items: matches.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: matches.length };
+}
+
+export const buildDataNotice = (overrides: Partial<DataNotice> = {}): DataNotice => ({
+  id: 'data:gaps_open:1760266320:4',
+  kind: 'data_gaps_open',
+  severity: 'warn',
+  text: '4 sessions have missing 1-minute bars',
+  at: '2026-10-12T15:52:00+05:30',
+  ...overrides,
+});
+
+export const buildRunFailedNotice = (overrides: Partial<DataNotice> = {}): DataNotice =>
+  buildDataNotice({
+    id: `data:run_failed:${dataJobId(5)}`,
+    kind: 'data_run_failed',
+    severity: 'error',
+    text: 'The automatic update of 12 Oct failed: Dhan refused the access token.',
+    at: '2026-10-12T15:51:00+05:30',
+    ...overrides,
+  });

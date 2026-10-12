@@ -4,6 +4,10 @@
  * shows in the instruments' lists) invalidates by the root and never imports the other feature.
  */
 export const queryRoots = {
+  /** Everything the Data & import screen reads (and the data jobs the Data quality screen starts and watches). */
+  data: ['data'] as const,
+  /** Everything the Data quality screen reads (a corporate action changes its pending count). */
+  quality: ['quality'] as const,
   /** Everything the Instruments screen reads: search results, counts, details, refresh status. */
   instruments: ['instruments'] as const,
   /** Every members list (current and as-of) of every basket. */

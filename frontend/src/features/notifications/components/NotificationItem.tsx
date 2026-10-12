@@ -45,7 +45,7 @@ export function NotificationItem({ notification, unread, now, onOpen }: Notifica
           <MuiLink
             component={Link}
             variant="body2"
-            to={`/accounts?account=${notification.accountId}&tab=connection`}
+            to={notification.href}
             aria-label={`Open: ${notification.text}`}
             onClick={() => {
               onOpen(notification);
