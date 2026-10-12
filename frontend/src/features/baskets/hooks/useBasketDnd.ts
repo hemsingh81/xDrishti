@@ -39,6 +39,8 @@ interface BasketDndOptions {
   /** The shown basket's members in their order (empty while a past date is shown: rows cannot be dragged then). */
   memberOrder: readonly string[];
   basketOrder: readonly string[];
+  /** The shown basket is a portfolio basket: its rows are only copied (Alt is ignored) and never reordered. */
+  readOnly?: boolean;
   /** Selected instrument ids: dragging a selected row drags all of them. */
   selection: ReadonlySet<string>;
   labelOf: (kind: 'member' | 'basket', id: string) => string;
@@ -69,7 +71,7 @@ const targetOf = (event: DragOverEvent | DragEndEvent): DropTarget | null => {
  * means (`resolveDrop`) and the spoken announcements. It decides nothing about the data: the caller gets the outcome.
  */
 export function useBasketDnd(options: BasketDndOptions): BasketDnd {
-  const { memberOrder, basketOrder, selection, labelOf, onOutcome } = options;
+  const { memberOrder, basketOrder, readOnly = false, selection, labelOf, onOutcome } = options;
   const [session, setSession] = useState<DragSession | null>(null);
   const [over, setOver] = useState<DropTarget | null>(null);
   const alt = useAltKey(session !== null);
@@ -79,6 +81,7 @@ export function useBasketDnd(options: BasketDndOptions): BasketDnd {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  const { isHeld } = alt;
   const announcements = useMemo(
     () =>
       createAnnouncements({
@@ -86,9 +89,9 @@ export function useBasketDnd(options: BasketDndOptions): BasketDnd {
         memberOrder,
         basketOrder,
         labelOf,
-        isMove: alt.isHeld,
+        isMove: () => !readOnly && isHeld(),
       }),
-    [selection, memberOrder, basketOrder, labelOf, alt.isHeld],
+    [selection, memberOrder, basketOrder, labelOf, isHeld, readOnly],
   );
 
   const onDragStart = useCallback(
@@ -116,9 +119,9 @@ export function useBasketDnd(options: BasketDndOptions): BasketDnd {
       const target = targetOf(event);
       const move = alt.isHeld();
       finish();
-      if (current) onOutcome(resolveDrop(current, target, { memberOrder, basketOrder, alt: move }), current);
+      if (current) onOutcome(resolveDrop(current, target, { memberOrder, basketOrder, alt: move, readOnly }), current);
     },
-    [session, alt, finish, onOutcome, memberOrder, basketOrder],
+    [session, alt, finish, onOutcome, memberOrder, basketOrder, readOnly],
   );
 
   return {
@@ -133,6 +136,6 @@ export function useBasketDnd(options: BasketDndOptions): BasketDnd {
     },
     session,
     over,
-    move: alt.held,
+    move: alt.held && !readOnly,
   };
 }

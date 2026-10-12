@@ -23,6 +23,8 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
   const count = ids.length;
   const label = subject(count, picked[0]?.instrument.symbol ?? '');
   const idle = count === 0;
+  // A portfolio basket's rows can only be copied out: no Move to…, no Remove.
+  const readOnly = basket.system;
   const guard = (action: () => void) => () => {
     if (!busy) action();
   };
@@ -37,7 +39,7 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
     >
       {idle ? (
         <Typography role="status" color="text.secondary">
-          Select instruments to copy, move or remove them
+          {readOnly ? 'Select instruments to copy them to a basket' : 'Select instruments to copy, move or remove them'}
         </Typography>
       ) : (
         <Stack direction="row" sx={{ columnGap: 1, alignItems: 'center' }}>
@@ -50,7 +52,7 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
         </Stack>
       )}
       <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
-        {(['copy', 'move'] as const).map((mode) => (
+        {(readOnly ? (['copy'] as const) : (['copy', 'move'] as const)).map((mode) => (
           <Button
             key={mode}
             size="small"
@@ -63,19 +65,21 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
             {mode === 'copy' ? 'Copy to…' : 'Move to…'}
           </Button>
         ))}
-        <Button
-          size="small"
-          variant="outlined"
-          disabled={idle}
-          aria-disabled={busy || undefined}
-          onClick={guard(() => {
-            void remove(ids, label).then((done) => {
-              if (done) onClear();
-            });
-          })}
-        >
-          {idle ? 'Remove' : `Remove (${formatNumber(count)})`}
-        </Button>
+        {!readOnly && (
+          <Button
+            size="small"
+            variant="outlined"
+            disabled={idle}
+            aria-disabled={busy || undefined}
+            onClick={guard(() => {
+              void remove(ids, label).then((done) => {
+                if (done) onClear();
+              });
+            })}
+          >
+            {idle ? 'Remove' : `Remove (${formatNumber(count)})`}
+          </Button>
+        )}
       </Stack>
       <TransferMenu
         anchor={menu?.anchor ?? null}

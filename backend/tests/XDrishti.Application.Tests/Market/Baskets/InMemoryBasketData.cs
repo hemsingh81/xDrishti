@@ -121,7 +121,7 @@ internal sealed class InMemoryBasketData : IBasketStore, IBasketQueries, IMarket
         [.. Members.Where(m => m.BasketId == basket.Id && m.IsActive).OrderBy(m => m.Position).Select(m => m.InstrumentId)];
 
     private BasketView View(Basket b) =>
-        new(b.Id, b.Name, b.Colour, b.Purpose.ToCode(), b.Description, b.Position, Members.Count(m => m.BasketId == b.Id && m.IsActive), b.CreatedAt, b.ArchivedAt);
+        new(b.Id, b.Name, b.Colour, b.Purpose.ToCode(), b.Description, b.Position, Members.Count(m => m.BasketId == b.Id && m.IsActive), b.CreatedAt, b.ArchivedAt, BasketKinds.Manual, false, null, null);
 
     private void Commit()
     {

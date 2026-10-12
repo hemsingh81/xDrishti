@@ -1,15 +1,26 @@
 import { TextField } from '@mui/material';
 import type { Basket } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
+import type { BasketGroups } from '../lib/groups';
 
 interface BasketSelectProps {
-  baskets: readonly Basket[];
+  groups: BasketGroups;
   selectedId: string;
   onSelect: (id: string) => void;
 }
 
-/** The phone version of the basket cards: one select. (Reordering baskets and dropping on them need the wider layout.) */
-export function BasketSelect({ baskets, selectedId, onSelect }: BasketSelectProps) {
+const optionOf = (basket: Basket) => (
+  <option key={basket.id} value={basket.id}>
+    {`${basket.name} (${formatNumber(basket.memberCount)})`}
+  </option>
+);
+
+/**
+ * The phone version of the basket cards: one select, in two groups when there are portfolio baskets. (Reordering
+ * baskets and dropping on them need the wider layout.)
+ */
+export function BasketSelect({ groups, selectedId, onSelect }: BasketSelectProps) {
+  const { portfolio, manual } = groups;
   return (
     <TextField
       select
@@ -21,11 +32,16 @@ export function BasketSelect({ baskets, selectedId, onSelect }: BasketSelectProp
       }}
       slotProps={{ select: { native: true } }}
     >
-      {baskets.map((basket) => (
-        <option key={basket.id} value={basket.id}>
-          {`${basket.name} (${formatNumber(basket.memberCount)})`}
-        </option>
-      ))}
+      {portfolio.length > 0
+        ? [
+            <optgroup key="portfolio" label="Portfolio">
+              {portfolio.map(optionOf)}
+            </optgroup>,
+            <optgroup key="manual" label="Your baskets">
+              {manual.map(optionOf)}
+            </optgroup>,
+          ]
+        : manual.map(optionOf)}
     </TextField>
   );
 }

@@ -16,6 +16,7 @@ public sealed record RemoveBasketMembersCommand(Guid BasketId, RemoveMembersInpu
 
 internal sealed class RemoveBasketMembersHandler(
     IBasketStore store,
+    IPortfolioBasketSource portfolio,
     IMarketUnitOfWork unitOfWork,
     IAccountEventLog events,
     TimeProvider clock,
@@ -31,7 +32,7 @@ internal sealed class RemoveBasketMembersHandler(
 
         for (var attempt = 0; attempt < BasketChecks.Attempts; attempt++)
         {
-            var found = await BasketChecks.EditableAsync(store, command.BasketId, cancellationToken);
+            var found = await BasketChecks.EditableAsync(store, portfolio, command.BasketId, cancellationToken);
             if (found.IsFailure)
             {
                 return Result.Failure<RemoveMembersResult>(found.Error);

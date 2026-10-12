@@ -1,5 +1,5 @@
 import { ApiError } from '@/shared/api';
-import { buildBasket } from '@/test/fixtures';
+import { buildBasket, buildPortfolioBasket } from '@/test/fixtures';
 import { createAnnouncements } from './announcements';
 import { basketFormFrom, toBasketInput, validateBasket } from './basketForm';
 import { resolveDrop, sessionFor, type DragSession, type DropTarget } from './dropRules';
@@ -9,9 +9,11 @@ import {
   basketProblemText,
   isConflict,
   isStaleOrder,
+  isSystemRefusal,
   PartialAddError,
   reorderProblemText,
 } from './errors';
+import { manualBaskets, splitBaskets } from './groups';
 import { capProblem, maxBasketMembers } from './limits';
 import { addedMessage, removedMessage, transferMessage } from './messages';
 import { mergeOrder, moveBlock, sameOrder } from './order';
@@ -85,6 +87,15 @@ describe('resolveDrop', () => {
     expect(resolveDrop(member(['i1']), onMember('i1'), context)).toEqual({ kind: 'none' });
     expect(resolveDrop(member(['i1']), null, context)).toEqual({ kind: 'none' });
     expect(resolveDrop(member(['i1']), onMember('x9', 'b2'), context)).toEqual({ kind: 'none' });
+  });
+
+  it('only ever copies the rows of a read-only (portfolio) basket: no reorder, Alt ignored', () => {
+    const readOnly = { ...context, readOnly: true };
+    expect(resolveDrop(member(['i1']), onMember('i3'), readOnly)).toEqual({ kind: 'none' });
+    expect(resolveDrop(member(['i1']), onBasket('b2'), { ...readOnly, alt: true })).toMatchObject({
+      kind: 'transfer',
+      mode: 'copy',
+    });
   });
 
   it('reorders baskets among baskets only', () => {
@@ -211,6 +222,15 @@ describe('errors', () => {
     expect(basketProblemText(conflict, 'fallback')).toMatch(/reloaded — please try again/);
   });
 
+  it('recognises a refused change of a portfolio basket and words it the same whatever the title', () => {
+    const refused = problem(409, 'baskets.system', 'Conflict');
+    expect(isSystemRefusal(refused)).toBe(true);
+    expect(isSystemRefusal(problem(409, 'baskets.conflict', 'x'))).toBe(false);
+    expect(isConflict(refused)).toBe(false);
+    expect(basketProblemText(refused, 'f')).toBe("Portfolio baskets can't be changed");
+    expect(reorderProblemText(refused, 'f')).toBe("Portfolio baskets can't be changed");
+  });
+
   it('prefers what the API says about the instruments, then its title, then the fallback', () => {
     expect(
       basketProblemText(
@@ -259,6 +279,21 @@ describe('errors', () => {
       name: 'One. Two.',
     });
     expect(basketFieldErrors(new TypeError('x'))).toEqual({});
+  });
+});
+
+describe('splitBaskets', () => {
+  it('separates the portfolio baskets from the owner’s and keeps both orders', () => {
+    const baskets = [
+      buildPortfolioBasket({ id: 'p1' }),
+      buildBasket({ id: 'm1' }),
+      buildPortfolioBasket({ id: 'p2' }),
+      buildBasket({ id: 'm2' }),
+    ];
+    const groups = splitBaskets(baskets);
+    expect(groups.portfolio.map((b) => b.id)).toEqual(['p1', 'p2']);
+    expect(groups.manual.map((b) => b.id)).toEqual(['m1', 'm2']);
+    expect(manualBaskets(baskets).map((b) => b.id)).toEqual(['m1', 'm2']);
   });
 });
 

@@ -77,7 +77,9 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
             r.ValidFrom,
             r.ValidTo,
             r.Note,
-            r.AddedBy)).ToList();
+            r.AddedBy,
+            null,
+            null)).ToList();
         return new BasketMembers(basketId, basket.Name, basket.ArchivedAt, asOf, items.Count, items);
     }
 
@@ -141,7 +143,7 @@ internal sealed class BasketQueries(XDrishtiDbContext db) : IBasketQueries
             b.ArchivedAt));
 
     private static BasketView ToView(BasketRow r) =>
-        new(r.Id, r.Name, r.Colour, r.Purpose.ToCode(), r.Description, r.Position, r.MemberCount, r.CreatedAt, r.ArchivedAt);
+        new(r.Id, r.Name, r.Colour, r.Purpose.ToCode(), r.Description, r.Position, r.MemberCount, r.CreatedAt, r.ArchivedAt, BasketKinds.Manual, false, null, null);
 
     private sealed record BasketRow(
         Guid Id, string Name, string Colour, BasketPurpose Purpose, string? Description, int Position, int MemberCount, DateTimeOffset CreatedAt, DateTimeOffset? ArchivedAt);

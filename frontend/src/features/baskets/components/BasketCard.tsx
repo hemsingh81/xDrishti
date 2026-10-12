@@ -1,14 +1,13 @@
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
-import { alpha } from '@mui/material/styles';
 import { Box, ButtonBase, Chip, IconButton, Stack, Typography } from '@mui/material';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Basket } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
-import { focusRing, motion } from '@/theme';
 import { useBasketDrag } from '../hooks/basketDragContext';
 import type { DndData } from '../lib/dropRules';
 import { purposeLabel } from '../lib/labels';
+import { basketCardSx } from './basketCardStyle';
 import { BasketDot } from './BasketDot';
 
 interface BasketCardProps {
@@ -35,26 +34,8 @@ export function BasketCard({ basket, selected, onSelect }: BasketCardProps) {
       component="li"
       ref={setNodeRef}
       data-drop-target={hot ? (drag.move ? 'move' : 'copy') : undefined}
-      sx={(theme) => ({
-        listStyle: 'none',
-        display: 'flex',
-        alignItems: 'stretch',
-        gap: 0.5,
-        p: 1,
-        pl: 0.5,
-        borderRadius: `${theme.shape.borderRadius}px`,
-        border: `1px solid ${theme.palette.divider}`,
-        borderTopWidth: 4,
-        bgcolor: hot ? alpha(theme.palette.primary.main, 0.12) : 'background.paper',
-        opacity: isDragging ? 0.6 : 1,
-        zIndex: isDragging ? 2 : 'auto',
-        transitionProperty: 'background-color, outline-color, box-shadow',
-        transitionDuration: motion.fast,
-        outline:
-          selected || hot ? `${focusRing.width}px ${hot ? 'dashed' : 'solid'} ${theme.palette.primary.main}` : 'none',
-        outlineOffset: 1,
-      })}
-      style={{ transform: CSS.Translate.toString(transform), transition, borderTopColor: basket.colour }}
+      sx={[basketCardSx({ selected, hot }), { opacity: isDragging ? 0.6 : 1, zIndex: isDragging ? 2 : 'auto' }]}
+      style={{ transform: CSS.Translate.toString(transform), transition, borderLeftColor: basket.colour }}
     >
       <IconButton
         ref={setActivatorNodeRef}

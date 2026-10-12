@@ -16,6 +16,7 @@ public sealed record ArchiveBasketCommand(Guid Id, string Actor) : ICommand;
 
 internal sealed class ArchiveBasketHandler(
     IBasketStore store,
+    IPortfolioBasketSource portfolio,
     IMarketUnitOfWork unitOfWork,
     IAccountEventLog events,
     TimeProvider clock,
@@ -28,7 +29,7 @@ internal sealed class ArchiveBasketHandler(
             var basket = await store.FindAsync(command.Id, cancellationToken);
             if (basket is null)
             {
-                return Result.Failure(BasketErrors.NotFound);
+                return Result.Failure(await portfolio.ExistsAsync(command.Id, cancellationToken) ? BasketErrors.System : BasketErrors.NotFound);
             }
 
             var now = clock.GetUtcNow();

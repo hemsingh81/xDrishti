@@ -16,6 +16,7 @@ public sealed record UpdateBasketCommand(Guid Id, BasketInput Input, string Acto
 
 internal sealed class UpdateBasketHandler(
     IBasketStore store,
+    IPortfolioBasketSource portfolio,
     IBasketQueries queries,
     IMarketUnitOfWork unitOfWork,
     IAccountEventLog events,
@@ -33,7 +34,7 @@ internal sealed class UpdateBasketHandler(
 
         for (var attempt = 0; attempt < BasketChecks.Attempts; attempt++)
         {
-            var found = await BasketChecks.EditableAsync(store, command.Id, cancellationToken);
+            var found = await BasketChecks.EditableAsync(store, portfolio, command.Id, cancellationToken);
             if (found.IsFailure)
             {
                 return Result.Failure<BasketView>(found.Error);

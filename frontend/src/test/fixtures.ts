@@ -963,6 +963,9 @@ export const basketIds = {
   myChoice: '00000000-0000-4000-8000-000000000401',
   myLongTerm: '00000000-0000-4000-8000-000000000402',
   bestStocks: '00000000-0000-4000-8000-000000000403',
+  /** A portfolio (system) basket: the id is its bucket's id. */
+  dhanPortfolio: '00000000-0000-4000-8000-000000000411',
+  zerodhaPortfolio: '00000000-0000-4000-8000-000000000412',
 } as const;
 
 export const buildBasket = (overrides: Partial<Basket> = {}): Basket => ({
@@ -975,8 +978,26 @@ export const buildBasket = (overrides: Partial<Basket> = {}): Basket => ({
   memberCount: 0,
   createdAt: '2026-10-11T04:00:00Z',
   archivedAt: null,
+  kind: 'manual',
+  system: false,
+  accountId: null,
+  accountName: null,
   ...overrides,
 });
+
+/** An account's portfolio bucket as the Baskets page lists it: protected, with the account's colour. */
+export const buildPortfolioBasket = (overrides: Partial<Basket> = {}): Basket =>
+  buildBasket({
+    id: basketIds.dhanPortfolio,
+    name: 'Dhan · Main · Portfolio',
+    colour: '#0ea5e9',
+    purpose: 'long_term',
+    kind: 'portfolio',
+    system: true,
+    accountId: '00000000-0000-4000-8000-000000000a01',
+    accountName: 'Dhan · Main',
+    ...overrides,
+  });
 
 /** The three baskets the migration creates, empty. */
 export const seededBaskets = (): Basket[] => [
@@ -996,6 +1017,8 @@ export const buildBasketMember = (
   validTo: null,
   note: null,
   addedBy: 'example@invalid.test',
+  quantity: null,
+  accountName: null,
   ...overrides,
 });
 

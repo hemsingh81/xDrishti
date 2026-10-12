@@ -14,6 +14,7 @@ import { useBasketDnd } from '../hooks/useBasketDnd';
 import { useMemberActions } from '../hooks/useMemberActions';
 import type { DragSession, DropOutcome } from '../lib/dropRules';
 import { isConflict, isStaleOrder, reorderProblemText } from '../lib/errors';
+import { splitBaskets } from '../lib/groups';
 import { subject } from '../lib/messages';
 import { BasketCardList } from './BasketCardList';
 import { BasketSelect } from './BasketSelect';
@@ -32,7 +33,8 @@ interface BasketsWorkspaceProps {
 
 /**
  * The basket cards and the selected basket's members, inside one drag-and-drop context: rows reorder among themselves,
- * rows dropped on a card are copied there (moved with Alt / Option), cards reorder among themselves.
+ * rows dropped on a card are copied there (moved with Alt / Option), cards reorder among themselves. A portfolio basket
+ * is read only: its rows can only be copied to the owner's baskets, and its card is neither sortable nor a drop target.
  */
 export function BasketsWorkspace({
   baskets,
@@ -47,17 +49,21 @@ export function BasketsWorkspace({
   const phone = useMediaQuery(theme.breakpoints.down('md'));
   const { notify } = useToast();
   const queryClient = useQueryClient();
-  const members = useQuery(membersQuery(selected.id, asOf));
+  const readOnly = selected.system;
+  // A portfolio basket has no look-back view: a date in the URL is kept for the owner's baskets and not sent for it.
+  const shownAsOf = readOnly ? null : asOf;
+  const groups = useMemo(() => splitBaskets(baskets), [baskets]);
+  const members = useQuery(membersQuery(selected.id, shownAsOf));
   const items = useMemo(() => members.data?.items ?? [], [members.data]);
-  const selection = useScopedSelection(`${selected.id}|${asOf ?? ''}`);
+  const selection = useScopedSelection(`${selected.id}|${shownAsOf ?? ''}`);
   const actions = useMemberActions({ source: selected, baskets });
   const { mutate: reorderBaskets } = useReorderBaskets();
   const { mutate: reorderMembers } = useReorderMembers();
-  const editable = asOf === null;
+  const editable = shownAsOf === null;
 
   const symbols = useMemo(() => new Map(items.map((m) => [m.instrument.id, m.instrument.symbol])), [items]);
   const memberOrder = useMemo(() => (editable ? items.map((m) => m.instrument.id) : []), [editable, items]);
-  const basketOrder = useMemo(() => baskets.map((b) => b.id), [baskets]);
+  const basketOrder = useMemo(() => groups.manual.map((b) => b.id), [groups]);
   const labelOf = useCallback(
     (kind: 'member' | 'basket', id: string) =>
       kind === 'basket' ? (baskets.find((b) => b.id === id)?.name ?? 'basket') : (symbols.get(id) ?? 'instrument'),
@@ -85,7 +91,7 @@ export function BasketsWorkspace({
     [notify, queryClient, reorderBaskets, reorderMembers, actions, symbols, clear],
   );
 
-  const dnd = useBasketDnd({ memberOrder, basketOrder, selection: selection.ids, labelOf, onOutcome });
+  const dnd = useBasketDnd({ memberOrder, basketOrder, readOnly, selection: selection.ids, labelOf, onOutcome });
   const drag = useMemo(
     () => ({ session: dnd.session, over: dnd.over, move: dnd.move }),
     [dnd.session, dnd.over, dnd.move],
@@ -93,12 +99,12 @@ export function BasketsWorkspace({
   const panel = useMemo<MemberPanel>(
     () => ({
       basket: selected,
-      others: baskets.filter((b) => b.id !== selected.id),
+      others: groups.manual.filter((b) => b.id !== selected.id),
       busy: actions.busy,
       transfer: actions.transfer,
       remove: actions.remove,
     }),
-    [selected, baskets, actions],
+    [selected, groups, actions],
   );
 
   return (
@@ -111,19 +117,19 @@ export function BasketsWorkspace({
               gap: 2,
               flex: '1 1 auto',
               minHeight: 0,
-              gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(260px, 320px) minmax(0, 1fr)' },
+              gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(240px, 280px) minmax(0, 1fr)' },
               gridTemplateRows: { md: 'minmax(0, 1fr)' },
             }}
           >
             {phone ? (
-              <BasketSelect baskets={baskets} selectedId={selected.id} onSelect={onSelect} />
+              <BasketSelect groups={groups} selectedId={selected.id} onSelect={onSelect} />
             ) : (
-              <BasketCardList baskets={baskets} selectedId={selected.id} onSelect={onSelect} />
+              <BasketCardList groups={groups} selectedId={selected.id} onSelect={onSelect} />
             )}
             <MembersPanel
               basket={selected}
               members={members}
-              asOf={asOf}
+              asOf={shownAsOf}
               onAsOfChange={onAsOfChange}
               selectedIds={selection.ids}
               onSelectionChange={selection.set}

@@ -26,7 +26,8 @@ interface MembersPanelProps {
 
 /**
  * The right-hand card: the selected basket's header and actions, the selection toolbar and the members grid, with the
- * Add instruments dialog and the history drawer it opens. A look-back date makes the list read only.
+ * Add instruments dialog and the history drawer it opens. A look-back date makes the list read only; so does a
+ * portfolio basket, which offers only Copy to….
  */
 export function MembersPanel({
   basket,
@@ -41,6 +42,7 @@ export function MembersPanel({
 }: MembersPanelProps) {
   const [adding, setAdding] = useState(false);
   const [history, setHistory] = useState(false);
+  const readOnly = basket.system;
   const editable = asOf === null;
   const items = members.data?.items ?? [];
   const failed = members.isError && !members.data;
@@ -75,7 +77,7 @@ export function MembersPanel({
       )}
       <MembersGrid
         members={items}
-        editable={editable}
+        mode={readOnly ? 'portfolio' : editable ? 'edit' : 'lookback'}
         selectedIds={editable ? selectedIds : undefined}
         onSelectionChange={editable ? onSelectionChange : undefined}
         loading={members.isPending}
@@ -83,9 +85,9 @@ export function MembersPanel({
         onRetry={() => {
           void members.refetch();
         }}
-        emptyState={<EmptyMembers asOf={asOf} onAdd={openAdd} />}
+        emptyState={<EmptyMembers asOf={asOf} readOnly={readOnly} onAdd={openAdd} />}
       />
-      {adding && (
+      {adding && !readOnly && (
         <AddInstrumentsDialog
           basket={basket}
           memberIds={new Set(items.map((m) => m.instrument.id))}
@@ -94,14 +96,16 @@ export function MembersPanel({
           }}
         />
       )}
-      <HistoryDrawer
-        basketId={basket.id}
-        basketName={basket.name}
-        open={history}
-        onClose={() => {
-          setHistory(false);
-        }}
-      />
+      {!readOnly && (
+        <HistoryDrawer
+          basketId={basket.id}
+          basketName={basket.name}
+          open={history}
+          onClose={() => {
+            setHistory(false);
+          }}
+        />
+      )}
     </Card>
   );
 }

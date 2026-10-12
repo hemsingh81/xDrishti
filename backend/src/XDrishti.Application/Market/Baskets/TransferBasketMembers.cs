@@ -15,11 +15,14 @@ namespace XDrishti.Application.Market.Baskets;
 /// the members of the source that are not in the target are appended to it (in the source's order, with their notes) and tracked when they are not
 /// tracked; a move also ends their stay in the source. Instruments that are not members of the source are skipped (counted as <c>notInSource</c>), so
 /// repeating a move changes nothing. Failures are as for adding (<c>instruments.retired</c>, <c>baskets.too_many_members</c>). Audited with counts.
+/// A system (portfolio) basket may be the source of a copy (its members are the instruments of the bucket's holdings); as the target of either mode or the source
+/// of a move it is refused with <c>baskets.system</c>.
 /// </summary>
 public sealed record TransferBasketMembersCommand(TransferInput Input, string Actor) : ICommand;
 
 internal sealed class TransferBasketMembersHandler(
     IBasketStore store,
+    IPortfolioBasketSource portfolio,
     InstrumentTracking tracking,
     IMarketUnitOfWork unitOfWork,
     IAccountEventLog events,
@@ -56,21 +59,53 @@ internal sealed class TransferBasketMembersHandler(
         }
 
         var moving = mode == Move;
+        if (await portfolio.ExistsAsync(input.ToBasketId, cancellationToken))
+        {
+            return Result.Failure<TransferResult>(BasketErrors.System);
+        }
+
+        var systemSource = await portfolio.ExistsAsync(input.FromBasketId, cancellationToken);
+        if (systemSource && moving)
+        {
+            return Result.Failure<TransferResult>(BasketErrors.System);
+        }
+
         for (var attempt = 0; attempt < BasketChecks.Attempts; attempt++)
         {
-            var source = await BasketChecks.EditableAsync(store, input.FromBasketId, cancellationToken);
-            if (source.IsFailure)
+            // The source: a manual basket (not archived) or the holdings of a portfolio bucket. Its members are read as (instrument, note, stay).
+            Basket? sourceBasket = null;
+            string sourceCalled;
+            List<SourceItem> sourceMembers;
+            if (systemSource)
             {
-                return Result.Failure<TransferResult>(source.Error);
+                var holdings = await portfolio.InstrumentsAsync(input.FromBasketId, cancellationToken);
+                if (holdings is null)
+                {
+                    return Result.Failure<TransferResult>(BasketErrors.NotFound);
+                }
+
+                sourceCalled = $"portfolio basket '{holdings.Name}'";
+                sourceMembers = [.. holdings.InstrumentIds.Select(id => new SourceItem(id, null, null))];
+            }
+            else
+            {
+                var source = await BasketChecks.EditableAsync(store, portfolio, input.FromBasketId, cancellationToken);
+                if (source.IsFailure)
+                {
+                    return Result.Failure<TransferResult>(source.Error);
+                }
+
+                sourceBasket = source.Value;
+                sourceCalled = BasketChecks.Called(sourceBasket);
+                sourceMembers = [.. (await store.ListActiveMembersAsync(sourceBasket.Id, cancellationToken)).Select(m => new SourceItem(m.InstrumentId, m.Note, m))];
             }
 
-            var target = await BasketChecks.EditableAsync(store, input.ToBasketId, cancellationToken);
+            var target = await BasketChecks.EditableAsync(store, portfolio, input.ToBasketId, cancellationToken);
             if (target.IsFailure)
             {
                 return Result.Failure<TransferResult>(target.Error);
             }
 
-            var sourceMembers = await store.ListActiveMembersAsync(source.Value.Id, cancellationToken);
             var targetMembers = await store.ListActiveMembersAsync(target.Value.Id, cancellationToken);
             var wanted = ids.Value.ToHashSet();
             var transferable = sourceMembers.Where(m => wanted.Contains(m.InstrumentId)).ToList(); // in the source's order
@@ -109,10 +144,10 @@ internal sealed class TransferBasketMembersHandler(
             {
                 foreach (var member in transferable)
                 {
-                    member.Remove(command.Actor, now);
+                    member.Stay!.Remove(command.Actor, now);
                 }
 
-                source.Value.Touch();
+                sourceBasket!.Touch();
             }
 
             var result = new TransferResult(
@@ -127,13 +162,13 @@ internal sealed class TransferBasketMembersHandler(
             events.Record(AccountEvent.Record(
                 AccountEventType.BasketMembersTransferred,
                 null,
-                $"{(moving ? "Moved" : "Copied")} {done} of {ids.Value.Length} instruments from {BasketChecks.Called(source.Value)} to {BasketChecks.Called(target.Value)} "
+                $"{(moving ? "Moved" : "Copied")} {done} of {ids.Value.Length} instruments from {sourceCalled} to {BasketChecks.Called(target.Value)} "
                     + $"({alreadyInTarget} already there, {notInSource} not in the source, {newlyTracked} tracked now)",
                 command.Actor,
                 now));
             if (await unitOfWork.TrySaveAsync(cancellationToken))
             {
-                MarketLog.BasketMembersTransferred(logger, source.Value.Id, target.Value.Id, mode, toAdd.Count, alreadyInTarget, removed, notInSource);
+                MarketLog.BasketMembersTransferred(logger, input.FromBasketId, target.Value.Id, mode, toAdd.Count, alreadyInTarget, removed, notInSource);
                 return Result.Success(result);
             }
         }
@@ -141,4 +176,7 @@ internal sealed class TransferBasketMembersHandler(
         MarketLog.BasketConflict(logger, BasketChecks.Attempts);
         return Result.Failure<TransferResult>(BasketErrors.Conflict);
     }
+
+    /// <summary>A member of the source: the instrument, its note and (manual baskets only) the stay a move ends.</summary>
+    private sealed record SourceItem(Guid InstrumentId, string? Note, BasketMember? Stay);
 }

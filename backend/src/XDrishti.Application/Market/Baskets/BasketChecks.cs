@@ -53,13 +53,13 @@ internal static class BasketChecks
             : Result.Success(ids.ToArray());
     }
 
-    /// <summary>The basket, when it exists and may be changed (not archived).</summary>
-    public static async ValueTask<Result<Basket>> EditableAsync(IBasketStore store, Guid id, CancellationToken cancellationToken)
+    /// <summary>The basket, when it exists and may be changed (not archived). A portfolio bucket is a system basket: <c>baskets.system</c>, never changed.</summary>
+    public static async ValueTask<Result<Basket>> EditableAsync(IBasketStore store, IPortfolioBasketSource portfolio, Guid id, CancellationToken cancellationToken)
     {
         var basket = await store.FindAsync(id, cancellationToken);
         if (basket is null)
         {
-            return Result.Failure<Basket>(BasketErrors.NotFound);
+            return Result.Failure<Basket>(await portfolio.ExistsAsync(id, cancellationToken) ? BasketErrors.System : BasketErrors.NotFound);
         }
 
         return basket.IsArchived ? Result.Failure<Basket>(BasketErrors.Archived) : Result.Success(basket);

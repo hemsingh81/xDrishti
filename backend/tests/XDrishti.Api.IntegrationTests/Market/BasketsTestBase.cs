@@ -14,6 +14,13 @@ public abstract class BasketsTestBase(ApiFactory factory) : MarketTestBase(facto
 {
     protected static readonly TimeSpan Tolerance = TimeSpan.FromMinutes(1);
 
+    /// <summary>The baskets list also shows the portfolio buckets (ADR 0014), so a basket test starts without accounts and buckets left behind by other tests.</summary>
+    public override async ValueTask InitializeAsync()
+    {
+        await Factory.ResetAccountsAsync();
+        await base.InitializeAsync();
+    }
+
     protected async Task ImportAsync() => (await RefreshAsync()).Status.ShouldBe("succeeded");
 
     protected async Task<InstrumentSummary> FindAsync(string symbol) =>

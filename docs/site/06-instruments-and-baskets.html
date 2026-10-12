@@ -284,9 +284,10 @@ Dhan historical API (1-minute up to ~5 years, daily since listing), and builds a
 <tr>
 <td><strong>System</strong></td>
 <td>Maintained automatically</td>
-<td>Open positions, Holdings, Today&#39;s plan, Paused-cell instruments</td>
+<td><strong>Portfolio</strong> (one per portfolio bucket, built — P1-15a, §3.4), Open positions, Today&#39;s plan, Paused-cell instruments</td>
 </tr>
 </tbody></table>
+<p>Each basket carries a <code>kind</code> in the API: <code>manual</code> or <code>portfolio</code> today; rule-based and the other system baskets reuse the same field and the <code>baskets.system</code> protection.</p>
 <h3 id="32-basket-attributes">3.2 Basket attributes<a class="hash" href="#32-basket-attributes" aria-label="Link to this section">#</a></h3>
 <table>
 <thead>
@@ -353,8 +354,8 @@ Dhan historical API (1-minute up to ~5 years, daily since listing), and builds a
 <td>Pin a basket to the live price panel (counts toward the live-feed budget, <a href="05-data-and-brokers.html">doc 05</a> §5)</td>
 </tr>
 </tbody></table>
-<h3 id="34-manual-baskets-what-is-built-p1-15">3.4 Manual baskets: what is built (P1-15)<a class="hash" href="#34-manual-baskets-what-is-built-p1-15" aria-label="Link to this section">#</a></h3>
-<p>Only <strong>manual</strong> baskets exist so far (rule-based and system baskets, allowed styles/sides, strategies in scope, risk override and target weights come with their stories). Tables live in the <code>market</code> schema (not <code>catalog</code>, which was never created),
+<h3 id="34-manual-baskets-what-is-built-p1-15-and-portfolio-system-baskets-p1-15a">3.4 Manual baskets: what is built (P1-15) and portfolio system baskets (P1-15a)<a class="hash" href="#34-manual-baskets-what-is-built-p1-15-and-portfolio-system-baskets-p1-15a" aria-label="Link to this section">#</a></h3>
+<p><strong>Manual</strong> baskets and the <strong>portfolio</strong> system baskets exist so far (rule-based baskets, the other system baskets, allowed styles/sides, strategies in scope, risk override and target weights come with their stories). Tables live in the <code>market</code> schema (not <code>catalog</code>, which was never created),
 next to the instruments they point to; the runtime role has plain DML on both and no DDL. Every route needs a session (changes also the CSRF token), none needs a step-up.</p>
 <p><strong>Rules</strong></p>
 <ul>
@@ -372,6 +373,16 @@ Removing the last membership never untracks. Archiving never untracks.</li>
 (the UI reloads and may retry). A reorder whose list no longer matches because the basket changed between two tries is a <code>409 baskets.conflict</code> rather than a <code>400</code>.</li>
 <li><strong>Idempotent and atomic:</strong> add, remove, reorder and transfer can be repeated; what is already done is counted, not repeated, and writes neither rows nor audit entries. Each call is <strong>one transaction</strong> (members, tracking rows, revision and audit entries are written together).</li>
 </ul>
+<p><strong>Portfolio system baskets (P1-15a, <a href="../adr/0014-portfolio-buckets-appear-as-system-baskets.html">ADR 0014</a>)</strong></p>
+<ul>
+<li><strong>A view, not copies:</strong> every bucket that <code>GET /api/portfolio-buckets</code> lists (not archived; custom, or the default bucket of an active account with the Portfolio role) is shown in the baskets list as <code>kind: portfolio</code>, <code>system: true</code>, with the bucket&#39;s id as the basket id. Nothing is stored in <code>market.baskets</code>; the name follows the account (ADR 0011) and archived or role-off buckets disappear. Read through the application port <code>IPortfolioBasketSource</code> (the market and portfolio/accounts modules share the one <code>XDrishtiDbContext</code>).</li>
+<li><strong>Order and fields:</strong> system baskets come first (account name, then bucket name; <code>position</code> counts within the group, 0 first), then the manual ones in the owner&#39;s order. <code>colour</code> is the account&#39;s colour (the neutral <code>#6366f1</code> for a custom bucket), <code>purpose</code> <code>long_term</code>, <code>archivedAt</code> null, <code>createdAt</code> the bucket&#39;s; <code>accountId</code> / <code>accountName</code> are set for an account&#39;s default bucket (null for custom buckets and for manual baskets). <code>memberCount</code> = distinct instruments with quantity &gt; 0, from one grouped query for all buckets.</li>
+<li><strong>Members</strong> = the instruments of the bucket&#39;s current holdings (quantity &gt; 0, active account with the Portfolio role, mapped to an instrument of the master list; holdings without a match are left out), sorted by symbol, <code>position</code> 0..n-1. Each item has <code>quantity</code> (summed when a custom bucket holds the instrument in several accounts) and <code>accountName</code> (the holding accounts, comma separated); <code>id</code> is the first holding&#39;s id, <code>validFrom</code> the first-seen date, <code>validTo</code> and <code>note</code> null, <code>addedBy</code> <code>portfolio</code>. For manual baskets <code>quantity</code> and <code>accountName</code> are null.</li>
+<li><strong>Read-only:</strong> every change route with a system basket answers <code>409 baskets.system</code> — <code>PUT</code> / <code>DELETE /api/baskets/{id}</code>, add / remove / reorder members, and <code>transfer</code> with it as the target (copy or move) or as the source of a <strong>move</strong>. <code>PUT /api/baskets/order</code> lists manual baskets only (a system id there is <code>400 baskets.invalid</code>). A bucket id that is not listed (archived, role off) is <code>404 baskets.not_found</code> everywhere.</li>
+<li><strong>Copy out:</strong> <code>transfer</code> with <code>mode: copy</code> and a system source is allowed — the instruments of the holdings are added to the manual target in symbol order (no notes), tracked when not tracked, retired ones refused as before, audited as &quot;Copied … from portfolio basket &#39;Name&#39; to basket &#39;Name&#39;&quot;.</li>
+<li><strong>No past:</strong> <code>GET /api/baskets/{id}/members?asOf=</code> and <code>GET /api/baskets/{id}/history</code> on a system basket are <code>400 baskets.invalid</code> (the holdings history is the portfolio module&#39;s, not basket history). <code>GET /api/instruments/{id}/baskets</code> lists manual baskets only.</li>
+<li><strong>Screen (built):</strong> the left column has a <strong>Portfolio</strong> group above <strong>Your baskets</strong> (the group headings show when there are portfolio baskets). A portfolio card has a lock and a &quot;Portfolio&quot; badge, the account name and the instrument count; it is selectable but has no grip, is not a drop target and shows no highlight. Selecting one opens a read-only panel: the title carries &quot;Portfolio · read only&quot;, the account name and the note &quot;Portfolio baskets follow the account&#39;s holdings and can&#39;t be archived or edited.&quot;; there is no Add instruments, Edit, History, Archive, as-of date, Remove or Move to…. The grid shows Quantity and Account instead of Added; each row keeps a grip that only <strong>starts a copy</strong> (drag onto one of the owner&#39;s cards: copy only — Alt does not turn it into a move; rows cannot be reordered), and the row menu and the toolbar offer <strong>Copy to…</strong> only, with the usual Undo. Empty state: &quot;No holdings in this bucket yet — they arrive when the account&#39;s portfolio is imported&quot;. The card reorder, the copy / move menus and the Instruments screen&#39;s Add to basket dialog list the owner&#39;s baskets only. The first of the owner&#39;s baskets is still the one shown when the URL names none (<code>?basket=&lt;id&gt;</code> works for both kinds; a look-back date in the URL is not sent for a portfolio basket). A stray <code>409 baskets.system</code> shows &quot;Portfolio baskets can&#39;t be changed&quot; and reloads the list. On a phone the select has two groups (Portfolio, Your baskets).</li>
+</ul>
 <p><strong>API</strong> (<code>Baskets</code> tag; every error is a problem-details response with a stable <code>code</code>, field problems in <code>errors</code>)</p>
 <table>
 <thead>
@@ -383,7 +394,7 @@ Removing the last membership never untracks. Archiving never untracks.</li>
 </thead>
 <tbody><tr>
 <td><code>GET /api/baskets?includeArchived=</code></td>
-<td>baskets in the owner&#39;s order</td>
+<td>system (portfolio) baskets first, then the owner&#39;s baskets in their order; each has <code>kind</code> (<code>manual</code> · <code>portfolio</code>), <code>system</code>, <code>accountId</code>, <code>accountName</code></td>
 <td><code>200 [BasketView]</code></td>
 </tr>
 <tr>
@@ -394,12 +405,12 @@ Removing the last membership never untracks. Archiving never untracks.</li>
 <tr>
 <td><code>PUT /api/baskets/{id}</code> same body</td>
 <td>replace the attributes (members untouched)</td>
-<td><code>200 BasketView</code> · <code>400</code> · <code>404 baskets.not_found</code> · <code>409 baskets.name_taken</code> / <code>baskets.archived</code></td>
+<td><code>200 BasketView</code> · <code>400</code> · <code>404 baskets.not_found</code> · <code>409 baskets.name_taken</code> / <code>baskets.archived</code> / <code>baskets.system</code></td>
 </tr>
 <tr>
 <td><code>DELETE /api/baskets/{id}</code></td>
 <td>archive (idempotent)</td>
-<td><code>204</code> · <code>404</code></td>
+<td><code>204</code> · <code>404</code> · <code>409 baskets.system</code></td>
 </tr>
 <tr>
 <td><code>PUT /api/baskets/order {ids[]}</code></td>
@@ -408,33 +419,33 @@ Removing the last membership never untracks. Archiving never untracks.</li>
 </tr>
 <tr>
 <td><code>GET /api/baskets/{id}/members?asOf=</code></td>
-<td>members in order with instrument summary + tracked block</td>
-<td><code>200 BasketMembers</code> · <code>400</code> (bad asOf) · <code>404</code></td>
+<td>members in order with instrument summary + tracked block (system basket: current holdings with <code>quantity</code>, <code>accountName</code>)</td>
+<td><code>200 BasketMembers</code> · <code>400</code> (bad asOf, or asOf on a system basket) · <code>404</code></td>
 </tr>
 <tr>
 <td><code>POST /api/baskets/{id}/members {instrumentIds[], note?}</code></td>
 <td>add 1–500 (idempotent, tracks)</td>
-<td><code>200 AddMembersResult</code> · <code>400 baskets.invalid / instruments.invalid / instruments.retired / baskets.too_many_members</code> · <code>404</code> · <code>409 archived / conflict</code></td>
+<td><code>200 AddMembersResult</code> · <code>400 baskets.invalid / instruments.invalid / instruments.retired / baskets.too_many_members</code> · <code>404</code> · <code>409 archived / conflict / system</code></td>
 </tr>
 <tr>
 <td><code>DELETE /api/baskets/{id}/members {instrumentIds[]}</code></td>
 <td>remove 1–500 (idempotent)</td>
-<td><code>200 RemoveMembersResult</code> · <code>400</code> · <code>404</code> · <code>409</code></td>
+<td><code>200 RemoveMembersResult</code> · <code>400</code> · <code>404</code> · <code>409</code> (incl. <code>system</code>)</td>
 </tr>
 <tr>
 <td><code>PUT /api/baskets/{id}/members/order {instrumentIds[]}</code></td>
 <td>every member once, wanted order</td>
-<td><code>204</code> · <code>400 baskets.invalid</code> · <code>404</code> · <code>409</code></td>
+<td><code>204</code> · <code>400 baskets.invalid</code> · <code>404</code> · <code>409</code> (incl. <code>system</code>)</td>
 </tr>
 <tr>
 <td><code>POST /api/baskets/transfer {fromBasketId, toBasketId, instrumentIds[], mode: copy|move}</code></td>
-<td>atomic, idempotent; only members of the source are transferred, in the source&#39;s order, with their notes; a move also ends the stay in the source</td>
-<td><code>200 TransferResult</code> · <code>400</code> · <code>404</code> · <code>409</code></td>
+<td>atomic, idempotent; only members of the source are transferred, in the source&#39;s order, with their notes; a move also ends the stay in the source; a system basket may be the source of a <strong>copy</strong> only</td>
+<td><code>200 TransferResult</code> · <code>400</code> · <code>404</code> · <code>409</code> (incl. <code>baskets.system</code>)</td>
 </tr>
 <tr>
 <td><code>GET /api/baskets/{id}/history?take=</code></td>
 <td>newest additions and removals (default 200, max 1000) with dates and who; only additions carry the note</td>
-<td><code>200 BasketHistory</code> · <code>400</code> · <code>404</code></td>
+<td><code>200 BasketHistory</code> · <code>400</code> (also: a system basket has none) · <code>404</code></td>
 </tr>
 <tr>
 <td><code>GET /api/instruments/{id}/baskets</code></td>
@@ -551,7 +562,7 @@ basket detail (members, performance by lens, benchmark, open positions).</li>
     <a class="prev" href="05-data-and-brokers.html"><small>← Previous  [</small>05 · Data &amp; brokers</a>
     <a class="next" href="07-strategies.html"><small>Next  ] →</small>07 · Strategies</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-11 20:04</footer>
+  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-12 05:51</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-concepts" class="d2">1. Concepts</a>
 <a href="#2-master-list-tracked-instruments" class="d2">2. Master list &amp;amp; tracked instruments</a>
@@ -562,7 +573,7 @@ basket detail (members, performance by lens, benchmark, open positions).</li>
 <a href="#31-basket-types" class="d3">3.1 Basket types</a>
 <a href="#32-basket-attributes" class="d3">3.2 Basket attributes</a>
 <a href="#33-how-baskets-are-used" class="d3">3.3 How baskets are used</a>
-<a href="#34-manual-baskets-what-is-built-p1-15" class="d3">3.4 Manual baskets: what is built (P1-15)</a>
+<a href="#34-manual-baskets-what-is-built-p1-15-and-portfolio-system-baskets-p1-15a" class="d3">3.4 Manual baskets: what is built (P1-15) and portfolio system baskets (P1-15a)</a>
 <a href="#4-evaluation-lenses-looking-at-results-from-different-angles" class="d2">4. Evaluation lenses — looking at results from different angles</a>
 <a href="#5-data-model" class="d2">5. Data model</a>
 <a href="#6-screens" class="d2">6. Screens</a></aside>

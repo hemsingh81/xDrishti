@@ -146,6 +146,7 @@ public static class DependencyInjection
         services.AddScoped<IMarketUnitOfWork, MarketUnitOfWork>();
         services.AddScoped<IBasketStore, BasketStore>();
         services.AddScoped<IBasketQueries, BasketQueries>();
+        services.AddScoped<IPortfolioBasketSource, PortfolioBasketSource>();
 
         services.AddTransient<MasterDataEndpointGuard>();
         services.AddHttpClient(MasterDataHttpClientNames.Dhan, MasterDataHttp.ConfigureDhan)

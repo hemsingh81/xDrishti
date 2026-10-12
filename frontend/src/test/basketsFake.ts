@@ -23,12 +23,20 @@ interface Stay {
   note: string | null;
 }
 
+/** A portfolio (system) basket with the holdings of its bucket: what `GET /api/baskets` lists first and reads from holdings. */
+export interface PortfolioSeed {
+  basket: Basket;
+  holdings: readonly { symbol: string; quantity: number; accountName?: string }[];
+}
+
 interface BasketsFakeOptions {
   /** Owns the instruments (and their tracked state); a basket adds through it. */
   tracking: TrackingFake;
   baskets?: readonly Basket[];
   /** Symbols to start with in a basket, in order (e.g. `{ [basketIds.myChoice]: ['NSE:TCS'] }`). */
   members?: Readonly<Record<string, readonly string[]>>;
+  /** Portfolio (system) baskets, listed before the manual ones; read only, as the API makes them. */
+  portfolio?: readonly PortfolioSeed[];
 }
 
 type Route =
@@ -52,7 +60,14 @@ const notFound = () => problemResponse({ title: 'The basket does not exist.', co
  * `calls` records the request bodies; `failNext(route, …)` makes the next call of a route answer a problem.
  * Use it with `server.use(...tracking.handlers, ...fake.handlers)`.
  */
-export function createBasketsFake({ tracking, baskets = seededBaskets(), members = {} }: BasketsFakeOptions) {
+export function createBasketsFake({
+  tracking,
+  baskets = seededBaskets(),
+  members = {},
+  portfolio = [],
+}: BasketsFakeOptions) {
+  const system: Basket[] = portfolio.map((p, position) => ({ ...p.basket, position }));
+  const holdingsOf = new Map(portfolio.map((p) => [p.basket.id, p.holdings]));
   let active: Basket[] = baskets.map((b, position) => ({ ...b, position }));
   const archived: Basket[] = [];
   let stays: Stay[] = [];
@@ -78,10 +93,25 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
   const instruments = (): readonly InstrumentSummary[] => tracking.items();
   const instrumentOf = (id: string) => instruments().find((i) => i.id === id);
   const idOfSymbol = (symbol: string) => instruments().find((i) => i.symbol === symbol)?.id ?? symbol;
-  const basketOf = (id: string) => [...active, ...archived].find((b) => b.id === id);
+  const basketOf = (id: string) => [...system, ...active, ...archived].find((b) => b.id === id);
+  const isSystem = (id: string) => system.some((b) => b.id === id);
+  /** The holdings of a portfolio basket whose instrument is in the master list, one member per instrument. */
+  const holdingMembers = (basketId: string) =>
+    (holdingsOf.get(basketId) ?? []).flatMap((h) => {
+      const instrument = instruments().find((i) => i.symbol === h.symbol);
+      return instrument ? [{ instrument, quantity: h.quantity, accountName: h.accountName ?? null }] : [];
+    });
   const activeStays = (basketId: string) =>
     stays.filter((s) => s.basketId === basketId && s.validTo === null).sort((a, b) => a.position - b.position);
-  const count = (basketId: string) => activeStays(basketId).length;
+  const count = (basketId: string) =>
+    isSystem(basketId) ? holdingMembers(basketId).length : activeStays(basketId).length;
+  /** Instrument ids in a basket now, in its order (the holdings for a portfolio basket). */
+  const idsIn = (basketId: string) =>
+    isSystem(basketId)
+      ? holdingMembers(basketId).map((h) => h.instrument.id)
+      : activeStays(basketId).map((s) => s.instrumentId);
+  const systemRefused = () =>
+    problemResponse({ title: "Portfolio baskets can't be changed", code: 'baskets.system' }, 409);
   const view = (b: Basket): Basket => ({ ...b, memberCount: count(b.id) });
   const failure = (route: Route) => {
     const next = failures.get(route);
@@ -134,6 +164,19 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
   };
 
   const membersAt = (basket: Basket, asOf: string | null): BasketMembers => {
+    if (basket.system) {
+      const items = holdingMembers(basket.id).map((h, position) =>
+        buildBasketMember(h.instrument, {
+          id: `00000000-0000-4000-8000-0000000004${h.instrument.id.slice(-2)}`,
+          position,
+          validFrom: '2026-09-01T04:00:00Z',
+          addedBy: 'portfolio',
+          quantity: h.quantity,
+          accountName: h.accountName,
+        }),
+      );
+      return buildBasketMembers(basket, items);
+    }
     let list: Stay[];
     if (asOf === null) list = activeStays(basket.id);
     else {
@@ -188,7 +231,7 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
   const handlers = [
     http.get('/api/baskets', ({ request }) => {
       const all = new URL(request.url).searchParams.get('includeArchived') === 'true';
-      return HttpResponse.json([...active, ...(all ? archived : [])].map(view));
+      return HttpResponse.json([...system, ...active, ...(all ? archived : [])].map(view));
     }),
     http.post('/api/baskets', async ({ request }) => {
       const body = (await request.json()) as Parameters<typeof validateBasket>[0] & { purpose?: string | null };
@@ -206,6 +249,10 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
         memberCount: 0,
         createdAt: now(),
         archivedAt: null,
+        kind: 'manual',
+        system: false,
+        accountId: null,
+        accountName: null,
       };
       active.push(created);
       return HttpResponse.json(created, { status: 201 });
@@ -237,7 +284,8 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       const refused = failure('transfer');
       if (refused) return refused;
       if (!basketOf(body.fromBasketId) || !basketOf(body.toBasketId)) return notFound();
-      const inSource = activeStays(body.fromBasketId).map((s) => s.instrumentId);
+      if (isSystem(body.toBasketId) || (isSystem(body.fromBasketId) && body.mode === 'move')) return systemRefused();
+      const inSource = idsIn(body.fromBasketId);
       const moving = inSource.filter((id) => body.instrumentIds.includes(id));
       const outcome = addAll(body.toBasketId, moving, null);
       if (body.mode === 'move') for (const id of moving) endStay(body.fromBasketId, id);
@@ -260,6 +308,7 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       calls.update.push({ id, body });
       const refused = failure('update');
       if (refused) return refused;
+      if (isSystem(id)) return systemRefused();
       const found = active.find((b) => b.id === id);
       if (!found) return notFound();
       const invalid = validateBasket(body, id);
@@ -279,6 +328,7 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       calls.archive.push(id);
       const refused = failure('archive');
       if (refused) return refused;
+      if (isSystem(id)) return systemRefused();
       const found = active.find((b) => b.id === id);
       if (found) {
         active = active.filter((b) => b.id !== id).map((b, position) => ({ ...b, position }));
@@ -293,6 +343,9 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       const refused = failure('members');
       if (refused) return refused;
       const found = basketOf(id);
+      if (found?.system && asOf !== null) {
+        return problem('A portfolio basket has no look-back view.', 'baskets.invalid', 400);
+      }
       return found ? HttpResponse.json(membersAt(found, asOf)) : notFound();
     }),
     http.post('/api/baskets/:id/members', async ({ params, request }) => {
@@ -302,6 +355,7 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       const refused = failure('add');
       if (refused) return refused;
       if (!basketOf(id)) return notFound();
+      if (isSystem(id)) return systemRefused();
       const retired = retiredNames(instrumentIds);
       if (retired.length > 0) {
         return problem('Retired instruments cannot be added.', 'instruments.retired', 400, {
@@ -327,6 +381,7 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       const refused = failure('remove');
       if (refused) return refused;
       if (!basketOf(id)) return notFound();
+      if (isSystem(id)) return systemRefused();
       const present = [...new Set(instrumentIds)].filter((x) => activeStays(id).some((s) => s.instrumentId === x));
       for (const x of present) endStay(id, x);
       const result: RemoveMembersResult = {
@@ -343,6 +398,7 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       calls.reorderMembers.push({ id, instrumentIds });
       const refused = failure('reorder-members');
       if (refused) return refused;
+      if (isSystem(id)) return systemRefused();
       const current = activeStays(id);
       if (instrumentIds.length !== current.length || !current.every((s) => instrumentIds.includes(s.instrumentId))) {
         return problem('The list must hold every instrument of the basket exactly once.', 'baskets.invalid', 400, {
@@ -362,6 +418,7 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
       if (refused) return refused;
       const found = basketOf(id);
       if (!found) return notFound();
+      if (found.system) return problem('A portfolio basket has no basket history.', 'baskets.invalid', 400);
       const entries = stays
         .filter((s) => s.basketId === id)
         .flatMap((s): BasketHistoryEntry[] => {
@@ -410,6 +467,8 @@ export function createBasketsFake({ tracking, baskets = seededBaskets(), members
     /** Symbols in a basket now, in its order. */
     symbolsIn: (basketId: string) => activeStays(basketId).flatMap((s) => instrumentOf(s.instrumentId)?.symbol ?? []),
     names: () => active.map((b) => b.name),
+    /** Symbols held in a portfolio basket now. */
+    holdingsIn: (basketId: string) => holdingMembers(basketId).map((h) => h.instrument.symbol),
     archivedNames: () => archived.map((b) => b.name),
     basket: (name: string) => [...active, ...archived].find((b) => b.name === name),
     /** Sets the note a current member was added with, without a request. */

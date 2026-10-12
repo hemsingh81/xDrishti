@@ -5,11 +5,22 @@ import { formatDate } from '@/shared/lib/format';
 interface EmptyMembersProps {
   /** The look-back date, if one is shown. */
   asOf: string | null;
+  /** A portfolio basket: its members are the account's holdings, nothing to add. */
+  readOnly?: boolean;
   onAdd: () => void;
 }
 
 /** Nothing in the list: an empty basket invites adding; a look-back date says there was nothing then. */
-export function EmptyMembers({ asOf, onAdd }: EmptyMembersProps) {
+export function EmptyMembers({ asOf, readOnly = false, onAdd }: EmptyMembersProps) {
+  if (readOnly) {
+    return (
+      <Box sx={{ p: 4, textAlign: 'center' }}>
+        <Typography color="text.secondary">
+          No holdings in this bucket yet — they arrive when the account&apos;s portfolio is imported
+        </Typography>
+      </Box>
+    );
+  }
   if (asOf) {
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>

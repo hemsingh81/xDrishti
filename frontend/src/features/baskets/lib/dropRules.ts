@@ -44,12 +44,14 @@ interface DropContext {
   basketOrder: readonly string[];
   /** Alt / Option is held: a drop on a basket moves instead of copying. */
   alt: boolean;
+  /** The shown basket is a portfolio basket: its rows cannot be reordered or moved, only copied. */
+  readOnly?: boolean;
 }
 
 /**
  * What a drop means. Cards reorder among cards. Members dropped on another member reorder (as a block when several are
  * dragged); dropped on another basket's card they are copied there, moved with Alt / Option held; on their own basket's
- * card or nowhere, nothing happens.
+ * card or nowhere, nothing happens. Rows of a read-only (portfolio) basket are only ever copied.
  */
 export function resolveDrop(session: DragSession, target: DropTarget | null, context: DropContext): DropOutcome {
   if (!target || target.id === session.activeId) return { kind: 'none' };
@@ -59,6 +61,7 @@ export function resolveDrop(session: DragSession, target: DropTarget | null, con
     return ids ? { kind: 'reorder-baskets', ids } : { kind: 'none' };
   }
   if (target.data.type === 'member') {
+    if (context.readOnly) return { kind: 'none' };
     if (target.data.basketId !== session.sourceId) return { kind: 'none' };
     const ids = moveBlock(context.memberOrder, session.ids, session.activeId, target.id);
     return ids ? { kind: 'reorder-members', ids } : { kind: 'none' };
@@ -69,7 +72,7 @@ export function resolveDrop(session: DragSession, target: DropTarget | null, con
     fromId: session.sourceId,
     toId: target.id,
     ids: session.ids,
-    mode: context.alt ? 'move' : 'copy',
+    mode: context.alt && !context.readOnly ? 'move' : 'copy',
   };
 }
 

@@ -17,6 +17,7 @@ public sealed record ReorderBasketMembersCommand(Guid BasketId, MembersOrderInpu
 
 internal sealed class ReorderBasketMembersHandler(
     IBasketStore store,
+    IPortfolioBasketSource portfolio,
     IMarketUnitOfWork unitOfWork,
     IAccountEventLog events,
     TimeProvider clock,
@@ -32,7 +33,7 @@ internal sealed class ReorderBasketMembersHandler(
 
         for (var attempt = 0; attempt < BasketChecks.Attempts; attempt++)
         {
-            var found = await BasketChecks.EditableAsync(store, command.BasketId, cancellationToken);
+            var found = await BasketChecks.EditableAsync(store, portfolio, command.BasketId, cancellationToken);
             if (found.IsFailure)
             {
                 return Result.Failure(found.Error);

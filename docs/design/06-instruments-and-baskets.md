@@ -109,7 +109,9 @@ Rules of a run:
 |------|---------------------------|----------|
 | **Manual** | You add/remove instruments | MyChoice, MyLongTerm, Best stocks, Watchlist |
 | **Rule-based (dynamic)** | A saved filter re-evaluated nightly | "F&O stocks with turnover > ₹50 Cr", "Nifty 50 members", "Sector = IT", "Near 52-week high" |
-| **System** | Maintained automatically | Open positions, Holdings, Today's plan, Paused-cell instruments |
+| **System** | Maintained automatically | **Portfolio** (one per portfolio bucket, built — P1-15a, §3.4), Open positions, Today's plan, Paused-cell instruments |
+
+Each basket carries a `kind` in the API: `manual` or `portfolio` today; rule-based and the other system baskets reuse the same field and the `baskets.system` protection.
 
 ### 3.2 Basket attributes
 
@@ -133,9 +135,9 @@ Rules of a run:
 | **Portfolio grouping** | Value, return and XIRR per basket ([doc 12](12-portfolio-monitoring.md)) |
 | **Live watch** | Pin a basket to the live price panel (counts toward the live-feed budget, [doc 05](05-data-and-brokers.md) §5) |
 
-### 3.4 Manual baskets: what is built (P1-15)
+### 3.4 Manual baskets: what is built (P1-15) and portfolio system baskets (P1-15a)
 
-Only **manual** baskets exist so far (rule-based and system baskets, allowed styles/sides, strategies in scope, risk override and target weights come with their stories). Tables live in the `market` schema (not `catalog`, which was never created),
+**Manual** baskets and the **portfolio** system baskets exist so far (rule-based baskets, the other system baskets, allowed styles/sides, strategies in scope, risk override and target weights come with their stories). Tables live in the `market` schema (not `catalog`, which was never created),
 next to the instruments they point to; the runtime role has plain DML on both and no DDL. Every route needs a session (changes also the CSRF token), none needs a step-up.
 
 **Rules**
@@ -153,21 +155,30 @@ next to the instruments they point to; the runtime role has plain DML on both an
   (the UI reloads and may retry). A reorder whose list no longer matches because the basket changed between two tries is a `409 baskets.conflict` rather than a `400`.
 - **Idempotent and atomic:** add, remove, reorder and transfer can be repeated; what is already done is counted, not repeated, and writes neither rows nor audit entries. Each call is **one transaction** (members, tracking rows, revision and audit entries are written together).
 
+**Portfolio system baskets (P1-15a, [ADR 0014](../adr/0014-portfolio-buckets-appear-as-system-baskets.md))**
+- **A view, not copies:** every bucket that `GET /api/portfolio-buckets` lists (not archived; custom, or the default bucket of an active account with the Portfolio role) is shown in the baskets list as `kind: portfolio`, `system: true`, with the bucket's id as the basket id. Nothing is stored in `market.baskets`; the name follows the account (ADR 0011) and archived or role-off buckets disappear. Read through the application port `IPortfolioBasketSource` (the market and portfolio/accounts modules share the one `XDrishtiDbContext`).
+- **Order and fields:** system baskets come first (account name, then bucket name; `position` counts within the group, 0 first), then the manual ones in the owner's order. `colour` is the account's colour (the neutral `#6366f1` for a custom bucket), `purpose` `long_term`, `archivedAt` null, `createdAt` the bucket's; `accountId` / `accountName` are set for an account's default bucket (null for custom buckets and for manual baskets). `memberCount` = distinct instruments with quantity > 0, from one grouped query for all buckets.
+- **Members** = the instruments of the bucket's current holdings (quantity > 0, active account with the Portfolio role, mapped to an instrument of the master list; holdings without a match are left out), sorted by symbol, `position` 0..n-1. Each item has `quantity` (summed when a custom bucket holds the instrument in several accounts) and `accountName` (the holding accounts, comma separated); `id` is the first holding's id, `validFrom` the first-seen date, `validTo` and `note` null, `addedBy` `portfolio`. For manual baskets `quantity` and `accountName` are null.
+- **Read-only:** every change route with a system basket answers `409 baskets.system` — `PUT` / `DELETE /api/baskets/{id}`, add / remove / reorder members, and `transfer` with it as the target (copy or move) or as the source of a **move**. `PUT /api/baskets/order` lists manual baskets only (a system id there is `400 baskets.invalid`). A bucket id that is not listed (archived, role off) is `404 baskets.not_found` everywhere.
+- **Copy out:** `transfer` with `mode: copy` and a system source is allowed — the instruments of the holdings are added to the manual target in symbol order (no notes), tracked when not tracked, retired ones refused as before, audited as "Copied … from portfolio basket 'Name' to basket 'Name'".
+- **No past:** `GET /api/baskets/{id}/members?asOf=` and `GET /api/baskets/{id}/history` on a system basket are `400 baskets.invalid` (the holdings history is the portfolio module's, not basket history). `GET /api/instruments/{id}/baskets` lists manual baskets only.
+- **Screen (built):** the left column has a **Portfolio** group above **Your baskets** (the group headings show when there are portfolio baskets). A portfolio card has a lock and a "Portfolio" badge, the account name and the instrument count; it is selectable but has no grip, is not a drop target and shows no highlight. Selecting one opens a read-only panel: the title carries "Portfolio · read only", the account name and the note "Portfolio baskets follow the account's holdings and can't be archived or edited."; there is no Add instruments, Edit, History, Archive, as-of date, Remove or Move to…. The grid shows Quantity and Account instead of Added; each row keeps a grip that only **starts a copy** (drag onto one of the owner's cards: copy only — Alt does not turn it into a move; rows cannot be reordered), and the row menu and the toolbar offer **Copy to…** only, with the usual Undo. Empty state: "No holdings in this bucket yet — they arrive when the account's portfolio is imported". The card reorder, the copy / move menus and the Instruments screen's Add to basket dialog list the owner's baskets only. The first of the owner's baskets is still the one shown when the URL names none (`?basket=<id>` works for both kinds; a look-back date in the URL is not sent for a portfolio basket). A stray `409 baskets.system` shows "Portfolio baskets can't be changed" and reloads the list. On a phone the select has two groups (Portfolio, Your baskets).
+
 **API** (`Baskets` tag; every error is a problem-details response with a stable `code`, field problems in `errors`)
 
 | Route | Meaning | Answer |
 |-------|---------|--------|
-| `GET /api/baskets?includeArchived=` | baskets in the owner's order | `200 [BasketView]` |
+| `GET /api/baskets?includeArchived=` | system (portfolio) baskets first, then the owner's baskets in their order; each has `kind` (`manual` · `portfolio`), `system`, `accountId`, `accountName` | `200 [BasketView]` |
 | `POST /api/baskets {name, colour?, purpose?, description?}` | create an empty basket at the end | `201 BasketView` · `400 baskets.invalid` · `409 baskets.name_taken` |
-| `PUT /api/baskets/{id}` same body | replace the attributes (members untouched) | `200 BasketView` · `400` · `404 baskets.not_found` · `409 baskets.name_taken` / `baskets.archived` |
-| `DELETE /api/baskets/{id}` | archive (idempotent) | `204` · `404` |
+| `PUT /api/baskets/{id}` same body | replace the attributes (members untouched) | `200 BasketView` · `400` · `404 baskets.not_found` · `409 baskets.name_taken` / `baskets.archived` / `baskets.system` |
+| `DELETE /api/baskets/{id}` | archive (idempotent) | `204` · `404` · `409 baskets.system` |
 | `PUT /api/baskets/order {ids[]}` | every active basket once, wanted order | `204` · `400 baskets.invalid` · `409 baskets.conflict` |
-| `GET /api/baskets/{id}/members?asOf=` | members in order with instrument summary + tracked block | `200 BasketMembers` · `400` (bad asOf) · `404` |
-| `POST /api/baskets/{id}/members {instrumentIds[], note?}` | add 1–500 (idempotent, tracks) | `200 AddMembersResult` · `400 baskets.invalid / instruments.invalid / instruments.retired / baskets.too_many_members` · `404` · `409 archived / conflict` |
-| `DELETE /api/baskets/{id}/members {instrumentIds[]}` | remove 1–500 (idempotent) | `200 RemoveMembersResult` · `400` · `404` · `409` |
-| `PUT /api/baskets/{id}/members/order {instrumentIds[]}` | every member once, wanted order | `204` · `400 baskets.invalid` · `404` · `409` |
-| `POST /api/baskets/transfer {fromBasketId, toBasketId, instrumentIds[], mode: copy\|move}` | atomic, idempotent; only members of the source are transferred, in the source's order, with their notes; a move also ends the stay in the source | `200 TransferResult` · `400` · `404` · `409` |
-| `GET /api/baskets/{id}/history?take=` | newest additions and removals (default 200, max 1000) with dates and who; only additions carry the note | `200 BasketHistory` · `400` · `404` |
+| `GET /api/baskets/{id}/members?asOf=` | members in order with instrument summary + tracked block (system basket: current holdings with `quantity`, `accountName`) | `200 BasketMembers` · `400` (bad asOf, or asOf on a system basket) · `404` |
+| `POST /api/baskets/{id}/members {instrumentIds[], note?}` | add 1–500 (idempotent, tracks) | `200 AddMembersResult` · `400 baskets.invalid / instruments.invalid / instruments.retired / baskets.too_many_members` · `404` · `409 archived / conflict / system` |
+| `DELETE /api/baskets/{id}/members {instrumentIds[]}` | remove 1–500 (idempotent) | `200 RemoveMembersResult` · `400` · `404` · `409` (incl. `system`) |
+| `PUT /api/baskets/{id}/members/order {instrumentIds[]}` | every member once, wanted order | `204` · `400 baskets.invalid` · `404` · `409` (incl. `system`) |
+| `POST /api/baskets/transfer {fromBasketId, toBasketId, instrumentIds[], mode: copy\|move}` | atomic, idempotent; only members of the source are transferred, in the source's order, with their notes; a move also ends the stay in the source; a system basket may be the source of a **copy** only | `200 TransferResult` · `400` · `404` · `409` (incl. `baskets.system`) |
+| `GET /api/baskets/{id}/history?take=` | newest additions and removals (default 200, max 1000) with dates and who; only additions carry the note | `200 BasketHistory` · `400` (also: a system basket has none) · `404` |
 | `GET /api/instruments/{id}/baskets` | the (non-archived) baskets that hold the instrument now | `200 [InstrumentBasketView]` · `404 instruments.not_found` |
 
 **Audit** (`accounts.account_events`, no account): `BasketCreated`, `BasketRenamed`, `BasketUpdated` (names the changed fields), `BasketArchived`, `BasketsReordered`, `BasketMembersAdded`, `BasketMembersRemoved`, `BasketMembersReordered`,

@@ -11,10 +11,13 @@ public static class BasketErrors
     public const string ArchivedCode = "baskets.archived";
     public const string ConflictCode = "baskets.conflict";
     public const string TooManyMembersCode = "baskets.too_many_members";
+    public const string SystemCode = "baskets.system";
 
     public static readonly Error NotFound = Error.NotFound(NotFoundCode, "The basket does not exist.");
 
     public static readonly Error Archived = Error.Conflict(ArchivedCode, "The basket is archived, so it cannot be changed.");
+
+    public static readonly Error System = Error.Conflict(SystemCode, "A portfolio basket is maintained automatically from the account's holdings, so it cannot be changed here.");
 
     public static readonly Error Conflict = Error.Conflict(ConflictCode, "The basket was changed at the same time. Reload it and try again.");
 

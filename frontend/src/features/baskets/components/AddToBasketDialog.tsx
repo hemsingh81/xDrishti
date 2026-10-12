@@ -1,6 +1,6 @@
 import { Alert, Button, Checkbox, FormControlLabel, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router';
 import type { AddMembersResult } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
@@ -9,6 +9,7 @@ import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/sh
 import { useToast } from '@/shared/ui/toastContext';
 import { basketsQuery } from '../api/basketsQueries';
 import { useAddMembers } from '../api/memberMutations';
+import { manualBaskets } from '../lib/groups';
 import { appliedText, basketProblemText, PartialAddError } from '../lib/errors';
 import { capProblem } from '../lib/limits';
 import { addedMessage } from '../lib/messages';
@@ -35,7 +36,8 @@ export function AddToBasketDialog({ instrumentIds, label, onClose, onAdded }: Ad
   const { mutateAsync, isPending } = useAddMembers();
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const [problem, setProblem] = useState<string | null>(null);
-  const baskets = list.data ?? [];
+  // Portfolio (system) baskets follow the holdings and are never a target.
+  const baskets = useMemo(() => manualBaskets(list.data ?? []), [list.data]);
 
   const toggle = (id: string) => {
     const next = new Set(chosen);

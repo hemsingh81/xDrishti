@@ -1,7 +1,7 @@
 import { Chip, Link } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
 import type { BasketMember } from '@/shared/api';
-import { formatDate } from '@/shared/lib/format';
+import { formatDate, formatNumber } from '@/shared/lib/format';
 import type { GridColumn } from '@/shared/ui/grid';
 import { monoFontFamily } from '@/theme';
 import { typeLabel } from '../lib/labels';
@@ -39,7 +39,7 @@ const nameColumn: Column = {
   id: 'name',
   header: 'Name',
   grow: true,
-  minWidth: 180,
+  minWidth: 140,
   accessor: (m) => m.instrument.displayName,
 };
 
@@ -52,7 +52,7 @@ const typeColumn: Column = {
 const sectorColumn: Column = {
   id: 'sector',
   header: 'Sector',
-  hideBelow: 'md',
+  hideBelow: 'xl',
   accessor: (m) => m.instrument.sector ?? dash,
 };
 
@@ -60,7 +60,6 @@ const sectorColumn: Column = {
 const statusColumn: Column = {
   id: 'status',
   header: 'Status',
-  minWidth: 200,
   render: (m) => {
     const { instrument } = m;
     if (instrument.tracked.retiredButTracked) {
@@ -78,7 +77,7 @@ const statusColumn: Column = {
 const addedColumn: Column = {
   id: 'added',
   header: 'Added',
-  hideBelow: 'sm',
+  hideBelow: 'lg',
   accessor: (m) => formatDate(m.validFrom),
 };
 
@@ -98,10 +97,39 @@ const actionsColumn: Column = {
   render: (m) => <MemberActions member={m} />,
 };
 
-const shared = [symbolColumn, nameColumn, typeColumn, sectorColumn, statusColumn, addedColumn];
+/** Portfolio baskets only: units held (summed over the bucket's holdings of the instrument). */
+const quantityColumn: Column = {
+  id: 'quantity',
+  header: 'Quantity',
+  numeric: true,
+  accessor: (m) => (m.quantity === null ? dash : formatNumber(m.quantity)),
+};
+
+/** Portfolio baskets only: the account(s) that hold it. */
+const accountColumn: Column = {
+  id: 'account',
+  header: 'Account',
+  hideBelow: 'xl',
+  accessor: (m) => m.accountName ?? dash,
+};
+
+/** The grip of a portfolio row only starts a copy to one of the owner's baskets. */
+const copyHandleColumn: Column = { ...orderColumn, id: 'copy', header: 'Copy' };
+
+const identity = [symbolColumn, nameColumn, typeColumn, sectorColumn, statusColumn];
+const shared = [...identity, addedColumn];
 
 /** The columns of the current members: with the drag grip first and copy / move / remove last. */
 export const editableColumns: readonly Column[] = [orderColumn, ...shared, actionsColumn];
 
 /** The columns of a look-back view: read only, so no grip and no actions. */
 export const lookBackColumns: readonly Column[] = [...shared, removedColumn];
+
+/** The columns of a portfolio basket: copy grip first, quantity and account instead of the added date, then Copy. */
+export const portfolioColumns: readonly Column[] = [
+  copyHandleColumn,
+  ...identity,
+  quantityColumn,
+  accountColumn,
+  actionsColumn,
+];

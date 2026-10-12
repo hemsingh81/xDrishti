@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http } from 'msw';
 import { createBasketsFake } from '@/test/basketsFake';
-import { basketIds } from '@/test/fixtures';
+import { basketIds, buildPortfolioBasket } from '@/test/fixtures';
 import { problemResponse, server } from '@/test/server';
 import { manyInstruments, renderTracking, trackedSample } from './trackingTestkit';
 
@@ -10,9 +10,14 @@ const bulkButton = (name: string) => screen.getByRole('button', { name });
 const rowBox = (symbol: string) => screen.getByRole('checkbox', { name: `Select ${symbol}` });
 
 /** The Instruments screen over the tracking fake and a baskets fake that tracks through it. */
-function renderWithBaskets(items = trackedSample, search = '', members: Record<string, string[]> = {}) {
+function renderWithBaskets(
+  items = trackedSample,
+  search = '',
+  members: Record<string, string[]> = {},
+  portfolio: Parameters<typeof createBasketsFake>[0]['portfolio'] = [],
+) {
   const view = renderTracking(items, search);
-  const baskets = createBasketsFake({ tracking: view.fake, members });
+  const baskets = createBasketsFake({ tracking: view.fake, members, portfolio });
   server.use(...baskets.handlers);
   return { ...view, baskets };
 }
@@ -50,6 +55,23 @@ describe('Instruments page: Add to basket', () => {
       expect(bulkButton('Add to basket')).toBeDisabled();
     });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('never lists a portfolio basket as a target', async () => {
+    renderWithBaskets(trackedSample, '', {}, [{ basket: buildPortfolioBasket(), holdings: [] }]);
+    await screen.findByRole('gridcell', { name: 'NSE:RELIANCE' });
+    await userEvent.click(rowBox('NSE:RELIANCE'));
+
+    await userEvent.click(bulkButton('Add to basket (1)'));
+
+    const dialog = within(await screen.findByRole('dialog'));
+    const boxes = await dialog.findAllByRole('checkbox');
+    expect(boxes.map((box) => box.closest('label')?.textContent)).toEqual([
+      expect.stringContaining('MyChoice'),
+      expect.stringContaining('MyLongTerm'),
+      expect.stringContaining('Best stocks'),
+    ]);
+    expect(dialog.queryByRole('checkbox', { name: /Portfolio/ })).not.toBeInTheDocument();
   });
 
   it('sends more than 500 instruments in calls of at most 500', async () => {

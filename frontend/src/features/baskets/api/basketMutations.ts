@@ -32,7 +32,7 @@ export function useArchiveBasket() {
 }
 
 /**
- * Puts the baskets in this order (every active basket once). The list shows the new order at once; when the server
+ * Puts the baskets in this order (every manual basket once). The list shows the new order at once; when the server
  * refuses, the old order comes back and the caller tells the owner.
  */
 export function useReorderBaskets() {
@@ -46,11 +46,12 @@ export function useReorderBaskets() {
       const previous = queryClient.getQueryData<Basket[]>(basketsKeys.list);
       if (previous) {
         const byId = new Map(previous.map((basket) => [basket.id, basket]));
-        const next = ids.flatMap((id, position) => {
+        const manual = ids.flatMap((id, position) => {
           const basket = byId.get(id);
           return basket ? [{ ...basket, position }] : [];
         });
-        queryClient.setQueryData(basketsKeys.list, next);
+        // The order lists the owner's baskets only: the portfolio baskets stay first, as they are.
+        queryClient.setQueryData(basketsKeys.list, [...previous.filter((basket) => basket.system), ...manual]);
       }
       return { previous };
     },

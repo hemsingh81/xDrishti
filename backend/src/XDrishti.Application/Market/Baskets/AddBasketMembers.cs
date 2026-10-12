@@ -19,6 +19,7 @@ public sealed record AddBasketMembersCommand(Guid BasketId, AddMembersInput Inpu
 
 internal sealed class AddBasketMembersHandler(
     IBasketStore store,
+    IPortfolioBasketSource portfolio,
     InstrumentTracking tracking,
     IMarketUnitOfWork unitOfWork,
     IAccountEventLog events,
@@ -42,7 +43,7 @@ internal sealed class AddBasketMembersHandler(
         // A concurrent change of the basket (or the same instruments added at once) makes the save fail; reading again shows what the other request did.
         for (var attempt = 0; attempt < BasketChecks.Attempts; attempt++)
         {
-            var found = await BasketChecks.EditableAsync(store, command.BasketId, cancellationToken);
+            var found = await BasketChecks.EditableAsync(store, portfolio, command.BasketId, cancellationToken);
             if (found.IsFailure)
             {
                 return Result.Failure<AddMembersResult>(found.Error);

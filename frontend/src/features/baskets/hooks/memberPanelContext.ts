@@ -23,6 +23,10 @@ const none: Basket = {
   memberCount: 0,
   createdAt: '',
   archivedAt: null,
+  kind: 'manual',
+  system: false,
+  accountId: null,
+  accountName: null,
 };
 
 export const MemberPanelContext = createContext<MemberPanel>({

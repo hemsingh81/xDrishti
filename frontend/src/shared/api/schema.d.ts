@@ -561,7 +561,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The baskets in the owner's order with their member counts; archived ones only with includeArchived=true */
+    /** The baskets with their member counts: the system baskets first (kind portfolio: one per portfolio bucket, read-only, by account then name), then the owner's in their order (kind manual); archived manual ones only with includeArchived=true */
     get: operations['ListBaskets'];
     put?: never;
     /** Create an empty basket (name, colour, purpose, description); 409 baskets.name_taken when an active basket has the name (ignoring case) */
@@ -598,7 +598,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Copy or move up to 500 instruments from one basket to another, atomically and idempotently (only members of the source are transferred; targets are tracked automatically) */
+    /** Copy or move up to 500 instruments from one basket to another, atomically and idempotently (only members of the source are transferred; targets are tracked automatically); a system basket can be the source of a copy only, anything else with one is 409 baskets.system */
     post: operations['TransferBasketMembers'];
     delete?: never;
     options?: never;
@@ -614,10 +614,10 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Replace the name, colour, purpose and description of a basket that is not archived */
+    /** Replace the name, colour, purpose and description of a basket that is not archived; 409 baskets.system for a system basket */
     put: operations['UpdateBasket'];
     post?: never;
-    /** Archive a basket (idempotent): it leaves the list, its members and history stay readable, instruments stay tracked */
+    /** Archive a basket (idempotent): it leaves the list, its members and history stay readable, instruments stay tracked; 409 baskets.system for a system basket */
     delete: operations['ArchiveBasket'];
     options?: never;
     head?: never;
@@ -631,7 +631,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The members of a basket in their order, with the instrument and its tracked block; asOf=yyyy-MM-dd (India date) gives the members at the end of that day */
+    /** The members of a basket in their order, with the instrument and its tracked block; asOf=yyyy-MM-dd (India date) gives the members at the end of that day. A system basket gives the instruments of the bucket's current holdings with quantity and accountName; asOf on it is 400 baskets.invalid */
     get: operations['ListBasketMembers'];
     put?: never;
     /** Add 1 to 500 instruments (idempotent, all or nothing); untracked ones are tracked in the same transaction, a retired one that is not tracked is refused (instruments.retired) */
@@ -667,7 +667,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The newest additions and removals of a basket, newest first (take 1 to 1000, default 200) */
+    /** The newest additions and removals of a basket, newest first (take 1 to 1000, default 200); 400 baskets.invalid for a system basket */
     get: operations['GetBasketHistory'];
     put?: never;
     post?: never;
@@ -963,6 +963,8 @@ export interface components {
     /**
      * @description One stay of an instrument in a basket: `validFrom` = when it was added, `validTo` = when it was removed (null while it is a member),
      *     `position` = place among the members (0 first), `addedBy` = the owner's address.
+     *     In a system (portfolio) basket a member is the instrument of the bucket's holdings: `id` = the (first) holding, `validFrom` = when the holding was first seen,
+     *     `addedBy` = "portfolio", `quantity` = units held (summed over the bucket's holdings of it) and `accountName` = the account(s) holding it; both are null in a manual basket.
      */
     BasketMemberView: {
       /** Format: uuid */
@@ -976,6 +978,9 @@ export interface components {
       validTo: null | string;
       note: null | string;
       addedBy: string;
+      /** Format: int64 */
+      quantity: null | number;
+      accountName: null | string;
     };
     /**
      * @description The members of a basket, in their order. `asOf` is null for the current members, otherwise the India date they are as of (members at the end of that
@@ -998,8 +1003,10 @@ export interface components {
       ids: null | string[];
     };
     /**
-     * @description A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first). `memberCount` = instruments in it now.
-     *     `archivedAt` is null for an active basket (archived ones are only listed on request).
+     * @description A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).
+     *     `memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).
+     *     `kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the
+     *     bucket's current holdings. `accountId`/`accountName` are set for the default bucket of an account.
      */
     BasketView: {
       /** Format: uuid */
@@ -1016,6 +1023,11 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       archivedAt: null | string;
+      kind: string;
+      system: boolean;
+      /** Format: uuid */
+      accountId: null | string;
+      accountName: null | string;
     };
     /** @description The id a broker uses for the instrument (Dhan: security id + exchange segment). */
     BrokerIdView: {
@@ -3710,6 +3722,15 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

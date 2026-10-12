@@ -38,7 +38,8 @@ function BasketsContent() {
   const [archiving, setArchiving] = useState<Basket | null>(null);
 
   const baskets = list.data ?? [];
-  const selected = baskets.find((b) => b.id === basketId) ?? baskets[0];
+  // Without a (valid) choice the first of the owner's baskets is shown; portfolio baskets only when there is none.
+  const selected = baskets.find((b) => b.id === basketId) ?? baskets.find((b) => !b.system) ?? baskets[0];
 
   const confirmArchive = () => {
     if (!archiving) return;
@@ -62,7 +63,7 @@ function BasketsContent() {
         title="Baskets"
         icon={ShoppingBasketIcon}
         hue="baskets"
-        description="Group instruments in baskets, in the order you want them. An instrument can sit in several baskets. Drag rows onto another basket to copy them (hold Alt or Option to move), or use the Copy to and Move to menus."
+        description="Group instruments in baskets. Drag rows onto a basket to copy them (hold Alt or Option to move) or use the Copy to and Move to menus."
         actions={
           <Button
             variant="contained"

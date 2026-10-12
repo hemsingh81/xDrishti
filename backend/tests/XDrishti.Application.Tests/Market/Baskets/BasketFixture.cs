@@ -18,6 +18,8 @@ internal sealed class BasketFixture
 
     public InMemoryBasketData Data { get; }
 
+    public InMemoryPortfolioBaskets Portfolio { get; } = new();
+
     public BasketFixture() => Data = new InMemoryBasketData(Master);
 
     public static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -26,23 +28,25 @@ internal sealed class BasketFixture
 
     public CreateBasketHandler Create => new(Data, Data, Data, Master, Clock, NullLogger<CreateBasketHandler>.Instance);
 
-    public UpdateBasketHandler Update => new(Data, Data, Data, Master, Clock, NullLogger<UpdateBasketHandler>.Instance);
+    public UpdateBasketHandler Update => new(Data, Portfolio, Data, Data, Master, Clock, NullLogger<UpdateBasketHandler>.Instance);
 
-    public ArchiveBasketHandler Archive => new(Data, Data, Master, Clock, NullLogger<ArchiveBasketHandler>.Instance);
+    public ArchiveBasketHandler Archive => new(Data, Portfolio, Data, Master, Clock, NullLogger<ArchiveBasketHandler>.Instance);
 
     public ReorderBasketsHandler ReorderBaskets => new(Data, Data, Master, Clock, NullLogger<ReorderBasketsHandler>.Instance);
 
-    public AddBasketMembersHandler Add => new(Data, Tracking, Data, Master, Clock, NullLogger<AddBasketMembersHandler>.Instance);
+    public AddBasketMembersHandler Add => new(Data, Portfolio, Tracking, Data, Master, Clock, NullLogger<AddBasketMembersHandler>.Instance);
 
-    public RemoveBasketMembersHandler Remove => new(Data, Data, Master, Clock, NullLogger<RemoveBasketMembersHandler>.Instance);
+    public RemoveBasketMembersHandler Remove => new(Data, Portfolio, Data, Master, Clock, NullLogger<RemoveBasketMembersHandler>.Instance);
 
-    public ReorderBasketMembersHandler ReorderMembers => new(Data, Data, Master, Clock, NullLogger<ReorderBasketMembersHandler>.Instance);
+    public ReorderBasketMembersHandler ReorderMembers => new(Data, Portfolio, Data, Master, Clock, NullLogger<ReorderBasketMembersHandler>.Instance);
 
-    public TransferBasketMembersHandler Transfer => new(Data, Tracking, Data, Master, Clock, NullLogger<TransferBasketMembersHandler>.Instance);
+    public TransferBasketMembersHandler Transfer => new(Data, Portfolio, Tracking, Data, Master, Clock, NullLogger<TransferBasketMembersHandler>.Instance);
 
-    public GetBasketMembersHandler Members => new(Data);
+    public GetBasketMembersHandler Members => new(Data, Portfolio);
 
-    public GetBasketHistoryHandler History => new(Data);
+    public GetBasketHistoryHandler History => new(Data, Portfolio);
+
+    public ListBasketsHandler List => new(Data, Portfolio);
 
     public ListInstrumentBasketsHandler ForInstrument => new(Data);
 

@@ -18,10 +18,18 @@ export class PartialAddError extends Error {
 /** The failure itself, whether or not part of the work was applied before it. */
 const reasonOf = (error: unknown): unknown => (error instanceof PartialAddError ? error.reason : error);
 
+export const systemRefusalText = "Portfolio baskets can't be changed";
+
 /** 409 `baskets.conflict`: the basket changed under the request and every retry lost. Reload and try again. */
 export const isConflict = (error: unknown): boolean => {
   const reason = reasonOf(error);
   return reason instanceof ApiError && reason.status === 409 && reason.problem?.code === 'baskets.conflict';
+};
+
+/** 409 `baskets.system`: a change on a portfolio (system) basket, which follows the account's holdings and has none. */
+export const isSystemRefusal = (error: unknown): boolean => {
+  const reason = reasonOf(error);
+  return reason instanceof ApiError && reason.status === 409 && reason.problem?.code === 'baskets.system';
 };
 
 /**
@@ -40,6 +48,7 @@ export function basketProblemText(error: unknown, fallback: string): string {
   if (isConflict(reason)) {
     return 'The basket was changed somewhere else at the same moment. It has been reloaded — please try again.';
   }
+  if (isSystemRefusal(reason)) return systemRefusalText;
   // Retired instruments are named, and too many members says how many, in `errors.instrumentIds`.
   return reason.problem?.errors?.instrumentIds?.[0] ?? reason.problem?.title ?? fallback;
 }

@@ -3,17 +3,23 @@ using XDrishti.Application.Market.Search;
 namespace XDrishti.Application.Market.Baskets;
 
 /// <summary>
-/// A basket. <c>purpose</c>: trading · long_term · watch. <c>position</c> = place among the active baskets (0 first). <c>memberCount</c> = instruments in it now.
-/// <c>archivedAt</c> is null for an active basket (archived ones are only listed on request).
+/// A basket. <c>purpose</c>: trading · long_term · watch. <c>position</c> = place among the active baskets (0 first; the system baskets count on their own, in their group).
+/// <c>memberCount</c> = instruments in it now. <c>archivedAt</c> is null for an active basket (archived ones are only listed on request).
+/// <c>kind</c>: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); <c>system</c> = true for the latter: read-only, never archived, its members are the
+/// bucket's current holdings. <c>accountId</c>/<c>accountName</c> are set for the default bucket of an account.
 /// </summary>
 public sealed record BasketView(
-    Guid Id, string Name, string Colour, string Purpose, string? Description, int Position, int MemberCount, DateTimeOffset CreatedAt, DateTimeOffset? ArchivedAt);
+    Guid Id, string Name, string Colour, string Purpose, string? Description, int Position, int MemberCount, DateTimeOffset CreatedAt, DateTimeOffset? ArchivedAt,
+    string Kind, bool System, Guid? AccountId, string? AccountName);
 
 /// <summary>
 /// One stay of an instrument in a basket: <c>validFrom</c> = when it was added, <c>validTo</c> = when it was removed (null while it is a member),
 /// <c>position</c> = place among the members (0 first), <c>addedBy</c> = the owner's address.
+/// In a system (portfolio) basket a member is the instrument of the bucket's holdings: <c>id</c> = the (first) holding, <c>validFrom</c> = when the holding was first seen,
+/// <c>addedBy</c> = "portfolio", <c>quantity</c> = units held (summed over the bucket's holdings of it) and <c>accountName</c> = the account(s) holding it; both are null in a manual basket.
 /// </summary>
-public sealed record BasketMemberView(Guid Id, InstrumentSummary Instrument, int Position, DateTimeOffset ValidFrom, DateTimeOffset? ValidTo, string? Note, string AddedBy);
+public sealed record BasketMemberView(
+    Guid Id, InstrumentSummary Instrument, int Position, DateTimeOffset ValidFrom, DateTimeOffset? ValidTo, string? Note, string AddedBy, long? Quantity, string? AccountName);
 
 /// <summary>
 /// The members of a basket, in their order. <c>asOf</c> is null for the current members, otherwise the India date they are as of (members at the end of that

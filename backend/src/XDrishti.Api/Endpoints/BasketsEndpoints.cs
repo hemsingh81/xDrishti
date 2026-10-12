@@ -9,7 +9,8 @@ namespace XDrishti.Api.Endpoints;
 
 /// <summary>
 /// Baskets (P1-15): manual groups of instruments, many-to-many, with dated membership and order. All routes need a session; changes also need the CSRF
-/// token, none needs a step-up. Part of the market module.
+/// token, none needs a step-up. Part of the market module. The portfolio buckets also appear here as read-only system baskets (ADR 0014): every change
+/// route answers 409 baskets.system for them.
 /// </summary>
 internal sealed class BasketsEndpoints : IEndpointModule
 {
@@ -19,7 +20,7 @@ internal sealed class BasketsEndpoints : IEndpointModule
 
         group.MapGet("/", ListAsync)
             .WithName("ListBaskets")
-            .WithSummary("The baskets in the owner's order with their member counts; archived ones only with includeArchived=true");
+            .WithSummary("The baskets with their member counts: the system baskets first (kind portfolio: one per portfolio bucket, read-only, by account then name), then the owner's in their order (kind manual); archived manual ones only with includeArchived=true");
 
         group.MapPost("/", CreateAsync)
             .WithName("CreateBasket")
@@ -36,26 +37,27 @@ internal sealed class BasketsEndpoints : IEndpointModule
 
         group.MapPost("/transfer", TransferAsync)
             .WithName("TransferBasketMembers")
-            .WithSummary("Copy or move up to 500 instruments from one basket to another, atomically and idempotently (only members of the source are transferred; targets are tracked automatically)")
+            .WithSummary("Copy or move up to 500 instruments from one basket to another, atomically and idempotently (only members of the source are transferred; targets are tracked automatically); a system basket can be the source of a copy only, anything else with one is 409 baskets.system")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapPut("/{id:guid}", UpdateAsync)
             .WithName("UpdateBasket")
-            .WithSummary("Replace the name, colour, purpose and description of a basket that is not archived")
+            .WithSummary("Replace the name, colour, purpose and description of a basket that is not archived; 409 baskets.system for a system basket")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapDelete("/{id:guid}", ArchiveAsync)
             .WithName("ArchiveBasket")
-            .WithSummary("Archive a basket (idempotent): it leaves the list, its members and history stay readable, instruments stay tracked")
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .WithSummary("Archive a basket (idempotent): it leaves the list, its members and history stay readable, instruments stay tracked; 409 baskets.system for a system basket")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
 
         group.MapGet("/{id:guid}/members", GetMembersAsync)
             .WithName("ListBasketMembers")
-            .WithSummary("The members of a basket in their order, with the instrument and its tracked block; asOf=yyyy-MM-dd (India date) gives the members at the end of that day")
+            .WithSummary("The members of a basket in their order, with the instrument and its tracked block; asOf=yyyy-MM-dd (India date) gives the members at the end of that day. A system basket gives the instruments of the bucket's current holdings with quantity and accountName; asOf on it is 400 baskets.invalid")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
@@ -82,7 +84,7 @@ internal sealed class BasketsEndpoints : IEndpointModule
 
         group.MapGet("/{id:guid}/history", GetHistoryAsync)
             .WithName("GetBasketHistory")
-            .WithSummary("The newest additions and removals of a basket, newest first (take 1 to 1000, default 200)")
+            .WithSummary("The newest additions and removals of a basket, newest first (take 1 to 1000, default 200); 400 baskets.invalid for a system basket")
             .ProducesValidationProblem()
             .ProducesProblem(StatusCodes.Status404NotFound);
 

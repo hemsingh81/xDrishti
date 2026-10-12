@@ -4,7 +4,7 @@ import type { Basket } from '@/shared/api';
 import { useToast } from '@/shared/ui/toastContext';
 import { basketsKeys, membersQuery } from '../api/basketsQueries';
 import { useAddMembers, useRemoveMembers, useReorderMembers, useTransferMembers } from '../api/memberMutations';
-import { basketProblemText, isConflict } from '../lib/errors';
+import { basketProblemText, isConflict, isSystemRefusal } from '../lib/errors';
 import { removedMessage, subject, transferMessage } from '../lib/messages';
 import { mergeOrder, sameOrder } from '../lib/order';
 
@@ -88,7 +88,8 @@ export function useMemberActions({ source, baskets }: MemberActionsOptions): Mem
     (error: unknown, fallback: string) => {
       notify(basketProblemText(error, fallback), 'error');
       // A lost race leaves the screen stale: read everything again.
-      if (isConflict(error)) void queryClient.invalidateQueries({ queryKey: basketsKeys.all });
+      if (isConflict(error) || isSystemRefusal(error))
+        void queryClient.invalidateQueries({ queryKey: basketsKeys.all });
     },
     [notify, queryClient],
   );

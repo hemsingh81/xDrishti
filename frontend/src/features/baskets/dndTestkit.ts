@@ -25,6 +25,11 @@ export function stubLayout() {
       const index = [...(this.parentElement?.children ?? [])].indexOf(this);
       return rect(300, 200 + index * 40, 600, 40);
     }
+    // The portfolio cards sit far below the manual ones: a drop there must find nothing (they are not drop targets).
+    if (this instanceof HTMLLIElement && this.parentElement?.getAttribute('aria-label') === 'Portfolio baskets') {
+      const index = [...this.parentElement.children].indexOf(this);
+      return rect(0, 1000 + index * 90, 280, 80);
+    }
     if (this instanceof HTMLLIElement && this.parentElement?.getAttribute('aria-label') === 'Baskets') {
       const index = [...this.parentElement.children].indexOf(this);
       return rect(0, 100 + index * 90, 280, 80);
