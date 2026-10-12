@@ -92,6 +92,21 @@ public sealed class HoldingLot : Entity<Guid>
         return piece;
     }
 
+    /// <summary>
+    /// Moves the lot to the account's new first import date (ADR 0015) and keeps it flagged as using the default date. Only a lot that still carries the
+    /// first import date qualifies (imported, flagged); a closed lot whose close day is before the new date is left as it is. False when the lot was not changed.
+    /// </summary>
+    internal bool RedateDefault(DateOnly date)
+    {
+        if (Source != LotSource.Import || !UsesDefaultDate || (ClosedOn is { } closed && date > closed))
+        {
+            return false;
+        }
+
+        AcquiredOn = date;
+        return true;
+    }
+
     /// <summary>Gives the lot the date the owner chose. It no longer counts as using the default date.</summary>
     internal Result ChangeDate(DateOnly date, DateOnly today)
     {

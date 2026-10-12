@@ -1,8 +1,8 @@
-import { Box, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader, Typography } from '@mui/material';
-import { NavLink } from 'react-router';
-import { BrandMark, IconChip } from '@/shared/ui';
-import { navHue } from '@/theme';
+import { Box, List, ListSubheader, Typography } from '@mui/material';
+import { BrandMark } from '@/shared/ui';
 import { navigation } from '../navigation';
+import { NavBadgeSource } from './navBadges';
+import { NavRow } from './NavRow';
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -37,24 +37,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </ListSubheader>
           }
         >
-          {section.items.map(({ path, label, icon: Icon, phase }) => (
-            <ListItemButton
-              key={path}
-              component={NavLink}
-              to={path}
-              end={path === '/'}
-              onClick={onNavigate}
-              sx={{ mb: 0.25 }}
-            >
-              <ListItemIcon sx={{ minWidth: 40 }}>
-                <IconChip icon={Icon} hue={navHue[path] ?? 'slate'} size="sm" />
-              </ListItemIcon>
-              <ListItemText
-                primary={label}
-                slotProps={{ primary: { sx: { fontWeight: 550, opacity: phase ? 0.7 : 1 } } }}
-              />
-            </ListItemButton>
-          ))}
+          {section.items.map((item) =>
+            item.badge ? (
+              <NavBadgeSource key={item.path} id={item.badge}>
+                {(badge) => <NavRow item={item} badge={badge} onNavigate={onNavigate} />}
+              </NavBadgeSource>
+            ) : (
+              <NavRow key={item.path} item={item} onNavigate={onNavigate} />
+            ),
+          )}
         </List>
       ))}
     </Box>

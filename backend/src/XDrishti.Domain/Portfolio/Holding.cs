@@ -181,6 +181,30 @@ public sealed class Holding : Entity<Guid>
         return lot is null ? Result.Failure(PortfolioErrors.LotNotFound) : lot.ChangeDate(date, today);
     }
 
+    /// <summary>
+    /// The account's first import date changed (ADR 0015): every lot that still carries it (imported, flagged as default-dated) gets <paramref name="date"/>
+    /// and stays flagged. A closed lot whose close day is before <paramref name="date"/> cannot take it and is counted as skipped. Lots the owner dated,
+    /// lots a refresh found and manual lots are never touched. The caller has checked the date (not in the future, not before 1990-01-01).
+    /// </summary>
+    public LotRedating RedateDefaultLots(DateOnly date)
+    {
+        var redated = 0;
+        var skipped = 0;
+        foreach (var lot in _lots.Where(l => l.Source == LotSource.Import && l.UsesDefaultDate))
+        {
+            if (lot.RedateDefault(date))
+            {
+                redated++;
+            }
+            else
+            {
+                skipped++;
+            }
+        }
+
+        return new LotRedating(redated, skipped);
+    }
+
     /// <summary>The open lots, oldest first (the order in which a sale closes them).</summary>
     public IEnumerable<HoldingLot> OpenLotsOldestFirst() =>
         _lots.Where(l => l.IsOpen).OrderBy(l => l.AcquiredOn).ThenBy(l => l.CreatedAt).ThenBy(l => l.Id);

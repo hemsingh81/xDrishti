@@ -7,8 +7,10 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
+using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 
@@ -47,6 +49,25 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(InstrumentPage))]
 [JsonSerializable(typeof(InstrumentFacets))]
 [JsonSerializable(typeof(InstrumentDetail))]
+[JsonSerializable(typeof(TrackingInput))]
+[JsonSerializable(typeof(TrackResult))]
+[JsonSerializable(typeof(UntrackResult))]
+[JsonSerializable(typeof(ResolveInput))]
+[JsonSerializable(typeof(ResolveResult))]
+[JsonSerializable(typeof(BasketView))]
+[JsonSerializable(typeof(IReadOnlyList<BasketView>))]
+[JsonSerializable(typeof(BasketInput))]
+[JsonSerializable(typeof(BasketOrderInput))]
+[JsonSerializable(typeof(BasketMembers))]
+[JsonSerializable(typeof(AddMembersInput))]
+[JsonSerializable(typeof(AddMembersResult))]
+[JsonSerializable(typeof(RemoveMembersInput))]
+[JsonSerializable(typeof(RemoveMembersResult))]
+[JsonSerializable(typeof(MembersOrderInput))]
+[JsonSerializable(typeof(TransferInput))]
+[JsonSerializable(typeof(TransferResult))]
+[JsonSerializable(typeof(BasketHistory))]
+[JsonSerializable(typeof(IReadOnlyList<InstrumentBasketView>))]
 [JsonSerializable(typeof(StartRefreshRequest))]
 [JsonSerializable(typeof(RefreshStarted))]
 [JsonSerializable(typeof(RefreshStatusView))]

@@ -6,6 +6,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Portfolio;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Application.Accounts;
 
@@ -15,6 +16,8 @@ namespace XDrishti.Application.Accounts;
 /// the account's own bucket) selects the own bucket. <b>The first import happens here (ADR 0013):</b> when the request carries <c>FirstImport</c> rows, the account
 /// has the Portfolio role, is connected to Dhan and has no holdings yet, the chosen holdings are imported after the settings are saved, in the same request. The
 /// settings are saved whatever happens to the import; its outcome comes back in the answer (failed, with <c>portfolio.import_failed</c>, or deferred to the first sync).
+/// <b>A changed first import date re-dates (ADR 0015):</b> with holdings, the lots still on the default date move to the new date in the same unit of work
+/// (no Dhan call); the counts come back in the answer and the change is audited once.
 /// </summary>
 public sealed record UpdatePortfolioCommand(Guid AccountId, PortfolioInput Input, string Actor) : ICommand;
 
@@ -72,10 +75,14 @@ internal sealed class UpdatePortfolioHandler(
                 AccountEventType.PortfolioRefreshSettingsChanged, account.Id, RefreshText(account.Portfolio.Refresh), command.Actor, now));
         }
 
+        var redating = LotRedating.None;
         if (account.Portfolio.ImportDate != dateBefore)
         {
+            // ADR 0015: the lots still on the first import date follow it, in the same unit of work as the date.
+            var tracked = await holdings.ListForAccountAsync(account.Id, cancellationToken);
+            redating = tracked.Aggregate(LotRedating.None, (sum, holding) => sum.Add(holding.RedateDefaultLots(account.Portfolio.ImportDate)));
             events.Record(AccountEvent.Record(
-                AccountEventType.PortfolioRefreshSettingsChanged, account.Id, $"First import date: {DateText(dateBefore)} -> {DateText(account.Portfolio.ImportDate)}", command.Actor, now));
+                AccountEventType.FirstImportDateChanged, account.Id, DateChangeText(dateBefore, account.Portfolio.ImportDate, tracked.Count > 0, redating), command.Actor, now));
         }
 
         if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
@@ -85,16 +92,16 @@ internal sealed class UpdatePortfolioHandler(
         }
 
         AccountsLog.PortfolioUpdated(logger, account.Slug);
-        var import = await FirstImportAsync(account, importRequest, command.Actor, cancellationToken);
+        var import = await FirstImportAsync(account, importRequest, redating, command.Actor, cancellationToken);
         return Result.Success(new PortfolioSaved(await views.DetailAsync(account, cancellationToken), import));
     }
 
     /// <summary>The first import of the saved settings. Never fails the request: the settings are saved already, so a problem is part of the answer.</summary>
-    private async ValueTask<FirstImportView> FirstImportAsync(BrokerAccount account, ImportInput request, string actor, CancellationToken cancellationToken)
+    private async ValueTask<FirstImportView> FirstImportAsync(BrokerAccount account, ImportInput request, LotRedating redating, string actor, CancellationToken cancellationToken)
     {
         if (await holdings.AnyForAccountAsync(account.Id, cancellationToken))
         {
-            return FirstImports.Skipped;
+            return FirstImports.Skipped(redating);
         }
 
         if (!account.Portfolio.Enabled)
@@ -117,7 +124,12 @@ internal sealed class UpdatePortfolioHandler(
         return FirstImports.Done(imported.Value.Result);
     }
 
-    private static string DateText(DateOnly? date) => date?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? "none";
+    private static string DateText(DateOnly date) => date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>For example <c>First import date changed from 2025-01-01 to 2024-04-01; 12 lots re-dated, 1 skipped</c> (counts only when the account has holdings; no per-lot data).</summary>
+    private static string DateChangeText(DateOnly from, DateOnly to, bool hasHoldings, LotRedating redating) =>
+        $"First import date changed from {DateText(from)} to {DateText(to)}"
+        + (hasHoldings ? $"; {redating.Redated} {(redating.Redated == 1 ? "lot" : "lots")} re-dated, {redating.Skipped} skipped" : string.Empty);
 
     /// <summary>For example <c>Automatic holdings refresh: daily at 16:00 IST</c>.</summary>
     private static string RefreshText(PortfolioRefresh refresh) => refresh.Mode switch

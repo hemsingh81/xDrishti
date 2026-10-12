@@ -18,6 +18,9 @@ public sealed class MarketAccessTests(ApiFactory factory)
         { "GET", "/api/instruments?q=rel&pageSize=10" },
         { "GET", "/api/instruments/facets" },
         { "GET", $"/api/instruments/{Id}" },
+        { "POST", "/api/instruments/tracked" },
+        { "DELETE", "/api/instruments/tracked" },
+        { "POST", "/api/instruments/tracked/resolve" },
         { "POST", "/api/instruments/refresh" },
         { "GET", "/api/instruments/refresh/status" },
         { "GET", "/api/instruments/refresh/history" },
@@ -25,7 +28,7 @@ public sealed class MarketAccessTests(ApiFactory factory)
 
     private static HttpRequestMessage Request(string method, string path) => new(new HttpMethod(method), new Uri(path, UriKind.Relative))
     {
-        Content = method == "POST" ? new StringContent("{}", Encoding.UTF8, "application/json") : null,
+        Content = method is "POST" or "DELETE" ? new StringContent("{}", Encoding.UTF8, "application/json") : null,
     };
 
     [Theory]
@@ -65,6 +68,23 @@ public sealed class MarketAccessTests(ApiFactory factory)
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    [Theory]
+    [InlineData("POST", "/api/instruments/tracked")]
+    [InlineData("DELETE", "/api/instruments/tracked")]
+    [InlineData("POST", "/api/instruments/tracked/resolve")]
+    public async Task Tracking_changes_need_the_CSRF_token_but_no_step_up(string method, string path)
+    {
+        var signedIn = await factory.SignInAsync(Ct);
+        var withoutToken = factory.CreateAnonymousClient();
+        withoutToken.DefaultRequestHeaders.Add("Cookie", signedIn.CookieHeader);
+
+        using var refused = await withoutToken.SendAsync(Request(method, path), Ct);
+        using var allowed = await signedIn.Client.SendAsync(Request(method, path), Ct);
+
+        refused.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        allowed.StatusCode.ShouldBe(HttpStatusCode.BadRequest, "an empty request is a validation error, not an authorisation one");
+    }
+
     [Fact]
     public async Task The_contract_lists_the_instrument_operations()
     {
@@ -73,7 +93,7 @@ public sealed class MarketAccessTests(ApiFactory factory)
         var contract = await signedIn.Client.GetAsync("/api/openapi/v1.json", Ct);
         var json = await contract.Content.ReadAsStringAsync(Ct);
 
-        foreach (var operation in new[] { "SearchInstruments", "GetInstrumentFacets", "GetInstrument", "StartInstrumentRefresh", "GetInstrumentRefreshStatus", "ListInstrumentRefreshes" })
+        foreach (var operation in new[] { "SearchInstruments", "GetInstrumentFacets", "GetInstrument", "TrackInstruments", "UntrackInstruments", "ResolveInstruments", "StartInstrumentRefresh", "GetInstrumentRefreshStatus", "ListInstrumentRefreshes" })
         {
             json.ShouldContain($"\"operationId\": \"{operation}\"");
         }

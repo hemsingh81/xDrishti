@@ -2,6 +2,11 @@ import type {
   AccountDetail,
   AccountEvent,
   AccountSummary,
+  Basket,
+  BasketHistoryEntry,
+  BasketMember,
+  BasketMembers,
+  InstrumentBasket,
   BrokerConnection,
   HoldingLots,
   HoldingPage,
@@ -24,6 +29,7 @@ import type {
   SyncRun,
   SyncStatus,
   SystemStatus,
+  TrackedInfo,
 } from '@/shared/api';
 
 /** Typed test data builders — tests override only what they care about. */
@@ -315,6 +321,27 @@ export const buildEvents = (): AccountEvent[] => [
 
 const instrumentId = (n: number) => `00000000-0000-4000-8000-0000000002${String(n).padStart(2, '0')}`;
 
+/** A not-tracked instrument's tracking block. */
+export const untrackedInfo: TrackedInfo = {
+  active: false,
+  since: null,
+  deactivatedAt: null,
+  dataFrom: null,
+  dataTo: null,
+  lastUpdate: null,
+  backfillRequestedAt: null,
+  retiredButTracked: false,
+};
+
+/** A tracked instrument's block (no history collected yet unless `overrides` says so). */
+export const trackedInfo = (overrides: Partial<TrackedInfo> = {}): TrackedInfo => ({
+  ...untrackedInfo,
+  active: true,
+  since: '2026-10-12T04:00:00Z',
+  backfillRequestedAt: '2026-10-12T04:00:00Z',
+  ...overrides,
+});
+
 export function buildInstrument(overrides: Partial<InstrumentSummary> = {}): InstrumentSummary {
   return {
     id: instrumentId(1),
@@ -331,6 +358,7 @@ export function buildInstrument(overrides: Partial<InstrumentSummary> = {}): Ins
     fnoEligible: true,
     asmGsm: false,
     retired: false,
+    tracked: untrackedInfo,
     ...overrides,
   };
 }
@@ -450,6 +478,7 @@ export function buildInstrumentDetail(overrides: Partial<InstrumentDetail> = {})
     lastSeenAt: '2026-10-12T03:15:00Z',
     retiredAt: null,
     brokerIds: [{ broker: 'dhan', brokerId: '2885', segment: 'NSE_EQ' }],
+    tracked: untrackedInfo,
     ...overrides,
   };
 }
@@ -480,6 +509,8 @@ export function buildFacets(items: InstrumentSummary[] = sampleInstruments): Ins
     ),
     fnoEligible: active.filter((i) => i.fnoEligible).length,
     asmGsm: active.filter((i) => i.asmGsm).length,
+    tracked: items.filter((i) => i.tracked.active).length,
+    trackedRetired: items.filter((i) => i.tracked.active && i.retired).length,
   };
 }
 
@@ -504,13 +535,16 @@ const sortKeys: Record<string, (i: InstrumentSummary) => string | number> = {
 export function searchInstruments(items: InstrumentSummary[], params: URLSearchParams): InstrumentPage {
   const q = params.get('q')?.toLowerCase();
   const sector = params.get('sector');
+  const trackedParam = params.get('tracked');
+  const tracked = trackedParam === null ? undefined : trackedParam === 'true';
   const sort = params.get('sort') ?? 'symbol';
   const descending = sort.startsWith('-');
   const key = sortKeys[descending ? sort.slice(1) : sort] ?? sortKeys.symbol!;
   const page = Number(params.get('page') ?? 1);
   const pageSize = Number(params.get('pageSize') ?? 50);
   const matches = items
-    .filter((i) => params.get('includeRetired') === 'true' || !i.retired)
+    .filter((i) => params.get('includeRetired') === 'true' || !i.retired || (tracked === true && i.tracked.active))
+    .filter((i) => tracked === undefined || i.tracked.active === tracked)
     .filter((i) => !q || [i.symbol, i.name, i.displayName, i.isin ?? ''].some((v) => v.toLowerCase().includes(q)))
     .filter((i) => !params.get('type') || i.type === params.get('type'))
     .filter((i) => !sector || (sector === 'Unclassified' ? i.sector === null : i.sector === sector))
@@ -908,6 +942,8 @@ export const buildFirstImportView = (overrides: Partial<FirstImportView> = {}): 
   defaultDated: 3,
   alreadyImported: 0,
   unknown: 0,
+  redated: 0,
+  redateSkipped: 0,
   errorCode: null,
   cause: null,
   message: null,
@@ -921,4 +957,106 @@ export const buildPortfolioSaved = (
 ): PortfolioSaved => ({
   account,
   import: imported,
+});
+
+// ---- Baskets ---------------------------------------------------------------------------------------------------------
+
+export const basketIds = {
+  myChoice: '00000000-0000-4000-8000-000000000401',
+  myLongTerm: '00000000-0000-4000-8000-000000000402',
+  bestStocks: '00000000-0000-4000-8000-000000000403',
+  /** A portfolio (system) basket: the id is its bucket's id. */
+  dhanPortfolio: '00000000-0000-4000-8000-000000000411',
+  zerodhaPortfolio: '00000000-0000-4000-8000-000000000412',
+} as const;
+
+export const buildBasket = (overrides: Partial<Basket> = {}): Basket => ({
+  id: basketIds.myChoice,
+  name: 'MyChoice',
+  colour: '#6366f1',
+  purpose: 'trading',
+  description: null,
+  position: 0,
+  memberCount: 0,
+  createdAt: '2026-10-11T04:00:00Z',
+  archivedAt: null,
+  kind: 'manual',
+  system: false,
+  accountId: null,
+  accountName: null,
+  ...overrides,
+});
+
+/** An account's portfolio bucket as the Baskets page lists it: protected, with the account's colour. */
+export const buildPortfolioBasket = (overrides: Partial<Basket> = {}): Basket =>
+  buildBasket({
+    id: basketIds.dhanPortfolio,
+    name: 'Dhan · Main · Portfolio',
+    colour: '#0ea5e9',
+    purpose: 'long_term',
+    kind: 'portfolio',
+    system: true,
+    accountId: '00000000-0000-4000-8000-000000000a01',
+    accountName: 'Dhan · Main',
+    ...overrides,
+  });
+
+/** The three baskets the migration creates, empty. */
+export const seededBaskets = (): Basket[] => [
+  buildBasket(),
+  buildBasket({ id: basketIds.myLongTerm, name: 'MyLongTerm', colour: '#10b981', purpose: 'long_term', position: 1 }),
+  buildBasket({ id: basketIds.bestStocks, name: 'Best stocks', colour: '#f59e0b', position: 2 }),
+];
+
+export const buildBasketMember = (
+  instrument: InstrumentSummary,
+  overrides: Partial<BasketMember> = {},
+): BasketMember => ({
+  id: `00000000-0000-4000-8000-0000000005${instrument.id.slice(-2)}`,
+  instrument,
+  position: 0,
+  validFrom: '2026-10-11T04:00:00Z',
+  validTo: null,
+  note: null,
+  addedBy: 'example@invalid.test',
+  quantity: null,
+  accountName: null,
+  ...overrides,
+});
+
+export const buildBasketMembers = (
+  basket: Basket,
+  items: BasketMember[],
+  overrides: Partial<BasketMembers> = {},
+): BasketMembers => ({
+  basketId: basket.id,
+  name: basket.name,
+  archivedAt: null,
+  asOf: null,
+  total: items.length,
+  items,
+  ...overrides,
+});
+
+export const buildHistoryEntry = (overrides: Partial<BasketHistoryEntry> = {}): BasketHistoryEntry => ({
+  memberId: '00000000-0000-4000-8000-000000000501',
+  kind: 'added',
+  at: '2026-10-11T04:00:00Z',
+  instrumentId: instrumentId(2),
+  symbol: 'NSE:TCS',
+  name: 'TATA CONSULTANCY SERVICES LTD',
+  type: 'share',
+  note: null,
+  by: 'example@invalid.test',
+  ...overrides,
+});
+
+export const buildInstrumentBasket = (overrides: Partial<InstrumentBasket> = {}): InstrumentBasket => ({
+  basketId: basketIds.myChoice,
+  name: 'MyChoice',
+  colour: '#6366f1',
+  purpose: 'trading',
+  position: 0,
+  since: '2026-10-11T04:00:00Z',
+  ...overrides,
 });

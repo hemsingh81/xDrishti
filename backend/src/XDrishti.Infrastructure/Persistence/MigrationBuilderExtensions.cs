@@ -50,4 +50,18 @@ internal static class MigrationBuilderExtensions
                 END IF;
             END $$;
             """);
+
+    /// <summary>
+    /// Takes DELETE away from the runtime role on a table whose rows are kept for good (it can still read, insert and update). Call after
+    /// <see cref="GrantSchemaUsageToAppRole"/> and after any later migration that re-grants the schema. No-op when the role does not exist (e.g. integration-test databases).
+    /// </summary>
+    public static void NeverDeleteForAppRole(this MigrationBuilder migrationBuilder, string schema, string table) =>
+        migrationBuilder.Sql($"""
+            DO $$
+            BEGIN
+                IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{AppRole}') THEN
+                    REVOKE DELETE ON {schema}.{table} FROM {AppRole};
+                END IF;
+            END $$;
+            """);
 }

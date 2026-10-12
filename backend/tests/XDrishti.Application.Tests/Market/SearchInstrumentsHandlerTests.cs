@@ -137,4 +137,15 @@ public sealed class SearchInstrumentsHandlerTests
 
         result.Error.Fields!.Select(f => f.Field).Order().ShouldBe(["pageSize", "q", "type"]);
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void The_tracked_filter_is_passed_on_and_not_set_by_default(bool? tracked)
+    {
+        var search = SearchInstrumentsHandler.Check(new InstrumentSearchRequest(null, null, null, null, null, null, null, null, null, null, tracked)).Value;
+
+        search.Tracked.ShouldBe(tracked);
+    }
 }

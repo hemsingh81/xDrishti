@@ -53,3 +53,16 @@ export const connectLabel = (status: ConnectionStatusKey): string => (status ===
 /** Connecting needs the broker app's API key and secret stored first. */
 export const appConfigured = (account: Pick<AccountSummary, 'secrets'>): boolean =>
   account.secrets.length > 0 && account.secrets.every((s) => s.set);
+
+/** What to do next for an account that is not connected (shown under its status); null once it is connected. */
+export function nextStepHint(status: ConnectionStatusKey, configured: boolean): string | null {
+  if (status === 'connected') {
+    return null;
+  }
+  if (!configured) {
+    return 'Add the API key & secret, then connect to Dhan.';
+  }
+  return status === 'expired'
+    ? 'The Dhan session has expired — reconnect to continue.'
+    : 'Not signed in to Dhan — connect to import holdings and data.';
+}

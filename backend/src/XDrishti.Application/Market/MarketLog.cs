@@ -43,4 +43,28 @@ internal static partial class MarketLog
 
     [LoggerMessage(EventId = 3013, Level = LogLevel.Warning, Message = "Instrument refresh {RunId}: refusing to retire most of the list: {New} instruments in the file, {Active} active")]
     public static partial void RefreshTripwire(ILogger logger, Guid runId, int @new, int active);
+
+    [LoggerMessage(EventId = 3014, Level = LogLevel.Information, Message = "Instruments tracked: {Added} new, {Reactivated} tracked again, {AlreadyTracked} already tracked")]
+    public static partial void InstrumentsTracked(ILogger logger, int added, int reactivated, int alreadyTracked);
+
+    [LoggerMessage(EventId = 3015, Level = LogLevel.Information, Message = "Instruments untracked: {Untracked} untracked, {NotTracked} were not tracked")]
+    public static partial void InstrumentsUntracked(ILogger logger, int untracked, int notTracked);
+
+    [LoggerMessage(EventId = 3016, Level = LogLevel.Information, Message = "Basket {BasketId} created")]
+    public static partial void BasketCreated(ILogger logger, Guid basketId);
+
+    [LoggerMessage(EventId = 3017, Level = LogLevel.Information, Message = "Basket {BasketId} archived")]
+    public static partial void BasketArchived(ILogger logger, Guid basketId);
+
+    [LoggerMessage(EventId = 3018, Level = LogLevel.Information, Message = "Basket {BasketId}: {Added} instruments added, {AlreadyMembers} were members already, {NewlyTracked} tracked now")]
+    public static partial void BasketMembersAdded(ILogger logger, Guid basketId, int added, int alreadyMembers, int newlyTracked);
+
+    [LoggerMessage(EventId = 3019, Level = LogLevel.Information, Message = "Basket {BasketId}: {Removed} instruments removed, {NotMembers} were not members")]
+    public static partial void BasketMembersRemoved(ILogger logger, Guid basketId, int removed, int notMembers);
+
+    [LoggerMessage(EventId = 3020, Level = LogLevel.Information, Message = "Basket {FromBasketId} to {ToBasketId} ({Mode}): {Added} added, {AlreadyInTarget} there already, {Removed} removed from the source, {NotInSource} not in the source")]
+    public static partial void BasketMembersTransferred(ILogger logger, Guid fromBasketId, Guid toBasketId, string mode, int added, int alreadyInTarget, int removed, int notInSource);
+
+    [LoggerMessage(EventId = 3021, Level = LogLevel.Warning, Message = "Basket change gave up after {Attempts} attempts: the basket was changed at the same time")]
+    public static partial void BasketConflict(ILogger logger, int attempts);
 }

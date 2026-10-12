@@ -16,11 +16,29 @@ internal sealed class InstrumentQueries(XDrishtiDbContext db) : IInstrumentQueri
         var items = await Sort(matches, search)
             .Skip((search.Page - 1) * search.PageSize)
             .Take(search.PageSize)
-            .Select(x => new InstrumentSummary(
-                x.Id, x.CanonicalSymbol, x.Name, x.DisplayName, x.Type, x.Isin, x.Series, x.Sector, x.LotSize, x.TickSize, x.ExpiryDate,
-                x.FnoEligible, x.AsmGsmFlag != null, x.RetiredAt != null))
+            .Select(x => new
+            {
+                x.Id,
+                x.CanonicalSymbol,
+                x.Name,
+                x.DisplayName,
+                x.Type,
+                x.Isin,
+                x.Series,
+                x.Sector,
+                x.LotSize,
+                x.TickSize,
+                x.ExpiryDate,
+                x.FnoEligible,
+                AsmGsm = x.AsmGsmFlag != null,
+                Retired = x.RetiredAt != null,
+            })
             .ToListAsync(cancellationToken);
-        return new InstrumentPage(items, search.Page, search.PageSize, total);
+        var tracked = await TrackedAsync([.. items.Select(x => x.Id)], cancellationToken);
+        var summaries = items.Select(x => new InstrumentSummary(
+            x.Id, x.CanonicalSymbol, x.Name, x.DisplayName, x.Type, x.Isin, x.Series, x.Sector, x.LotSize, x.TickSize, x.ExpiryDate,
+            x.FnoEligible, x.AsmGsm, x.Retired, Info(tracked, x.Id, x.Retired))).ToList();
+        return new InstrumentPage(summaries, search.Page, search.PageSize, total);
     }
 
     public async ValueTask<InstrumentFacets> FacetsAsync(CancellationToken cancellationToken)
@@ -30,6 +48,9 @@ internal sealed class InstrumentQueries(XDrishtiDbContext db) : IInstrumentQueri
         var retired = await db.Instruments.AsNoTracking().CountAsync(x => x.RetiredAt != null, cancellationToken);
         var fno = await active.CountAsync(x => x.FnoEligible, cancellationToken);
         var asmGsm = await active.CountAsync(x => x.AsmGsmFlag != null, cancellationToken);
+        var tracked = await db.TrackedInstruments.AsNoTracking().CountAsync(t => t.Active, cancellationToken);
+        var trackedRetired = await db.Instruments.AsNoTracking()
+            .CountAsync(x => x.RetiredAt != null && db.TrackedInstruments.Any(t => t.Id == x.Id && t.Active), cancellationToken);
 
         var types = await active.GroupBy(x => x.Type).Select(g => new FacetCount(g.Key, g.Count())).ToListAsync(cancellationToken);
         // Only shares get sectors, so the sector facet counts shares (and "Unclassified" = shares without a sector), matching the sector filter.
@@ -45,7 +66,9 @@ internal sealed class InstrumentQueries(XDrishtiDbContext db) : IInstrumentQueri
             [.. named, .. unclassified],
             [.. series.OrderByDescending(s => s.Count).ThenBy(s => s.Value, StringComparer.Ordinal)],
             fno,
-            asmGsm);
+            asmGsm,
+            tracked,
+            trackedRetired);
     }
 
     public async ValueTask<InstrumentDetail?> GetAsync(Guid id, CancellationToken cancellationToken)
@@ -64,16 +87,50 @@ internal sealed class InstrumentQueries(XDrishtiDbContext db) : IInstrumentQueri
         return new InstrumentDetail(
             x.Id, x.CanonicalSymbol, x.Exchange, x.ExchangeSegment, x.Type, x.Name, x.DisplayName, x.Isin, x.Series, x.LotSize, x.TickSize, x.ExpiryDate,
             x.UnderlyingSymbol, x.Sector, x.SectorSource, x.FnoEligible, x.AsmGsmFlag != null, x.AsmGsmFlag, x.AsmGsmCategory, x.MtfLeverage,
-            x.FreezeQuantity, x.FirstSeenAt, x.LastSeenAt, x.RetiredAt, ids);
+            x.FreezeQuantity, x.FirstSeenAt, x.LastSeenAt, x.RetiredAt, ids, Info(await TrackedAsync([id], cancellationToken), id, x.RetiredAt != null));
     }
+
+    public async ValueTask<IReadOnlyList<ResolveCandidate>> FindForResolveAsync(
+        IReadOnlyCollection<string> symbols, IReadOnlyCollection<string> isins, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(symbols);
+        ArgumentNullException.ThrowIfNull(isins);
+        return await db.Instruments.AsNoTracking()
+            .Where(x => symbols.Contains(x.CanonicalSymbol.ToUpper())
+                || (x.Isin != null && x.Type != InstrumentTypeCodes.Future && isins.Contains(x.Isin.ToUpper())))
+            .Select(x => new ResolveCandidate(
+                x.Id, x.CanonicalSymbol, x.Name, x.Type, x.Isin, x.RetiredAt != null, db.TrackedInstruments.Any(t => t.Id == x.Id && t.Active)))
+            .ToListAsync(cancellationToken);
+    }
+
+    private async Task<Dictionary<Guid, TrackedInstrument>> TrackedAsync(Guid[] ids, CancellationToken cancellationToken) =>
+        ids.Length == 0
+            ? []
+            : await db.TrackedInstruments.AsNoTracking().Where(t => ids.Contains(t.Id)).ToDictionaryAsync(t => t.Id, cancellationToken);
+
+    private static TrackedInfo Info(Dictionary<Guid, TrackedInstrument> tracked, Guid id, bool retired) =>
+        TrackedInfoMapper.From(tracked.GetValueOrDefault(id), retired);
 
     private static int TypeOrder(string type) => InstrumentTypeCodes.TryParse(type, out var parsed) ? (int)parsed : int.MaxValue;
 
-    private static IQueryable<InstrumentRecord> Filter(IQueryable<InstrumentRecord> query, InstrumentSearch s)
+    private IQueryable<InstrumentRecord> Filter(IQueryable<InstrumentRecord> query, InstrumentSearch s)
     {
-        if (!s.IncludeRetired)
+        // Tracked instruments that retired stay in the tracked list (with a warning), whatever includeRetired says.
+        if (s.Tracked == true)
         {
-            query = query.Where(x => x.RetiredAt == null);
+            query = query.Where(x => db.TrackedInstruments.Any(t => t.Id == x.Id && t.Active));
+        }
+        else
+        {
+            if (!s.IncludeRetired)
+            {
+                query = query.Where(x => x.RetiredAt == null);
+            }
+
+            if (s.Tracked == false)
+            {
+                query = query.Where(x => !db.TrackedInstruments.Any(t => t.Id == x.Id && t.Active));
+            }
         }
 
         if (s.Text is { } text)

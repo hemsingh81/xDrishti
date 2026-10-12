@@ -109,7 +109,7 @@ describe('wizard helpers', () => {
     ['roles.data.kind', 2],
     ['roles.trading', 2],
     ['trading.riskProfileId', 3],
-    ['portfolio.defaultBucket', 3],
+    ['portfolio.firstImportDate', 3],
     ['data.liveFeedBudget', 3],
   ])('maps %s to step %d', (field, step) => {
     expect(stepOfField(field)).toBe(step);

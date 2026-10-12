@@ -15,5 +15,8 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0008](0008-broker-credentials-vault-and-connection.md) | Broker credentials in an encrypted vault; broker-first accounts; connecting Dhan (consent) and Upstox (authorization code) | Accepted (narrowed by 0009) |
 | [0009](0009-dhan-consent-flow-only.md) | Accounts: Dhan only, API key & secret consent flow only; account status in the header | Accepted |
 | [0010](0010-instrument-master-sources-and-scope.md) | Instrument master: Dhan scrip master + NSE sector list, NSE shares/ETFs/indices/futures only, manual + daily refresh | Accepted |
-| [0011](0011-default-portfolio-bucket-per-account.md) | Portfolio: one automatic default bucket per Portfolio account (no presets); acquisition dates derived from Dhan trades and ledger, no manual history date | Accepted (acquisition-date part superseded by 0012) |
+| [0011](0011-default-portfolio-bucket-per-account.md) | Portfolio: one automatic default bucket per Portfolio account (no presets); acquisition dates derived from Dhan trades and ledger, no manual history date | Accepted (acquisition-date part superseded by 0012; bucket choices in Accounts removed by 0015) |
 | [0012](0012-holdings-acquisition-dates-and-returns-model.md) | Holdings: owner-set acquisition dates (default 1 Jan 2025), lot model, auto refresh, returns/XIRR | Accepted |
+| [0013](0013-portfolio-import-with-settings-and-daily-refresh.md) | Portfolio: saving the account's Portfolio settings imports the holdings; refresh Off or Daily; Sync now on the Portfolio screen | Accepted (date read-only rule amended by 0015) |
+| [0014](0014-portfolio-buckets-appear-as-system-baskets.md) | Portfolio buckets appear on the Baskets page as read-only, protected system baskets | Accepted |
+| [0015](0015-first-import-date-editable-and-no-bucket-ui-in-accounts.md) | The first import date stays editable (re-dates the default-dated lots); no bucket choices in Accounts | Accepted |

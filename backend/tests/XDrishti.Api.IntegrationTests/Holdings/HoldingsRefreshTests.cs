@@ -53,8 +53,10 @@ public sealed class HoldingsRefreshTests(ApiFactory factory) : HoldingsTestBase(
             .Where(e => e.Event == "PortfolioRefreshSettingsChanged").Select(e => e.Detail).ToList();
         events.ShouldContain("Automatic holdings refresh: off");
         events.ShouldContain("Automatic holdings refresh: daily at 17:45 IST");
-        events.ShouldContain("First import date: 2025-01-01 -> 2024-05-06");
-        events.Count.ShouldBe(3);
+        events.Count.ShouldBe(2);
+        var dateEvents = (await (await Client.GetAsync($"/api/accounts/{account.Id}/activity", Ct)).ReadAsync<List<AccountEventView>>(Ct))
+            .Where(e => e.Event == "FirstImportDateChanged").Select(e => e.Detail).ToList();
+        dateEvents.ShouldBe(["First import date changed from 2025-01-01 to 2024-05-06"]);
     }
 
     [Theory]

@@ -185,7 +185,7 @@ describe('Trading tab', () => {
     renderTrading(`/accounts?account=${ids.swing}&tab=portfolio`);
 
     expect(await screen.findByText(/role is off for this account/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Default bucket/)).toBeInTheDocument();
+    expect(screen.getByLabelText('First import date')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Enable in Roles' }));
     expect(await screen.findByRole('tab', { name: 'Roles', selected: true })).toBeInTheDocument();
   });

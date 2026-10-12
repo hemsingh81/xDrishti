@@ -16,12 +16,17 @@ import TuneIcon from '@mui/icons-material/TuneOutlined';
 import WbSunnyIcon from '@mui/icons-material/WbSunnyOutlined';
 import type { SvgIconComponent } from '@mui/icons-material';
 
+/** Names a badge source the shell provides (see layout/navBadges); keeps this list free of feature code. */
+export type NavBadgeId = 'accounts-attention';
+
 export interface NavItem {
   path: string;
   label: string;
   icon: SvgIconComponent;
   /** Roadmap phase that delivers the screen; undefined = available now. */
   phase?: string;
+  /** Optional count badge on the item; the shell resolves the id to live data. */
+  badge?: NavBadgeId;
 }
 
 export interface NavSection {
@@ -44,7 +49,7 @@ export const navigation: NavSection[] = [
     title: 'Market',
     items: [
       { path: '/instruments', label: 'Instruments', icon: ListAltIcon },
-      { path: '/baskets', label: 'Baskets', icon: ShoppingBasketIcon, phase: 'P1' },
+      { path: '/baskets', label: 'Baskets', icon: ShoppingBasketIcon },
       { path: '/data', label: 'Data & import', icon: StorageIcon, phase: 'P1' },
       { path: '/quality', label: 'Data quality', icon: FactCheckIcon, phase: 'P1' },
     ],
@@ -60,7 +65,7 @@ export const navigation: NavSection[] = [
   {
     title: 'System',
     items: [
-      { path: '/accounts', label: 'Accounts', icon: PeopleIcon },
+      { path: '/accounts', label: 'Accounts', icon: PeopleIcon, badge: 'accounts-attention' },
       { path: '/services', label: 'Services', icon: DnsIcon, phase: 'P1' },
       { path: '/settings', label: 'Settings', icon: TuneIcon },
       { path: '/audit', label: 'Audit log', icon: HistoryIcon, phase: 'P1' },

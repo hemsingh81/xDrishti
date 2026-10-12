@@ -23,7 +23,7 @@ public abstract class MarketTestBase(ApiFactory factory) : IAsyncLifetime
 
     protected HttpClient Client => Owner.Client;
 
-    public async ValueTask InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         Factory.Clock.Pin(Now);
         await Factory.ResetInstrumentsAsync();

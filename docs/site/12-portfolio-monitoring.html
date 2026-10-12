@@ -199,13 +199,18 @@ and ISIN, but <strong>no purchase date</strong> (docs read 2026-10-11), so the d
 again inside one transaction, one holding with <strong>one lot</strong> (Dhan&#39;s quantity and average cost) is created for every holding Dhan lists, in the account&#39;s bucket (its own default
 bucket or the custom bucket chosen in the settings), dated with the first import date and flagged <code>uses_default_date</code> (counted on the Portfolio screen until its date is edited
 there). <code>firstImport.rows</code> = <code>[{key, acquiredOn?}]</code> is an optional API detail: a row&#39;s date overrides the default for its key. The run is recorded with the trigger <code>import</code>. The answer carries the result:
-<code>import.status</code> <code>imported</code> (counts <code>imported</code>, <code>defaultDated</code>, <code>alreadyImported</code>, <code>unknown</code>), <code>skipped</code> (the account already has holdings: nothing is imported, Dhan is not called),
+<code>import.status</code> <code>imported</code> (counts <code>imported</code>, <code>defaultDated</code>, <code>alreadyImported</code>, <code>unknown</code>), <code>skipped</code> (the account already has holdings: nothing is imported, Dhan is not called; <code>redated</code>/<code>redateSkipped</code> say how many lots followed a changed first import date),
 <code>deferred</code> (not connected, or role off: nothing is called) or <code>failed</code> (the <strong>settings are still saved</strong>; <code>import.errorCode</code> <code>portfolio.import_failed</code>, <code>import.cause</code> the reason code
 such as <code>portfolio.not_connected</code> or <code>portfolio.sync_running</code>; retry with Save again or Sync now). Invalid dates or rows are <code>400 accounts.invalid</code> (fields <code>firstImportDate</code>,
 <code>firstImport.rows[i].key</code>, <code>firstImport.rows[i].acquiredOn</code>) and nothing is saved.
 <strong>An account that is not connected</strong> keeps the stored first import date, and its <strong>first sync</strong> — manual or daily — performs the import: every holding
 Dhan lists gets one lot dated with the first import date (flagged as default, editable per lot) and the run is recorded as <code>import</code>. After that nothing imports again: saving the settings
-again or changing the first import date has no effect on existing holdings, and everything else arrives through the refresh below.</p>
+again imports nothing, and everything else arrives through the refresh below.
+<strong>The first import date stays editable</strong> (<a href="../adr/0015-first-import-date-editable-and-no-bucket-ui-in-accounts.html">ADR 0015</a>, <a href="../specs/P2-01b-editable-first-import-date-and-no-buckets-in-accounts.html">P2-01b</a>):
+saving a <strong>changed</strong> date on an account that has holdings <strong>re-dates, in the same unit of work, every lot with <code>source = import</code> and <code>uses_default_date = true</code></strong> to the new date (the lots stay flagged;
+a closed lot whose <code>closed_on</code> is before the new date cannot take it and is skipped). Lots the owner dated by hand, lots found by refreshes and manual lots are never touched; returns and XIRR are computed on
+read, so they follow. No Dhan call is made (<code>import.status</code> stays <code>skipped</code>); the answer&#39;s <code>import</code> carries <code>redated</code> and <code>redateSkipped</code> (lot counts, 0 when the date did not change or the account has no
+holdings). The same date again changes nothing. The change is audited once (<code>FirstImportDateChanged</code>: old and new date and the counts, no per-lot data). Without holdings only the date is stored.</p>
 <p><strong>Lots.</strong> A holding has lots <code>(acquired_on, qty, unit_cost)</code>; a closed lot also has <code>closed_on</code>, <code>close_price</code> and <code>estimated</code>. A partial sale splits a lot into a
 closed piece and an open remainder with the same date and cost, so every lot has one close price. The open quantities always add up to Dhan&#39;s quantity, and the
 holding&#39;s quantity and average cost are always Dhan&#39;s after a sync. Any lot&#39;s date can be edited later (<code>PUT /api/holdings/{id}/lots/{lotId}</code>); figures are computed on
@@ -347,8 +352,9 @@ such holdings are left out of group and summary invested / value / P&amp;L / XIR
 linked to the account (<code>default_for_account_id</code>, unique), renamed when the account is renamed, archived with the account (renamed <em>… · Portfolio (archived)</em> so the name is free again), and kept — but hidden from
 pickers — while the role is off. A name collision gets a numeric suffix (<em>… · Portfolio 2</em>). It is where the account&#39;s imported holdings go unless
 another bucket is chosen. There are no predefined buckets (the earlier <em>Trading / MyLongTerm / MyChoice</em> presets were removed in P1-16e).</li>
-<li><strong>Custom buckets</strong> can still be added (Accounts → Portfolio → <em>Add bucket</em>) and chosen as an account&#39;s default for imports; the account&#39;s own default
-bucket is always available, so the selection is never empty.</li>
+<li><strong>Custom buckets:</strong> the buckets API stays (<code>GET/POST /api/portfolio-buckets</code>, <code>defaultBucket</code> on the settings), but <strong>Accounts no longer offers any bucket choice</strong>
+— no default-bucket select, no Buckets list, no <em>Add bucket</em> form, in the Portfolio tab or the add-account wizard; saves leave <code>defaultBucket</code> out, so imports go to
+the account&#39;s own default bucket and a custom bucket set earlier is kept (<a href="../adr/0015-first-import-date-editable-and-no-bucket-ui-in-accounts.html">ADR 0015</a>).</li>
 <li>A position&#39;s bucket defaults to the account&#39;s chosen bucket and can be overridden per trade — e.g. the same stock bought for long-term
 (custom bucket <em>Long term</em>) and for a swing trade (the account&#39;s own bucket) is tracked as two positions with separate lots, returns and XIRR.</li>
 <li>System-plan trades go to the Trading account&#39;s own default bucket unless a custom bucket is configured for plan trades.</li>
@@ -467,7 +473,7 @@ Nifty 50, XIRR by group.</li>
     <a class="prev" href="11-strategy-lab.html"><small>← Previous  [</small>11 · Strategy Lab</a>
     <a class="next" href="13-reports-and-ui.html"><small>Next  ] →</small>13 · Reports &amp; UI</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-11 18:10</footer>
+  <footer class="foot">Generated from <code>docs/12-portfolio-monitoring.md</code> · 2026-10-12 07:06</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources" class="d2">1. Data sources</a>
 <a href="#2-domain-model" class="d2">2. Domain model</a>

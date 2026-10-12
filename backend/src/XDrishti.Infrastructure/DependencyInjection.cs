@@ -142,6 +142,11 @@ public static class DependencyInjection
         services.AddScoped<IRefreshRunStore, RefreshRunStore>();
         services.AddScoped<IInstrumentCatalog, InstrumentCatalog>();
         services.AddScoped<IInstrumentQueries, InstrumentQueries>();
+        services.AddScoped<ITrackedInstrumentStore, TrackedInstrumentStore>();
+        services.AddScoped<IMarketUnitOfWork, MarketUnitOfWork>();
+        services.AddScoped<IBasketStore, BasketStore>();
+        services.AddScoped<IBasketQueries, BasketQueries>();
+        services.AddScoped<IPortfolioBasketSource, PortfolioBasketSource>();
 
         services.AddTransient<MasterDataEndpointGuard>();
         services.AddHttpClient(MasterDataHttpClientNames.Dhan, MasterDataHttp.ConfigureDhan)

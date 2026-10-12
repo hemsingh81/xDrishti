@@ -34,4 +34,15 @@ describe('Top bar', () => {
     expect(at('Notifications')).toBeLessThan(at('Toggle colour mode'));
     expect(at('Toggle colour mode')).toBeLessThan(at('Account menu'));
   });
+
+  it('says in the accounts control which account needs reconnecting', async () => {
+    renderWithProviders(<TopBar title="Today" onMenu={() => undefined} />);
+
+    // The default accounts: one connected, one never connected.
+    expect(
+      await screen.findByRole('button', {
+        name: /^Accounts: 2 accounts · 1 needs connecting.*Test Dhan Swing: not connected/,
+      }),
+    ).toBeInTheDocument();
+  });
 });

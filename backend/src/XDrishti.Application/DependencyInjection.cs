@@ -5,8 +5,10 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
+using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
@@ -84,6 +86,26 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<SearchInstrumentsQuery, Result<InstrumentPage>>, SearchInstrumentsHandler>();
         services.AddScoped<IQueryHandler<GetInstrumentFacetsQuery, InstrumentFacets>, GetInstrumentFacetsHandler>();
         services.AddScoped<IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>>, GetInstrumentHandler>();
+
+        // Tracking: the service is shared with features that track on the owner's behalf (baskets), inside their own unit of work.
+        services.AddScoped<InstrumentTracking>();
+        services.AddScoped<ICommandHandler<TrackInstrumentsCommand, TrackResult>, TrackInstrumentsHandler>();
+        services.AddScoped<ICommandHandler<UntrackInstrumentsCommand, UntrackResult>, UntrackInstrumentsHandler>();
+        services.AddScoped<IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>>, ResolveInstrumentsHandler>();
+
+        // Baskets (many-to-many, with dated membership). Adding to a basket tracks in the same unit of work, through InstrumentTracking above.
+        services.AddScoped<IQueryHandler<ListBasketsQuery, IReadOnlyList<BasketView>>, ListBasketsHandler>();
+        services.AddScoped<ICommandHandler<CreateBasketCommand, BasketView>, CreateBasketHandler>();
+        services.AddScoped<ICommandHandler<UpdateBasketCommand, BasketView>, UpdateBasketHandler>();
+        services.AddScoped<ICommandHandler<ArchiveBasketCommand>, ArchiveBasketHandler>();
+        services.AddScoped<ICommandHandler<ReorderBasketsCommand>, ReorderBasketsHandler>();
+        services.AddScoped<IQueryHandler<GetBasketMembersQuery, Result<BasketMembers>>, GetBasketMembersHandler>();
+        services.AddScoped<IQueryHandler<GetBasketHistoryQuery, Result<BasketHistory>>, GetBasketHistoryHandler>();
+        services.AddScoped<IQueryHandler<ListInstrumentBasketsQuery, Result<IReadOnlyList<InstrumentBasketView>>>, ListInstrumentBasketsHandler>();
+        services.AddScoped<ICommandHandler<AddBasketMembersCommand, AddMembersResult>, AddBasketMembersHandler>();
+        services.AddScoped<ICommandHandler<RemoveBasketMembersCommand, RemoveMembersResult>, RemoveBasketMembersHandler>();
+        services.AddScoped<ICommandHandler<ReorderBasketMembersCommand>, ReorderBasketMembersHandler>();
+        services.AddScoped<ICommandHandler<TransferBasketMembersCommand, TransferResult>, TransferBasketMembersHandler>();
 
         // The daily schedule is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<DailyRefreshRunner>();

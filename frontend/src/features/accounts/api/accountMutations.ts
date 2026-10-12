@@ -142,11 +142,3 @@ export function useUpdateData() {
     onSuccess: (detail) => refreshAccount(queryClient, detail),
   });
 }
-
-export function useAddBucket() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (name: string) => unwrap(await api.POST('/api/portfolio-buckets', { body: { name } })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: accountsKeys.buckets }),
-  });
-}

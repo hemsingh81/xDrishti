@@ -7,7 +7,7 @@ namespace XDrishti.Application.Market.Search;
 
 /// <summary>
 /// Searches the master list: <c>q</c> (symbol, name, display name, ISIN), <c>type</c>, <c>sector</c> (or "Unclassified"), <c>fno</c>, <c>asmGsm</c>,
-/// <c>series</c>, <c>includeRetired</c>, <c>sort</c> (<c>symbol|name|type|series|sector|lot|tick</c>, prefix <c>-</c> for descending), <c>page</c> from 1,
+/// <c>series</c>, <c>tracked</c> (true = tracked now, retired-but-tracked ones included whatever <c>includeRetired</c> says; false = not tracked now), <c>includeRetired</c>, <c>sort</c> (<c>symbol|name|type|series|sector|lot|tick</c>, prefix <c>-</c> for descending), <c>page</c> from 1,
 /// <c>pageSize</c> up to 100. The order is stable.
 /// </summary>
 public sealed record SearchInstrumentsQuery(InstrumentSearchRequest Request) : IQuery<Result<InstrumentPage>>;
@@ -77,7 +77,8 @@ internal sealed class SearchInstrumentsHandler(IInstrumentQueries queries) : IQu
             field,
             descending,
             page,
-            pageSize));
+            pageSize,
+            r.Tracked));
     }
 
     private static void CheckText(FieldErrors errors, string field, string? value, int maxLength)

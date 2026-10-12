@@ -10,7 +10,12 @@ describe('filters in the URL', () => {
   });
 
   it('reads every parameter', () => {
-    expect(parse('q=tcs&type=etf&sector=Banking&series=EQ&fno=1&asm=1&retired=1&sort=-lot&page=3&size=100')).toEqual({
+    expect(
+      parse(
+        'tab=tracked&q=tcs&type=etf&sector=Banking&series=EQ&fno=1&asm=1&retired=1&untracked=1&sort=-lot&page=3&size=100',
+      ),
+    ).toEqual({
+      tab: 'tracked',
       q: 'tcs',
       type: 'etf',
       sector: 'Banking',
@@ -18,6 +23,7 @@ describe('filters in the URL', () => {
       fno: true,
       asmGsm: true,
       includeRetired: true,
+      untracked: true,
       sort: { field: 'lot', descending: true },
       page: 3,
       pageSize: 100,

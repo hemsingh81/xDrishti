@@ -17,7 +17,7 @@ const symbolsShown = () =>
   within(screen.getByRole('grid', { name: 'Instruments' }))
     .getAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('gridcell')[0]?.textContent);
+    .map((row) => within(row).getAllByRole('gridcell')[1]?.textContent);
 
 const expectRows = (symbols: string[]) =>
   vi.waitFor(() => {
@@ -39,7 +39,7 @@ describe('Instruments page: results', () => {
     const tiny = screen.getByRole('row', { name: /NSE:TINYCO/ });
     expect(within(tiny).getByText('SM')).toBeInTheDocument();
     expect(within(tiny).getByText('Tiny Co')).toBeInTheDocument();
-    expect(within(tiny).getAllByRole('gridcell')[4]).toHaveTextContent('—'); // no sector
+    expect(within(tiny).getAllByRole('gridcell')[5]).toHaveTextContent('—'); // no sector
     expect(within(screen.getByRole('row', { name: /NSE:RELIANCE / })).getByText('F&O')).toBeInTheDocument();
     expect(within(screen.getByRole('row', { name: /NSE:YESBANK/ })).getByText('ASM/GSM')).toBeInTheDocument();
   });

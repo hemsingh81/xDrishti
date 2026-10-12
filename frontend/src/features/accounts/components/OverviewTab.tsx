@@ -44,7 +44,7 @@ function facts(account: AccountDetail): Fact[] {
     const p = account.portfolio;
     list.push({
       label: 'Portfolio',
-      value: `default bucket ${p.defaultBucket} · ${p.includeInTotals ? 'included in totals' : 'excluded from totals'}`,
+      value: p.includeInTotals ? 'Included in portfolio totals' : 'Excluded from portfolio totals',
     });
   }
   if (account.data.enabled) {

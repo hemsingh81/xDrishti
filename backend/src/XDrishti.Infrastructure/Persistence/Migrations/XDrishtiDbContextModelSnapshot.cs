@@ -546,6 +546,128 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("owner_accounts", "auth");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Market.Baskets.Basket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
+                    b.Property<string>("Colour")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("colour");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("purpose");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("revision");
+
+                    b.HasKey("Id")
+                        .HasName("pk_baskets");
+
+                    b.ToTable("baskets", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_baskets_colour", "colour ~ '^#[0-9a-f]{6}$'");
+
+                            t.HasCheckConstraint("ck_baskets_position", "position >= 0");
+
+                            t.HasCheckConstraint("ck_baskets_purpose", "purpose IN ('trading', 'long_term', 'watch')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Market.Baskets.BasketMember", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AddedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("added_by");
+
+                    b.Property<Guid>("BasketId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("basket_id");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("RemovedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("removed_by");
+
+                    b.Property<DateTimeOffset>("ValidFrom")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateTimeOffset?>("ValidTo")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valid_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_basket_members");
+
+                    b.HasIndex("InstrumentId")
+                        .HasDatabaseName("ix_basket_members_instrument_id");
+
+                    b.HasIndex("BasketId", "InstrumentId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_basket_members_active")
+                        .HasFilter("valid_to IS NULL");
+
+                    b.ToTable("basket_members", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_basket_members_dates", "valid_to IS NULL OR valid_to >= valid_from");
+
+                            t.HasCheckConstraint("ck_basket_members_position", "position >= 0");
+
+                            t.HasCheckConstraint("ck_basket_members_removed_by", "(valid_to IS NULL) = (removed_by IS NULL)");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Market.RefreshRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -694,6 +816,71 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_master_refreshes_status", "status IN ('running', 'succeeded', 'unchanged', 'failed')");
 
                             t.HasCheckConstraint("ck_master_refreshes_trigger", "trigger IN ('manual', 'daily', 'forced')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Market.TrackedInstrument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<DateTimeOffset>("ActiveSince")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("active_since");
+
+                    b.Property<DateTimeOffset?>("BackfillRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("backfill_requested_at");
+
+                    b.Property<DateOnly?>("DataFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("data_from");
+
+                    b.Property<DateOnly?>("DataTo")
+                        .HasColumnType("date")
+                        .HasColumnName("data_to");
+
+                    b.Property<DateTimeOffset?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deactivated_at");
+
+                    b.Property<DateTimeOffset?>("LastUpdate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_update");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("TrackedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("tracked_by");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tracked_instruments");
+
+                    b.HasIndex("Active")
+                        .HasDatabaseName("ix_tracked_instruments_active");
+
+                    b.ToTable("tracked_instruments", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_tracked_instruments_data_range", "data_from IS NULL OR data_to IS NULL OR data_from <= data_to");
+
+                            t.HasCheckConstraint("ck_tracked_instruments_state", "(active AND deactivated_at IS NULL) OR (NOT active AND deactivated_at IS NOT NULL)");
                         });
                 });
 
@@ -1417,6 +1604,33 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_sessions_owner_accounts_owner_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Market.Baskets.BasketMember", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Market.Baskets.Basket", null)
+                        .WithMany()
+                        .HasForeignKey("BasketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_basket_members_baskets_basket_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithMany()
+                        .HasForeignKey("InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_basket_members_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Market.TrackedInstrument", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Domain.Market.TrackedInstrument", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tracked_instruments_instruments_instrument_id");
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>

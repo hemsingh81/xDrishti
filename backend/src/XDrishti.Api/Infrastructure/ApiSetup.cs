@@ -51,6 +51,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, RiskProfilesEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioBucketsEndpoints>();
         services.AddSingleton<IEndpointModule, InstrumentsEndpoints>();
+        services.AddSingleton<IEndpointModule, BasketsEndpoints>();
         services.AddSingleton<IEndpointModule, HoldingsEndpoints>();
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes, and the daily automatic refresh.
