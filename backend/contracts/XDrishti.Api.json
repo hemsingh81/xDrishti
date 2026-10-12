@@ -3073,6 +3073,297 @@
           }
         }
       }
+    },
+    "/api/data/overview": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The CSV folder (files loaded and pending), the Dhan Data account and whether a fetch can run, the aggregates per timeframe, the stored bars with the last bar (last tick) and how far behind it is, the job in progress and the last job of each phase",
+        "operationId": "GetDataOverview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/instruments": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The tracked instruments and the ones with bars, with first bar, last bar, 1-minute bars, source (csv|dhan|mixed) and status (current|behind|empty): q, status, sort (symbol|name|firstBar|lastBar|bars, '-' for descending), page, pageSize (max 200)",
+        "operationId": "ListDataInstruments",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataInstrumentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/instruments/{id}/bars": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The latest bars of an instrument, newest first: timeframe 1m|5m|10m|15m|30m|1h|1D|1W|1M (default 1D), take 1 to 1000 (default 100)",
+        "operationId": "GetInstrumentBars",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "timeframe",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentBars"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/refresh": {
+      "post": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Start a data update in the background: steps (any of csv, dhan, aggregate; default all, always in that order), forceCsv loads unchanged CSV files again. 202 with the job; 409 data.job_running while one runs, 409 data.master_missing without an instrument list",
+        "operationId": "StartDataRefresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/StartDataJobRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/jobs": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "The most recent data updates, newest first (take 1 to 100, default 20)",
+        "operationId": "ListDataJobs",
+        "parameters": [
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DataJobView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "One data update with the progress and result of each phase",
+        "operationId": "GetDataJob",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataJobView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3352,6 +3643,103 @@
         },
         "description": "What an add did (counts of distinct instruments): `added` became members, `alreadyMembers` were members already, `newlyTracked` of the added\nones were not tracked and are now. `memberCount` = members now."
       },
+      "AggregatePhase": {
+        "required": [
+          "status",
+          "startedAt",
+          "finishedAt",
+          "done",
+          "total",
+          "message",
+          "code",
+          "full",
+          "buckets",
+          "bucketsByTimeframe"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "full": {
+            "type": "boolean"
+          },
+          "buckets": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bucketsByTimeframe": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        },
+        "description": "The aggregate phase of a data job (ADR 0016 §6): `Done` of `Total` are instruments. `Buckets` counts the bars written (new or changed),\nby timeframe; `Full` is true when everything was rebuilt rather than the ranges touched by this job. Part of the API (the job's `aggregate` block)."
+      },
+      "AggregatesOverview": {
+        "required": [
+          "timeframes",
+          "lastBuiltAt",
+          "instrumentsPending"
+        ],
+        "type": "object",
+        "properties": {
+          "timeframes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeframeStat"
+            }
+          },
+          "lastBuiltAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "instrumentsPending": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The derived timeframes: per timeframe, when they were last built and how many instruments have changes that are not aggregated yet."
+      },
       "ApplicationStatus": {
         "required": [
           "name",
@@ -3445,6 +3833,121 @@
           }
         },
         "description": "The daily automatic refresh: whether it is on, at what India time, and when it runs next."
+      },
+      "BarRow": {
+        "required": [
+          "ts",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "bars",
+          "complete",
+          "source"
+        ],
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "open": {
+            "type": "number",
+            "format": "double"
+          },
+          "high": {
+            "type": "number",
+            "format": "double"
+          },
+          "low": {
+            "type": "number",
+            "format": "double"
+          },
+          "close": {
+            "type": "number",
+            "format": "double"
+          },
+          "volume": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One bar. Times of the day timeframes (`1D 1W 1M`) are India midnight of the first day of the bucket. `bars` counts the 1-minute bars in it; `complete` says none was missing. `source` (1m only): csv · dhan."
+      },
+      "BarsOverview": {
+        "required": [
+          "instruments",
+          "instrumentsBehind",
+          "instrumentsEmpty",
+          "totalBars",
+          "firstBar",
+          "lastBar",
+          "expectedSession",
+          "daysBehind",
+          "stale"
+        ],
+        "type": "object",
+        "properties": {
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instrumentsBehind": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instrumentsEmpty": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalBars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "firstBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "expectedSession": {
+            "type": "string",
+            "format": "date"
+          },
+          "daysBehind": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "stale": {
+            "type": "boolean"
+          }
+        },
+        "description": "The stored 1-minute bars: instruments with bars, the first bar and the last bar (the \"last tick\"), how many weekday sessions the last bar is behind the last\nclosed session (`expectedSession`), `stale` (behind) and how many instruments are behind or still empty (tracked without bars)."
       },
       "BasketHistory": {
         "required": [
@@ -4034,6 +4537,219 @@
         },
         "description": "A new Dhan account. ClientId and Secrets (API key and secret) are required. ApiKeyIssuedOn is the day the API key was generated\n(default today, India time)."
       },
+      "CsvOverview": {
+        "required": [
+          "folder",
+          "folderExists",
+          "filesTotal",
+          "filesLoaded",
+          "filesPending",
+          "rows",
+          "lastLoadAt"
+        ],
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "string"
+          },
+          "folderExists": {
+            "type": "boolean"
+          },
+          "filesTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesLoaded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "filesPending": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastLoadAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "The CSV folder: the files that match `&lt;SYMBOL&gt;_1m.csv[.gz]`, how many are loaded (unchanged since they were loaded) or pending, the rows loaded so far and when the last file was loaded."
+      },
+      "CsvPhase": {
+        "required": [
+          "status",
+          "startedAt",
+          "finishedAt",
+          "done",
+          "total",
+          "message",
+          "code",
+          "filesLoaded",
+          "filesUnchanged",
+          "filesSkipped",
+          "filesFailed",
+          "rows",
+          "inserted",
+          "updated",
+          "unchanged",
+          "keptDhan",
+          "repaired",
+          "rejected",
+          "rejections",
+          "rejectionExamples",
+          "unknownSymbols",
+          "ambiguousSymbols",
+          "failedFiles",
+          "instrumentsTracked"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "filesLoaded": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "filesUnchanged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "filesSkipped": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "filesFailed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inserted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "keptDhan": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repaired": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "rejectionExamples": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unknownSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ambiguousSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failedFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "instrumentsTracked": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The CSV phase of a data job (ADR 0016 §4): `Done` of `Total` are files. Rows are counted over all files read in this job. Part of the API\n(the job's `csv` block) and stored with the job."
+      },
+      "DataAccountView": {
+        "required": [
+          "id",
+          "name",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "description": "The primary Data account. `status`: connected · expired · notConnected."
+      },
       "DataInput": {
         "required": [
           "liveFeedBudget"
@@ -4048,6 +4764,225 @@
             "format": "int32"
           }
         }
+      },
+      "DataInstrumentPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataInstrumentRow"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "DataInstrumentRow": {
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "type",
+          "tracked",
+          "firstBar",
+          "lastBar",
+          "bars",
+          "source",
+          "status",
+          "daysBehind"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "firstBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastBar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "daysBehind": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "An instrument's coverage. `source`: csv · dhan · mixed (null without bars). `status`: current · behind · empty (tracked, no bars).\n`daysBehind` counts weekday sessions (null without bars)."
+      },
+      "DataJobView": {
+        "required": [
+          "id",
+          "status",
+          "requestedBy",
+          "startedAt",
+          "finishedAt",
+          "steps",
+          "forceCsv",
+          "rebuildAll",
+          "currentPhase",
+          "csv",
+          "dhan",
+          "aggregate",
+          "warnings",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          },
+          "requestedBy": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "forceCsv": {
+            "type": "boolean"
+          },
+          "rebuildAll": {
+            "type": "boolean"
+          },
+          "currentPhase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "csv": {
+            "$ref": "#/components/schemas/CsvPhase"
+          },
+          "dhan": {
+            "$ref": "#/components/schemas/DhanPhase"
+          },
+          "aggregate": {
+            "$ref": "#/components/schemas/AggregatePhase"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One data job (a run of the pipeline, ADR 0016). `status`: running · succeeded · failed. `currentPhase` (while running): csv · dhan · aggregate.\nEach phase block has `status` (notRequested · pending · running · succeeded · skipped · failed), `done` of `total` (files, instruments,\ninstruments), `message` and `code` (why it was skipped or failed) and its counts."
+      },
+      "DataOverview": {
+        "required": [
+          "csv",
+          "dhan",
+          "aggregates",
+          "bars",
+          "runningJob",
+          "lastJobs"
+        ],
+        "type": "object",
+        "properties": {
+          "csv": {
+            "$ref": "#/components/schemas/CsvOverview"
+          },
+          "dhan": {
+            "$ref": "#/components/schemas/DhanOverview"
+          },
+          "aggregates": {
+            "$ref": "#/components/schemas/AggregatesOverview"
+          },
+          "bars": {
+            "$ref": "#/components/schemas/BarsOverview"
+          },
+          "runningJob": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          },
+          "lastJobs": {
+            "$ref": "#/components/schemas/LastDataJobs"
+          }
+        },
+        "description": "Everything the Data &amp; import screen shows above the table: the three phases, the stored bars and the job in progress."
       },
       "DataRoleInput": {
         "required": [
@@ -4160,6 +5095,190 @@
             ]
           }
         }
+      },
+      "DhanOverview": {
+        "required": [
+          "account",
+          "canFetch",
+          "reason",
+          "reasonCode",
+          "initialDays",
+          "requestsPerSecond",
+          "lastFetchAt",
+          "lastFetchBars"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataAccountView"
+              }
+            ]
+          },
+          "canFetch": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reasonCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "initialDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requestsPerSecond": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lastFetchAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastFetchBars": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "The Dhan Data API phase: the primary Data account (null when there is none), whether a fetch can run now (`canFetch`) and, when not, why\n(`reason` in words, `reasonCode` data.dhan_not_available · data.dhan_not_connected), the settings, and the last successful fetch (time and bars added)."
+      },
+      "DhanPhase": {
+        "required": [
+          "status",
+          "startedAt",
+          "finishedAt",
+          "done",
+          "total",
+          "message",
+          "code",
+          "accountName",
+          "instrumentsFetched",
+          "instrumentsFailed",
+          "requests",
+          "bars",
+          "inserted",
+          "updated",
+          "unchanged",
+          "repaired",
+          "rejected",
+          "overlapCompared",
+          "overlapMismatched",
+          "errors"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instrumentsFetched": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "instrumentsFailed": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "inserted": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "repaired": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "overlapCompared": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "overlapMismatched": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The Dhan phase of a data job (ADR 0016 §2, §7): `Done` of `Total` are instruments. `Bars` are the 1-minute bars Dhan returned;\n`Rejected` are bars that did not lie on an IST minute inside a session or broke the row rules; `OverlapCompared` and\n`OverlapMismatched` compare the overlap with the bars already stored (tolerance 0.05 %). Part of the API (the job's `dhan` block)."
       },
       "DhanRedirectView": {
         "required": [
@@ -4643,6 +5762,38 @@
         },
         "description": "One holding to import (a key from the preview). AcquiredOn left out means \"use the first import date\" (the lot is then flagged)."
       },
+      "InstrumentBars": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "timeframe",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timeframe": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BarRow"
+            }
+          }
+        },
+        "description": "The latest bars of an instrument and timeframe, newest first."
+      },
       "InstrumentBasketView": {
         "required": [
           "basketId",
@@ -5075,6 +6226,47 @@
             }
           }
         }
+      },
+      "LastDataJobs": {
+        "required": [
+          "csv",
+          "dhan",
+          "aggregate"
+        ],
+        "type": "object",
+        "properties": {
+          "csv": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          },
+          "dhan": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          },
+          "aggregate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DataJobView"
+              }
+            ]
+          }
+        },
+        "description": "The latest job in which each phase ran to an end (null when none did yet)."
       },
       "LoginRequest": {
         "required": [
@@ -6211,6 +7403,27 @@
         },
         "description": "What the client needs to know about its session."
       },
+      "StartDataJobRequest": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "forceCsv": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        },
+        "description": "Starts a data job. `steps`: any of csv · dhan · aggregate (default all three, always run in that order); `forceCsv` loads CSV files again that were loaded already and have not changed."
+      },
       "StartRefreshRequest": {
         "type": "object",
         "properties": {
@@ -6424,6 +7637,31 @@
             "format": "date-time"
           }
         }
+      },
+      "TimeframeStat": {
+        "required": [
+          "timeframe",
+          "bars",
+          "lastBucket"
+        ],
+        "type": "object",
+        "properties": {
+          "timeframe": {
+            "type": "string"
+          },
+          "bars": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "lastBucket": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "A derived timeframe (`5m 10m 15m 30m 1h 1D 1W 1M`): the bars stored and the start of the newest one."
       },
       "TrackResult": {
         "required": [
@@ -6898,6 +8136,9 @@
     },
     {
       "name": "Holdings"
+    },
+    {
+      "name": "Data"
     }
   ]
 }

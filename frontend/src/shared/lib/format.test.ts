@@ -5,8 +5,12 @@ import {
   formatHoursMinutes,
   formatInr,
   formatInrPrecise,
+  formatCompact,
+  formatIstDate,
+  formatIstDateTime,
   formatIstTimeAndDay,
   formatPercent,
+  formatPrice,
 } from './format';
 
 describe('formatDuration', () => {
@@ -64,6 +68,32 @@ describe('formatIstTimeAndDay', () => {
   it("shows the time and day in India time, whatever the viewer's zone", () => {
     expect(formatIstTimeAndDay('2026-10-10T22:00:00Z')).toBe('03:30, 11 Oct');
     expect(formatIstTimeAndDay('2026-10-11T06:30:00Z')).toBe('12:00, 11 Oct');
+  });
+});
+
+describe('formatIstDateTime and formatIstDate', () => {
+  it("show a moment in India time with the zone named, whatever the viewer's zone", () => {
+    expect(formatIstDateTime('2026-10-12T09:59:00Z')).toBe('12 Oct 2026, 15:29 IST');
+    expect(formatIstDateTime('2026-10-12T15:29:00+05:30')).toBe('12 Oct 2026, 15:29 IST');
+    expect(formatIstDate('2026-10-11T19:00:00Z')).toBe('12 Oct 2026');
+  });
+});
+
+describe('formatPrice', () => {
+  it('always shows two decimals with Indian grouping and no currency sign', () => {
+    expect(formatPrice(2456.3)).toBe('2,456.30');
+    expect(formatPrice(123456)).toBe('1,23,456.00');
+  });
+});
+
+describe('formatCompact', () => {
+  it.each([
+    [999, '999'],
+    [8_234, '8.2K'],
+    [123_456, '1.2L'],
+    [41_234_567, '4.1Cr'],
+  ])('shortens %d to %s', (value, expected) => {
+    expect(formatCompact(value)).toBe(expected);
   });
 });
 

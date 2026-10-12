@@ -39,6 +39,26 @@ flowchart TB
 
 ## 3. CSV import (1-minute data)
 
+> **Built so far (P1-17a, [ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)):** one fixed profile instead of the configurable ones below —
+> the folder `Data:CsvFolder` (mounted read-only at `/data/csv`) with files `<SYMBOL>_1m.csv[.gz]` whose header columns `time` (epoch seconds, UTC, bar start), `open`, `high`,
+> `low`, `close`, `volume` are found by name (others ignored). Each file is streamed (never held in memory) through the row rules, written with binary `COPY` into a staging table and merged in
+> one transaction; a file already loaded and unchanged (name, size, modified time in `market.csv_files`) is skipped unless forced. Rules: an inconsistent high/low (the opening bar when the open
+> is the pre-open price) is **repaired** (high = max, low = min of open/high/low/close) and counted; unparseable rows, prices not above zero, negative volume, a minute twice (the first is
+> kept) and a time that is not a whole minute are **rejected** and counted with the first ten reasons; zero volume and special sessions (Muhurat) are kept. `CSV never overwrites Dhan`;
+> Dhan overwrites CSV. `<SYMBOL>` ↦ `NSE:<SYMBOL>` (shares and ETFs that are not retired); unknown or ambiguous symbols are listed and skipped. Preview, undo, profiles and the watched
+> folder stay with P1-07/P1-08.
+>
+> **A file is refused as a whole, before anything of it is merged** (nothing stored, the file is not recorded as loaded, the reason is in the job's `failedFiles`) when
+> - its **clock is wrong**: most bars lie outside the regular session (India time) but nearly all (≥ 99 %) fit a session after adding or subtracting 5 h 30 min (the message names the shift), or most lie outside
+>   every session, or the bars are stamped with the *end* of each minute (15:30 present, 09:15 absent) — the streaming counterpart of the window check of the Dhan fetch (§6); a few stray bars, the 60-bar
+>   Muhurat evening session and Saturday special sessions are legitimate and never trigger it (verified on the 214 real files: 41 M rows, none refused);
+> - most of its **times are not epoch seconds** between 2000 and 2100 (milliseconds are named as such) or are **later than one day from now**; a few such rows are only rejected and counted (`timeOutOfRange`, `timeInFuture`);
+> - it exceeds the **limits that bound the work per file**: `Data:Csv:MaxRowsPerFile` (default 5 000 000 rows; the real files have ≈ 200 000), `Data:Csv:MaxBytesPerFile` (default 1 GiB read *after* decompression, so a
+>   gzip bomb stops), `Data:Csv:MaxSpanDays` (default 3 700 days ≈ 120 monthly chunks of the hypertable).
+>
+> **Tracking after a load.** After the files, the instruments that have bars from CSV files — loaded in this run *or in an earlier one*, so a tracking that failed is tried again by the next run even for unchanged
+> files — are tracked, **but only those that have never had a tracking row** (active or not). An instrument the owner untracked is never tracked again behind their back, by a changed file or a forced load.
+
 ### 3.1 How files arrive
 - **Upload** in the Data → Import screen (multiple files / zip), or **drop** into the watched folder
   `data/inbox/` (mounted into `xd-worker`), or CLI `xd data import <path> --profile <name>`.
@@ -91,9 +111,30 @@ All timeframes are built from 1-minute bars — identical logic for CSV and Dhan
 | Alignment | Intraday buckets anchored to the **09:15** session open: 15m = 09:15, 09:30…; 1h = 09:15–10:15 … 14:15–15:15, then 15:15–15:30 (partial, flagged) |
 | Timeframes | 5m, 10m, 15m, 30m, 1h (and any custom minute size) · 1D · 1W · 1M |
 | Daily bar | `daily_source: official` (Dhan daily candles, default when available) or `derived` (from 1-minute) — official open uses the pre-open auction price, so the two can differ slightly |
-| Missing minutes | Bucket built from available minutes; completeness % stored; buckets below threshold flagged |
-| Special sessions | Holidays skipped; special sessions (e.g. Muhurat) from the calendar |
-| Implementation | TimescaleDB **continuous aggregates** (`time_bucket` with 09:15 origin) for intraday; 1D/1W/1M from daily table; refreshed after imports and after the EOD fetch; real-time aggregation combines materialised + newest rows |
+| Missing minutes | Bucket built from available minutes; `bars` (the number of 1-minute bars in it) and a `complete` flag are stored (what complete means: see below) |
+| Special sessions | Holidays skipped; special sessions (e.g. Muhurat) are kept as they come; the calendar (P1-11) will name them |
+| Implementation | **In the application, not continuous aggregates** (ADR 0016): set-based SQL upserts (`date_bin` with the 09:15 origin) run by the aggregate phase of the data job, for the ranges whose 1-minute bars changed since the last build (or everything on request); real-time aggregation combines materialised + newest rows (P2) |
+
+**Why not continuous aggregates.** The runtime role `xd_app` has plain DML only and may not refresh or own a continuous aggregate; a refresh policy would need a second privileged path, and a
+continuous aggregate cannot express the rules above (09:15 anchoring with a partial 15:15 hour, Monday weeks, a completeness flag, a day that is the *India* date, a special evening session) as plainly
+as a query we can test. So the application builds `market.bars_agg` itself with idempotent upserts (a bucket that comes out the same is not written), per instrument and changed range, as `xd_app`,
+and a test recomputes every bucket with an independent implementation over fixtures (a Muhurat evening, month and week boundaries, gaps) and compares them exactly.
+
+**Bucket rules as built** (all from the stored 1-minute bars; times are India time, UTC+05:30, no daylight saving):
+
+| Timeframe | Bucket start (`ts`) | `bars` | `complete` |
+|-----------|---------------------|--------|------------|
+| 5m, 10m, 15m, 30m | 09:15 + k × N minutes of the same India date (09:15, 09:30 … for 15m) | 1-minute bars in the bucket | exactly the minutes of the bucket's window, clipped at the 15:30 close for buckets that start before it (the 10m bucket at 15:25 and the 30m bucket at 15:15 hold 5 and 15) |
+| 1h | 09:15, 10:15 … 14:15, then 15:15 (the partial 15:15–15:30 hour holds 15 bars) | as above | as above |
+| 1D | India midnight of the India date (a Muhurat evening belongs to its own date) | 1-minute bars of the date | all 375 minutes of 09:15–15:29 are there; for a date without a single regular-session minute (an evening session) every minute between its first and last bar is |
+| 1W | India midnight of the **Monday** of the week | sum of its days | every day with bars is complete |
+| 1M | India midnight of the first of the month | sum of its days | every day with bars is complete |
+
+`complete` for 1W and 1M means that every *day that has bars* is complete — not that the week or month is over: the running week or month is `complete` as long as the days so far are; use the last bucket's
+date, not the flag, to tell an unfinished period.
+
+`ts` of every bar is a UTC instant; the API shows it with the India offset (`+05:30`). The days, weeks and months are built from the day bars, the day bars and the intraday bars from the 1-minute bars.
+Prices are raw (adjustments come with P1-10).
 
 ## 5. Real-time data — the active set only
 
@@ -126,11 +167,25 @@ Scheduled after close (default 15:50 IST) before the nightly pipeline:
 
 Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for gaps).
 
+> **Built so far (P1-17a, [ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md) §7):** the manual **Dhan phase** of the Update data button, without the schedule,
+> gap detection or the daily candle. For every tracked, not retired share, ETF or index with a Dhan id (`instrument_broker_ids`) it calls Dhan's Data API once per window of at most 90 days, from
+> two days before the instrument's last stored bar (the overlap proves the timestamp alignment: price differences beyond 0.05 % are counted as warnings) or `Data:Dhan:InitialDays` (365) back, up to now:
+>
+> | | |
+> |---|---|
+> | Request | `POST https://api.dhan.co/v2/charts/intraday`, headers `access-token` (the primary Data account's token from the vault) and `Content-Type: application/json` (no `client-id`: not documented for this endpoint, and the holdings read works without it) |
+> | Body | `{"securityId":"<SECURITY_ID, text>","exchangeSegment":"NSE_EQ"\|"IDX_I","instrument":"EQUITY"\|"INDEX","interval":1,"oi":false,"fromDate":"yyyy-MM-dd HH:mm:ss","toDate":"yyyy-MM-dd HH:mm:ss"}` — dates in **India time**, `toDate` = now; shares/ETFs are `NSE_EQ`/`EQUITY`, indices `IDX_I`/`INDEX` (a type and segment that do not belong together are not sent) |
+> | Answer | parallel arrays `open, high, low, close` (float), `volume`, `timestamp` (and `open_interest`, ignored). The documentation does not state the time base: `timestamp` is read as **Unix seconds**, or milliseconds when it has 13 digits. Empty arrays are "no bars", arrays of different lengths are a failure |
+> | Proof | the bars of a window must lie within a day of the period asked for, and not be 5 h 30 min off: when most bars lie outside the regular session but all fit a session after adding or subtracting 5 h 30 min, or the bars include one stamped 15:30 and none 09:15 (stamped with the minute's end), that instrument **fails** with a message naming the suspicion — nothing is shifted or guessed. Bars outside sessions are rejected and counted by the pipeline; the minute still running is left for the next fetch |
+> | Limits | 15 s per request, answers up to 16 MB, no redirects, one request at a time through a shared throttle (`Data:Dhan:RequestsPerSecond`, default 4); the documentation states no rate limit |
+> | Errors | 401/403, or DH-901/DH-902 on a 4xx → the token or Data API subscription is refused: the phase ends (`data.dhan_not_connected`, reconnect under Accounts); **429, 5xx or DH-904 → one retry after 2 s**, then the instrument fails; every other 4xx is never retried and fails only that instrument (the run goes on). `DH-907` is *not* read as "no data" here (it also means wrong parameters): it is a visible failure of that instrument |
+> | Leaks | only the HTTP status and a well-formed Dhan error code (`DH-905`) are logged or shown; never the token, the URL, the request body or the text of Dhan's answer |
+
 ## 7. Broker abstraction
 
 | Interface | Methods | v1 adapter |
 |-----------|---------|-----------|
-| `IMarketDataProvider` | instruments, intraday/daily history, quotes | Dhan |
+| `IMarketDataProvider` | instruments, intraday/daily history, quotes | Dhan (built so far: the 1-minute history behind `IIntradayBarSource`, §6) |
 | `ILiveFeed` | subscribe/unsubscribe, tick stream | Dhan WebSocket |
 | `IAccountReader` | funds, positions, holdings, trades (history), ledger | Dhan |
 | `IBrokerConnector` (P1-16c) | start/complete the browser consent login | Dhan (API key & secret consent flow) — §8.1 |
@@ -201,16 +256,24 @@ raw answer is logged or returned.
 | `market.instruments` | Table (P1-03) | The master list: canonical symbol (unique), type, name, ISIN, series, lot/tick size, expiry, sector, flags, first/last seen, `retired_at`; trigram indexes for search |
 | `market.instrument_broker_ids` | Table (P1-03) | Dhan `SECURITY_ID` + exchange segment per instrument |
 | `market.master_refreshes` | Table (P1-03) | One row per refresh run: trigger, status, phase, counts, validators, warnings, error |
-| `market.bars_1m` | Hypertable, compressed after 7 days | (instrument_id, ts), source = csv / dhan_eod |
+| `market.bars_1m` | Hypertable (P1-17a), 1-month chunks, compressed after 7 days (segmented by instrument, ordered by time) | PK (instrument_id, ts) with ts = bar start (UTC); raw o/h/l/c (double), volume, `source` = `csv` / `dhan`. `xd_app`: no DELETE. The one index is the primary key |
+| `market.bars_agg` | Table (P1-17a), not a hypertable | One row per (instrument_id, timeframe, ts) for 5m, 10m, 15m, 30m, 1h, 1D, 1W, 1M: o/h/l/c, volume, `bars`, `complete`; 09:15-anchored (§4). Built by the application. `xd_app`: no DELETE |
+| `market.bar_coverage` | Table (P1-17a) | Per instrument: first/last bar, 1-minute bars (all, csv, dhan), the changed range not aggregated yet (`dirty_from`/`dirty_to`), when and what the aggregates hold (`aggregates` JSON). Kept up to date by every write of bars |
+| `market.csv_files` | Table (P1-17a) | The CSV files loaded: name, size, modified time, instrument, rows / inserted / updated / repaired / rejected, loaded at (written in the transaction of the file's bars) |
+| `market.data_jobs` | Table (P1-17a) | One row per run of the data pipeline (CSV → Dhan → aggregates): steps, status, and per phase its progress and counts (JSON); at most one row `running` (unique partial index + advisory lock); history is kept |
 | `market.bars_1m_live` | Hypertable, short retention | Live bars for the active set |
-| `market.bars_5m … bars_1h` | Continuous aggregates | 09:15-anchored |
-| `market.bars_1d` | Table | Official or derived (flagged) |
-| `market.bars_1w`, `bars_1m_month` | Views/aggregates | From daily |
+| `market.bars_1d` | Table | Official (Dhan daily candles) or derived (flagged) — the derived day bar is `bars_agg` `1D` until the official one exists |
 | `market.context_daily` | Table | Indices, VIX, breadth, regime |
 | `data.import_profiles`, `data.import_jobs`, `data.import_issues` | Tables | CSV import config, history, rejected rows |
 | Adjustment factors | Table | Research reads adjusted views; plans use raw prices |
 
 Size: ~200 instruments × 8 years of 1-minute data ≈ 150 M rows → ~5–10 GB compressed.
+
+**The chunks of `bars_1m` are protected too.** A hypertable's chunks are tables of their own (`_timescaledb_internal._hyper_*_chunk`, and for compressed ones `_hyper_*_chunk_compressed`), reachable by name,
+so the missing DELETE on `market.bars_1m` would mean little if `xd_app` could delete from them. It cannot: TimescaleDB gives every new chunk — ordinary and compressed, whenever created — the privileges of the
+hypertable (`xd_app` has `SELECT, INSERT, UPDATE` on them, no DELETE, TRUNCATE, REFERENCES or TRIGGER), and the default privileges that grant DELETE on new tables do not override that. This is verified by
+`DataTableGrantsTests` against the real extension as the real role (privilege check and an attempted `DELETE`/`TRUNCATE` on a chunk created after the migrations and on a compressed chunk), so no extra migration
+or event trigger is needed; a TimescaleDB upgrade that changed it fails that test.
 
 ## 10. Data quality
 

@@ -104,6 +104,14 @@ services:
       # Holdings (ADR 0012): whether the API looks once a minute at the accounts whose own automatic refresh (Off / Every N minutes / Daily, set in the app,
       # off by default) is due; false disables every schedule. "Sync now" always works.
       Portfolio__AutoRefresh__Enabled: ${XD_PORTFOLIO_AUTO_REFRESH:-true}
+      # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
+      # back, at most this many requests per second.
+      Data__CsvFolder: /data/csv
+      Data__Dhan__InitialDays: ${XD_DATA_DHAN_INITIAL_DAYS:-365}
+      Data__Dhan__RequestsPerSecond: ${XD_DATA_DHAN_REQUESTS_PER_SECOND:-4}
+    # The 1-minute CSV files (ADR 0016): read-only, the API never writes there. deploy/xd-up.sh creates the folder when it is missing.
+    volumes:
+      - ${XD_CSV_DIR:-../data/Stocks_CSV}:/data/csv:ro
     secrets:
       - source: db_app_password
         target: Database__Password

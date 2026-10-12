@@ -45,4 +45,21 @@ writes it as the secret file `broker_vault_key`, mounted **into `xd-api` only** 
 - The credential references of ADR 0007 (`scripts/broker-secrets.sh`, `secrets/brokers/`, `brokers.index`) are gone; `xd-up.sh` deletes leftover files.
   Old Keychain items `xdrishti/broker/<ref>/…` are no longer read and can be removed in Keychain Access.
 
+## Market data (CSV folder and Dhan Data API)
+
+The **Data & import** screen loads the 1-minute files of one folder, fetches what is missing from Dhan's Data API and aggregates every timeframe
+([ADR 0016](../docs/adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)).
+
+- The folder is `data/Stocks_CSV` (git-ignored; override with `XD_CSV_DIR`, a path relative to `deploy/` or absolute). `xd-up.sh` creates it when it is
+  missing (world-readable, because the container user is not you) and `compose.yaml` mounts it **read-only** at `/data/csv` in `xd-api` (`Data__CsvFolder`).
+  Files are named `<SYMBOL>_1m.csv` or `<SYMBOL>_1m.csv.gz` (columns `time` in epoch seconds, `open`, `high`, `low`, `close`, `volume`, found by name).
+  The instrument list must be loaded first (Instruments → Refresh list): a symbol is matched to `NSE:<SYMBOL>` in it. Nothing is written to the folder.
+  A file with a wrong clock (off by 5 h 30 min, milliseconds, dates in the future) or over the limits (`Data__Csv__MaxRowsPerFile` 5 000 000, `Data__Csv__MaxBytesPerFile` 1 GiB after
+  decompression, `Data__Csv__MaxSpanDays` 3 700) is refused as a whole with the reason in the job; the defaults suit files of about 200 000 rows.
+- Dhan Data API: the fetch uses the access token of the **primary Data account** (Accounts), reconnected daily like any Dhan token. `XD_DATA_DHAN_INITIAL_DAYS`
+  (default `365`) is how far back the first fetch of an instrument goes, `XD_DATA_DHAN_REQUESTS_PER_SECOND` (default `4`) the request rate. Without a
+  connected Data account the phase is skipped and the screen says so.
+- The first load of about 40 million rows runs in the background (minutes) and can be repeated safely: files already loaded and unchanged are skipped.
+  Bars are stored in a TimescaleDB hypertable and compressed after 7 days; the database volume grows accordingly (see doc 05 §9).
+
 Files: `compose.yaml`, `compose.dev.yaml`, `caddy/Caddyfile`, `db/init/` (roles, runs on first start), `xd-up.sh`, `xd-down.sh`.

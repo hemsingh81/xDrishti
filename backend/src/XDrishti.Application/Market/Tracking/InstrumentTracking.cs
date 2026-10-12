@@ -78,6 +78,21 @@ internal sealed class InstrumentTracking(ITrackedInstrumentStore store, IAccount
     }
 
     /// <summary>
+    /// Tracks only the instruments that have never had a tracking row (active or not): an instrument the owner untracked is left alone, so a feature that tracks on
+    /// the owner's behalf (the CSV load) never undoes an untrack. Otherwise as <see cref="TrackAsync"/>; the outcome counts the instruments left alone as already
+    /// tracked.
+    /// </summary>
+    public async ValueTask<Result<TrackingOutcome>> TrackNeverTrackedAsync(
+        IReadOnlyCollection<Guid> instrumentIds, string actor, DateTimeOffset now, string? via, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrumentIds);
+        var ids = instrumentIds.Distinct().ToArray();
+        var withRow = (await store.FindAsync(ids, cancellationToken)).Select(t => t.Id).ToHashSet();
+        var fresh = ids.Where(id => !withRow.Contains(id)).ToArray();
+        return fresh.Length == 0 ? Result.Success(new TrackingOutcome(ids.Length, 0, 0, ids.Length)) : await TrackAsync(fresh, actor, now, via, cancellationToken);
+    }
+
+    /// <summary>
     /// Untracks the instruments, idempotently: tracked ones become inactive (history kept), the others are left alone. All or nothing: an unknown id
     /// fails with <c>instruments.invalid</c>. An audit event with the counts is collected only when something changed.
     /// </summary>

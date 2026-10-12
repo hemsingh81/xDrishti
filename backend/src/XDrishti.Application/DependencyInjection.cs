@@ -5,6 +5,8 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Bars;
+using XDrishti.Application.Market.Bars.Pipeline;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
@@ -109,6 +111,25 @@ public static class DependencyInjection
 
         // The daily schedule is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<DailyRefreshRunner>();
+
+        services.AddMarketData();
+    }
+
+    /// <summary>Market data (ADR 0016): the pipeline (CSV files, Dhan fetch, aggregates), its job records and the reads of the Data &amp; import screen.</summary>
+    private static void AddMarketData(this IServiceCollection services)
+    {
+        services.AddScoped<CsvPhaseRunner>();
+        services.AddScoped<DhanPhaseRunner>();
+        services.AddScoped<AggregatePhaseRunner>();
+
+        services.AddScoped<ICommandHandler<StartDataJobCommand, DataJobView>, StartDataJobHandler>();
+        services.AddScoped<ICommandHandler<ExecuteDataJobCommand>, ExecuteDataJobHandler>();
+        services.AddScoped<ICommandHandler<RecoverInterruptedDataJobsCommand>, RecoverInterruptedDataJobsHandler>();
+        services.AddScoped<IQueryHandler<GetDataOverviewQuery, DataOverview>, GetDataOverviewHandler>();
+        services.AddScoped<IQueryHandler<ListDataInstrumentsQuery, Result<DataInstrumentPage>>, ListDataInstrumentsHandler>();
+        services.AddScoped<IQueryHandler<GetInstrumentBarsQuery, Result<InstrumentBars>>, GetInstrumentBarsHandler>();
+        services.AddScoped<IQueryHandler<ListDataJobsQuery, IReadOnlyList<DataJobView>>, ListDataJobsHandler>();
+        services.AddScoped<IQueryHandler<GetDataJobQuery, Result<DataJobView>>, GetDataJobHandler>();
     }
 
     private static void AddPortfolio(this IServiceCollection services)

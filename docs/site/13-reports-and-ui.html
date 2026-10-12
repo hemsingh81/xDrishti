@@ -136,8 +136,8 @@
 </tr>
 <tr>
 <td><strong>Data &amp; Import</strong></td>
-<td>CSV upload/preview/commit/undo, import profiles, coverage per timeframe, EOD fetch runs, quality issues</td>
-<td>Dropzone, preview grid, coverage heatmap</td>
+<td><strong>Built in P1-17a (manual load, <a href="../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.html">ADR 0016</a>):</strong> one <strong>Update data</strong> split button (menu: <em>Load CSV files only</em>, <em>Fetch from Dhan only</em>, <em>Rebuild aggregates only</em>, <em>Re-import all CSV files</em>; <code>aria-disabled</code> with a spinner while a job runs); a <strong>freshness strip</strong> with the <strong>Last tick</strong> (newest stored 1-minute bar in IST with &quot;N days ago&quot;; the card says &quot;Up to date&quot; with a check icon or &quot;Behind by N trading days&quot; with a warning icon, never colour alone), instruments with data, total 1-minute bars (compact), covered period and the Data account with a <strong>Reconnect</strong> link when the Dhan step cannot run; a <strong>pipeline card</strong> with the three steps <em>CSV files</em> (n of N loaded, rows, pending, folder-missing hint, &quot;39 repaired, 0 rejected&quot;, unknown symbols in a collapsible), <em>Dhan Data API</em> (last fetch, bars added, skipped reason) and <em>Aggregates</em> (bars per timeframe, last built), each with its last run time and, while a job runs, a progress bar with done/total and the phase message (the overview is polled every 2 s only while a job runs, also one found running on load; a toast tells how it ended); a <strong>coverage table</strong> (shared Grid: symbol, name, first bar, last bar highlighted when behind, 1m bars, source chip, status chip <em>Current</em> / <em>Behind N d</em> / <em>Empty</em>; search, status filter, sortable headers, paging; columns hidden on narrow screens; state in the URL) whose rows open a <strong>drawer</strong> with a timeframe select (1m … 1M) and the latest bars (OHLCV, bars built from, complete/partial); <strong>Recent runs</strong> (start time IST, steps, result, counts, a failed run&#39;s message). Upload, preview/undo, import profiles, folder watch, scheduled EOD runs and quality issues follow in P1-07/08/12/14</td>
+<td>Freshness strip, pipeline card, paged coverage table, bars drawer</td>
 </tr>
 <tr>
 <td><strong>Accounts</strong></td>
@@ -794,7 +794,7 @@ nightly; responses are chart-ready series.</li>
     <a class="prev" href="12-portfolio-monitoring.html"><small>← Previous  [</small>12 · Portfolio monitoring</a>
     <a class="next" href="14-ai-assistant.html"><small>Next  ] →</small>14 · AI assistant</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-12 07:06</footer>
+  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-12 11:15</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-screens" class="d2">1. Screens</a>
 <a href="#1b-clickable-prototype" class="d2">1b. Clickable prototype</a>

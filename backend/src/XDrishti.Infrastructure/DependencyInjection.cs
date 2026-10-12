@@ -7,12 +7,15 @@ using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Market;
+using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
@@ -81,6 +84,7 @@ public static class DependencyInjection
         services.AddScoped<IPendingConnectStore, PendingConnectStore>();
         services.AddDhanConnector();
         services.AddInstrumentMaster(configuration);
+        services.AddMarketData(configuration);
         services.AddPortfolio(configuration);
 
         services.AddHealthChecks()
@@ -109,6 +113,12 @@ public static class DependencyInjection
             .AddHttpMessageHandler<BrokerEndpointGuard>()
             .RemoveAllLoggers();
         services.AddScoped<IBrokerHoldings, DhanHoldingsClient>();
+
+        // The 1-minute chart data of the Data API (ADR 0016 §7): 15-second timeout, answers up to 16 MB; the guard allows only POST /v2/charts/intraday.
+        services.AddHttpClient(BrokerHttpClientNames.DhanChart, BrokerHttp.ConfigureChart)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
     }
 
     /// <summary>The holdings module (ADR 0012): lots and returns inputs, sync records, the unit of work and the automatic refresh setting.</summary>
@@ -158,6 +168,33 @@ public static class DependencyInjection
             .AddHttpMessageHandler<MasterDataEndpointGuard>()
             .RemoveAllLoggers();
         services.AddScoped<IInstrumentSource, HttpInstrumentSource>();
+    }
+
+    /// <summary>
+    /// The market data pipeline (ADR 0016): the stored bars and aggregates, the data job records and queue, the CSV folder and the settings of the Dhan fetch.
+    /// Dhan's bars come from <see cref="DhanIntradayBarSource"/> (one request at a time, shared throttle of <c>Data:Dhan:RequestsPerSecond</c>) behind <see cref="IIntradayBarSource"/>.
+    /// </summary>
+    private static void AddMarketData(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<DataOptions>()
+            .Bind(configuration.GetSection(DataOptions.SectionName))
+            .ValidateDataAnnotations()
+            .Validate(DataOptions.IsValid, DataOptions.InvalidMessage)
+            .ValidateOnStart();
+        services.AddSingleton<IDataSettings, DataSettings>();
+        services.AddSingleton<ICsvFolder, CsvFolder>();
+        services.AddSingleton<IDataJobChannel, DataJobChannel>();
+        services.AddScoped<IDataJobStore, DataJobStore>();
+        services.AddScoped<ICsvFileLog, CsvFileLog>();
+        services.AddScoped<IBarStore, BarStore>();
+        services.AddScoped<IBarAggregates, BarAggregates>();
+        services.AddScoped<IBarQueries, BarQueries>();
+        services.AddScoped<IListedInstruments, ListedInstruments>();
+        services.AddScoped<IFetchTargets, FetchTargets>();
+        services.AddScoped<IDataAccountStatus, DataAccountStatus>();
+        services.AddSingleton(sp => new RequestThrottle(sp.GetRequiredService<IDataSettings>().DhanRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
+        services.AddScoped<DhanIntradayChartClient>();
+        services.AddScoped<IIntradayBarSource, DhanIntradayBarSource>();
     }
 
     /// <summary>

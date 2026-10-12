@@ -813,6 +813,108 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/data/overview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The CSV folder (files loaded and pending), the Dhan Data account and whether a fetch can run, the aggregates per timeframe, the stored bars with the last bar (last tick) and how far behind it is, the job in progress and the last job of each phase */
+    get: operations['GetDataOverview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/instruments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The tracked instruments and the ones with bars, with first bar, last bar, 1-minute bars, source (csv|dhan|mixed) and status (current|behind|empty): q, status, sort (symbol|name|firstBar|lastBar|bars, '-' for descending), page, pageSize (max 200) */
+    get: operations['ListDataInstruments'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/instruments/{id}/bars': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The latest bars of an instrument, newest first: timeframe 1m|5m|10m|15m|30m|1h|1D|1W|1M (default 1D), take 1 to 1000 (default 100) */
+    get: operations['GetInstrumentBars'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/refresh': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start a data update in the background: steps (any of csv, dhan, aggregate; default all, always in that order), forceCsv loads unchanged CSV files again. 202 with the job; 409 data.job_running while one runs, 409 data.master_missing without an instrument list */
+    post: operations['StartDataRefresh'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/jobs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The most recent data updates, newest first (take 1 to 100, default 20) */
+    get: operations['ListDataJobs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/data/jobs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One data update with the progress and result of each phase */
+    get: operations['GetDataJob'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -906,6 +1008,37 @@ export interface components {
       /** Format: int32 */
       memberCount: number;
     };
+    /**
+     * @description The aggregate phase of a data job (ADR 0016 §6): `Done` of `Total` are instruments. `Buckets` counts the bars written (new or changed),
+     *     by timeframe; `Full` is true when everything was rebuilt rather than the ranges touched by this job. Part of the API (the job's `aggregate` block).
+     */
+    AggregatePhase: {
+      status: string;
+      /** Format: date-time */
+      startedAt: null | string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      /** Format: int64 */
+      done: number;
+      /** Format: int64 */
+      total: number;
+      message: null | string;
+      code: null | string;
+      full: boolean;
+      /** Format: int64 */
+      buckets: number;
+      bucketsByTimeframe: {
+        [key: string]: number;
+      };
+    };
+    /** @description The derived timeframes: per timeframe, when they were last built and how many instruments have changes that are not aggregated yet. */
+    AggregatesOverview: {
+      timeframes: components['schemas']['TimeframeStat'][];
+      /** Format: date-time */
+      lastBuiltAt: null | string;
+      /** Format: int32 */
+      instrumentsPending: number;
+    };
     ApplicationStatus: {
       name: string;
       version: string;
@@ -930,6 +1063,48 @@ export interface components {
       timeIst: string;
       /** Format: date-time */
       nextRunAt: null | string;
+    };
+    /** @description One bar. Times of the day timeframes (`1D 1W 1M`) are India midnight of the first day of the bucket. `bars` counts the 1-minute bars in it; `complete` says none was missing. `source` (1m only): csv · dhan. */
+    BarRow: {
+      /** Format: date-time */
+      ts: string;
+      /** Format: double */
+      open: number;
+      /** Format: double */
+      high: number;
+      /** Format: double */
+      low: number;
+      /** Format: double */
+      close: number;
+      /** Format: int64 */
+      volume: number;
+      /** Format: int64 */
+      bars: number;
+      complete: boolean;
+      source: null | string;
+    };
+    /**
+     * @description The stored 1-minute bars: instruments with bars, the first bar and the last bar (the "last tick"), how many weekday sessions the last bar is behind the last
+     *     closed session (`expectedSession`), `stale` (behind) and how many instruments are behind or still empty (tracked without bars).
+     */
+    BarsOverview: {
+      /** Format: int32 */
+      instruments: number;
+      /** Format: int32 */
+      instrumentsBehind: number;
+      /** Format: int32 */
+      instrumentsEmpty: number;
+      /** Format: int64 */
+      totalBars: number;
+      /** Format: date-time */
+      firstBar: null | string;
+      /** Format: date-time */
+      lastBar: null | string;
+      /** Format: date */
+      expectedSession: string;
+      /** Format: int32 */
+      daysBehind: null | number;
+      stale: boolean;
     };
     /** @description The newest additions and removals of a basket, newest first. */
     BasketHistory: {
@@ -1098,9 +1273,143 @@ export interface components {
       portfolio: null | components['schemas']['PortfolioInput'];
       data: null | components['schemas']['DataInput'];
     };
+    /** @description The CSV folder: the files that match `&lt;SYMBOL&gt;_1m.csv[.gz]`, how many are loaded (unchanged since they were loaded) or pending, the rows loaded so far and when the last file was loaded. */
+    CsvOverview: {
+      folder: string;
+      folderExists: boolean;
+      /** Format: int32 */
+      filesTotal: number;
+      /** Format: int32 */
+      filesLoaded: number;
+      /** Format: int32 */
+      filesPending: number;
+      /** Format: int64 */
+      rows: number;
+      /** Format: date-time */
+      lastLoadAt: null | string;
+    };
+    /**
+     * @description The CSV phase of a data job (ADR 0016 §4): `Done` of `Total` are files. Rows are counted over all files read in this job. Part of the API
+     *     (the job's `csv` block) and stored with the job.
+     */
+    CsvPhase: {
+      status: string;
+      /** Format: date-time */
+      startedAt: null | string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      /** Format: int64 */
+      done: number;
+      /** Format: int64 */
+      total: number;
+      message: null | string;
+      code: null | string;
+      /** Format: int64 */
+      filesLoaded: number;
+      /** Format: int64 */
+      filesUnchanged: number;
+      /** Format: int64 */
+      filesSkipped: number;
+      /** Format: int64 */
+      filesFailed: number;
+      /** Format: int64 */
+      rows: number;
+      /** Format: int64 */
+      inserted: number;
+      /** Format: int64 */
+      updated: number;
+      /** Format: int64 */
+      unchanged: number;
+      /** Format: int64 */
+      keptDhan: number;
+      /** Format: int64 */
+      repaired: number;
+      /** Format: int64 */
+      rejected: number;
+      rejections: {
+        [key: string]: number;
+      };
+      rejectionExamples: string[];
+      unknownSymbols: string[];
+      ambiguousSymbols: string[];
+      failedFiles: string[];
+      /** Format: int32 */
+      instrumentsTracked: number;
+    };
+    /** @description The primary Data account. `status`: connected · expired · notConnected. */
+    DataAccountView: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      status: string;
+    };
     DataInput: {
       /** Format: int32 */
       liveFeedBudget: null | number;
+    };
+    DataInstrumentPage: {
+      items: components['schemas']['DataInstrumentRow'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /**
+     * @description An instrument's coverage. `source`: csv · dhan · mixed (null without bars). `status`: current · behind · empty (tracked, no bars).
+     *     `daysBehind` counts weekday sessions (null without bars).
+     */
+    DataInstrumentRow: {
+      /** Format: uuid */
+      id: string;
+      symbol: string;
+      name: string;
+      type: string;
+      tracked: boolean;
+      /** Format: date-time */
+      firstBar: null | string;
+      /** Format: date-time */
+      lastBar: null | string;
+      /** Format: int64 */
+      bars: number;
+      source: null | string;
+      status: string;
+      /** Format: int32 */
+      daysBehind: null | number;
+    };
+    /**
+     * @description One data job (a run of the pipeline, ADR 0016). `status`: running · succeeded · failed. `currentPhase` (while running): csv · dhan · aggregate.
+     *     Each phase block has `status` (notRequested · pending · running · succeeded · skipped · failed), `done` of `total` (files, instruments,
+     *     instruments), `message` and `code` (why it was skipped or failed) and its counts.
+     */
+    DataJobView: {
+      /** Format: uuid */
+      id: string;
+      status: string;
+      requestedBy: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      steps: string[];
+      forceCsv: boolean;
+      rebuildAll: boolean;
+      currentPhase: null | string;
+      csv: components['schemas']['CsvPhase'];
+      dhan: components['schemas']['DhanPhase'];
+      aggregate: components['schemas']['AggregatePhase'];
+      warnings: string[];
+      error: null | string;
+    };
+    /** @description Everything the Data &amp; import screen shows above the table: the three phases, the stored bars and the job in progress. */
+    DataOverview: {
+      csv: components['schemas']['CsvOverview'];
+      dhan: components['schemas']['DhanOverview'];
+      aggregates: components['schemas']['AggregatesOverview'];
+      bars: components['schemas']['BarsOverview'];
+      runningJob: null | components['schemas']['DataJobView'];
+      lastJobs: components['schemas']['LastDataJobs'];
     };
     /** @description Switch the Data role. Kind ("primary" or "standby") is required when Enabled is true. */
     DataRoleInput: {
@@ -1130,6 +1439,66 @@ export interface components {
       /** Format: double */
       latencyMs: number;
       error: null | string;
+    };
+    /**
+     * @description The Dhan Data API phase: the primary Data account (null when there is none), whether a fetch can run now (`canFetch`) and, when not, why
+     *     (`reason` in words, `reasonCode` data.dhan_not_available · data.dhan_not_connected), the settings, and the last successful fetch (time and bars added).
+     */
+    DhanOverview: {
+      account: null | components['schemas']['DataAccountView'];
+      canFetch: boolean;
+      reason: null | string;
+      reasonCode: null | string;
+      /** Format: int32 */
+      initialDays: number;
+      /** Format: int32 */
+      requestsPerSecond: number;
+      /** Format: date-time */
+      lastFetchAt: null | string;
+      /** Format: int64 */
+      lastFetchBars: null | number;
+    };
+    /**
+     * @description The Dhan phase of a data job (ADR 0016 §2, §7): `Done` of `Total` are instruments. `Bars` are the 1-minute bars Dhan returned;
+     *     `Rejected` are bars that did not lie on an IST minute inside a session or broke the row rules; `OverlapCompared` and
+     *     `OverlapMismatched` compare the overlap with the bars already stored (tolerance 0.05 %). Part of the API (the job's `dhan` block).
+     */
+    DhanPhase: {
+      status: string;
+      /** Format: date-time */
+      startedAt: null | string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      /** Format: int64 */
+      done: number;
+      /** Format: int64 */
+      total: number;
+      message: null | string;
+      code: null | string;
+      accountName: null | string;
+      /** Format: int64 */
+      instrumentsFetched: number;
+      /** Format: int64 */
+      instrumentsFailed: number;
+      /** Format: int64 */
+      requests: number;
+      /** Format: int64 */
+      bars: number;
+      /** Format: int64 */
+      inserted: number;
+      /** Format: int64 */
+      updated: number;
+      /** Format: int64 */
+      unchanged: number;
+      /** Format: int64 */
+      repaired: number;
+      /** Format: int64 */
+      rejected: number;
+      /** Format: int64 */
+      overlapCompared: number;
+      /** Format: int64 */
+      overlapMismatched: number;
+      errors: string[];
     };
     /** @description The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`. */
     DhanRedirectView: {
@@ -1308,6 +1677,15 @@ export interface components {
       /** Format: date */
       acquiredOn: null | string;
     };
+    /** @description The latest bars of an instrument and timeframe, newest first. */
+    InstrumentBars: {
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      name: string;
+      timeframe: string;
+      items: components['schemas']['BarRow'][];
+    };
     /** @description A basket that holds an instrument now; `since` = when it was added. */
     InstrumentBasketView: {
       /** Format: uuid */
@@ -1421,6 +1799,12 @@ export interface components {
       intraday: string[];
       swingBuy: string[];
       swingSell: string[];
+    };
+    /** @description The latest job in which each phase ran to an end (null when none did yet). */
+    LastDataJobs: {
+      csv: null | components['schemas']['DataJobView'];
+      dhan: null | components['schemas']['DataJobView'];
+      aggregate: null | components['schemas']['DataJobView'];
     };
     /** @description Body of `POST /api/auth/login`. */
     LoginRequest: {
@@ -1801,6 +2185,11 @@ export interface components {
        */
       elevatedUntil?: null | string;
     };
+    /** @description Starts a data job. `steps`: any of csv · dhan · aggregate (default all three, always run in that order); `forceCsv` loads CSV files again that were loaded already and have not changed. */
+    StartDataJobRequest: {
+      steps?: null | string[];
+      forceCsv?: null | boolean;
+    };
     /** @description Starts a refresh. `force` skips the "file unchanged" check. */
     StartRefreshRequest: {
       /** @default false */
@@ -1877,6 +2266,14 @@ export interface components {
       isHealthy: boolean;
       /** Format: date-time */
       checkedAt: string;
+    };
+    /** @description A derived timeframe (`5m 10m 15m 30m 1h 1D 1W 1M`): the bars stored and the start of the newest one. */
+    TimeframeStat: {
+      timeframe: string;
+      /** Format: int64 */
+      bars: number;
+      /** Format: date-time */
+      lastBucket: null | string;
     };
     /**
      * @description What a track call did (all counts are of distinct instruments): `added` never tracked before, `reactivated` tracked again after an
@@ -4292,6 +4689,199 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SyncStatusView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetDataOverview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DataOverview'];
+        };
+      };
+    };
+  };
+  ListDataInstruments: {
+    parameters: {
+      query?: {
+        q?: string;
+        status?: string;
+        sort?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DataInstrumentPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetInstrumentBars: {
+    parameters: {
+      query?: {
+        timeframe?: string;
+        take?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InstrumentBars'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartDataRefresh: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['StartDataJobRequest'];
+      };
+    };
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DataJobView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListDataJobs: {
+    parameters: {
+      query?: {
+        take?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DataJobView'][];
+        };
+      };
+    };
+  };
+  GetDataJob: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DataJobView'];
         };
       };
       /** @description Not Found */

@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { createDataFake } from '@/test/dataFake';
 import { buildProblem, buildSystemStatus } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
@@ -30,9 +31,20 @@ describe('app routes', () => {
   });
 
   it('shows the roadmap phase for screens that are not built yet', async () => {
-    renderRoutes(routes, { initialPath: '/data' });
+    renderRoutes(routes, { initialPath: '/quality' });
 
     expect(await screen.findByText('P1')).toBeInTheDocument();
+  });
+
+  it('opens the Data & import screen (no longer a placeholder)', async () => {
+    server.use(...createDataFake().handlers);
+    renderRoutes(routes, { initialPath: '/data' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Data & import' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Data freshness' })).toBeInTheDocument();
+    expect(await screen.findByRole('grid', { name: 'Coverage' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Update data' })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
   });
 
   it('opens the Baskets screen (no longer a placeholder)', async () => {

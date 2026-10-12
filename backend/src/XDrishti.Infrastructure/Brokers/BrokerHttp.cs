@@ -44,6 +44,20 @@ internal static partial class BrokerHttp
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
+    /// <summary>Upper bound for one chart request (the spec: 15 seconds).</summary>
+    public static readonly TimeSpan ChartTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>Ninety days of 1-minute bars are about 2 MB of JSON; anything beyond 16 MB is refused.</summary>
+    public const int MaxChartResponseBytes = 16 * 1024 * 1024;
+
+    public static void ConfigureChart(HttpClient client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        client.Timeout = ChartTimeout;
+        client.MaxResponseContentBufferSize = MaxChartResponseBytes;
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    }
+
     public static HttpMessageHandler CreatePrimaryHandler() => new SocketsHttpHandler
     {
         // A redirect would leave the allow-list unchecked (it is followed inside this handler): never follow one.
@@ -169,5 +183,5 @@ internal static partial class BrokerHttp
     private static partial Regex DhanCode();
 
     [LoggerMessage(EventId = 2101, Level = LogLevel.Warning, Message = "Dhan {Operation} failed: {Outcome} (HTTP {Status}, broker error code {BrokerCode})")]
-    private static partial void LogFailed(ILogger logger, string operation, int? status, string outcome, string? brokerCode);
+    internal static partial void LogFailed(ILogger logger, string operation, int? status, string outcome, string? brokerCode);
 }

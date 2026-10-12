@@ -7,6 +7,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Baskets;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
@@ -72,6 +73,12 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(RefreshStarted))]
 [JsonSerializable(typeof(RefreshStatusView))]
 [JsonSerializable(typeof(IReadOnlyList<RefreshRunView>))]
+[JsonSerializable(typeof(StartDataJobRequest))]
+[JsonSerializable(typeof(DataJobView))]
+[JsonSerializable(typeof(IReadOnlyList<DataJobView>))]
+[JsonSerializable(typeof(DataOverview))]
+[JsonSerializable(typeof(DataInstrumentPage))]
+[JsonSerializable(typeof(InstrumentBars))]
 [JsonSerializable(typeof(HoldingPage))]
 [JsonSerializable(typeof(HoldingsSummary))]
 [JsonSerializable(typeof(HoldingLots))]

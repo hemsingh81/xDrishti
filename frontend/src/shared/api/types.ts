@@ -81,3 +81,23 @@ export type TransferInput = Schemas['TransferInput'];
 export type TransferResult = Schemas['TransferResult'];
 /** A basket that holds an instrument now. */
 export type InstrumentBasket = Schemas['InstrumentBasketView'];
+
+/** Data & import: what is stored, the pipeline (CSV → Dhan → aggregates) and the job in progress. */
+export type DataOverview = Schemas['DataOverview'];
+export type CsvOverview = Schemas['CsvOverview'];
+export type DhanOverview = Schemas['DhanOverview'];
+export type AggregatesOverview = Schemas['AggregatesOverview'];
+/** The stored 1-minute bars: instruments, first and last bar (the last tick), how far behind. */
+export type BarsOverview = Schemas['BarsOverview'];
+export type DataCoveragePage = Schemas['DataInstrumentPage'];
+export type DataCoverageRow = Schemas['DataInstrumentRow'];
+/** One run of the pipeline with a block per phase. */
+export type DataJob = Schemas['DataJobView'];
+export type CsvPhase = Schemas['CsvPhase'];
+export type DhanPhase = Schemas['DhanPhase'];
+export type AggregatePhase = Schemas['AggregatePhase'];
+export type TimeframeStat = Schemas['TimeframeStat'];
+/** The latest bars of an instrument and timeframe, newest first. */
+export type InstrumentBars = Schemas['InstrumentBars'];
+export type BarRow = Schemas['BarRow'];
+export type StartDataJobInput = Schemas['StartDataJobRequest'];

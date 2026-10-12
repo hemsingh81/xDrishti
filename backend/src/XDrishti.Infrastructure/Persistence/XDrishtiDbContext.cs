@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Auth;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Baskets;
 using XDrishti.Domain.Platform;
 using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Market;
+using XDrishti.Infrastructure.Market.Bars;
 
 namespace XDrishti.Infrastructure.Persistence;
 
@@ -44,6 +46,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<BasketMember> BasketMembers => Set<BasketMember>();
 
+    public DbSet<DataJob> DataJobs => Set<DataJob>();
+
     public DbSet<Holding> Holdings => Set<Holding>();
 
     public DbSet<HoldingLot> HoldingLots => Set<HoldingLot>();
@@ -54,6 +58,14 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
 
     internal DbSet<InstrumentBrokerIdRecord> InstrumentBrokerIds => Set<InstrumentBrokerIdRecord>();
+
+    internal DbSet<Bar1mRecord> Bars1m => Set<Bar1mRecord>();
+
+    internal DbSet<BarAggRecord> BarsAgg => Set<BarAggRecord>();
+
+    internal DbSet<BarCoverageRecord> BarCoverage => Set<BarCoverageRecord>();
+
+    internal DbSet<CsvFileRecord> CsvFiles => Set<CsvFileRecord>();
 
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();

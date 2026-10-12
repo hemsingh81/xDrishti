@@ -50,7 +50,7 @@ export const navigation: NavSection[] = [
     items: [
       { path: '/instruments', label: 'Instruments', icon: ListAltIcon },
       { path: '/baskets', label: 'Baskets', icon: ShoppingBasketIcon },
-      { path: '/data', label: 'Data & import', icon: StorageIcon, phase: 'P1' },
+      { path: '/data', label: 'Data & import', icon: StorageIcon },
       { path: '/quality', label: 'Data quality', icon: FactCheckIcon, phase: 'P1' },
     ],
   },

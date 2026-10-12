@@ -209,7 +209,7 @@ power, wired network, small UPS recommended.</li>
 </tr>
 </tbody></table>
 <p>*<code>xd-sandbox</code> has no egress and no access except its job inputs/outputs.
-<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>), for the read of the account&#39;s holdings (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>) and for the instrument master files (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>): outbound only, no
+<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>), for the read of the account&#39;s holdings (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>), for the 1-minute chart data of the Data API (<a href="../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.html">ADR 0016</a>) and for the instrument master files (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>): outbound only, no
 published ports, no other member. The network itself does not filter hosts; the API&#39;s HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):</p>
 <table>
 <thead>
@@ -231,6 +231,12 @@ published ports, no other member. The network itself does not filter hosts; the 
 <td><code>api.dhan.co</code>: <code>/v2/holdings</code> only, no query (doc 05 §8.2)</td>
 <td>GET</td>
 <td>30 s, 5 MB; the stored access token goes in the <code>access-token</code> header and is never logged; nothing else of <code>api.dhan.co</code> is callable</td>
+</tr>
+<tr>
+<td>Broker (Dhan chart data)</td>
+<td><code>api.dhan.co</code>: <code>/v2/charts/intraday</code> only, no query (doc 05 §6; ADR 0016)</td>
+<td>POST</td>
+<td>15 s, 16 MB; one request at a time, at most <code>Data__Dhan__RequestsPerSecond</code> (4) per second, one retry on 429/5xx; the Data account&#39;s access token goes in the <code>access-token</code> header and is never logged; no other chart, order, position or funds path is callable</td>
 </tr>
 <tr>
 <td>Instrument master — Dhan</td>
@@ -325,6 +331,10 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 <td>Host folder <code>data/inbox/</code> bind-mounted into <code>xd-worker</code>; processed files moved to <code>data/processed/&lt;job-id&gt;/</code></td>
 </tr>
 <tr>
+<td>CSV folder (P1-17a)</td>
+<td>Host folder <code>data/Stocks_CSV/</code> (<code>XD_CSV_DIR</code>) bind-mounted <strong>read-only</strong> at <code>/data/csv</code> into <code>xd-api</code> (<code>Data__CsvFolder</code>); <code>xd-up.sh</code> creates it when missing; nothing is written there (<a href="../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.html">ADR 0016</a>)</td>
+</tr>
+<tr>
 <td>Market hours</td>
 <td><code>xd-feed</code> starts 09:00 and stops 15:35 on trading days (scheduled); Mac must be awake</td>
 </tr>
@@ -376,7 +386,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-12 07:06</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-12 11:15</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

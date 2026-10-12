@@ -9,6 +9,8 @@ export Database__Password
 # The API refuses to start without the broker vault key (created by deploy/xd-up.sh on its first run).
 BrokerVault__Key="$(security find-generic-password -a xdrishti -s xdrishti/broker/vault-key -w)"
 export BrokerVault__Key
+# The 1-minute CSV files (ADR 0016) are read from the repository's data folder.
+export Data__CsvFolder="$ROOT/data/Stocks_CSV"
 export Serilog__WriteTo__1__Name=Seq Serilog__WriteTo__1__Args__serverUrl=http://localhost:5341
 cd "$ROOT/backend"
 exec dotnet watch --project src/XDrishti.Api/XDrishti.Api.csproj

@@ -11,12 +11,17 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://AUTH.DHAN.CO/app/consumeApp-consent?tokenId=abc")]
     [InlineData("GET", "https://api.dhan.co/v2/holdings")] // the one data endpoint (ADR 0012)
     [InlineData("GET", "https://API.DHAN.CO/v2/holdings")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/intraday")] // the 1-minute chart data of the Data API (ADR 0016 §7)
+    [InlineData("POST", "https://API.DHAN.CO/v2/charts/intraday")]
     public void The_documented_endpoints_are_allowed(string method, string url) =>
         BrokerEndpoints.IsAllowed(new HttpMethod(method), new Uri(url)).ShouldBeTrue();
 
     [Theory]
     [InlineData("GET", "https://api.dhan.co/v2/orders")] // orders
     [InlineData("POST", "https://api.dhan.co/v2/orders")]
+    [InlineData("POST", "https://api.dhan.co/v2/super/orders")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/ltp")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades")]
     [InlineData("GET", "https://api.dhan.co/v2/positions")] // positions
     [InlineData("GET", "https://api.dhan.co/v2/holdings?x=1")] // holdings take no query
     [InlineData("GET", "https://api.dhan.co/v2/holdings?")]
@@ -31,6 +36,23 @@ public sealed class BrokerEndpointsTests
     [InlineData("GET", "https://api.dhan.co.example.invalid/v2/holdings")] // other host
     [InlineData("GET", "https://auth.dhan.co/v2/holdings")] // the path belongs to the API host only
     [InlineData("GET", "https://api.dhan.co/v2/holdings#x")]
+    [InlineData("GET", "https://api.dhan.co/v2/charts/intraday")] // the chart request is a POST with a body
+    [InlineData("PUT", "https://api.dhan.co/v2/charts/intraday")]
+    [InlineData("DELETE", "https://api.dhan.co/v2/charts/intraday")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/intraday?x=1")] // no query
+    [InlineData("POST", "https://api.dhan.co/v2/charts/intraday?")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/intraday/")] // paths are exact
+    [InlineData("POST", "https://api.dhan.co/v2/charts/Intraday")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/intraday/1")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts/historical")] // other chart paths
+    [InlineData("POST", "https://api.dhan.co/v2/charts/rollingoption")]
+    [InlineData("POST", "https://api.dhan.co/v2/charts")]
+    [InlineData("POST", "http://api.dhan.co/v2/charts/intraday")] // not HTTPS
+    [InlineData("POST", "https://api.dhan.co:8443/v2/charts/intraday")] // other port
+    [InlineData("POST", "https://user@api.dhan.co/v2/charts/intraday")]
+    [InlineData("POST", "https://auth.dhan.co/v2/charts/intraday")] // the path belongs to the API host only
+    [InlineData("POST", "https://api.dhan.co.example.invalid/v2/charts/intraday")] // other host
+    [InlineData("POST", "https://api.dhan.co/v2/charts/intraday#x")]
     [InlineData("GET", "https://api.dhan.co/v2/fundlimit")] // funds
     [InlineData("GET", "https://api.dhan.co/v2/profile")] // no longer used
     [InlineData("GET", "https://api.dhan.co/v2/RenewToken")] // no longer used
