@@ -942,6 +942,8 @@ export const buildFirstImportView = (overrides: Partial<FirstImportView> = {}): 
   defaultDated: 3,
   alreadyImported: 0,
   unknown: 0,
+  redated: 0,
+  redateSkipped: 0,
   errorCode: null,
   cause: null,
   message: null,

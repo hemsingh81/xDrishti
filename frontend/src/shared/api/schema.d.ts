@@ -1154,7 +1154,9 @@ export interface components {
      *     imported), "deferred" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or
      *     "failed" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example
      *     `portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those
-     *     among them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists.
+     *     among them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists. Redated counts the lots that
+     *     followed a changed first import date (imported lots still on the default date; they stay flagged as such), RedateSkipped the ones that could not follow
+     *     because they were closed before the new date; both are 0 when the date did not change or the account has no holdings (ADR 0015).
      */
     FirstImportView: {
       status: string;
@@ -1166,6 +1168,10 @@ export interface components {
       alreadyImported: number;
       /** Format: int32 */
       unknown: number;
+      /** Format: int32 */
+      redated: number;
+      /** Format: int32 */
+      redateSkipped: number;
       errorCode: null | string;
       cause: null | string;
       message: null | string;

@@ -100,7 +100,7 @@ describe('Baskets page: copy and move with the menus', () => {
 
     expect(await toast()).toHaveTextContent('Copied 2 instruments to Best stocks');
     expect(fake.symbolsIn(basketIds.bestStocks)).toEqual(['NSE:TCS', 'NSE:HDFCBANK']);
-    expect(screen.getByText('Select instruments to copy, move or remove them')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear selection' })).not.toBeInTheDocument();
 
     await userEvent.click(rowBox('NSE:RELIANCE'));
     await userEvent.click(screen.getByRole('button', { name: 'Move to…' }));
@@ -158,7 +158,7 @@ describe('Baskets page: drag and drop onto a basket', () => {
     const { fake } = renderBaskets();
     await membersGrid();
 
-    await dragWithKeyboard('Drag NSE:TCS', ['{ArrowLeft}', '{ArrowDown}']);
+    await dragWithKeyboard('Drag NSE:TCS', ['{ArrowUp}']);
 
     expect(announced()).toBe('Dropped NSE:TCS on basket Best stocks.');
     expect(await toast()).toHaveTextContent(/^Copied NSE:TCS to Best stocks/);
@@ -172,10 +172,10 @@ describe('Baskets page: drag and drop onto a basket', () => {
     const { fake } = renderBaskets();
     await membersGrid();
 
-    await dragWithKeyboard('Drag NSE:TCS', ['{ArrowLeft}'], ['Alt']);
+    await dragWithKeyboard('Drag NSE:TCS', ['{ArrowUp}'], ['Alt']);
 
-    expect(await toast()).toHaveTextContent(/^Moved NSE:TCS to MyLongTerm/);
-    expect(fake.calls.transfer).toEqual([expect.objectContaining({ mode: 'move', toBasketId: basketIds.myLongTerm })]);
+    expect(await toast()).toHaveTextContent(/^Moved NSE:TCS to Best stocks/);
+    expect(fake.calls.transfer).toEqual([expect.objectContaining({ mode: 'move', toBasketId: basketIds.bestStocks })]);
     await waitFor(() => {
       expect(symbolsShown()).toEqual(['NSE:RELIANCE', 'NSE:HDFCBANK']);
     });
@@ -188,10 +188,10 @@ describe('Baskets page: drag and drop onto a basket', () => {
     await userEvent.click(rowBox('NSE:TCS'));
     await userEvent.click(rowBox('NSE:RELIANCE'));
 
-    await dragWithKeyboard('Drag NSE:TCS', ['{ArrowLeft}']);
+    await dragWithKeyboard('Drag NSE:TCS', ['{ArrowUp}']);
 
-    expect(await toast()).toHaveTextContent('Copied 2 instruments to MyLongTerm');
-    expect(fake.symbolsIn(basketIds.myLongTerm)).toEqual(['NSE:TCS', 'NSE:RELIANCE']);
+    expect(await toast()).toHaveTextContent('Copied 2 instruments to Best stocks');
+    expect(fake.symbolsIn(basketIds.bestStocks)).toEqual(['NSE:TCS', 'NSE:RELIANCE']);
   });
 
   it('copies with the mouse and moves with Alt, highlighting the card under the pointer', async () => {
@@ -199,15 +199,15 @@ describe('Baskets page: drag and drop onto a basket', () => {
     const { fake } = renderBaskets();
     await membersGrid();
     const grip = screen.getByRole('button', { name: 'Drag NSE:TCS' });
-    // Cards are stacked on the left; the second one (MyLongTerm) is at y 190-270.
+    // Cards are a row across the top (250 px apart); the second one (MyLongTerm) is at x 250-490.
     fireEvent.mouseDown(grip, { button: 0, clientX: 320, clientY: 220 });
-    fireEvent.mouseMove(document, { clientX: 200, clientY: 230 });
-    fireEvent.mouseMove(document, { clientX: 140, clientY: 230 });
+    fireEvent.mouseMove(document, { clientX: 400, clientY: 150 });
+    fireEvent.mouseMove(document, { clientX: 370, clientY: 140 });
     const hot = document.querySelector('[data-drop-target]');
     expect(hot).toHaveAttribute('data-drop-target', 'copy');
     expect(hot).toHaveTextContent('MyLongTerm');
 
-    fireEvent.mouseUp(document, { clientX: 140, clientY: 230 });
+    fireEvent.mouseUp(document, { clientX: 370, clientY: 140 });
 
     expect(await toast()).toHaveTextContent(/^Copied NSE:TCS to MyLongTerm/);
     expect(fake.calls.transfer).toEqual([expect.objectContaining({ mode: 'copy' })]);

@@ -2,11 +2,8 @@ import ArchiveIcon from '@mui/icons-material/ArchiveOutlined';
 import EditIcon from '@mui/icons-material/EditOutlined';
 import HistoryIcon from '@mui/icons-material/HistoryOutlined';
 import LockIcon from '@mui/icons-material/LockOutlined';
-import PlaylistAddIcon from '@mui/icons-material/PlaylistAddOutlined';
 import { Button, Chip, Stack, Typography } from '@mui/material';
 import type { Basket } from '@/shared/api';
-import { formatNumber } from '@/shared/lib/format';
-import { purposeLabel } from '../lib/labels';
 import { AsOfField } from './AsOfField';
 import { BasketDot } from './BasketDot';
 
@@ -14,73 +11,54 @@ interface BasketHeaderProps {
   basket: Basket;
   asOf: string | null;
   onAsOfChange: (value: string | null) => void;
-  onAdd: () => void;
   onEdit: () => void;
   onHistory: () => void;
   onArchive: () => void;
 }
 
-export const portfolioNote = "Portfolio baskets follow the account's holdings and can't be archived or edited.";
+export const portfolioNote =
+  "Portfolio — follows the account's holdings; read only. Copy instruments to one of your baskets.";
+export const manualNote = 'Manual — you add and remove instruments.';
 
-/** The title block of a portfolio basket: name, badge, account and count, and why there are no actions. */
-function PortfolioHeader({ basket }: { basket: Basket }) {
+/**
+ * The title row of the members card (prototype `.card-h`): colour dot and name on the left, the actions on the right
+ * (View as of, History, Edit, Archive), then one muted line saying what kind of basket it is. A portfolio basket has
+ * no actions, only the "Portfolio · read only" chip.
+ */
+export function BasketHeader({ basket, asOf, onAsOfChange, onEdit, onHistory, onArchive }: BasketHeaderProps) {
+  const system = basket.system;
   return (
-    <Stack spacing={1.5} sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-        <BasketDot colour={basket.colour} size={14} />
-        <Typography variant="h2" sx={{ overflowWrap: 'anywhere' }}>
-          {basket.name}
-        </Typography>
-        <Chip size="small" variant="outlined" icon={<LockIcon />} label="Portfolio · read only" />
-        {basket.accountName && <Typography color="text.secondary">{basket.accountName}</Typography>}
-        <Typography color="text.secondary">
-          {`${formatNumber(basket.memberCount)} ${basket.memberCount === 1 ? 'instrument' : 'instruments'}`}
-        </Typography>
-      </Stack>
-      <Typography color="text.secondary">{portfolioNote}</Typography>
-    </Stack>
-  );
-}
-
-/** The selected basket's title block: name, purpose, count, description and the actions on the basket. */
-export function BasketHeader({ basket, asOf, onAsOfChange, onAdd, onEdit, onHistory, onArchive }: BasketHeaderProps) {
-  if (basket.system) return <PortfolioHeader basket={basket} />;
-  return (
-    <Stack spacing={1.5} sx={{ p: 2 }}>
-      <Stack direction="row" sx={{ gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-        <BasketDot colour={basket.colour} size={14} />
-        <Typography variant="h2" sx={{ overflowWrap: 'anywhere' }}>
-          {basket.name}
-        </Typography>
-        <Chip size="small" variant="outlined" label={purposeLabel(basket.purpose)} />
-        <Typography color="text.secondary">
-          {`${formatNumber(basket.memberCount)} ${basket.memberCount === 1 ? 'instrument' : 'instruments'}`}
-        </Typography>
-      </Stack>
-      {basket.description && <Typography color="text.secondary">{basket.description}</Typography>}
-      <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<PlaylistAddIcon />}
-            disabled={asOf !== null}
-            onClick={onAdd}
-          >
-            Add instruments
-          </Button>
-          <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={onEdit}>
-            Edit
-          </Button>
-          <Button size="small" variant="outlined" startIcon={<HistoryIcon />} onClick={onHistory}>
-            History
-          </Button>
-          <Button size="small" variant="outlined" color="error" startIcon={<ArchiveIcon />} onClick={onArchive}>
-            Archive
-          </Button>
+    <Stack spacing={0.75} sx={{ px: 2, pt: 1.5, pb: 1.25 }}>
+      <Stack
+        direction="row"
+        sx={{ gap: 1.5, rowGap: 1, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}
+      >
+        <Stack direction="row" sx={{ gap: 1, alignItems: 'center', minWidth: 0 }}>
+          <BasketDot colour={basket.colour} size={12} />
+          <Typography variant="h3" component="h2" sx={{ overflowWrap: 'anywhere' }}>
+            {basket.name}
+          </Typography>
         </Stack>
-        <AsOfField value={asOf} onChange={onAsOfChange} />
+        {system ? (
+          <Chip size="small" variant="outlined" icon={<LockIcon />} label="Portfolio · read only" />
+        ) : (
+          <Stack direction="row" sx={{ gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <AsOfField value={asOf} onChange={onAsOfChange} />
+            <Button size="small" variant="outlined" startIcon={<HistoryIcon />} onClick={onHistory}>
+              History
+            </Button>
+            <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={onEdit}>
+              Edit
+            </Button>
+            <Button size="small" variant="outlined" color="error" startIcon={<ArchiveIcon />} onClick={onArchive}>
+              Archive
+            </Button>
+          </Stack>
+        )}
       </Stack>
+      <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>
+        {system ? portfolioNote : basket.description?.trim() ? basket.description : manualNote}
+      </Typography>
     </Stack>
   );
 }

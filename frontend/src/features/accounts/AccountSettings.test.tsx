@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { buildAccountDetail, buildBucket, buildBuckets, buildPortfolioSaved, ids } from '@/test/fixtures';
+import { buildAccountDetail, buildPortfolioSaved, ids } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { createStepUpGate, problemResponse, server } from '@/test/server';
 import { AccountsPage } from './components/AccountsPage';
@@ -239,57 +239,44 @@ describe('Connection tab', () => {
 });
 
 describe('Portfolio tab', () => {
-  const customBucket = buildBucket({ id: '00000000-0000-4000-8000-0000000000b2', name: 'MyLongTerm' });
-  const otherDefault = buildBucket({
-    id: '00000000-0000-4000-8000-0000000000b3',
-    name: 'Test Dhan Swing · Portfolio',
-    isAccountDefault: true,
-    accountId: ids.swing,
-    accountName: 'Test Dhan Swing',
-  });
-
-  it('pre-selects the account’s own bucket and offers custom buckets only', async () => {
+  it('has no bucket choices: no select, no Buckets list, no Add bucket form, and never asks for the buckets', async () => {
+    let bucketRequests = 0;
     server.use(
-      http.get('/api/portfolio-buckets', () => HttpResponse.json([...buildBuckets(), otherDefault, customBucket])),
+      http.get('/api/portfolio-buckets', () => {
+        bucketRequests += 1;
+        return HttpResponse.json([]);
+      }),
     );
     renderTab('portfolio');
 
-    const select = await screen.findByLabelText(/^Default bucket/);
-    expect(select).toHaveDisplayValue('Test Dhan Main · Portfolio (default)');
-    expect(
-      within(select)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual(['Test Dhan Main · Portfolio (default)', 'MyLongTerm']);
-    expect(screen.queryByRole('option', { name: 'Choose…' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('checkbox', { name: 'Include in portfolio totals' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/bucket/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Buckets' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Buckets' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add bucket' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/history/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Import trade/)).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'First import' })).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/Holdings refresh automatically; new holdings are dated the day they appear/),
-    ).toBeVisible();
-    expect(screen.queryByLabelText('First import date')).not.toBeInTheDocument();
-    expect(screen.getByText('2025-01-01')).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    // Regression: the label sits above the selected value instead of overlapping it.
-    expect(screen.getByText('Default bucket', { selector: 'label' })).toHaveAttribute('data-shrink', 'true');
+    expect(bucketRequests).toBe(0);
   });
 
-  it('lists the buckets with the account’s own default first', async () => {
-    server.use(
-      http.get('/api/portfolio-buckets', () => HttpResponse.json([...buildBuckets(), otherDefault, customBucket])),
-    );
+  it('shows the first import date as a calendar even though the account has holdings, with its helper line', async () => {
     renderTab('portfolio');
 
-    const list = await screen.findByRole('list', { name: 'Buckets' });
-    expect(
-      within(list)
-        .getAllByRole('listitem')
-        .map((i) => i.textContent),
-    ).toEqual(['Test Dhan Main · Portfolio (default for this account)', 'MyLongTerm']);
+    const date = await screen.findByLabelText('First import date');
+    expect(date).toHaveAttribute('type', 'date');
+    expect(date).toHaveValue('2025-01-01');
+    expect(date).toBeEnabled();
+    expect(date).toHaveAttribute('min', '1990-01-01');
+    expect(date).toHaveAttribute('max', istDayIso());
+    expect(date).toHaveAccessibleDescription(
+      'The date holdings from the first import get. Changing it re-dates the holdings still on the default date.',
+    );
   });
 
-  it('saves the own bucket as an empty string (null would keep the current one) without a date, and no password is asked', async () => {
+  it('saves without any bucket (the API keeps the account’s own), and no password is asked', async () => {
     const bodies: unknown[] = [];
     server.use(
       http.put('/api/accounts/:id/portfolio', async ({ request }) => {
@@ -305,40 +292,14 @@ describe('Portfolio tab', () => {
     expect(await screen.findByText('Portfolio settings saved.')).toBeInTheDocument();
     expect(bodies).toEqual([
       {
-        defaultBucket: '',
         includeInTotals: false,
         refreshMode: 'off',
         refreshDailyTimeIst: '16:00',
         firstImportDate: '2025-01-01',
       },
     ]);
+    expect(bodies[0]).not.toHaveProperty('defaultBucket');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('lets the owner choose a custom bucket', async () => {
-    const bodies: unknown[] = [];
-    server.use(
-      http.get('/api/portfolio-buckets', () => HttpResponse.json([...buildBuckets(), customBucket])),
-      http.put('/api/accounts/:id/portfolio', async ({ request }) => {
-        bodies.push(await request.json());
-        return HttpResponse.json(buildPortfolioSaved(buildAccountDetail()));
-      }),
-    );
-    renderTab('portfolio');
-
-    await userEvent.selectOptions(await screen.findByLabelText(/^Default bucket/), 'MyLongTerm');
-    await userEvent.click(screen.getByRole('button', { name: 'Save portfolio settings' }));
-
-    expect(await screen.findByText('Portfolio settings saved.')).toBeInTheDocument();
-    expect(bodies).toEqual([
-      {
-        defaultBucket: 'MyLongTerm',
-        includeInTotals: true,
-        refreshMode: 'off',
-        refreshDailyTimeIst: '16:00',
-        firstImportDate: '2025-01-01',
-      },
-    ]);
   });
 
   it('offers only Off and Daily, shows the saved daily time and saves switching it off', async () => {
@@ -368,7 +329,6 @@ describe('Portfolio tab', () => {
     expect(await screen.findByText('Portfolio settings saved.')).toBeInTheDocument();
     expect(bodies).toEqual([
       {
-        defaultBucket: '',
         includeInTotals: true,
         refreshMode: 'off',
         refreshDailyTimeIst: '09:45',
@@ -435,92 +395,6 @@ describe('Portfolio tab', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Save portfolio settings' }));
 
     expect(await screen.findByText('includeInTotals: Cannot change right now.')).toBeInTheDocument();
-  });
-
-  it('shows a saved custom bucket as selected', async () => {
-    server.use(
-      http.get('/api/portfolio-buckets', () => HttpResponse.json([...buildBuckets(), customBucket])),
-      http.get('/api/accounts/:id', () =>
-        HttpResponse.json(
-          buildAccountDetail({
-            portfolio: {
-              enabled: true,
-              defaultBucket: 'MyLongTerm',
-              autoBucketName: 'Test Dhan Main · Portfolio',
-              includeInTotals: true,
-              refreshMode: 'off',
-              refreshDailyTimeIst: '16:00',
-              firstImportDate: '2025-01-01',
-              hasHoldings: true,
-            },
-          }),
-        ),
-      ),
-    );
-    renderTab('portfolio');
-
-    expect(await screen.findByLabelText(/^Default bucket/)).toHaveDisplayValue('MyLongTerm');
-  });
-
-  it('shows the server message when it refuses another account’s bucket', async () => {
-    server.use(
-      http.put('/api/accounts/:id/portfolio', () =>
-        problemResponse(
-          {
-            title: 'Invalid',
-            code: 'accounts.invalid',
-            errors: { defaultBucket: ['Another account’s default bucket cannot be used.'] },
-          },
-          400,
-        ),
-      ),
-    );
-    renderTab('portfolio');
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Save portfolio settings' }));
-
-    expect(await screen.findByText('Another account’s default bucket cannot be used.')).toBeInTheDocument();
-  });
-
-  it('adds a bucket and offers it in the selector and the list', async () => {
-    let buckets = buildBuckets();
-    server.use(
-      http.get('/api/portfolio-buckets', () => HttpResponse.json(buckets)),
-      http.post('/api/portfolio-buckets', async ({ request }) => {
-        const { name } = (await request.json()) as { name: string };
-        const bucket = buildBucket({ name });
-        buckets = [...buckets, bucket];
-        return HttpResponse.json(bucket, { status: 201 });
-      }),
-    );
-    renderTab('portfolio');
-
-    await userEvent.type(await screen.findByLabelText('New bucket name'), 'Retirement{Enter}');
-
-    expect(await screen.findByText('Bucket “Retirement” added.')).toBeInTheDocument();
-    expect(await screen.findByRole('option', { name: 'Retirement' })).toBeInTheDocument();
-    expect(within(screen.getByRole('list', { name: 'Buckets' })).getByText('Retirement')).toBeInTheDocument();
-  });
-
-  it('shows the server message for a bucket name it refuses', async () => {
-    server.use(
-      http.post('/api/portfolio-buckets', () =>
-        problemResponse(
-          {
-            title: 'Invalid',
-            code: 'accounts.invalid',
-            errors: { name: ["Use 1 to 40 letters, digits, spaces, '_' or '-'."] },
-          },
-          400,
-        ),
-      ),
-    );
-    renderTab('portfolio');
-
-    await userEvent.type(await screen.findByLabelText('New bucket name'), 'a/b');
-    await userEvent.click(screen.getByRole('button', { name: 'Add bucket' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent("Use 1 to 40 letters, digits, spaces, '_' or '-'.");
   });
 });
 

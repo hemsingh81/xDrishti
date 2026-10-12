@@ -2,12 +2,11 @@ import { Alert, Box, Stack, TextField, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { bucketsQuery, riskProfilesQuery } from '../../api/accountsQueries';
+import { riskProfilesQuery } from '../../api/accountsQueries';
 import type { FieldErrors } from '../../lib/fieldErrors';
 import { scoped } from '../../lib/fieldErrors';
-import { autoBucketNameOf, maxLiveFeedBudget } from '../../lib/portfolioForm';
+import { maxLiveFeedBudget } from '../../lib/portfolioForm';
 import type { WizardState } from '../../lib/wizardState';
-import { BucketAdder } from '../BucketAdder';
 import { PortfolioFields } from '../PortfolioFields';
 import { TradingFields } from '../TradingFields';
 
@@ -20,13 +19,12 @@ interface SettingsStepProps {
 /** Step 4: settings for the chosen roles only (same fields as the account tabs). */
 export function SettingsStep({ state, errors, onChange }: SettingsStepProps) {
   const profiles = useQuery({ ...riskProfilesQuery, enabled: state.roles.trading });
-  const buckets = useQuery({ ...bucketsQuery, enabled: state.roles.portfolio });
 
-  if ((state.roles.trading && profiles.isPending) || (state.roles.portfolio && buckets.isPending)) {
+  if (state.roles.trading && profiles.isPending) {
     return <LoadingState label="Loading settings" />;
   }
-  if (profiles.error ?? buckets.error) {
-    return <ErrorState error={profiles.error ?? buckets.error} />;
+  if (profiles.error) {
+    return <ErrorState error={profiles.error} />;
   }
   return (
     <Stack spacing={3}>
@@ -43,21 +41,17 @@ export function SettingsStep({ state, errors, onChange }: SettingsStepProps) {
           />
         </Section>
       )}
-      {state.roles.portfolio && buckets.data && (
+      {state.roles.portfolio && (
         <Section title="Portfolio">
           <PortfolioFields
             idPrefix="wizard-portfolio"
             state={state.portfolio}
             errors={scoped(errors, 'portfolio')}
-            buckets={buckets.data}
-            ownBucketName={autoBucketNameOf(state.identity.name)}
-            ownBucketPending
             firstImport={{ hasHoldings: false, connected: false }}
             onChange={(patch) => {
               onChange({ portfolio: { ...state.portfolio, ...patch } });
             }}
           />
-          <BucketAdder />
         </Section>
       )}
       {state.roles.data && (

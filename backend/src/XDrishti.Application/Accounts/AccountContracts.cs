@@ -165,7 +165,9 @@ public sealed record FirstImportInput(IReadOnlyList<ImportRowInput>? Rows);
 /// imported), "deferred" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or
 /// "failed" (the settings were saved but the import was not: ErrorCode is <c>portfolio.import_failed</c>, Cause the code of the reason, for example
 /// <c>portfolio.not_connected</c>, <c>portfolio.sync_running</c>; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those
-/// among them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists.
+/// among them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists. Redated counts the lots that
+/// followed a changed first import date (imported lots still on the default date; they stay flagged as such), RedateSkipped the ones that could not follow
+/// because they were closed before the new date; both are 0 when the date did not change or the account has no holdings (ADR 0015).
 /// </summary>
 public sealed record FirstImportView(
     string Status,
@@ -173,6 +175,8 @@ public sealed record FirstImportView(
     int DefaultDated,
     int AlreadyImported,
     int Unknown,
+    int Redated,
+    int RedateSkipped,
     string? ErrorCode,
     string? Cause,
     string? Message);

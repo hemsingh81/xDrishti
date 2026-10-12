@@ -137,9 +137,9 @@ public sealed class HoldingsImportTests(ApiFactory factory) : HoldingsTestBase(f
 
         (first.Status, first.Imported, first.DefaultDated).ShouldBe(("imported", 4, 4));
         (await Factory.HoldingAsync("ALPHA", Ct)).Lots.Single().ShouldSatisfyAllConditions(
-            l => l.AcquiredOn.ShouldBe(new DateOnly(2024, 2, 2)),
+            l => l.AcquiredOn.ShouldBe(new DateOnly(2024, 3, 3)), // the second save changed the date: the default-dated lot followed (ADR 0015)
             l => l.UsesDefaultDate.ShouldBeTrue());
-        (second.Status, second.Imported).ShouldBe(("skipped", 0));
+        (second.Status, second.Imported, second.Redated).ShouldBe(("skipped", 0, 4));
         third.Status.ShouldBe("skipped");
         HoldingRequests.Count.ShouldBe(requests); // an account with holdings is not asked Dhan again
         (await Factory.CountAsync("portfolio.holdings", Ct)).ShouldBe(4);

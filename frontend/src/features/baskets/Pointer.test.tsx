@@ -4,9 +4,9 @@ import { basketIds, membersGrid, renderBaskets, symbolsShown } from './testing';
 
 const toast = () => screen.findByRole('alert');
 const grip = (symbol: string) => screen.getByRole('button', { name: `Drag ${symbol}` });
-// Rows are stacked from y = 200 (40 high) at x 300-900; the cards from y = 100 (90 apart) at x 0-280.
+// Rows are stacked from y = 200 (40 high) at x 300-900; the cards are a row at y 100-180, 250 px apart, 240 wide.
 const overRow = (index: number) => ({ clientX: 500, clientY: 200 + index * 40 + 20 });
-const overCard = (index: number) => ({ clientX: 140, clientY: 100 + index * 90 + 40 });
+const overCard = (index: number) => ({ clientX: index * 250 + 120, clientY: 140 });
 
 describe('Baskets page: drag with the mouse and touch', () => {
   it('reorders by dragging a row onto another row', async () => {

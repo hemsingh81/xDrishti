@@ -22,7 +22,7 @@ export function AsOfField({ value, onChange }: AsOfFieldProps) {
           if (next <= todayIso()) onChange(next === '' ? null : next);
         }}
         slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: todayIso() } }}
-        sx={{ width: 170 }}
+        sx={{ width: 150 }}
       />
       {value && (
         <Button

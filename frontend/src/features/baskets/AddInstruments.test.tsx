@@ -6,7 +6,7 @@ import { problemResponse, server } from '@/test/server';
 import { basketIds, membersGrid, renderBaskets, symbolsShown } from './testing';
 
 async function openAdd() {
-  await userEvent.click(screen.getAllByRole('button', { name: 'Add instruments' })[0]!);
+  await userEvent.click(screen.getByRole('button', { name: 'Add' }));
   const dialog = await screen.findByRole('dialog', { name: 'Add instruments to MyChoice' });
   await within(dialog).findByRole('list', { name: 'Instruments to add' });
   return within(dialog);

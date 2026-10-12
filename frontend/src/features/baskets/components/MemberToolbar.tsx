@@ -14,7 +14,10 @@ interface MemberToolbarProps {
 
 type Verb = 'copy' | 'move';
 
-/** Actions over the selected members: Copy to…, Move to… (menus of the other baskets) and Remove. */
+/**
+ * A slim row above the grid, there only while something is selected: how many, Clear selection, and the actions over
+ * them: Copy to…, Move to… (menus of the other baskets) and Remove.
+ */
 export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarProps) {
   const { basket, others, busy, transfer, remove } = useMemberPanel();
   const [menu, setMenu] = useState<{ anchor: HTMLElement; mode: Verb } | null>(null);
@@ -22,7 +25,6 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
   const ids = picked.map((m) => m.instrument.id);
   const count = ids.length;
   const label = subject(count, picked[0]?.instrument.symbol ?? '');
-  const idle = count === 0;
   // A portfolio basket's rows can only be copied out: no Move to…, no Remove.
   const readOnly = basket.system;
   const guard = (action: () => void) => () => {
@@ -32,25 +34,30 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
     if (!busy) setMenu({ anchor: event.currentTarget, mode });
   };
 
+  if (count === 0) return null;
+
   return (
     <Stack
       direction="row"
-      sx={{ flexWrap: 'wrap', gap: 1.5, alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1 }}
+      sx={{
+        flexWrap: 'wrap',
+        gap: 1.5,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        px: 2,
+        py: 0.75,
+        borderBottom: 1,
+        borderColor: 'divider',
+      }}
     >
-      {idle ? (
-        <Typography role="status" color="text.secondary">
-          {readOnly ? 'Select instruments to copy them to a basket' : 'Select instruments to copy, move or remove them'}
+      <Stack direction="row" sx={{ columnGap: 1, alignItems: 'center' }}>
+        <Typography role="status" sx={{ fontWeight: 600 }}>
+          {`${formatNumber(count)} selected`}
         </Typography>
-      ) : (
-        <Stack direction="row" sx={{ columnGap: 1, alignItems: 'center' }}>
-          <Typography role="status" sx={{ fontWeight: 600 }}>
-            {`${formatNumber(count)} selected`}
-          </Typography>
-          <Button size="small" onClick={onClear}>
-            Clear selection
-          </Button>
-        </Stack>
-      )}
+        <Button size="small" onClick={onClear}>
+          Clear selection
+        </Button>
+      </Stack>
       <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
         {(readOnly ? (['copy'] as const) : (['copy', 'move'] as const)).map((mode) => (
           <Button
@@ -58,7 +65,7 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
             size="small"
             variant="outlined"
             aria-haspopup="menu"
-            disabled={idle || others.length === 0}
+            disabled={others.length === 0}
             aria-disabled={busy || undefined}
             onClick={open(mode)}
           >
@@ -69,7 +76,6 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
           <Button
             size="small"
             variant="outlined"
-            disabled={idle}
             aria-disabled={busy || undefined}
             onClick={guard(() => {
               void remove(ids, label).then((done) => {
@@ -77,7 +83,7 @@ export function MemberToolbar({ members, selectedIds, onClear }: MemberToolbarPr
               });
             })}
           >
-            {idle ? 'Remove' : `Remove (${formatNumber(count)})`}
+            {`Remove (${formatNumber(count)})`}
           </Button>
         )}
       </Stack>

@@ -18,8 +18,9 @@ import { BasketsWorkspace } from './BasketsWorkspace';
 type Editor = { kind: 'create' } | { kind: 'edit'; basket: Basket } | null;
 
 /**
- * The Baskets screen. From `md` up it fills the viewport under the top bar (the cards and the members grid scroll
- * inside themselves); below `md` the page scrolls. The selected basket and the look-back date live in the URL.
+ * The Baskets screen, laid out as in the prototype: the title row, a row of basket cards across the top, then the
+ * selected basket's members beside two insight cards. The page scrolls; only a long members list scrolls inside its
+ * card. The selected basket and the look-back date live in the URL.
  */
 export function BasketsPage() {
   return (
@@ -57,17 +58,17 @@ function BasketsContent() {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
       <PageHeader
-        dense
         title="Baskets"
         icon={ShoppingBasketIcon}
         hue="baskets"
-        description="Group instruments in baskets. Drag rows onto a basket to copy them (hold Alt or Option to move) or use the Copy to and Move to menus."
+        description="Group tracked instruments. Baskets define what the nightly plan scans, Strategy Lab universes, report lenses and portfolio grouping."
         actions={
           <Button
             variant="contained"
             startIcon={<AddIcon />}
+            sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
             onClick={() => {
               setEditor({ kind: 'create' });
             }}

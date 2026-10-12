@@ -30,10 +30,11 @@ describe('Baskets page', () => {
     const cards = within(list).getAllByRole('listitem');
     expect(cards).toHaveLength(3);
     expect(cards[0]).toHaveTextContent('MyChoice');
-    expect(cards[0]).toHaveTextContent('Trading');
+    expect(cards[0]).toHaveTextContent('manual');
+    expect(cards[0]).toHaveTextContent('trading');
     expect(cards[0]).toHaveTextContent('3 instruments');
     expect(cards[1]).toHaveTextContent('MyLongTerm');
-    expect(cards[1]).toHaveTextContent('Long-term');
+    expect(cards[1]).toHaveTextContent('long-term');
     expect(cards[1]).toHaveTextContent('0 instruments');
     expect(cards[2]).toHaveTextContent('Best stocks');
 
@@ -43,7 +44,7 @@ describe('Baskets page', () => {
     expect(basketCard('MyChoice')).toHaveAttribute('aria-current', 'true');
   });
 
-  it('shows name, type, sector, tracked status and the added date of each member', async () => {
+  it('shows name, type, sector and tracked status of each member (the added date is in the history)', async () => {
     renderBaskets();
     await membersGrid();
 
@@ -52,7 +53,7 @@ describe('Baskets page', () => {
     expect(within(tcs).getByText('Share')).toBeInTheDocument();
     expect(within(tcs).getByText('Information Technology')).toBeInTheDocument();
     expect(within(tcs).getByText('Not tracked')).toBeInTheDocument();
-    expect(within(tcs).getByText(/Oct 2026/)).toBeInTheDocument();
+    expect(within(tcs).queryByText(/Oct 2026/)).not.toBeInTheDocument();
     expect(within(tcs).getByRole('link', { name: 'NSE:TCS' })).toHaveAttribute(
       'href',
       expect.stringContaining('/instruments?id='),
@@ -88,7 +89,7 @@ describe('Baskets page', () => {
     renderBaskets({ members: {} });
 
     expect(await screen.findByText('This basket is empty — add instruments')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Add instruments' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Add instruments' })).toBeInTheDocument();
   });
 
   it('shows a loading state, then an error with Retry when the baskets cannot be loaded', async () => {

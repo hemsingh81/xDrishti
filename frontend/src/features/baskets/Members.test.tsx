@@ -90,7 +90,7 @@ describe('Baskets page: removing members', () => {
       expect(symbolsShown()).toEqual(['NSE:RELIANCE']);
     });
     expect(fake.calls.remove).toHaveLength(1);
-    expect(screen.getByText('Select instruments to copy, move or remove them')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Clear selection' })).not.toBeInTheDocument();
   });
 
   it('keeps the rows and says why when the removal fails', async () => {
@@ -223,7 +223,8 @@ describe('Baskets page: view as of a date', () => {
     expect(screen.queryByRole('button', { name: /^Drag / })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Add instruments' })[0]).toBeDisabled();
+    expect(screen.queryByRole('textbox', { name: 'Add instrument' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
     // The member that left later says when.
     expect(screen.getByRole('row', { name: /NSE:YESBANK/ })).toHaveTextContent(/Jun 2025/);
 

@@ -18,6 +18,8 @@ interface AddInstrumentsDialogProps {
   basket: Basket;
   /** Instrument ids that are members now (they are shown, ticked and disabled). */
   memberIds: ReadonlySet<string>;
+  /** What was typed in the add row: the search the dialog opens with. */
+  initialQuery?: string;
   onClose: () => void;
 }
 
@@ -25,10 +27,10 @@ interface AddInstrumentsDialogProps {
  * Search the master list (or only the tracked instruments), tick any number of instruments, add them. The ticks are
  * kept across searches. Instruments that are not tracked are tracked on the way; retired ones cannot be added.
  */
-export function AddInstrumentsDialog({ basket, memberIds, onClose }: AddInstrumentsDialogProps) {
+export function AddInstrumentsDialog({ basket, memberIds, initialQuery = '', onClose }: AddInstrumentsDialogProps) {
   const { notify } = useToast();
   const add = useAddMembers();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialQuery);
   const [scope, setScope] = useState<CandidateScope>('all');
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [labels, setLabels] = useState<ReadonlyMap<string, string>>(new Map());

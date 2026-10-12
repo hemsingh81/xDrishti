@@ -16,7 +16,7 @@ const orderColumn: Column = {
   id: 'order',
   header: 'Order',
   kind: 'handle',
-  width: 64,
+  width: 48,
   render: (m) => <MemberHandle id={m.instrument.id} symbol={m.instrument.symbol} />,
 };
 
@@ -38,6 +38,7 @@ const symbolColumn: Column = {
 const nameColumn: Column = {
   id: 'name',
   header: 'Name',
+  hideBelow: 'xl',
   grow: true,
   minWidth: 140,
   accessor: (m) => m.instrument.displayName,
@@ -46,6 +47,7 @@ const nameColumn: Column = {
 const typeColumn: Column = {
   id: 'type',
   header: 'Type',
+  hideBelow: 'lg',
   render: (m) => <Chip size="small" variant="outlined" label={typeLabel(m.instrument.type)} />,
 };
 
@@ -77,7 +79,7 @@ const statusColumn: Column = {
 const addedColumn: Column = {
   id: 'added',
   header: 'Added',
-  hideBelow: 'lg',
+  hideBelow: 'xl',
   accessor: (m) => formatDate(m.validFrom),
 };
 
@@ -93,7 +95,7 @@ const actionsColumn: Column = {
   id: 'actions',
   header: 'Actions',
   kind: 'handle',
-  width: 96,
+  width: 80,
   render: (m) => <MemberActions member={m} />,
 };
 
@@ -113,14 +115,23 @@ const accountColumn: Column = {
   accessor: (m) => m.accountName ?? dash,
 };
 
+/** Portfolio baskets have the quantity column too, so the type joins later (from `xl`). */
+const portfolioTypeColumn: Column = { ...typeColumn, hideBelow: 'xl' };
+
 /** The grip of a portfolio row only starts a copy to one of the owner's baskets. */
 const copyHandleColumn: Column = { ...orderColumn, id: 'copy', header: 'Copy' };
 
+/**
+ * The members card is about half the page, so the columns are chosen by width instead of scrolling sideways. Widths of
+ * what is always there (selection 48, grip 48, symbol ~115, status ~110, actions 80) come to ~400 px; type (+70) joins
+ * from `lg` (1200 px, where the card is ~530 px or more), name, sector and added (+185, +165, +95) from `xl`.
+ */
 const identity = [symbolColumn, nameColumn, typeColumn, sectorColumn, statusColumn];
 const shared = [...identity, addedColumn];
 
 /** The columns of the current members: with the drag grip first and copy / move / remove last. */
-export const editableColumns: readonly Column[] = [orderColumn, ...shared, actionsColumn];
+// The added date is in the history drawer; leaving it out keeps the table inside its half of the page.
+export const editableColumns: readonly Column[] = [orderColumn, ...identity, actionsColumn];
 
 /** The columns of a look-back view: read only, so no grip and no actions. */
 export const lookBackColumns: readonly Column[] = [...shared, removedColumn];
@@ -128,7 +139,11 @@ export const lookBackColumns: readonly Column[] = [...shared, removedColumn];
 /** The columns of a portfolio basket: copy grip first, quantity and account instead of the added date, then Copy. */
 export const portfolioColumns: readonly Column[] = [
   copyHandleColumn,
-  ...identity,
+  symbolColumn,
+  nameColumn,
+  portfolioTypeColumn,
+  sectorColumn,
+  statusColumn,
   quantityColumn,
   accountColumn,
   actionsColumn,

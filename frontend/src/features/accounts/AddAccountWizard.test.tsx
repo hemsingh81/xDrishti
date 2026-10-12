@@ -1,8 +1,8 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { externalNavigation } from '@/shared/lib/externalNavigation';
-import { buildAccountDetail, buildBucket, buildBuckets, ids } from '@/test/fixtures';
+import { buildAccountDetail, ids } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { createStepUpGate, dhanAuthorizeUrl, dhanRedirectUrl, problemResponse, server } from '@/test/server';
 import { AccountsPage } from './components/AccountsPage';
@@ -101,9 +101,7 @@ describe('Add-account wizard', () => {
 
     expect(await within(dialog).findByRole('region', { name: 'Trading settings' })).toBeInTheDocument();
     expect(within(dialog).getByLabelText(/^Risk profile/)).toHaveDisplayValue('Standard');
-    expect(within(dialog).getByLabelText(/^Default bucket/)).toHaveDisplayValue(
-      'Dhan · Main · Portfolio — account’s own bucket (created automatically)',
-    );
+    expect(within(dialog).queryByLabelText(/bucket/i)).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText(/history/i)).not.toBeInTheDocument();
     await fillSettings(dialog);
 
@@ -139,7 +137,6 @@ describe('Add-account wizard', () => {
           overrides: { riskPerTradePct: null, maxNewEntriesPerDay: null, maxOpenPositions: null, dailyLossPct: null },
         },
         portfolio: {
-          defaultBucket: null,
           includeInTotals: true,
           refreshMode: 'off',
           refreshDailyTimeIst: '16:00',
@@ -150,47 +147,47 @@ describe('Add-account wizard', () => {
     ]);
   });
 
-  it('offers the own bucket and custom buckets only, with only the first import date (no list, no account yet)', async () => {
-    server.use(
-      http.get('/api/portfolio-buckets', () =>
-        HttpResponse.json([
-          ...buildBuckets(),
-          buildBucket({ id: '00000000-0000-4000-8000-0000000000b2', name: 'MyLongTerm' }),
-        ]),
-      ),
-    );
+  it('has no bucket choices: a calendar for the first import date, the totals checkbox and the auto refresh', async () => {
     renderPage();
     const dialog = await openWizard();
     await fillDhanApp(dialog);
     await next(dialog);
     await next(dialog);
 
-    const select = await within(dialog).findByLabelText(/^Default bucket/);
-    expect(
-      within(select)
-        .getAllByRole('option')
-        .map((o) => o.textContent),
-    ).toEqual(['Dhan · Main · Portfolio — account’s own bucket (created automatically)', 'MyLongTerm']);
-    expect(within(select).queryByRole('option', { name: /Test Dhan Main/ })).not.toBeInTheDocument();
-    expect(within(dialog).queryByLabelText(/Import trade|history/i)).not.toBeInTheDocument();
-    // No account yet: only the date, and a note that the first sync after connecting imports.
-    expect(within(dialog).getByLabelText('First import date')).toHaveValue('2025-01-01');
-    expect(within(dialog).getByText(/import on the first sync after connecting/)).toBeInTheDocument();
-    expect(within(dialog).queryByRole('region', { name: 'First import' })).not.toBeInTheDocument();
-    // The label stays above the value (regression: it used to overlap the own bucket's text).
-    expect(within(dialog).getByText('Default bucket', { selector: 'label' })).toHaveAttribute('data-shrink', 'true');
-    expect(within(dialog).queryByRole('table')).not.toBeInTheDocument();
-    expect(within(dialog).getByRole('radio', { name: 'Off' })).toBeChecked();
+    const section = await within(dialog).findByRole('region', { name: 'Portfolio settings' });
+    expect(within(section).queryByLabelText(/bucket/i)).not.toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: 'Add bucket' })).not.toBeInTheDocument();
+    expect(within(section).queryByRole('combobox')).not.toBeInTheDocument();
+    // No account yet: a calendar with the default, and a note that the first sync after connecting imports.
+    const date = within(section).getByLabelText('First import date');
+    expect(date).toHaveAttribute('type', 'date');
+    expect(date).toHaveAttribute('min', '1990-01-01');
+    expect(date).toHaveAttribute('max', istDayIso());
+    expect(date).toHaveValue('2025-01-01');
+    expect(within(section).getByText(/imports them with this date/)).toBeInTheDocument();
+    expect(within(section).getByRole('checkbox', { name: 'Include in portfolio totals' })).toBeChecked();
+    expect(within(section).getByRole('radio', { name: 'Off' })).toBeChecked();
   });
 
-  it('follows the typed name in the own bucket and sends a chosen custom bucket without a date', async () => {
+  it('blocks a future first import date on the way to the review', async () => {
+    renderPage();
+    const dialog = await openWizard();
+    await fillDhanApp(dialog);
+    await next(dialog);
+    await next(dialog);
+
+    fireEvent.change(await within(dialog).findByLabelText('First import date'), { target: { value: '2999-01-01' } });
+    await next(dialog);
+
+    expect(await within(dialog).findByText('The date cannot be in the future.')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Check the details, then create the account.')).not.toBeInTheDocument();
+  });
+
+  it('sends the chosen first import date and no bucket with the new account', async () => {
     const gate = createStepUpGate();
     const bodies: Record<string, unknown>[] = [];
     server.use(
       gate.handler,
-      http.get('/api/portfolio-buckets', () =>
-        HttpResponse.json([buildBucket({ id: '00000000-0000-4000-8000-0000000000b2', name: 'MyLongTerm' })]),
-      ),
       http.post('/api/accounts', async ({ request }) => {
         const denied = gate.require();
         if (denied) {
@@ -203,19 +200,15 @@ describe('Add-account wizard', () => {
     renderPage();
     const dialog = await openWizard();
     await fillDhanApp(dialog);
-    const name = within(dialog).getByLabelText(/^Display name/);
-    await userEvent.clear(name);
-    await userEvent.type(name, 'My Dhan');
     await next(dialog);
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Data' }));
     await next(dialog);
 
-    const select = await within(dialog).findByLabelText(/^Default bucket/);
-    expect(select).toHaveDisplayValue('My Dhan · Portfolio — account’s own bucket (created automatically)');
-    await userEvent.selectOptions(select, 'MyLongTerm');
+    fireEvent.change(await within(dialog).findByLabelText('First import date'), { target: { value: '2024-06-03' } });
     await next(dialog);
     expect(await within(dialog).findByText('Check the details, then create the account.')).toBeInTheDocument();
-    expect(within(dialog).getByText('MyLongTerm')).toBeInTheDocument();
+    expect(within(dialog).getByText('3 Jun 2024')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/bucket/i)).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create account' }));
     const passwordDialog = await screen.findByRole('dialog', { name: 'Confirm your password' });
     await userEvent.type(within(passwordDialog).getByLabelText(/Password/), 'correct-password');
@@ -225,11 +218,10 @@ describe('Add-account wizard', () => {
       expect(bodies).toHaveLength(1);
     });
     expect(bodies[0]?.portfolio).toEqual({
-      defaultBucket: 'MyLongTerm',
       includeInTotals: true,
       refreshMode: 'off',
       refreshDailyTimeIst: '16:00',
-      firstImportDate: '2025-01-01',
+      firstImportDate: '2024-06-03',
     });
   });
 
@@ -269,20 +261,11 @@ describe('Add-account wizard', () => {
       expect(bodies).toHaveLength(1);
     });
     expect(bodies[0]?.portfolio).toEqual({
-      defaultBucket: null,
       includeInTotals: true,
       refreshMode: 'daily',
       refreshDailyTimeIst: '09:30',
       firstImportDate: '2025-01-01',
     });
-  });
-
-  it('shows the own bucket name in the review', async () => {
-    renderPage();
-    const dialog = await openWizard();
-    await reachReview(dialog);
-
-    expect(within(dialog).getByText('Dhan · Main · Portfolio')).toBeInTheDocument();
   });
 
   it('asks Dhan for a client id, both secrets and the day the key was generated', async () => {

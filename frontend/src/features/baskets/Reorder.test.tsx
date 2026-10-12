@@ -7,7 +7,7 @@ const rowBox = (symbol: string) => screen.getByRole('checkbox', { name: `Select 
 const cardNames = () =>
   within(screen.getByRole('list', { name: 'Baskets' }))
     .getAllByRole('listitem')
-    .map((card) => /^(.*?)(Trading|Long-term|Watch)/.exec(card.textContent)?.[1]);
+    .map((card) => /^(.*?)manual/.exec(card.textContent)?.[1]);
 
 describe('Baskets page: reordering members', () => {
   it('moves a member down with the keyboard and tells the screen reader', async () => {
@@ -109,7 +109,7 @@ describe('Baskets page: reordering baskets', () => {
     await membersGrid();
     expect(cardNames()).toEqual(['MyChoice', 'MyLongTerm', 'Best stocks']);
 
-    await dragWithKeyboard('Reorder MyChoice', ['{ArrowDown}']);
+    await dragWithKeyboard('Reorder MyChoice', ['{ArrowRight}']);
 
     expect(cardNames()).toEqual(['MyLongTerm', 'MyChoice', 'Best stocks']);
     expect(fake.calls.reorderBaskets).toEqual([[basketIds.myLongTerm, basketIds.myChoice, basketIds.bestStocks]]);
@@ -122,7 +122,7 @@ describe('Baskets page: reordering baskets', () => {
     await membersGrid();
     fake.failNext('reorder-baskets', 409, 'baskets.conflict', 'Changed meanwhile.');
 
-    await dragWithKeyboard('Reorder MyChoice', ['{ArrowDown}']);
+    await dragWithKeyboard('Reorder MyChoice', ['{ArrowRight}']);
 
     expect(await screen.findByText(/changed somewhere else at the same moment/)).toBeInTheDocument();
     await screen.findAllByRole('listitem');
@@ -135,7 +135,7 @@ describe('Baskets page: reordering baskets', () => {
     await membersGrid();
     fake.failNext('reorder-baskets', 400, 'baskets.invalid', 'The list must hold every basket exactly once.');
 
-    await dragWithKeyboard('Reorder MyChoice', ['{ArrowDown}']);
+    await dragWithKeyboard('Reorder MyChoice', ['{ArrowRight}']);
 
     expect(await screen.findByText('The basket changed; it has been reloaded.')).toBeInTheDocument();
     await screen.findAllByRole('listitem');

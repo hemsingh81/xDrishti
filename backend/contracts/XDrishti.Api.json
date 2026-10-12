@@ -4215,6 +4215,8 @@
           "defaultDated",
           "alreadyImported",
           "unknown",
+          "redated",
+          "redateSkipped",
           "errorCode",
           "cause",
           "message"
@@ -4240,6 +4242,14 @@
             "type": "integer",
             "format": "int32"
           },
+          "redated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "redateSkipped": {
+            "type": "integer",
+            "format": "int32"
+          },
           "errorCode": {
             "type": [
               "null",
@@ -4259,7 +4269,7 @@
             ]
           }
         },
-        "description": "What a first import did. Status: \"imported\" (the holdings were created; the counts say how many), \"skipped\" (the account already has holdings, nothing was\nimported), \"deferred\" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or\n\"failed\" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example\n`portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those\namong them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists."
+        "description": "What a first import did. Status: \"imported\" (the holdings were created; the counts say how many), \"skipped\" (the account already has holdings, nothing was\nimported), \"deferred\" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or\n\"failed\" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example\n`portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those\namong them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists. Redated counts the lots that\nfollowed a changed first import date (imported lots still on the default date; they stay flagged as such), RedateSkipped the ones that could not follow\nbecause they were closed before the new date; both are 0 when the date did not change or the account has no holdings (ADR 0015)."
       },
       "HoldingLots": {
         "required": [

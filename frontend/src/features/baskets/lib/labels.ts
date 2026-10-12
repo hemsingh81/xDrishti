@@ -16,6 +16,9 @@ export const purposeOptions: readonly { value: BasketPurpose; label: string }[] 
 export const purposeLabel = (purpose: string): string =>
   purpose in purposeChip ? purposeChip[purpose as BasketPurpose] : purpose;
 
+/** Purpose → the lower-case tag on a basket card, as in the prototype (`trading`, `long-term`, `watch`). */
+export const purposeTag = (purpose: string): string => purpose.replace('_', '-');
+
 const typeLabels: Readonly<Record<string, string>> = { share: 'Share', etf: 'ETF', index: 'Index', future: 'Future' };
 
 export const typeLabel = (type: string): string => typeLabels[type] ?? type;

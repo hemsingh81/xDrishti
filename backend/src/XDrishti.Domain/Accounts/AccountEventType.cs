@@ -36,4 +36,5 @@ public enum AccountEventType
     BasketMembersRemoved,
     BasketMembersReordered,
     BasketMembersTransferred,
+    FirstImportDateChanged,
 }

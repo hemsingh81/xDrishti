@@ -36,26 +36,25 @@ afterEach(() => {
 });
 
 describe('Baskets page: the Portfolio group', () => {
-  it('lists the portfolio baskets in their own group above the owner’s baskets', async () => {
+  it('lists the portfolio baskets first in the same row of cards, as `portfolio` with a lock, without group headings', async () => {
     renderBaskets({ portfolio: portfolioSeeds });
 
-    const portfolioList = await screen.findByRole('list', { name: 'Portfolio baskets' });
-    const manualList = screen.getByRole('list', { name: 'Baskets' });
-    const cards = within(portfolioList).getAllByRole('listitem');
-    expect(cards).toHaveLength(2);
+    const cards = within(await screen.findByRole('list', { name: 'Baskets' })).getAllByRole('listitem');
+    expect(cards).toHaveLength(5);
     expect(cards[0]).toHaveTextContent('Dhan · Main · Portfolio');
-    expect(cards[0]).toHaveTextContent('Portfolio');
-    expect(cards[0]).toHaveTextContent('Dhan · Main');
+    expect(cards[0]).toHaveTextContent('portfolio');
     expect(cards[0]).toHaveTextContent('2 instruments');
+    expect(cards[0]?.querySelector('[data-testid="LockOutlinedIcon"]')).not.toBeNull();
     expect(cards[1]).toHaveTextContent('Retirement bucket');
     expect(cards[1]).toHaveTextContent('0 instruments');
-    expect(within(manualList).getAllByRole('listitem')).toHaveLength(3);
-
-    const portfolioHeading = screen.getByRole('heading', { level: 2, name: 'Portfolio' });
-    const manualHeading = screen.getByRole('heading', { level: 2, name: 'Your baskets' });
-    expect(portfolioHeading.compareDocumentPosition(portfolioList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(portfolioList.compareDocumentPosition(manualHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(manualHeading.compareDocumentPosition(manualList) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(cards.slice(2).map((card) => card.textContent)).toEqual([
+      expect.stringContaining('MyChoice'),
+      expect.stringContaining('MyLongTerm'),
+      expect.stringContaining('Best stocks'),
+    ]);
+    expect(cards[2]).toHaveTextContent('manual');
+    expect(screen.queryByRole('heading', { name: 'Portfolio' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Your baskets' })).not.toBeInTheDocument();
   });
 
   it('still opens the first of the owner’s baskets, not the portfolio group above them', async () => {
@@ -99,12 +98,12 @@ describe('Baskets page: the Portfolio group', () => {
     expect(portfolioCard('Dhan · Main · Portfolio')).toHaveAttribute('aria-current', 'true');
   });
 
-  it('shows only the portfolio group, and an invitation to create a basket, when the owner has none', async () => {
+  it('shows only the portfolio cards, and an invitation to create a basket, when the owner has none', async () => {
     renderBaskets({ baskets: [], members: {}, portfolio: portfolioSeeds });
 
     expect(await screen.findByRole('heading', { level: 2, name: 'Dhan · Main · Portfolio' })).toBeInTheDocument();
     expect(screen.getByText('No baskets of your own yet — create one with New basket.')).toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Baskets' })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Baskets' })).getAllByRole('listitem')).toHaveLength(2);
   });
 });
 
@@ -114,7 +113,9 @@ describe('Baskets page: a portfolio basket is read only', () => {
 
     expect(screen.getByText('Portfolio · read only')).toBeInTheDocument();
     expect(
-      screen.getByText("Portfolio baskets follow the account's holdings and can't be archived or edited."),
+      screen.getByText(
+        "Portfolio — follows the account's holdings; read only. Copy instruments to one of your baskets.",
+      ),
     ).toBeInTheDocument();
     const grid = screen.getByRole('grid', { name: 'Basket members' });
     expect(
@@ -132,15 +133,20 @@ describe('Baskets page: a portfolio basket is read only', () => {
   it('has no archive, edit, history, as-of, add or remove controls, and cannot be reordered', async () => {
     await openPortfolio();
 
-    for (const name of ['Archive', 'Edit', 'History', 'Add instruments', 'Move to…', 'Remove']) {
+    for (const name of ['Archive', 'Edit', 'History', 'Add instruments', 'Add', 'Move to…', 'Remove']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
+    expect(screen.queryByRole('textbox', { name: 'Add instrument' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('View as of')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Remove NSE:/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Copy or move / })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Reorder Dhan/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy to…' })).toBeDisabled();
-    expect(screen.getByText('Select instruments to copy them to a basket')).toBeInTheDocument();
+    // The selection toolbar is there only while something is selected, and then offers Copy to… alone.
+    expect(screen.queryByRole('button', { name: 'Copy to…' })).not.toBeInTheDocument();
+    await userEvent.click(rowBox('NSE:TCS'));
+    expect(screen.getByRole('button', { name: 'Copy to…' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /^Move to/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument();
   });
 
   it('does not send the look-back date of the URL for a portfolio basket', async () => {
@@ -214,12 +220,12 @@ describe('Baskets page: copying out of a portfolio basket', () => {
     stubLayout();
     const { fake } = await openPortfolio();
 
-    await dragWithKeyboard('Drag NSE:TCS to copy', ['{ArrowLeft}'], ['Alt']);
+    await dragWithKeyboard('Drag NSE:TCS to copy', ['{ArrowUp}'], ['Alt']);
 
-    expect(announced()).toBe('Dropped NSE:TCS on basket MyLongTerm.');
-    expect(await toast()).toHaveTextContent(/^Copied NSE:TCS to MyLongTerm/);
+    expect(announced()).toBe('Dropped NSE:TCS on basket Best stocks.');
+    expect(await toast()).toHaveTextContent(/^Copied NSE:TCS to Best stocks/);
     expect(fake.calls.transfer).toEqual([
-      expect.objectContaining({ fromBasketId: dhan, toBasketId: basketIds.myLongTerm, mode: 'copy' }),
+      expect.objectContaining({ fromBasketId: dhan, toBasketId: basketIds.bestStocks, mode: 'copy' }),
     ]);
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
     expect(symbolsShown()).toEqual(['NSE:TCS', 'NSE:RELIANCE']);
@@ -231,14 +237,14 @@ describe('Baskets page: copying out of a portfolio basket', () => {
     const grip = screen.getByRole('button', { name: 'Drag NSE:TCS to copy' });
 
     fireEvent.mouseDown(grip, { button: 0, clientX: 320, clientY: 220 });
-    fireEvent.mouseMove(document, { clientX: 200, clientY: 230 });
-    fireEvent.mouseMove(document, { clientX: 140, clientY: 230, altKey: true });
+    fireEvent.mouseMove(document, { clientX: 400, clientY: 150 });
+    fireEvent.mouseMove(document, { clientX: 370, clientY: 140, altKey: true });
     const hot = document.querySelectorAll('[data-drop-target]');
     expect(hot).toHaveLength(1);
     expect(hot[0]).toHaveAttribute('data-drop-target', 'copy');
     expect(hot[0]).toHaveTextContent('MyLongTerm');
     expect(hot[0]).toHaveTextContent('Drop to copy here');
-    fireEvent.mouseUp(document, { clientX: 140, clientY: 230, altKey: true });
+    fireEvent.mouseUp(document, { clientX: 370, clientY: 140, altKey: true });
 
     expect(await toast()).toHaveTextContent(/^Copied NSE:TCS to MyLongTerm/);
     expect(fake.calls.transfer).toEqual([expect.objectContaining({ mode: 'copy' })]);
@@ -319,14 +325,20 @@ describe('Baskets page: portfolio baskets are never a target', () => {
     const { fake } = renderBaskets({ portfolio: portfolioSeeds });
     await membersGrid();
 
-    await dragWithKeyboard('Reorder MyChoice', ['{ArrowDown}']);
+    await dragWithKeyboard('Reorder MyChoice', ['{ArrowRight}']);
 
     await waitFor(() => {
       expect(fake.calls.reorderBaskets).toHaveLength(1);
     });
     expect(fake.calls.reorderBaskets[0]).toEqual([basketIds.myLongTerm, basketIds.myChoice, basketIds.bestStocks]);
-    const portfolioList = screen.getByRole('list', { name: 'Portfolio baskets' });
-    expect(within(portfolioList).getAllByRole('listitem')).toHaveLength(2);
+    const cards = within(screen.getByRole('list', { name: 'Baskets' })).getAllByRole('listitem');
+    expect(cards.map((card) => card.textContent.slice(0, 8))).toEqual([
+      'Dhan · M',
+      'Retireme',
+      'MyLongTe',
+      'MyChoice',
+      'Best sto',
+    ]);
   });
 });
 

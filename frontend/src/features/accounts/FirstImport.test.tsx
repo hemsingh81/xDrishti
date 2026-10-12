@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildAccountDetail, buildConnection, buildFirstImportView, buildPortfolioSaved, ids } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
-import { server } from '@/test/server';
+import { problemResponse, server } from '@/test/server';
+import { istDayIso } from '@/shared/lib/format';
 import { AccountsPage } from './components/AccountsPage';
 
 const connectedNoHoldings = () => {
@@ -35,12 +36,16 @@ function captureSaves(answer: () => ReturnType<typeof buildPortfolioSaved>) {
 const save = () => userEvent.click(screen.getByRole('button', { name: 'Save portfolio settings' }));
 
 describe('Portfolio tab: first import date', () => {
-  it('shows the date beside the bucket and the totals checkbox, with one helper line and no list', async () => {
+  it('shows the date as a calendar beside the totals checkbox, with one helper line and no bucket', async () => {
     useAccount(connectedNoHoldings());
     renderPortfolioTab();
 
-    expect(await screen.findByLabelText('First import date')).toHaveValue('2025-01-01');
-    expect(screen.getByLabelText(/^Default bucket/)).toBeInTheDocument();
+    const date = await screen.findByLabelText('First import date');
+    expect(date).toHaveAttribute('type', 'date');
+    expect(date).toHaveValue('2025-01-01');
+    expect(date).toHaveAttribute('min', '1990-01-01');
+    expect(date).toHaveAttribute('max', istDayIso());
+    expect(screen.queryByLabelText(/bucket/i)).not.toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Include in portfolio totals' })).toBeInTheDocument();
     expect(screen.getByText(/Holdings are imported when you save/)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'First import' })).not.toBeInTheDocument();
@@ -53,15 +58,109 @@ describe('Portfolio tab: first import date', () => {
     renderPortfolioTab();
 
     expect(await screen.findByLabelText('First import date')).toBeInTheDocument();
-    expect(screen.getByText(/import on the first sync after connecting/)).toBeInTheDocument();
+    expect(screen.getByText(/first sync after connecting imports them with this date/)).toBeInTheDocument();
   });
 
-  it('shows the stored date read-only once the account has holdings', async () => {
+  it('keeps the date editable once the account has holdings, and says what changing it does', async () => {
     renderPortfolioTab();
 
-    expect(await screen.findByText(/Holdings refresh automatically/)).toBeInTheDocument();
-    expect(screen.queryByLabelText('First import date')).not.toBeInTheDocument();
-    expect(screen.getByText('2025-01-01')).toBeInTheDocument();
+    const date = await screen.findByLabelText('First import date');
+    expect(date).toBeEnabled();
+    expect(date).toHaveValue('2025-01-01');
+    expect(screen.getByText(/Changing it re-dates the holdings still on the default date\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Holdings are imported when you save/)).not.toBeInTheDocument();
+    expect(screen.queryByText('First import date:')).not.toBeInTheDocument();
+
+    fireEvent.change(date, { target: { value: '2024-03-04' } });
+    expect(date).toHaveValue('2024-03-04');
+  });
+
+  it('sends the changed date for an account with holdings and says how many holdings were re-dated', async () => {
+    const base = buildAccountDetail();
+    const bodies = captureSaves(() =>
+      buildPortfolioSaved(
+        buildAccountDetail({ portfolio: { ...base.portfolio, firstImportDate: '2024-06-03' } }),
+        buildFirstImportView({ status: 'skipped', imported: 0, defaultDated: 0, redated: 12 }),
+      ),
+    );
+    renderPortfolioTab();
+
+    fireEvent.change(await screen.findByLabelText('First import date'), { target: { value: '2024-06-03' } });
+    await save();
+
+    expect(await screen.findByText('Re-dated 12 holdings to 3 Jun 2024.')).toBeInTheDocument();
+    expect(bodies).toEqual([
+      { includeInTotals: true, refreshMode: 'off', refreshDailyTimeIst: '16:00', firstImportDate: '2024-06-03' },
+    ]);
+    expect(bodies[0]).not.toHaveProperty('defaultBucket');
+    expect(await screen.findByLabelText('First import date')).toHaveValue('2024-06-03');
+  });
+
+  it('says holding in the singular for one re-dated holding', async () => {
+    const base = buildAccountDetail();
+    captureSaves(() =>
+      buildPortfolioSaved(
+        buildAccountDetail({ portfolio: { ...base.portfolio, firstImportDate: '2024-06-03' } }),
+        buildFirstImportView({ status: 'skipped', imported: 0, defaultDated: 0, redated: 1 }),
+      ),
+    );
+    renderPortfolioTab();
+
+    fireEvent.change(await screen.findByLabelText('First import date'), { target: { value: '2024-06-03' } });
+    await save();
+
+    expect(await screen.findByText('Re-dated 1 holding to 3 Jun 2024.')).toBeInTheDocument();
+  });
+
+  it('adds a note when some lots could not be re-dated because they were closed before the new date', async () => {
+    const base = buildAccountDetail();
+    captureSaves(() =>
+      buildPortfolioSaved(
+        buildAccountDetail({ portfolio: { ...base.portfolio, firstImportDate: '2026-01-01' } }),
+        buildFirstImportView({ status: 'skipped', imported: 0, defaultDated: 0, redated: 4, redateSkipped: 2 }),
+      ),
+    );
+    renderPortfolioTab();
+
+    fireEvent.change(await screen.findByLabelText('First import date'), { target: { value: '2026-01-01' } });
+    await save();
+
+    expect(
+      await screen.findByText(
+        'Re-dated 4 holdings to 1 Jan 2026. 2 lots could not be re-dated because they were closed before that date.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('still reports skipped lots when none could be re-dated', async () => {
+    captureSaves(() =>
+      buildPortfolioSaved(
+        buildAccountDetail(),
+        buildFirstImportView({ status: 'skipped', imported: 0, defaultDated: 0, redated: 0, redateSkipped: 1 }),
+      ),
+    );
+    renderPortfolioTab();
+
+    await screen.findByLabelText('First import date');
+    await save();
+
+    expect(
+      await screen.findByText(
+        'Portfolio settings saved. 1 lot could not be re-dated because it was closed before that date.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Re-dated/)).not.toBeInTheDocument();
+  });
+
+  it('says only that the settings were saved when nothing was re-dated', async () => {
+    captureSaves(() => buildPortfolioSaved(buildAccountDetail()));
+    renderPortfolioTab();
+
+    await screen.findByLabelText('First import date');
+    await save();
+
+    expect(await screen.findByText('Portfolio settings saved.')).toBeInTheDocument();
+    expect(screen.queryByText(/Re-dated|could not be re-dated/)).not.toBeInTheDocument();
   });
 
   it('sends only the date (no rows) and reports how many holdings were imported', async () => {
@@ -73,9 +172,9 @@ describe('Portfolio tab: first import date', () => {
     await save();
 
     expect(await screen.findByText('Imported 3 holdings.')).toBeInTheDocument();
+    expect(bodies[0]).not.toHaveProperty('defaultBucket');
     expect(bodies).toEqual([
       {
-        defaultBucket: '',
         includeInTotals: true,
         refreshMode: 'off',
         refreshDailyTimeIst: '16:00',
@@ -107,17 +206,43 @@ describe('Portfolio tab: first import date', () => {
     expect(screen.queryByText(/^Imported/)).not.toBeInTheDocument();
   });
 
-  it('refuses a first import date in the future before asking the server', async () => {
-    useAccount(connectedNoHoldings());
+  it.each([
+    ['in the future', '2999-01-01', 'The date cannot be in the future.'],
+    ['before 1990', '1989-12-31', 'The date cannot be before 1 Jan 1990.'],
+    ['empty', '', 'Enter a date.'],
+  ])('refuses a first import date that is %s before asking the server', async (_name, value, message) => {
     const bodies = captureSaves(() => buildPortfolioSaved(buildAccountDetail()));
     renderPortfolioTab();
 
-    fireEvent.change(await screen.findByLabelText('First import date'), { target: { value: '2999-01-01' } });
+    fireEvent.change(await screen.findByLabelText('First import date'), { target: { value } });
     await save();
 
-    expect(await screen.findByText('The date cannot be in the future.')).toBeInTheDocument();
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.getByLabelText('First import date')).toBeInvalid();
     await waitFor(() => {
       expect(bodies).toHaveLength(0);
     });
+  });
+
+  it('shows the server’s message on the date field', async () => {
+    server.use(
+      http.put('/api/accounts/:id/portfolio', () =>
+        problemResponse(
+          {
+            title: 'Some values are not valid.',
+            code: 'accounts.invalid',
+            errors: { firstImportDate: ['The first import date cannot be in the future.'] },
+          },
+          400,
+        ),
+      ),
+    );
+    renderPortfolioTab();
+
+    await screen.findByLabelText('First import date');
+    await save();
+
+    expect(await screen.findByText('The first import date cannot be in the future.')).toBeInTheDocument();
+    expect(screen.getByLabelText('First import date')).toBeInvalid();
   });
 });

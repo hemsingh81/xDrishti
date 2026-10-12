@@ -17,6 +17,7 @@ import { isConflict, isStaleOrder, reorderProblemText } from '../lib/errors';
 import { splitBaskets } from '../lib/groups';
 import { subject } from '../lib/messages';
 import { BasketCardList } from './BasketCardList';
+import { BasketInsights } from './BasketInsights';
 import { BasketSelect } from './BasketSelect';
 import { DragPreview } from './DragPreview';
 import { MembersPanel } from './MembersPanel';
@@ -32,7 +33,8 @@ interface BasketsWorkspaceProps {
 }
 
 /**
- * The basket cards and the selected basket's members, inside one drag-and-drop context: rows reorder among themselves,
+ * The row of basket cards, the selected basket's members and the two insight cards beside them (below on narrower
+ * screens), inside one drag-and-drop context: rows reorder among themselves,
  * rows dropped on a card are copied there (moved with Alt / Option), cards reorder among themselves. A portfolio basket
  * is read only: its rows can only be copied to the owner's baskets, and its card is neither sortable nor a drop target.
  */
@@ -111,32 +113,37 @@ export function BasketsWorkspace({
     <DndContext {...dnd.dndProps}>
       <BasketDragContext value={drag}>
         <MemberPanelContext value={panel}>
-          <Box
-            sx={{
-              display: 'grid',
-              gap: 2,
-              flex: '1 1 auto',
-              minHeight: 0,
-              gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(240px, 280px) minmax(0, 1fr)' },
-              gridTemplateRows: { md: 'minmax(0, 1fr)' },
-            }}
-          >
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
             {phone ? (
               <BasketSelect groups={groups} selectedId={selected.id} onSelect={onSelect} />
             ) : (
               <BasketCardList groups={groups} selectedId={selected.id} onSelect={onSelect} />
             )}
-            <MembersPanel
-              basket={selected}
-              members={members}
-              asOf={shownAsOf}
-              onAsOfChange={onAsOfChange}
-              selectedIds={selection.ids}
-              onSelectionChange={selection.set}
-              onClear={selection.clear}
-              onEdit={onEdit}
-              onArchive={onArchive}
-            />
+            <Box
+              sx={{
+                display: 'grid',
+                gap: 2,
+                alignItems: 'start',
+                gridTemplateColumns: {
+                  xs: 'minmax(0, 1fr)',
+                  lg: 'minmax(0, 3fr) minmax(0, 2fr)',
+                  xl: 'minmax(0, 1fr) 340px',
+                },
+              }}
+            >
+              <MembersPanel
+                basket={selected}
+                members={members}
+                asOf={shownAsOf}
+                onAsOfChange={onAsOfChange}
+                selectedIds={selection.ids}
+                onSelectionChange={selection.set}
+                onClear={selection.clear}
+                onEdit={onEdit}
+                onArchive={onArchive}
+              />
+              <BasketInsights />
+            </Box>
           </Box>
           <DragOverlay dropAnimation={null}>
             {dnd.session && <DragPreview session={dnd.session} over={dnd.over} move={dnd.move} labelOf={labelOf} />}

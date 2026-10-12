@@ -1,45 +1,27 @@
-import { buildAccountDetail, buildBucket, buildBuckets, ids } from '@/test/fixtures';
+import { buildAccountDetail } from '@/test/fixtures';
 import { autoRefreshFrom, toRefreshInput, validateAutoRefresh } from './autoRefresh';
-import {
-  autoBucketNameOf,
-  customBuckets,
-  portfolioFormFrom,
-  toPortfolioInput,
-  validatePortfolio,
-} from './portfolioForm';
+import { portfolioFormFrom, toPortfolioInput, validatePortfolio } from './portfolioForm';
 
 const offRefresh = { refreshMode: 'off', refreshDailyTimeIst: '16:00', firstImportDate: '2025-01-01' };
 
 describe('portfolio form', () => {
-  it('names the account’s own bucket after the account', () => {
-    expect(autoBucketNameOf('  Dhan · Main ')).toBe('Dhan · Main · Portfolio');
-  });
-
-  it('shows a placeholder until the account has a name', () => {
-    expect(autoBucketNameOf('  ')).toBe('Account name · Portfolio');
-  });
-
-  it('keeps the own bucket as blank and sends it as an empty string (null would keep the current choice)', () => {
+  it('reads the settings and sends them without any bucket (the API then keeps the account’s own)', () => {
     const state = portfolioFormFrom(buildAccountDetail().portfolio);
 
     expect(state).toEqual({
-      defaultBucket: '',
       includeInTotals: true,
       refresh: { mode: 'off', dailyTime: '16:00' },
       firstImportDate: '2025-01-01',
     });
-    expect(toPortfolioInput(state)).toEqual({ defaultBucket: '', includeInTotals: true, ...offRefresh });
-    expect(toPortfolioInput(state)).not.toHaveProperty('historyFrom');
+    const body = toPortfolioInput(state);
+    expect(body).toEqual({ includeInTotals: true, ...offRefresh });
+    expect(body).not.toHaveProperty('defaultBucket');
+    expect(JSON.stringify(body)).not.toMatch(/bucket/i);
+    expect(body).not.toHaveProperty('historyFrom');
   });
 
-  it('keeps a custom bucket by name', () => {
-    const portfolio = { ...buildAccountDetail().portfolio, defaultBucket: 'MyLongTerm' };
-
-    expect(toPortfolioInput(portfolioFormFrom(portfolio))).toEqual({
-      defaultBucket: 'MyLongTerm',
-      includeInTotals: true,
-      ...offRefresh,
-    });
+  it('defaults the first import date to 2025-01-01 when nothing is stored', () => {
+    expect(portfolioFormFrom().firstImportDate).toBe('2025-01-01');
   });
 
   it('reads the saved refresh settings and sends them back', () => {
@@ -56,13 +38,6 @@ describe('portfolio form', () => {
       refreshMode: 'daily',
       refreshDailyTimeIst: '09:45',
     });
-  });
-
-  it('offers custom buckets only, never any account’s default bucket', () => {
-    const other = buildBucket({ name: 'Other · Portfolio', isAccountDefault: true, accountId: ids.swing });
-    const custom = buildBucket({ name: 'MyLongTerm' });
-
-    expect(customBuckets([...buildBuckets(), other, custom])).toEqual([custom]);
   });
 });
 

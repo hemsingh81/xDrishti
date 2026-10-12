@@ -12,6 +12,9 @@ internal sealed class AccountUnitOfWork(XDrishtiDbContext db) : IAccountUnitOfWo
     /// <summary>Key of the transaction-scoped advisory lock that serialises <see cref="RunSerializedAsync"/> (switching the primary Data account, deleting a risk profile).</summary>
     internal const long SerializedWriteLockKey = 7_207_001L;
 
+    // The one check a concurrent change can break: a sync closed a lot before the date it is being re-dated to. Any other check failure is a bug, not a race.
+    private const string LotClosedAfterAcquired = "ck_holding_lots_closed_after_acquired";
+
     public async ValueTask<bool> TrySaveChangesAsync(CancellationToken cancellationToken)
     {
         try
@@ -25,9 +28,9 @@ internal sealed class AccountUnitOfWork(XDrishtiDbContext db) : IAccountUnitOfWo
             db.ChangeTracker.Clear();
             return false;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.ForeignKeyViolation })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.ForeignKeyViolation } or PostgresException { SqlState: PostgresErrorCodes.CheckViolation, ConstraintName: LotClosedAfterAcquired })
         {
-            // A uniqueness rule (primary/standby Data, slug, name) or a reference (profile, bucket) was violated by a concurrent change.
+            // A uniqueness rule (primary/standby Data, slug, name), a reference (profile, bucket) or a check (a lot closed before its new first import date) was violated by a concurrent change.
             db.ChangeTracker.Clear();
             return false;
         }

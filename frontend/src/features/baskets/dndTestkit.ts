@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 
 /**
  * jsdom has no layout, so every element measures 0 x 0 and drag and drop cannot tell rows or cards apart. This gives
- * the member rows (stacked, on the right) and the basket cards (stacked, on the left) rectangles, as a real screen would
+ * the member rows (stacked, below the cards) and the basket cards (a row across the top) rectangles, as a real screen would
  * have them. Call it in the test (restoreMocks undoes it).
  */
 export function stubLayout() {
@@ -25,14 +25,14 @@ export function stubLayout() {
       const index = [...(this.parentElement?.children ?? [])].indexOf(this);
       return rect(300, 200 + index * 40, 600, 40);
     }
-    // The portfolio cards sit far below the manual ones: a drop there must find nothing (they are not drop targets).
-    if (this instanceof HTMLLIElement && this.parentElement?.getAttribute('aria-label') === 'Portfolio baskets') {
-      const index = [...this.parentElement.children].indexOf(this);
-      return rect(0, 1000 + index * 90, 280, 80);
-    }
+    // The cards are a row across the top: the owner's baskets (the ones with a grip) at y 100, 250 px apart. The
+    // portfolio cards sit far below them: a drop there must find nothing (they are not drop targets).
     if (this instanceof HTMLLIElement && this.parentElement?.getAttribute('aria-label') === 'Baskets') {
-      const index = [...this.parentElement.children].indexOf(this);
-      return rect(0, 100 + index * 90, 280, 80);
+      const cards = [...this.parentElement.children];
+      const sortable = (card: Element) => card.querySelector('[aria-label^="Reorder "]') !== null;
+      const mine = sortable(this);
+      const index = cards.filter((card) => sortable(card) === mine).indexOf(this);
+      return rect(index * 250, mine ? 100 : 1000, 240, 80);
     }
     // The drag overlay is a fixed box placed on the rect of the row it was lifted from (dnd-kit measures its first child).
     const placed = this.closest<HTMLElement>('[style*="position: fixed"]');

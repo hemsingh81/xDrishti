@@ -38,7 +38,7 @@ public sealed class FirstImportOnSaveTests
 
         var saved = Ok(await SaveAsync(account.Id, WithImport(Chosen, R("INE000A00001", new DateOnly(2023, 5, 5)), R("INE000B00002", null))));
 
-        saved.Import.ShouldBe(new FirstImportView("imported", 2, 1, 0, 0, null, null, null));
+        saved.Import.ShouldBe(new FirstImportView("imported", 2, 1, 0, 0, 0, 0, null, null, null));
         (saved.Account.Portfolio.RefreshMode, saved.Account.Portfolio.RefreshDailyTimeIst, saved.Account.Portfolio.FirstImportDate, saved.Account.Portfolio.HasHoldings)
             .ShouldBe(("daily", "17:00", Chosen, true));
         var one = _fx.HoldingOf("AAA").Lots.Single();
@@ -55,7 +55,7 @@ public sealed class FirstImportOnSaveTests
 
         var saved = Ok(await SaveAsync(account.Id, WithImport(Chosen, R("INE000A00001", new DateOnly(2023, 5, 5)))));
 
-        saved.Import.ShouldBe(new FirstImportView("imported", 2, 1, 0, 0, null, null, null));
+        saved.Import.ShouldBe(new FirstImportView("imported", 2, 1, 0, 0, 0, 0, null, null, null));
         _fx.Data.Holdings.Select(h => h.TradingSymbol).Order().ShouldBe(["AAA", "BBB"]);
         _fx.HoldingOf("AAA").Lots.Single().AcquiredOn.ShouldBe(new DateOnly(2023, 5, 5));
         _fx.HoldingOf("BBB").Lots.Single().AcquiredOn.ShouldBe(Chosen);
@@ -68,7 +68,7 @@ public sealed class FirstImportOnSaveTests
 
         var saved = Ok(await SaveAsync(account.Id, new PortfolioInput(null, null, FirstImportDate: Chosen)));
 
-        saved.Import.ShouldBe(new FirstImportView("imported", 2, 2, 0, 0, null, null, null));
+        saved.Import.ShouldBe(new FirstImportView("imported", 2, 2, 0, 0, 0, 0, null, null, null));
         _fx.Data.Holdings.SelectMany(h => h.Lots).ShouldAllBe(l => l.AcquiredOn == Chosen && l.UsesDefaultDate);
         _fx.Data.Syncs.Single().Trigger.ShouldBe(SyncTrigger.Import);
     }
@@ -114,19 +114,18 @@ public sealed class FirstImportOnSaveTests
     }
 
     [Fact]
-    public async Task An_account_that_has_holdings_already_skips_the_import_and_changes_no_holding()
+    public async Task An_account_that_has_holdings_already_skips_the_import_and_ignores_the_rows()
     {
         var account = await AccountWithDhanHoldingsAsync();
         await _fx.ImportAllAsync(account.Id, new DateOnly(2023, 1, 1));
         var runs = _fx.Data.Syncs.Count;
 
-        var saved = Ok(await SaveAsync(account.Id, WithImport(Chosen, R("INE000A00001", new DateOnly(2020, 2, 2)))));
+        var saved = Ok(await SaveAsync(account.Id, WithImport(new DateOnly(2023, 1, 1), R("INE000A00001", new DateOnly(2020, 2, 2)))));
 
         saved.Import!.Status.ShouldBe("skipped");
-        (saved.Import.Imported, saved.Import.DefaultDated).ShouldBe((0, 0));
+        (saved.Import.Imported, saved.Import.DefaultDated, saved.Import.Redated, saved.Import.RedateSkipped).ShouldBe((0, 0, 0, 0));
         _fx.Data.Holdings.SelectMany(h => h.Lots).ShouldAllBe(l => l.AcquiredOn == new DateOnly(2023, 1, 1));
         _fx.Data.Syncs.Count.ShouldBe(runs);
-        saved.Account.Portfolio.FirstImportDate.ShouldBe(Chosen); // stored, but without effect on existing holdings
     }
 
     [Fact]
@@ -183,7 +182,8 @@ public sealed class FirstImportOnSaveTests
 
         Ok(await SaveAsync(account.Id, new PortfolioInput(null, null, FirstImportDate: Chosen)));
 
-        _fx.Accounts.Events.Select(e => e.Detail).ShouldContain("First import date: 2025-01-01 -> 2024-04-01");
+        _fx.Events(AccountEventType.FirstImportDateChanged).Select(e => e.Detail).ShouldBe(["First import date changed from 2025-01-01 to 2024-04-01"]);
+        _fx.Events(AccountEventType.PortfolioRefreshSettingsChanged).ShouldBeEmpty();
     }
 
     [Fact]
