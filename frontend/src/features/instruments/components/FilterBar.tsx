@@ -34,7 +34,7 @@ const sectorOptions = (facets: InstrumentFacets | undefined): TypeaheadOption[] 
 const withCount = (label: string, count: number | undefined) =>
   count === undefined ? label : `${label} ${formatNumber(count)}`;
 
-/** Search box and every filter of the master list. Each change goes to the URL through `onChange`. */
+/** Search box and every filter of the lists (retired and not-tracked switches: master list only). Each change goes to the URL through `onChange`. */
 export function FilterBar({ filters, facets, onChange, onClear }: FilterBarProps) {
   const active = activeFilterCount(filters);
   return (
@@ -93,17 +93,30 @@ export function FilterBar({ filters, facets, onChange, onClear }: FilterBarProps
                 onChange({ asmGsm: !filters.asmGsm });
               }}
             />
-            <FormControlLabel
-              label={facets && facets.retired > 0 ? `Show retired (${formatNumber(facets.retired)})` : 'Show retired'}
-              control={
-                <Switch
-                  checked={filters.includeRetired}
-                  onChange={(event) => {
-                    onChange({ includeRetired: event.target.checked });
+            {filters.tab === 'master' && (
+              <>
+                <Toggle
+                  label={withCount('Not tracked only', facets && facets.total - facets.tracked + facets.trackedRetired)}
+                  on={filters.untracked}
+                  onToggle={() => {
+                    onChange({ untracked: !filters.untracked });
                   }}
                 />
-              }
-            />
+                <FormControlLabel
+                  label={
+                    facets && facets.retired > 0 ? `Show retired (${formatNumber(facets.retired)})` : 'Show retired'
+                  }
+                  control={
+                    <Switch
+                      checked={filters.includeRetired}
+                      onChange={(event) => {
+                        onChange({ includeRetired: event.target.checked });
+                      }}
+                    />
+                  }
+                />
+              </>
+            )}
           </Stack>
         </Stack>
       </CardContent>

@@ -222,7 +222,8 @@ get when imported without a date of their own. A field that is left out keeps it
 <code>firstImportDate</code> —, or <code>failed</code> with <code>errorCode</code> <code>portfolio.import_failed</code>, <code>cause</code> and <code>message</code>: the settings stay saved); <code>import</code> is always present. At account creation <code>firstImportDate</code> is stored and <code>firstImport</code> is ignored (a new account is not connected).
 Details: <a href="12-portfolio-monitoring.html">doc 12</a> §3.
 There is no &quot;history from&quot; setting: acquisition dates are chosen by the owner at the first import (saving these settings) and can be edited per lot (<a href="12-portfolio-monitoring.html">doc 12</a> §3).
-The import, sync and lot-date edits are audited in the account&#39;s activity (<code>HoldingsImported</code>, <code>HoldingsSynced</code>, <code>LotDateChanged</code>: counts and dates only, never tokens or Dhan&#39;s payload).</p>
+The import, sync and lot-date edits are audited in the account&#39;s activity (<code>HoldingsImported</code>, <code>HoldingsSynced</code>, <code>LotDateChanged</code>: counts and dates only, never tokens or Dhan&#39;s payload).
+Tracking instruments (P1-05, <a href="06-instruments-and-baskets.html">doc 06</a> §2.3) is audited in the same table without an account (<code>InstrumentsTracked</code>, <code>InstrumentsUntracked</code>: counts only); so are the basket changes (P1-15, <a href="06-instruments-and-baskets.html">doc 06</a> §3.4: <code>BasketCreated</code>, <code>BasketRenamed</code>, <code>BasketUpdated</code>, <code>BasketArchived</code>, <code>BasketsReordered</code>, <code>BasketMembersAdded</code>, <code>BasketMembersRemoved</code>, <code>BasketMembersReordered</code>, <code>BasketMembersTransferred</code>: basket names and counts, never instrument symbols or ids).</p>
 <p><strong>Removing an account archives it:</strong> it disappears from lists and services, its history and audit trail (<code>accounts.account_events</code>, insert-only
 for the runtime role) stay, its name becomes free again and its stored broker secrets are deleted. The primary Data account cannot be removed or lose the
 Data role until another account has been made primary (an atomic swap; the old primary becomes the standby when that slot is free).</p>
@@ -582,7 +583,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-11 18:10</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-11 20:04</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

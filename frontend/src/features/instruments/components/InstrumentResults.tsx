@@ -1,31 +1,39 @@
-import { Button, Card, Stack, Typography } from '@mui/material';
+import { Card, Divider } from '@mui/material';
 import type { UseQueryResult } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import type { InstrumentPage, InstrumentSummary } from '@/shared/api';
 import { Grid, type GridSort } from '@/shared/ui/grid';
 import { isSortField, pageSizes, type InstrumentFilters } from '../lib/filters';
 import { problemText } from '../lib/errors';
-import { instrumentColumns } from './instrumentColumns';
+import { columnsFor } from './instrumentColumns';
 
 interface InstrumentResultsProps {
   result: UseQueryResult<InstrumentPage>;
   filters: InstrumentFilters;
   openId: string | null;
-  hasActiveFilters: boolean;
+  selectedIds: ReadonlySet<string>;
+  onSelectionChange: (ids: ReadonlySet<string>) => void;
+  /** The bulk bar, above the list. */
+  toolbar: ReactNode;
+  /** Shown when the list is empty. */
+  emptyState: ReactNode;
   onChange: (patch: Partial<InstrumentFilters>) => void;
-  onClear: () => void;
   onOpen: (id: string) => void;
 }
 
 const getRowId = (item: InstrumentSummary) => item.id;
+const getRowLabel = (item: InstrumentSummary) => item.symbol;
 
-/** The results card: fills the space under the filters; the list scrolls inside it between the header and the footer. */
+/** The results card: fills the space under the filters; the list scrolls inside it between the toolbar and the footer. */
 export function InstrumentResults({
   result,
   filters,
   openId,
-  hasActiveFilters,
+  selectedIds,
+  onSelectionChange,
+  toolbar,
+  emptyState,
   onChange,
-  onClear,
   onOpen,
 }: InstrumentResultsProps) {
   const { data, isPending, isError, isPlaceholderData, error } = result;
@@ -34,11 +42,16 @@ export function InstrumentResults({
 
   return (
     <Card sx={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: { md: 200 } }}>
+      {toolbar}
+      <Divider />
       <Grid
-        label="Instruments"
-        columns={instrumentColumns}
+        label={filters.tab === 'tracked' ? 'Tracked instruments' : 'Instruments'}
+        columns={columnsFor(filters.tab)}
         rows={data?.items ?? []}
         getRowId={getRowId}
+        getRowLabel={getRowLabel}
+        selectedIds={selectedIds}
+        onSelectionChange={onSelectionChange}
         sort={sort}
         onSortChange={(next) => {
           if (isSortField(next.columnId)) onChange({ sort: { field: next.columnId, descending: next.descending } });
@@ -68,12 +81,7 @@ export function InstrumentResults({
                 },
               }
         }
-        emptyState={
-          <Stack spacing={1} sx={{ alignItems: 'center', py: 5 }}>
-            <Typography sx={{ fontWeight: 600 }}>No instruments match these filters</Typography>
-            {hasActiveFilters && <Button onClick={onClear}>Clear filters</Button>}
-          </Stack>
-        }
+        emptyState={emptyState}
       />
     </Card>
   );

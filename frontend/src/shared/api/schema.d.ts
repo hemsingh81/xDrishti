@@ -424,7 +424,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Search the master list: q (symbol, name, ISIN), type, sector, fno, asmGsm, series, includeRetired, sort, page, pageSize (max 100) */
+    /** Search the master list: q (symbol, name, ISIN), type, sector, fno, asmGsm, series, tracked (true|false), includeRetired, sort, page, pageSize (max 100) */
     get: operations['SearchInstruments'];
     put?: never;
     post?: never;
@@ -441,7 +441,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Counts of the active instruments by type, series, F&O and ASM/GSM, and of the active shares by sector (incl. Unclassified), for the filters */
+    /** Counts of the active instruments by type, series, F&O and ASM/GSM, and of the active shares by sector (incl. Unclassified), for the filters; plus how many are tracked */
     get: operations['GetInstrumentFacets'];
     put?: never;
     post?: never;
@@ -462,6 +462,41 @@ export interface paths {
     get: operations['GetInstrument'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/tracked': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Track 1 to 500 instruments (idempotent, all or nothing; a retired one that is not tracked yet is refused with 400 instruments.retired) */
+    post: operations['TrackInstruments'];
+    /** Untrack 1 to 500 instruments (idempotent, all or nothing; their history is kept and tracking again continues from it) */
+    delete: operations['UntrackInstruments'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/tracked/resolve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Look up pasted tickers, canonical symbols or ISINs (up to 5,000, case-insensitive): matched instruments and the unmatched entries (never guessed) */
+    post: operations['ResolveInstruments'];
     delete?: never;
     options?: never;
     head?: never;
@@ -511,6 +546,146 @@ export interface paths {
     };
     /** The most recent refreshes, newest first (take 1 to 100, default 20) */
     get: operations['ListInstrumentRefreshes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The baskets in the owner's order with their member counts; archived ones only with includeArchived=true */
+    get: operations['ListBaskets'];
+    put?: never;
+    /** Create an empty basket (name, colour, purpose, description); 409 baskets.name_taken when an active basket has the name (ignoring case) */
+    post: operations['CreateBasket'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/order': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Put the baskets in this order: the ids must be every active basket exactly once (400 baskets.invalid), 409 baskets.conflict when baskets changed meanwhile */
+    put: operations['ReorderBaskets'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/transfer': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Copy or move up to 500 instruments from one basket to another, atomically and idempotently (only members of the source are transferred; targets are tracked automatically) */
+    post: operations['TransferBasketMembers'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace the name, colour, purpose and description of a basket that is not archived */
+    put: operations['UpdateBasket'];
+    post?: never;
+    /** Archive a basket (idempotent): it leaves the list, its members and history stay readable, instruments stay tracked */
+    delete: operations['ArchiveBasket'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/{id}/members': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The members of a basket in their order, with the instrument and its tracked block; asOf=yyyy-MM-dd (India date) gives the members at the end of that day */
+    get: operations['ListBasketMembers'];
+    put?: never;
+    /** Add 1 to 500 instruments (idempotent, all or nothing); untracked ones are tracked in the same transaction, a retired one that is not tracked is refused (instruments.retired) */
+    post: operations['AddBasketMembers'];
+    /** Remove 1 to 500 instruments (idempotent, all or nothing); the stay stays in the history, the instruments stay tracked */
+    delete: operations['RemoveBasketMembers'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/{id}/members/order': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Put the members in this order: the instrumentIds must be every member exactly once (400 baskets.invalid), 409 baskets.conflict when the basket changed meanwhile */
+    put: operations['ReorderBasketMembers'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/baskets/{id}/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The newest additions and removals of a basket, newest first (take 1 to 1000, default 200) */
+    get: operations['GetBasketHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/instruments/{id}/baskets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The baskets (not archived) that hold the instrument now */
+    get: operations['ListInstrumentBaskets'];
     put?: never;
     post?: never;
     delete?: never;
@@ -710,6 +885,27 @@ export interface components {
       tokenStatus: string;
       connection: components['schemas']['ConnectionView'];
     };
+    /** @description Instruments to add (1 to 500; repeats count once) with an optional note stored on each new membership. */
+    AddMembersInput: {
+      instrumentIds: null | string[];
+      note: null | string;
+    };
+    /**
+     * @description What an add did (counts of distinct instruments): `added` became members, `alreadyMembers` were members already, `newlyTracked` of the added
+     *     ones were not tracked and are now. `memberCount` = members now.
+     */
+    AddMembersResult: {
+      /** Format: int32 */
+      requested: number;
+      /** Format: int32 */
+      added: number;
+      /** Format: int32 */
+      alreadyMembers: number;
+      /** Format: int32 */
+      newlyTracked: number;
+      /** Format: int32 */
+      memberCount: number;
+    };
     ApplicationStatus: {
       name: string;
       version: string;
@@ -734,6 +930,92 @@ export interface components {
       timeIst: string;
       /** Format: date-time */
       nextRunAt: null | string;
+    };
+    /** @description The newest additions and removals of a basket, newest first. */
+    BasketHistory: {
+      /** Format: uuid */
+      basketId: string;
+      name: string;
+      items: components['schemas']['BasketHistoryEntry'][];
+    };
+    /** @description An addition (`kind` = added, `by` = who added it) or removal (`kind` = removed, `by` = who removed it) of an instrument. Only additions carry a note (the one given when adding); a removal has none. */
+    BasketHistoryEntry: {
+      /** Format: uuid */
+      memberId: string;
+      kind: string;
+      /** Format: date-time */
+      at: string;
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      name: string;
+      type: string;
+      note: null | string;
+      by: null | string;
+    };
+    /** @description Attributes of a basket (create and replace). Missing colour = the default; missing purpose = trading; blank description = none. */
+    BasketInput: {
+      name: null | string;
+      colour: null | string;
+      purpose: null | string;
+      description: null | string;
+    };
+    /**
+     * @description One stay of an instrument in a basket: `validFrom` = when it was added, `validTo` = when it was removed (null while it is a member),
+     *     `position` = place among the members (0 first), `addedBy` = the owner's address.
+     */
+    BasketMemberView: {
+      /** Format: uuid */
+      id: string;
+      instrument: components['schemas']['InstrumentSummary'];
+      /** Format: int32 */
+      position: number;
+      /** Format: date-time */
+      validFrom: string;
+      /** Format: date-time */
+      validTo: null | string;
+      note: null | string;
+      addedBy: string;
+    };
+    /**
+     * @description The members of a basket, in their order. `asOf` is null for the current members, otherwise the India date they are as of (members at the end of that
+     *     day; removed ones show their `validTo`). `total` counts the items.
+     */
+    BasketMembers: {
+      /** Format: uuid */
+      basketId: string;
+      name: string;
+      /** Format: date-time */
+      archivedAt: null | string;
+      /** Format: date */
+      asOf: null | string;
+      /** Format: int32 */
+      total: number;
+      items: components['schemas']['BasketMemberView'][];
+    };
+    /** @description Every active basket exactly once, in the wanted order. */
+    BasketOrderInput: {
+      ids: null | string[];
+    };
+    /**
+     * @description A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first). `memberCount` = instruments in it now.
+     *     `archivedAt` is null for an active basket (archived ones are only listed on request).
+     */
+    BasketView: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      colour: string;
+      purpose: string;
+      description: null | string;
+      /** Format: int32 */
+      position: number;
+      /** Format: int32 */
+      memberCount: number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      archivedAt: null | string;
     };
     /** @description The id a broker uses for the instrument (Dhan: security id + exchange segment). */
     BrokerIdView: {
@@ -1008,6 +1290,18 @@ export interface components {
       /** Format: date */
       acquiredOn: null | string;
     };
+    /** @description A basket that holds an instrument now; `since` = when it was added. */
+    InstrumentBasketView: {
+      /** Format: uuid */
+      basketId: string;
+      name: string;
+      colour: string;
+      purpose: string;
+      /** Format: int32 */
+      position: number;
+      /** Format: date-time */
+      since: string;
+    };
     /** @description Everything the master list knows about an instrument. */
     InstrumentDetail: {
       /** Format: uuid */
@@ -1044,10 +1338,12 @@ export interface components {
       /** Format: date-time */
       retiredAt: null | string;
       brokerIds: components['schemas']['BrokerIdView'][];
+      tracked: components['schemas']['TrackedInfo'];
     };
     /**
      * @description Counts of the active (not retired) instruments per filter value. Sectors are counted over shares only (only shares get one);
-     *     sector "Unclassified" = shares without a known sector, and filtering by it returns exactly those.
+     *     sector "Unclassified" = shares without a known sector, and filtering by it returns exactly those. `tracked` = instruments tracked now (what
+     *     `?tracked=true` lists, retired ones included); `trackedRetired` = those of them that are no longer in Dhan's list.
      */
     InstrumentFacets: {
       /** Format: int32 */
@@ -1061,6 +1357,10 @@ export interface components {
       fnoEligible: number;
       /** Format: int32 */
       asmGsm: number;
+      /** Format: int32 */
+      tracked: number;
+      /** Format: int32 */
+      trackedRetired: number;
     };
     /** @description One page of search results (`total` counts all matches). */
     InstrumentPage: {
@@ -1092,6 +1392,7 @@ export interface components {
       fnoEligible: boolean;
       asmGsm: boolean;
       retired: boolean;
+      tracked: components['schemas']['TrackedInfo'];
     };
     InstrumentsInput: {
       intraday: null | string[];
@@ -1135,6 +1436,10 @@ export interface components {
       closePrice: null | number;
       estimated: boolean;
       returns: components['schemas']['ReturnsView'];
+    };
+    /** @description Every member of the basket exactly once, in the wanted order. */
+    MembersOrderInput: {
+      instrumentIds: null | string[];
     };
     /**
      * @description The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of
@@ -1289,6 +1594,49 @@ export interface components {
       autoRefresh: components['schemas']['AutoRefreshView'];
       /** Format: int32 */
       totalActive: number;
+    };
+    /** @description Instruments to remove from a basket (1 to 500; repeats count once). */
+    RemoveMembersInput: {
+      instrumentIds: null | string[];
+    };
+    /** @description What a removal did: `removed` were members, `notMembers` were not. Untracking never happens. `memberCount` = members now. */
+    RemoveMembersResult: {
+      /** Format: int32 */
+      requested: number;
+      /** Format: int32 */
+      removed: number;
+      /** Format: int32 */
+      notMembers: number;
+      /** Format: int32 */
+      memberCount: number;
+    };
+    /** @description Pasted tickers, canonical symbols (`NSE:RELIANCE`) or ISINs, up to 5,000 entries. */
+    ResolveInput: {
+      symbols: null | string[];
+    };
+    /**
+     * @description The outcome of looking up a pasted list. `entries` counts the non-blank entries, `duplicates` those collapsed because an earlier entry
+     *     was the same text or named the same instrument. Entries that match nothing are never guessed: they are listed in `unmatched`.
+     */
+    ResolveResult: {
+      matched: components['schemas']['ResolvedInstrument'][];
+      unmatched: components['schemas']['UnmatchedEntry'][];
+      /** Format: int32 */
+      entries: number;
+      /** Format: int32 */
+      duplicates: number;
+    };
+    /** @description An entry that named an instrument. `term` is the entry as typed (the first one when several name the same instrument); `tracked` = tracked now; `retired` = cannot be newly tracked. */
+    ResolvedInstrument: {
+      term: string;
+      /** Format: uuid */
+      id: string;
+      symbol: string;
+      name: string;
+      type: string;
+      isin: null | string;
+      retired: boolean;
+      tracked: boolean;
     };
     /** @description The profit/loss figures that every holding row, lot row and summary carries. */
     ReturnsView: {
@@ -1512,6 +1860,48 @@ export interface components {
       /** Format: date-time */
       checkedAt: string;
     };
+    /**
+     * @description What a track call did (all counts are of distinct instruments): `added` never tracked before, `reactivated` tracked again after an
+     *     untrack, `alreadyTracked` nothing to do. `totalTracked` is the number tracked now.
+     */
+    TrackResult: {
+      /** Format: int32 */
+      requested: number;
+      /** Format: int32 */
+      added: number;
+      /** Format: int32 */
+      reactivated: number;
+      /** Format: int32 */
+      alreadyTracked: number;
+      /** Format: int32 */
+      totalTracked: number;
+    };
+    /**
+     * @description Whether the owner tracks the instrument (every instrument has this block). `active` = tracked now; `since` = when tracking last started;
+     *     `deactivatedAt` = when it was switched off (history is kept; null while active); `dataFrom`/`dataTo`/`lastUpdate` = the collected
+     *     history (null until the history service has collected some); `backfillRequestedAt` = when collecting history was last asked for;
+     *     `retiredButTracked` = tracked, but no longer in Dhan's list (a warning, nothing is removed).
+     */
+    TrackedInfo: {
+      active: boolean;
+      /** Format: date-time */
+      since: null | string;
+      /** Format: date-time */
+      deactivatedAt: null | string;
+      /** Format: date */
+      dataFrom: null | string;
+      /** Format: date */
+      dataTo: null | string;
+      /** Format: date-time */
+      lastUpdate: null | string;
+      /** Format: date-time */
+      backfillRequestedAt: null | string;
+      retiredButTracked: boolean;
+    };
+    /** @description Instruments to track or untrack: 1 to 500 ids (duplicates are fine and count once). */
+    TrackingInput: {
+      instrumentIds: null | string[];
+    };
     /** @description The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. */
     TradingInput: {
       mode: null | string;
@@ -1543,6 +1933,55 @@ export interface components {
       styles: string[];
       instruments: components['schemas']['InstrumentsView'];
       overrides: components['schemas']['AccountOverrides'];
+    };
+    /** @description Instruments (1 to 500) to copy or move from one basket to another; `mode` = copy · move. */
+    TransferInput: {
+      /** Format: uuid */
+      fromBasketId: string;
+      /** Format: uuid */
+      toBasketId: string;
+      instrumentIds: null | string[];
+      mode: null | string;
+    };
+    /**
+     * @description What a transfer did. Only instruments that are members of the source are transferred: the others are `notInSource` (for a repeated move, the ones
+     *     moved before). `added` became members of the target, `alreadyInTarget` were there already, `removed` left the source (a move only),
+     *     `newlyTracked` of the added ones were not tracked and are now.
+     */
+    TransferResult: {
+      mode: string;
+      /** Format: int32 */
+      requested: number;
+      /** Format: int32 */
+      added: number;
+      /** Format: int32 */
+      alreadyInTarget: number;
+      /** Format: int32 */
+      removed: number;
+      /** Format: int32 */
+      notInSource: number;
+      /** Format: int32 */
+      newlyTracked: number;
+      /** Format: int32 */
+      sourceMemberCount: number;
+      /** Format: int32 */
+      targetMemberCount: number;
+    };
+    /** @description An entry that named no instrument. `reason`: `not_found` · `ambiguous` (an ISIN of several instruments) · `invalid` (too long or with control characters). */
+    UnmatchedEntry: {
+      term: string;
+      reason: string;
+    };
+    /** @description What an untrack call did: `untracked` were tracked, `notTracked` were not (nothing to do). `totalTracked` is the number tracked now. */
+    UntrackResult: {
+      /** Format: int32 */
+      requested: number;
+      /** Format: int32 */
+      untracked: number;
+      /** Format: int32 */
+      notTracked: number;
+      /** Format: int32 */
+      totalTracked: number;
     };
     /**
      * @description Replaces the account's API key and/or secret (write-only). A value that is left out stays as it is; an empty one is invalid.
@@ -2790,6 +3229,7 @@ export interface operations {
         sort?: string;
         page?: number;
         pageSize?: number;
+        tracked?: boolean;
       };
       header?: never;
       path?: never;
@@ -2868,6 +3308,105 @@ export interface operations {
       };
     };
   };
+  TrackInstruments: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['TrackingInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TrackResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  UntrackInstruments: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['TrackingInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UntrackResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  ResolveInstruments: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['ResolveInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResolveResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
   StartInstrumentRefresh: {
     parameters: {
       query?: never;
@@ -2939,6 +3478,515 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RefreshRunView'][];
+        };
+      };
+    };
+  };
+  ListBaskets: {
+    parameters: {
+      query?: {
+        includeArchived?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketView'][];
+        };
+      };
+    };
+  };
+  CreateBasket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['BasketInput'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ReorderBaskets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['BasketOrderInput'];
+      };
+    };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  TransferBasketMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['TransferInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TransferResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateBasket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['BasketInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ArchiveBasket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListBasketMembers: {
+    parameters: {
+      query?: {
+        asOf?: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketMembers'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AddBasketMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['AddMembersInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AddMembersResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RemoveBasketMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['RemoveMembersInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RemoveMembersResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ReorderBasketMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['MembersOrderInput'];
+      };
+    };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetBasketHistory: {
+    parameters: {
+      query?: {
+        take?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BasketHistory'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListInstrumentBaskets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InstrumentBasketView'][];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

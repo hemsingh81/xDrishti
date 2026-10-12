@@ -13,7 +13,8 @@ public sealed record InstrumentSearchRequest(
     bool? IncludeRetired,
     string? Sort,
     int? Page,
-    int? PageSize);
+    int? PageSize,
+    bool? Tracked = null);
 
 public enum InstrumentSortField
 {
@@ -40,7 +41,8 @@ public sealed record InstrumentSearch(
     InstrumentSortField SortField,
     bool Descending,
     int Page,
-    int PageSize)
+    int PageSize,
+    bool? Tracked)
 {
     public const string Unclassified = "Unclassified";
 

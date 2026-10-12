@@ -44,7 +44,7 @@ export const navigation: NavSection[] = [
     title: 'Market',
     items: [
       { path: '/instruments', label: 'Instruments', icon: ListAltIcon },
-      { path: '/baskets', label: 'Baskets', icon: ShoppingBasketIcon, phase: 'P1' },
+      { path: '/baskets', label: 'Baskets', icon: ShoppingBasketIcon },
       { path: '/data', label: 'Data & import', icon: StorageIcon, phase: 'P1' },
       { path: '/quality', label: 'Data quality', icon: FactCheckIcon, phase: 'P1' },
     ],

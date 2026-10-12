@@ -28,8 +28,8 @@ export function useInstrumentFilters() {
   );
 
   const clear = useCallback(() => {
-    update({ ...emptyFilters, sort: filters.sort, pageSize: filters.pageSize });
-  }, [update, filters.sort, filters.pageSize]);
+    update({ ...emptyFilters, tab: filters.tab, sort: filters.sort, pageSize: filters.pageSize });
+  }, [update, filters.tab, filters.sort, filters.pageSize]);
 
   const open = useCallback(
     (id: string | null) => {

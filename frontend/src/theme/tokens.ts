@@ -118,6 +118,21 @@ export const layout = { sidebarWidth: 248, topBarHeight: 60 } as const;
 export const accountColors = ['#5b8def', '#16a34a', '#b45309', '#a855f7', '#0891b2', '#dc2626'] as const;
 
 /**
+ * Colours offered for a basket's dot (the prototype's palette; the first three are the seeded baskets' colours). A basket
+ * can also take any `#rrggbb`; the chosen value is user data stored with the basket.
+ */
+export const basketColors = [
+  { name: 'Indigo', value: '#6366f1' },
+  { name: 'Emerald', value: '#10b981' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Rose', value: '#f43f5e' },
+  { name: 'Sky', value: '#38bdf8' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Slate', value: '#64748b' },
+] as const;
+
+/**
  * Icon hues (docs/prototype `NAVSTYLE` and `C`). Each hue is a pair: `light` is the icon colour on a dark chip, `strong`
  * the icon colour on a light chip. The chip background is the icon colour at `iconChip.tintLight` / `tintDark` over the
  * surface. Contrast (icon on its chip) is >= 3:1 in both modes; these strong values were darkened minimally from the

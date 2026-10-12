@@ -1,6 +1,9 @@
 import CloseIcon from '@mui/icons-material/Close';
+import WarningIcon from '@mui/icons-material/WarningAmberOutlined';
 import { Alert, Box, Button, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { AddToBasketDialog, InstrumentBaskets } from '@/features/baskets';
 import type { InstrumentDetail } from '@/shared/api';
 import { Facts, LoadingState } from '@/shared/ui';
 import { monoFontFamily } from '@/theme';
@@ -8,6 +11,8 @@ import { detailQuery } from '../api/instrumentsQueries';
 import { problemText } from '../lib/errors';
 import { detailFacts } from '../lib/detailFacts';
 import { typeLabel } from '../lib/labels';
+import { trackingFacts } from '../lib/trackingFacts';
+import { TrackToggle } from './TrackToggle';
 
 function Flags({ detail }: { detail: InstrumentDetail }) {
   return (
@@ -16,6 +21,10 @@ function Flags({ detail }: { detail: InstrumentDetail }) {
       <Chip size="small" variant="outlined" label={detail.sector ?? 'No sector'} />
       {detail.fnoEligible && <Chip size="small" variant="outlined" color="info" label="F&O" />}
       {detail.asmGsm && <Chip size="small" variant="outlined" color="warning" label="ASM/GSM" />}
+      {detail.tracked.active && <Chip size="small" variant="outlined" color="success" label="Tracked" />}
+      {detail.tracked.retiredButTracked && (
+        <Chip size="small" variant="outlined" color="warning" icon={<WarningIcon />} label="No longer in Dhan's list" />
+      )}
       {detail.retiredAt && <Chip size="small" label="Retired" />}
     </Stack>
   );
@@ -31,6 +40,7 @@ interface InstrumentDrawerProps {
 export function InstrumentDrawer({ id, onClose }: InstrumentDrawerProps) {
   const query = useQuery({ ...detailQuery(id ?? ''), enabled: id !== null });
   const { data, isPending, isError, error } = query;
+  const [addingToBasket, setAddingToBasket] = useState(false);
 
   return (
     <Drawer
@@ -73,10 +83,58 @@ export function InstrumentDrawer({ id, onClose }: InstrumentDrawerProps) {
         {data && (
           <Stack spacing={2}>
             <Flags detail={data} />
+            <Box>
+              <Typography variant="h3" component="h3" sx={{ mb: 1 }}>
+                Tracking
+              </Typography>
+              <Stack spacing={1.5}>
+                <Facts items={trackingFacts(data.tracked)} />
+                <Box>
+                  <TrackToggle
+                    id={data.id}
+                    symbol={data.symbol}
+                    tracked={data.tracked.active}
+                    retired={data.retiredAt !== null}
+                  />
+                </Box>
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="h3" component="h3" sx={{ mb: 1 }}>
+                Baskets
+              </Typography>
+              <Stack spacing={1.5}>
+                <InstrumentBaskets instrumentId={data.id} />
+                <Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    disabled={data.retiredAt !== null && !data.tracked.active}
+                    onClick={() => {
+                      setAddingToBasket(true);
+                    }}
+                  >
+                    Add to basket
+                  </Button>
+                </Box>
+              </Stack>
+            </Box>
             <Facts items={detailFacts(data)} />
           </Stack>
         )}
       </Box>
+      {data && addingToBasket && (
+        <AddToBasketDialog
+          instrumentIds={[data.id]}
+          label={data.symbol}
+          onClose={() => {
+            setAddingToBasket(false);
+          }}
+          onAdded={() => {
+            setAddingToBasket(false);
+          }}
+        />
+      )}
     </Drawer>
   );
 }

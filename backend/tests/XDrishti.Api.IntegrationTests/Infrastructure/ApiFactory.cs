@@ -10,6 +10,7 @@ using Testcontainers.PostgreSql;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Auth;
+using XDrishti.Domain.Market.Baskets;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Persistence;
@@ -171,7 +172,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         });
     }
 
-    /// <summary>Empties the instrument master (instruments, broker ids and refresh records) and the fake file servers, so a test starts from nothing.</summary>
+    /// <summary>
+    /// Empties the instrument master (instruments, baskets and their members, tracking, broker ids and refresh records) and the fake file servers, so a
+    /// test starts from nothing. The three baskets the migration creates are put back, empty.
+    /// </summary>
     public async Task ResetInstrumentsAsync()
     {
         MasterData.Reset();
@@ -179,10 +183,23 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM market.basket_members;
+                DELETE FROM market.baskets;
+                DELETE FROM market.tracked_instruments;
+                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%';
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;
                 """);
+            foreach (var basket in DefaultBaskets.All)
+            {
+                await db.Database.ExecuteSqlAsync(
+                    $"""
+                    INSERT INTO market.baskets (id, name, colour, purpose, position, created_at, revision)
+                    VALUES ({basket.Id}, {basket.Name}, {basket.Colour}, {basket.Purpose.ToCode()}, {basket.Position}, now(), 0)
+                    """);
+            }
+
             return 0;
         });
     }

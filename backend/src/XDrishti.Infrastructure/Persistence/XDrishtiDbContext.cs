@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Auth;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Baskets;
 using XDrishti.Domain.Platform;
 using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
@@ -36,6 +37,12 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     public DbSet<PendingConnect> PendingConnects => Set<PendingConnect>();
 
     public DbSet<RefreshRun> RefreshRuns => Set<RefreshRun>();
+
+    public DbSet<TrackedInstrument> TrackedInstruments => Set<TrackedInstrument>();
+
+    public DbSet<Basket> Baskets => Set<Basket>();
+
+    public DbSet<BasketMember> BasketMembers => Set<BasketMember>();
 
     public DbSet<Holding> Holdings => Set<Holding>();
 

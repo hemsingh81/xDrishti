@@ -105,6 +105,7 @@ get when imported without a date of their own. A field that is left out keeps it
 Details: [doc 12](12-portfolio-monitoring.md) §3.
 There is no "history from" setting: acquisition dates are chosen by the owner at the first import (saving these settings) and can be edited per lot ([doc 12](12-portfolio-monitoring.md) §3).
 The import, sync and lot-date edits are audited in the account's activity (`HoldingsImported`, `HoldingsSynced`, `LotDateChanged`: counts and dates only, never tokens or Dhan's payload).
+Tracking instruments (P1-05, [doc 06](06-instruments-and-baskets.md) §2.3) is audited in the same table without an account (`InstrumentsTracked`, `InstrumentsUntracked`: counts only); so are the basket changes (P1-15, [doc 06](06-instruments-and-baskets.md) §3.4: `BasketCreated`, `BasketRenamed`, `BasketUpdated`, `BasketArchived`, `BasketsReordered`, `BasketMembersAdded`, `BasketMembersRemoved`, `BasketMembersReordered`, `BasketMembersTransferred`: basket names and counts, never instrument symbols or ids).
 
 **Removing an account archives it:** it disappears from lists and services, its history and audit trail (`accounts.account_events`, insert-only
 for the runtime role) stay, its name becomes free again and its stored broker secrets are deleted. The primary Data account cannot be removed or lose the

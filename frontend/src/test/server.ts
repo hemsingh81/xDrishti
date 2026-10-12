@@ -12,7 +12,10 @@ import {
   buildRefreshStatus,
   sampleInstruments,
   searchInstruments,
+  buildBasket,
+  buildBasketMembers,
   buildBuckets,
+  seededBaskets,
   buildEvents,
   buildRiskProfiles,
   buildSession,
@@ -66,6 +69,12 @@ export const handlers = [
         )
       : problemResponse({ title: 'Instrument not found.', code: 'instruments.not_found' }, 404);
   }),
+  // Baskets: the three seeded ones, all empty; tests of the Baskets screen use `createBasketsFake` instead.
+  http.get('/api/baskets', () => HttpResponse.json(seededBaskets())),
+  http.get('/api/baskets/:id/members', ({ params }) =>
+    HttpResponse.json(buildBasketMembers(buildBasket({ id: String(params.id) }), [])),
+  ),
+  http.get('/api/instruments/:id/baskets', () => HttpResponse.json([])),
   // Portfolio (read side): holdings are searched in memory; writes (import, sync, date edits) are mocked per test.
   http.get('/api/holdings', ({ request }) =>
     HttpResponse.json(searchHoldings(sampleHoldings, new URL(request.url).searchParams)),

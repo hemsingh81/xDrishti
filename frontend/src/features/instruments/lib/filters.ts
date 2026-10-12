@@ -2,6 +2,10 @@
 export const instrumentTypes = ['share', 'etf', 'index', 'future'] as const;
 export type InstrumentType = (typeof instrumentTypes)[number];
 
+/** The two lists of the screen: everything Dhan lists, or only what the owner tracks. */
+export const instrumentTabs = ['master', 'tracked'] as const;
+export type InstrumentTab = (typeof instrumentTabs)[number];
+
 export const sortFields = ['symbol', 'name', 'type', 'series', 'sector', 'lot', 'tick'] as const;
 export type SortField = (typeof sortFields)[number];
 
@@ -13,6 +17,7 @@ export interface SortState {
 }
 
 export interface InstrumentFilters {
+  tab: InstrumentTab;
   q: string;
   type: InstrumentType | null;
   sector: string | null;
@@ -20,6 +25,8 @@ export interface InstrumentFilters {
   fno: boolean;
   asmGsm: boolean;
   includeRetired: boolean;
+  /** Master list only: the instruments that are not tracked. */
+  untracked: boolean;
   sort: SortState;
   page: number;
   pageSize: number;
@@ -29,6 +36,7 @@ export const defaultSort: SortState = { field: 'symbol', descending: false };
 export const defaultPageSize = 50;
 
 export const emptyFilters: InstrumentFilters = {
+  tab: 'master',
   q: '',
   type: null,
   sector: null,
@@ -36,11 +44,13 @@ export const emptyFilters: InstrumentFilters = {
   fno: false,
   asmGsm: false,
   includeRetired: false,
+  untracked: false,
   sort: defaultSort,
   page: 1,
   pageSize: defaultPageSize,
 };
 
+const isTab = (value: string | null): value is InstrumentTab => instrumentTabs.some((t) => t === value);
 const isType = (value: string | null): value is InstrumentType => instrumentTypes.some((t) => t === value);
 /** True when `value` names a column the API can sort by. */
 export const isSortField = (value: string): value is SortField => sortFields.some((f) => f === value);
@@ -63,8 +73,10 @@ function positiveInt(value: string | null, fallback: number): number {
 /** Reads the page state from URL parameters; anything unknown or malformed falls back to the default. */
 export function parseFilters(params: URLSearchParams): InstrumentFilters {
   const type = params.get('type');
+  const tab = params.get('tab');
   const size = positiveInt(params.get('size'), defaultPageSize);
   return {
+    tab: isTab(tab) ? tab : 'master',
     q: params.get('q') ?? '',
     type: isType(type) ? type : null,
     sector: nonEmpty(params.get('sector')),
@@ -72,6 +84,7 @@ export function parseFilters(params: URLSearchParams): InstrumentFilters {
     fno: params.get('fno') === '1',
     asmGsm: params.get('asm') === '1',
     includeRetired: params.get('retired') === '1',
+    untracked: params.get('untracked') === '1',
     sort: parseSort(params.get('sort')),
     page: positiveInt(params.get('page'), 1),
     pageSize: pageSizes.some((s) => s === size) ? size : defaultPageSize,
@@ -85,6 +98,7 @@ export function toParams(filters: InstrumentFilters, extra: URLSearchParams = ne
     if (value) next.set(key, value);
     else next.delete(key);
   };
+  set('tab', filters.tab === 'master' ? null : filters.tab);
   set('q', filters.q.trim() || null);
   set('type', filters.type);
   set('sector', filters.sector);
@@ -92,13 +106,22 @@ export function toParams(filters: InstrumentFilters, extra: URLSearchParams = ne
   set('fno', filters.fno ? '1' : null);
   set('asm', filters.asmGsm ? '1' : null);
   set('retired', filters.includeRetired ? '1' : null);
+  set('untracked', filters.untracked ? '1' : null);
   set('sort', formatSort(filters.sort) === formatSort(defaultSort) ? null : formatSort(filters.sort));
   set('page', filters.page > 1 ? String(filters.page) : null);
   set('size', filters.pageSize !== defaultPageSize ? String(filters.pageSize) : null);
   return next;
 }
 
-/** Number of narrowing filters in use (search text, type, sector, series, F&O, ASM/GSM, retired). */
+/**
+ * Number of narrowing filters in use (search text, type, sector, series, F&O, ASM/GSM, and on the master list retired and
+ * not tracked). The tab is not a filter.
+ */
 export function activeFilterCount(f: InstrumentFilters): number {
-  return [f.q.trim() !== '', f.type, f.sector, f.series, f.fno, f.asmGsm, f.includeRetired].filter(Boolean).length;
+  const masterOnly = f.tab === 'master' ? [f.includeRetired, f.untracked] : [];
+  return [f.q.trim() !== '', f.type, f.sector, f.series, f.fno, f.asmGsm, ...masterOnly].filter(Boolean).length;
 }
+
+/** Identifies the list a selection was made in: the tab and the narrowing filters (not page, page size or sort). */
+export const selectionScope = (f: InstrumentFilters): string =>
+  JSON.stringify([f.tab, f.q.trim(), f.type, f.sector, f.series, f.fno, f.asmGsm, f.includeRetired, f.untracked]);

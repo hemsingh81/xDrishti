@@ -68,11 +68,26 @@ Rules of a run:
 ### 2.3 Searching, tracking and the instrument record
 
 - **Search & add** from the Instruments screen: server-side search (partial symbol, name, display name or ISIN) and filters (type, sector, F&O, ASM/GSM, series, retired), sortable and paginated (≤ 100 per page; `GET /api/instruments`, facets at `/api/instruments/facets`); later also exchange/segment, index membership, price and turnover.
-- **Bulk add** by pasting symbols, uploading a CSV list, or adding all members of an index/rule-based basket.
-- **On activation** the system backfills history: first from your CSV files if present, then gaps from the
+- **Bulk add** by pasting symbols or uploading a CSV list (both resolved by `POST /api/instruments/tracked/resolve`, below), or adding all members of an index/rule-based basket (with the baskets, P1-15).
+- **Tracking** (P1-05) is the owner's choice of what the system works on; it needs a session, no step-up. Rows live in `market.tracked_instruments` (the module's schema is `market`;
+  the `catalog` schema of the first sketch was not created): `instrument_id` (key, FK to `market.instruments`, restrict), `active`, `active_since`, `deactivated_at`, `data_from`, `data_to`, `last_update`,
+  `backfill_requested_at`, `note`, `tracked_by`; a row is kept for good.
+  - `POST /api/instruments/tracked {instrumentIds}` tracks 1–500 instruments, `DELETE /api/instruments/tracked {instrumentIds}` untracks them. Both are **idempotent and all-or-nothing** (one transaction),
+    duplicates count once, an unknown id is `400 instruments.invalid`, and the answer counts what happened (`added`, `reactivated`, `alreadyTracked` / `untracked`, `notTracked`, `totalTracked`).
+  - **Retired instruments** (no longer in Dhan's list) cannot be newly tracked or re-tracked: `400 instruments.retired` naming them, nothing in the call is applied. One that retires **after** being tracked stays
+    tracked: it keeps appearing in `?tracked=true` (whatever `includeRetired` says) with `tracked.retiredButTracked: true` (the UI shows "no longer in Dhan's list"); it can still be untracked, and then cannot come back.
+  - **Untrack** only sets `active = false` and `deactivated_at`; `data_from`, `data_to`, `last_update` stay. **Tracking again** reactivates the same row (`active_since` restarts, `deactivated_at` clears, the history fields are kept, so only the gap is filled).
+  - Tracking sets `backfill_requested_at`; **the backfill job itself belongs to P1-06 / P1-12**. Until history exists, `dataFrom`/`dataTo`/`lastUpdate` are null and the screens show "—" ("history not collected yet").
+  - **Audit** (`accounts.account_events`, no account): `InstrumentsTracked` / `InstrumentsUntracked` with counts ("Tracked 12 of 15 instruments (10 new, 2 tracked again, 3 already tracked)"), written only when something changed; never symbols or ids.
+  - `POST /api/instruments/tracked/resolve {symbols}` (up to 5,000 entries, blanks ignored) looks up pasted tickers (`RELIANCE` = `NSE:RELIANCE`), canonical symbols (`NSE:RELIANCE-2026-10-FUT`) and ISINs of shares/ETFs, trimmed and
+    case-insensitive, repeats collapsed. The answer is `{matched[], unmatched[], entries, duplicates}`; a matched entry carries `retired` and `tracked`; an unmatched one has a `reason` (`not_found`, `ambiguous` = an ISIN of several instruments with not exactly one still
+    listed, `invalid` = over 100 characters or control characters). Nothing is guessed: no partial or name matching.
+  - `GET /api/instruments?tracked=true|false` filters on tracked-now; every instrument in lists and detail has a `tracked` block (`active`, `since`, `deactivatedAt`, `dataFrom`, `dataTo`, `lastUpdate`, `backfillRequestedAt`, `retiredButTracked`),
+    and `/api/instruments/facets` has `tracked` (all tracked now, retired ones included) and `trackedRetired`, for the "N tracked" header.
+- **On activation** the system will backfill history (P1-06 / P1-12): first from your CSV files if present, then gaps from the
   Dhan historical API (1-minute up to ~5 years, daily since listing), and builds all timeframes.
 - **On deactivation** collection stops; history is kept (re-activation only fills the gap).
-- Status shown per instrument: data coverage (from/to), last update, quality issues, baskets, open positions.
+- Status shown per instrument: data coverage (from/to), last update, quality issues, baskets, open positions. (Baskets are shown in the detail drawer; see §3.4.)
 
 | Field | Example |
 |-------|---------|
@@ -84,7 +99,7 @@ Rules of a run:
 | Lot size, tick size | 1 / 0.05 (futures: contract lot size); expiry date for futures |
 | Flags | F&O eligible, ASM/GSM, MTF leverage, freeze quantity, retired |
 | First / last seen | when the instrument first appeared in the file / last appeared |
-| Tracking | active since 2026-10-15; data from 2021-10-01 *(P1-05)* |
+| Tracking | active since 2026-10-15; data from 2021-10-01 (the `tracked` block, P1-05) |
 
 ## 3. Baskets
 
@@ -118,6 +133,55 @@ Rules of a run:
 | **Portfolio grouping** | Value, return and XIRR per basket ([doc 12](12-portfolio-monitoring.md)) |
 | **Live watch** | Pin a basket to the live price panel (counts toward the live-feed budget, [doc 05](05-data-and-brokers.md) §5) |
 
+### 3.4 Manual baskets: what is built (P1-15)
+
+Only **manual** baskets exist so far (rule-based and system baskets, allowed styles/sides, strategies in scope, risk override and target weights come with their stories). Tables live in the `market` schema (not `catalog`, which was never created),
+next to the instruments they point to; the runtime role has plain DML on both and no DDL. Every route needs a session (changes also the CSRF token), none needs a step-up.
+
+**Rules**
+- **Many-to-many, once per basket at a time:** an instrument can be in any number of baskets, but at most once in a basket — `ux_basket_members_active` is a unique index on `(basket_id, instrument_id)` where `valid_to IS NULL`.
+  Removing sets `valid_to` (and `removed_by`) and keeps the row; adding again makes a **new row**, so the history shows every stay. Rows are never deleted; baskets are archived, instruments retired (both foreign keys are `restrict`), and the runtime role `xd_app` has no `DELETE` on `market.baskets`, `market.basket_members` or `market.tracked_instruments`.
+- **Dated membership:** `valid_from` / `valid_to` are timestamps. `asOf=yyyy-MM-dd` (an India date) returns the members **at the end of that day**: `valid_from < start of the next day (IST)` and `valid_to` empty or `>=` that instant — i.e. a member added on the 13th is a member on the 13th; one removed on the 13th is not.
+- **Names:** 1–60 characters, unique among **active** baskets ignoring case (`ux_baskets_active_name_lower` on `lower(name) WHERE archived_at IS NULL`); an archived basket frees its name. Colour is `#rrggbb` (default `#6366f1`), purpose `trading | long_term | watch` (default `trading`), description up to 500 characters, note on a membership up to 500.
+- **Seed:** the migration creates, empty and idempotently, **MyChoice** (`trading`, `#6366f1`), **MyLongTerm** (`long_term`, `#10b981`) and **Best stocks** (`trading`, `#f59e0b`) at positions 0–2 (the prototype's palette). The owner can rename or archive them.
+- **Tracking:** adding an instrument that is not tracked **tracks it in the same transaction** (the tracking service of §2.3, audited as "… via basket 'Name'"); a retired instrument that is not tracked is refused with `instruments.retired` and nothing in the call is applied. A tracked instrument the add relied on is part of the save (tracking rows carry PostgreSQL's `xmin` as a row version): if a concurrent untrack commits first, the save is refused and the add reads again and tracks it again, so a member is never added on the strength of a stale "tracked".
+  Removing the last membership never untracks. Archiving never untracks.
+- **Limits:** 2,000 active members per basket (`baskets.too_many_members`), 500 instrument ids per add / remove / transfer call, a reorder must list **every** active basket / member exactly once (else `400 baskets.invalid`).
+- **Archived baskets** are hidden from the list (`includeArchived=true` shows them), their members and history stay readable, and every change is refused with `409 baskets.archived`. Archiving twice is fine.
+- **Order:** `position` (0 first) among the active baskets and among the active members; a reorder numbers them 0..n-1; new members are appended in the order given. Reads sort by position, then symbol / creation, then id, so the order is deterministic.
+- **Concurrency:** `market.baskets.revision` is an optimistic concurrency token that every change of a basket **or of its members** raises. A save based on a stale read fails; the use case then reads again and retries (up to 5 times, which also resolves two requests adding the same instrument or creating the same name). Only when all tries lose does the call end in `409 baskets.conflict`
+  (the UI reloads and may retry). A reorder whose list no longer matches because the basket changed between two tries is a `409 baskets.conflict` rather than a `400`.
+- **Idempotent and atomic:** add, remove, reorder and transfer can be repeated; what is already done is counted, not repeated, and writes neither rows nor audit entries. Each call is **one transaction** (members, tracking rows, revision and audit entries are written together).
+
+**API** (`Baskets` tag; every error is a problem-details response with a stable `code`, field problems in `errors`)
+
+| Route | Meaning | Answer |
+|-------|---------|--------|
+| `GET /api/baskets?includeArchived=` | baskets in the owner's order | `200 [BasketView]` |
+| `POST /api/baskets {name, colour?, purpose?, description?}` | create an empty basket at the end | `201 BasketView` · `400 baskets.invalid` · `409 baskets.name_taken` |
+| `PUT /api/baskets/{id}` same body | replace the attributes (members untouched) | `200 BasketView` · `400` · `404 baskets.not_found` · `409 baskets.name_taken` / `baskets.archived` |
+| `DELETE /api/baskets/{id}` | archive (idempotent) | `204` · `404` |
+| `PUT /api/baskets/order {ids[]}` | every active basket once, wanted order | `204` · `400 baskets.invalid` · `409 baskets.conflict` |
+| `GET /api/baskets/{id}/members?asOf=` | members in order with instrument summary + tracked block | `200 BasketMembers` · `400` (bad asOf) · `404` |
+| `POST /api/baskets/{id}/members {instrumentIds[], note?}` | add 1–500 (idempotent, tracks) | `200 AddMembersResult` · `400 baskets.invalid / instruments.invalid / instruments.retired / baskets.too_many_members` · `404` · `409 archived / conflict` |
+| `DELETE /api/baskets/{id}/members {instrumentIds[]}` | remove 1–500 (idempotent) | `200 RemoveMembersResult` · `400` · `404` · `409` |
+| `PUT /api/baskets/{id}/members/order {instrumentIds[]}` | every member once, wanted order | `204` · `400 baskets.invalid` · `404` · `409` |
+| `POST /api/baskets/transfer {fromBasketId, toBasketId, instrumentIds[], mode: copy\|move}` | atomic, idempotent; only members of the source are transferred, in the source's order, with their notes; a move also ends the stay in the source | `200 TransferResult` · `400` · `404` · `409` |
+| `GET /api/baskets/{id}/history?take=` | newest additions and removals (default 200, max 1000) with dates and who; only additions carry the note | `200 BasketHistory` · `400` · `404` |
+| `GET /api/instruments/{id}/baskets` | the (non-archived) baskets that hold the instrument now | `200 [InstrumentBasketView]` · `404 instruments.not_found` |
+
+**Audit** (`accounts.account_events`, no account): `BasketCreated`, `BasketRenamed`, `BasketUpdated` (names the changed fields), `BasketArchived`, `BasketsReordered`, `BasketMembersAdded`, `BasketMembersRemoved`, `BasketMembersReordered`,
+`BasketMembersTransferred` — the basket's name and counts only, never instrument symbols or ids, and only when something changed.
+
+**Screen (Baskets, built in P1-15; frontend `features/baskets`, lazy route `/baskets`)**
+- **Layout:** from `md` up a left column of basket cards (colour dot and name, purpose chip, member count; selected card outlined) and a right panel with the selected basket; the page fills the viewport under the top bar and the cards and the members grid scroll inside themselves. Below `md` the cards become one **Basket** select (reordering baskets and dropping on a basket need the wide layout; the Copy to / Move to menus still work). The selected basket (`?basket=<id>`) and the look-back date (`&asOf=yyyy-MM-dd`) live in the URL; an unknown id falls back to the first basket.
+- **Header of the panel:** name, purpose, count, description and the actions **Add instruments**, **Edit**, **History**, **Archive** (confirmation: members and history are kept) and the **View as of** date. A look-back date makes the panel read only (no grip, selection, actions or adding; a *Removed later* column), says so in words and offers *Back to today*.
+- **Members grid** (the shared Grid, in the owner's order, not sortable): grip, symbol (links to the instrument on the Instruments screen), name, type, sector, status (*Tracked* / *Not tracked* / *Retired* as text), added date, and per row **Copy or move** (menu of the other baskets: *Copy to X* / *Move to X*) and **Remove**. Selection toolbar: *Copy to…*, *Move to…*, *Remove (N)*. All members are listed (no paging; baskets hold at most 2,000).
+- **Drag and drop (`@dnd-kit`)**, grip as the handle, for mouse, touch (long press) and keyboard (space picks up, arrows move, space drops, escape cancels), with spoken announcements: a row dropped on another row **reorders** (a dragged selected row takes the whole selection along as a block); dropped on another basket's card it **copies** there, with **Alt / Option held it moves** (the card under the pointer lights up and says "Drop to copy here · hold Alt to move"); dropping on its own basket or nowhere does nothing; cards reorder among themselves. Reordering is optimistic and rolls back (with a message) when the server refuses.
+- **Undo toast** after a copy, move or remove: undoing a copy removes only what the copy added (instruments it tracked stay tracked, and the toast says so); undoing a move transfers back what was moved and restores the order where the basket still allows it (the added date of those instruments restarts, because the stay was ended); if the situation before could not be read the toast says the action cannot be undone. A `409 baskets.conflict` reloads the screen and asks to try again.
+- **Add instruments** dialog: search the master list or only the tracked instruments (symbol, name, ISIN), tick any number across searches, add. Members are shown ticked and disabled ("Already in X"), retired instruments disabled ("Retired — cannot be added"), untracked ones marked "Will be tracked". **Basket editor:** name, purpose, colour (the app palette or any `#rrggbb`), description; the server's field messages (e.g. name taken) show on the field. **History drawer:** added / removed entries newest first with date and who (additions also show the note).
+- **Instruments screen:** the bulk bar's *Add to basket (N)* opens a dialog to tick one or more baskets (more than 500 instruments go out in several calls); the instrument drawer lists the instrument's baskets as links to `/baskets?basket=` and has an *Add to basket* button. The Tracked tab has **no basket-chips column**: the API gives the baskets of one instrument per request, so a column would fire one request per row; it waits for a list endpoint that returns them with the page.
+
 ## 4. Evaluation lenses — looking at results from different angles
 
 Every analytic screen uses the same **lens + filters** model: pick the lens (how rows are grouped), then
@@ -150,13 +214,13 @@ membership to evaluate a basket exactly as it was composed on each trade date.
 |-------|------------|
 | `market.instruments` | id, canonical_symbol, type, segment, sector, lot_size, tick_size, flags, listed_on |
 | `market.instrument_broker_ids` | instrument_id, broker, broker_id, segment |
-| `catalog.tracked_instruments` | instrument_id, active, active_since, data_from, data_to, last_update |
-| `catalog.baskets` | id, name, type (manual/rule/system), purpose, colour, settings (JSON), rule (JSON) |
-| `catalog.basket_members` | basket_id, instrument_id, valid_from, valid_to, note, target_weight |
+| `market.tracked_instruments` | instrument_id, active, active_since, deactivated_at, data_from, data_to, last_update, backfill_requested_at, note, tracked_by |
+| `market.baskets` | id, name, colour, purpose, description, position, created_at, archived_at, revision (concurrency token) — manual baskets (P1-15); type (rule/system), settings and rule (JSON) join with those basket types |
+| `market.basket_members` | id, basket_id, instrument_id, position, valid_from, valid_to, note, added_by, removed_by — one row per stay; `target_weight` joins with the allocation story |
 
 ## 6. Screens
 
-- **Instruments** — master-list search with facets; tracked list with coverage/quality/basket chips; bulk actions
+- **Instruments** — master-list search with facets; tracked list with coverage/quality (basket chips: in the detail drawer, §3.4); bulk actions
   (track, untrack, add to basket, backfill).
 - **Baskets** — list with key stats; editor (manual add/remove, drag & drop, rule builder with live preview);
   basket detail (members, performance by lens, benchmark, open positions).

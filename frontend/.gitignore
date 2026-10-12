@@ -3,3 +3,6 @@ dist/
 coverage/
 *.tsbuildinfo
 .vite/
+
+# vitest run artefacts
+.vitest/

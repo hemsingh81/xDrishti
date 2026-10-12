@@ -1510,7 +1510,7 @@
         "tags": [
           "Instruments"
         ],
-        "summary": "Search the master list: q (symbol, name, ISIN), type, sector, fno, asmGsm, series, includeRetired, sort, page, pageSize (max 100)",
+        "summary": "Search the master list: q (symbol, name, ISIN), type, sector, fno, asmGsm, series, tracked (true|false), includeRetired, sort, page, pageSize (max 100)",
         "operationId": "SearchInstruments",
         "parameters": [
           {
@@ -1584,6 +1584,13 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "tracked",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -1615,7 +1622,7 @@
         "tags": [
           "Instruments"
         ],
-        "summary": "Counts of the active instruments by type, series, F&O and ASM/GSM, and of the active shares by sector (incl. Unclassified), for the filters",
+        "summary": "Counts of the active instruments by type, series, F&O and ASM/GSM, and of the active shares by sector (incl. Unclassified), for the filters; plus how many are tracked",
         "operationId": "GetInstrumentFacets",
         "responses": {
           "200": {
@@ -1666,6 +1673,145 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/tracked": {
+      "post": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Track 1 to 500 instruments (idempotent, all or nothing; a retired one that is not tracked yet is refused with 400 instruments.retired)",
+        "operationId": "TrackInstruments",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TrackingInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Untrack 1 to 500 instruments (idempotent, all or nothing; their history is kept and tracking again continues from it)",
+        "operationId": "UntrackInstruments",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TrackingInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UntrackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/tracked/resolve": {
+      "post": {
+        "tags": [
+          "Instruments"
+        ],
+        "summary": "Look up pasted tickers, canonical symbols or ISINs (up to 5,000, case-insensitive): matched instruments and the unmatched entries (never guessed)",
+        "operationId": "ResolveInstruments",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ResolveInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -1768,6 +1914,709 @@
                   "items": {
                     "$ref": "#/components/schemas/RefreshRunView"
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "The baskets in the owner's order with their member counts; archived ones only with includeArchived=true",
+        "operationId": "ListBaskets",
+        "parameters": [
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BasketView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Create an empty basket (name, colour, purpose, description); 409 baskets.name_taken when an active basket has the name (ignoring case)",
+        "operationId": "CreateBasket",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BasketInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/order": {
+      "put": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Put the baskets in this order: the ids must be every active basket exactly once (400 baskets.invalid), 409 baskets.conflict when baskets changed meanwhile",
+        "operationId": "ReorderBaskets",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BasketOrderInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/transfer": {
+      "post": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Copy or move up to 500 instruments from one basket to another, atomically and idempotently (only members of the source are transferred; targets are tracked automatically)",
+        "operationId": "TransferBasketMembers",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TransferInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/{id}": {
+      "put": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Replace the name, colour, purpose and description of a basket that is not archived",
+        "operationId": "UpdateBasket",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BasketInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Archive a basket (idempotent): it leaves the list, its members and history stay readable, instruments stay tracked",
+        "operationId": "ArchiveBasket",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/{id}/members": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "The members of a basket in their order, with the instrument and its tracked block; asOf=yyyy-MM-dd (India date) gives the members at the end of that day",
+        "operationId": "ListBasketMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "asOf",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketMembers"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Add 1 to 500 instruments (idempotent, all or nothing); untracked ones are tracked in the same transaction, a retired one that is not tracked is refused (instruments.retired)",
+        "operationId": "AddBasketMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AddMembersInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddMembersResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Remove 1 to 500 instruments (idempotent, all or nothing); the stay stays in the history, the instruments stay tracked",
+        "operationId": "RemoveBasketMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RemoveMembersInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveMembersResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/{id}/members/order": {
+      "put": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "Put the members in this order: the instrumentIds must be every member exactly once (400 baskets.invalid), 409 baskets.conflict when the basket changed meanwhile",
+        "operationId": "ReorderBasketMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MembersOrderInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/baskets/{id}/history": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "The newest additions and removals of a basket, newest first (take 1 to 1000, default 200)",
+        "operationId": "GetBasketHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/instruments/{id}/baskets": {
+      "get": {
+        "tags": [
+          "Baskets"
+        ],
+        "summary": "The baskets (not archived) that hold the instrument now",
+        "operationId": "ListInstrumentBaskets",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstrumentBasketView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -2434,6 +3283,65 @@
         },
         "description": "One row of the accounts list. Broker is \"dhan\"; MaskedClientId shows the first four and last two characters; Secrets lists the\nsecret fields with set / not set; ApiKeyExpiresOn is the first day the Dhan API key is no longer valid; TokenStatus repeats\nConnection.Status (for the list's health dot)."
       },
+      "AddMembersInput": {
+        "required": [
+          "instrumentIds",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Instruments to add (1 to 500; repeats count once) with an optional note stored on each new membership."
+      },
+      "AddMembersResult": {
+        "required": [
+          "requested",
+          "added",
+          "alreadyMembers",
+          "newlyTracked",
+          "memberCount"
+        ],
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newlyTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What an add did (counts of distinct instruments): `added` became members, `alreadyMembers` were members already, `newlyTracked` of the added\nones were not tracked and are now. `memberCount` = members now."
+      },
       "ApplicationStatus": {
         "required": [
           "name",
@@ -2527,6 +3435,284 @@
           }
         },
         "description": "The daily automatic refresh: whether it is on, at what India time, and when it runs next."
+      },
+      "BasketHistory": {
+        "required": [
+          "basketId",
+          "name",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketHistoryEntry"
+            }
+          }
+        },
+        "description": "The newest additions and removals of a basket, newest first."
+      },
+      "BasketHistoryEntry": {
+        "required": [
+          "memberId",
+          "kind",
+          "at",
+          "instrumentId",
+          "symbol",
+          "name",
+          "type",
+          "note",
+          "by"
+        ],
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "by": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "An addition (`kind` = added, `by` = who added it) or removal (`kind` = removed, `by` = who removed it) of an instrument. Only additions carry a note (the one given when adding); a removal has none."
+      },
+      "BasketInput": {
+        "required": [
+          "name",
+          "colour",
+          "purpose",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "colour": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "purpose": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Attributes of a basket (create and replace). Missing colour = the default; missing purpose = trading; blank description = none."
+      },
+      "BasketMemberView": {
+        "required": [
+          "id",
+          "instrument",
+          "position",
+          "validFrom",
+          "validTo",
+          "note",
+          "addedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instrument": {
+            "$ref": "#/components/schemas/InstrumentSummary"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "addedBy": {
+            "type": "string"
+          }
+        },
+        "description": "One stay of an instrument in a basket: `validFrom` = when it was added, `validTo` = when it was removed (null while it is a member),\n`position` = place among the members (0 first), `addedBy` = the owner's address."
+      },
+      "BasketMembers": {
+        "required": [
+          "basketId",
+          "name",
+          "archivedAt",
+          "asOf",
+          "total",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "archivedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "asOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketMemberView"
+            }
+          }
+        },
+        "description": "The members of a basket, in their order. `asOf` is null for the current members, otherwise the India date they are as of (members at the end of that\nday; removed ones show their `validTo`). `total` counts the items."
+      },
+      "BasketOrderInput": {
+        "required": [
+          "ids"
+        ],
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "Every active basket exactly once, in the wanted order."
+      },
+      "BasketView": {
+        "required": [
+          "id",
+          "name",
+          "colour",
+          "purpose",
+          "description",
+          "position",
+          "memberCount",
+          "createdAt",
+          "archivedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "colour": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archivedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first). `memberCount` = instruments in it now.\n`archivedAt` is null for an active basket (archived ones are only listed on request)."
       },
       "BrokerIdView": {
         "required": [
@@ -3399,6 +4585,41 @@
         },
         "description": "One holding to import (a key from the preview). AcquiredOn left out means \"use the first import date\" (the lot is then flagged)."
       },
+      "InstrumentBasketView": {
+        "required": [
+          "basketId",
+          "name",
+          "colour",
+          "purpose",
+          "position",
+          "since"
+        ],
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "colour": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "A basket that holds an instrument now; `since` = when it was added."
+      },
       "InstrumentDetail": {
         "required": [
           "id",
@@ -3425,7 +4646,8 @@
           "firstSeenAt",
           "lastSeenAt",
           "retiredAt",
-          "brokerIds"
+          "brokerIds",
+          "tracked"
         ],
         "type": "object",
         "properties": {
@@ -3548,6 +4770,9 @@
             "items": {
               "$ref": "#/components/schemas/BrokerIdView"
             }
+          },
+          "tracked": {
+            "$ref": "#/components/schemas/TrackedInfo"
           }
         },
         "description": "Everything the master list knows about an instrument."
@@ -3560,7 +4785,9 @@
           "sectors",
           "series",
           "fnoEligible",
-          "asmGsm"
+          "asmGsm",
+          "tracked",
+          "trackedRetired"
         ],
         "type": "object",
         "properties": {
@@ -3597,9 +4824,17 @@
           "asmGsm": {
             "type": "integer",
             "format": "int32"
+          },
+          "tracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trackedRetired": {
+            "type": "integer",
+            "format": "int32"
           }
         },
-        "description": "Counts of the active (not retired) instruments per filter value. Sectors are counted over shares only (only shares get one);\nsector \"Unclassified\" = shares without a known sector, and filtering by it returns exactly those."
+        "description": "Counts of the active (not retired) instruments per filter value. Sectors are counted over shares only (only shares get one);\nsector \"Unclassified\" = shares without a known sector, and filtering by it returns exactly those. `tracked` = instruments tracked now (what\n`?tracked=true` lists, retired ones included); `trackedRetired` = those of them that are no longer in Dhan's list."
       },
       "InstrumentPage": {
         "required": [
@@ -3646,7 +4881,8 @@
           "expiryDate",
           "fnoEligible",
           "asmGsm",
-          "retired"
+          "retired",
+          "tracked"
         ],
         "type": "object",
         "properties": {
@@ -3710,6 +4946,9 @@
           },
           "retired": {
             "type": "boolean"
+          },
+          "tracked": {
+            "$ref": "#/components/schemas/TrackedInfo"
           }
         },
         "description": "A row of the master list. `type`: share · etf · index · future."
@@ -3874,6 +5113,25 @@
           }
         },
         "description": "A lot of a holding with its own figures: Invested is its cost, Value is its value now (open) or its sale proceeds (closed), Pnl the difference.\nStatus is \"open\" or \"closed\"; Source \"import\", \"added\" or \"manual\". Estimated: the sale price is the last price a sync saw."
+      },
+      "MembersOrderInput": {
+        "required": [
+          "instrumentIds"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "Every member of the basket exactly once, in the wanted order."
       },
       "PortfolioInput": {
         "required": [
@@ -4299,6 +5557,147 @@
           }
         },
         "description": "Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active."
+      },
+      "RemoveMembersInput": {
+        "required": [
+          "instrumentIds"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "Instruments to remove from a basket (1 to 500; repeats count once)."
+      },
+      "RemoveMembersResult": {
+        "required": [
+          "requested",
+          "removed",
+          "notMembers",
+          "memberCount"
+        ],
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "removed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notMembers": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "memberCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What a removal did: `removed` were members, `notMembers` were not. Untracking never happens. `memberCount` = members now."
+      },
+      "ResolveInput": {
+        "required": [
+          "symbols"
+        ],
+        "type": "object",
+        "properties": {
+          "symbols": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "Pasted tickers, canonical symbols (`NSE:RELIANCE`) or ISINs, up to 5,000 entries."
+      },
+      "ResolveResult": {
+        "required": [
+          "matched",
+          "unmatched",
+          "entries",
+          "duplicates"
+        ],
+        "type": "object",
+        "properties": {
+          "matched": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolvedInstrument"
+            }
+          },
+          "unmatched": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnmatchedEntry"
+            }
+          },
+          "entries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The outcome of looking up a pasted list. `entries` counts the non-blank entries, `duplicates` those collapsed because an earlier entry\nwas the same text or named the same instrument. Entries that match nothing are never guessed: they are listed in `unmatched`."
+      },
+      "ResolvedInstrument": {
+        "required": [
+          "term",
+          "id",
+          "symbol",
+          "name",
+          "type",
+          "isin",
+          "retired",
+          "tracked"
+        ],
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "retired": {
+            "type": "boolean"
+          },
+          "tracked": {
+            "type": "boolean"
+          }
+        },
+        "description": "An entry that named an instrument. `term` is the entry as typed (the first one when several name the same instrument); `tracked` = tracked now; `retired` = cannot be newly tracked."
       },
       "ReturnsView": {
         "required": [
@@ -4968,6 +6367,122 @@
           }
         }
       },
+      "TrackResult": {
+        "required": [
+          "requested",
+          "added",
+          "reactivated",
+          "alreadyTracked",
+          "totalTracked"
+        ],
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reactivated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalTracked": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What a track call did (all counts are of distinct instruments): `added` never tracked before, `reactivated` tracked again after an\nuntrack, `alreadyTracked` nothing to do. `totalTracked` is the number tracked now."
+      },
+      "TrackedInfo": {
+        "required": [
+          "active",
+          "since",
+          "deactivatedAt",
+          "dataFrom",
+          "dataTo",
+          "lastUpdate",
+          "backfillRequestedAt",
+          "retiredButTracked"
+        ],
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "since": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "deactivatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "dataFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "dataTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastUpdate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "backfillRequestedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "retiredButTracked": {
+            "type": "boolean"
+          }
+        },
+        "description": "Whether the owner tracks the instrument (every instrument has this block). `active` = tracked now; `since` = when tracking last started;\n`deactivatedAt` = when it was switched off (history is kept; null while active); `dataFrom`/`dataTo`/`lastUpdate` = the collected\nhistory (null until the history service has collected some); `backfillRequestedAt` = when collecting history was last asked for;\n`retiredButTracked` = tracked, but no longer in Dhan's list (a warning, nothing is removed)."
+      },
+      "TrackingInput": {
+        "required": [
+          "instrumentIds"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "description": "Instruments to track or untrack: 1 to 500 ids (duplicates are fine and count once)."
+      },
       "TradingInput": {
         "required": [
           "mode",
@@ -5119,6 +6634,138 @@
         },
         "description": "Trading configuration. Mode is \"paper\" or \"manual_live\", CapitalSource is \"fixed\" or \"broker_funds\", Styles holds \"intraday\" and/or \"swing\"; instruments are EQ_MIS, EQ_CNC or FUT."
       },
+      "TransferInput": {
+        "required": [
+          "fromBasketId",
+          "toBasketId",
+          "instrumentIds",
+          "mode"
+        ],
+        "type": "object",
+        "properties": {
+          "fromBasketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toBasketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instrumentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "mode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Instruments (1 to 500) to copy or move from one basket to another; `mode` = copy · move."
+      },
+      "TransferResult": {
+        "required": [
+          "mode",
+          "requested",
+          "added",
+          "alreadyInTarget",
+          "removed",
+          "notInSource",
+          "newlyTracked",
+          "sourceMemberCount",
+          "targetMemberCount"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyInTarget": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "removed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notInSource": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newlyTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sourceMemberCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "targetMemberCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What a transfer did. Only instruments that are members of the source are transferred: the others are `notInSource` (for a repeated move, the ones\nmoved before). `added` became members of the target, `alreadyInTarget` were there already, `removed` left the source (a move only),\n`newlyTracked` of the added ones were not tracked and are now."
+      },
+      "UnmatchedEntry": {
+        "required": [
+          "term",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "term": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "An entry that named no instrument. `reason`: `not_found` · `ambiguous` (an ISIN of several instruments) · `invalid` (too long or with control characters)."
+      },
+      "UntrackResult": {
+        "required": [
+          "requested",
+          "untracked",
+          "notTracked",
+          "totalTracked"
+        ],
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "untracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalTracked": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What an untrack call did: `untracked` were tracked, `notTracked` were not (nothing to do). `totalTracked` is the number tracked now."
+      },
       "UpdateSecretsInput": {
         "required": [
           "apiKey",
@@ -5187,6 +6834,9 @@
     },
     {
       "name": "Instruments"
+    },
+    {
+      "name": "Baskets"
     },
     {
       "name": "Holdings"

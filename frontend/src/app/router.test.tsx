@@ -17,9 +17,17 @@ describe('app routes', () => {
   });
 
   it('shows the roadmap phase for screens that are not built yet', async () => {
-    renderRoutes(routes, { initialPath: '/baskets' });
+    renderRoutes(routes, { initialPath: '/data' });
 
     expect(await screen.findByText('P1')).toBeInTheDocument();
+  });
+
+  it('opens the Baskets screen (no longer a placeholder)', async () => {
+    renderRoutes(routes, { initialPath: '/baskets' });
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Baskets' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Baskets' })).toBeInTheDocument();
+    expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
   });
 
   it('opens the Portfolio screen (no longer a placeholder)', async () => {

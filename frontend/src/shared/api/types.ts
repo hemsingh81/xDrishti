@@ -35,6 +35,12 @@ export type InstrumentDetail = Schemas['InstrumentDetail'];
 export type InstrumentPage = Schemas['InstrumentPage'];
 export type InstrumentFacets = Schemas['InstrumentFacets'];
 export type FacetCount = Schemas['FacetCount'];
+export type TrackedInfo = Schemas['TrackedInfo'];
+export type TrackResult = Schemas['TrackResult'];
+export type UntrackResult = Schemas['UntrackResult'];
+export type ResolveResult = Schemas['ResolveResult'];
+export type ResolvedInstrument = Schemas['ResolvedInstrument'];
+export type UnmatchedEntry = Schemas['UnmatchedEntry'];
 export type BrokerId = Schemas['BrokerIdView'];
 /** One run of the master-list refresh (manual, daily or forced). */
 export type RefreshRun = Schemas['RefreshRunView'];
@@ -59,3 +65,19 @@ export type PortfolioSaved = Schemas['PortfolioSaved'];
 export type FirstImportView = Schemas['FirstImportView'];
 export type FirstImportInput = Schemas['FirstImportInput'];
 export type ImportRowInput = Schemas['ImportRowInput'];
+
+/** A manual basket: name, colour, purpose, order and how many instruments it holds now. */
+export type Basket = Schemas['BasketView'];
+export type BasketInput = Schemas['BasketInput'];
+/** The members of a basket now (or as of a date) with their instrument summaries. */
+export type BasketMembers = Schemas['BasketMembers'];
+/** One stay of an instrument in a basket (added date, removed date, note). */
+export type BasketMember = Schemas['BasketMemberView'];
+export type BasketHistory = Schemas['BasketHistory'];
+export type BasketHistoryEntry = Schemas['BasketHistoryEntry'];
+export type AddMembersResult = Schemas['AddMembersResult'];
+export type RemoveMembersResult = Schemas['RemoveMembersResult'];
+export type TransferInput = Schemas['TransferInput'];
+export type TransferResult = Schemas['TransferResult'];
+/** A basket that holds an instrument now. */
+export type InstrumentBasket = Schemas['InstrumentBasketView'];
