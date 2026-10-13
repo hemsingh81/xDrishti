@@ -63,3 +63,13 @@ export function NoPortfolioAccounts() {
     </Card>
   );
 }
+
+/** A grouping with no group: nothing in the scope (the filters narrowed it to nothing, or there is nothing yet). */
+export function NoGroups({ canClear, onClear }: { canClear: boolean; onClear: () => void }) {
+  return (
+    <Stack spacing={1} sx={{ alignItems: 'center', py: 5 }}>
+      <Typography sx={{ fontWeight: 600 }}>No holdings in this scope</Typography>
+      {canClear && <Button onClick={onClear}>Clear filters</Button>}
+    </Stack>
+  );
+}

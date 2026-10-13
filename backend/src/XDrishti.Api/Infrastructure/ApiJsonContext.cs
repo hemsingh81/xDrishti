@@ -22,6 +22,10 @@ using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
+using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Portfolio.Trades;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -110,6 +114,10 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ImportCorporateActionsResult))]
 [JsonSerializable(typeof(HoldingPage))]
 [JsonSerializable(typeof(HoldingsSummary))]
+[JsonSerializable(typeof(HoldingGroups))]
+[JsonSerializable(typeof(HoldingGroup))]
+[JsonSerializable(typeof(HoldingGroupTotal))]
+[JsonSerializable(typeof(GroupPart))]
 [JsonSerializable(typeof(PricesAsOf))]
 [JsonSerializable(typeof(HoldingLots))]
 [JsonSerializable(typeof(LotRow))]
@@ -118,6 +126,39 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(SyncInput))]
 [JsonSerializable(typeof(SyncRunView))]
 [JsonSerializable(typeof(SyncStatusView))]
+[JsonSerializable(typeof(PortfolioHistory))]
+[JsonSerializable(typeof(BenchmarkInput))]
+[JsonSerializable(typeof(BenchmarkView))]
+[JsonSerializable(typeof(PortfolioTrackResult))]
+[JsonSerializable(typeof(ActionList))]
+[JsonSerializable(typeof(ActionItem))]
+[JsonSerializable(typeof(ActionNumbers))]
+[JsonSerializable(typeof(LongTermLot))]
+[JsonSerializable(typeof(ActionCounts))]
+[JsonSerializable(typeof(ActionUnavailable))]
+[JsonSerializable(typeof(ActionDecisionView))]
+[JsonSerializable(typeof(ActionThresholdsView))]
+[JsonSerializable(typeof(ActionThresholdsInput))]
+[JsonSerializable(typeof(PriceAlertInput))]
+[JsonSerializable(typeof(PriceAlertView))]
+[JsonSerializable(typeof(PriceAlertPage))]
+[JsonSerializable(typeof(PortfolioNotices))]
+[JsonSerializable(typeof(TradePreviewReport))]
+[JsonSerializable(typeof(TradeFileSummary))]
+[JsonSerializable(typeof(TradeSkipped))]
+[JsonSerializable(typeof(TradeBadRow))]
+[JsonSerializable(typeof(TradeCount))]
+[JsonSerializable(typeof(OpeningQtyView))]
+[JsonSerializable(typeof(TradeRebuildView))]
+[JsonSerializable(typeof(TradeSecurityView))]
+[JsonSerializable(typeof(TradeImportResult))]
+[JsonSerializable(typeof(TradeBatchView))]
+[JsonSerializable(typeof(TradeBatchPage))]
+[JsonSerializable(typeof(TradeUndoResult))]
+[JsonSerializable(typeof(TradeView))]
+[JsonSerializable(typeof(TradePage))]
+[JsonSerializable(typeof(ManualTradeInput))]
+[JsonSerializable(typeof(HoldingRebuildResult))]
 [JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(ServiceView))]
 [JsonSerializable(typeof(ServiceRunView))]

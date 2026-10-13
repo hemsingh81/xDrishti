@@ -701,7 +701,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100). Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote) */
+    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote) */
     get: operations['ListHoldings'];
     put?: never;
     post?: never;
@@ -720,6 +720,23 @@ export interface paths {
     };
     /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync */
     get: operations['GetHoldingsSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/groups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0) */
+    get: operations['GetHoldingGroups'];
     put?: never;
     post?: never;
     delete?: never;
@@ -753,7 +770,7 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    /** Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date */
+    /** Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date. A lot rebuilt from trades (source trade) takes its date from the trade: 409 portfolio.lot_from_trade; the opening lot of such a holding must stay before the earliest trade: 400 portfolio.invalid, field acquiredOn */
     put: operations['UpdateHoldingLotDate'];
     post?: never;
     delete?: never;
@@ -807,6 +824,75 @@ export interface paths {
     get: operations['GetAccountHoldingsSyncStatus'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Value history of the lots of a scope (accountId, bucketId; all accounts that count in totals when neither is given) from the lots and the stored day bars adjusted for splits and bonuses: points {date, value, invested, benchmarkValue (the same cash flows in the benchmark index, null when unavailable), nav, benchmarkNav} (NAV starts at 100 and ignores cash flows), coverage {holdings, covered, unpriced, lateStart}, partial, benchmark {state ok|unavailable, instrumentId, symbol, name, tracked, hasBars, reason}, maxDrawdown and benchmarkMaxDrawdown {pct, from, to} (a fall of pct %), firstDate, lastPriceAt (set when the last point is today's live one) and resolution. from/to yyyy-MM-dd; resolution day|week|month (last trading day of the period; default the finest with at most 2,000 points, 400 portfolio.invalid when a given one gives more). An unknown account or bucket gives an empty history */
+    get: operations['GetPortfolioHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/benchmark': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The benchmark index the portfolio is compared with (Nifty 50 until another is chosen): instrumentId, symbol, name, isDefault, tracked, hasBars; all null when the instrument master has no such index yet */
+    get: operations['GetPortfolioBenchmark'];
+    /** Choose the benchmark index: body {instrumentId} of any index of the instrument master that is still listed; 400 portfolio.invalid for no id, an unknown id, a non-index or a retired index. Audited; the cached histories are dropped */
+    put: operations['SetPortfolioBenchmark'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/history/track-holdings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Track my holdings: tracks the instruments of the open holdings of the scope (accountId, bucketId) that are in the instrument master, with the bulk tracking command; idempotent. Answers how many were added, how many holdings are not in the master (notInMaster) and how many instruments are retired and skipped; starts no job, the hint says the next Update data builds the bars */
+    post: operations['TrackPortfolioHoldings'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/history/track-benchmark': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Track the benchmark: tracks the benchmark index with the bulk tracking command; idempotent. Answers how many were added; starts no job, the hint says the next Update data builds the bars. 404 portfolio.not_found when the instrument master has no benchmark index */
+    post: operations['TrackPortfolioBenchmark'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1478,6 +1564,314 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/portfolio/actions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The holdings that need a decision, evaluated on read by seven rules (below_cost, large_gain, overweight, sector_concentration, long_term_soon, lagging_nifty, not_in_basket): items[{id, rule, severity high|medium|info, accountId, accountName, holdingId, instrumentId, symbol (null for the account-level sector_concentration), title, detail, numbers (the figures behind the item; which are set depends on the rule), suggestions[open|set_alert|add_to_basket|snooze|done], state open|snoozed|done, snoozedUntil}] most important first (severity, then the size of the trigger), and counts {open, snoozed, done, byRule, bySeverity (of the open items; every rule and severity present), unavailable {lagging: holdings held long enough for lagging_nifty that could not be judged because the benchmark has no bars from the first flow or an XIRR is not ok}, noPrice (open holdings without a usable price: no price-based rule fires for them)}. Filters: accountId (404 accounts.not_found when unknown; without it the accounts that count in totals), bucketId (the items about its holdings; weights and sector shares stay shares of the whole account), status open (default) | snoozed | done | all (the counts always cover the whole scope). A snoozed item shows again on its snoozedUntil date. One write is made by this read: a done decision whose condition no longer holds is cleared, so a recurrence shows again */
+    get: operations['GetPortfolioActions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/actions/{id}/snooze': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hide an item for 7 days (it shows again on that India date if a rule still produces it): answers {id, state, snoozedUntil, item}. Idempotent; audited. 404 portfolio.not_found for an id that no rule produces now (stale) */
+    post: operations['SnoozePortfolioAction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/actions/{id}/done': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Mark an item done: it stays hidden for as long as the condition holds and the decision is cleared when it stops holding (a later recurrence is open again). Answers {id, state, snoozedUntil, item}. Idempotent; audited. 404 portfolio.not_found for an id that no rule produces now (stale) */
+    post: operations['MarkPortfolioActionDone'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/actions/{id}/reopen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Take a snooze or done decision back: the item is open again. Answers {id, state open, item (null when no rule produces the id now)}. Idempotent; audited when it changes something; allowed for an item that is gone; 404 portfolio.not_found only for an id that is not the id of any rule's item */
+    post: operations['ReopenPortfolioAction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/action-thresholds': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The thresholds of the Action-center rules in force: values {belowCostPct, belowCostHighPct, gainPct, overweightFloorPct, overweightMultiple, minPositions, concentrationPct, lagPp, lagDays, longTermWindowDays}, the documented defaults, isDefault, updatedBy and updatedAt (null while none are stored) */
+    get: operations['GetPortfolioActionThresholds'];
+    /** Save the thresholds (all ten required): below cost 1-90 %, high 2-95 % and above below cost, gain 1-1000 %, overweight floor 1-100 %, multiple 1-10, minimum positions 2-50, concentration 5-100 %, lag 1-100 points, lag days 30-3650, long-term window 1-365 days; at most 2 decimals, minPositions/lagDays/longTermWindowDays whole numbers. 400 portfolio.invalid with a field error per problem. The next read of the actions uses them at once. Audited */
+    put: operations['SavePortfolioActionThresholds'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/action-thresholds/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restore defaults: writes the documented default thresholds. Audited; nothing changes when they are already in force */
+    post: operations['ResetPortfolioActionThresholds'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/notices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the owner should know about the portfolio, for the notification bell: price_alert_triggered (warn; one per alert, id portfolio:alert:{alertId}, listed for 7 days after it triggered; carries alertId and instrumentId) and actions_need_decision (info; "N holdings need a decision" when the accounts that count in totals have open Action-center items; id portfolio:actions:{India date}, so it is raised again at most once a day) */
+    get: operations['GetPortfolioNotices'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/alerts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The price alerts, newest first: status active | triggered | cancelled | all (default all), page, pageSize (max 100, default 50). Each alert has id, instrumentId, symbol, name, direction (at_or_below | at_or_above), level, note, status, createdAt, triggeredAt and triggerPrice (the last price of the tick that hit the level). The page also carries activeCount of activeLimit (200) */
+    get: operations['ListPortfolioAlerts'];
+    put?: never;
+    /** Create an active alert: body {instrumentId (an NSE share or ETF of the instrument master that is not retired and that Dhan can quote), direction at_or_below | at_or_above, level (above 0, at most 10,000,000, at most 4 decimals), note (optional, at most 200 characters of plain text)}. Checked on each quotes tick's last price (at_or_below: last <= level; at_or_above: last >= level). 400 portfolio.invalid with field errors, including field level when the condition already holds at the last known price (the holding's last price, else the last stored daily close; unknown: allowed) with the price in the message; 409 portfolio.alert_limit at 200 active alerts. Audited */
+    post: operations['CreatePortfolioAlert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/alerts/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel an alert. Idempotent: a cancelled alert stays cancelled and a triggered one stays triggered (the answer shows the real status). Audited when it cancels. 404 portfolio.not_found for an unknown id */
+    post: operations['CancelPortfolioAlert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/trades/template': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The template of a tradebook file as a CSV download: the canonical header (Date, Symbol, ISIN, Side, Quantity, Price, Exchange, Trade ID, Time, Charges) and two example rows. Other header names are accepted too (any case, punctuation ignored); only date, symbol or ISIN, side, quantity and price are required */
+    get: operations['GetTradeTemplate'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/trades/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Read a tradebook against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows). Returns the file (rows, parsed, skipped by reason, bad rows with line and reason - at most 200 listed, badTotal counts all -, duplicates, alreadyImported, newTrades), the securities - every held or master-listed one and at most 200 unmatched ones; securitiesTotal counts all, unmatchedListed the unmatched listed - (symbol, isin, matched, holdingId, trades, buys, sells, first and last trade date and the rebuild: status ok | unchanged | quantity_mismatch | no_holding | ambiguous, reason, lotsBefore, lotsAfter, handDatedLotsReplaced, syncLotsReplaced, realisedPnl, adjustedFor, q, net, openingQty {before, after}, openCostAfter, brokerCost, costDelta, costNote, digest), notHeld and unmatched {securities, trades} and the overall digest. 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off */
+    post: operations['PreviewTradeImport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/trades/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import a tradebook: body multipart/form-data with accountId, file, rebuild (true | false, default true) and digest (required with rebuild: the digest of the preview). Stores the trades the account does not have yet as one batch (a trade id of the file together with the trade date - exchanges number trades per day -, else a hash of the line, is the identity: the same file again stores nothing and makes no batch) and, with rebuild, replaces the lots of every holding whose result is ok by lots built from the real buy and sell dates. Trades of securities not held, of mismatching or ambiguous holdings are stored and not applied. 409 portfolio.preview_stale when holdings, lots, corporate actions or trades changed since the preview (extension report: the fresh preview; nothing applied); 409 portfolio.sync_running while the account's holdings sync runs; 400 portfolio.invalid; 404 portfolio.not_found. Audited with counts only */
+    post: operations['ImportTrades'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/trades': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add one trade by hand: holdingId, or accountId with symbol and/or isin of an NSE share or ETF of the instrument master; side buy | sell, tradeDate (1990-01-02 to today), tradeTime (optional, India time), quantity (whole, above 0), price (above 0), charges (optional). Validated like a CSV row; identical manual trades are not deduplicated. Changes no lots - rebuild them afterwards. 400 portfolio.invalid with field errors; 404 portfolio.not_found. Audited */
+    post: operations['AddTrade'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/trades/{id}/void': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Void a trade: it stops counting, is never deleted and can be imported again. Voiding a voided trade is a no-op. Changes no lots - rebuild them afterwards. 404 portfolio.not_found. Audited */
+    post: operations['VoidTrade'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/trade-batches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The imports of tradebook files, newest first: accountId (optional), page, pageSize (max 100, default 50). Each has id, accountId, accountName, fileName, sha256, parsed, imported, duplicates, skipped, bad, status imported | undone, activeTrades, securities, createdBy, createdAt, undoneAt */
+    get: operations['ListTradeBatches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/trade-batches/{id}/undo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Undo an import: voids its trades (nothing is deleted) and rebuilds from the remaining trades the lots of the affected holdings whose lots came from trades - with none left, one lot of the broker's quantity and cost dated by the first import date, flagged default. LIMITATION: an undo cannot bring back lots the owner dated by hand or a sync added that an earlier rebuild replaced; handDatedLotsReplaced and syncLotsReplaced say how many the rebuild removes (the lots of holdings it rebuilds). Holdings whose lots did not come from trades keep their lots; holdings that cannot be rebuilt (quantity mismatch, ambiguous) keep theirs and are listed in notRebuilt [{symbol, holdingId, reason}] (holdingsNotRebuilt counts them). dryRun=true (default false) changes nothing and returns the same result (dryRun, applied=false) so the confirmation can say what will happen. Undoing twice is a no-op (alreadyUndone). 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only */
+    post: operations['UndoTradeBatch'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/{id}/trades': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The trades of a holding's security (by ISIN, else symbol), newest first, voided ones included and flagged (voided, voidedAt, voidedBy): page, pageSize (max 200, default 50) */
+    get: operations['ListHoldingTrades'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/{id}/rebuild-lots': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Rebuild a holding's lots from its stored trades. dryRun (default true) returns the rebuild block - status, counts of lots replaced, realised profit, adjustments, the broker's quantity against the trades - and changes nothing; dryRun=false replaces the lots when the status is ok (applied) and leaves them for unchanged, quantity_mismatch and ambiguous. A holding without trades is rebuilt into one default-dated lot. 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only */
+    post: operations['RebuildHoldingLots'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1549,6 +1943,169 @@ export interface components {
       apiKeyExpiresOn: string;
       tokenStatus: string;
       connection: components['schemas']['ConnectionView'];
+    };
+    /**
+     * @description What the Action center counts for the scope (before the status filter): items by state, and for the <i>open</i> items by rule (all seven rules, zeros included) and by severity (high, medium, info). `NoPrice` counts open holdings without a usable price
+     *     (no price-based rule can fire for them).
+     */
+    ActionCounts: {
+      /** Format: int32 */
+      open: number;
+      /** Format: int32 */
+      snoozed: number;
+      /** Format: int32 */
+      done: number;
+      byRule: {
+        [key: string]: number;
+      };
+      bySeverity: {
+        [key: string]: number;
+      };
+      unavailable: components['schemas']['ActionUnavailable'];
+      /** Format: int32 */
+      noPrice: number;
+    };
+    /** @description The outcome of a decision: `State``open|snoozed|done`, `SnoozedUntil`, and the item as it is now (null when the id is not produced by a rule now, which only a reopen can still ask about). */
+    ActionDecisionView: {
+      id: string;
+      state: string;
+      /** Format: date */
+      snoozedUntil: null | string;
+      item: null | components['schemas']['ActionItem'];
+    };
+    /**
+     * @description One Action-center item. `Id` is stable (`{rule}:{holdingId}`, or `sector_concentration:{accountId}:{12 hex}`) and safe in a URL path. `Rule` is one of `below_cost`, `large_gain`, `overweight`, `sector_concentration`,
+     *     `long_term_soon`, `lagging_nifty`, `not_in_basket`; `Severity``high|medium|info`; `HoldingId`, `InstrumentId` and `Symbol` are null for an account-level item (concentration) and `InstrumentId` for a holding that is not in the
+     *     master list. `Title` and `Detail` are plain sentences; `Numbers` the figures behind them; `Suggestions` the buttons that make sense (`open|set_alert|add_to_basket|snooze|done`). `State` is `open|snoozed|done`;
+     *     `SnoozedUntil` the India date a snoozed item shows again. Severity, text and numbers are recomputed on every read.
+     */
+    ActionItem: {
+      id: string;
+      rule: string;
+      severity: string;
+      /** Format: uuid */
+      accountId: string;
+      accountName: string;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      title: string;
+      detail: string;
+      numbers: components['schemas']['ActionNumbers'];
+      suggestions: string[];
+      state: string;
+      /** Format: date */
+      snoozedUntil: null | string;
+    };
+    /** @description The items of the status asked for, most important first, and the counts of the whole scope. */
+    ActionList: {
+      items: components['schemas']['ActionItem'][];
+      counts: components['schemas']['ActionCounts'];
+    };
+    /**
+     * @description The figures that made an item fire; which ones are set depends on the rule, the others are null. <b>below_cost</b>, <b>large_gain</b>: `PnlPct`, `Pnl`, `Invested`, `Value`, `ThresholdPct` (the band reached: 10 or 20 / 25).
+     *     <b>overweight</b>: `WeightPct` of the account's priced value, `ThresholdPct` (the limit), `Positions` (priced positions of the account), `Value`. <b>sector_concentration</b>: `Sector`, `SectorSharePct` of the account's priced value,
+     *     `ThresholdPct`, `SectorValue`, `Positions` (in the sector), `LargestSymbol`, `LargestHoldingId` and `LargestValue` of the largest holding in it. <b>long_term_soon</b>: `Lots`, `PnlPct`. <b>lagging_nifty</b>: `HeldDays`,
+     *     `XirrPct`, `BenchmarkXirrPct`, `GapPp` (holding minus benchmark, negative), `ThresholdPp`. <b>not_in_basket</b>: `Invested`, `Value` (null when unpriced).
+     */
+    ActionNumbers: {
+      /** Format: double */
+      pnlPct?: null | number;
+      /** Format: double */
+      pnl?: null | number;
+      /** Format: double */
+      invested?: null | number;
+      /** Format: double */
+      value?: null | number;
+      /** Format: double */
+      thresholdPct?: null | number;
+      /** Format: double */
+      weightPct?: null | number;
+      /** Format: int32 */
+      positions?: null | number;
+      sector?: null | string;
+      /** Format: double */
+      sectorSharePct?: null | number;
+      /** Format: double */
+      sectorValue?: null | number;
+      largestSymbol?: null | string;
+      /** Format: uuid */
+      largestHoldingId?: null | string;
+      /** Format: double */
+      largestValue?: null | number;
+      lots?: null | components['schemas']['LongTermLot'][];
+      /** Format: int32 */
+      heldDays?: null | number;
+      /** Format: double */
+      xirrPct?: null | number;
+      /** Format: double */
+      benchmarkXirrPct?: null | number;
+      /** Format: double */
+      gapPp?: null | number;
+      /** Format: double */
+      thresholdPp?: null | number;
+    };
+    /** @description The thresholds of the Action-center rules (ADR 0022, doc 15 §3): percentages are percent numbers (10 = 10 %). The defaults are the ones of the design; the owner edits them in Settings within the fixed ranges below. */
+    ActionThresholds: {
+      /** Format: double */
+      belowCostPct: number;
+      /** Format: double */
+      belowCostHighPct: number;
+      /** Format: double */
+      gainPct: number;
+      /** Format: double */
+      overweightFloorPct: number;
+      /** Format: double */
+      overweightMultiple: number;
+      /** Format: int32 */
+      minPositions: number;
+      /** Format: double */
+      concentrationPct: number;
+      /** Format: double */
+      lagPp: number;
+      /** Format: int32 */
+      lagDays: number;
+      /** Format: int32 */
+      longTermWindowDays: number;
+    };
+    /** @description The thresholds to save: every value is required. `MinPositions`, `LagDays` and `LongTermWindowDays` must be whole numbers. */
+    ActionThresholdsInput: {
+      /** Format: double */
+      belowCostPct: null | number;
+      /** Format: double */
+      belowCostHighPct: null | number;
+      /** Format: double */
+      gainPct: null | number;
+      /** Format: double */
+      overweightFloorPct: null | number;
+      /** Format: double */
+      overweightMultiple: null | number;
+      /** Format: double */
+      minPositions: null | number;
+      /** Format: double */
+      concentrationPct: null | number;
+      /** Format: double */
+      lagPp: null | number;
+      /** Format: double */
+      lagDays: null | number;
+      /** Format: double */
+      longTermWindowDays: null | number;
+    };
+    /** @description The thresholds in force with the documented defaults; `IsDefault` when they are the defaults; `UpdatedBy`/`UpdatedAt` null while none are stored. */
+    ActionThresholdsView: {
+      values: components['schemas']['ActionThresholds'];
+      defaults: components['schemas']['ActionThresholds'];
+      isDefault: boolean;
+      updatedBy: null | string;
+      /** Format: date-time */
+      updatedAt: null | string;
+    };
+    /** @description Rules that could not be evaluated: `Lagging` holdings held long enough for the lagging-Nifty rule but without a usable benchmark or XIRR. */
+    ActionUnavailable: {
+      /** Format: int32 */
+      lagging: number;
     };
     /**
      * @description Adds a day to the calendar, confirmed (source manual), replacing what the date had before. `date` is `yyyy-MM-dd`; `kind` is holiday (a weekday,
@@ -1832,6 +2389,21 @@ export interface components {
       /** Format: uuid */
       accountId: null | string;
       accountName: null | string;
+    };
+    /** @description Sets the benchmark: the id of a master-list index. */
+    BenchmarkInput: {
+      /** Format: uuid */
+      instrumentId: null | string;
+    };
+    /** @description The benchmark in force (all null when the master list has no such index yet). `IsDefault`: the owner has not chosen one, Nifty 50 applies. */
+    BenchmarkView: {
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      name: null | string;
+      isDefault: boolean;
+      tracked: boolean;
+      hasBars: boolean;
     };
     /** @description The id a broker uses for the instrument (Dhan: security id + exchange segment). */
     BrokerIdView: {
@@ -2450,6 +3022,18 @@ export interface components {
       redirectUrl: string;
     };
     /**
+     * @description The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)
+     *     gives 0 and no dates.
+     */
+    Drawdown: {
+      /** Format: double */
+      pct: number;
+      /** Format: date */
+      from: null | string;
+      /** Format: date */
+      to: null | string;
+    };
+    /**
      * @description The scheduled end-of-day run (ADR 0017 §2) as set on the Services screen (ADR 0018): `enabled` (the service is not paused), `timeIst` (`HH:mm`, India time; empty when the schedule has no time of its own),
      *     `nextRunAt` (the next scheduled start; null when paused or none ahead), `lastRun` (the latest automatic data job, null before the first) and `scheduleWords` (the schedule in words).
      */
@@ -2583,6 +3167,135 @@ export interface components {
       /** Format: date-time */
       lastDetectedAt: null | string;
     };
+    /** @description The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value. */
+    GroupPart: {
+      key: string;
+      name: string;
+      /** Format: double */
+      value: number;
+    };
+    /**
+     * @description The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has
+     *     no such index). `Tracked`: tracking is on; `HasBars`: 1-minute bars are stored (the day bars follow when the aggregates are built). A screen offers "Track the benchmark" when it is unavailable and not tracked.
+     *     `AsOf` is the date of the last index close the benchmark lines were valued at (null when unavailable): the index has no live quote, so the benchmark lines end there and a live point of today (portfolio at today's prices) has no benchmark value.
+     */
+    HistoryBenchmark: {
+      state: string;
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      name: null | string;
+      tracked: boolean;
+      hasBars: boolean;
+      reason: null | string;
+      /** Format: date */
+      asOf: null | string;
+    };
+    /**
+     * @description How much of the open holdings the history covers: `Holdings` open holdings, `Covered` of them have stored day bars, `Unpriced` have none (not tracked, not in the instrument master, or bars not fetched yet:
+     *     they are left out and never valued at zero). `LateStart` counts covered holdings whose bars begin after their earliest lot, so part of their history is missing.
+     */
+    HistoryCoverage: {
+      /** Format: int32 */
+      holdings: number;
+      /** Format: int32 */
+      covered: number;
+      /** Format: int32 */
+      unpriced: number;
+      /** Format: int32 */
+      lateStart: number;
+    };
+    /**
+     * @description One day of the portfolio history (rupees; `Nav` and `BenchmarkNav` start at 100). `Value` is what the lots held that day were worth at the day's close (adjusted prices), `Invested` what
+     *     they cost. `BenchmarkValue` is the same cash flows put into the benchmark index; it and `BenchmarkNav` are null when the benchmark has no history for the series.
+     */
+    HistoryPoint: {
+      /** Format: date */
+      date: string;
+      /** Format: double */
+      value: number;
+      /** Format: double */
+      invested: number;
+      /** Format: double */
+      benchmarkValue: null | number;
+      /** Format: double */
+      nav: number;
+      /** Format: double */
+      benchmarkNav: null | number;
+    };
+    /**
+     * @description One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector "Unclassified" and the basket "No basket". Holdings counts every holding of the group in the scope;
+     *     Unpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`.
+     */
+    HoldingGroup: {
+      key: string;
+      name: string;
+      /** Format: int32 */
+      holdings: number;
+      /** Format: int32 */
+      unpriced: number;
+      /** Format: double */
+      invested: number;
+      /** Format: double */
+      value: null | number;
+      /** Format: double */
+      pnl: null | number;
+      /** Format: double */
+      pnlPct: null | number;
+      /** Format: double */
+      realised: number;
+      /** Format: double */
+      xirr: null | number;
+      xirrState: string;
+      /** Format: double */
+      dayChange: null | number;
+      /** Format: double */
+      dayChangePct: null | number;
+      /** Format: int32 */
+      dayChangeExcluded: number;
+      /** Format: double */
+      weightPct: null | number;
+      parts: null | components['schemas']['GroupPart'][];
+    };
+    /** @description The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value. */
+    HoldingGroupTotal: {
+      /** Format: int32 */
+      holdings: number;
+      /** Format: int32 */
+      unpriced: number;
+      /** Format: double */
+      invested: number;
+      /** Format: double */
+      value: null | number;
+      /** Format: double */
+      pnl: null | number;
+      /** Format: double */
+      pnlPct: null | number;
+      /** Format: double */
+      realised: number;
+      /** Format: double */
+      xirr: null | number;
+      xirrState: string;
+      /** Format: double */
+      dayChange: null | number;
+      /** Format: double */
+      dayChangePct: null | number;
+      /** Format: int32 */
+      dayChangeExcluded: number;
+      /** Format: double */
+      weightPct: null | number;
+    };
+    /**
+     * @description The groups of the scope. By is `account`, `bucket`, `sector` or `basket`; Additive is false for baskets (a holding is in every basket that contains it, so the groups overlap). StackBy is the second dimension of the
+     *     parts, when asked for. At most 200 groups are returned.
+     */
+    HoldingGroups: {
+      by: string;
+      additive: boolean;
+      stackBy: null | string;
+      groups: components['schemas']['HoldingGroup'][];
+      total: components['schemas']['HoldingGroupTotal'];
+    };
     /** @description The lots of a holding, open lots first (oldest first), then closed ones. */
     HoldingLots: {
       /** Format: uuid */
@@ -2603,6 +3316,12 @@ export interface components {
       pageSize: number;
       /** Format: int32 */
       total: number;
+    };
+    /** @description The rebuild of one holding's lots: with `DryRun` only what it would do; otherwise `Applied` says whether the lots were replaced (only an `ok` rebuild is). */
+    HoldingRebuildResult: {
+      dryRun: boolean;
+      applied: boolean;
+      rebuild: components['schemas']['TradeRebuildView'];
     };
     /**
      * @description One holding. Status is "open" or "closed". Mapped is false when the holding is not in the instrument master (InstrumentId and CanonicalSymbol are
@@ -2667,6 +3386,10 @@ export interface components {
      *     still have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).
      *     DayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no
      *     holding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings.
+     *     BenchmarkXirr (percent number) is the XIRR of the same cash flows put into the benchmark index (Nifty 50 by default, ADR 0020 §2), Alpha the portfolio's XIRR minus it in percentage points; BenchmarkState is "ok", "unavailable" (the index has no history
+     *     from the first cash flow: track it and run Update data), "insufficient" (the same reasons as for XIRR) or "n_m" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState "ok").
+     *     BenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which
+     *     it is when Alpha is set: "last_close" (portfolio and index are both as of their last close) or "live_vs_last_close" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only).
      */
     HoldingsSummary: {
       returns: components['schemas']['ReturnsView'];
@@ -2690,6 +3413,14 @@ export interface components {
       /** Format: int32 */
       dayChangeExcluded: number;
       pricesAsOf: components['schemas']['PricesAsOf'];
+      /** Format: double */
+      benchmarkXirr: null | number;
+      /** Format: double */
+      alpha: null | number;
+      benchmarkState: string;
+      /** Format: date */
+      benchmarkAsOf: null | string;
+      alphaBasis: null | string;
     };
     HttpValidationProblemDetails: {
       type?: null | string;
@@ -2701,7 +3432,7 @@ export interface components {
       errors?: {
         [key: string]: string[];
       };
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
       code?: string;
       /**
        * Format: int32
@@ -2726,12 +3457,16 @@ export interface components {
         code: string;
         message: string;
       }[];
+      /** @description Present on portfolio.preview_stale: the fresh preview of the file, in the shape of the response of POST /api/portfolio/trades/preview (TradePreviewReport). */
+      report?: Record<string, never>;
       /**
        * Format: int32
        * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
        */
       wouldClose?: number;
     };
+    /** Format: binary */
+    IFormFile: string;
     /**
      * @description The outcome of a CSV import (or its preview). `lines`: data lines read; `importable`: new valid actions; `imported`: written (0 for a preview); `duplicates`: lines that repeat an action
      *     that exists (any status) or an earlier line; `invalid`: lines with a problem (the first 50 in `errors`, among them lines that clash with an applied action of the other kind on the same day);
@@ -2927,6 +3662,19 @@ export interface components {
       email: string;
       password: string;
     };
+    /** @description A profitable open lot that turns 12 months old soon (the `long_term_soon` rule): `LongTermOn` is the date it is 12 months old, `DaysLeft` the days until then, `GainPct` its unrealised gain in percent (null for a lot that cost nothing, for example bonus shares: the gain is then the whole value and has no percentage). */
+    LongTermLot: {
+      /** Format: date */
+      acquiredOn: string;
+      /** Format: int64 */
+      qty: number;
+      /** Format: date */
+      longTermOn: string;
+      /** Format: int32 */
+      daysLeft: number;
+      /** Format: double */
+      gainPct: null | number;
+    };
     /** @description Sets the acquisition date of a lot (between 1990-01-01 and today, India). */
     LotDateInput: {
       /** Format: date */
@@ -2955,6 +3703,29 @@ export interface components {
       estimated: boolean;
       returns: components['schemas']['ReturnsView'];
     };
+    /**
+     * @description A trade typed in by the owner: for a holding (`HoldingId`) or for a security of an account (`AccountId` and `Symbol` and/or `Isin`, which must be an NSE share or ETF of the master list). `Side` buy or sell, the date not in the
+     *     future, `Quantity` a whole number above 0, `Price` above 0, `Charges` optional (0).
+     */
+    ManualTradeInput: {
+      /** Format: uuid */
+      accountId: null | string;
+      /** Format: uuid */
+      holdingId: null | string;
+      symbol: null | string;
+      isin: null | string;
+      side: null | string;
+      /** Format: date */
+      tradeDate: null | string;
+      /** Format: time */
+      tradeTime: null | string;
+      /** Format: double */
+      quantity: null | number;
+      /** Format: double */
+      price: null | number;
+      /** Format: double */
+      charges: null | number;
+    };
     /** @description Every member of the basket exactly once, in the wanted order. */
     MembersOrderInput: {
       instrumentIds: null | string[];
@@ -2970,6 +3741,13 @@ export interface components {
       status: string;
       message: string;
     };
+    /** @description The quantity the lots count as opening (the shares the trades do not explain): now, and after the rebuild. Null where it cannot be told (no holding, or a quantity that is not whole after a split or bonus). */
+    OpeningQtyView: {
+      /** Format: int64 */
+      before: null | number;
+      /** Format: int64 */
+      after: null | number;
+    };
     /** @description A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default. */
     ParameterView: {
       name: string;
@@ -2983,6 +3761,30 @@ export interface components {
       default: components['schemas']['JsonElement'];
       description: null | string;
       unit: null | string;
+    };
+    /**
+     * @description The value history of a scope (all accounts that count in totals, one account, one bucket). `Points` are in date order at `Resolution` (`day`, `week` or `month`: the last trading day of the period); `Value` is what the
+     *     lots held that day were worth at that day's close (adjusted for splits and bonuses), `Invested` what they cost, `BenchmarkValue` the same cash flows in the benchmark index, `Nav` and `BenchmarkNav` unit values starting at 100
+     *     that cash flows do not move. `Coverage` says how many open holdings have price history; `Partial` is true when anything is left out (holdings without bars, history that starts late). `MaxDrawdown` / `BenchmarkMaxDrawdown`: the largest
+     *     fall of the NAV measured within the requested range (`Pct` 12.5 = fell 12.5 %; the peak must lie inside the range too) between the peak on `From` and the low on `To`, daily, whatever the resolution; `RangeFrom` and `RangeTo` are the first and
+     *     the last day of that range as returned (null when there is no point). `FirstDate` is the first day of the whole history (before the range is cut). `LastPriceAt` is set when the last point is today's live one: the time of the newest price in it.
+     */
+    PortfolioHistory: {
+      points: components['schemas']['HistoryPoint'][];
+      coverage: components['schemas']['HistoryCoverage'];
+      partial: boolean;
+      benchmark: components['schemas']['HistoryBenchmark'];
+      maxDrawdown: null | components['schemas']['Drawdown'];
+      benchmarkMaxDrawdown: null | components['schemas']['Drawdown'];
+      /** Format: date */
+      firstDate: null | string;
+      /** Format: date-time */
+      lastPriceAt: null | string;
+      resolution: string;
+      /** Format: date */
+      rangeFrom: null | string;
+      /** Format: date */
+      rangeTo: null | string;
     };
     /**
      * @description The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of
@@ -3000,6 +3802,22 @@ export interface components {
       /** Format: date */
       firstImportDate?: null | string;
       firstImport?: null | components['schemas']['FirstImportInput'];
+    };
+    /** @description One notice of the Portfolio module for the top-bar bell. `Kind` is `price_alert_triggered` (`Severity` warn; `AlertId` and `InstrumentId` set) or `actions_need_decision` (info). `Id` is stable, so the bell keeps what was read by id. */
+    PortfolioNotice: {
+      id: string;
+      kind: string;
+      severity: string;
+      text: string;
+      /** Format: date-time */
+      at: null | string;
+      /** Format: uuid */
+      alertId: null | string;
+      /** Format: uuid */
+      instrumentId: null | string;
+    };
+    PortfolioNotices: {
+      items: components['schemas']['PortfolioNotice'][];
     };
     PortfolioRoleView: {
       enabled: boolean;
@@ -3029,6 +3847,25 @@ export interface components {
       firstImportDate: string;
       hasHoldings: boolean;
     };
+    /**
+     * @description What a track action did. `Requested` distinct master-list instruments were asked to be tracked, `Added` of them are newly tracked (or tracked again), `AlreadyTracked` were; `NotInMaster` open holdings in scope
+     *     are not in the instrument master (nothing to track), `Retired` instruments are no longer listed and were skipped. `TotalTracked` is the number tracked now. No job is started: `Hint` says the next <i>Update data</i> builds the bars.
+     */
+    PortfolioTrackResult: {
+      /** Format: int32 */
+      requested: number;
+      /** Format: int32 */
+      added: number;
+      /** Format: int32 */
+      alreadyTracked: number;
+      /** Format: int32 */
+      notInMaster: number;
+      /** Format: int32 */
+      retired: number;
+      /** Format: int32 */
+      totalTracked: number;
+      hint: string;
+    };
     /** @description The files to preview: names from the folder listing, at most int PreviewCsvFilesHandler.MaxFiles. */
     PreviewCsvFilesRequest: {
       files: null | string[];
@@ -3057,6 +3894,52 @@ export interface components {
       /** Format: date */
       suggestedDate: string;
     };
+    /** @description A new price alert: the master-list share or ETF, `Direction``at_or_below|at_or_above`, the `Level` in rupees (above 0, at most 10,000,000, at most 4 decimals) and an optional plain-text `Note` of at most 200 characters. */
+    PriceAlertInput: {
+      /** Format: uuid */
+      instrumentId: null | string;
+      direction: null | string;
+      /** Format: double */
+      level: null | number;
+      note: null | string;
+    };
+    /** @description One page of alerts, newest first (`Total` counts all matches). `ActiveCount` of `ActiveLimit` alerts are active, whatever the filter. */
+    PriceAlertPage: {
+      items: components['schemas']['PriceAlertView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+      /** Format: int32 */
+      activeCount: number;
+      /** Format: int32 */
+      activeLimit: number;
+    };
+    /**
+     * @description A price alert. `Status` is `active`, `triggered` (with `TriggeredAt` and `TriggerPrice`, the last price of the tick that hit the level) or `cancelled`. It is checked on the last price of each quotes tick only (every 5 minutes while the market
+     *     is open): a spike between two ticks is not seen.
+     */
+    PriceAlertView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      name: string;
+      direction: string;
+      /** Format: double */
+      level: number;
+      note: null | string;
+      status: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      triggeredAt: null | string;
+      /** Format: double */
+      triggerPrice: null | number;
+    };
     /** @description The oldest and the newest time of the prices of the open holdings (null when none has a priced time). */
     PricesAsOf: {
       /** Format: date-time */
@@ -3071,7 +3954,7 @@ export interface components {
       status?: null | number;
       detail?: null | string;
       instance?: null | string;
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
       code?: string;
       /**
        * Format: int32
@@ -3096,6 +3979,8 @@ export interface components {
         code: string;
         message: string;
       }[];
+      /** @description Present on portfolio.preview_stale: the fresh preview of the file, in the shape of the response of POST /api/portfolio/trades/preview (TradePreviewReport). */
+      report?: Record<string, never>;
       /**
        * Format: int32
        * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
@@ -3955,6 +4840,269 @@ export interface components {
     /** @description Instruments to track or untrack: 1 to 500 ids (duplicates are fine and count once). */
     TrackingInput: {
       instrumentIds: null | string[];
+    };
+    /** @description A row that cannot be imported: the line of the file it starts on and why. */
+    TradeBadRow: {
+      /** Format: int32 */
+      line: number;
+      reason: string;
+    };
+    /** @description One page of import batches, newest first. */
+    TradeBatchPage: {
+      items: components['schemas']['TradeBatchView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description One import of a file. `Status` is `imported` or `undone`; `ActiveTrades` counts its trades that are not voided and `Securities` the securities among them. */
+    TradeBatchView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      accountName: string;
+      fileName: string;
+      sha256: string;
+      /** Format: int32 */
+      parsed: number;
+      /** Format: int32 */
+      imported: number;
+      /** Format: int32 */
+      duplicates: number;
+      /** Format: int32 */
+      skipped: number;
+      /** Format: int32 */
+      bad: number;
+      status: string;
+      /** Format: int32 */
+      activeTrades: number;
+      /** Format: int32 */
+      securities: number;
+      createdBy: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      undoneAt: null | string;
+    };
+    /** @description A number of securities and the number of trades of the file in them. */
+    TradeCount: {
+      /** Format: int32 */
+      securities: number;
+      /** Format: int32 */
+      trades: number;
+    };
+    /**
+     * @description What was in the file. `Rows` are the data rows (empty lines do not count), `Parsed` the valid trade rows, `Duplicates` the valid rows that repeat a trade id of the file, `AlreadyImported` the trades of the file that are stored already
+     *     (and not voided), `NewTrades` the ones an import would store. `Bad` lists the first 200 bad rows (line, reason); `BadTotal` counts all of them.
+     */
+    TradeFileSummary: {
+      fileName: string;
+      /** Format: int32 */
+      rows: number;
+      /** Format: int32 */
+      parsed: number;
+      skipped: components['schemas']['TradeSkipped'];
+      bad: components['schemas']['TradeBadRow'][];
+      /** Format: int32 */
+      badTotal: number;
+      /** Format: int32 */
+      duplicates: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      /** Format: int32 */
+      newTrades: number;
+    };
+    /**
+     * @description What an import did. `Batch` is null when the file had nothing new. `Imported` trades were stored, `AlreadyImported` were there already. With `Rebuilt` the lots of `HoldingsRebuilt` holdings were replaced
+     *     (`LotsReplaced` lots removed); `Report` is the preview the owner confirmed (statuses before the rebuild).
+     */
+    TradeImportResult: {
+      batch: null | components['schemas']['TradeBatchView'];
+      /** Format: int32 */
+      imported: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      rebuilt: boolean;
+      /** Format: int32 */
+      holdingsRebuilt: number;
+      /** Format: int32 */
+      lotsReplaced: number;
+      report: components['schemas']['TradePreviewReport'];
+    };
+    /** @description A holding (or security) that an undo could not rebuild: its `Symbol`, the `HoldingId` when it is a single holding, and the `Reason` — `ambiguous` or the mismatch (`negative_opening`, `sell_exceeds_open`, `fractional_after_adjustment`). */
+    TradeNotRebuilt: {
+      symbol: string;
+      /** Format: uuid */
+      holdingId: null | string;
+      reason: string;
+    };
+    /** @description One page of the trades of a holding, newest first, voided ones included. */
+    TradePage: {
+      items: components['schemas']['TradeView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /**
+     * @description The preview of a tradebook import — nothing is stored. `NotHeld`: securities the account does not hold now (their trades are stored by an import, not applied); `Unmatched`: those of them that are not even NSE shares or ETFs of the master list.
+     *     `Digest` fingerprints everything the preview shows (all securities, listed or not); an import with `rebuild` must send it back. `Securities` lists every security that is a holding or an NSE share/ETF of the
+     *     master list and at most int TradeCsvLimits.MaxListedUnmatched (200) of the unmatched ones; `SecuritiesTotal` counts all the securities of the file and `UnmatchedListed` the unmatched ones listed.
+     */
+    TradePreviewReport: {
+      file: components['schemas']['TradeFileSummary'];
+      securities: components['schemas']['TradeSecurityView'][];
+      notHeld: components['schemas']['TradeCount'];
+      unmatched: components['schemas']['TradeCount'];
+      digest: string;
+      /**
+       * Format: int32
+       * @default 0
+       */
+      securitiesTotal: number;
+      /**
+       * Format: int32
+       * @default 0
+       */
+      unmatchedListed: number;
+    };
+    /**
+     * @description What rebuilding a holding's lots from its trades does. `Status`: `ok` (the lots would change), `unchanged`, `quantity_mismatch` (see `Reason`: `negative_opening`, `sell_exceeds_open`,
+     *     `fractional_after_adjustment`; nothing is applied), `no_holding`, `ambiguous`. `Q` is the broker's quantity, `Net` bought minus sold (today's shares). `HandDatedLotsReplaced` counts the lots whose date the owner chose
+     *     and `SyncLotsReplaced` the lots a sync added, among the `LotsBefore` lots that an `ok` rebuild replaces by `LotsAfter` lots. `RealisedPnl` is the profit of the pieces the trades sold. `AdjustedFor` counts the corporate
+     *     actions that changed a trade. `Digest` fingerprints this rebuild. `OpenCostAfter` is what the open lots cost after the rebuild (Σ open quantity × unit cost; also for `unchanged`), `BrokerCost` the broker's `Q × A`
+     *     and `CostDelta` their difference. The open quantities always add up to `Q`. With no sales in the file and an opening lot (the file does not explain the whole holding) `CostDelta` is 0, to within the rounding of the opening
+     *     lot's unit cost to 4 decimals (0.0001 × its quantity); with sales — or without an opening lot — the first-in first-out cost basis of the trades can differ from the broker's average-cost figure (brokers keep the average by the
+     *     weighted-average-cost method, a sale does not change it), which is shown, not hidden. `CostNote` is `opening_cost_fallback` when the trades cost more than the broker's average cost allows and the opening lot therefore costs the
+     *     average cost. The four are null unless the trades fit (`ok` or `unchanged`).
+     */
+    TradeRebuildView: {
+      status: string;
+      reason: null | string;
+      /** Format: int32 */
+      lotsBefore: number;
+      /** Format: int32 */
+      lotsAfter: number;
+      /** Format: int32 */
+      handDatedLotsReplaced: number;
+      /** Format: int32 */
+      syncLotsReplaced: number;
+      /** Format: double */
+      realisedPnl: null | number;
+      /** Format: int32 */
+      adjustedFor: number;
+      /** Format: int64 */
+      q: null | number;
+      /** Format: int64 */
+      net: null | number;
+      openingQty: components['schemas']['OpeningQtyView'];
+      digest: string;
+      /** Format: double */
+      openCostAfter?: null | number;
+      /** Format: double */
+      brokerCost?: null | number;
+      /** Format: double */
+      costDelta?: null | number;
+      costNote?: null | string;
+    };
+    /** @description A security of the file: its trades in the file and, when the account holds it, what the rebuild would do. `Matched` is true when it is a holding of the account or an NSE share or ETF of the master list. */
+    TradeSecurityView: {
+      symbol: string;
+      isin: null | string;
+      matched: boolean;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      buys: number;
+      /** Format: int32 */
+      sells: number;
+      /** Format: date */
+      firstTradeDate: string;
+      /** Format: date */
+      lastTradeDate: string;
+      rebuild: components['schemas']['TradeRebuildView'];
+    };
+    /** @description Rows of the file that were left out because they are not NSE equity trades: how many, and how many for each reason (`derivatives`, `commodity`, `currency`, `bse`, `non_equity`). */
+    TradeSkipped: {
+      /** Format: int32 */
+      total: number;
+      byReason: {
+        [key: string]: number;
+      };
+    };
+    /**
+     * @description What undoing a batch did — or, with `DryRun`, would do (nothing is changed then; `Applied` is false). Undoing a batch again is a no-op (`AlreadyUndone`). Holdings whose lots came from trades are rebuilt from the remaining
+     *     trades; `NotRebuilt` lists those that could not be (a mismatch, or ambiguous) and keep their lots, `HoldingsNotRebuilt` counts them. <b>An undo cannot bring back</b> lots the owner dated by hand or a sync added that an
+     *     earlier rebuild replaced: the holding returns to one default-dated lot of the broker's quantity and cost (or to the shape of the remaining trades); `HandDatedLotsReplaced` and `SyncLotsReplaced` count what the rebuild
+     *     removes (the lots of the holdings it rebuilds).
+     */
+    TradeUndoResult: {
+      batch: components['schemas']['TradeBatchView'];
+      alreadyUndone: boolean;
+      /** Format: int32 */
+      voided: number;
+      /** Format: int32 */
+      holdingsRebuilt: number;
+      /** Format: int32 */
+      lotsReplaced: number;
+      /** Format: int32 */
+      holdingsNotRebuilt: number;
+      dryRun: boolean;
+      applied: boolean;
+      /** Format: int32 */
+      handDatedLotsReplaced: number;
+      /** Format: int32 */
+      syncLotsReplaced: number;
+      notRebuilt: components['schemas']['TradeNotRebuilt'][];
+    };
+    /**
+     * @description The multipart form of the trade preview and import, for the API contract only (the request is read by TradeUploads). `AccountId` is the account, `File` the tradebook (CSV), `Rebuild` and `Digest` are
+     *     for the import: whether to rebuild the lots (default true) and the digest of the preview, which is required with a rebuild.
+     */
+    TradeUploadForm: {
+      /** Format: uuid */
+      accountId: string;
+      file: components['schemas']['IFormFile'];
+      rebuild: null | boolean;
+      digest: null | string;
+    };
+    /** @description A trade. `Side` is `buy` or `sell`, `Source` is `csv` or `manual`. A voided trade does not count. */
+    TradeView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      symbol: string;
+      isin: null | string;
+      exchange: string;
+      side: string;
+      /** Format: date */
+      tradeDate: string;
+      /** Format: time */
+      tradeTime: null | string;
+      /** Format: int64 */
+      qty: number;
+      /** Format: double */
+      price: number;
+      /** Format: double */
+      charges: number;
+      source: string;
+      /** Format: uuid */
+      batchId: null | string;
+      createdBy: string;
+      /** Format: date-time */
+      createdAt: string;
+      voided: boolean;
+      /** Format: date-time */
+      voidedAt: null | string;
+      voidedBy: null | string;
     };
     /** @description The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. */
     TradingInput: {
@@ -6078,6 +7226,8 @@ export interface operations {
         sort?: string;
         page?: number;
         pageSize?: number;
+        groupBy?: string;
+        groupKey?: string;
       };
       header?: never;
       path?: never;
@@ -6133,6 +7283,43 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetHoldingGroups: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+        status?: string;
+        q?: string;
+        by?: string;
+        sort?: string;
+        stackBy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingGroups'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
         };
       };
     };
@@ -6204,6 +7391,15 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -6346,6 +7542,191 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioHistory: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+        from?: string;
+        to?: string;
+        resolution?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioHistory'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioBenchmark: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BenchmarkView'];
+        };
+      };
+    };
+  };
+  SetPortfolioBenchmark: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BenchmarkInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BenchmarkView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  TrackPortfolioHoldings: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioTrackResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  TrackPortfolioBenchmark: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioTrackResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -7774,6 +9155,749 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ServiceRunView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioActions: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+        status?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionList'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SnoozePortfolioAction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionDecisionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  MarkPortfolioActionDone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionDecisionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ReopenPortfolioAction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionDecisionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioActionThresholds: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionThresholdsView'];
+        };
+      };
+    };
+  };
+  SavePortfolioActionThresholds: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ActionThresholdsInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionThresholdsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ResetPortfolioActionThresholds: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionThresholdsView'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioNotices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioNotices'];
+        };
+      };
+    };
+  };
+  ListPortfolioAlerts: {
+    parameters: {
+      query?: {
+        status?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceAlertPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  CreatePortfolioAlert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PriceAlertInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceAlertView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelPortfolioAlert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceAlertView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetTradeTemplate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/csv': string;
+        };
+      };
+    };
+  };
+  PreviewTradeImport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['TradeUploadForm'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradePreviewReport'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ImportTrades: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['TradeUploadForm'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradeImportResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AddTrade: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ManualTradeInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradeView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  VoidTrade: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradeView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListTradeBatches: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradeBatchPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  UndoTradeBatch: {
+    parameters: {
+      query?: {
+        dryRun?: boolean;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradeUndoResult'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListHoldingTrades: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradePage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RebuildHoldingLots: {
+    parameters: {
+      query?: {
+        dryRun?: boolean;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingRebuildResult'];
         };
       };
       /** @description Not Found */

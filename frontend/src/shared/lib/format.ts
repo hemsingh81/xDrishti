@@ -16,6 +16,7 @@ const rupeesPrecise = new Intl.NumberFormat('en-IN', {
 });
 const price = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percent = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const share = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 // Broker token expiries are defined in India time (Dhan: 24 h after sign-in), so they are shown in IST whatever the viewer's zone.
 const istTimeAndDay = new Intl.DateTimeFormat('en-IN', {
@@ -69,6 +70,19 @@ export function formatDateTime(value: string | Date): string {
 /** "11 Oct 2026": a calendar date (yyyy-MM-dd) as written, or the viewer's day of a timestamp. */
 export function formatDate(value: string): string {
   return isoDay.test(value) ? calendarDate.format(new Date(`${value}T00:00:00Z`)) : date.format(new Date(value));
+}
+
+const calendarDayMonth = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const calendarMonthYear = new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** "13 Oct": a calendar date (yyyy-MM-dd) without the year, for the axis of a chart over a few months. */
+export function formatDayMonth(value: string): string {
+  return calendarDayMonth.format(new Date(`${value}T00:00:00Z`));
+}
+
+/** "Oct 2026": the month of a calendar date (yyyy-MM-dd), for the axis of a chart over years. */
+export function formatMonthYear(value: string): string {
+  return calendarMonthYear.format(new Date(`${value}T00:00:00Z`));
 }
 
 const calendarWeekday = new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' });
@@ -127,6 +141,11 @@ export function formatPercent(value: number): string {
   return percent.format(value);
 }
 
+/** A share of a whole with one decimal, for weights and allocations: 32.14 -> "32.1". The caller adds the % sign. */
+export function formatShare(value: number): string {
+  return share.format(value);
+}
+
 /** "3 hours 5 minutes" style duration from seconds. */
 export function formatDuration(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -175,3 +194,6 @@ export function formatHoursMinutes(totalSeconds: number): string {
   if (hours === 0) return `${minutes} min`;
   return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`;
 }
+
+/** "3 hand-dated lots will be replaced" from "3 hand-dated…": the first letter in capitals, the rest as it is. */
+export const capitalise = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;

@@ -23,8 +23,12 @@ using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
+using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
+using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Application;
@@ -230,10 +234,48 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RecoverInterruptedSyncsCommand>, RecoverInterruptedSyncsHandler>();
         services.AddScoped<IQueryHandler<ListHoldingsQuery, Result<HoldingPage>>, ListHoldingsHandler>();
         services.AddScoped<IQueryHandler<GetHoldingsSummaryQuery, Result<HoldingsSummary>>, GetHoldingsSummaryHandler>();
+        services.AddScoped<IQueryHandler<GetHoldingGroupsQuery, Result<HoldingGroups>>, GetHoldingGroupsHandler>();
         services.AddScoped<IQueryHandler<GetHoldingLotsQuery, Result<HoldingLots>>, GetHoldingLotsHandler>();
         services.AddScoped<ICommandHandler<UpdateLotDateCommand, LotRow>, UpdateLotDateHandler>();
         services.AddScoped<IQueryHandler<GetSyncStatusQuery, Result<SyncStatusView>>, GetSyncStatusHandler>();
         services.AddScoped<IAccountSyncSource, AccountSyncSource>();
+
+        // Value history, benchmark and max drawdown (ADR 0020): computed on read from the lots and the stored day bars; the benchmark setting and the two track actions.
+        services.AddScoped<IQueryHandler<GetPortfolioHistoryQuery, Result<PortfolioHistory>>, GetPortfolioHistoryHandler>();
+        services.AddScoped<IQueryHandler<GetBenchmarkQuery, BenchmarkView>, GetBenchmarkHandler>();
+        services.AddScoped<ICommandHandler<SetBenchmarkCommand, BenchmarkView>, SetBenchmarkHandler>();
+        services.AddScoped<ICommandHandler<TrackPortfolioHoldingsCommand, PortfolioTrackResult>, TrackPortfolioHoldingsHandler>();
+        services.AddScoped<ICommandHandler<TrackBenchmarkCommand, PortfolioTrackResult>, TrackBenchmarkHandler>();
+
+        // The Action center (ADR 0022): rules evaluated on read, the owner's decisions, the thresholds, the price alerts and the notices of the bell. The evaluator, the reconciler, the writer and the checker are shared by several use cases and the quote poll.
+        services.AddScoped<ActionEvaluator>();
+        services.AddScoped<ActionReconciler>();
+        services.AddScoped<ActionDecisions>();
+        services.AddScoped<ActionThresholdsWriter>();
+        services.AddScoped<PriceAlertChecker>();
+        services.AddScoped<IQueryHandler<GetActionItemsQuery, Result<ActionList>>, GetActionItemsHandler>();
+        services.AddScoped<ICommandHandler<SnoozeActionCommand, ActionDecisionView>, SnoozeActionHandler>();
+        services.AddScoped<ICommandHandler<MarkActionDoneCommand, ActionDecisionView>, MarkActionDoneHandler>();
+        services.AddScoped<ICommandHandler<ReopenActionCommand, ActionDecisionView>, ReopenActionHandler>();
+        services.AddScoped<IQueryHandler<GetActionThresholdsQuery, ActionThresholdsView>, GetActionThresholdsHandler>();
+        services.AddScoped<ICommandHandler<SaveActionThresholdsCommand, ActionThresholdsView>, SaveActionThresholdsHandler>();
+        services.AddScoped<ICommandHandler<ResetActionThresholdsCommand, ActionThresholdsView>, ResetActionThresholdsHandler>();
+        services.AddScoped<ICommandHandler<CreatePriceAlertCommand, PriceAlertView>, CreatePriceAlertHandler>();
+        services.AddScoped<IQueryHandler<ListPriceAlertsQuery, Result<PriceAlertPage>>, ListPriceAlertsHandler>();
+        services.AddScoped<ICommandHandler<CancelPriceAlertCommand, PriceAlertView>, CancelPriceAlertHandler>();
+        services.AddScoped<IQueryHandler<GetPortfolioNoticesQuery, PortfolioNotices>, GetPortfolioNoticesHandler>();
+
+        // Trades from a tradebook CSV or by hand, and the rebuild of a holding's lots from them (ADR 0023). The workspace is shared by the use cases.
+        services.AddScoped<TradeWorkspace>();
+        services.AddScoped<IQueryHandler<PreviewTradesQuery, Result<TradePreviewReport>>, PreviewTradesHandler>();
+        services.AddScoped<ICommandHandler<ImportTradesCommand, TradeImportResult>, ImportTradesHandler>();
+        services.AddScoped<IQueryHandler<ListTradeBatchesQuery, Result<TradeBatchPage>>, ListTradeBatchesHandler>();
+        services.AddScoped<ICommandHandler<UndoTradeBatchCommand, TradeUndoResult>, UndoTradeBatchHandler>();
+        services.AddScoped<IQueryHandler<ListHoldingTradesQuery, Result<TradePage>>, ListHoldingTradesHandler>();
+        services.AddScoped<ICommandHandler<AddManualTradeCommand, TradeView>, AddManualTradeHandler>();
+        services.AddScoped<ICommandHandler<VoidTradeCommand, TradeView>, VoidTradeHandler>();
+        services.AddScoped<ICommandHandler<RebuildLotsCommand, HoldingRebuildResult>, RebuildLotsHandler>();
+        services.AddScoped<IQueryHandler<GetTradeTemplateQuery, string>, GetTradeTemplateHandler>();
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();

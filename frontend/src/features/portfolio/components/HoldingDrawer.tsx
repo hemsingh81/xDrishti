@@ -1,5 +1,7 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { Box, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/NotificationsNoneOutlined';
+import { Box, Button, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
+import { lazy, Suspense } from 'react';
 import type { HoldingRow } from '@/shared/api';
 import {
   formatDate,
@@ -9,11 +11,14 @@ import {
   formatIstDateTime,
   formatNumber,
 } from '@/shared/lib/format';
-import { Facts, type Fact } from '@/shared/ui';
+import { Facts, LoadingState, type Fact } from '@/shared/ui';
 import { monoFontFamily } from '@/theme';
 import { noDayChangeReasonOf } from '../lib/figures';
 import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
 import { LotsSection } from './LotsSection';
+
+// The trades of a holding (and the dialogs behind them) are loaded when the drawer first opens: most visits never get there.
+const HoldingTrades = lazy(async () => ({ default: (await import('./trades/HoldingTrades')).HoldingTrades }));
 
 const priceSourceLabel = (source: string): string => (source === 'quote' ? 'Quote' : 'Synced');
 
@@ -51,10 +56,14 @@ interface HoldingDrawerProps {
   /** Its row in the list, when it is on the current page (the summary needs it; the lots do not). */
   holding: HoldingRow | undefined;
   onClose: () => void;
+  /** Set a price alert on this holding (offered when it is in the master list). */
+  onSetAlert: (holding: HoldingRow) => void;
+  /** Open the Alerts panel. */
+  onShowAlerts: () => void;
 }
 
-/** Side panel for one holding: its figures, then its lots with their dates. */
-export function HoldingDrawer({ id, holding, onClose }: HoldingDrawerProps) {
+/** Side panel for one holding: its figures, then its lots with their dates, then its trades. */
+export function HoldingDrawer({ id, holding, onClose, onSetAlert, onShowAlerts }: HoldingDrawerProps) {
   return (
     <Drawer
       anchor="right"
@@ -79,6 +88,25 @@ export function HoldingDrawer({ id, holding, onClose }: HoldingDrawerProps) {
               {holding.status === 'closed' && <Chip size="small" variant="outlined" label="Closed" />}
             </Stack>
           )}
+          {holding && (
+            <Stack direction="row" sx={{ mt: 1, gap: 1, flexWrap: 'wrap' }}>
+              {holding.instrumentId !== null && holding.status === 'open' && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<NotificationsIcon />}
+                  onClick={() => {
+                    onSetAlert(holding);
+                  }}
+                >
+                  Set price alert
+                </Button>
+              )}
+              <Button size="small" onClick={onShowAlerts}>
+                View alerts
+              </Button>
+            </Stack>
+          )}
         </Box>
         <IconButton aria-label="Close details" edge="end" onClick={onClose}>
           <CloseIcon />
@@ -88,6 +116,11 @@ export function HoldingDrawer({ id, holding, onClose }: HoldingDrawerProps) {
         <Stack spacing={3}>
           {holding && <Facts items={factsOf(holding)} />}
           {id !== null && <LotsSection holdingId={id} />}
+          {id !== null && (
+            <Suspense fallback={<LoadingState label="Loading trades" />}>
+              <HoldingTrades holdingId={id} holding={holding} />
+            </Suspense>
+          )}
         </Stack>
       </Box>
     </Drawer>

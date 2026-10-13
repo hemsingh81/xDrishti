@@ -6,16 +6,24 @@ using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Infrastructure.Portfolio;
 
-/// <summary>The scoped context tracks the holdings and account events of one use case; saving commits them, a run commits them together with the sync record.</summary>
-internal sealed class PortfolioUnitOfWork(XDrishtiDbContext db) : IPortfolioUnitOfWork
+/// <summary>
+/// The scoped context tracks the holdings and account events of one use case; saving commits them, a run commits them together with the sync record. Whatever is saved here may change a lot, a holding or the benchmark setting, so the cached portfolio histories
+/// are dropped after every save and every committed run (<see cref="IPortfolioHistoryCache"/>).
+/// </summary>
+internal sealed class PortfolioUnitOfWork(XDrishtiDbContext db, IPortfolioHistoryCache histories) : IPortfolioUnitOfWork
 {
-    public async ValueTask SaveAsync(CancellationToken cancellationToken) => await db.SaveChangesAsync(cancellationToken);
+    public async ValueTask SaveAsync(CancellationToken cancellationToken)
+    {
+        await db.SaveChangesAsync(cancellationToken);
+        histories.Invalidate();
+    }
 
     public async ValueTask<bool> TrySaveAsync(CancellationToken cancellationToken)
     {
         try
         {
             await db.SaveChangesAsync(cancellationToken);
+            histories.Invalidate();
             return true;
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.CheckViolation or PostgresErrorCodes.UniqueViolation })
@@ -29,7 +37,7 @@ internal sealed class PortfolioUnitOfWork(XDrishtiDbContext db) : IPortfolioUnit
     {
         // The retrying execution strategy requires user transactions to run inside it; it may run the whole block again after a transient failure.
         var strategy = db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async token =>
+        var result = await strategy.ExecuteAsync(async token =>
         {
             try
             {
@@ -42,6 +50,12 @@ internal sealed class PortfolioUnitOfWork(XDrishtiDbContext db) : IPortfolioUnit
                 return await AttemptAsync(work, token);
             }
         }, cancellationToken);
+        if (result.IsSuccess)
+        {
+            histories.Invalidate();
+        }
+
+        return result;
     }
 
     private async Task<Result> AttemptAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken token)

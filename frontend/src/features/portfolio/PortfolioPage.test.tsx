@@ -23,6 +23,7 @@ import { scrollToEnd } from '@/test/intersection';
 import { problemResponse, server } from '@/test/server';
 import { smallPage, threePages } from '@/test/smallPages';
 import { noHoldingsHandlers, renderPortfolio, twoPortfolioAccounts } from './testing';
+import { pendingResponse, releasePending } from '@/test/gate';
 
 // Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
 vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
@@ -33,6 +34,10 @@ const twoPages = smallPage * 1.5; // the second page half full
 const shown = (count: number, total: number) => `Showing ${String(count)} of ${String(total)}`;
 const symbolOf = (n: number) => `S${String(n).padStart(3, '0')}`;
 const gridName = 'Holdings';
+
+/** The Open · Closed · All buttons (the History range chips also have an "All"). */
+const statusButton = (name: string, options: { pressed?: boolean } = {}) =>
+  within(screen.getByRole('group', { name: 'Status' })).getByRole('button', { name, ...options });
 
 const symbolsShown = () =>
   within(screen.getByRole('grid', { name: gridName }))
@@ -204,7 +209,7 @@ describe('Portfolio page: totals', () => {
   });
 
   it('shows a progress indicator while the totals load', async () => {
-    server.use(http.get('/api/holdings/summary', () => new Promise(() => undefined)));
+    server.use(http.get('/api/holdings/summary', () => pendingResponse()));
     renderPortfolio();
 
     expect(await screen.findByRole('progressbar', { name: 'Loading totals' })).toBeInTheDocument();
@@ -332,14 +337,14 @@ describe('Portfolio page: holdings', () => {
   it('switches between open, closed and all holdings', async () => {
     const { router } = renderPortfolio();
     await screen.findByRole('gridcell', { name: 'RELIANCE' });
-    expect(screen.getByRole('button', { name: 'Open', pressed: true })).toBeInTheDocument();
+    expect(statusButton('Open', { pressed: true })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Closed' }));
+    await userEvent.click(statusButton('Closed'));
     await expectSymbols(['OLDCO']);
     expect(router.state.location.search).toBe('?status=closed');
     expect(await rowTexts('OLDCO')).toContain('OLDCOClosed');
 
-    await userEvent.click(screen.getByRole('button', { name: 'All' }));
+    await userEvent.click(statusButton('All'));
     await expectSymbols(['INFY', 'OLDCO', 'RELIANCE', 'SMALLCO', 'TCS']);
     expect(router.state.location.search).toBe('?status=all');
   });
@@ -348,7 +353,7 @@ describe('Portfolio page: holdings', () => {
     renderPortfolio('?status=all&q=ltd&sort=-qty');
 
     await expectSymbols(['SMALLCO', 'OLDCO']);
-    expect(screen.getByRole('button', { name: 'All', pressed: true })).toBeInTheDocument();
+    expect(statusButton('All', { pressed: true })).toBeInTheDocument();
     expect(screen.getByRole('searchbox', { name: 'Search holdings' })).toHaveValue('ltd');
     expect(screen.getByRole('columnheader', { name: 'Qty' })).toHaveAttribute('aria-sort', 'descending');
   });
@@ -453,9 +458,11 @@ describe('Portfolio page: holdings', () => {
   });
 
   it('shows skeleton rows on the first load and an error with Retry when the list fails', async () => {
-    server.use(http.get('/api/holdings', () => new Promise(() => undefined)));
+    server.use(http.get('/api/holdings', () => pendingResponse()));
     const { unmount } = renderPortfolio();
     expect(await screen.findByRole('grid', { name: gridName })).toHaveAttribute('aria-busy', 'true');
+    // Answer the held request before the screen goes: an aborted, hanging request can let the next one escape the mock.
+    await releasePending();
     unmount();
 
     let fail = true;

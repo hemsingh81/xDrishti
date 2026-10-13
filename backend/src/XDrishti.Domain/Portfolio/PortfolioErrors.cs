@@ -16,8 +16,33 @@ public static class PortfolioErrors
     public const string ConfirmationStaleCode = "portfolio.confirmation_stale";
     public const string SettlingCode = "portfolio.settling";
     public const string ConflictCode = "portfolio.conflict";
+    public const string AlertLimitCode = "portfolio.alert_limit";
+    public const string LotFromTradeCode = "portfolio.lot_from_trade";
+    public const string PreviewStaleCode = "portfolio.preview_stale";
+
+    /// <summary>The most active price alerts there can be (ADR 0022).</summary>
+    public const int MaxActiveAlerts = 200;
 
     public static readonly Error HoldingNotFound = Error.NotFound(NotFoundCode, "The holding does not exist.");
+
+    public static readonly Error BenchmarkNotFound = Error.NotFound(NotFoundCode, "The benchmark index is not in the instrument master. Refresh the instrument list or choose another index.");
+
+    public static readonly Error ActionNotFound = Error.NotFound(NotFoundCode, "That item is not on the Action center now. Reload the list.");
+
+    public static readonly Error AlertNotFound = Error.NotFound(NotFoundCode, "The price alert does not exist.");
+
+    public static readonly Error AlertLimit = Error.Conflict(AlertLimitCode, "There are 200 active price alerts, the most there can be. Cancel one first.");
+
+    public static readonly Error ActionChanged = Error.Conflict(ConflictCode, "The decision was changed meanwhile. Reload and try again.");
+
+    public static readonly Error AccountNotFound = Error.NotFound(NotFoundCode, "The account does not exist or has no Portfolio role.");
+
+    public static readonly Error TradeNotFound = Error.NotFound(NotFoundCode, "The trade does not exist.");
+
+    public static readonly Error TradeBatchNotFound = Error.NotFound(NotFoundCode, "The import does not exist.");
+
+    public static readonly Error LotFromTrade = Error.Conflict(
+        LotFromTradeCode, "This lot was rebuilt from your trades, so its date is the trade's. Void or add a trade, then rebuild the lots, to change it.");
 
     public static readonly Error LotNotFound = Error.NotFound(NotFoundCode, "The lot does not exist.");
 
@@ -35,6 +60,8 @@ public static class PortfolioErrors
     public static readonly Error RoleOff = Error.Conflict(RoleOffCode, "Switch on the Portfolio role of this account first.");
 
     public static readonly Error NoBucket = Error.Conflict(NoBucketCode, "The account has no portfolio bucket to put holdings in. Switch the Portfolio role off and on again.");
+
+    public static readonly Error BenchmarkChanged = Error.Conflict(ConflictCode, "The benchmark was changed meanwhile. Reload and try again.");
 
     public static readonly Error LotChanged = Error.Conflict(ConflictCode, "The lot was changed or closed meanwhile. Reload and try again.");
 

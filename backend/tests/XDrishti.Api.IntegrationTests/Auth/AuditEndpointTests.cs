@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Auth;
+using XDrishti.Domain.Auth;
 
 namespace XDrishti.Api.IntegrationTests.Auth;
 
@@ -60,10 +62,9 @@ public sealed class AuditEndpointTests(ApiFactory factory)
     [Fact]
     public async Task Provisioning_is_in_the_trail()
     {
-        var reader = await factory.SignInAsync(Ct);
+        // Read from the table, not from the newest events of the endpoint: the endpoint lists at most 200 and the suite signs in many more times than that after the app was provisioned.
+        var provisioned = await factory.WithDbAsync(db => db.AuditEvents.AsNoTracking().AnyAsync(e => e.Event == AuditEventType.OwnerProvisioned, Ct));
 
-        var events = await reader.Client.GetFromJsonAsync<AuditEventResponse[]>(new Uri("/api/auth/audit?take=200", UriKind.Relative), Ct);
-
-        events.ShouldNotBeNull().ShouldContain(e => e.Event == "OwnerProvisioned");
+        provisioned.ShouldBeTrue();
     }
 }

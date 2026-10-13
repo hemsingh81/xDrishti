@@ -15,6 +15,7 @@ import { formatDate } from '@/shared/lib/format';
 import { LoadingState } from '@/shared/ui';
 import { lotsQuery } from '../api/portfolioQueries';
 import { problemText } from '../lib/errors';
+import { isOpeningLot } from '../lib/tradeLots';
 import { LotRowView } from './LotRowView';
 
 const headings = ['Acquired', 'Qty', 'Unit cost', 'Invested', 'Value', 'P&L', 'XIRR', 'Status'] as const;
@@ -51,7 +52,7 @@ export function LotsSection({ holdingId }: { holdingId: string }) {
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         Values as of {formatDate(valuationDate)}. A lot on the default date was not dated by you: set its real purchase
-        date for a true XIRR.
+        date for a true XIRR. Lots from trades take their dates from the trades.
       </Typography>
       <TableContainer>
         <Table size="small" aria-label="Lots">
@@ -69,7 +70,7 @@ export function LotsSection({ holdingId }: { holdingId: string }) {
           </TableHead>
           <TableBody>
             {lots.map((lot) => (
-              <LotRowView key={lot.id} holdingId={holdingId} lot={lot} />
+              <LotRowView key={lot.id} holdingId={holdingId} lot={lot} opening={isOpeningLot(lots, lot)} />
             ))}
           </TableBody>
         </Table>

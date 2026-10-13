@@ -13,6 +13,7 @@ import { renderWithProviders } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
 import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { PortfolioRefreshDialog } from './components/PortfolioRefreshDialog';
+import { pendingResponse } from '@/test/gate';
 
 const daily = (time: string) => ({ refreshMode: 'daily', refreshDailyTimeIst: time });
 
@@ -141,7 +142,7 @@ describe('Account sync settings', () => {
     let slow = false;
     server.use(
       http.get('/api/accounts/:id', async () => {
-        if (slow) await new Promise<never>(() => undefined);
+        if (slow) await pendingResponse();
         return HttpResponse.json(buildAccountDetail());
       }),
     );

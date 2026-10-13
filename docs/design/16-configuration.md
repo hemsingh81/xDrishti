@@ -146,6 +146,15 @@ portfolio:
   benchmark: NIFTY 50
   min_days_for_xirr: 30
   alerts: { max_position_weight_pct: 15, bucket_drawdown_pct: 10, results_within_days: 3, day_move_pct: 5 }
+  action_center:                           # built in P2-09 (ADR 0022): stored in the database (platform.app_settings, key portfolio.action_thresholds), edited in Settings; ranges are fixed in code
+    below_cost_pct: 10                     # 1-90; medium at or below -N %
+    below_cost_high_pct: 20                # 2-95, above below_cost_pct; high at or below -N %
+    gain_pct: 25                           # 1-1000
+    overweight: { floor_pct: 15, multiple: 1.5, min_positions: 3 }   # floor 1-100, multiple 1-10, positions 2-50
+    concentration_pct: 35                  # 5-100
+    lagging: { pp: 10, days: 180 }         # points 1-100, days 30-3650
+    long_term_window_days: 30              # 1-365
+  price_alerts: { max_active: 200, checked: quotes_tick }   # one-shot; checked on the last price of every holdings-quotes tick (5 min in market hours)
 
 timeframes:
   enabled: [5m, 10m, 15m, 30m, 1h, 1D]

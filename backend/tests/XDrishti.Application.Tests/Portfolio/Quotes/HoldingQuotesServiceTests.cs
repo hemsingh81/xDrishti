@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Tests.Platform.Services;
+using XDrishti.Application.Tests.Portfolio.Actions;
 using XDrishti.Domain.Platform.Services;
 using static XDrishti.Application.Tests.Platform.Services.ServicesWorld;
 
@@ -15,6 +16,7 @@ public sealed class HoldingQuotesServiceTests : IDisposable
     private readonly FakeHoldingQuotes _holdings = new();
     private readonly FakeQuoteSource _source = new();
     private readonly FakeDataAccount _account = FakeDataAccount.Connected();
+    private readonly ActionsHarness _actions = new();
     private readonly ServicesWorld _world;
 
     public HoldingQuotesServiceTests() =>
@@ -23,7 +25,9 @@ public sealed class HoldingQuotesServiceTests : IDisposable
             provider => provider
                 .Singleton<IHoldingQuotes>(_holdings)
                 .Singleton<IQuoteSource>(_source)
-                .Singleton<IDataAccountStatus>(_account));
+                .Singleton<IDataAccountStatus>(_account)
+                .Singleton(_actions.Checker())
+                .Singleton(_actions.Reconciler()));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

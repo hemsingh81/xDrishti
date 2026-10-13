@@ -2639,7 +2639,7 @@
         "tags": [
           "Holdings"
         ],
-        "summary": "Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100). Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote)",
+        "summary": "Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote)",
         "operationId": "ListHoldings",
         "parameters": [
           {
@@ -2693,6 +2693,20 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "groupBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupKey",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2769,6 +2783,90 @@
         }
       }
     },
+    "/api/holdings/groups": {
+      "get": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0)",
+        "operationId": "GetHoldingGroups",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stackBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingGroups"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/holdings/{id}/lots": {
       "get": {
         "tags": [
@@ -2816,7 +2914,7 @@
         "tags": [
           "Holdings"
         ],
-        "summary": "Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date",
+        "summary": "Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date. A lot rebuilt from trades (source trade) takes its date from the trade: 409 portfolio.lot_from_trade; the opening lot of such a holding must stay before the earliest trade: 400 portfolio.invalid, field acquiredOn",
         "operationId": "UpdateHoldingLotDate",
         "parameters": [
           {
@@ -2871,6 +2969,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3063,6 +3171,256 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/history": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Value history of the lots of a scope (accountId, bucketId; all accounts that count in totals when neither is given) from the lots and the stored day bars adjusted for splits and bonuses: points {date, value, invested, benchmarkValue (the same cash flows in the benchmark index, null when unavailable), nav, benchmarkNav} (NAV starts at 100 and ignores cash flows), coverage {holdings, covered, unpriced, lateStart}, partial, benchmark {state ok|unavailable, instrumentId, symbol, name, tracked, hasBars, reason}, maxDrawdown and benchmarkMaxDrawdown {pct, from, to} (a fall of pct %), firstDate, lastPriceAt (set when the last point is today's live one) and resolution. from/to yyyy-MM-dd; resolution day|week|month (last trading day of the period; default the finest with at most 2,000 points, 400 portfolio.invalid when a given one gives more). An unknown account or bucket gives an empty history",
+        "operationId": "GetPortfolioHistory",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resolution",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/benchmark": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "The benchmark index the portfolio is compared with (Nifty 50 until another is chosen): instrumentId, symbol, name, isDefault, tracked, hasBars; all null when the instrument master has no such index yet",
+        "operationId": "GetPortfolioBenchmark",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Choose the benchmark index: body {instrumentId} of any index of the instrument master that is still listed; 400 portfolio.invalid for no id, an unknown id, a non-index or a retired index. Audited; the cached histories are dropped",
+        "operationId": "SetPortfolioBenchmark",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BenchmarkInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/history/track-holdings": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Track my holdings: tracks the instruments of the open holdings of the scope (accountId, bucketId) that are in the instrument master, with the bulk tracking command; idempotent. Answers how many were added, how many holdings are not in the master (notInMaster) and how many instruments are retired and skipped; starts no job, the hint says the next Update data builds the bars",
+        "operationId": "TrackPortfolioHoldings",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioTrackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/history/track-benchmark": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Track the benchmark: tracks the benchmark index with the bulk tracking command; idempotent. Answers how many were added; starts no job, the hint says the next Update data builds the bars. 404 portfolio.not_found when the instrument master has no benchmark index",
+        "operationId": "TrackPortfolioBenchmark",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioTrackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5114,6 +5472,985 @@
           }
         }
       }
+    },
+    "/api/portfolio/actions": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "The holdings that need a decision, evaluated on read by seven rules (below_cost, large_gain, overweight, sector_concentration, long_term_soon, lagging_nifty, not_in_basket): items[{id, rule, severity high|medium|info, accountId, accountName, holdingId, instrumentId, symbol (null for the account-level sector_concentration), title, detail, numbers (the figures behind the item; which are set depends on the rule), suggestions[open|set_alert|add_to_basket|snooze|done], state open|snoozed|done, snoozedUntil}] most important first (severity, then the size of the trigger), and counts {open, snoozed, done, byRule, bySeverity (of the open items; every rule and severity present), unavailable {lagging: holdings held long enough for lagging_nifty that could not be judged because the benchmark has no bars from the first flow or an XIRR is not ok}, noPrice (open holdings without a usable price: no price-based rule fires for them)}. Filters: accountId (404 accounts.not_found when unknown; without it the accounts that count in totals), bucketId (the items about its holdings; weights and sector shares stay shares of the whole account), status open (default) | snoozed | done | all (the counts always cover the whole scope). A snoozed item shows again on its snoozedUntil date. One write is made by this read: a done decision whose condition no longer holds is cleared, so a recurrence shows again",
+        "operationId": "GetPortfolioActions",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/actions/{id}/snooze": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Hide an item for 7 days (it shows again on that India date if a rule still produces it): answers {id, state, snoozedUntil, item}. Idempotent; audited. 404 portfolio.not_found for an id that no rule produces now (stale)",
+        "operationId": "SnoozePortfolioAction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionDecisionView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/actions/{id}/done": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Mark an item done: it stays hidden for as long as the condition holds and the decision is cleared when it stops holding (a later recurrence is open again). Answers {id, state, snoozedUntil, item}. Idempotent; audited. 404 portfolio.not_found for an id that no rule produces now (stale)",
+        "operationId": "MarkPortfolioActionDone",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionDecisionView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/actions/{id}/reopen": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Take a snooze or done decision back: the item is open again. Answers {id, state open, item (null when no rule produces the id now)}. Idempotent; audited when it changes something; allowed for an item that is gone; 404 portfolio.not_found only for an id that is not the id of any rule's item",
+        "operationId": "ReopenPortfolioAction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionDecisionView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/action-thresholds": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "The thresholds of the Action-center rules in force: values {belowCostPct, belowCostHighPct, gainPct, overweightFloorPct, overweightMultiple, minPositions, concentrationPct, lagPp, lagDays, longTermWindowDays}, the documented defaults, isDefault, updatedBy and updatedAt (null while none are stored)",
+        "operationId": "GetPortfolioActionThresholds",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionThresholdsView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Save the thresholds (all ten required): below cost 1-90 %, high 2-95 % and above below cost, gain 1-1000 %, overweight floor 1-100 %, multiple 1-10, minimum positions 2-50, concentration 5-100 %, lag 1-100 points, lag days 30-3650, long-term window 1-365 days; at most 2 decimals, minPositions/lagDays/longTermWindowDays whole numbers. 400 portfolio.invalid with a field error per problem. The next read of the actions uses them at once. Audited",
+        "operationId": "SavePortfolioActionThresholds",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionThresholdsInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionThresholdsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/action-thresholds/reset": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Restore defaults: writes the documented default thresholds. Audited; nothing changes when they are already in force",
+        "operationId": "ResetPortfolioActionThresholds",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionThresholdsView"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/notices": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "What the owner should know about the portfolio, for the notification bell: price_alert_triggered (warn; one per alert, id portfolio:alert:{alertId}, listed for 7 days after it triggered; carries alertId and instrumentId) and actions_need_decision (info; \"N holdings need a decision\" when the accounts that count in totals have open Action-center items; id portfolio:actions:{India date}, so it is raised again at most once a day)",
+        "operationId": "GetPortfolioNotices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioNotices"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/alerts": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "The price alerts, newest first: status active | triggered | cancelled | all (default all), page, pageSize (max 100, default 50). Each alert has id, instrumentId, symbol, name, direction (at_or_below | at_or_above), level, note, status, createdAt, triggeredAt and triggerPrice (the last price of the tick that hit the level). The page also carries activeCount of activeLimit (200)",
+        "operationId": "ListPortfolioAlerts",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceAlertPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Create an active alert: body {instrumentId (an NSE share or ETF of the instrument master that is not retired and that Dhan can quote), direction at_or_below | at_or_above, level (above 0, at most 10,000,000, at most 4 decimals), note (optional, at most 200 characters of plain text)}. Checked on each quotes tick's last price (at_or_below: last <= level; at_or_above: last >= level). 400 portfolio.invalid with field errors, including field level when the condition already holds at the last known price (the holding's last price, else the last stored daily close; unknown: allowed) with the price in the message; 409 portfolio.alert_limit at 200 active alerts. Audited",
+        "operationId": "CreatePortfolioAlert",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceAlertInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceAlertView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/alerts/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Cancel an alert. Idempotent: a cancelled alert stays cancelled and a triggered one stays triggered (the answer shows the real status). Audited when it cancels. 404 portfolio.not_found for an unknown id",
+        "operationId": "CancelPortfolioAlert",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceAlertView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/template": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "The template of a tradebook file as a CSV download: the canonical header (Date, Symbol, ISIN, Side, Quantity, Price, Exchange, Trade ID, Time, Charges) and two example rows. Other header names are accepted too (any case, punctuation ignored); only date, symbol or ISIN, side, quantity and price are required",
+        "operationId": "GetTradeTemplate",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/preview": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Read a tradebook against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows). Returns the file (rows, parsed, skipped by reason, bad rows with line and reason - at most 200 listed, badTotal counts all -, duplicates, alreadyImported, newTrades), the securities - every held or master-listed one and at most 200 unmatched ones; securitiesTotal counts all, unmatchedListed the unmatched listed - (symbol, isin, matched, holdingId, trades, buys, sells, first and last trade date and the rebuild: status ok | unchanged | quantity_mismatch | no_holding | ambiguous, reason, lotsBefore, lotsAfter, handDatedLotsReplaced, syncLotsReplaced, realisedPnl, adjustedFor, q, net, openingQty {before, after}, openCostAfter, brokerCost, costDelta, costNote, digest), notHeld and unmatched {securities, trades} and the overall digest. 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off",
+        "operationId": "PreviewTradeImport",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/import": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Import a tradebook: body multipart/form-data with accountId, file, rebuild (true | false, default true) and digest (required with rebuild: the digest of the preview). Stores the trades the account does not have yet as one batch (a trade id of the file together with the trade date - exchanges number trades per day -, else a hash of the line, is the identity: the same file again stores nothing and makes no batch) and, with rebuild, replaces the lots of every holding whose result is ok by lots built from the real buy and sell dates. Trades of securities not held, of mismatching or ambiguous holdings are stored and not applied. 409 portfolio.preview_stale when holdings, lots, corporate actions or trades changed since the preview (extension report: the fresh preview; nothing applied); 409 portfolio.sync_running while the account's holdings sync runs; 400 portfolio.invalid; 404 portfolio.not_found. Audited with counts only",
+        "operationId": "ImportTrades",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Add one trade by hand: holdingId, or accountId with symbol and/or isin of an NSE share or ETF of the instrument master; side buy | sell, tradeDate (1990-01-02 to today), tradeTime (optional, India time), quantity (whole, above 0), price (above 0), charges (optional). Validated like a CSV row; identical manual trades are not deduplicated. Changes no lots - rebuild them afterwards. 400 portfolio.invalid with field errors; 404 portfolio.not_found. Audited",
+        "operationId": "AddTrade",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualTradeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/{id}/void": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Void a trade: it stops counting, is never deleted and can be imported again. Voiding a voided trade is a no-op. Changes no lots - rebuild them afterwards. 404 portfolio.not_found. Audited",
+        "operationId": "VoidTrade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trade-batches": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "The imports of tradebook files, newest first: accountId (optional), page, pageSize (max 100, default 50). Each has id, accountId, accountName, fileName, sha256, parsed, imported, duplicates, skipped, bad, status imported | undone, activeTrades, securities, createdBy, createdAt, undoneAt",
+        "operationId": "ListTradeBatches",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeBatchPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trade-batches/{id}/undo": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Undo an import: voids its trades (nothing is deleted) and rebuilds from the remaining trades the lots of the affected holdings whose lots came from trades - with none left, one lot of the broker's quantity and cost dated by the first import date, flagged default. LIMITATION: an undo cannot bring back lots the owner dated by hand or a sync added that an earlier rebuild replaced; handDatedLotsReplaced and syncLotsReplaced say how many the rebuild removes (the lots of holdings it rebuilds). Holdings whose lots did not come from trades keep their lots; holdings that cannot be rebuilt (quantity mismatch, ambiguous) keep theirs and are listed in notRebuilt [{symbol, holdingId, reason}] (holdingsNotRebuilt counts them). dryRun=true (default false) changes nothing and returns the same result (dryRun, applied=false) so the confirmation can say what will happen. Undoing twice is a no-op (alreadyUndone). 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only",
+        "operationId": "UndoTradeBatch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "dryRun",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeUndoResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/{id}/trades": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "The trades of a holding's security (by ISIN, else symbol), newest first, voided ones included and flagged (voided, voidedAt, voidedBy): page, pageSize (max 200, default 50)",
+        "operationId": "ListHoldingTrades",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/{id}/rebuild-lots": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Rebuild a holding's lots from its stored trades. dryRun (default true) returns the rebuild block - status, counts of lots replaced, realised profit, adjustments, the broker's quantity against the trades - and changes nothing; dryRun=false replaces the lots when the status is ok (applied) and leaves them for unchanged, quantity_mismatch and ambiguous. A holding without trades is rebuilt into one default-dated lot. 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only",
+        "operationId": "RebuildHoldingLots",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "dryRun",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingRebuildResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5333,6 +6670,524 @@
           }
         },
         "description": "One row of the accounts list. Broker is \"dhan\"; MaskedClientId shows the first four and last two characters; Secrets lists the\nsecret fields with set / not set; ApiKeyExpiresOn is the first day the Dhan API key is no longer valid; TokenStatus repeats\nConnection.Status (for the list's health dot)."
+      },
+      "ActionCounts": {
+        "required": [
+          "open",
+          "snoozed",
+          "done",
+          "byRule",
+          "bySeverity",
+          "unavailable",
+          "noPrice"
+        ],
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "snoozed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byRule": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "bySeverity": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "unavailable": {
+            "$ref": "#/components/schemas/ActionUnavailable"
+          },
+          "noPrice": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What the Action center counts for the scope (before the status filter): items by state, and for the <i>open</i> items by rule (all seven rules, zeros included) and by severity (high, medium, info). `NoPrice` counts open holdings without a usable price\n(no price-based rule can fire for them)."
+      },
+      "ActionDecisionView": {
+        "required": [
+          "id",
+          "state",
+          "snoozedUntil",
+          "item"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "snoozedUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "item": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ActionItem"
+              }
+            ]
+          }
+        },
+        "description": "The outcome of a decision: `State``open|snoozed|done`, `SnoozedUntil`, and the item as it is now (null when the id is not produced by a rule now, which only a reopen can still ask about)."
+      },
+      "ActionItem": {
+        "required": [
+          "id",
+          "rule",
+          "severity",
+          "accountId",
+          "accountName",
+          "holdingId",
+          "instrumentId",
+          "symbol",
+          "title",
+          "detail",
+          "numbers",
+          "suggestions",
+          "state",
+          "snoozedUntil"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "rule": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/ActionNumbers"
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "type": "string"
+          },
+          "snoozedUntil": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "One Action-center item. `Id` is stable (`{rule}:{holdingId}`, or `sector_concentration:{accountId}:{12 hex}`) and safe in a URL path. `Rule` is one of `below_cost`, `large_gain`, `overweight`, `sector_concentration`,\n`long_term_soon`, `lagging_nifty`, `not_in_basket`; `Severity``high|medium|info`; `HoldingId`, `InstrumentId` and `Symbol` are null for an account-level item (concentration) and `InstrumentId` for a holding that is not in the\nmaster list. `Title` and `Detail` are plain sentences; `Numbers` the figures behind them; `Suggestions` the buttons that make sense (`open|set_alert|add_to_basket|snooze|done`). `State` is `open|snoozed|done`;\n`SnoozedUntil` the India date a snoozed item shows again. Severity, text and numbers are recomputed on every read."
+      },
+      "ActionList": {
+        "required": [
+          "items",
+          "counts"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActionItem"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/ActionCounts"
+          }
+        },
+        "description": "The items of the status asked for, most important first, and the counts of the whole scope."
+      },
+      "ActionNumbers": {
+        "type": "object",
+        "properties": {
+          "pnlPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "invested": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "thresholdPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "weightPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "positions": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "sector": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sectorSharePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "sectorValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "largestSymbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "largestHoldingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "largestValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "lots": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/LongTermLot"
+            }
+          },
+          "heldDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "xirrPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "benchmarkXirrPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "gapPp": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "thresholdPp": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The figures that made an item fire; which ones are set depends on the rule, the others are null. <b>below_cost</b>, <b>large_gain</b>: `PnlPct`, `Pnl`, `Invested`, `Value`, `ThresholdPct` (the band reached: 10 or 20 / 25).\n<b>overweight</b>: `WeightPct` of the account's priced value, `ThresholdPct` (the limit), `Positions` (priced positions of the account), `Value`. <b>sector_concentration</b>: `Sector`, `SectorSharePct` of the account's priced value,\n`ThresholdPct`, `SectorValue`, `Positions` (in the sector), `LargestSymbol`, `LargestHoldingId` and `LargestValue` of the largest holding in it. <b>long_term_soon</b>: `Lots`, `PnlPct`. <b>lagging_nifty</b>: `HeldDays`,\n`XirrPct`, `BenchmarkXirrPct`, `GapPp` (holding minus benchmark, negative), `ThresholdPp`. <b>not_in_basket</b>: `Invested`, `Value` (null when unpriced)."
+      },
+      "ActionThresholds": {
+        "required": [
+          "belowCostPct",
+          "belowCostHighPct",
+          "gainPct",
+          "overweightFloorPct",
+          "overweightMultiple",
+          "minPositions",
+          "concentrationPct",
+          "lagPp",
+          "lagDays",
+          "longTermWindowDays"
+        ],
+        "type": "object",
+        "properties": {
+          "belowCostPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "belowCostHighPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "gainPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "overweightFloorPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "overweightMultiple": {
+            "type": "number",
+            "format": "double"
+          },
+          "minPositions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "concentrationPct": {
+            "type": "number",
+            "format": "double"
+          },
+          "lagPp": {
+            "type": "number",
+            "format": "double"
+          },
+          "lagDays": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "longTermWindowDays": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The thresholds of the Action-center rules (ADR 0022, doc 15 §3): percentages are percent numbers (10 = 10 %). The defaults are the ones of the design; the owner edits them in Settings within the fixed ranges below."
+      },
+      "ActionThresholdsInput": {
+        "required": [
+          "belowCostPct",
+          "belowCostHighPct",
+          "gainPct",
+          "overweightFloorPct",
+          "overweightMultiple",
+          "minPositions",
+          "concentrationPct",
+          "lagPp",
+          "lagDays",
+          "longTermWindowDays"
+        ],
+        "type": "object",
+        "properties": {
+          "belowCostPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "belowCostHighPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "gainPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "overweightFloorPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "overweightMultiple": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "minPositions": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "concentrationPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "lagPp": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "lagDays": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "longTermWindowDays": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The thresholds to save: every value is required. `MinPositions`, `LagDays` and `LongTermWindowDays` must be whole numbers."
+      },
+      "ActionThresholdsView": {
+        "required": [
+          "values",
+          "defaults",
+          "isDefault",
+          "updatedBy",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "values": {
+            "$ref": "#/components/schemas/ActionThresholds"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/ActionThresholds"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "updatedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "The thresholds in force with the documented defaults; `IsDefault` when they are the defaults; `UpdatedBy`/`UpdatedAt` null while none are stored."
+      },
+      "ActionUnavailable": {
+        "required": [
+          "lagging"
+        ],
+        "type": "object",
+        "properties": {
+          "lagging": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Rules that could not be evaluated: `Lagging` holdings held long enough for the lagging-Nifty rule but without a usable benchmark or XIRR."
       },
       "AddCalendarDayRequest": {
         "required": [
@@ -6210,6 +8065,64 @@
           }
         },
         "description": "A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).\n`memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).\n`kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the\nbucket's current holdings. `accountId`/`accountName` are set for the default bucket of an account."
+      },
+      "BenchmarkInput": {
+        "required": [
+          "instrumentId"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "Sets the benchmark: the id of a master-list index."
+      },
+      "BenchmarkView": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "isDefault",
+          "tracked",
+          "hasBars"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "hasBars": {
+            "type": "boolean"
+          }
+        },
+        "description": "The benchmark in force (all null when the master list has no such index yet). `IsDefault`: the owner has not chosen one, Nifty 50 applies."
       },
       "BrokerIdView": {
         "required": [
@@ -8146,6 +10059,35 @@
         },
         "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
       },
+      "Drawdown": {
+        "required": [
+          "pct",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "number",
+            "format": "double"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)\ngives 0 and no dates."
+      },
       "EodOverview": {
         "required": [
           "enabled",
@@ -8500,6 +10442,394 @@
         },
         "description": "How many instrument-sessions are in each state (the Dhan phase's gap table): `open` (missing bars a refetch may still add), `unfillable` (a refetch added\nnothing), `filled`; `lastDetectedAt` is when a gap was last found (null while there never was one)."
       },
+      "GroupPart": {
+        "required": [
+          "key",
+          "name",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value."
+      },
+      "HistoryBenchmark": {
+        "required": [
+          "state",
+          "instrumentId",
+          "symbol",
+          "name",
+          "tracked",
+          "hasBars",
+          "reason",
+          "asOf"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "hasBars": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "asOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has\nno such index). `Tracked`: tracking is on; `HasBars`: 1-minute bars are stored (the day bars follow when the aggregates are built). A screen offers \"Track the benchmark\" when it is unavailable and not tracked.\n`AsOf` is the date of the last index close the benchmark lines were valued at (null when unavailable): the index has no live quote, so the benchmark lines end there and a live point of today (portfolio at today's prices) has no benchmark value."
+      },
+      "HistoryCoverage": {
+        "required": [
+          "holdings",
+          "covered",
+          "unpriced",
+          "lateStart"
+        ],
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "covered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpriced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lateStart": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "How much of the open holdings the history covers: `Holdings` open holdings, `Covered` of them have stored day bars, `Unpriced` have none (not tracked, not in the instrument master, or bars not fetched yet:\nthey are left out and never valued at zero). `LateStart` counts covered holdings whose bars begin after their earliest lot, so part of their history is missing."
+      },
+      "HistoryPoint": {
+        "required": [
+          "date",
+          "value",
+          "invested",
+          "benchmarkValue",
+          "nav",
+          "benchmarkNav"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "invested": {
+            "type": "number",
+            "format": "double"
+          },
+          "benchmarkValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "nav": {
+            "type": "number",
+            "format": "double"
+          },
+          "benchmarkNav": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "One day of the portfolio history (rupees; `Nav` and `BenchmarkNav` start at 100). `Value` is what the lots held that day were worth at the day's close (adjusted prices), `Invested` what\nthey cost. `BenchmarkValue` is the same cash flows put into the benchmark index; it and `BenchmarkNav` are null when the benchmark has no history for the series."
+      },
+      "HoldingGroup": {
+        "required": [
+          "key",
+          "name",
+          "holdings",
+          "unpriced",
+          "invested",
+          "value",
+          "pnl",
+          "pnlPct",
+          "realised",
+          "xirr",
+          "xirrState",
+          "dayChange",
+          "dayChangePct",
+          "dayChangeExcluded",
+          "weightPct",
+          "parts"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "holdings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpriced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invested": {
+            "type": "number",
+            "format": "double"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnlPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "realised": {
+            "type": "number",
+            "format": "double"
+          },
+          "xirr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "xirrState": {
+            "type": "string"
+          },
+          "dayChange": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangeExcluded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "weightPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "parts": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/GroupPart"
+            }
+          }
+        },
+        "description": "One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector \"Unclassified\" and the basket \"No basket\". Holdings counts every holding of the group in the scope;\nUnpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`."
+      },
+      "HoldingGroupTotal": {
+        "required": [
+          "holdings",
+          "unpriced",
+          "invested",
+          "value",
+          "pnl",
+          "pnlPct",
+          "realised",
+          "xirr",
+          "xirrState",
+          "dayChange",
+          "dayChangePct",
+          "dayChangeExcluded",
+          "weightPct"
+        ],
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpriced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invested": {
+            "type": "number",
+            "format": "double"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnlPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "realised": {
+            "type": "number",
+            "format": "double"
+          },
+          "xirr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "xirrState": {
+            "type": "string"
+          },
+          "dayChange": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangeExcluded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "weightPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value."
+      },
+      "HoldingGroups": {
+        "required": [
+          "by",
+          "additive",
+          "stackBy",
+          "groups",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "by": {
+            "type": "string"
+          },
+          "additive": {
+            "type": "boolean"
+          },
+          "stackBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldingGroup"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/HoldingGroupTotal"
+          }
+        },
+        "description": "The groups of the scope. By is `account`, `bucket`, `sector` or `basket`; Additive is false for baskets (a holding is in every basket that contains it, so the groups overlap). StackBy is the second dimension of the\nparts, when asked for. At most 200 groups are returned."
+      },
       "HoldingLots": {
         "required": [
           "holdingId",
@@ -8563,6 +10893,26 @@
           }
         },
         "description": "One page of holdings (Total counts all matches)."
+      },
+      "HoldingRebuildResult": {
+        "required": [
+          "dryRun",
+          "applied",
+          "rebuild"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "rebuild": {
+            "$ref": "#/components/schemas/TradeRebuildView"
+          }
+        },
+        "description": "The rebuild of one holding's lots: with `DryRun` only what it would do; otherwise `Applied` says whether the lots were replaced (only an `ok` rebuild is)."
       },
       "HoldingRow": {
         "required": [
@@ -8756,7 +11106,12 @@
           "dayChange",
           "dayChangePct",
           "dayChangeExcluded",
-          "pricesAsOf"
+          "pricesAsOf",
+          "benchmarkXirr",
+          "alpha",
+          "benchmarkState",
+          "benchmarkAsOf",
+          "alphaBasis"
         ],
         "type": "object",
         "properties": {
@@ -8817,9 +11172,39 @@
           },
           "pricesAsOf": {
             "$ref": "#/components/schemas/PricesAsOf"
+          },
+          "benchmarkXirr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "alpha": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "benchmarkState": {
+            "type": "string"
+          },
+          "benchmarkAsOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "alphaBasis": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that\nstill have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).\nDayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no\nholding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings."
+        "description": "Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that\nstill have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).\nDayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no\nholding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings.\nBenchmarkXirr (percent number) is the XIRR of the same cash flows put into the benchmark index (Nifty 50 by default, ADR 0020 §2), Alpha the portfolio's XIRR minus it in percentage points; BenchmarkState is \"ok\", \"unavailable\" (the index has no history\nfrom the first cash flow: track it and run Update data), \"insufficient\" (the same reasons as for XIRR) or \"n_m\" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState \"ok\").\nBenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which\nit is when Alpha is set: \"last_close\" (portfolio and index are both as of their last close) or \"live_vs_last_close\" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only)."
       },
       "HttpValidationProblemDetails": {
         "type": "object",
@@ -8866,7 +11251,7 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
           },
           "retryAfterSeconds": {
             "type": "integer",
@@ -8916,12 +11301,20 @@
             },
             "description": "Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text."
           },
+          "report": {
+            "type": "object",
+            "description": "Present on portfolio.preview_stale: the fresh preview of the file, in the shape of the response of POST /api/portfolio/trades/preview (TradePreviewReport)."
+          },
           "wouldClose": {
             "type": "integer",
             "description": "Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.",
             "format": "int32"
           }
         }
+      },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
       },
       "ImportCorporateActionsResult": {
         "required": [
@@ -9614,6 +12007,42 @@
         },
         "description": "Body of `POST /api/auth/login`."
       },
+      "LongTermLot": {
+        "required": [
+          "acquiredOn",
+          "qty",
+          "longTermOn",
+          "daysLeft",
+          "gainPct"
+        ],
+        "type": "object",
+        "properties": {
+          "acquiredOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "longTermOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "daysLeft": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "gainPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A profitable open lot that turns 12 months old soon (the `long_term_soon` rule): `LongTermOn` is the date it is 12 months old, `DaysLeft` the days until then, `GainPct` its unrealised gain in percent (null for a lot that cost nothing, for example bonus shares: the gain is then the whole value and has no percentage)."
+      },
       "LotDateInput": {
         "required": [
           "acquiredOn"
@@ -9694,6 +12123,91 @@
         },
         "description": "A lot of a holding with its own figures: Invested is its cost, Value is its value now (open) or its sale proceeds (closed), Pnl the difference.\nStatus is \"open\" or \"closed\"; Source \"import\", \"added\" or \"manual\". Estimated: the sale price is the last price a sync saw."
       },
+      "ManualTradeInput": {
+        "required": [
+          "accountId",
+          "holdingId",
+          "symbol",
+          "isin",
+          "side",
+          "tradeDate",
+          "tradeTime",
+          "quantity",
+          "price",
+          "charges"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "side": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tradeDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "tradeTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "quantity": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "price": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "charges": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A trade typed in by the owner: for a holding (`HoldingId`) or for a security of an account (`AccountId` and `Symbol` and/or `Isin`, which must be an NSE share or ETF of the master list). `Side` buy or sell, the date not in the\nfuture, `Quantity` a whole number above 0, `Price` above 0, `Charges` optional (0)."
+      },
       "MembersOrderInput": {
         "required": [
           "instrumentIds"
@@ -9745,6 +12259,30 @@
           }
         },
         "description": "The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched."
+      },
+      "OpeningQtyView": {
+        "required": [
+          "before",
+          "after"
+        ],
+        "type": "object",
+        "properties": {
+          "before": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "after": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "The quantity the lots count as opening (the shares the trades do not explain): now, and after the rebuild. Null where it cannot be told (no holding, or a quantity that is not whole after a split or bonus)."
       },
       "ParameterView": {
         "required": [
@@ -9798,6 +12336,91 @@
         },
         "description": "A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default."
       },
+      "PortfolioHistory": {
+        "required": [
+          "points",
+          "coverage",
+          "partial",
+          "benchmark",
+          "maxDrawdown",
+          "benchmarkMaxDrawdown",
+          "firstDate",
+          "lastPriceAt",
+          "resolution",
+          "rangeFrom",
+          "rangeTo"
+        ],
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryPoint"
+            }
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/HistoryCoverage"
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "benchmark": {
+            "$ref": "#/components/schemas/HistoryBenchmark"
+          },
+          "maxDrawdown": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Drawdown"
+              }
+            ]
+          },
+          "benchmarkMaxDrawdown": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Drawdown"
+              }
+            ]
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastPriceAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "resolution": {
+            "type": "string"
+          },
+          "rangeFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "rangeTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The value history of a scope (all accounts that count in totals, one account, one bucket). `Points` are in date order at `Resolution` (`day`, `week` or `month`: the last trading day of the period); `Value` is what the\nlots held that day were worth at that day's close (adjusted for splits and bonuses), `Invested` what they cost, `BenchmarkValue` the same cash flows in the benchmark index, `Nav` and `BenchmarkNav` unit values starting at 100\nthat cash flows do not move. `Coverage` says how many open holdings have price history; `Partial` is true when anything is left out (holdings without bars, history that starts late). `MaxDrawdown` / `BenchmarkMaxDrawdown`: the largest\nfall of the NAV measured within the requested range (`Pct` 12.5 = fell 12.5 %; the peak must lie inside the range too) between the peak on `From` and the low on `To`, daily, whatever the resolution; `RangeFrom` and `RangeTo` are the first and\nthe last day of that range as returned (null when there is no point). `FirstDate` is the first day of the whole history (before the range is cut). `LastPriceAt` is set when the last point is today's live one: the time of the newest price in it."
+      },
       "PortfolioInput": {
         "required": [
           "defaultBucket",
@@ -9848,6 +12471,68 @@
           }
         },
         "description": "The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of\nthe bucket imports go to — a custom bucket's name; an empty string \"\" (or the name of the account's own \"{account name} · Portfolio\" bucket) selects the account's\nown default bucket; null or omitted keeps the current choice. IncludeInTotals: true or false; null keeps it. At account creation, omitted means the account's own\nbucket and true. The automatic holdings refresh: RefreshMode \"off\" or \"daily\"; RefreshDailyTimeIst \"HH:mm\" (India time); left out keeps the current value (a new\naccount: off, 16:00). FirstImportDate (not in the future, not before 1990-01-01) is the date the first import gives holdings without a date of their own.\nFirstImport is honoured only when updating the portfolio settings of an account (it is ignored at account creation): see FirstImportInput."
+      },
+      "PortfolioNotice": {
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "text",
+          "at",
+          "alertId",
+          "instrumentId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "alertId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "One notice of the Portfolio module for the top-bar bell. `Kind` is `price_alert_triggered` (`Severity` warn; `AlertId` and `InstrumentId` set) or `actions_need_decision` (info). `Id` is stable, so the bell keeps what was read by id."
+      },
+      "PortfolioNotices": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioNotice"
+            }
+          }
+        }
       },
       "PortfolioRoleView": {
         "required": [
@@ -9916,6 +12601,48 @@
           }
         },
         "description": "Portfolio configuration. DefaultBucket is the name of the bucket imports go to (the account's own default bucket unless a custom bucket was chosen);\nAutoBucketName is the name of the account's own default bucket (\"{account name} · Portfolio\") — the one that exists, or, while the account has none yet,\nthe name it would get now (with a numeric suffix when the plain name is taken); it is chosen for real when the role is switched on.\nThe holdings refresh by themselves according to RefreshMode: \"off\" (default) or \"daily\" (once a day from RefreshDailyTimeIst, \"HH:mm\" India time, default 16:00;\nthe time is kept while the mode is off). FirstImportDate is the date holdings get when they are imported for the first time without a date of their own\n(2025-01-01 until the owner chooses another). HasHoldings is true once the account has any holding; the first import has happened then and\nFirstImportDate no longer affects existing holdings (ADR 0013)."
+      },
+      "PortfolioTrackResult": {
+        "required": [
+          "requested",
+          "added",
+          "alreadyTracked",
+          "notInMaster",
+          "retired",
+          "totalTracked",
+          "hint"
+        ],
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notInMaster": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hint": {
+            "type": "string"
+          }
+        },
+        "description": "What a track action did. `Requested` distinct master-list instruments were asked to be tracked, `Added` of them are newly tracked (or tracked again), `AlreadyTracked` were; `NotInMaster` open holdings in scope\nare not in the instrument master (nothing to track), `Retired` instruments are no longer listed and were skipped. `TotalTracked` is the number tracked now. No job is started: `Hint` says the next <i>Update data</i> builds the bars."
       },
       "PreviewCsvFilesRequest": {
         "required": [
@@ -10002,6 +12729,151 @@
         },
         "description": "A holding Dhan reports, for the first import in the portfolio settings. Key identifies it in the import request (the ISIN, otherwise \"securityId:EXCHANGE\").\nMapped is false when it is not in the instrument master. AlreadyImported: the account has the holding (open) already.\nSuggestedDate is the date to pre-fill: the first import date, or the oldest lot's date of an already imported holding."
       },
+      "PriceAlertInput": {
+        "required": [
+          "instrumentId",
+          "direction",
+          "level",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "direction": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "level": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A new price alert: the master-list share or ETF, `Direction``at_or_below|at_or_above`, the `Level` in rupees (above 0, at most 10,000,000, at most 4 decimals) and an optional plain-text `Note` of at most 200 characters."
+      },
+      "PriceAlertPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total",
+          "activeCount",
+          "activeLimit"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceAlertView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeLimit": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of alerts, newest first (`Total` counts all matches). `ActiveCount` of `ActiveLimit` alerts are active, whatever the filter."
+      },
+      "PriceAlertView": {
+        "required": [
+          "id",
+          "instrumentId",
+          "symbol",
+          "name",
+          "direction",
+          "level",
+          "note",
+          "status",
+          "createdAt",
+          "triggeredAt",
+          "triggerPrice"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instrumentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "level": {
+            "type": "number",
+            "format": "double"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "triggeredAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "triggerPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A price alert. `Status` is `active`, `triggered` (with `TriggeredAt` and `TriggerPrice`, the last price of the tick that hit the level) or `cancelled`. It is checked on the last price of each quotes tick only (every 5 minutes while the market\nis open): a spike between two ticks is not seen."
+      },
       "PricesAsOf": {
         "required": [
           "oldest",
@@ -10062,7 +12934,7 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
           },
           "retryAfterSeconds": {
             "type": "integer",
@@ -10111,6 +12983,10 @@
               }
             },
             "description": "Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text."
+          },
+          "report": {
+            "type": "object",
+            "description": "Present on portfolio.preview_stale: the fresh preview of the file, in the shape of the response of POST /api/portfolio/trades/preview (TradePreviewReport)."
           },
           "wouldClose": {
             "type": "integer",
@@ -12789,6 +15665,733 @@
         },
         "description": "Instruments to track or untrack: 1 to 500 ids (duplicates are fine and count once)."
       },
+      "TradeBadRow": {
+        "required": [
+          "line",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A row that cannot be imported: the line of the file it starts on and why."
+      },
+      "TradeBatchPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeBatchView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of import batches, newest first."
+      },
+      "TradeBatchView": {
+        "required": [
+          "id",
+          "accountId",
+          "accountName",
+          "fileName",
+          "sha256",
+          "parsed",
+          "imported",
+          "duplicates",
+          "skipped",
+          "bad",
+          "status",
+          "activeTrades",
+          "securities",
+          "createdBy",
+          "createdAt",
+          "undoneAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "parsed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bad": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "activeTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "securities": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "undoneAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "One import of a file. `Status` is `imported` or `undone`; `ActiveTrades` counts its trades that are not voided and `Securities` the securities among them."
+      },
+      "TradeCount": {
+        "required": [
+          "securities",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A number of securities and the number of trades of the file in them."
+      },
+      "TradeFileSummary": {
+        "required": [
+          "fileName",
+          "rows",
+          "parsed",
+          "skipped",
+          "bad",
+          "badTotal",
+          "duplicates",
+          "alreadyImported",
+          "newTrades"
+        ],
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parsed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "$ref": "#/components/schemas/TradeSkipped"
+          },
+          "bad": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeBadRow"
+            }
+          },
+          "badTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newTrades": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What was in the file. `Rows` are the data rows (empty lines do not count), `Parsed` the valid trade rows, `Duplicates` the valid rows that repeat a trade id of the file, `AlreadyImported` the trades of the file that are stored already\n(and not voided), `NewTrades` the ones an import would store. `Bad` lists the first 200 bad rows (line, reason); `BadTotal` counts all of them."
+      },
+      "TradeImportResult": {
+        "required": [
+          "batch",
+          "imported",
+          "alreadyImported",
+          "rebuilt",
+          "holdingsRebuilt",
+          "lotsReplaced",
+          "report"
+        ],
+        "type": "object",
+        "properties": {
+          "batch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TradeBatchView"
+              }
+            ]
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rebuilt": {
+            "type": "boolean"
+          },
+          "holdingsRebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "report": {
+            "$ref": "#/components/schemas/TradePreviewReport"
+          }
+        },
+        "description": "What an import did. `Batch` is null when the file had nothing new. `Imported` trades were stored, `AlreadyImported` were there already. With `Rebuilt` the lots of `HoldingsRebuilt` holdings were replaced\n(`LotsReplaced` lots removed); `Report` is the preview the owner confirmed (statuses before the rebuild)."
+      },
+      "TradeNotRebuilt": {
+        "required": [
+          "symbol",
+          "holdingId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A holding (or security) that an undo could not rebuild: its `Symbol`, the `HoldingId` when it is a single holding, and the `Reason` — `ambiguous` or the mismatch (`negative_opening`, `sell_exceeds_open`, `fractional_after_adjustment`)."
+      },
+      "TradePage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of the trades of a holding, newest first, voided ones included."
+      },
+      "TradePreviewReport": {
+        "required": [
+          "file",
+          "securities",
+          "notHeld",
+          "unmatched",
+          "digest"
+        ],
+        "type": "object",
+        "properties": {
+          "file": {
+            "$ref": "#/components/schemas/TradeFileSummary"
+          },
+          "securities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeSecurityView"
+            }
+          },
+          "notHeld": {
+            "$ref": "#/components/schemas/TradeCount"
+          },
+          "unmatched": {
+            "$ref": "#/components/schemas/TradeCount"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "securitiesTotal": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "unmatchedListed": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          }
+        },
+        "description": "The preview of a tradebook import — nothing is stored. `NotHeld`: securities the account does not hold now (their trades are stored by an import, not applied); `Unmatched`: those of them that are not even NSE shares or ETFs of the master list.\n`Digest` fingerprints everything the preview shows (all securities, listed or not); an import with `rebuild` must send it back. `Securities` lists every security that is a holding or an NSE share/ETF of the\nmaster list and at most int TradeCsvLimits.MaxListedUnmatched (200) of the unmatched ones; `SecuritiesTotal` counts all the securities of the file and `UnmatchedListed` the unmatched ones listed."
+      },
+      "TradeRebuildView": {
+        "required": [
+          "status",
+          "reason",
+          "lotsBefore",
+          "lotsAfter",
+          "handDatedLotsReplaced",
+          "syncLotsReplaced",
+          "realisedPnl",
+          "adjustedFor",
+          "q",
+          "net",
+          "openingQty",
+          "digest"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lotsBefore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsAfter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "handDatedLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "syncLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "realisedPnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "adjustedFor": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "q": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "net": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "openingQty": {
+            "$ref": "#/components/schemas/OpeningQtyView"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "openCostAfter": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "brokerCost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "costDelta": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "costNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What rebuilding a holding's lots from its trades does. `Status`: `ok` (the lots would change), `unchanged`, `quantity_mismatch` (see `Reason`: `negative_opening`, `sell_exceeds_open`,\n`fractional_after_adjustment`; nothing is applied), `no_holding`, `ambiguous`. `Q` is the broker's quantity, `Net` bought minus sold (today's shares). `HandDatedLotsReplaced` counts the lots whose date the owner chose\nand `SyncLotsReplaced` the lots a sync added, among the `LotsBefore` lots that an `ok` rebuild replaces by `LotsAfter` lots. `RealisedPnl` is the profit of the pieces the trades sold. `AdjustedFor` counts the corporate\nactions that changed a trade. `Digest` fingerprints this rebuild. `OpenCostAfter` is what the open lots cost after the rebuild (Σ open quantity × unit cost; also for `unchanged`), `BrokerCost` the broker's `Q × A`\nand `CostDelta` their difference. The open quantities always add up to `Q`. With no sales in the file and an opening lot (the file does not explain the whole holding) `CostDelta` is 0, to within the rounding of the opening\nlot's unit cost to 4 decimals (0.0001 × its quantity); with sales — or without an opening lot — the first-in first-out cost basis of the trades can differ from the broker's average-cost figure (brokers keep the average by the\nweighted-average-cost method, a sale does not change it), which is shown, not hidden. `CostNote` is `opening_cost_fallback` when the trades cost more than the broker's average cost allows and the opening lot therefore costs the\naverage cost. The four are null unless the trades fit (`ok` or `unchanged`)."
+      },
+      "TradeSecurityView": {
+        "required": [
+          "symbol",
+          "isin",
+          "matched",
+          "holdingId",
+          "trades",
+          "buys",
+          "sells",
+          "firstTradeDate",
+          "lastTradeDate",
+          "rebuild"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "matched": {
+            "type": "boolean"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "buys": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sells": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstTradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "lastTradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "rebuild": {
+            "$ref": "#/components/schemas/TradeRebuildView"
+          }
+        },
+        "description": "A security of the file: its trades in the file and, when the account holds it, what the rebuild would do. `Matched` is true when it is a holding of the account or an NSE share or ETF of the master list."
+      },
+      "TradeSkipped": {
+        "required": [
+          "total",
+          "byReason"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byReason": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "description": "Rows of the file that were left out because they are not NSE equity trades: how many, and how many for each reason (`derivatives`, `commodity`, `currency`, `bse`, `non_equity`)."
+      },
+      "TradeUndoResult": {
+        "required": [
+          "batch",
+          "alreadyUndone",
+          "voided",
+          "holdingsRebuilt",
+          "lotsReplaced",
+          "holdingsNotRebuilt",
+          "dryRun",
+          "applied",
+          "handDatedLotsReplaced",
+          "syncLotsReplaced",
+          "notRebuilt"
+        ],
+        "type": "object",
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/TradeBatchView"
+          },
+          "alreadyUndone": {
+            "type": "boolean"
+          },
+          "voided": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdingsRebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdingsNotRebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "handDatedLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "syncLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notRebuilt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeNotRebuilt"
+            }
+          }
+        },
+        "description": "What undoing a batch did — or, with `DryRun`, would do (nothing is changed then; `Applied` is false). Undoing a batch again is a no-op (`AlreadyUndone`). Holdings whose lots came from trades are rebuilt from the remaining\ntrades; `NotRebuilt` lists those that could not be (a mismatch, or ambiguous) and keep their lots, `HoldingsNotRebuilt` counts them. <b>An undo cannot bring back</b> lots the owner dated by hand or a sync added that an\nearlier rebuild replaced: the holding returns to one default-dated lot of the broker's quantity and cost (or to the shape of the remaining trades); `HandDatedLotsReplaced` and `SyncLotsReplaced` count what the rebuild\nremoves (the lots of the holdings it rebuilds)."
+      },
+      "TradeUploadForm": {
+        "required": [
+          "accountId",
+          "file",
+          "rebuild",
+          "digest"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file": {
+            "$ref": "#/components/schemas/IFormFile"
+          },
+          "rebuild": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "digest": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The multipart form of the trade preview and import, for the API contract only (the request is read by TradeUploads). `AccountId` is the account, `File` the tradebook (CSV), `Rebuild` and `Digest` are\nfor the import: whether to rebuild the lots (default true) and the digest of the preview, which is required with a rebuild."
+      },
+      "TradeView": {
+        "required": [
+          "id",
+          "accountId",
+          "symbol",
+          "isin",
+          "exchange",
+          "side",
+          "tradeDate",
+          "tradeTime",
+          "qty",
+          "price",
+          "charges",
+          "source",
+          "batchId",
+          "createdBy",
+          "createdAt",
+          "voided",
+          "voidedAt",
+          "voidedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "tradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "tradeTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "charges": {
+            "type": "number",
+            "format": "double"
+          },
+          "source": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voided": {
+            "type": "boolean"
+          },
+          "voidedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "voidedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A trade. `Side` is `buy` or `sell`, `Source` is `csv` or `manual`. A voided trade does not count."
+      },
       "TradingInput": {
         "required": [
           "mode",
@@ -13199,6 +16802,9 @@
       "name": "Holdings"
     },
     {
+      "name": "Portfolio"
+    },
+    {
       "name": "Data"
     },
     {
@@ -13209,6 +16815,9 @@
     },
     {
       "name": "Services"
+    },
+    {
+      "name": "Trades"
     }
   ]
 }

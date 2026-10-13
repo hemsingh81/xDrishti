@@ -10,6 +10,9 @@ export type ProblemKind =
   | 'conflict'
   | 'invalid'
   | 'not_found'
+  | 'alert_limit'
+  | 'preview_stale'
+  | 'lot_from_trade'
   | 'broker_error'
   | 'network'
   | 'other';
@@ -24,6 +27,9 @@ const byCode: Record<string, ProblemKind> = {
   'portfolio.conflict': 'conflict',
   'portfolio.invalid': 'invalid',
   'portfolio.not_found': 'not_found',
+  'portfolio.alert_limit': 'alert_limit',
+  'portfolio.preview_stale': 'preview_stale',
+  'portfolio.lot_from_trade': 'lot_from_trade',
   'accounts.broker_error': 'broker_error',
 };
 
@@ -40,6 +46,10 @@ const friendly: Partial<Record<ProblemKind, string>> = {
     'This account has no portfolio bucket to put holdings in. Switch its Portfolio role off and on again in Accounts.',
   sync_running: 'A sync or import of this account is already running. Wait a moment for it to finish.',
   conflict: 'The lot was changed or closed meanwhile. Reload and try again.',
+  preview_stale: 'Holdings or trades changed — please review again.',
+  lot_from_trade:
+    'This lot comes from your trades, so its date follows them. Change the trades and rebuild the lots instead.',
+  alert_limit: 'You have reached the limit of 200 active alerts. Cancel one you no longer need, then set this one.',
   broker_error: 'Dhan could not be reached right now. Try again in a moment.',
   network: 'Could not reach the server. Check your connection and try again.',
 };
@@ -82,6 +92,15 @@ export function confirmationOf(error: unknown): Confirmation | null {
 export function fieldMessages(error: unknown): Record<string, string> {
   const errors = error instanceof ApiError ? error.problem?.errors : undefined;
   return errors ? Object.fromEntries(Object.entries(errors).map(([field, list]) => [field, list.join(' ')])) : {};
+}
+
+/**
+ * The history call refuses a scope with too many bars (400 `portfolio.invalid`, field `scope`): the message of the field,
+ * else null. The server's guard does not depend on the range, so neither a chip nor Retry clears it: the screen shows the
+ * server's own words (which carry the advice) and no Retry.
+ */
+export function scopeTooLarge(error: unknown): string | null {
+  return problemKind(error) === 'invalid' ? (fieldMessages(error).scope ?? null) : null;
 }
 
 /** Where to fix a connection problem: the account's tab in Accounts. */

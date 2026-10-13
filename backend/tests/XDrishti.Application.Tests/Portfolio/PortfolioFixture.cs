@@ -2,9 +2,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Refresh;
+using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Application.Tests.Accounts.Connections;
+using XDrishti.Application.Tests.Portfolio.Groups;
+using XDrishti.Application.Tests.Portfolio.History;
+using XDrishti.Application.Tests.Portfolio.Trades;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Portfolio;
@@ -42,13 +47,50 @@ internal sealed class PortfolioFixture
 
     public HoldingsImporter Importer => Connections.Accounts.Importer;
 
-    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Clock, NullLogger<SyncHoldingsHandler>.Instance);
+    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Reconciler(), Clock, NullLogger<SyncHoldingsHandler>.Instance);
 
-    public ListHoldingsHandler List() => new(Data, Clock);
+    /// <summary>The Action-center reconciliation a sync ends with; there are no decisions in these tests, so it reads them (none) and stops.</summary>
+    public ActionReconciler Reconciler() => new(
+        new ActionEvaluator(Data, Classifications, Actions, Actions, Benchmarks, Prices, new FakeTradingCalendar(HistoryData.Weekdays), Clock), Actions, Clock, NullLogger<ActionReconciler>.Instance);
 
-    public GetHoldingsSummaryHandler Summary() => new(Data, Data, Accounts, Clock);
+    public XDrishti.Application.Tests.Portfolio.Actions.InMemoryActionData Actions { get; } = new();
+
+    /// <summary>The master's sectors and the baskets' members of the holdings' instruments (empty: every holding is unclassified and in no basket).</summary>
+    public FakeHoldingClassifications Classifications { get; } = new();
+
+    public ListHoldingsHandler List() => new(Data, Classifications, Clock);
+
+    public GetHoldingGroupsHandler Groups() => new(Data, Classifications, Clock, NullLogger<GetHoldingGroupsHandler>.Instance);
+
+    /// <summary>The benchmark setting and the stored day closes the summary's benchmark XIRR reads (empty: no benchmark index).</summary>
+    public FakePortfolioBenchmark Benchmarks { get; } = new();
+
+    public FakePortfolioPrices Prices { get; } = new();
+
+    public GetHoldingsSummaryHandler Summary() => new(Data, Data, Accounts, Benchmarks, Prices, new FakeTradingCalendar(HistoryData.Weekdays), Clock);
 
     public GetHoldingLotsHandler Lots() => new(Data, Clock);
+
+    /// <summary>The trades, their import batches, the master list's shares and the applied corporate actions (ADR 0023).</summary>
+    public InMemoryTradeData Trades { get; } = new();
+
+    public TradeWorkspace Workspace => new(Accounts, Data, Trades, Trades, Accounts);
+
+    public PreviewTradesHandler PreviewTrades() => new(Workspace, Clock, NullLogger<PreviewTradesHandler>.Instance);
+
+    public ImportTradesHandler ImportTrades() => new(Workspace, Trades, Trades, Data, Accounts, Data, Clock, NullLogger<ImportTradesHandler>.Instance);
+
+    public ListTradeBatchesHandler ListTradeBatches() => new(Trades, Accounts);
+
+    public UndoTradeBatchHandler UndoTradeBatch() => new(Workspace, Trades, Trades, Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UndoTradeBatchHandler>.Instance);
+
+    public ListHoldingTradesHandler ListHoldingTrades() => new(Data, Trades);
+
+    public AddManualTradeHandler AddManualTrade() => new(Accounts, Data, Trades, Trades, Accounts, Data, Clock, NullLogger<AddManualTradeHandler>.Instance);
+
+    public VoidTradeHandler VoidTrade() => new(Trades, Accounts, Accounts, Data, Clock, NullLogger<VoidTradeHandler>.Instance);
+
+    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Trades, Accounts, Data, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
 
     public UpdateLotDateHandler UpdateLotDate() => new(Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UpdateLotDateHandler>.Instance);
 

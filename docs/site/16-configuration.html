@@ -229,6 +229,15 @@ portfolio:
   benchmark: NIFTY 50
   min_days_for_xirr: 30
   alerts: { max_position_weight_pct: 15, bucket_drawdown_pct: 10, results_within_days: 3, day_move_pct: 5 }
+  action_center:                           # built in P2-09 (ADR 0022): stored in the database (platform.app_settings, key portfolio.action_thresholds), edited in Settings; ranges are fixed in code
+    below_cost_pct: 10                     # 1-90; medium at or below -N %
+    below_cost_high_pct: 20                # 2-95, above below_cost_pct; high at or below -N %
+    gain_pct: 25                           # 1-1000
+    overweight: { floor_pct: 15, multiple: 1.5, min_positions: 3 }   # floor 1-100, multiple 1-10, positions 2-50
+    concentration_pct: 35                  # 5-100
+    lagging: { pp: 10, days: 180 }         # points 1-100, days 30-3650
+    long_term_window_days: 30              # 1-365
+  price_alerts: { max_active: 200, checked: quotes_tick }   # one-shot; checked on the last price of every holdings-quotes tick (5 min in market hours)
 
 timeframes:
   enabled: [5m, 10m, 15m, 30m, 1h, 1D]
@@ -389,18 +398,42 @@ Broker API keys, secrets and tokens are not configuration: they are entered in t
 </thead>
 <tbody><tr>
 <td><code>Instruments:AutoRefresh:Enabled</code> (<code>Instruments__AutoRefresh__Enabled</code>; compose: <code>XD_INSTRUMENTS_AUTO_REFRESH</code>)</td>
-<td>The API refreshes the master list from Dhan&#39;s public scrip master by itself once a day</td>
+<td><strong>First-start setting</strong> (ADR 0018): whether the master list is refreshed by itself once a day. Read once, when the service <code>instrument-master</code> has no stored row; after that the Services screen is the only place to change it</td>
 <td><code>true</code></td>
 <td>boolean</td>
 </tr>
 <tr>
 <td><code>Instruments:AutoRefresh:TimeIst</code> (<code>Instruments__AutoRefresh__TimeIst</code>; compose: <code>XD_INSTRUMENTS_REFRESH_TIME_IST</code>)</td>
-<td>Time of the daily run as <code>HH:mm</code> (24-hour), <strong>India time</strong> (UTC+05:30, no daylight saving); Dhan publishes the file around 08:20</td>
+<td><strong>First-start setting</strong> (read once, like the switch above): time of the daily run as <code>HH:mm</code> (24-hour), <strong>India time</strong> (UTC+05:30, no daylight saving); Dhan publishes the file around 08:20</td>
 <td><code>08:45</code></td>
 <td>required, validated at start (<code>ValidateOnStart</code>): a wrong value stops the API with a message</td>
 </tr>
 </tbody></table>
 <p>The two source URLs are not configuration: they are fixed in the code and on the allow-list (<a href="05-data-and-brokers.html">doc 05</a> §7.1, <a href="17-deployment-and-operations.html">doc 17</a> §3). The manual &quot;Refresh list&quot; button works whether the daily run is on or off.</p>
+<h3 id="end-of-day-run-dataeod-adr-0017-2-adr-0018">End-of-day run (<code>Data:Eod:*</code>, ADR 0017 §2, ADR 0018)<a class="hash" href="#end-of-day-run-dataeod-adr-0017-2-adr-0018" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option (<code>appsettings</code> / environment)</th>
+<th>Meaning</th>
+<th>Default</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Data:Eod:Enabled</code> (<code>Data__Eod__Enabled</code>)</td>
+<td><strong>First-start setting</strong>: whether the service <code>eod</code> is on. Read once, when it has no stored row; after that the Services screen is the only place to change it</td>
+<td><code>true</code></td>
+<td>boolean</td>
+</tr>
+<tr>
+<td><code>Data:Eod:TimeIst</code> (<code>Data__Eod__TimeIst</code>)</td>
+<td><strong>First-start setting</strong> (read once, like the switch above): time of the run as <code>HH:mm</code> (24-hour), <strong>India time</strong>; a run never starts before that day&#39;s session has ended</td>
+<td><code>15:50</code></td>
+<td>required, validated at start</td>
+</tr>
+</tbody></table>
+<p>The other <code>Data:*</code> options (CSV folder and limits, Dhan fetch, gap look-back, data quality thresholds) are ordinary configuration and unchanged.</p>
 <h3 id="holdings-refresh-portfolio-adr-0012-p2-01">Holdings refresh (<code>Portfolio:*</code>, ADR 0012, P2-01)<a class="hash" href="#holdings-refresh-portfolio-adr-0012-p2-01" aria-label="Link to this section">#</a></h3>
 <table>
 <thead>
@@ -497,12 +530,13 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-12 17:51</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-13 17:50</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>
 <a href="#3-infrastructure-settings-appsettingsjson-excerpt" class="d2">3. Infrastructure settings (appsettings.json excerpt)</a>
 <a href="#instrument-master-instruments-adr-0010-p1-03" class="d3">Instrument master (Instruments:*, ADR 0010, P1-03)</a>
+<a href="#end-of-day-run-dataeod-adr-0017-2-adr-0018" class="d3">End-of-day run (Data:Eod:*, ADR 0017 §2, ADR 0018)</a>
 <a href="#holdings-refresh-portfolio-adr-0012-p2-01" class="d3">Holdings refresh (Portfolio:*, ADR 0012, P2-01)</a>
 <a href="#4-most-used-settings" class="d2">4. Most-used settings</a></aside>
 </div>

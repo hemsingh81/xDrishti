@@ -10,7 +10,7 @@ internal sealed class HoldingLotConfiguration : IEntityTypeConfiguration<Holding
     {
         builder.ToTable("holding_lots", Schemas.Portfolio, t =>
         {
-            t.HasCheckConstraint("ck_holding_lots_source", "source IN ('import', 'added', 'manual')");
+            t.HasCheckConstraint("ck_holding_lots_source", "source IN ('import', 'added', 'manual', 'trade')");
             t.HasCheckConstraint("ck_holding_lots_qty", "qty > 0");
             t.HasCheckConstraint("ck_holding_lots_unit_cost", "unit_cost >= 0");
             // A lot is closed as a whole: day and price are both set or both missing.

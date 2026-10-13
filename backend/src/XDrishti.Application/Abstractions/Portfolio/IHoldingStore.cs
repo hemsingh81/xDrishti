@@ -15,4 +15,10 @@ public interface IHoldingStore
     ValueTask<Holding?> FindAsync(Guid holdingId, CancellationToken cancellationToken);
 
     void Add(Holding holding);
+
+    /// <summary>
+    /// Marks the holding's row as changed although only its lots changed, so that saving checks the row's concurrency token: a sync or a quote that changed the holding since it was read makes the save fail instead of being overwritten
+    /// (see <see cref="IPortfolioUnitOfWork.RunAsync"/>, which then runs the work again).
+    /// </summary>
+    void Touch(Holding holding);
 }

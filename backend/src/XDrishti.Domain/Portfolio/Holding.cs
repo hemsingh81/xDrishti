@@ -206,11 +206,85 @@ public sealed class Holding : Entity<Guid>
         return true;
     }
 
-    /// <summary>Sets the acquisition date of one lot (checked against <paramref name="today"/>, India).</summary>
+    /// <summary>
+    /// True when the lots carry facts from trades (ADR 0023): a lot made from a buy, or a piece closed at a real sale price. Such a holding was rebuilt from its trades; the re-dating of the default-dated lots leaves it alone
+    /// and the date of its opening lot must stay before its first trade.
+    /// </summary>
+    public bool HasTradeLots => _lots.Any(l => l.Source == LotSource.Trade || (l.ClosedOn is not null && !l.Estimated));
+
+    /// <summary>The day of the earliest trade the lots show (a trade lot's date, or the day a really-sold piece was closed); null when the holding has no trade lots.</summary>
+    public DateOnly? EarliestTradeDate => _lots
+        .Where(l => l.Source == LotSource.Trade || (l.ClosedOn is not null && !l.Estimated))
+        .Select(l => l.Source == LotSource.Trade ? l.AcquiredOn : l.ClosedOn!.Value)
+        .Cast<DateOnly?>()
+        .Min();
+
+    /// <summary>
+    /// Sets the acquisition date of one lot (checked against <paramref name="today"/>, India). A lot made from a trade takes its date from the trade and refuses (<c>portfolio.lot_from_trade</c>); on a holding
+    /// rebuilt from trades the opening lot (imported, not made from a trade) must stay before the earliest trade.
+    /// </summary>
     public Result ChangeLotDate(Guid lotId, DateOnly date, DateOnly today)
     {
         var lot = _lots.FirstOrDefault(l => l.Id == lotId);
-        return lot is null ? Result.Failure(PortfolioErrors.LotNotFound) : lot.ChangeDate(date, today);
+        if (lot is null)
+        {
+            return Result.Failure(PortfolioErrors.LotNotFound);
+        }
+
+        if (lot.Source == LotSource.Trade)
+        {
+            return Result.Failure(PortfolioErrors.LotFromTrade);
+        }
+
+        if (lot.Source == LotSource.Import && EarliestTradeDate is { } earliest && date >= earliest)
+        {
+            return Result.Failure(PortfolioErrors.Invalid("acquiredOn", $"The opening lot is from before the first trade: choose a date before {earliest:yyyy-MM-dd}."));
+        }
+
+        return lot.ChangeDate(date, today);
+    }
+
+    /// <summary>
+    /// Replaces all lots by the plan of a rebuild from trades (ADR 0023): the old lots are removed, the planned ones created in the planned order (each a microsecond apart, so that first-in first-out stays stable).
+    /// The open quantities of the plan must add up to the broker's quantity; a closed piece is closed on or after its acquisition day, at a real (not estimated) price.
+    /// </summary>
+    public void ReplaceLots(IReadOnlyList<LotPlan> plan, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        if (Status != HoldingStatus.Open)
+        {
+            throw new InvalidOperationException("Lots of a closed holding are not rebuilt.");
+        }
+
+        if (plan.Where(p => p.IsOpen).Sum(p => p.Qty) != Qty)
+        {
+            throw new ArgumentException("The open quantities of the plan must add up to the holding's quantity.", nameof(plan));
+        }
+
+        var fresh = new List<HoldingLot>(plan.Count);
+        for (var i = 0; i < plan.Count; i++)
+        {
+            var step = plan[i];
+            var lot = HoldingLot.Open(Id, step.AcquiredOn, step.Qty, Round(step.UnitCost), step.Source, step.UsesDefaultDate, now.AddTicks(i * TimeSpan.TicksPerMicrosecond));
+            if (step is { ClosedOn: { } closedOn, ClosePrice: { } closePrice })
+            {
+                if (closedOn < step.AcquiredOn)
+                {
+                    throw new ArgumentException("A piece cannot be closed before it was acquired.", nameof(plan));
+                }
+
+                lot.Close(closedOn, Round(closePrice), estimated: false);
+            }
+            else if (!step.IsOpen)
+            {
+                throw new ArgumentException("A closed piece has a close price.", nameof(plan));
+            }
+
+            fresh.Add(lot);
+        }
+
+        _lots.Clear();
+        _lots.AddRange(fresh);
     }
 
     /// <summary>
@@ -222,6 +296,12 @@ public sealed class Holding : Entity<Guid>
     {
         var redated = 0;
         var skipped = 0;
+        if (HasTradeLots)
+        {
+            // Rebuilt from trades (ADR 0023): the opening lot was dated before the first trade, a later first import date must not move it. Counted as skipped.
+            return new LotRedating(0, _lots.Count(l => l.Source == LotSource.Import && l.UsesDefaultDate));
+        }
+
         foreach (var lot in _lots.Where(l => l.Source == LotSource.Import && l.UsesDefaultDate))
         {
             if (lot.RedateDefault(date))

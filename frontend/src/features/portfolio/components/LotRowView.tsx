@@ -5,11 +5,20 @@ import type { LotRow } from '@/shared/api';
 import { formatDate, formatInr, formatInrPrecise, formatNumber } from '@/shared/lib/format';
 import { numeric } from '@/theme';
 import { Pnl, Xirr } from './Figures';
+import { FromTradesLock } from './FromTradesLock';
 import { LotDateEditor } from './LotDateEditor';
 
-const sourceLabels: Record<string, string> = { import: 'Imported', added: 'Added by sync', manual: 'Date edited' };
+const sourceLabels: Record<string, string> = {
+  import: 'Imported',
+  added: 'Added by sync',
+  manual: 'Date edited',
+  trade: 'From trades',
+};
 
-function Acquired({ holdingId, lot }: { holdingId: string; lot: LotRow }) {
+/** The lot that the trades do not explain: it is dated before the first trade, and its date can still be edited. */
+const openingLabel = 'Before the first trade';
+
+function Acquired({ holdingId, lot, opening }: { holdingId: string; lot: LotRow; opening: boolean }) {
   const [editing, setEditing] = useState(false);
   const name = formatDate(lot.acquiredOn);
   if (editing) {
@@ -28,17 +37,21 @@ function Acquired({ holdingId, lot }: { holdingId: string; lot: LotRow }) {
     <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.25 }}>
       <time dateTime={lot.acquiredOn}>{name}</time>
       {lot.usesDefaultDate && <Chip size="small" variant="outlined" color="warning" label="Default date" />}
-      <IconButton
-        size="small"
-        aria-label={`Edit the date of the lot bought on ${name}`}
-        onClick={() => {
-          setEditing(true);
-        }}
-      >
-        <EditIcon fontSize="small" />
-      </IconButton>
+      {lot.source === 'trade' ? (
+        <FromTradesLock lotName={name} />
+      ) : (
+        <IconButton
+          size="small"
+          aria-label={`Edit the date of the lot bought on ${name}`}
+          onClick={() => {
+            setEditing(true);
+          }}
+        >
+          <EditIcon fontSize="small" />
+        </IconButton>
+      )}
       <Typography component="span" variant="caption" color="text.secondary">
-        {sourceLabels[lot.source] ?? lot.source}
+        {opening ? openingLabel : (sourceLabels[lot.source] ?? lot.source)}
       </Typography>
     </Stack>
   );
@@ -61,12 +74,12 @@ function Status({ lot }: { lot: LotRow }) {
 const number = { ...numeric, textAlign: 'right', whiteSpace: 'nowrap' } as const;
 
 /** One lot: when it was bought (editable), how much, what it cost and how it did. */
-export function LotRowView({ holdingId, lot }: { holdingId: string; lot: LotRow }) {
+export function LotRowView({ holdingId, lot, opening = false }: { holdingId: string; lot: LotRow; opening?: boolean }) {
   const { returns } = lot;
   return (
     <TableRow>
       <TableCell sx={{ minWidth: 200 }}>
-        <Acquired holdingId={holdingId} lot={lot} />
+        <Acquired holdingId={holdingId} lot={lot} opening={opening} />
       </TableCell>
       <TableCell sx={number}>{formatNumber(lot.qty)}</TableCell>
       <TableCell sx={number}>{formatInrPrecise(lot.unitCost)}</TableCell>

@@ -373,8 +373,8 @@ has no effect on scheduled work.</li>
 </tr>
 <tr>
 <td>Holdings quote refresh</td>
-<td>Every 5 min, 09:15–15:30</td>
-<td><code>xd-feed</code></td>
+<td>Every 5 min, 09:15–15:30 on trading days; <strong>built</strong> as the service <code>holdings-quotes</code> (P2-06, <a href="../adr/0019-holdings-quotes-day-change-and-the-first-interval-service.html">ADR 0019</a>; the first <code>interval</code> service: retries 0, timeout 2 min, no catch-up, overlapping ticks dropped)</td>
+<td><code>xd-api</code> today (<code>xd-feed</code> later)</td>
 </tr>
 <tr>
 <td><strong>Pre-open check &amp; arming</strong></td>
@@ -388,8 +388,8 @@ has no effect on scheduled work.</li>
 </tr>
 <tr>
 <td>End-of-day fetch &amp; aggregation (with gap backfill)</td>
-<td>15:50 on trading days of the calendar (<a href="05-data-and-brokers.html">doc 05</a> §6; built in <code>xd-api</code> as a hosted service until the services framework P1-13 moves it, switch <code>Data:Eod:Enabled</code>, time <code>Data:Eod:TimeIst</code>)</td>
-<td><code>xd-worker</code></td>
+<td>15:50 on trading days of the calendar, never before the session has ended (<a href="05-data-and-brokers.html">doc 05</a> §6; <strong>built</strong> as the service <code>eod</code> (P1-13): the job <code>dhan → aggregate → quality</code>, trigger <code>daily</code>)</td>
+<td><code>xd-api</code> today (<code>xd-worker</code> later)</td>
 </tr>
 <tr>
 <td>Data validation</td>
@@ -398,8 +398,8 @@ has no effect on scheduled work.</li>
 </tr>
 <tr>
 <td>Account &amp; portfolio sync</td>
-<td>16:30</td>
-<td><code>xd-worker</code></td>
+<td>16:30 (designed); <strong>built</strong> per account, once a day at the time set under Accounts (<a href="../adr/0013-portfolio-import-with-settings-and-daily-refresh.html">ADR 0013</a>) and shown on the Services screen as a <strong>read-only row</strong> with a link</td>
+<td><code>xd-api</code> today</td>
 </tr>
 <tr>
 <td>Nightly pipeline → proposed plan</td>
@@ -427,7 +427,32 @@ has no effect on scheduled work.</li>
 <td><code>xd-backup</code></td>
 </tr>
 </tbody></table>
+<p><strong>Instrument master refresh</strong> (built, not in the table above): daily at 08:45, every day of the week; the service <code>instrument-master</code> (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>).</p>
 <h3 id="31-schedule-configuration">3.1 Schedule configuration<a class="hash" href="#31-schedule-configuration" aria-label="Link to this section">#</a></h3>
+<blockquote>
+<p><strong>Built (P1-13, <a href="../specs/P1-13-services-framework-and-services-screen.html">spec</a>, <a href="../adr/0018-services-framework-and-editable-schedules.html">ADR 0018</a>):</strong> the framework, the two first services and the API of the Services screen.</p>
+<ul>
+<li><strong>A service</strong> is a registered definition (id, name, <code>runsAs</code>, allowed schedule types, default schedule and execution settings, parameter schema with bounds, constraints <code>MustFollow</code> / <code>MustNotOverlap</code> / <code>MustCover</code>, a start-time advice) plus
+one row of the owner&#39;s choices in <code>platform.service_schedules</code> (enabled, schedule, retries, timeout, catch-up, notify on failure, parameters, <code>xmin</code> as revision, who and when). Without a row a service runs on its first-start settings.
+The two services built so far are <strong><code>eod</code></strong> (End-of-day data run) and <strong><code>instrument-master</code></strong> (Instrument master refresh); the others of the table above register themselves when they are built, and their checks apply from then on.</li>
+<li><strong>One scheduler</strong> (<code>ServiceScheduler</code>, a hosted service in <code>xd-api</code>) looks at the rows at least once a minute and at the next start, so an edit counts at the next look without a restart. A service runs at most once at a time (a start while it
+runs is recorded as a skipped run). Every attempt is a row of <code>platform.service_runs</code> (trigger <code>scheduled | catch_up | after | manual</code>); a failed attempt is retried up to <em>retries</em> times after 30 s, 2 min, 10 min, 30 min, 1 h (a sequence the previous process left in its back-off goes on after a restart); an attempt past
+the timeout is cancelled and recorded as failed (timed out; a job that cannot be cancelled and is still running is said so; a timeout is never retried); a run that succeeds starts the services set to run after it. At start-up the runs the previous process left running are closed as failed (interrupted) first, then each enabled
+service with catch-up on whose latest scheduled time passed without a run since is run once (<code>catch_up</code>: the same day for a daily job, 24 hours for a weekly one, any age for the instrument master); a paused service never catches up, not even
+when resumed. The same rule applies when the machine slept through a time. Pause stops scheduled, catch-up and run-after starts; <strong>Run now</strong> (trigger <code>manual</code>) still works.</li>
+<li><strong>First-start settings.</strong> <code>Data:Eod:Enabled</code> / <code>Data:Eod:TimeIst</code> and <code>Instruments:AutoRefresh:Enabled</code> / <code>TimeIst</code> are read <strong>once</strong>, when a service has no row, and stored as its row; after that the Services screen is the only place to change
+them and the configuration is ignored (a restart keeps the edit). Until the row exists the screen shows the configured values.</li>
+<li><strong>Checks</strong> (<code>ScheduleRules</code>, pure, over the whole set; the same rules answer the dry run): errors block saving — a type the service does not allow, an unreadable time, no day chosen, a window whose start is not before its end, an interval
+outside 1–120 minutes or longer than its window, a run-after chain that is circular or points at an always-on or unknown service, retries outside 0–5, a timeout outside 1–240 minutes, an unknown parameter or one out of its bounds;
+warnings are shown and allowed — a start before or after the advised time (the end-of-day fetch before 15:35), a window that does not cover what the definition requires, a run during market hours that must not, a service that should follow
+another and does not, a chain of more than three, two services at the same minute. A finding is reported on the service it is about, so moving the end-of-day time after a dependent service&#39;s own time warns on the dependent.</li>
+<li><strong>API</strong> (<code>/api/services</code>, session + CSRF, no step-up, every change audited as <code>ServiceScheduleChanged | ServicePaused | ServiceResumed | ServiceRunRequested</code> in the account events): list, one service, runs (newest first, the latest 200), timeline
+of a date, notices for the bell (<code>service_failed</code>, derived on read), save (optimistic revision, <code>409 services.revision_changed</code>), preview (issues + next three runs), restore default, pause, resume, run now (<code>202</code>, <code>409 services.already_running</code>).
+<code>services.invalid</code> carries <code>issues[]</code>; <code>services.read_only</code> for the per-account sync row.</li>
+<li><strong>Not in this slice:</strong> the <code>xd-worker</code> container (the scheduler runs in <code>xd-api</code>; moving it is a deployment change), services that do not exist yet, parameters for the two built services (the framework validates them against a service&#39;s
+schema; <code>eod</code> and <code>instrument-master</code> declare none yet), purging old runs.</li>
+</ul>
+</blockquote>
 <p>Each service has an editable schedule stored in the database (not in code):</p>
 <table>
 <thead>
@@ -583,7 +608,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-12 17:51</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-13 17:50</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

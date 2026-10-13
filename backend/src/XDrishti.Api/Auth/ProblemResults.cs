@@ -48,6 +48,14 @@ internal static class ProblemResults
             }
         }
 
+        if (error.Payload is { } payload)
+        {
+            foreach (var (name, value) in payload)
+            {
+                problem.Extensions[name] = value;
+            }
+        }
+
         if (error.Fields is { Count: > 0 } fields)
         {
             // Same shape as ASP.NET Core validation problems: "errors": { "<field>": ["message", ...] }.

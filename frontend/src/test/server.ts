@@ -23,7 +23,11 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { actionCenterHandlers } from './actionCenterFixtures';
+import { answerGroupHoldings, groupHandlers } from './groupFixtures';
+import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
+import { tradeHandlers } from './tradeFixtures';
 
 /** A made-up Dhan consent page URL (the documented form, with a fake consentAppId). */
 export const dhanAuthorizeUrl = 'https://auth.dhan.co/login/consentApp-login?consentAppId=fake-consent-0001';
@@ -77,9 +81,14 @@ export const handlers = [
   ),
   http.get('/api/instruments/:id/baskets', () => HttpResponse.json([])),
   // Portfolio (read side): holdings are searched in memory; writes (import, sync, date edits) are mocked per test.
-  http.get('/api/holdings', ({ request }) =>
-    HttpResponse.json(searchHoldings(sampleHoldings, new URL(request.url).searchParams)),
-  ),
+  http.get('/api/holdings', ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    // A list of one group (groupBy + groupKey, P2-08) answers that group's holdings; otherwise the whole scope.
+    return HttpResponse.json(
+      params.has('groupBy') ? answerGroupHoldings(params) : searchHoldings(sampleHoldings, params),
+    );
+  }),
+  ...groupHandlers,
   http.get('/api/holdings/summary', () => HttpResponse.json(buildSummary())),
   http.get('/api/holdings/:id/lots', ({ params }) => {
     const found = sampleHoldings.find((h) => h.id === params.id);
@@ -88,6 +97,12 @@ export const handlers = [
       : problemResponse({ title: 'The holding does not exist.', code: 'portfolio.not_found' }, 404);
   }),
   http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus())),
+  // The value history (P2-07): a complete one over the same holdings; tests of the History card replace it.
+  ...historyHandlers,
+  // The Action center, price alerts, thresholds and the Portfolio notices of the bell (P2-09): none by default.
+  ...actionCenterHandlers,
+  // Trades (P2-03): no imports and no trades of a holding by default; the trade fake brings stateful ones.
+  ...tradeHandlers,
   // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),

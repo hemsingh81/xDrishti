@@ -43,6 +43,10 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
 
     public void Add(Holding holding) => Holdings.Add(holding);
 
+    public void Touch(Holding holding)
+    {
+    }
+
     public ValueTask<IReadOnlyList<HoldingData>> ListAsync(HoldingFilter filter, CancellationToken cancellationToken)
     {
         var rows = Holdings.Select(Read).Where(x => x is not null).Select(x => x!.Value).Where(x => x.Account.ArchivedAt is null);

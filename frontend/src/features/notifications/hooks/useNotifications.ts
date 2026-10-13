@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { accountsQuery, useNow } from '@/features/accounts';
-import { dataNoticesQuery, serviceNoticesQuery } from '@/shared/api';
+import { dataNoticesQuery, portfolioNoticesQuery, serviceNoticesQuery } from '@/shared/api';
 import { deriveDataNotifications } from '../lib/deriveDataNotifications';
+import { derivePortfolioNotifications } from '../lib/derivePortfolioNotifications';
 import { deriveServiceNotifications } from '../lib/deriveServiceNotifications';
 import { compareNotifications, deriveNotifications, type AppNotification } from '../lib/deriveNotifications';
 
@@ -16,8 +17,8 @@ export interface NotificationsState {
 }
 
 /**
- * All current notifications: the accounts' (derived here from their state), the data notices and the service notices
- * (both derived by the API), most urgent first. The notices are polled lightly; when they cannot be read the account
+ * All current notifications: the accounts' (derived here from their state), the data, service and Portfolio notices
+ * (derived by the API), most urgent first. The notices are polled lightly; when they cannot be read the account
  * notifications still show.
  */
 export function useNotifications(): NotificationsState {
@@ -27,14 +28,17 @@ export function useNotifications(): NotificationsState {
   const noticeItems = notices.data?.items;
   const serviceNotices = useQuery(serviceNoticesQuery);
   const serviceItems = serviceNotices.data?.items;
+  const portfolioNotices = useQuery(portfolioNoticesQuery);
+  const portfolioItems = portfolioNotices.data?.items;
   const notifications = useMemo(
     () =>
       [
         ...deriveNotifications(data ?? [], now),
         ...deriveDataNotifications(noticeItems ?? []),
         ...deriveServiceNotifications(serviceItems ?? []),
+        ...derivePortfolioNotifications(portfolioItems ?? []),
       ].sort(compareNotifications),
-    [data, now, noticeItems, serviceItems],
+    [data, now, noticeItems, serviceItems, portfolioItems],
   );
   return {
     notifications,

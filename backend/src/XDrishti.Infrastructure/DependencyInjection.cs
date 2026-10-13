@@ -148,9 +148,21 @@ public static class DependencyInjection
         services.AddSingleton<IPortfolioRefreshSettings, PortfolioRefreshSettings>();
         services.AddScoped<IHoldingStore, HoldingStore>();
         services.AddScoped<IHoldingQueries, HoldingQueries>();
+        services.AddScoped<IHoldingClassifications, HoldingClassifications>();
         services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
+        services.AddScoped<ITradeStore, TradeStore>();
+        services.AddScoped<ITradeBatches, TradeBatches>();
+        services.AddScoped<ITradeReferenceData, TradeReferenceData>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
+        services.AddScoped<IActionStates, ActionStates>();
+        services.AddScoped<IActionSettings, ActionSettings>();
+        services.AddScoped<PriceAlertStore>();
+        services.AddScoped<IPriceAlerts>(sp => sp.GetRequiredService<PriceAlertStore>());
+        services.AddScoped<IPriceAlertStore>(sp => sp.GetRequiredService<PriceAlertStore>());
+        services.AddScoped<IPortfolioPrices, PortfolioPrices>();
+        services.AddScoped<IPortfolioBenchmark, PortfolioBenchmarkStore>();
+        services.AddSingleton<IPortfolioHistoryCache, PortfolioHistoryCache>();
         services.AddScoped<IInstrumentMapper, InstrumentMapper>();
     }
 

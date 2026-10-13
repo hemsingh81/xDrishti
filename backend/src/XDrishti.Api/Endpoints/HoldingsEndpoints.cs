@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Portfolio;
 
@@ -20,13 +21,18 @@ internal sealed class HoldingsEndpoints : IEndpointModule
 
         holdings.MapGet("/", ListAsync)
             .WithName("ListHoldings")
-            .WithSummary("Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100). Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote)")
+            .WithSummary("Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote)")
             .ProducesValidationProblem();
 
         holdings.MapGet("/summary", GetSummaryAsync)
             .WithName("GetHoldingsSummary")
             .WithSummary("Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync")
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        holdings.MapGet("/groups", GetGroupsAsync)
+            .WithName("GetHoldingGroups")
+            .WithSummary("The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0)")
+            .ProducesValidationProblem();
 
         holdings.MapGet("/{id:guid}/lots", GetLotsAsync)
             .WithName("GetHoldingLots")
@@ -35,8 +41,8 @@ internal sealed class HoldingsEndpoints : IEndpointModule
 
         holdings.MapPut("/{id:guid}/lots/{lotId:guid}", UpdateLotDateAsync)
             .WithName("UpdateHoldingLotDate")
-            .WithSummary("Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date")
-            .ProducesRejections(conflict: false);
+            .WithSummary("Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date. A lot rebuilt from trades (source trade) takes its date from the trade: 409 portfolio.lot_from_trade; the opening lot of such a holding must stay before the earliest trade: 400 portfolio.invalid, field acquiredOn")
+            .ProducesRejections(conflict: true);
 
         var account = api.MapGroup("/accounts/{id:guid}/holdings").WithTags("Holdings");
 
@@ -67,8 +73,23 @@ internal sealed class HoldingsEndpoints : IEndpointModule
         [FromQuery(Name = "q")] string? q = null,
         string? sort = null,
         int? page = null,
-        int? pageSize = null) =>
-        Respond(await handler.HandleAsync(new ListHoldingsQuery(new HoldingsRequest(accountId, bucketId, status, q, sort, page, pageSize)), cancellationToken), http);
+        int? pageSize = null,
+        string? groupBy = null,
+        string? groupKey = null) =>
+        Respond(await handler.HandleAsync(new ListHoldingsQuery(new HoldingsRequest(accountId, bucketId, status, q, sort, page, pageSize, groupBy, groupKey)), cancellationToken), http);
+
+    private static async Task<Results<Ok<HoldingGroups>, ProblemHttpResult>> GetGroupsAsync(
+        HttpContext http,
+        IQueryHandler<GetHoldingGroupsQuery, Result<HoldingGroups>> handler,
+        CancellationToken cancellationToken,
+        Guid? accountId = null,
+        Guid? bucketId = null,
+        string? status = null,
+        [FromQuery(Name = "q")] string? q = null,
+        string? by = null,
+        string? sort = null,
+        string? stackBy = null) =>
+        Respond(await handler.HandleAsync(new GetHoldingGroupsQuery(new HoldingGroupsRequest(accountId, bucketId, status, q, by, sort, stackBy)), cancellationToken), http);
 
     private static async Task<Results<Ok<HoldingsSummary>, ProblemHttpResult>> GetSummaryAsync(
         HttpContext http,

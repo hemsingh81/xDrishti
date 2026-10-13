@@ -28,6 +28,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<ServiceRun> ServiceRuns => Set<ServiceRun>();
 
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+
     public DbSet<OwnerAccount> OwnerAccounts => Set<OwnerAccount>();
 
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();
@@ -71,6 +73,14 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     public DbSet<HoldingLot> HoldingLots => Set<HoldingLot>();
 
     public DbSet<HoldingSync> HoldingSyncs => Set<HoldingSync>();
+
+    public DbSet<ActionState> ActionStates => Set<ActionState>();
+
+    public DbSet<PriceAlert> PriceAlerts => Set<PriceAlert>();
+
+    public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<TradeBatch> TradeBatches => Set<TradeBatch>();
 
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();

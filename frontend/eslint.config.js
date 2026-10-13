@@ -8,6 +8,23 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
+// The chart library is imported by exactly two modules (shared/ui/chart/EChartsCanvas.tsx for the line chart and
+// shared/ui/chart/CategoryChartCanvas.tsx for the donut and the bars), which their wrappers load with a dynamic import:
+// anything else importing it would pull it into another chunk (ADR 0020 §5, ADR 0021 §5).
+const featureIndexOnly = {
+  group: ['@/features/*/*'],
+  message: 'Import a feature only through its public index: @/features/<name>.',
+};
+const sharedIsLeaf = {
+  group: ['@/features/*', '@/app/*'],
+  message: 'shared/ and theme/ must not depend on features or app.',
+};
+const chartLibrary = {
+  group: ['echarts', 'echarts/*', 'zrender', 'zrender/*'],
+  message:
+    'Use <TimeSeriesChart> or <CategoryChart> from @/shared/ui/chart; only shared/ui/chart/EChartsCanvas.tsx and CategoryChartCanvas.tsx import the chart library.',
+};
+
 export default defineConfig([
   globalIgnores(['dist', 'coverage', 'src/shared/api/schema.d.ts']),
   {
@@ -36,13 +53,8 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
-            // Inside a feature use relative imports; from outside, only the feature's public index.
-            {
-              group: ['@/features/*/*'],
-              message: 'Import a feature only through its public index: @/features/<name>.',
-            },
-          ],
+          // Inside a feature use relative imports; from outside, only the feature's public index.
+          patterns: [featureIndexOnly, chartLibrary],
         },
       ],
     },
@@ -53,16 +65,26 @@ export default defineConfig([
       'no-restricted-imports': [
         'error',
         {
-          patterns: [
-            { group: ['@/features/*', '@/app/*'], message: 'shared/ and theme/ must not depend on features or app.' },
-          ],
+          patterns: [featureIndexOnly, sharedIsLeaf, chartLibrary],
         },
       ],
     },
   },
   {
+    // The two modules allowed to import the chart library.
+    files: ['src/shared/ui/chart/EChartsCanvas.tsx', 'src/shared/ui/chart/CategoryChartCanvas.tsx'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [featureIndexOnly, sharedIsLeaf] }],
+    },
+  },
+  {
     files: ['**/*.test.{ts,tsx}', 'src/test/**'],
-    rules: { 'max-lines': 'off', '@typescript-eslint/no-non-null-assertion': 'off' },
+    rules: {
+      'max-lines': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Test helpers export builders and components side by side; there is no fast refresh in tests.
+      'react-refresh/only-export-components': 'off',
+    },
   },
   {
     files: ['*.config.{js,ts}'],

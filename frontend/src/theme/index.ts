@@ -5,6 +5,8 @@ export { createAppTheme } from './theme';
 export {
   accountColors,
   basketColors,
+  categorical,
+  categoricalSeries,
   focusRing,
   iconChip,
   layout,

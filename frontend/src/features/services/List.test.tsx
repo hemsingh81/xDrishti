@@ -15,6 +15,7 @@ import {
   serviceRunId,
 } from '@/test/servicesFixtures';
 import { chooseAction, passMinutes, renderServices, serviceCard, servicesList, setNow } from './testing';
+import { pendingResponse } from '@/test/gate';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -258,7 +259,7 @@ describe('Services: an entry that is set elsewhere', () => {
 
 describe('Services: loading, errors and nothing to show', () => {
   it('shows a loading state until the list arrives', async () => {
-    renderServices({ handlers: [http.get('/api/services', () => new Promise<never>(() => undefined))] });
+    renderServices({ handlers: [http.get('/api/services', () => pendingResponse())] });
 
     expect(await screen.findByRole('progressbar', { name: 'Loading services' })).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Services' })).not.toBeInTheDocument();

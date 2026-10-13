@@ -298,7 +298,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 </tr>
 <tr>
 <td>Schedules</td>
-<td>Stored in the database (<code>ops.service_schedules</code>), edited on the Services screen with dependency validation; applied to Hangfire recurring jobs in <code>xd-worker</code> without restart</td>
+<td>Stored in the database (<code>platform.service_schedules</code>, runs in <code>platform.service_runs</code>), edited on the Services screen with dependency validation and applied at the scheduler&#39;s next look (at most a minute) without restart. Built (P1-13, <a href="../adr/0018-services-framework-and-editable-schedules.html">ADR 0018</a>): one <code>ServiceScheduler</code> hosted in <code>xd-api</code>; the Hangfire jobs of <code>xd-worker</code> follow when that container exists (a deployment change, not a design one)</td>
 </tr>
 <tr>
 <td>Database migrations</td>
@@ -392,7 +392,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-12 17:51</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-13 17:50</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

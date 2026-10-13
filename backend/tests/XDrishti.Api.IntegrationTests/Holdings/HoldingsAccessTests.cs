@@ -22,7 +22,10 @@ public sealed class HoldingsAccessTests(ApiFactory factory) : IAsyncLifetime
     {
         { "GET", "/api/holdings" },
         { "GET", "/api/holdings?accountId=" + "00000000-0000-0000-0000-000000000001&status=all&pageSize=10" },
+        { "GET", "/api/holdings?groupBy=sector&groupKey=Banks" },
         { "GET", "/api/holdings/summary" },
+        { "GET", "/api/holdings/groups?by=account" },
+        { "GET", "/api/holdings/groups?by=sector&stackBy=account&sort=-value" },
         { "GET", $"/api/holdings/{Id}/lots" },
         { "PUT", $"/api/holdings/{Id}/lots/{LotId}" },
         { "POST", $"/api/accounts/{Id}/holdings/preview" },

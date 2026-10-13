@@ -39,6 +39,20 @@ export const palettes = {
   },
 } as const satisfies Record<ColorMode, Record<string, string>>;
 
+/**
+ * Categorical palette for charts that colour categories (an allocation donut, a stacked bar): eight series colours and a
+ * ninth, a neutral, for "Other". Each is at least 3:1 against the card (`surface`) in its mode (`contrast.test.ts`), and the
+ * charts never rely on colour alone (names and percentages are in labels, legend and table). The light set is the
+ * darker, the dark set the lighter variant of the same hues.
+ */
+export const categorical = {
+  light: ['#4f46e5', '#c2410c', '#0f766e', '#db2777', '#0284c7', '#a16207', '#15803d', '#9333ea', '#64748b'],
+  dark: ['#818cf8', '#fb923c', '#2dd4bf', '#f472b6', '#38bdf8', '#fbbf24', '#4ade80', '#c084fc', '#94a3b8'],
+} as const satisfies Record<ColorMode, readonly string[]>;
+
+/** How many categories get their own colour; the next one (index `categoricalSeries`) is the neutral "Other". */
+export const categoricalSeries = 8;
+
 export const shape = { radius: 12, radiusSmall: 8, radiusLarge: 18 } as const;
 
 /** Dialog band padding (px) — from the prototype's `.dlg-h`, `.dlg-b`, `.dlg-f`. */

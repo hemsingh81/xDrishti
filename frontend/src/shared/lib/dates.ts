@@ -8,7 +8,8 @@ export const todayIso = (): string => istDayIso();
 
 const isoDay = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-function isRealDay(value: string): boolean {
+/** Whether `value` is a real calendar day written yyyy-MM-dd (no 31 February). */
+export function isRealDay(value: string): boolean {
   const match = isoDay.exec(value);
   if (!match) return false;
   const [, year, month, day] = match;

@@ -54,11 +54,15 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, InstrumentsEndpoints>();
         services.AddSingleton<IEndpointModule, BasketsEndpoints>();
         services.AddSingleton<IEndpointModule, HoldingsEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioHistoryEndpoints>();
         services.AddSingleton<IEndpointModule, DataEndpoints>();
         services.AddSingleton<IEndpointModule, DataQualityEndpoints>();
         services.AddSingleton<IEndpointModule, DataCsvEndpoints>();
         services.AddSingleton<IEndpointModule, CorporateActionEndpoints>();
         services.AddSingleton<IEndpointModule, ServicesEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioActionsEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioAlertsEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioTradesEndpoints>();
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes.
         services.AddHostedService<RefreshJobWorker>();

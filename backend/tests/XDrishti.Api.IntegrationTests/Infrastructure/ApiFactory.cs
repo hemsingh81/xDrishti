@@ -12,6 +12,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Api.Platform;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Auth;
 using XDrishti.Domain.Market.Baskets;
 using XDrishti.Infrastructure.Brokers;
@@ -75,6 +76,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Stands in for the Dhan Data API and the Data account when a test sets them; otherwise the real placeholders answer.</summary>
     public FakeDhan Dhan { get; } = new();
 
+    /// <summary>Lets a test change the data "meanwhile", inside the trade use cases' unit of work (see <see cref="TradeHooks"/>).</summary>
+    public TradeHooks TradeHooks { get; } = new();
+
     /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
     public string AdminConnectionString => _database.GetConnectionString();
 
@@ -132,6 +136,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             // The Dhan Data API source and the Data account: the real ones answer (over the fake Dhan server above) unless a test puts a fake in (FakeDhan).
             Dhan.Wrap(services);
+
+            // The trade use cases read the applied corporate actions inside their unit of work: a test can act at that moment (TradeHooks).
+            var reference = services.Single(d => d.ServiceType == typeof(ITradeReferenceData));
+            services.Remove(reference);
+            services.AddScoped<ITradeReferenceData>(sp => new HookedTradeReferenceData((ITradeReferenceData)ActivatorUtilities.CreateInstance(sp, reference.ImplementationType!), TradeHooks));
         });
     }
 
@@ -173,6 +182,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM portfolio.price_alerts;
+                DELETE FROM portfolio.action_states;
+                DELETE FROM portfolio.transactions;
+                DELETE FROM portfolio.trade_batches;
                 DELETE FROM portfolio.holding_lots;
                 DELETE FROM portfolio.holdings;
                 DELETE FROM portfolio.holding_syncs;
@@ -184,6 +197,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 """);
             return 0;
         });
+        Services.GetRequiredService<IPortfolioHistoryCache>().Invalidate();
     }
 
     /// <summary>
@@ -238,6 +252,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.quality_results;
                 DELETE FROM market.quality_runs;
                 DELETE FROM market.bar_gaps;
+                DELETE FROM platform.app_settings;
+                DELETE FROM portfolio.price_alerts;
+                DELETE FROM portfolio.action_states;
                 DELETE FROM market.corporate_actions;
                 DELETE FROM market.trading_days;
                 DELETE FROM market.csv_files;
@@ -247,7 +264,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
-                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%';
+                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%' OR event = 'PortfolioBenchmarkChanged' OR event LIKE 'Action%' OR event LIKE 'PriceAlert%';
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;
@@ -263,6 +280,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             return 0;
         });
+        Services.GetRequiredService<IPortfolioHistoryCache>().Invalidate();
     }
 
     /// <summary>Resets the owner to the factory's credentials: clears a lockout and ends every session. For tests that lock or change the account.</summary>

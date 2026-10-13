@@ -19,8 +19,18 @@ describe('filters', () => {
       status: 'all',
       q: 'tcs',
       sort: { field: 'pnl', descending: true },
+      groupBy: 'none',
     });
-    expect(parse('status=weird&sort=nonsense')).toEqual(emptyFilters);
+    expect(parse('status=weird&sort=nonsense&groupBy=planet')).toEqual(emptyFilters);
+  });
+
+  it('reads and writes the grouping; none is the default and is not written', () => {
+    expect(parse('groupBy=sector').groupBy).toBe('sector');
+    expect(parse('groupBy=none').groupBy).toBe('none');
+    expect(parse('groupBy=').groupBy).toBe('none');
+    expect(toParams({ ...emptyFilters, groupBy: 'basket' }).toString()).toBe('groupBy=basket');
+    expect(toParams({ ...emptyFilters, groupBy: 'none' }, new URLSearchParams('groupBy=basket')).toString()).toBe('');
+    expect(activeFilterCount({ ...emptyFilters, groupBy: 'account' })).toBe(0);
   });
 
   it('writes only what differs from the defaults and keeps other parameters', () => {

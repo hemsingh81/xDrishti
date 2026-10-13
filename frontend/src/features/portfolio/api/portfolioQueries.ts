@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
-import { api, unwrap, type HoldingRow } from '@/shared/api';
+import { api, queryRoots, unwrap, type HoldingRow } from '@/shared/api';
 import type { InfiniteRowsOptions } from '@/shared/lib/useInfiniteRows';
 import { formatSort, type PortfolioFilters } from '../lib/filters';
 
@@ -7,8 +7,20 @@ import { formatSort, type PortfolioFilters } from '../lib/filters';
 export const portfolioKeys = {
   all: ['portfolio'] as const,
   holdings: ['portfolio', 'holdings'] as const,
+  /** The groups of the Group by view and the holdings of each opened group (P2-08). */
+  groups: ['portfolio', 'groups'] as const,
   summary: ['portfolio', 'summary'] as const,
+  history: ['portfolio', 'history'] as const,
+  benchmark: ['portfolio', 'benchmark'] as const,
   lots: ['portfolio', 'lots'] as const,
+  /** The Action center's lists (P2-09). */
+  actions: queryRoots.portfolioActions,
+  /** Price alerts: the lists per status and their counts (P2-09). */
+  alerts: ['portfolio', 'alerts'] as const,
+  /** Trades (P2-03): the import history, a holding's trades and the dry run of a rebuild. */
+  trades: ['portfolio', 'trades'] as const,
+  /** Holdings and instruments looked up for a price (the alert dialog) or a row (the drawer). */
+  lookups: ['portfolio', 'lookups'] as const,
   lotsOf: (holdingId: string) => ['portfolio', 'lots', holdingId] as const,
   syncStatuses: ['portfolio', 'sync-status'] as const,
   syncStatus: (accountId: string) => ['portfolio', 'sync-status', accountId] as const,

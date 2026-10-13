@@ -13,6 +13,7 @@ import {
 } from '@/test/fixtures';
 import { problemResponse, server } from '@/test/server';
 import { renderPortfolio } from './testing';
+import { pendingResponse } from '@/test/gate';
 
 async function openInfy() {
   const view = renderPortfolio();
@@ -109,7 +110,7 @@ describe('Holding drawer', () => {
   });
 
   it('shows a progress indicator while the lots load', async () => {
-    server.use(http.get('/api/holdings/:id/lots', () => new Promise(() => undefined)));
+    server.use(http.get('/api/holdings/:id/lots', () => pendingResponse()));
     renderPortfolio(`?holding=${holdingIds.infy}`);
 
     const drawer = await screen.findByLabelText('Holding details');

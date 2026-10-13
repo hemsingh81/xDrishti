@@ -16,7 +16,7 @@
  * named by `label`; emptying the text clears the value too.
  */
 import { Autocomplete, Box, CircularProgress, TextField, Typography, createFilterOptions } from '@mui/material';
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, type ReactNode, type Ref } from 'react';
 import { formatNumber } from '@/shared/lib/format';
 
 export interface TypeaheadOption {
@@ -43,6 +43,8 @@ export interface TypeaheadProps {
   minWidth?: number;
   /** The options come from a search on the server: called as the owner types (and with '' when cleared). */
   onSearch?: (text: string) => void;
+  /** The text input, e.g. to put the keyboard on it when a dialog opens. */
+  inputRef?: Ref<HTMLInputElement>;
 }
 
 /** Case-insensitive substring on the label, ignoring leading/trailing spaces of the typed text; accents count. */
@@ -99,6 +101,7 @@ export function Typeahead({
   getOptionDisabled,
   minWidth = 220,
   onSearch,
+  inputRef,
 }: TypeaheadProps) {
   const known = options.find((o) => o.value === value);
   const kept: TypeaheadOption | null = value === null ? null : (known ?? { value, label: value });
@@ -132,6 +135,7 @@ export function Typeahead({
           {...params}
           label={label}
           placeholder={placeholder}
+          inputRef={inputRef}
           slotProps={{
             ...params.slotProps,
             inputLabel: { ...params.slotProps.inputLabel, shrink: true },

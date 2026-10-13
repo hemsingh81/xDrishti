@@ -1372,6 +1372,35 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Platform.AppSetting", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_app_settings");
+
+                    b.ToTable("app_settings", "platform");
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Platform.ServiceHeartbeat", b =>
                 {
                     b.Property<string>("Id")
@@ -1535,6 +1564,49 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_service_schedules_schedule", "schedule ->> 'type' IN ('daily', 'weekly', 'after', 'window', 'interval', 'continuous')");
 
                             t.HasCheckConstraint("ck_service_schedules_timeout", "timeout_minutes BETWEEN 1 AND 240");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.ActionState", b =>
+                {
+                    b.Property<string>("Rule")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("rule");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<DateOnly?>("SnoozedUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("snoozed_until");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Rule", "Key")
+                        .HasName("pk_action_states");
+
+                    b.ToTable("action_states", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_action_states_snoozed_until", "(state = 'snoozed') = (snoozed_until IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_action_states_state", "state IN ('snoozed', 'done', 'cleared')");
                         });
                 });
 
@@ -1730,7 +1802,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_holding_lots_qty", "qty > 0");
 
-                            t.HasCheckConstraint("ck_holding_lots_source", "source IN ('import', 'added', 'manual')");
+                            t.HasCheckConstraint("ck_holding_lots_source", "source IN ('import', 'added', 'manual', 'trade')");
 
                             t.HasCheckConstraint("ck_holding_lots_unit_cost", "unit_cost >= 0");
                         });
@@ -1818,6 +1890,284 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_holding_syncs_status", "status IN ('running', 'succeeded', 'failed', 'skipped')");
 
                             t.HasCheckConstraint("ck_holding_syncs_trigger", "trigger IN ('manual', 'auto', 'import')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.PriceAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("direction");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<decimal>("Level")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("level");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal?>("TriggerPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("trigger_price");
+
+                    b.Property<DateTimeOffset?>("TriggeredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("triggered_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_alerts");
+
+                    b.HasIndex("Status", "InstrumentId")
+                        .HasDatabaseName("ix_price_alerts_status_instrument");
+
+                    b.ToTable("price_alerts", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_price_alerts_direction", "direction IN ('at_or_below', 'at_or_above')");
+
+                            t.HasCheckConstraint("ck_price_alerts_level", "level > 0 AND level <= 10000000");
+
+                            t.HasCheckConstraint("ck_price_alerts_status", "status IN ('active', 'triggered', 'cancelled')");
+
+                            t.HasCheckConstraint("ck_price_alerts_triggered", "status <> 'triggered' OR (triggered_at IS NOT NULL AND trigger_price IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.TradeBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<int>("Bad")
+                        .HasColumnType("integer")
+                        .HasColumnName("bad");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("Duplicates")
+                        .HasColumnType("integer")
+                        .HasColumnName("duplicates");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Imported")
+                        .HasColumnType("integer")
+                        .HasColumnName("imported");
+
+                    b.Property<int>("Parsed")
+                        .HasColumnType("integer")
+                        .HasColumnName("parsed");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<int>("Skipped")
+                        .HasColumnType("integer")
+                        .HasColumnName("skipped");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("UndoneAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("undone_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trade_batches");
+
+                    b.HasIndex("AccountId", "CreatedAt")
+                        .HasDatabaseName("ix_trade_batches_account_created");
+
+                    b.ToTable("trade_batches", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_trade_batches_counts", "parsed >= 0 AND imported >= 0 AND duplicates >= 0 AND skipped >= 0 AND bad >= 0");
+
+                            t.HasCheckConstraint("ck_trade_batches_status", "status IN ('imported', 'undone')");
+
+                            t.HasCheckConstraint("ck_trade_batches_undone", "(status = 'undone') = (undone_at IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Transaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<decimal>("Charges")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("charges");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Exchange")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("exchange");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_id");
+
+                    b.Property<Guid?>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("Isin")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("price");
+
+                    b.Property<long>("Qty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qty");
+
+                    b.Property<int>("Seq")
+                        .HasColumnType("integer")
+                        .HasColumnName("seq");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("side");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("source");
+
+                    b.Property<DateOnly>("TradeDate")
+                        .HasColumnType("date")
+                        .HasColumnName("trade_date");
+
+                    b.Property<TimeOnly?>("TradeTime")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("trade_time");
+
+                    b.Property<string>("TradingSymbol")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trading_symbol");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
+                    b.Property<string>("VoidedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("voided_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transactions");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_transactions_batch");
+
+                    b.HasIndex("AccountId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_transactions_account_external_active")
+                        .HasFilter("voided_at IS NULL");
+
+                    b.HasIndex("AccountId", "Isin")
+                        .HasDatabaseName("ix_transactions_account_isin");
+
+                    b.HasIndex("AccountId", "TradingSymbol")
+                        .HasDatabaseName("ix_transactions_account_symbol");
+
+                    b.ToTable("transactions", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_transactions_charges", "charges >= 0");
+
+                            t.HasCheckConstraint("ck_transactions_price", "price > 0");
+
+                            t.HasCheckConstraint("ck_transactions_qty", "qty > 0");
+
+                            t.HasCheckConstraint("ck_transactions_side", "side IN ('buy', 'sell')");
+
+                            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual')");
+
+                            t.HasCheckConstraint("ck_transactions_voided", "(voided_at IS NULL) = (voided_by IS NULL)");
                         });
                 });
 
@@ -2597,6 +2947,32 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_holding_syncs_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.TradeBatch", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_trade_batches_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Transaction", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_transactions_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.TradeBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_transactions_trade_batches_batch_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Accounts.BrokerSecretRecord", b =>

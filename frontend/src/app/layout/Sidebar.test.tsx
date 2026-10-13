@@ -9,6 +9,7 @@ import { server } from '@/test/server';
 import { navHue } from '@/theme';
 import { allNavItems } from '../navigation';
 import { Sidebar } from './Sidebar';
+import { pendingResponse } from '@/test/gate';
 
 describe('Sidebar', () => {
   it('shows a coloured icon chip on every item, planned ones included', () => {
@@ -85,7 +86,7 @@ describe('Sidebar', () => {
     });
 
     it('shows no badge while the accounts load', () => {
-      server.use(http.get('/api/accounts', () => new Promise(() => undefined)));
+      server.use(http.get('/api/accounts', () => pendingResponse()));
       renderWithProviders(<Sidebar />);
 
       expect(screen.getByRole('link', { name: 'Accounts' })).toBeInTheDocument();

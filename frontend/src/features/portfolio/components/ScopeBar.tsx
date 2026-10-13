@@ -3,6 +3,7 @@ import type { AccountSummary, PortfolioBucket } from '@/shared/api';
 import { SearchField } from '@/shared/ui/SearchField';
 import { Typeahead, type TypeaheadOption } from '@/shared/ui/Typeahead';
 import { holdingStatuses, type HoldingStatus, type PortfolioFilters } from '../lib/filters';
+import { GroupByControl } from './GroupByControl';
 
 interface ScopeBarProps {
   filters: PortfolioFilters;
@@ -22,7 +23,7 @@ const accountOptions = (accounts: readonly AccountSummary[]): TypeaheadOption[] 
 const bucketOptions = (buckets: readonly PortfolioBucket[] | undefined): TypeaheadOption[] =>
   (buckets ?? []).map((b) => ({ value: b.id, label: b.name }));
 
-/** Which holdings: the account, the bucket, open or closed, and a search. Every change goes to the URL through `onChange`. */
+/** Which holdings and how they are listed: the account, the bucket, open or closed, a search and Group by. Every change goes to the URL through `onChange`. */
 export function ScopeBar({ filters, accounts, buckets, bucketsLoading, onChange }: ScopeBarProps) {
   return (
     <Card sx={{ mb: 2, flexShrink: 0 }}>
@@ -72,6 +73,12 @@ export function ScopeBar({ filters, accounts, buckets, bucketsLoading, onChange 
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
+          <GroupByControl
+            value={filters.groupBy}
+            onChange={(groupBy) => {
+              onChange({ groupBy });
+            }}
+          />
         </Stack>
       </CardContent>
     </Card>

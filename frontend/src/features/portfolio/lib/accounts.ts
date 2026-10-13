@@ -18,3 +18,11 @@ export function actingAccount(accounts: readonly AccountSummary[], selectedId: s
 /** Whether Dhan is signed in for the account right now (a token whose expiry has passed counts as not connected). */
 export const isConnected = (account: AccountSummary, nowMs: number): boolean =>
   connectionState(account.connection, nowMs).status === 'connected';
+
+/** The account the Trades panel and the Add trade dialog start with: the page's account, or the only one; '' = the owner chooses. */
+export function initialTradesAccount(accounts: readonly { id: string }[], scopeAccountId: string | null): string {
+  return (
+    accounts.find((account) => account.id === scopeAccountId)?.id ??
+    (accounts.length === 1 ? (accounts[0]?.id ?? '') : '')
+  );
+}

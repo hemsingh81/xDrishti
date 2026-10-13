@@ -16,6 +16,7 @@ import { renderRoutes } from '@/test/render';
 import { createStepUpGate, dhanAuthorizeUrl, problemResponse, server } from '@/test/server';
 import { AccountsPage } from './components/AccountsPage';
 import { HeaderAccounts } from './index';
+import { pendingResponse } from '@/test/gate';
 
 function renderHeader() {
   return renderRoutes(
@@ -252,7 +253,7 @@ describe('Header accounts', () => {
   });
 
   it('stays quiet while loading: the button is there but disabled', async () => {
-    server.use(http.get('/api/accounts', () => new Promise(() => undefined)));
+    server.use(http.get('/api/accounts', () => pendingResponse()));
     renderHeader();
 
     expect(await screen.findByRole('button', { name: /Accounts: Accounts/ })).toBeDisabled();

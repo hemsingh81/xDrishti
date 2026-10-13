@@ -22,6 +22,11 @@ export const sortFields = [
 ] as const;
 export type SortField = (typeof sortFields)[number];
 
+/** Group by: `none` is the flat holdings list (the default); the others group the holdings, one row per group (P2-08). */
+export const groupings = ['none', 'account', 'bucket', 'sector', 'basket'] as const;
+export type Grouping = (typeof groupings)[number];
+export type GroupBy = Exclude<Grouping, 'none'>;
+
 export interface SortState {
   field: SortField;
   descending: boolean;
@@ -37,6 +42,7 @@ export interface PortfolioFilters {
   status: HoldingStatus;
   q: string;
   sort: SortState;
+  groupBy: Grouping;
 }
 
 export const emptyFilters: PortfolioFilters = {
@@ -45,8 +51,10 @@ export const emptyFilters: PortfolioFilters = {
   status: 'open',
   q: '',
   sort: defaultSort,
+  groupBy: 'none',
 };
 
+const isGrouping = (value: string | null): value is Grouping => groupings.some((g) => g === value);
 const isStatus = (value: string | null): value is HoldingStatus => holdingStatuses.some((s) => s === value);
 /** True when `value` names a column the API can sort by. */
 export const isSortField = (value: string): value is SortField => sortFields.some((f) => f === value);
@@ -64,12 +72,14 @@ const nonEmpty = (value: string | null): string | null => (value === null || val
 /** Reads the page state from URL parameters; anything unknown or malformed falls back to the default. */
 export function parseFilters(params: URLSearchParams): PortfolioFilters {
   const status = params.get('status');
+  const groupBy = params.get('groupBy');
   return {
     account: nonEmpty(params.get('account')),
     bucket: nonEmpty(params.get('bucket')),
     status: isStatus(status) ? status : 'open',
     q: params.get('q') ?? '',
     sort: parseSort(params.get('sort')),
+    groupBy: isGrouping(groupBy) ? groupBy : 'none',
   };
 }
 
@@ -85,6 +95,7 @@ export function toParams(filters: PortfolioFilters, extra: URLSearchParams = new
   set('status', filters.status === 'open' ? null : filters.status);
   set('q', filters.q.trim() || null);
   set('sort', formatSort(filters.sort) === formatSort(defaultSort) ? null : formatSort(filters.sort));
+  set('groupBy', filters.groupBy === 'none' ? null : filters.groupBy);
   // The list loads as the owner scrolls: an old link's page and size are dropped.
   set('page', null);
   set('size', null);

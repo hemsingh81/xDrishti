@@ -52,7 +52,23 @@ export type Returns = Schemas['ReturnsView'];
 export type HoldingRow = Schemas['HoldingRow'];
 export type HoldingPage = Schemas['HoldingPage'];
 export type HoldingsSummary = Schemas['HoldingsSummary'];
+/** The holdings of a scope grouped by account, bucket, sector or basket, with the scope total (P2-08, ADR 0021). */
+export type HoldingGroups = Schemas['HoldingGroups'];
+export type HoldingGroup = Schemas['HoldingGroup'];
+export type HoldingGroupTotal = Schemas['HoldingGroupTotal'];
+/** One part of a group's value in the second dimension (the sector of an account, the account of a sector). */
+export type GroupPart = Schemas['GroupPart'];
 export type HoldingLots = Schemas['HoldingLots'];
+/** The value history of a scope with its benchmark and coverage (P2-07, ADR 0020). */
+export type PortfolioHistory = Schemas['PortfolioHistory'];
+export type HistoryPoint = Schemas['HistoryPoint'];
+export type HistoryBenchmark = Schemas['HistoryBenchmark'];
+export type HistoryCoverage = Schemas['HistoryCoverage'];
+/** The largest fall of a unit-value series: `pct` is a positive number (a fall of pct %), with the peak and low dates. */
+export type Drawdown = Schemas['Drawdown'];
+/** The benchmark index in force. */
+export type PortfolioBenchmark = Schemas['BenchmarkView'];
+export type PortfolioTrackResult = Schemas['PortfolioTrackResult'];
 export type LotRow = Schemas['LotRow'];
 /** One run of the holdings sync (manual, automatic or the import). */
 export type SyncRun = Schemas['SyncRunView'];
@@ -193,3 +209,42 @@ export type TimelineEntry = Schemas['TimelineEntry'];
 /** A failed run to tell the owner of (the bell). */
 export type ServiceNotice = Schemas['ServiceNotice'];
 export type ServiceNotices = Schemas['ServiceNotices'];
+
+/** The Portfolio Action center (P2-09, ADR 0022): holdings that need a decision, with the figures behind each. */
+export type ActionList = Schemas['ActionList'];
+export type ActionItem = Schemas['ActionItem'];
+export type ActionNumbers = Schemas['ActionNumbers'];
+export type ActionCounts = Schemas['ActionCounts'];
+/** A profitable open lot that turns 12 months old soon. */
+export type LongTermLot = Schemas['LongTermLot'];
+export type ActionThresholds = Schemas['ActionThresholds'];
+export type ActionThresholdsInput = Schemas['ActionThresholdsInput'];
+export type ActionThresholdsView = Schemas['ActionThresholdsView'];
+/** One-shot price alerts, checked on every quotes tick. */
+export type PriceAlert = Schemas['PriceAlertView'];
+export type PriceAlertPage = Schemas['PriceAlertPage'];
+export type PriceAlertInput = Schemas['PriceAlertInput'];
+/** What the Portfolio module tells the bell: a triggered alert, items waiting for a decision. */
+export type PortfolioNotice = Schemas['PortfolioNotice'];
+export type PortfolioNotices = Schemas['PortfolioNotices'];
+
+/** Trades (P2-03, ADR 0023): a tradebook CSV or a manual entry, stored as transactions that can rebuild a holding's lots. */
+export type TradePreviewReport = Schemas['TradePreviewReport'];
+export type TradeFileSummary = Schemas['TradeFileSummary'];
+export type TradeBadRow = Schemas['TradeBadRow'];
+/** One security of the file: its trades in the file and what rebuilding its holding's lots would do. */
+export type TradeSecurity = Schemas['TradeSecurityView'];
+/** What rebuilding a holding's lots from its trades does (status ok · unchanged · quantity_mismatch · no_holding · ambiguous). */
+export type TradeRebuild = Schemas['TradeRebuildView'];
+export type TradeImportResult = Schemas['TradeImportResult'];
+/** One imported file; status imported | undone. */
+export type TradeBatch = Schemas['TradeBatchView'];
+export type TradeBatchPage = Schemas['TradeBatchPage'];
+/** What undoing an import did, or with a dry run would do (`dryRun`, `applied`, the lots it would replace, the holdings it cannot rebuild). */
+export type TradeUndoResult = Schemas['TradeUndoResult'];
+export type TradeNotRebuilt = Schemas['TradeNotRebuilt'];
+/** A trade (side buy | sell, source csv | manual); a voided trade does not count. */
+export type Trade = Schemas['TradeView'];
+export type TradePage = Schemas['TradePage'];
+export type ManualTradeInput = Schemas['ManualTradeInput'];
+export type HoldingRebuildResult = Schemas['HoldingRebuildResult'];
