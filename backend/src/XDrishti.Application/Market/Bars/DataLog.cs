@@ -56,15 +56,6 @@ internal static partial class DataLog
     [LoggerMessage(EventId = 3317, Level = LogLevel.Error, Message = "Dhan fetch for {Symbol}: the gap records could not be updated")]
     public static partial void GapCompleteFailed(ILogger logger, string symbol, Exception exception);
 
-    [LoggerMessage(EventId = 3318, Level = LogLevel.Information, Message = "The end-of-day update is switched off (Data:Eod:Enabled)")]
-    public static partial void EodOff(ILogger logger);
-
-    [LoggerMessage(EventId = 3319, Level = LogLevel.Information, Message = "The next end-of-day update is at {Next:yyyy-MM-dd HH:mm} India time")]
-    public static partial void EodScheduled(ILogger logger, DateTimeOffset next);
-
-    [LoggerMessage(EventId = 3320, Level = LogLevel.Information, Message = "The end-of-day update of today was missed (the application was not running): updating now")]
-    public static partial void EodCatchUp(ILogger logger);
-
     [LoggerMessage(EventId = 3321, Level = LogLevel.Information, Message = "Scheduled end-of-day data job {JobId} started")]
     public static partial void EodStarted(ILogger logger, Guid jobId);
 

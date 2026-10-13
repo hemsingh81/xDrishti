@@ -24,10 +24,10 @@ public interface IDataSettings
     /// <summary>How many of the latest trading sessions are checked for missing bars (<c>Data:Gaps:LookbackSessions</c>, default 30).</summary>
     int GapLookbackSessions { get; }
 
-    /// <summary>Whether the end-of-day run starts by itself on trading days (<c>Data:Eod:Enabled</c>, default true).</summary>
+    /// <summary>First-start setting of the end-of-day service (ADR 0018): whether it starts switched on (<c>Data:Eod:Enabled</c>, default true). Read once, when the service has no stored row; the Services screen decides after that.</summary>
     bool EodEnabled { get; }
 
-    /// <summary>Time of day, India time, of the end-of-day run (<c>Data:Eod:TimeIst</c>, <c>HH:mm</c>, default 15:50).</summary>
+    /// <summary>First-start setting of the end-of-day service (ADR 0018): time of day, India time, of the run (<c>Data:Eod:TimeIst</c>, <c>HH:mm</c>, default 15:50). Read once, when the service has no stored row.</summary>
     TimeOnly EodTimeIst { get; }
 
     /// <summary>How many of the latest closed trading sessions the data quality checks look at (<c>Data:Quality:Sessions</c>, default 5).</summary>

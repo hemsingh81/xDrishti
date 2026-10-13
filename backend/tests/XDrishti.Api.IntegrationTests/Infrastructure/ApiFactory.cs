@@ -5,9 +5,11 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Serilog.Core;
 using Testcontainers.PostgreSql;
 using XDrishti.Api.Auth;
+using XDrishti.Api.Platform;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Auth;
@@ -100,7 +102,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("BrokerVault:Key", VaultKey);
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
-        builder.UseSetting("Data:Eod:Enabled", "false"); // tests ask the end-of-day runner themselves, with the clock pinned
+        builder.UseSetting("Data:Eod:Enabled", "false"); // first-start seed (ADR 0018): the end-of-day service starts paused; tests resume it and ask the scheduler themselves, with the clock pinned
         builder.UseSetting("Data:CsvFolder", CsvFolder);
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);
@@ -123,6 +125,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(MasterDataHttpClientNames.NseApi).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
             services.AddSingleton<IRefreshJobChannel>(RefreshJobs);
             services.AddSingleton<IDataJobChannel>(DataJobs);
+
+            // The scheduler's own loop is switched off for the suite: tests look at the schedules themselves (ServiceScheduler.TickAsync) with the clock pinned.
+            services.Remove(services.Single(d => d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(ServiceSchedulerHost)));
 
             // The Dhan Data API source and the Data account: the real ones answer (over the fake Dhan server above) unless a test puts a fake in (FakeDhan).
             Dhan.Wrap(services);
@@ -194,6 +199,20 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         });
     }
 
+    /// <summary>Removes the stored schedules and the run history of the services (and their audit events), so every service starts on its first-start settings again.</summary>
+    public async Task ResetServicesAsync()
+    {
+        await this.WithDbAsync(async db =>
+        {
+            await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM platform.service_runs;
+                DELETE FROM platform.service_schedules;
+                DELETE FROM accounts.account_events WHERE event LIKE 'Service%';
+                """);
+            return 0;
+        });
+    }
+
     /// <summary>
     /// Empties the instrument master (instruments, baskets and their members, tracking, broker ids and refresh records) and the fake file servers, so a
     /// test starts from nothing. The three baskets the migration creates are put back, empty.
@@ -212,6 +231,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM platform.service_runs;
+                DELETE FROM platform.service_schedules;
                 DELETE FROM market.data_jobs;
                 DELETE FROM market.quality_results;
                 DELETE FROM market.quality_runs;
@@ -225,7 +246,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
-                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%';
+                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%';
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;

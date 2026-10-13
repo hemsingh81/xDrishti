@@ -20,3 +20,6 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0013](0013-portfolio-import-with-settings-and-daily-refresh.md) | Portfolio: saving the account's Portfolio settings imports the holdings; refresh Off or Daily; Sync now on the Portfolio screen | Accepted (date read-only rule amended by 0015) |
 | [0014](0014-portfolio-buckets-appear-as-system-baskets.md) | Portfolio buckets appear on the Baskets page as read-only, protected system baskets | Accepted |
 | [0015](0015-first-import-date-editable-and-no-bucket-ui-in-accounts.md) | The first import date stays editable (re-dates the default-dated lots); no bucket choices in Accounts | Accepted |
+| [0016](0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md) | Market bars: CSV folder load, Dhan intraday fetch, app-managed aggregates for every timeframe | Accepted |
+| [0017](0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md) | Trading calendar, scheduled end-of-day run with gap backfill, data quality, price adjustments, CSV undo | Accepted |
+| [0018](0018-services-framework-and-editable-schedules.md) | Services framework: schedules in the database, one scheduler, the Services screen | Accepted |

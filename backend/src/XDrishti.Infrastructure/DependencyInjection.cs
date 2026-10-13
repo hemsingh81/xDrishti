@@ -59,6 +59,9 @@ public static class DependencyInjection
             ConfigureDbContext(options, sp.GetRequiredService<NpgsqlDataSource>()));
 
         services.AddScoped<IServiceHeartbeatStore, ServiceHeartbeatStore>();
+        services.AddScoped<IServiceScheduleStore, ServiceScheduleStore>();
+        services.AddScoped<IServiceRunStore, ServiceRunStore>();
+        services.AddScoped<IPlatformUnitOfWork, PlatformUnitOfWork>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();
 
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();

@@ -93,7 +93,7 @@ Nothing else is needed for the master: no published port, no volume (the file is
 |-------|----------|
 | Start at boot | launchd agent → `podman machine start` → `xd-up.sh`; services run with **no user logged in to the app** |
 | Missed schedules | On start, services catch up missed runs (e.g. EOD fetch while the Mac slept) and reconcile desired state |
-| Schedules | Stored in the database (`ops.service_schedules`), edited on the Services screen with dependency validation; applied to Hangfire recurring jobs in `xd-worker` without restart |
+| Schedules | Stored in the database (`platform.service_schedules`, runs in `platform.service_runs`), edited on the Services screen with dependency validation and applied at the scheduler's next look (at most a minute) without restart. Built (P1-13, [ADR 0018](../adr/0018-services-framework-and-editable-schedules.md)): one `ServiceScheduler` hosted in `xd-api`; the Hangfire jobs of `xd-worker` follow when that container exists (a deployment change, not a design one) |
 | Database migrations | EF Core migrations applied by the one-shot `xd-migrate` service (API image, `migrate` command, as `xd_owner`) before `xd-api`/`xd-worker` start; apps connect as least-privilege `xd_app`; the migrations create `market.undo_csv_bars`, the one `SECURITY DEFINER` function (owned by `xd_owner`, executable by `xd_app` only) through which the app removes bars when the owner undoes a CSV load ([doc 05](05-data-and-brokers.md) §9) |
 | Start / stop | `deploy/xd-up.sh` (secrets → build → start → wait healthy → print URLs), `deploy/xd-down.sh` (`--purge` deletes data) |
 | URLs (local) | App http://localhost:8080 · API docs `/api/docs` · Seq http://localhost:5341 · PostgreSQL `localhost:5433` (dev override) |

@@ -2,6 +2,7 @@ export { api, ApiError, configureApiAuth, ensureOk, unwrap, type ApiAuthHooks } 
 export { dataIdlePollMs, dataJobQuery, dataOverviewQuery } from './dataJobs';
 export { dataNoticesPollMs, dataNoticesQuery } from './dataNotices';
 export { queryRoots } from './queryRoots';
+export { serviceNoticesPollMs, serviceNoticesQuery } from './serviceNotices';
 export type {
   AccountDetail,
   AccountEvent,
@@ -130,5 +131,19 @@ export type {
   QualityPhase,
   QualityRun,
   SanityCheck,
+  SchedulePreview,
+  ScheduleSpec,
+  ServiceExecution,
+  ServiceIssue,
+  ServiceList,
+  ServiceNotice,
+  ServiceNotices,
+  ServiceParameter,
+  ServiceRun,
+  ServiceRunPage,
+  ServiceScheduleInput,
+  ServiceView,
+  ServicesTimeline,
   SpikeCheck,
+  TimelineEntry,
 } from './types';

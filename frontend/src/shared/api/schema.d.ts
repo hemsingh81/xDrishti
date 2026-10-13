@@ -922,7 +922,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What the owner should know about the data for the notification bell: the last scheduled run failed (data_run_failed), sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending) */
+    /** What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices */
     get: operations['GetDataNotices'];
     put?: never;
     post?: never;
@@ -1285,6 +1285,193 @@ export interface paths {
     put?: never;
     /** Import actions from CSV (header symbol,exDate,kind,numerator,denominator; RELIANCE or NSE:RELIANCE; at most 5,000 lines) sent as the text/csv or text/plain body, or as the first file of a multipart/form-data upload; they are applied. preview=true writes nothing and returns the counts. Unknown symbols are listed, never guessed; duplicates (any status) are skipped; bad lines (also a kind that clashes with an applied one on the same day) are reported and skipped. Lines with an ex-date on or before the date the loaded CSV files reach (adjusted at source) are counted in adjustsCsvTwice and listed in warnings; importing them needs acknowledgeCsvAdjusted=true. 200; 400 data.invalid; 409 data.csv_already_adjusted (with adjustsCsvTwice and instruments) */
     post: operations['ImportCorporateActions'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Every registered service (id, name, description, runsAs, enabled, schedule with words, execution settings, parameters with their schema, status healthy|running|failed|paused, lastRun, nextRun, issues, isDefault, revision) and the read-only entries (the per-account sync: readOnly true, manageUrl /accounts) */
+    get: operations['ListServices'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/timeline': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The trading-day timeline of a date (date yyyy-MM-dd, India time; default today): market hours, the review cutoff, whether it is a trading day and the starts (marks) and up-times (bands) of every enabled service, with the service a run-after entry follows */
+    get: operations['GetServicesTimeline'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/notices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the owner should know about the services for the notification bell: service_failed for the latest run of each service with notify on failure when it failed and no retry follows; the next run of the service clears it */
+    get: operations['GetServiceNotices'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One service as the list shows it. 404 services.not_found */
+    get: operations['GetService'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The runs and attempts of a service, newest first (page from 1, pageSize 1 to 100, default 25; the latest 200 are shown). trigger scheduled|catch_up|after|manual, status running|succeeded|failed|skipped, dataJobId links the data job a run started. 404 services.not_found */
+    get: operations['ListServiceRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}/schedule': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Save enabled, schedule (type daily|weekly|after|window|interval|continuous with its fields, times HH:mm India time), retries 0-5, timeoutMinutes 1-240, catchUp, notifyOnFailure and parameters, with the revision read. Checked against all services: 400 services.invalid with issues[] (service, field, message) when anything is wrong, nothing stored; warnings come back with the service. 409 services.revision_changed on a stale revision, 404 services.not_found, 409 services.read_only. Takes effect at the next look of the scheduler, no restart */
+    put: operations['SaveServiceSchedule'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}/schedule/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Dry run of a save: the same checks (issues: errors and warnings) and the next three starts, nothing stored. The revision is not looked at. 404 services.not_found, 409 services.read_only */
+    post: operations['PreviewServiceSchedule'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}/schedule/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restore default: writes the definition's default choices (nothing is deleted). Audited. 400 services.invalid if they would break a rule against the other services, 404 services.not_found, 409 services.read_only */
+    post: operations['ResetServiceSchedule'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}/pause': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Pause: no scheduled, catch-up or run-after starts; past times are not made up for when it is resumed; Run now still works. Audited. 404 services.not_found, 409 services.read_only */
+    post: operations['PauseService'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume a paused service. Audited. 404 services.not_found, 409 services.read_only */
+    post: operations['ResumeService'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/services/{id}/run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only */
+    post: operations['RunServiceNow'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2113,7 +2300,7 @@ export interface components {
     };
     /**
      * @description Something about the data pipeline the owner should know, derived from the stored state like the account notices of the bell. `id` includes the situation (a new failed
-     *     run or a changed number of open gaps is a new notice, hence unread again). `kind`: data_run_failed · data_gaps_open · data_quality_failed (instruments fail the data quality checks: warn within the allowed share, error when the gate blocks the nightly plan) · data_corporate_actions_pending (suggested splits or bonus issues wait for a decision; warn). `severity`: error · warn.
+     *     run or a changed number of open gaps is a new notice, hence unread again). `kind`: data_gaps_open · data_quality_failed (instruments fail the data quality checks: warn within the allowed share, error when the gate blocks the nightly plan) · data_corporate_actions_pending (suggested splits or bonus issues wait for a decision; warn). `severity`: error · warn.
      */
     DataNotice: {
       id: string;
@@ -2263,8 +2450,8 @@ export interface components {
       redirectUrl: string;
     };
     /**
-     * @description The scheduled end-of-day run (ADR 0017 §2): `enabled` (`Data:Eod:Enabled`), `timeIst` (`HH:mm`, India time), `nextRunAt` (the next trading day's run;
-     *     null when switched off) and `lastRun` (the latest automatic run, null before the first).
+     * @description The scheduled end-of-day run (ADR 0017 §2) as set on the Services screen (ADR 0018): `enabled` (the service is not paused), `timeIst` (`HH:mm`, India time; empty when the schedule has no time of its own),
+     *     `nextRunAt` (the next scheduled start; null when paused or none ahead), `lastRun` (the latest automatic data job, null before the first) and `scheduleWords` (the schedule in words).
      */
     EodOverview: {
       enabled: boolean;
@@ -2272,6 +2459,7 @@ export interface components {
       /** Format: date-time */
       nextRunAt: null | string;
       lastRun: null | components['schemas']['EodRunView'];
+      scheduleWords?: null | string;
     };
     /**
      * @description An automatic (scheduled) run as the Data screen shows it. `status`: running · succeeded · failed · skipped; `message` is the reason a run failed or was skipped
@@ -2287,6 +2475,15 @@ export interface components {
       status: string;
       trigger: string;
       message: null | string;
+    };
+    /** @description How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell. */
+    ExecutionView: {
+      /** Format: int32 */
+      retries: number;
+      /** Format: int32 */
+      timeoutMinutes: number;
+      catchUp: boolean;
+      notifyOnFailure: boolean;
     };
     /** @description A filter value and how many active instruments have it. */
     FacetCount: {
@@ -2483,7 +2680,7 @@ export interface components {
       errors?: {
         [key: string]: string[];
       };
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found. */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
       code?: string;
       /**
        * Format: int32
@@ -2500,6 +2697,14 @@ export interface components {
        * @description Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.
        */
       listedHoldings?: number;
+      /** @description Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text. */
+      issues?: {
+        serviceId?: null | string;
+        field: string;
+        severity: string;
+        code: string;
+        message: string;
+      }[];
       /**
        * Format: int32
        * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
@@ -2689,6 +2894,7 @@ export interface components {
       swingBuy: string[];
       swingSell: string[];
     };
+    JsonElement: unknown;
     /** @description The latest job in which each phase ran to an end (null when none did yet). */
     LastDataJobs: {
       csv: null | components['schemas']['DataJobView'];
@@ -2742,6 +2948,20 @@ export interface components {
     OfficialDailyCheck: {
       status: string;
       message: string;
+    };
+    /** @description A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default. */
+    ParameterView: {
+      name: string;
+      label: string;
+      kind: string;
+      /** Format: double */
+      min: number;
+      /** Format: double */
+      max: number;
+      value: components['schemas']['JsonElement'];
+      default: components['schemas']['JsonElement'];
+      description: null | string;
+      unit: null | string;
     };
     /**
      * @description The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of
@@ -2823,7 +3043,7 @@ export interface components {
       status?: null | number;
       detail?: null | string;
       instance?: null | string;
-      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found. */
+      /** @description Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in "errors"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409). */
       code?: string;
       /**
        * Format: int32
@@ -2840,6 +3060,14 @@ export interface components {
        * @description Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.
        */
       listedHoldings?: number;
+      /** @description Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text. */
+      issues?: {
+        serviceId?: null | string;
+        field: string;
+        severity: string;
+        code: string;
+        message: string;
+      }[];
       /**
        * Format: int32
        * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
@@ -3308,6 +3536,29 @@ export interface components {
       badBars: number;
       examples: components['schemas']['BadBar'][];
     };
+    /** @description The dry run of a schedule: the findings (errors and warnings), the next three starts after now (empty when the schedule has errors or follows another service) and the schedule in words. */
+    SchedulePreview: {
+      issues: components['schemas']['ServiceIssueView'][];
+      nextRuns: string[];
+      scheduleWords: string;
+    };
+    /**
+     * @description A Schedule as text: what the API sends and receives and what the database stores (JSON). `type` is daily · weekly · after · window · interval · continuous; times are
+     *     `HH:mm` India time; `days` are mon … sun; `weekday` is one of them; `after` is a service id. Fields that do not belong to the type are left out (null).
+     */
+    ScheduleSpec: {
+      type: string;
+      time?: null | string;
+      days?: null | string[];
+      /** @default false */
+      tradingDaysOnly: boolean;
+      weekday?: null | string;
+      after?: null | string;
+      from?: null | string;
+      to?: null | string;
+      /** Format: int32 */
+      everyMinutes?: null | number;
+    };
     /** @description Whether one of the owner's Dhan secrets is stored (encrypted) and when it last changed. Name is the request field name ("apiKey", "apiSecret"). The value itself is never returned. */
     SecretStatusView: {
       name: string;
@@ -3323,6 +3574,79 @@ export interface components {
       apiKey: null | string;
       apiSecret: null | string;
     };
+    /** @description A finding of the schedule checks. `severity`: error (blocks saving) · warning. `field` is a dotted path like the request (schedule.time, retries, parameters.x); `relatedServiceId` names the other service of a finding that involves two. */
+    ServiceIssueView: {
+      serviceId: string;
+      field: string;
+      severity: string;
+      code: string;
+      message: string;
+      relatedServiceId: null | string;
+    };
+    /** @description Every service: the registered ones in screen order, then the read-only entries. */
+    ServiceList: {
+      items: components['schemas']['ServiceView'][];
+    };
+    /** @description A failure to tell the owner of (the bell). `id` is `service:failed:{runId}`, so a newer failed run is a new notice. `kind` is service_failed; `severity` error. */
+    ServiceNotice: {
+      id: string;
+      kind: string;
+      severity: string;
+      text: string;
+      serviceId: string;
+      /** Format: date-time */
+      at: null | string;
+    };
+    ServiceNotices: {
+      items: components['schemas']['ServiceNotice'][];
+    };
+    /** @description A page of runs, newest first. At most the latest int ServiceRunLimits.MaxShown runs of a service are shown; `total` counts those. */
+    ServiceRunPage: {
+      items: components['schemas']['ServiceRunView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description One run (or attempt) of a service. `trigger`: scheduled · catch_up · after · manual. `status`: running · succeeded · failed · skipped. `dataJobId` links the data job a run started. */
+    ServiceRunView: {
+      /** Format: uuid */
+      id: string;
+      serviceId: string;
+      trigger: string;
+      /** Format: int32 */
+      attempt: number;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      status: string;
+      message: null | string;
+      /** Format: uuid */
+      dataJobId: null | string;
+    };
+    /**
+     * @description The body of a schedule save or preview: everything the dialog sets, all of it required (a body that leaves a field out is a 400, so a missing switch is never read as "off"). `parameters` are the values by name
+     *     (those left out keep the schema's default); `revision` is the one read with the service (0 for a service that has no stored choices yet, also the default) and is only checked by a save.
+     */
+    ServiceScheduleInput: {
+      enabled: boolean;
+      schedule: components['schemas']['ScheduleSpec'];
+      /** Format: int32 */
+      retries: number;
+      /** Format: int32 */
+      timeoutMinutes: number;
+      catchUp: boolean;
+      notifyOnFailure: boolean;
+      parameters?: null | Record<string, never>;
+      /**
+       * Format: int64
+       * @default 0
+       */
+      revision: number;
+    };
     ServiceStatus: {
       name: string;
       instance: string;
@@ -3332,6 +3656,43 @@ export interface components {
       /** Format: date-time */
       lastSeenAt: string;
       isAlive: boolean;
+    };
+    /**
+     * @description A service on the Services screen (ADR 0018). `status`: healthy · running · failed (its latest run failed) · paused. `schedule` is the stored form (`scheduleWords` says it in words);
+     *     `allowedScheduleTypes` are the types the owner may choose; `isDefault` says the choices are the definition's defaults; `lastRun` is the latest run of any kind, `nextRun` the next
+     *     scheduled start (null when paused, when it follows another service, is always up or has no day ahead). `revision` is sent back with a save (0 until the first save or seed). A `readOnly`
+     *     entry is set elsewhere (`manageUrl`) and refuses writes.
+     */
+    ServiceView: {
+      id: string;
+      name: string;
+      description: string;
+      runsAs: string;
+      readOnly: boolean;
+      manageUrl: null | string;
+      enabled: boolean;
+      status: string;
+      schedule: components['schemas']['ScheduleSpec'];
+      scheduleWords: string;
+      allowedScheduleTypes: string[];
+      execution: components['schemas']['ExecutionView'];
+      parameters: components['schemas']['ParameterView'][];
+      lastRun: null | components['schemas']['ServiceRunView'];
+      /** Format: date-time */
+      nextRun: null | string;
+      issues: components['schemas']['ServiceIssueView'][];
+      isDefault: boolean;
+      /** Format: int64 */
+      revision: number;
+    };
+    /** @description The trading-day timeline: market hours (null on a day without a session), the review cutoff, whether the date is a trading day and every enabled service's starts and bands. */
+    ServicesTimeline: {
+      date: string;
+      tradingDay: boolean;
+      marketOpen: null | string;
+      marketClose: null | string;
+      reviewCutoff: string;
+      entries: components['schemas']['TimelineEntry'][];
     };
     /** @description One trading session of the window as completeness sees it: the minutes the calendar expects, the ones stored, and whether a refetch already proved the day unfillable (`bar_gaps`). */
     SessionCompleteness: {
@@ -3499,6 +3860,31 @@ export interface components {
       bars: number;
       /** Format: date-time */
       lastBucket: null | string;
+    };
+    /** @description A part of the day a service is up (`from`, `to` as `HH:mm`; a continuous service spans 00:00 to 24:00). */
+    TimelineBand: {
+      from: string;
+      to: string;
+    };
+    /**
+     * @description What one enabled service does on the day. `kind`: mark (starts at the marks) · band (up over the band; an interval also gives `everyMinutes`). `followsServiceId` names the service a
+     *     run-after service waits for (its mark is the one of the service it follows, at the end of the chain).
+     */
+    TimelineEntry: {
+      serviceId: string;
+      name: string;
+      kind: string;
+      marks: components['schemas']['TimelineMark'][];
+      band: null | components['schemas']['TimelineBand'];
+      /** Format: int32 */
+      everyMinutes: null | number;
+      followsServiceId: null | string;
+    };
+    /** @description One start on the timeline: the India time as `HH:mm` and the instant. */
+    TimelineMark: {
+      time: string;
+      /** Format: date-time */
+      at: string;
     };
     /**
      * @description What a track call did (all counts are of distinct instruments): `added` never tracked before, `reactivated` tracked again after an
@@ -6958,6 +7344,417 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListServices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceList'];
+        };
+      };
+    };
+  };
+  GetServicesTimeline: {
+    parameters: {
+      query?: {
+        date?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServicesTimeline'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetServiceNotices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceNotices'];
+        };
+      };
+    };
+  };
+  GetService: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListServiceRuns: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceRunPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SaveServiceSchedule: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ServiceScheduleInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PreviewServiceSchedule: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ServiceScheduleInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SchedulePreview'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ResetServiceSchedule: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PauseService: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ResumeService: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RunServiceNow: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceRunView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Conflict */

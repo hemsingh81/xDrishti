@@ -43,6 +43,17 @@ public sealed class RefreshStatusHandlerTests
     }
 
     [Fact]
+    public async Task The_schedule_is_the_one_stored_for_the_service_not_the_configuration()
+    {
+        var rows = new Platform.Services.InMemoryServiceData();
+        rows.Store("instrument-master", Platform.Services.Svc.Settings(XDrishti.Domain.Platform.Services.Schedule.Daily(new TimeOnly(7, 5), false, XDrishti.Domain.Platform.Services.Weekdays.EveryDay)));
+        var status = await new GetRefreshStatusHandler(_f.Data, _f.Data, Platform.Services.ServiceReaders.Schedules(_f.Clock, rows: rows)).HandleAsync(new GetRefreshStatusQuery(), Ct);
+
+        (status.AutoRefresh.Enabled, status.AutoRefresh.TimeIst).ShouldBe((true, "07:05"));
+        status.AutoRefresh.NextRunAt.ShouldBe(new DateTimeOffset(2026, 10, 12, 1, 35, 0, TimeSpan.Zero)); // the clock reads 04:00 UTC on the 11th: 07:05 India time of the 12th is next
+    }
+
+    [Fact]
     public async Task The_running_and_the_last_finished_refresh_are_reported_with_their_progress()
     {
         _f.Data.ActiveCount = 4381;

@@ -3406,7 +3406,7 @@
         "tags": [
           "Data"
         ],
-        "summary": "What the owner should know about the data for the notification bell: the last scheduled run failed (data_run_failed), sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending)",
+        "summary": "What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices",
         "operationId": "GetDataNotices",
         "responses": {
           "200": {
@@ -4562,6 +4562,542 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services": {
+      "get": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Every registered service (id, name, description, runsAs, enabled, schedule with words, execution settings, parameters with their schema, status healthy|running|failed|paused, lastRun, nextRun, issues, isDefault, revision) and the read-only entries (the per-account sync: readOnly true, manageUrl /accounts)",
+        "operationId": "ListServices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/timeline": {
+      "get": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "The trading-day timeline of a date (date yyyy-MM-dd, India time; default today): market hours, the review cutoff, whether it is a trading day and the starts (marks) and up-times (bands) of every enabled service, with the service a run-after entry follows",
+        "operationId": "GetServicesTimeline",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServicesTimeline"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/notices": {
+      "get": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "What the owner should know about the services for the notification bell: service_failed for the latest run of each service with notify on failure when it failed and no retry follows; the next run of the service clears it",
+        "operationId": "GetServiceNotices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceNotices"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}": {
+      "get": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "One service as the list shows it. 404 services.not_found",
+        "operationId": "GetService",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}/runs": {
+      "get": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "The runs and attempts of a service, newest first (page from 1, pageSize 1 to 100, default 25; the latest 200 are shown). trigger scheduled|catch_up|after|manual, status running|succeeded|failed|skipped, dataJobId links the data job a run started. 404 services.not_found",
+        "operationId": "ListServiceRuns",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceRunPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}/schedule": {
+      "put": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Save enabled, schedule (type daily|weekly|after|window|interval|continuous with its fields, times HH:mm India time), retries 0-5, timeoutMinutes 1-240, catchUp, notifyOnFailure and parameters, with the revision read. Checked against all services: 400 services.invalid with issues[] (service, field, message) when anything is wrong, nothing stored; warnings come back with the service. 409 services.revision_changed on a stale revision, 404 services.not_found, 409 services.read_only. Takes effect at the next look of the scheduler, no restart",
+        "operationId": "SaveServiceSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceScheduleInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}/schedule/preview": {
+      "post": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Dry run of a save: the same checks (issues: errors and warnings) and the next three starts, nothing stored. The revision is not looked at. 404 services.not_found, 409 services.read_only",
+        "operationId": "PreviewServiceSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceScheduleInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchedulePreview"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}/schedule/reset": {
+      "post": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Restore default: writes the definition's default choices (nothing is deleted). Audited. 400 services.invalid if they would break a rule against the other services, 404 services.not_found, 409 services.read_only",
+        "operationId": "ResetServiceSchedule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}/pause": {
+      "post": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Pause: no scheduled, catch-up or run-after starts; past times are not made up for when it is resumed; Run now still works. Audited. 404 services.not_found, 409 services.read_only",
+        "operationId": "PauseService",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}/resume": {
+      "post": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Resume a paused service. Audited. 404 services.not_found, 409 services.read_only",
+        "operationId": "ResumeService",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/services/{id}/run": {
+      "post": {
+        "tags": [
+          "Services"
+        ],
+        "summary": "Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only",
+        "operationId": "RunServiceNow",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceRunView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -7175,7 +7711,7 @@
             "format": "date-time"
           }
         },
-        "description": "Something about the data pipeline the owner should know, derived from the stored state like the account notices of the bell. `id` includes the situation (a new failed\nrun or a changed number of open gaps is a new notice, hence unread again). `kind`: data_run_failed · data_gaps_open · data_quality_failed (instruments fail the data quality checks: warn within the allowed share, error when the gate blocks the nightly plan) · data_corporate_actions_pending (suggested splits or bonus issues wait for a decision; warn). `severity`: error · warn."
+        "description": "Something about the data pipeline the owner should know, derived from the stored state like the account notices of the bell. `id` includes the situation (a new failed\nrun or a changed number of open gaps is a new notice, hence unread again). `kind`: data_gaps_open · data_quality_failed (instruments fail the data quality checks: warn within the allowed share, error when the gate blocks the nightly plan) · data_corporate_actions_pending (suggested splits or bonus issues wait for a decision; warn). `severity`: error · warn."
       },
       "DataNotices": {
         "required": [
@@ -7641,9 +8177,15 @@
                 "$ref": "#/components/schemas/EodRunView"
               }
             ]
+          },
+          "scheduleWords": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "The scheduled end-of-day run (ADR 0017 §2): `enabled` (`Data:Eod:Enabled`), `timeIst` (`HH:mm`, India time), `nextRunAt` (the next trading day's run;\nnull when switched off) and `lastRun` (the latest automatic run, null before the first)."
+        "description": "The scheduled end-of-day run (ADR 0017 §2) as set on the Services screen (ADR 0018): `enabled` (the service is not paused), `timeIst` (`HH:mm`, India time; empty when the schedule has no time of its own),\n`nextRunAt` (the next scheduled start; null when paused or none ahead), `lastRun` (the latest automatic data job, null before the first) and `scheduleWords` (the schedule in words)."
       },
       "EodRunView": {
         "required": [
@@ -7685,6 +8227,32 @@
           }
         },
         "description": "An automatic (scheduled) run as the Data screen shows it. `status`: running · succeeded · failed · skipped; `message` is the reason a run failed or was skipped\n(for example the Data account was not connected). `trigger` is always `daily` here."
+      },
+      "ExecutionView": {
+        "required": [
+          "retries",
+          "timeoutMinutes",
+          "catchUp",
+          "notifyOnFailure"
+        ],
+        "type": "object",
+        "properties": {
+          "retries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timeoutMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "catchUp": {
+            "type": "boolean"
+          },
+          "notifyOnFailure": {
+            "type": "boolean"
+          }
+        },
+        "description": "How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell."
       },
       "FacetCount": {
         "required": [
@@ -8237,7 +8805,7 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
           },
           "retryAfterSeconds": {
             "type": "integer",
@@ -8253,6 +8821,39 @@
             "type": "integer",
             "description": "Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.",
             "format": "int32"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "required": [
+                "field",
+                "severity",
+                "code",
+                "message"
+              ],
+              "type": "object",
+              "properties": {
+                "serviceId": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "field": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text."
           },
           "wouldClose": {
             "type": "integer",
@@ -8894,6 +9495,7 @@
           }
         }
       },
+      "JsonElement": { },
       "LastDataJobs": {
         "required": [
           "csv",
@@ -9082,6 +9684,58 @@
           }
         },
         "description": "The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched."
+      },
+      "ParameterView": {
+        "required": [
+          "name",
+          "label",
+          "kind",
+          "min",
+          "max",
+          "value",
+          "default",
+          "description",
+          "unit"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "min": {
+            "type": "number",
+            "format": "double"
+          },
+          "max": {
+            "type": "number",
+            "format": "double"
+          },
+          "value": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "default": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unit": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default."
       },
       "PortfolioInput": {
         "required": [
@@ -9323,7 +9977,7 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
           },
           "retryAfterSeconds": {
             "type": "integer",
@@ -9339,6 +9993,39 @@
             "type": "integer",
             "description": "Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.",
             "format": "int32"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "required": [
+                "field",
+                "severity",
+                "code",
+                "message"
+              ],
+              "type": "object",
+              "properties": {
+                "serviceId": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "field": {
+                  "type": "string"
+                },
+                "severity": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text."
           },
           "wouldClose": {
             "type": "integer",
@@ -10828,6 +11515,95 @@
         },
         "description": "Bar sanity: low ≤ open and close ≤ high, prices positive and finite, volume not negative. `examples` holds the first few bad bars."
       },
+      "SchedulePreview": {
+        "required": [
+          "issues",
+          "nextRuns",
+          "scheduleWords"
+        ],
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceIssueView"
+            }
+          },
+          "nextRuns": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "scheduleWords": {
+            "type": "string"
+          }
+        },
+        "description": "The dry run of a schedule: the findings (errors and warnings), the next three starts after now (empty when the schedule has errors or follows another service) and the schedule in words."
+      },
+      "ScheduleSpec": {
+        "required": [
+          "type"
+        ],
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "time": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "days": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "tradingDaysOnly": {
+            "type": "boolean",
+            "default": false
+          },
+          "weekday": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "after": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "everyMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "A Schedule as text: what the API sends and receives and what the database stores (JSON). `type` is daily · weekly · after · window · interval · continuous; times are\n`HH:mm` India time; `days` are mon … sun; `weekday` is one of them; `after` is a service id. Fields that do not belong to the type are left out (null)."
+      },
       "SecretStatusView": {
         "required": [
           "name",
@@ -10874,6 +11650,239 @@
         },
         "description": "The Dhan API key and secret, write-only (app_id / app_secret). Surrounding spaces are\nremoved; the values are stored encrypted and never returned."
       },
+      "ServiceIssueView": {
+        "required": [
+          "serviceId",
+          "field",
+          "severity",
+          "code",
+          "message",
+          "relatedServiceId"
+        ],
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "relatedServiceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A finding of the schedule checks. `severity`: error (blocks saving) · warning. `field` is a dotted path like the request (schedule.time, retries, parameters.x); `relatedServiceId` names the other service of a finding that involves two."
+      },
+      "ServiceList": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceView"
+            }
+          }
+        },
+        "description": "Every service: the registered ones in screen order, then the read-only entries."
+      },
+      "ServiceNotice": {
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "text",
+          "serviceId",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "at": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "A failure to tell the owner of (the bell). `id` is `service:failed:{runId}`, so a newer failed run is a new notice. `kind` is service_failed; `severity` error."
+      },
+      "ServiceNotices": {
+        "required": [
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceNotice"
+            }
+          }
+        }
+      },
+      "ServiceRunPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceRunView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A page of runs, newest first. At most the latest int ServiceRunLimits.MaxShown runs of a service are shown; `total` counts those."
+      },
+      "ServiceRunView": {
+        "required": [
+          "id",
+          "serviceId",
+          "trigger",
+          "attempt",
+          "startedAt",
+          "finishedAt",
+          "status",
+          "message",
+          "dataJobId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serviceId": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "dataJobId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "One run (or attempt) of a service. `trigger`: scheduled · catch_up · after · manual. `status`: running · succeeded · failed · skipped. `dataJobId` links the data job a run started."
+      },
+      "ServiceScheduleInput": {
+        "required": [
+          "enabled",
+          "schedule",
+          "retries",
+          "timeoutMinutes",
+          "catchUp",
+          "notifyOnFailure"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/ScheduleSpec"
+          },
+          "retries": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timeoutMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "catchUp": {
+            "type": "boolean"
+          },
+          "notifyOnFailure": {
+            "type": "boolean"
+          },
+          "parameters": {
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "default": 0
+          }
+        },
+        "description": "The body of a schedule save or preview: everything the dialog sets, all of it required (a body that leaves a field out is a 400, so a missing switch is never read as \"off\"). `parameters` are the values by name\n(those left out keep the schema's default); `revision` is the one read with the service (0 for a service that has no stored choices yet, also the default) and is only checked by a save."
+      },
       "ServiceStatus": {
         "required": [
           "name",
@@ -10906,6 +11915,151 @@
             "type": "boolean"
           }
         }
+      },
+      "ServiceView": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "runsAs",
+          "readOnly",
+          "manageUrl",
+          "enabled",
+          "status",
+          "schedule",
+          "scheduleWords",
+          "allowedScheduleTypes",
+          "execution",
+          "parameters",
+          "lastRun",
+          "nextRun",
+          "issues",
+          "isDefault",
+          "revision"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "runsAs": {
+            "type": "string"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "manageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/ScheduleSpec"
+          },
+          "scheduleWords": {
+            "type": "string"
+          },
+          "allowedScheduleTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "execution": {
+            "$ref": "#/components/schemas/ExecutionView"
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParameterView"
+            }
+          },
+          "lastRun": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ServiceRunView"
+              }
+            ]
+          },
+          "nextRun": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceIssueView"
+            }
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "description": "A service on the Services screen (ADR 0018). `status`: healthy · running · failed (its latest run failed) · paused. `schedule` is the stored form (`scheduleWords` says it in words);\n`allowedScheduleTypes` are the types the owner may choose; `isDefault` says the choices are the definition's defaults; `lastRun` is the latest run of any kind, `nextRun` the next\nscheduled start (null when paused, when it follows another service, is always up or has no day ahead). `revision` is sent back with a save (0 until the first save or seed). A `readOnly`\nentry is set elsewhere (`manageUrl`) and refuses writes."
+      },
+      "ServicesTimeline": {
+        "required": [
+          "date",
+          "tradingDay",
+          "marketOpen",
+          "marketClose",
+          "reviewCutoff",
+          "entries"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "tradingDay": {
+            "type": "boolean"
+          },
+          "marketOpen": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "marketClose": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reviewCutoff": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntry"
+            }
+          }
+        },
+        "description": "The trading-day timeline: market hours (null on a day without a session), the review cutoff, whether the date is a trading day and every enabled service's starts and bands."
       },
       "SessionCompleteness": {
         "required": [
@@ -11347,6 +12501,92 @@
           }
         },
         "description": "A derived timeframe (`5m 10m 15m 30m 1h 1D 1W 1M`): the bars stored and the start of the newest one."
+      },
+      "TimelineBand": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "description": "A part of the day a service is up (`from`, `to` as `HH:mm`; a continuous service spans 00:00 to 24:00)."
+      },
+      "TimelineEntry": {
+        "required": [
+          "serviceId",
+          "name",
+          "kind",
+          "marks",
+          "band",
+          "everyMinutes",
+          "followsServiceId"
+        ],
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "marks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineMark"
+            }
+          },
+          "band": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TimelineBand"
+              }
+            ]
+          },
+          "everyMinutes": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "followsServiceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What one enabled service does on the day. `kind`: mark (starts at the marks) · band (up over the band; an interval also gives `everyMinutes`). `followsServiceId` names the service a\nrun-after service waits for (its mark is the one of the service it follows, at the end of the chain)."
+      },
+      "TimelineMark": {
+        "required": [
+          "time",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "One start on the timeline: the India time as `HH:mm` and the instant."
       },
       "TrackResult": {
         "required": [
@@ -11881,6 +13121,9 @@
     },
     {
       "name": "Corporate actions"
+    },
+    {
+      "name": "Services"
     }
   ]
 }

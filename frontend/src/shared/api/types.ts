@@ -172,3 +172,24 @@ export type SpikeCheck = Schemas['SpikeCheck'];
 export type AggregatesCheck = Schemas['AggregatesCheck'];
 export type FreshnessCheck = Schemas['FreshnessCheck'];
 export type OfficialDailyCheck = Schemas['OfficialDailyCheck'];
+
+/** Services (P1-13): the registered automatic jobs with their schedule, execution settings, parameters, last and next run. */
+export type ServiceView = Schemas['ServiceView'];
+export type ServiceList = Schemas['ServiceList'];
+/** The stored form of a schedule: type daily · weekly · after · window · interval · continuous, times HH:mm India time. */
+export type ScheduleSpec = Schemas['ScheduleSpec'];
+export type ServiceExecution = Schemas['ExecutionView'];
+export type ServiceParameter = Schemas['ParameterView'];
+/** One run (or attempt) of a service: trigger scheduled · catch_up · after · manual, status running · succeeded · failed · skipped. */
+export type ServiceRun = Schemas['ServiceRunView'];
+export type ServiceRunPage = Schemas['ServiceRunPage'];
+/** A finding of the schedule checks: severity error (blocks saving) · warning, `field` a dotted path like the request. */
+export type ServiceIssue = Schemas['ServiceIssueView'];
+export type ServiceScheduleInput = Schemas['ServiceScheduleInput'];
+/** The dry run of a save: issues and the next three starts. */
+export type SchedulePreview = Schemas['SchedulePreview'];
+export type ServicesTimeline = Schemas['ServicesTimeline'];
+export type TimelineEntry = Schemas['TimelineEntry'];
+/** A failed run to tell the owner of (the bell). */
+export type ServiceNotice = Schemas['ServiceNotice'];
+export type ServiceNotices = Schemas['ServiceNotices'];

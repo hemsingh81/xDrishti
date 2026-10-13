@@ -23,23 +23,8 @@ internal static partial class MarketLog
     [LoggerMessage(EventId = 3006, Level = LogLevel.Warning, Message = "Instrument refresh {RunId}: the sector list is not used: {Reason}")]
     public static partial void SectorsSkipped(ILogger logger, Guid runId, string reason);
 
-    [LoggerMessage(EventId = 3007, Level = LogLevel.Information, Message = "Daily instrument refresh is off (Instruments:AutoRefresh:Enabled = false)")]
-    public static partial void AutoRefreshOff(ILogger logger);
-
-    [LoggerMessage(EventId = 3008, Level = LogLevel.Information, Message = "Next daily instrument refresh at {At:yyyy-MM-dd HH:mm zzz}")]
-    public static partial void AutoRefreshScheduled(ILogger logger, DateTimeOffset at);
-
-    [LoggerMessage(EventId = 3009, Level = LogLevel.Information, Message = "Daily instrument refresh skipped: another refresh is running")]
-    public static partial void AutoRefreshSkipped(ILogger logger);
-
-    [LoggerMessage(EventId = 3010, Level = LogLevel.Error, Message = "Daily instrument refresh could not be started")]
-    public static partial void AutoRefreshCrashed(ILogger logger, Exception exception);
-
     [LoggerMessage(EventId = 3011, Level = LogLevel.Warning, Message = "{Count} instrument refresh(es) that were running when the application stopped were marked failed")]
     public static partial void InterruptedRunsRecovered(ILogger logger, int count);
-
-    [LoggerMessage(EventId = 3012, Level = LogLevel.Information, Message = "The instrument master has not been refreshed since the last scheduled time; refreshing now")]
-    public static partial void AutoRefreshCatchUp(ILogger logger);
 
     [LoggerMessage(EventId = 3013, Level = LogLevel.Warning, Message = "Instrument refresh {RunId}: refusing to retire most of the list: {New} instruments in the file, {Active} active")]
     public static partial void RefreshTripwire(ILogger logger, Guid runId, int @new, int active);

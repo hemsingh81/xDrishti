@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Market.Refresh;
+using XDrishti.Application.Tests.Platform.Services;
 using XDrishti.Domain.Market;
 
 namespace XDrishti.Application.Tests.Market;
@@ -22,7 +23,7 @@ internal sealed class MarketFixture
 
     public ExecuteRefreshHandler Execute => new(Data, Source, Data, Clock, NullLogger<ExecuteRefreshHandler>.Instance);
 
-    public GetRefreshStatusHandler Status => new(Data, Data, Settings, Clock);
+    public GetRefreshStatusHandler Status => new(Data, Data, ServiceReaders.Schedules(Clock, refresh: Settings));
 
     /// <summary>A registered, running refresh.</summary>
     public RefreshRun Register(RefreshTrigger trigger = RefreshTrigger.Manual, bool force = false)
