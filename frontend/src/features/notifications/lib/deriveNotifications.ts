@@ -11,7 +11,8 @@ export type NotificationKind =
   | 'data_run_failed'
   | 'data_gaps_open'
   | 'data_quality_failed'
-  | 'data_corporate_actions_pending';
+  | 'data_corporate_actions_pending'
+  | 'service_failed';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 export interface AppNotification {
@@ -19,7 +20,7 @@ export interface AppNotification {
   id: string;
   kind: NotificationKind;
   severity: NotificationSeverity;
-  /** The account the notice is about; null for notices that are not about one (the data pipeline). */
+  /** The account the notice is about; null for notices that are not about one (the data pipeline, the services). */
   accountId: string | null;
   accountName: string | null;
   text: string;
@@ -102,7 +103,7 @@ export function compareNotifications(a: AppNotification, b: AppNotification): nu
 
 /**
  * Everything the owner should know about the accounts right now. Pure: the same accounts and clock always give the
- * same list. Later sources (alerts, services, plan tickets) add their own derivations next to this one.
+ * same list. Later sources (alerts, plan tickets) add their own derivations next to this one.
  */
 export function deriveNotifications(accounts: readonly AccountSummary[], nowMs: number): AppNotification[] {
   return accounts.flatMap((account) => forAccount(account, nowMs)).sort(compareNotifications);

@@ -261,16 +261,14 @@ Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for
 
 ### 6.1 Scheduled run and gap backfill (ADR 0017 §2–§3, P1-12a)
 
-> **Built (P1-12a, [spec](../specs/P1-12a-scheduled-end-of-day-run-and-gap-backfill.md)):** the schedule and the gap backfill, in `xd-api` until the services framework (P1-13) takes over.
+> **Built (P1-12a, [spec](../specs/P1-12a-scheduled-end-of-day-run-and-gap-backfill.md); moved onto the services framework by P1-13, [ADR 0018](../adr/0018-services-framework-and-editable-schedules.md)):** the schedule and the gap backfill, in `xd-api`.
 >
-> **The scheduled run.** A hosted service (`DataEodService`, the shape of the daily instrument refresh) waits, in slices of at most one minute that read the clock again, for the next
-> run time and then starts the ordinary data job with the steps `dhan, aggregate, quality` (every step of the pipeline but `csv`, which is for history the owner brings by hand; the quality checks of P1-14a are §10b) and trigger `daily`, requested by `system:data-eod`. The run time is `Data:Eod:TimeIst` (`HH:mm` India time, default **15:50**) on **trading days of the calendar**
-> (§4.1: no weekends or holidays, special sessions included) and never before that day's session has closed — a special evening session such as Muhurat moves the day's run to its end.
-> `Data:Eod:Enabled` (default true) switches it off. **Catch-up:** when the application starts on a trading day after the run time and no automatic run exists for the day, it runs at once.
+> **The scheduled run.** The end-of-day run is the service **`eod`** of the Services screen ([doc 04](04-accounts-access-and-operations.md) §3.1): the scheduler starts the ordinary data job with the steps `dhan, aggregate, quality` (every step of the pipeline but `csv`, which is for history the owner brings by hand; the quality checks of P1-14a are §10b) and trigger `daily`, requested by `system:data-eod`, and the run ends as the job does (its progress is linked to the run record, `data_job_id`). The run time is set **on the Services screen** — by default **15:50 India time** on **trading days of the calendar**
+> (§4.1: no weekends or holidays, special sessions included) and never before that day's session has closed — a special evening session such as Muhurat moves the day's run to its end. `Data:Eod:Enabled` and `Data:Eod:TimeIst` are only the **first-start settings**: read once, when the service has no stored row, and ignored after it (a service paused there is switched off). **Catch-up:** when the application starts on a trading day after the run time and no run exists for the day, it runs at once (a paused service never does).
 > **At most one automatic run per day.** When another data job is running, or the primary Data account cannot fetch (no account, not connected, expired) or the Dhan fetch is not
 > available, no job starts: a **skipped run** is recorded (job status `skipped`, the reason as its error, no phase ran) and nothing is retried that day; the owner runs "Update data" by hand. A
-> failure to read the database at the run time is retried a few times a minute apart.
-> Jobs carry `trigger` (`manual` | `daily`); the overview's `eod` block gives `enabled`, `timeIst`, `nextRunAt` (null when switched off) and `lastRun` (the latest automatic run: id, start, end, status, trigger, reason).
+> failure (a database error, a failed job) ends the run as failed; it is retried only when the service's *retries* setting says so (default none), and raises a notice when *notify on failure* is on.
+> Jobs carry `trigger` (`manual` | `daily`); the overview's `eod` block gives `enabled` (the service is not paused), `timeIst` (the time of the stored schedule), `nextRunAt` (the next scheduled start; null when paused), `scheduleWords` and `lastRun` (the latest automatic data job: id, start, end, status, trigger, reason) — the same schedule the Services screen edits.
 >
 > **Gap detection and backfill** (the Dhan phase of every job, scheduled or not). For each tracked instrument with bars, the sessions of the last `Data:Gaps:LookbackSessions` (default **30**, 1 to 250)
 > trading days of the calendar that have **closed** (never today's open session) and that lie **after the day of the instrument's first bar** are counted. The bars of a day come from the daily
@@ -294,8 +292,8 @@ Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for
 > **Start-up.** The catch-up at start waits for the data worker's recovery of jobs a previous process left `running` (`DataJobRecovery`, at most two minutes), so such a job is not mistaken for a running one; when a start fails because a job runs, the day's automatic jobs are looked at again before a skipped run is recorded (a run of the day that appeared meanwhile is not followed by a skipped row), and the wait slices are clamped at zero so a clock that jumped cannot make a delay negative.
 >
 > The phase reports `gapsFound`, `gapsFilled` and `gapsUnfillable` (sessions it asked for or found incomplete) and warns when some stay open. **Notices** for the bell
-> (`GET /api/data/notices`, derived from state like the account notices, with an id that includes the situation): the latest automatic run **failed** (`data_run_failed`, error), and sessions are left with **open gaps**
-> (`data_gaps_open`, warning; unfillable sessions raise nothing — they are listed, not alarming); P1-14a adds `data_quality_failed` (§10b).
+> (`GET /api/data/notices`, derived from state like the account notices, with an id that includes the situation): sessions are left with **open gaps**
+> (`data_gaps_open`, warning; unfillable sessions raise nothing — they are listed, not alarming); P1-14a adds `data_quality_failed` (§10b). A failed automatic run (`data_run_failed`) was a data notice in P1-12a; **replaced by the `service_failed` notice of the end-of-day service in P1-13** (`GET /api/services/notices`, governed by the service's *notify on failure*).
 
 ## 7. Broker abstraction
 

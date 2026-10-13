@@ -5,8 +5,10 @@ using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Tests.Market.Actions;
 using XDrishti.Application.Tests.Market.Calendar;
+using XDrishti.Application.Tests.Platform.Services;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
+using XDrishti.Domain.Platform.Services;
 
 namespace XDrishti.Application.Tests.Market.Bars;
 
@@ -154,8 +156,7 @@ public sealed class DataQueryHandlersTests
             new FakeDataJobStore(),
             _calendar,
             _days,
-            _actions,
-            _clock);
+            _actions, ServiceReaders.Schedules(_clock), _clock);
 
         var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
 
@@ -229,7 +230,7 @@ public sealed class DataQueryHandlersTests
     }
 
     private GetDataOverviewHandler Overview() =>
-        new(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, _clock);
+        new(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, ServiceReaders.Schedules(_clock), _clock);
 
     [Fact]
     public async Task The_overview_counts_the_suggested_corporate_actions_waiting_for_a_decision()
@@ -251,7 +252,7 @@ public sealed class DataQueryHandlersTests
         _queries.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new BarTotals(0, 0, null, null, 0, 0));
         _queries.GetAggregateTotalsAsync(Arg.Any<CancellationToken>()).Returns(new AggregateTotals([], null, 0));
         var folder = new FakeCsvFolder { ListFailure = new UnauthorizedAccessException("denied") };
-        var handler = new GetDataOverviewHandler(folder, new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, _clock);
+        var handler = new GetDataOverviewHandler(folder, new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, ServiceReaders.Schedules(_clock), _clock);
 
         var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
 
@@ -272,7 +273,7 @@ public sealed class DataQueryHandlersTests
         jobs.Jobs[skipped.Id] = skipped;
         _queries.GetBarTotalsAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(new BarTotals(0, 0, null, null, 0, 0));
         _queries.GetAggregateTotalsAsync(Arg.Any<CancellationToken>()).Returns(new AggregateTotals([], null, 0));
-        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), jobs, _calendar, _days, _actions, _clock);
+        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), jobs, _calendar, _days, _actions, ServiceReaders.Schedules(_clock), _clock);
 
         var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
 
@@ -299,7 +300,7 @@ public sealed class DataQueryHandlersTests
         var id = Guid.NewGuid();
         gaps.Rows[(id, new DateOnly(2026, 10, 7))] = BarGap.Detect(id, new DateOnly(2026, 10, 7), 375, 10, Now.AddDays(-2));
         gaps.Rows[(id, new DateOnly(2026, 10, 8))] = BarGap.Detect(id, new DateOnly(2026, 10, 8), 375, 375, Now);
-        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, gaps, new FakeDataJobStore(), _calendar, _days, _actions, _clock);
+        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, gaps, new FakeDataJobStore(), _calendar, _days, _actions, ServiceReaders.Schedules(_clock), _clock);
 
         var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
 
@@ -318,7 +319,7 @@ public sealed class DataQueryHandlersTests
         var manual = DataJob.Start(["dhan"], false, "owner", started.AddHours(20));
         manual.Finish(started.AddHours(21));
         jobs.Jobs[manual.Id] = manual;
-        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), jobs, _calendar, _days, _actions, _clock);
+        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), jobs, _calendar, _days, _actions, ServiceReaders.Schedules(_clock), _clock);
 
         var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
 
@@ -333,7 +334,7 @@ public sealed class DataQueryHandlersTests
     {
         EmptyBars(_queries);
         var handler = new GetDataOverviewHandler(
-            new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings { EodEnabled = false, EodTimeIst = new TimeOnly(16, 5) }, _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, _clock);
+            new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, ServiceReaders.Schedules(_clock, new FakeDataSettings { EodEnabled = false, EodTimeIst = new TimeOnly(16, 5) }), _clock);
 
         var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
 
@@ -345,10 +346,24 @@ public sealed class DataQueryHandlersTests
     {
         EmptyBars(_queries);
         _calendar.Calendar = new TradingCalendar([TradingDay.Holiday(new DateOnly(2026, 10, 12), CalendarSource.Manual, CalendarStatus.Confirmed, null, Now)]);
-        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, _clock);
+        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings(), _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, ServiceReaders.Schedules(_clock, calendar: _calendar), _clock);
 
         var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
 
         overview.Eod.NextRunAt.ShouldBe(new DateTimeOffset(2026, 10, 13, 15, 50, 0, TimeSpan.FromMinutes(330)));
+    }
+
+    [Fact]
+    public async Task The_overview_reads_the_schedule_the_owner_set_on_the_services_screen_not_the_configuration()
+    {
+        EmptyBars(_queries);
+        var rows = new InMemoryServiceData();
+        rows.Store("eod", XDrishti.Application.Tests.Platform.Services.Svc.Settings(Schedule.Daily(new TimeOnly(16, 20)), enabled: true));
+        var handler = new GetDataOverviewHandler(new FakeCsvFolder(), new FakeCsvFileLog(), new FakeIntradaySource(), FakeAccountStatus.Connected(), new FakeDataSettings { EodEnabled = false, EodTimeIst = new TimeOnly(9, 0) }, _queries, new FakeBarGaps(), new FakeDataJobStore(), _calendar, _days, _actions, ServiceReaders.Schedules(_clock, new FakeDataSettings { EodEnabled = false, EodTimeIst = new TimeOnly(9, 0) }, rows: rows), _clock);
+
+        var overview = await handler.HandleAsync(new GetDataOverviewQuery(), Ct);
+
+        (overview.Eod.Enabled, overview.Eod.TimeIst, overview.Eod.ScheduleWords).ShouldBe((true, "16:20", "Every trading day at 16:20 IST, never before the session has ended"));
+        overview.Eod.NextRunAt.ShouldBe(new DateTimeOffset(2026, 10, 12, 16, 20, 0, TimeSpan.FromMinutes(330)));
     }
 }

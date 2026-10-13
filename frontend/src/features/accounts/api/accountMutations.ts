@@ -114,8 +114,9 @@ export function useArchiveAccount() {
 /**
  * Saves the portfolio settings; the answer holds the account and what the first import did (when one was asked for).
  * The import creates holdings, so the Portfolio screen's holdings, totals and sync status are marked stale too.
+ * `onSaved` is called after the reads were marked stale (for a screen that shows something that depends on the settings).
  */
-export function useUpdatePortfolio() {
+export function useUpdatePortfolio({ onSaved }: { onSaved?: () => void } = {}) {
   const queryClient = useQueryClient();
   const { notify } = useToast();
   return useMutation({
@@ -130,6 +131,8 @@ export function useUpdatePortfolio() {
         // The portfolio feature's keys all start with 'portfolio' (holdings, summary, lots, sync-status).
         queryClient.invalidateQueries({ queryKey: ['portfolio'] }),
       ]);
+      // A hook-level callback: unlike one passed to `mutate`, it still runs when the form that saved has been replaced.
+      onSaved?.();
     },
   });
 }

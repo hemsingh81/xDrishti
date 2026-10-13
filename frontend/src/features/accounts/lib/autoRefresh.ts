@@ -48,3 +48,7 @@ export function toRefreshInput(state: AutoRefreshState): Pick<PortfolioInput, 'r
     refreshDailyTimeIst: timePattern.test(state.dailyTime) ? state.dailyTime : undefined,
   };
 }
+
+/** "Off" or "Daily at 16:00 IST": the setting in words. */
+export const refreshSummary = (state: AutoRefreshState): string =>
+  state.mode === 'daily' ? `Daily at ${state.dailyTime} IST` : 'Off';

@@ -8,6 +8,7 @@ using XDrishti.Domain.Market.Baskets;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Market.Quality;
 using XDrishti.Domain.Platform;
+using XDrishti.Domain.Platform.Services;
 using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Market;
@@ -22,6 +23,10 @@ namespace XDrishti.Infrastructure.Persistence;
 public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> options) : DbContext(options)
 {
     public DbSet<ServiceHeartbeat> ServiceHeartbeats => Set<ServiceHeartbeat>();
+
+    public DbSet<ServiceSchedule> ServiceSchedules => Set<ServiceSchedule>();
+
+    public DbSet<ServiceRun> ServiceRuns => Set<ServiceRun>();
 
     public DbSet<OwnerAccount> OwnerAccounts => Set<OwnerAccount>();
 

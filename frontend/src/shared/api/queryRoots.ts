@@ -10,6 +10,8 @@ export const queryRoots = {
   quality: ['quality'] as const,
   /** Everything the Instruments screen reads: search results, counts, details, refresh status. */
   instruments: ['instruments'] as const,
+  /** Everything the Services screen reads (the list, the timeline, the runs, the bell's notices). */
+  services: ['services'] as const,
   /** Every members list (current and as-of) of every basket. */
   basketMembers: ['baskets', 'members'] as const,
 };

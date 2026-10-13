@@ -14,7 +14,7 @@ internal static class ProblemDetailsSchema
             schema.Properties["code"] = new OpenApiSchema
             {
                 Type = JsonSchemaType.String,
-                Description = "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found.",
+                Description = "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409).",
             };
             schema.Properties["retryAfterSeconds"] = new OpenApiSchema
             {
@@ -33,6 +33,24 @@ internal static class ProblemDetailsSchema
                 Type = JsonSchemaType.Integer,
                 Format = "int32",
                 Description = "Present on portfolio.confirmation_required and portfolio.confirmation_stale: how many holdings Dhan listed.",
+            };
+            schema.Properties["issues"] = new OpenApiSchema
+            {
+                Type = JsonSchemaType.Array,
+                Description = "Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text.",
+                Items = new OpenApiSchema
+                {
+                    Type = JsonSchemaType.Object,
+                    Properties = new Dictionary<string, IOpenApiSchema>
+                    {
+                        ["serviceId"] = new OpenApiSchema { Type = JsonSchemaType.String | JsonSchemaType.Null },
+                        ["field"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                        ["severity"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                        ["code"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                        ["message"] = new OpenApiSchema { Type = JsonSchemaType.String },
+                    },
+                    Required = new HashSet<string> { "field", "severity", "code", "message" },
+                },
             };
             schema.Properties["wouldClose"] = new OpenApiSchema
             {

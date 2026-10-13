@@ -182,16 +182,40 @@ flowchart LR
 | Holdings quote refresh | Every 5 min, 09:15–15:30 | `xd-feed` |
 | **Pre-open check & arming** | **09:10** (after the 09:05 review cutoff and NSE pre-open price discovery, before the 09:15 open) | `xd-worker` |
 | Price alerts & action center | Every 1 min, 09:15–15:30 | `xd-worker` |
-| End-of-day fetch & aggregation (with gap backfill) | 15:50 on trading days of the calendar ([doc 05](05-data-and-brokers.md) §6; built in `xd-api` as a hosted service until the services framework P1-13 moves it, switch `Data:Eod:Enabled`, time `Data:Eod:TimeIst`) | `xd-worker` |
+| End-of-day fetch & aggregation (with gap backfill) | 15:50 on trading days of the calendar, never before the session has ended ([doc 05](05-data-and-brokers.md) §6; **built** as the service `eod` (P1-13): the job `dhan → aggregate → quality`, trigger `daily`) | `xd-api` today (`xd-worker` later) |
 | Data validation | Runs after the EOD fetch and aggregation, as the last step of the same data job ([doc 05](05-data-and-brokers.md) §10b; built in P1-14a: `dhan → aggregate → quality`, trigger `daily`; on demand from the Data quality screen; `Data:Quality:*`) | `xd-worker` |
-| Account & portfolio sync | 16:30 | `xd-worker` |
+| Account & portfolio sync | 16:30 (designed); **built** per account, once a day at the time set under Accounts ([ADR 0013](../adr/0013-portfolio-import-with-settings-and-daily-refresh.md)) and shown on the Services screen as a **read-only row** with a link | `xd-api` today |
 | Nightly pipeline → proposed plan | 18:30 | `xd-worker` |
 | AI suggestions & briefing | After the nightly pipeline; starts `xd-llm` on demand and waits for readiness (a 30B load took 22–105 s) | `xd-worker` + `xd-llm` |
 | CSV inbox watcher | Continuous | `xd-worker` |
 | Weekly retrain / monthly review | Sat 10:00 / 1st of month | `xd-worker` |
 | Backup | Daily 23:30 | `xd-backup` |
 
+**Instrument master refresh** (built, not in the table above): daily at 08:45, every day of the week; the service `instrument-master` ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md)).
+
 ### 3.1 Schedule configuration
+
+> **Built (P1-13, [spec](../specs/P1-13-services-framework-and-services-screen.md), [ADR 0018](../adr/0018-services-framework-and-editable-schedules.md)):** the framework, the two first services and the API of the Services screen.
+>
+> - **A service** is a registered definition (id, name, `runsAs`, allowed schedule types, default schedule and execution settings, parameter schema with bounds, constraints `MustFollow` / `MustNotOverlap` / `MustCover`, a start-time advice) plus
+>   one row of the owner's choices in `platform.service_schedules` (enabled, schedule, retries, timeout, catch-up, notify on failure, parameters, `xmin` as revision, who and when). Without a row a service runs on its first-start settings.
+>   The two services built so far are **`eod`** (End-of-day data run) and **`instrument-master`** (Instrument master refresh); the others of the table above register themselves when they are built, and their checks apply from then on.
+> - **One scheduler** (`ServiceScheduler`, a hosted service in `xd-api`) looks at the rows at least once a minute and at the next start, so an edit counts at the next look without a restart. A service runs at most once at a time (a start while it
+>   runs is recorded as a skipped run). Every attempt is a row of `platform.service_runs` (trigger `scheduled | catch_up | after | manual`); a failed attempt is retried up to *retries* times after 30 s, 2 min, 10 min, 30 min, 1 h (a sequence the previous process left in its back-off goes on after a restart); an attempt past
+>   the timeout is cancelled and recorded as failed (timed out; a job that cannot be cancelled and is still running is said so; a timeout is never retried); a run that succeeds starts the services set to run after it. At start-up the runs the previous process left running are closed as failed (interrupted) first, then each enabled
+>   service with catch-up on whose latest scheduled time passed without a run since is run once (`catch_up`: the same day for a daily job, 24 hours for a weekly one, any age for the instrument master); a paused service never catches up, not even
+>   when resumed. The same rule applies when the machine slept through a time. Pause stops scheduled, catch-up and run-after starts; **Run now** (trigger `manual`) still works.
+> - **First-start settings.** `Data:Eod:Enabled` / `Data:Eod:TimeIst` and `Instruments:AutoRefresh:Enabled` / `TimeIst` are read **once**, when a service has no row, and stored as its row; after that the Services screen is the only place to change
+>   them and the configuration is ignored (a restart keeps the edit). Until the row exists the screen shows the configured values.
+> - **Checks** (`ScheduleRules`, pure, over the whole set; the same rules answer the dry run): errors block saving — a type the service does not allow, an unreadable time, no day chosen, a window whose start is not before its end, an interval
+>   outside 1–120 minutes or longer than its window, a run-after chain that is circular or points at an always-on or unknown service, retries outside 0–5, a timeout outside 1–240 minutes, an unknown parameter or one out of its bounds;
+>   warnings are shown and allowed — a start before or after the advised time (the end-of-day fetch before 15:35), a window that does not cover what the definition requires, a run during market hours that must not, a service that should follow
+>   another and does not, a chain of more than three, two services at the same minute. A finding is reported on the service it is about, so moving the end-of-day time after a dependent service's own time warns on the dependent.
+> - **API** (`/api/services`, session + CSRF, no step-up, every change audited as `ServiceScheduleChanged | ServicePaused | ServiceResumed | ServiceRunRequested` in the account events): list, one service, runs (newest first, the latest 200), timeline
+>   of a date, notices for the bell (`service_failed`, derived on read), save (optimistic revision, `409 services.revision_changed`), preview (issues + next three runs), restore default, pause, resume, run now (`202`, `409 services.already_running`).
+>   `services.invalid` carries `issues[]`; `services.read_only` for the per-account sync row.
+> - **Not in this slice:** the `xd-worker` container (the scheduler runs in `xd-api`; moving it is a deployment change), services that do not exist yet, parameters for the two built services (the framework validates them against a service's
+>   schema; `eod` and `instrument-master` declare none yet), purging old runs.
 
 Each service has an editable schedule stored in the database (not in code):
 

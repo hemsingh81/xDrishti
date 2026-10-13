@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
@@ -19,6 +20,7 @@ using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Platform.Heartbeats;
+using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Refresh;
@@ -44,11 +46,43 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ProvisionOwnerCommand, ProvisionOutcome>, ProvisionOwnerHandler>();
         services.AddScoped<ICommandHandler<ResetOwnerPasswordCommand>, ResetOwnerPasswordHandler>();
 
+        services.AddServices();
         services.AddAccounts();
         services.AddMarket();
         services.AddPortfolio();
 
         return services;
+    }
+
+    /// <summary>
+    /// The services framework (ADR 0018): the registry of the services other modules register as <see cref="IScheduledService"/>, the runner and the scheduler (singletons: the API's hosted service runs the
+    /// scheduler for the lifetime of the process), the reads of the Services screen and the use cases behind its endpoints.
+    /// </summary>
+    private static void AddServices(this IServiceCollection services)
+    {
+        // The services, in the order of the Services screen; each module's work is a singleton that the scheduler runs when its schedule says so.
+        services.AddSingleton<IScheduledService, EodService>();
+        services.AddSingleton<IScheduledService, InstrumentMasterService>();
+        services.AddSingleton<ServiceRegistry>();
+        services.AddSingleton<ServiceRunner>();
+        services.AddSingleton<ServiceScheduler>();
+        services.AddScoped<ServiceSettingsReader>();
+        services.AddScoped<ServiceViewReader>();
+        services.AddScoped<ServiceWriter>();
+        services.AddScoped<AccountSyncEntry>();
+        services.AddScoped<IServiceScheduleReader, ServiceScheduleReader>();
+
+        services.AddScoped<IQueryHandler<ListServicesQuery, ServiceList>, ListServicesHandler>();
+        services.AddScoped<IQueryHandler<GetServiceQuery, Result<ServiceView>>, GetServiceHandler>();
+        services.AddScoped<IQueryHandler<ListServiceRunsQuery, Result<ServiceRunPage>>, ListServiceRunsHandler>();
+        services.AddScoped<IQueryHandler<GetServicesTimelineQuery, Result<ServicesTimeline>>, GetServicesTimelineHandler>();
+        services.AddScoped<IQueryHandler<GetServiceNoticesQuery, ServiceNotices>, GetServiceNoticesHandler>();
+        services.AddScoped<IQueryHandler<PreviewServiceScheduleQuery, Result<SchedulePreview>>, PreviewServiceScheduleHandler>();
+        services.AddScoped<ICommandHandler<SaveServiceScheduleCommand, ServiceView>, SaveServiceScheduleHandler>();
+        services.AddScoped<ICommandHandler<ResetServiceScheduleCommand, ServiceView>, ResetServiceScheduleHandler>();
+        services.AddScoped<ICommandHandler<PauseServiceCommand, ServiceView>, PauseServiceHandler>();
+        services.AddScoped<ICommandHandler<ResumeServiceCommand, ServiceView>, ResumeServiceHandler>();
+        services.AddScoped<ICommandHandler<RunServiceNowCommand, ServiceRunView>, RunServiceNowHandler>();
     }
 
     private static void AddAccounts(this IServiceCollection services)
@@ -116,9 +150,6 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ReorderBasketMembersCommand>, ReorderBasketMembersHandler>();
         services.AddScoped<ICommandHandler<TransferBasketMembersCommand, TransferResult>, TransferBasketMembersHandler>();
 
-        // The daily schedule is a singleton: the API's hosted service runs it for the lifetime of the process.
-        services.AddSingleton<DailyRefreshRunner>();
-
         services.AddMarketData();
     }
 
@@ -160,9 +191,8 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RefetchQualityInstrumentCommand, DataJobView>, RefetchQualityInstrumentHandler>();
         services.AddScoped<ICommandHandler<RefreshQualityAggregatesCommand, DataJobView>, RefreshQualityAggregatesHandler>();
 
-        // The scheduled end-of-day run (ADR 0017 §2) is a singleton: the API's hosted service runs it for the lifetime of the process.
+        // The scheduled end-of-day run (ADR 0017 §2) is a service of the framework (ADR 0018, registered with the others in AddServices): it waits for the cleanup of interrupted jobs first.
         services.AddSingleton<DataJobRecovery>();
-        services.AddSingleton<DataEodRunner>();
 
         // The trading calendar (ADR 0017 §1): the scoped snapshot other slices read, the use cases of its endpoints and the upkeep that follows every data job.
         services.AddScoped<ITradingCalendar, TradingCalendarProvider>();
@@ -201,6 +231,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetHoldingLotsQuery, Result<HoldingLots>>, GetHoldingLotsHandler>();
         services.AddScoped<ICommandHandler<UpdateLotDateCommand, LotRow>, UpdateLotDateHandler>();
         services.AddScoped<IQueryHandler<GetSyncStatusQuery, Result<SyncStatusView>>, GetSyncStatusHandler>();
+        services.AddScoped<IAccountSyncSource, AccountSyncSource>();
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();

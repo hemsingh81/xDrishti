@@ -77,15 +77,15 @@ internal sealed class GapDataOptions
     public int LookbackSessions { get; set; } = 30;
 }
 
-/// <summary>The end-of-day run that starts by itself on trading days (<c>Data:Eod</c>).</summary>
+/// <summary>The first-start settings of the end-of-day service (<c>Data:Eod</c>, ADR 0018): read once, when the service has no stored row; the Services screen decides after that.</summary>
 internal sealed class EodDataOptions
 {
     public const string TimeFormat = "HH:mm";
 
-    /// <summary>Whether the API starts the update by itself on trading days.</summary>
+    /// <summary>Whether the service starts switched on (first start only).</summary>
     public bool Enabled { get; set; } = true;
 
-    /// <summary>Time of day, India time (UTC+05:30), as <c>HH:mm</c>; never before the session has closed (15:30).</summary>
+    /// <summary>Time of day, India time (UTC+05:30), as <c>HH:mm</c> (first start only); a run is never before the session has closed (15:30).</summary>
     [Required]
     public string TimeIst { get; set; } = "15:50";
 

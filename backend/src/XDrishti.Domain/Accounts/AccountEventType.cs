@@ -47,4 +47,8 @@ public enum AccountEventType
     CorporateActionIgnored,
     CorporateActionsImported,
     CsvLoadUndone,
+    ServiceScheduleChanged,
+    ServicePaused,
+    ServiceResumed,
+    ServiceRunRequested,
 }

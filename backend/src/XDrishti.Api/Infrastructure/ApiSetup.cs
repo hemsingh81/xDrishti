@@ -8,6 +8,7 @@ using Serilog;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
 using XDrishti.Api.Market;
+using XDrishti.Api.Platform;
 using XDrishti.Api.Portfolio;
 
 namespace XDrishti.Api.Infrastructure;
@@ -57,16 +58,16 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, DataQualityEndpoints>();
         services.AddSingleton<IEndpointModule, DataCsvEndpoints>();
         services.AddSingleton<IEndpointModule, CorporateActionEndpoints>();
+        services.AddSingleton<IEndpointModule, ServicesEndpoints>();
 
-        // Instrument master (ADR 0010): the worker that carries out registered refreshes, and the daily automatic refresh.
+        // Instrument master (ADR 0010): the worker that carries out registered refreshes.
         services.AddHostedService<RefreshJobWorker>();
-        services.AddHostedService<DailyRefreshService>();
 
         // Market data (ADR 0016): the worker that carries out registered data jobs (CSV load, Dhan fetch, aggregates).
         services.AddHostedService<DataJobWorker>();
 
-        // The scheduled end-of-day run (ADR 0017 §2): starts the data job on trading days at Data:Eod:TimeIst.
-        services.AddHostedService<DataEodService>();
+        // The services framework (ADR 0018): the one scheduler of the automatic jobs (end-of-day data run, instrument master refresh); their times are edited on the Services screen.
+        services.AddHostedService<ServiceSchedulerHost>();
 
         // Holdings (ADR 0012): the automatic refresh of the accounts that switched it on.
         services.AddHostedService<PortfolioRefreshService>();

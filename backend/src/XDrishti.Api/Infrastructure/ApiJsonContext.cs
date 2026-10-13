@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using XDrishti.Api.Auth;
+using XDrishti.Api.Endpoints;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
@@ -18,6 +19,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 
@@ -115,6 +117,15 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(SyncInput))]
 [JsonSerializable(typeof(SyncRunView))]
 [JsonSerializable(typeof(SyncStatusView))]
+[JsonSerializable(typeof(ServiceList))]
+[JsonSerializable(typeof(ServiceView))]
+[JsonSerializable(typeof(ServiceRunView))]
+[JsonSerializable(typeof(ServiceRunPage))]
+[JsonSerializable(typeof(ServicesTimeline))]
+[JsonSerializable(typeof(ServiceNotices))]
+[JsonSerializable(typeof(ServiceScheduleInput))]
+[JsonSerializable(typeof(SchedulePreview))]
+[JsonSerializable(typeof(ProblemIssue[]))]
 [JsonSerializable(typeof(ProblemDetails))]
 [JsonSerializable(typeof(HttpValidationProblemDetails))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

@@ -6,13 +6,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using XDrishti.Api.IntegrationTests.Infrastructure;
+using XDrishti.Api.Platform;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Refresh;
 
 namespace XDrishti.Api.IntegrationTests.Market;
 
-/// <summary>The hosted services of the API: the worker that carries out registered refreshes, the daily schedule and the option checks at start.</summary>
+/// <summary>The hosted services of the API: the worker that carries out registered refreshes, the scheduler that starts the daily refresh (the instrument master service, ADR 0018) and the option checks at start.</summary>
 [Collection(ApiTestSuite.Name)]
 public sealed class BackgroundWorkTests(ApiFactory factory) : MarketTestBase(factory)
 {
@@ -44,23 +45,47 @@ public sealed class BackgroundWorkTests(ApiFactory factory) : MarketTestBase(fac
     }
 
     [Fact]
-    public async Task The_daily_schedule_starts_with_the_API_when_enabled_and_catches_up_a_list_that_was_never_refreshed()
+    public async Task The_scheduler_starts_with_the_API_seeds_the_service_from_the_configuration_and_catches_up_a_list_that_was_never_refreshed()
     {
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await using var scheduled = Factory.WithWebHostBuilder(b =>
         {
             b.UseSetting("Instruments:AutoRefresh:Enabled", "true").UseSetting("Instruments:AutoRefresh:TimeIst", "03:30");
-            b.ConfigureTestServices(services => Wrap<StartRefreshCommand, RefreshStarted>(services, started));
+            b.ConfigureTestServices(services =>
+            {
+                services.AddHostedService<ServiceSchedulerHost>(); // the suite switches the loop off; this test is about it
+                Wrap<StartRefreshCommand, RefreshStarted>(services, started);
+            });
         });
         using var client = scheduled.CreateClient(); // starts the host and its hosted services
         await started.Task.WaitAsync(Ct);
 
-        Factory.Logs.All.ShouldContain(l => l.Contains("Next daily instrument refresh at", StringComparison.Ordinal));
-        Factory.Logs.All.ShouldContain(l => l.Contains("has not been refreshed since the last scheduled time", StringComparison.Ordinal));
+        Factory.Logs.All.ShouldContain(l => l.Contains("service.catch_up service=\"instrument-master\"", StringComparison.Ordinal));
         var history = await Factory.WithDbAsync(async db => await db.RefreshRuns.AsNoTracking().ToListAsync(Ct));
         var run = history.ShouldHaveSingleItem();
         (run.Trigger, run.RequestedBy, run.Force).ShouldBe((XDrishti.Domain.Market.RefreshTrigger.Daily, "system:daily-refresh", false));
         Factory.RefreshJobs.PendingCount.ShouldBe(1);
+        var row = await Factory.WithDbAsync(async db => await db.ServiceSchedules.AsNoTracking().SingleAsync(x => x.Id == "instrument-master", Ct));
+        (row.Enabled, row.Schedule.StartTime, row.UpdatedBy).ShouldBe((true, new TimeOnly(3, 30), "system:first-start"));
+    }
+
+    [Fact]
+    public async Task The_service_stays_off_when_the_configuration_seeds_it_switched_off()
+    {
+        await using var off = Factory.WithWebHostBuilder(b =>
+        {
+            b.UseSetting("Instruments:AutoRefresh:Enabled", "false");
+            b.ConfigureTestServices(services => services.AddHostedService<ServiceSchedulerHost>());
+        });
+        var client = await SignInAsync(off);
+
+        using var response = await client.GetAsync("/api/services/instrument-master", Ct);
+        var service = await response.ReadAsync<XDrishti.Application.Platform.Services.ServiceView>(Ct);
+
+        (service.Enabled, service.Status, service.NextRun).ShouldBe((false, "paused", null));
+        var settings = off.Services.GetRequiredService<IInstrumentRefreshSettings>();
+        settings.AutoRefreshEnabled.ShouldBeFalse();
+        (await Factory.WithDbAsync(async db => await db.RefreshRuns.CountAsync(Ct))).ShouldBe(0);
     }
 
     [Fact]
@@ -83,17 +108,6 @@ public sealed class BackgroundWorkTests(ApiFactory factory) : MarketTestBase(fac
         (run.Status, run.Phase).ShouldBe((XDrishti.Domain.Market.RefreshStatus.Failed, null));
         run.Error!.ShouldContain("did not finish");
         run.FinishedAt.ShouldNotBeNull();
-    }
-
-    [Fact]
-    public async Task The_daily_schedule_stays_off_when_switched_off()
-    {
-        await using var off = Factory.WithWebHostBuilder(b => b.UseSetting("Instruments:AutoRefresh:Enabled", "false"));
-        using var client = off.CreateClient();
-
-        Factory.Logs.All.ShouldContain(l => l.Contains("Daily instrument refresh is off", StringComparison.Ordinal));
-        var settings = off.Services.GetRequiredService<IInstrumentRefreshSettings>();
-        settings.AutoRefreshEnabled.ShouldBeFalse();
     }
 
     [Theory]

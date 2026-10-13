@@ -54,7 +54,7 @@ internal sealed class DataEndpoints : IEndpointModule
 
         group.MapGet("/notices", GetNoticesAsync)
             .WithName("GetDataNotices")
-            .WithSummary("What the owner should know about the data for the notification bell: the last scheduled run failed (data_run_failed), sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending)");
+            .WithSummary("What the owner should know about the data for the notification bell: sessions with missing bars (data_gaps_open), instruments failing the data quality checks (data_quality_failed), suggested corporate actions to review (data_corporate_actions_pending). A failed scheduled run is no longer here: it is the service_failed notice of GET /api/services/notices");
 
         group.MapGet("/calendar", GetCalendarAsync)
             .WithName("GetTradingCalendar")

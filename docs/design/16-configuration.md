@@ -304,10 +304,19 @@ Broker API keys, secrets and tokens are not configuration: they are entered in t
 
 | Option (`appsettings` / environment) | Meaning | Default | Check |
 |--------------------------------------|---------|---------|-------|
-| `Instruments:AutoRefresh:Enabled` (`Instruments__AutoRefresh__Enabled`; compose: `XD_INSTRUMENTS_AUTO_REFRESH`) | The API refreshes the master list from Dhan's public scrip master by itself once a day | `true` | boolean |
-| `Instruments:AutoRefresh:TimeIst` (`Instruments__AutoRefresh__TimeIst`; compose: `XD_INSTRUMENTS_REFRESH_TIME_IST`) | Time of the daily run as `HH:mm` (24-hour), **India time** (UTC+05:30, no daylight saving); Dhan publishes the file around 08:20 | `08:45` | required, validated at start (`ValidateOnStart`): a wrong value stops the API with a message |
+| `Instruments:AutoRefresh:Enabled` (`Instruments__AutoRefresh__Enabled`; compose: `XD_INSTRUMENTS_AUTO_REFRESH`) | **First-start setting** (ADR 0018): whether the master list is refreshed by itself once a day. Read once, when the service `instrument-master` has no stored row; after that the Services screen is the only place to change it | `true` | boolean |
+| `Instruments:AutoRefresh:TimeIst` (`Instruments__AutoRefresh__TimeIst`; compose: `XD_INSTRUMENTS_REFRESH_TIME_IST`) | **First-start setting** (read once, like the switch above): time of the daily run as `HH:mm` (24-hour), **India time** (UTC+05:30, no daylight saving); Dhan publishes the file around 08:20 | `08:45` | required, validated at start (`ValidateOnStart`): a wrong value stops the API with a message |
 
 The two source URLs are not configuration: they are fixed in the code and on the allow-list ([doc 05](05-data-and-brokers.md) §7.1, [doc 17](17-deployment-and-operations.md) §3). The manual "Refresh list" button works whether the daily run is on or off.
+
+### End-of-day run (`Data:Eod:*`, ADR 0017 §2, ADR 0018)
+
+| Option (`appsettings` / environment) | Meaning | Default | Check |
+|--------------------------------------|---------|---------|-------|
+| `Data:Eod:Enabled` (`Data__Eod__Enabled`) | **First-start setting**: whether the service `eod` is on. Read once, when it has no stored row; after that the Services screen is the only place to change it | `true` | boolean |
+| `Data:Eod:TimeIst` (`Data__Eod__TimeIst`) | **First-start setting** (read once, like the switch above): time of the run as `HH:mm` (24-hour), **India time**; a run never starts before that day's session has ended | `15:50` | required, validated at start |
+
+The other `Data:*` options (CSV folder and limits, Dhan fetch, gap look-back, data quality thresholds) are ordinary configuration and unchanged.
 
 ### Holdings refresh (`Portfolio:*`, ADR 0012, P2-01)
 

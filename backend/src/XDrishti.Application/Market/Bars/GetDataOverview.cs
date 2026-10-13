@@ -2,6 +2,7 @@ using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Market.Bars.Csv;
 using XDrishti.Application.Market.Bars.Eod;
 using XDrishti.Application.Market.Bars.Gaps;
@@ -26,6 +27,7 @@ internal sealed class GetDataOverviewHandler(
     ITradingCalendar tradingCalendar,
     ITradingDayStore tradingDays,
     ICorporateActionQueries corporateActions,
+    IServiceScheduleReader schedules,
     TimeProvider clock) : IQueryHandler<GetDataOverviewQuery, DataOverview>
 {
     private static readonly string[] Ended = [PhaseStatus.Succeeded, PhaseStatus.Failed, PhaseStatus.Skipped];
@@ -64,20 +66,23 @@ internal sealed class GetDataOverviewHandler(
         var proposals = await tradingDays.CountProposedAsync(cancellationToken);
 
         var gapCounts = GapsOverview.From(await gaps.GetSummaryAsync(cancellationToken));
-        var eod = await EodAsync(calendar, now, cancellationToken);
+        var eod = await EodAsync(cancellationToken);
         var pending = await corporateActions.GetPendingAsync(cancellationToken);
 
         return new DataOverview(csv, dhan, aggregates, bars, View(running), last3, nextHoliday is null ? null : CalendarDayView.From(nextHoliday), proposals, gapCounts, eod, pending.Count);
     }
 
-    private async ValueTask<EodOverview> EodAsync(Domain.Market.Calendar.TradingCalendar calendar, DateTimeOffset now, CancellationToken cancellationToken)
+    private async ValueTask<EodOverview> EodAsync(CancellationToken cancellationToken)
     {
+        // the schedule is the one of the Services screen (ADR 0018): the stored choices of the end-of-day run
+        var eod = await schedules.GetAsync(EodService.Id, cancellationToken);
         var last = await jobs.GetLastByTriggerAsync(DataJobTrigger.Daily, cancellationToken);
         return new EodOverview(
-            settings.EodEnabled,
-            settings.EodTimeIst.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture),
-            settings.EodEnabled ? DataEodSchedule.NextRun(now, settings.EodTimeIst, calendar) : null,
-            last is null ? null : EodRunView.From(last));
+            eod?.Enabled ?? false,
+            eod?.TimeIst?.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+            eod?.NextRunAt,
+            last is null ? null : EodRunView.From(last),
+            eod?.Words);
     }
 
     private static DataJobView? View(DataJob? job) => job is null ? null : DataJobView.From(job);

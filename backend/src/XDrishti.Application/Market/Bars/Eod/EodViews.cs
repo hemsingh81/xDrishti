@@ -16,14 +16,14 @@ public sealed record EodRunView(Guid JobId, DateTimeOffset StartedAt, DateTimeOf
 }
 
 /// <summary>
-/// The scheduled end-of-day run (ADR 0017 §2): <c>enabled</c> (<c>Data:Eod:Enabled</c>), <c>timeIst</c> (<c>HH:mm</c>, India time), <c>nextRunAt</c> (the next trading day's run;
-/// null when switched off) and <c>lastRun</c> (the latest automatic run, null before the first).
+/// The scheduled end-of-day run (ADR 0017 §2) as set on the Services screen (ADR 0018): <c>enabled</c> (the service is not paused), <c>timeIst</c> (<c>HH:mm</c>, India time; empty when the schedule has no time of its own),
+/// <c>nextRunAt</c> (the next scheduled start; null when paused or none ahead), <c>lastRun</c> (the latest automatic data job, null before the first) and <c>scheduleWords</c> (the schedule in words).
 /// </summary>
-public sealed record EodOverview(bool Enabled, string TimeIst, DateTimeOffset? NextRunAt, EodRunView? LastRun);
+public sealed record EodOverview(bool Enabled, string TimeIst, DateTimeOffset? NextRunAt, EodRunView? LastRun, string? ScheduleWords = null);
 
 /// <summary>
 /// Something about the data pipeline the owner should know, derived from the stored state like the account notices of the bell. <c>id</c> includes the situation (a new failed
-/// run or a changed number of open gaps is a new notice, hence unread again). <c>kind</c>: data_run_failed · data_gaps_open · data_quality_failed (instruments fail the data quality checks: warn within the allowed share, error when the gate blocks the nightly plan) · data_corporate_actions_pending (suggested splits or bonus issues wait for a decision; warn). <c>severity</c>: error · warn.
+/// run or a changed number of open gaps is a new notice, hence unread again). <c>kind</c>: data_gaps_open · data_quality_failed (instruments fail the data quality checks: warn within the allowed share, error when the gate blocks the nightly plan) · data_corporate_actions_pending (suggested splits or bonus issues wait for a decision; warn). <c>severity</c>: error · warn.
 /// </summary>
 public sealed record DataNotice(string Id, string Kind, string Severity, string Text, DateTimeOffset? At);
 

@@ -87,21 +87,21 @@ public sealed class CorporateActionHooksTests
     {
         var found = Now.AddHours(-2);
 
-        var one = DataNoticeRules.Build(null, new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(1, found));
-        var three = DataNoticeRules.Build(null, new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(3, found));
+        var one = DataNoticeRules.Build(new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(1, found));
+        var three = DataNoticeRules.Build(new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(3, found));
 
         var notice = one.ShouldHaveSingleItem();
         (notice.Kind, notice.Severity, notice.Text, notice.At).ShouldBe(("data_corporate_actions_pending", "warn", "1 suggested corporate action (split or bonus) to review", found));
         three.ShouldHaveSingleItem().Text.ShouldBe("3 suggested corporate actions (splits or bonus issues) to review");
         three[0].Id.ShouldNotBe(notice.Id);
-        three[0].Id.ShouldBe(DataNoticeRules.Build(null, new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(3, found))[0].Id);
+        three[0].Id.ShouldBe(DataNoticeRules.Build(new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(3, found))[0].Id);
     }
 
     [Fact]
     public void No_suggestions_no_notice()
     {
-        DataNoticeRules.Build(null, new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(0, null)).ShouldBeEmpty();
-        DataNoticeRules.Build(null, new GapSummary(0, 0, 0, null)).ShouldBeEmpty();
+        DataNoticeRules.Build(new GapSummary(0, 0, 0, null), pendingActions: new PendingActions(0, null)).ShouldBeEmpty();
+        DataNoticeRules.Build(new GapSummary(0, 0, 0, null)).ShouldBeEmpty();
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public sealed class CorporateActionHooksTests
     {
         _data.Actions.Add(CorporateAction.Suggest(Guid.NewGuid(), new DateOnly(2026, 9, 1), CorporateActionKind.Split, 1, 5, null, Now));
 
-        var notices = await new GetDataNoticesHandler(new FakeDataJobStore(), new FakeBarGaps(), new StubQualityQueries(), new FixedCalendar(), new FakeDataSettings(), _data, _clock).HandleAsync(new GetDataNoticesQuery(), Ct);
+        var notices = await new GetDataNoticesHandler(new FakeBarGaps(), new StubQualityQueries(), new FixedCalendar(), new FakeDataSettings(), _data, _clock).HandleAsync(new GetDataNoticesQuery(), Ct);
 
         notices.Items.ShouldHaveSingleItem().Kind.ShouldBe("data_corporate_actions_pending");
     }

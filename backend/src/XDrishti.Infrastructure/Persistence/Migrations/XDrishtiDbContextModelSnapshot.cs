@@ -1405,6 +1405,139 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("service_heartbeats", "platform");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Platform.Services.ServiceRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<short>("Attempt")
+                        .HasColumnType("smallint")
+                        .HasColumnName("attempt");
+
+                    b.Property<Guid?>("DataJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("data_job_id");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("ServiceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("service_id");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("trigger");
+
+                    b.HasKey("Id")
+                        .HasName("pk_service_runs");
+
+                    b.HasIndex("ServiceId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_service_runs_one_running")
+                        .HasFilter("status = 'running'");
+
+                    b.HasIndex("ServiceId", "StartedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_service_runs_service_id_started_at");
+
+                    b.ToTable("service_runs", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_service_runs_attempt", "attempt >= 1");
+
+                            t.HasCheckConstraint("ck_service_runs_status", "status IN ('running', 'succeeded', 'failed', 'skipped')");
+
+                            t.HasCheckConstraint("ck_service_runs_trigger", "trigger IN ('scheduled', 'catch_up', 'after', 'manual')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Platform.Services.ServiceSchedule", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("service_id");
+
+                    b.Property<bool>("CatchUp")
+                        .HasColumnType("boolean")
+                        .HasColumnName("catch_up");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<bool>("NotifyOnFailure")
+                        .HasColumnType("boolean")
+                        .HasColumnName("notify_on_failure");
+
+                    b.Property<string>("Parameters")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("parameters");
+
+                    b.Property<short>("Retries")
+                        .HasColumnType("smallint")
+                        .HasColumnName("retries");
+
+                    b.Property<uint>("Revision")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Schedule")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("schedule");
+
+                    b.Property<short>("TimeoutMinutes")
+                        .HasColumnType("smallint")
+                        .HasColumnName("timeout_minutes");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_service_schedules");
+
+                    b.ToTable("service_schedules", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_service_schedules_retries", "retries BETWEEN 0 AND 5");
+
+                            t.HasCheckConstraint("ck_service_schedules_schedule", "schedule ->> 'type' IN ('daily', 'weekly', 'after', 'window', 'interval', 'continuous')");
+
+                            t.HasCheckConstraint("ck_service_schedules_timeout", "timeout_minutes BETWEEN 1 AND 240");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
                 {
                     b.Property<Guid>("Id")
