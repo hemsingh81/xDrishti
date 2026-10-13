@@ -11,6 +11,8 @@ export type ProblemKind =
   | 'invalid'
   | 'not_found'
   | 'alert_limit'
+  | 'preview_stale'
+  | 'lot_from_trade'
   | 'broker_error'
   | 'network'
   | 'other';
@@ -26,6 +28,8 @@ const byCode: Record<string, ProblemKind> = {
   'portfolio.invalid': 'invalid',
   'portfolio.not_found': 'not_found',
   'portfolio.alert_limit': 'alert_limit',
+  'portfolio.preview_stale': 'preview_stale',
+  'portfolio.lot_from_trade': 'lot_from_trade',
   'accounts.broker_error': 'broker_error',
 };
 
@@ -42,6 +46,9 @@ const friendly: Partial<Record<ProblemKind, string>> = {
     'This account has no portfolio bucket to put holdings in. Switch its Portfolio role off and on again in Accounts.',
   sync_running: 'A sync or import of this account is already running. Wait a moment for it to finish.',
   conflict: 'The lot was changed or closed meanwhile. Reload and try again.',
+  preview_stale: 'Holdings or trades changed — please review again.',
+  lot_from_trade:
+    'This lot comes from your trades, so its date follows them. Change the trades and rebuild the lots instead.',
   alert_limit: 'You have reached the limit of 200 active alerts. Cancel one you no longer need, then set this one.',
   broker_error: 'Dhan could not be reached right now. Try again in a moment.',
   network: 'Could not reach the server. Check your connection and try again.',

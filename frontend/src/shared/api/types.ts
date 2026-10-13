@@ -227,3 +227,24 @@ export type PriceAlertInput = Schemas['PriceAlertInput'];
 /** What the Portfolio module tells the bell: a triggered alert, items waiting for a decision. */
 export type PortfolioNotice = Schemas['PortfolioNotice'];
 export type PortfolioNotices = Schemas['PortfolioNotices'];
+
+/** Trades (P2-03, ADR 0023): a tradebook CSV or a manual entry, stored as transactions that can rebuild a holding's lots. */
+export type TradePreviewReport = Schemas['TradePreviewReport'];
+export type TradeFileSummary = Schemas['TradeFileSummary'];
+export type TradeBadRow = Schemas['TradeBadRow'];
+/** One security of the file: its trades in the file and what rebuilding its holding's lots would do. */
+export type TradeSecurity = Schemas['TradeSecurityView'];
+/** What rebuilding a holding's lots from its trades does (status ok · unchanged · quantity_mismatch · no_holding · ambiguous). */
+export type TradeRebuild = Schemas['TradeRebuildView'];
+export type TradeImportResult = Schemas['TradeImportResult'];
+/** One imported file; status imported | undone. */
+export type TradeBatch = Schemas['TradeBatchView'];
+export type TradeBatchPage = Schemas['TradeBatchPage'];
+/** What undoing an import did, or with a dry run would do (`dryRun`, `applied`, the lots it would replace, the holdings it cannot rebuild). */
+export type TradeUndoResult = Schemas['TradeUndoResult'];
+export type TradeNotRebuilt = Schemas['TradeNotRebuilt'];
+/** A trade (side buy | sell, source csv | manual); a voided trade does not count. */
+export type Trade = Schemas['TradeView'];
+export type TradePage = Schemas['TradePage'];
+export type ManualTradeInput = Schemas['ManualTradeInput'];
+export type HoldingRebuildResult = Schemas['HoldingRebuildResult'];

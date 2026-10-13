@@ -17,6 +17,8 @@ export const portfolioKeys = {
   actions: queryRoots.portfolioActions,
   /** Price alerts: the lists per status and their counts (P2-09). */
   alerts: ['portfolio', 'alerts'] as const,
+  /** Trades (P2-03): the import history, a holding's trades and the dry run of a rebuild. */
+  trades: ['portfolio', 'trades'] as const,
   /** Holdings and instruments looked up for a price (the alert dialog) or a row (the drawer). */
   lookups: ['portfolio', 'lookups'] as const,
   lotsOf: (holdingId: string) => ['portfolio', 'lots', holdingId] as const,

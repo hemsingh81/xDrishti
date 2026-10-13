@@ -4,10 +4,12 @@ using XDrishti.Application.Accounts;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Refresh;
+using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Application.Tests.Accounts.Connections;
 using XDrishti.Application.Tests.Portfolio.Groups;
 using XDrishti.Application.Tests.Portfolio.History;
+using XDrishti.Application.Tests.Portfolio.Trades;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Portfolio;
@@ -68,6 +70,27 @@ internal sealed class PortfolioFixture
     public GetHoldingsSummaryHandler Summary() => new(Data, Data, Accounts, Benchmarks, Prices, new FakeTradingCalendar(HistoryData.Weekdays), Clock);
 
     public GetHoldingLotsHandler Lots() => new(Data, Clock);
+
+    /// <summary>The trades, their import batches, the master list's shares and the applied corporate actions (ADR 0023).</summary>
+    public InMemoryTradeData Trades { get; } = new();
+
+    public TradeWorkspace Workspace => new(Accounts, Data, Trades, Trades, Accounts);
+
+    public PreviewTradesHandler PreviewTrades() => new(Workspace, Clock, NullLogger<PreviewTradesHandler>.Instance);
+
+    public ImportTradesHandler ImportTrades() => new(Workspace, Trades, Trades, Data, Accounts, Data, Clock, NullLogger<ImportTradesHandler>.Instance);
+
+    public ListTradeBatchesHandler ListTradeBatches() => new(Trades, Accounts);
+
+    public UndoTradeBatchHandler UndoTradeBatch() => new(Workspace, Trades, Trades, Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UndoTradeBatchHandler>.Instance);
+
+    public ListHoldingTradesHandler ListHoldingTrades() => new(Data, Trades);
+
+    public AddManualTradeHandler AddManualTrade() => new(Accounts, Data, Trades, Trades, Accounts, Data, Clock, NullLogger<AddManualTradeHandler>.Instance);
+
+    public VoidTradeHandler VoidTrade() => new(Trades, Accounts, Accounts, Data, Clock, NullLogger<VoidTradeHandler>.Instance);
+
+    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Trades, Accounts, Data, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
 
     public UpdateLotDateHandler UpdateLotDate() => new(Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UpdateLotDateHandler>.Instance);
 

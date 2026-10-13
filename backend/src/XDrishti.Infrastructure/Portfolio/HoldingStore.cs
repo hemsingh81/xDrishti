@@ -17,4 +17,6 @@ internal sealed class HoldingStore(XDrishtiDbContext db) : IHoldingStore
         await db.Holdings.Include(x => x.Lots).FirstOrDefaultAsync(x => x.Id == holdingId, cancellationToken);
 
     public void Add(Holding holding) => db.Holdings.Add(holding);
+
+    public void Touch(Holding holding) => db.Entry(holding).Property(x => x.SyncedAt).IsModified = true;
 }

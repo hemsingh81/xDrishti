@@ -189,7 +189,7 @@
 <li><strong>Tripwire:</strong> a file that would leave fewer than half of the currently active instruments is refused (the run fails with a plain message); a forced refresh applies it anyway.</li>
 <li><strong>All or nothing:</strong> the kept rows are copied into a temporary table (binary <code>COPY</code>) and merged in <strong>one transaction</strong>, so a failed run changes nothing. Instruments no longer in the file are <strong>retired</strong> (<code>retired_at</code>, hidden by default, never deleted) and <strong>revived</strong> when they come back.</li>
 <li><strong>Sectors are optional:</strong> whatever goes wrong with the NSE list (timeout, refusal, bad data) only adds a warning; the stored sectors stay and the next refresh does not skip the unchanged master.</li>
-<li><strong>Recorded:</strong> every run — succeeded, unchanged or failed — is a row in <code>market.master_refreshes</code> with counts (added / updated / retired / revived / unchanged / skipped by scope / collisions / sector matches / F&amp;O underlyings), source validators, rules version, warnings and error. The daily run moves into the service framework with P1-13.</li>
+<li><strong>Recorded:</strong> every run — succeeded, unchanged or failed — is a row in <code>market.master_refreshes</code> with counts (added / updated / retired / revived / unchanged / skipped by scope / collisions / sector matches / F&amp;O underlyings), source validators, rules version, warnings and error. The daily run is the service <code>instrument-master</code> of the services framework (P1-13, <a href="04-accounts-access-and-operations.html">doc 04</a> §3.1): its time and switch are set on the Services screen; <code>Instruments:AutoRefresh:*</code> are the first-start settings only.</li>
 </ul>
 <h3 id="23-searching-tracking-and-the-instrument-record">2.3 Searching, tracking and the instrument record<a class="hash" href="#23-searching-tracking-and-the-instrument-record" aria-label="Link to this section">#</a></h3>
 <ul>
@@ -562,7 +562,7 @@ basket detail (members, performance by lens, benchmark, open positions).</li>
     <a class="prev" href="05-data-and-brokers.html"><small>← Previous  [</small>05 · Data &amp; brokers</a>
     <a class="next" href="07-strategies.html"><small>Next  ] →</small>07 · Strategies</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-12 17:51</footer>
+  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-13 17:50</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-concepts" class="d2">1. Concepts</a>
 <a href="#2-master-list-tracked-instruments" class="d2">2. Master list &amp;amp; tracked instruments</a>

@@ -150,6 +150,9 @@ public static class DependencyInjection
         services.AddScoped<IHoldingQueries, HoldingQueries>();
         services.AddScoped<IHoldingClassifications, HoldingClassifications>();
         services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
+        services.AddScoped<ITradeStore, TradeStore>();
+        services.AddScoped<ITradeBatches, TradeBatches>();
+        services.AddScoped<ITradeReferenceData, TradeReferenceData>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
         services.AddScoped<IActionStates, ActionStates>();

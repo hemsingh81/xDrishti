@@ -27,12 +27,22 @@ const refused = (error: unknown) => {
   return cause?.code === 'ECONNREFUSED';
 };
 
+// A multipart upload (the trades import, see `multipart.ts`): the network mock cannot take in a request whose body is the
+// stream of a form (its copy of the body ends early and the request fails), so such a request is handed over with the same
+// bytes as text; the handler reads it with `readUpload`.
+const isMultipart = (input: Request | string | URL): input is Request =>
+  input instanceof Request && (input.headers.get('content-type') ?? '').startsWith('multipart/form-data');
+
 // jsdom resolves relative fetch URLs against this origin.
 beforeAll(() => {
   server.listen({ onUnhandledFrame: 'error' }); // any unmocked request fails the test
   const mocked = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     try {
+      if (isMultipart(input)) {
+        const body = await input.clone().text();
+        return await mocked(new Request(input, { body, signal: input.signal }), init);
+      }
       return await mocked(input, init);
     } catch (error) {
       if (refused(error)) escaped.push(input instanceof Request ? input.url : String(input));

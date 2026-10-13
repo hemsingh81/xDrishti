@@ -390,6 +390,8 @@ public sealed class HoldingQuotesTests(ApiFactory factory) : HoldingsTestBase(fa
         public ValueTask<XDrishti.Domain.Portfolio.Holding?> FindAsync(Guid holdingId, CancellationToken cancellationToken) => inner.FindAsync(holdingId, cancellationToken);
 
         public void Add(XDrishti.Domain.Portfolio.Holding holding) => inner.Add(holding);
+
+        public void Touch(XDrishti.Domain.Portfolio.Holding holding) => inner.Touch(holding);
     }
 
     [Fact]

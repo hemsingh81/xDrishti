@@ -27,3 +27,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0020](0020-portfolio-value-history-benchmark-and-charts.md) | Portfolio value history and benchmark computed from lots and stored daily bars; ECharts for charts | Accepted |
 | [0021](0021-portfolio-grouping-and-allocation-charts.md) | Portfolio grouping by account, bucket, sector or basket, computed on the server, with allocation charts | Accepted |
 | [0022](0022-action-center-and-price-alerts.md) | Portfolio Action center evaluated on read, and one-shot price alerts checked by the quotes service | Accepted |
+| [0023](0023-trade-import-and-lot-reconstruction.md) | Trades from CSV or by hand are stored as transactions and rebuild a holding's lots with real dates | Accepted |

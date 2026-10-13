@@ -431,12 +431,18 @@ Prices are raw by default; <code>adjusted=true</code> on the bars read applies t
 <td>WebSocket (counts toward budget)</td>
 </tr>
 <tr>
+<td>Benchmark index (Nifty 50 by default, P2-07)</td>
+<td>Portfolio value history vs the same cash flows in the index</td>
+<td>Tracked like any instrument (<code>IDX_I</code> day bars from the daily fetch); the Portfolio screen offers <em>Track the benchmark</em></td>
+</tr>
+<tr>
 <td>Long-term holdings</td>
-<td>Valuation</td>
-<td>Quote API polling (≤ 1,000 per request, every 5 min)</td>
+<td>Valuation, day change</td>
+<td>Quote API polling (≤ 1,000 per request, every 5 min) — <strong>built</strong> (P2-06, <a href="../adr/0019-holdings-quotes-day-change-and-the-first-interval-service.html">ADR 0019</a>): the service <code>holdings-quotes</code></td>
 </tr>
 </tbody></table>
 <ul>
+<li><strong>Holdings quotes (built, P2-06).</strong> <code>POST https://api.dhan.co/v2/marketfeed/quote</code> with the <strong>primary Data account&#39;s</strong> <code>access-token</code> and <code>client-id</code> headers and the body <code>{&quot;NSE_EQ&quot;:[securityId, …]}</code> (≤ 1,000 ids per request; more are split into several requests at least 1 s apart by a throttle of its own, 1 request/s, apart from the bar fetch&#39;s). The answer per security gives <code>last_price</code> and <code>ohlc.close</code> (the previous session&#39;s close); a security that is missing or has a zero/negative/non-numeric price is left out for that security only. It is the one market-feed path on the endpoint allow-list (<code>ltp</code>, <code>ohlc</code>, any query, any other method or host stay refused). Failures are fail-closed with fixed safe messages: 401/403 (or DH-901/DH-902) → the token was refused, 429 (or DH-904) → rate limited, anything else or an unexpected answer → failed; nothing is retried inside the call (the next tick is the retry) and neither token, client id nor body is logged. The shapes in <code>docs/research/dhan-samples/quote-*.json</code> are written from Dhan&#39;s documentation and <strong>unverified</strong> until the owner&#39;s first real run. Only the open holdings that map to an NSE instrument of the master are quoted; the rest keep their synced price.</li>
 <li>Dhan limits: up to 5 WebSocket connections × 5,000 instruments; our active set is typically &lt; 100 → one
 connection. <code>live.max_ws_instruments</code> caps it (default 200).</li>
 <li><code>xd-feed</code> builds <strong>live 1-minute bars</strong> in memory from ticks and persists them to <code>market.bars_1m_live</code>.</li>
@@ -497,15 +503,13 @@ two days before the instrument&#39;s last stored bar (the overlap proves the tim
 </blockquote>
 <h3 id="61-scheduled-run-and-gap-backfill-adr-0017-23-p1-12a">6.1 Scheduled run and gap backfill (ADR 0017 §2–§3, P1-12a)<a class="hash" href="#61-scheduled-run-and-gap-backfill-adr-0017-23-p1-12a" aria-label="Link to this section">#</a></h3>
 <blockquote>
-<p><strong>Built (P1-12a, <a href="../specs/P1-12a-scheduled-end-of-day-run-and-gap-backfill.html">spec</a>):</strong> the schedule and the gap backfill, in <code>xd-api</code> until the services framework (P1-13) takes over.</p>
-<p><strong>The scheduled run.</strong> A hosted service (<code>DataEodService</code>, the shape of the daily instrument refresh) waits, in slices of at most one minute that read the clock again, for the next
-run time and then starts the ordinary data job with the steps <code>dhan, aggregate, quality</code> (every step of the pipeline but <code>csv</code>, which is for history the owner brings by hand; the quality checks of P1-14a are §10b) and trigger <code>daily</code>, requested by <code>system:data-eod</code>. The run time is <code>Data:Eod:TimeIst</code> (<code>HH:mm</code> India time, default <strong>15:50</strong>) on <strong>trading days of the calendar</strong>
-(§4.1: no weekends or holidays, special sessions included) and never before that day&#39;s session has closed — a special evening session such as Muhurat moves the day&#39;s run to its end.
-<code>Data:Eod:Enabled</code> (default true) switches it off. <strong>Catch-up:</strong> when the application starts on a trading day after the run time and no automatic run exists for the day, it runs at once.
+<p><strong>Built (P1-12a, <a href="../specs/P1-12a-scheduled-end-of-day-run-and-gap-backfill.html">spec</a>; moved onto the services framework by P1-13, <a href="../adr/0018-services-framework-and-editable-schedules.html">ADR 0018</a>):</strong> the schedule and the gap backfill, in <code>xd-api</code>.</p>
+<p><strong>The scheduled run.</strong> The end-of-day run is the service <strong><code>eod</code></strong> of the Services screen (<a href="04-accounts-access-and-operations.html">doc 04</a> §3.1): the scheduler starts the ordinary data job with the steps <code>dhan, aggregate, quality</code> (every step of the pipeline but <code>csv</code>, which is for history the owner brings by hand; the quality checks of P1-14a are §10b) and trigger <code>daily</code>, requested by <code>system:data-eod</code>, and the run ends as the job does (its progress is linked to the run record, <code>data_job_id</code>). The run time is set <strong>on the Services screen</strong> — by default <strong>15:50 India time</strong> on <strong>trading days of the calendar</strong>
+(§4.1: no weekends or holidays, special sessions included) and never before that day&#39;s session has closed — a special evening session such as Muhurat moves the day&#39;s run to its end. <code>Data:Eod:Enabled</code> and <code>Data:Eod:TimeIst</code> are only the <strong>first-start settings</strong>: read once, when the service has no stored row, and ignored after it (a service paused there is switched off). <strong>Catch-up:</strong> when the application starts on a trading day after the run time and no run exists for the day, it runs at once (a paused service never does).
 <strong>At most one automatic run per day.</strong> When another data job is running, or the primary Data account cannot fetch (no account, not connected, expired) or the Dhan fetch is not
 available, no job starts: a <strong>skipped run</strong> is recorded (job status <code>skipped</code>, the reason as its error, no phase ran) and nothing is retried that day; the owner runs &quot;Update data&quot; by hand. A
-failure to read the database at the run time is retried a few times a minute apart.
-Jobs carry <code>trigger</code> (<code>manual</code> | <code>daily</code>); the overview&#39;s <code>eod</code> block gives <code>enabled</code>, <code>timeIst</code>, <code>nextRunAt</code> (null when switched off) and <code>lastRun</code> (the latest automatic run: id, start, end, status, trigger, reason).</p>
+failure (a database error, a failed job) ends the run as failed; it is retried only when the service&#39;s <em>retries</em> setting says so (default none), and raises a notice when <em>notify on failure</em> is on.
+Jobs carry <code>trigger</code> (<code>manual</code> | <code>daily</code>); the overview&#39;s <code>eod</code> block gives <code>enabled</code> (the service is not paused), <code>timeIst</code> (the time of the stored schedule), <code>nextRunAt</code> (the next scheduled start; null when paused), <code>scheduleWords</code> and <code>lastRun</code> (the latest automatic data job: id, start, end, status, trigger, reason) — the same schedule the Services screen edits.</p>
 <p><strong>Gap detection and backfill</strong> (the Dhan phase of every job, scheduled or not). For each tracked instrument with bars, the sessions of the last <code>Data:Gaps:LookbackSessions</code> (default <strong>30</strong>, 1 to 250)
 trading days of the calendar that have <strong>closed</strong> (never today&#39;s open session) and that lie <strong>after the day of the instrument&#39;s first bar</strong> are counted. The bars of a day come from the daily
 aggregate&#39;s <code>bars</code> column — one cheap read of a month of days; only the days of the instrument&#39;s not-yet-aggregated range (the dirty range) are counted in the 1-minute table, by its primary key —
@@ -554,8 +558,8 @@ is a <strong>gap</strong> in <code>market.bar_gaps (instrument_id, date, expecte
 <p><strong>Which gaps count.</strong> The records are kept for every instrument, but the overview, <code>GET /api/data/gaps</code>, the <code>hasGaps</code> filter and the bell notice count only the gaps of <strong>tracked, not retired</strong> instruments (the quality universe): untracking or retiring an instrument takes its open gaps out of sight, tracking it again brings them back.</p>
 <p><strong>Start-up.</strong> The catch-up at start waits for the data worker&#39;s recovery of jobs a previous process left <code>running</code> (<code>DataJobRecovery</code>, at most two minutes), so such a job is not mistaken for a running one; when a start fails because a job runs, the day&#39;s automatic jobs are looked at again before a skipped run is recorded (a run of the day that appeared meanwhile is not followed by a skipped row), and the wait slices are clamped at zero so a clock that jumped cannot make a delay negative.</p>
 <p>The phase reports <code>gapsFound</code>, <code>gapsFilled</code> and <code>gapsUnfillable</code> (sessions it asked for or found incomplete) and warns when some stay open. <strong>Notices</strong> for the bell
-(<code>GET /api/data/notices</code>, derived from state like the account notices, with an id that includes the situation): the latest automatic run <strong>failed</strong> (<code>data_run_failed</code>, error), and sessions are left with <strong>open gaps</strong>
-(<code>data_gaps_open</code>, warning; unfillable sessions raise nothing — they are listed, not alarming); P1-14a adds <code>data_quality_failed</code> (§10b).</p>
+(<code>GET /api/data/notices</code>, derived from state like the account notices, with an id that includes the situation): sessions are left with <strong>open gaps</strong>
+(<code>data_gaps_open</code>, warning; unfillable sessions raise nothing — they are listed, not alarming); P1-14a adds <code>data_quality_failed</code> (§10b). A failed automatic run (<code>data_run_failed</code>) was a data notice in P1-12a; <strong>replaced by the <code>service_failed</code> notice of the end-of-day service in P1-13</strong> (<code>GET /api/services/notices</code>, governed by the service&#39;s <em>notify on failure</em>).</p>
 </blockquote>
 <h2 id="7-broker-abstraction">7. Broker abstraction<a class="hash" href="#7-broker-abstraction" aria-label="Link to this section">#</a></h2>
 <table>
@@ -961,7 +965,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-12 17:51</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-13 17:50</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>

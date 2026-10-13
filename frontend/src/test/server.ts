@@ -27,6 +27,7 @@ import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
+import { tradeHandlers } from './tradeFixtures';
 
 /** A made-up Dhan consent page URL (the documented form, with a fake consentAppId). */
 export const dhanAuthorizeUrl = 'https://auth.dhan.co/login/consentApp-login?consentAppId=fake-consent-0001';
@@ -100,6 +101,8 @@ export const handlers = [
   ...historyHandlers,
   // The Action center, price alerts, thresholds and the Portfolio notices of the bell (P2-09): none by default.
   ...actionCenterHandlers,
+  // Trades (P2-03): no imports and no trades of a holding by default; the trade fake brings stateful ones.
+  ...tradeHandlers,
   // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),

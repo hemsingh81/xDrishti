@@ -78,6 +78,10 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<PriceAlert> PriceAlerts => Set<PriceAlert>();
 
+    public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<TradeBatch> TradeBatches => Set<TradeBatch>();
+
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
 

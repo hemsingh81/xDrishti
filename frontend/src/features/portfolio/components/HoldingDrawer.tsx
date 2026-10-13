@@ -1,6 +1,7 @@
 import CloseIcon from '@mui/icons-material/Close';
 import NotificationsIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import { Box, Button, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
+import { lazy, Suspense } from 'react';
 import type { HoldingRow } from '@/shared/api';
 import {
   formatDate,
@@ -10,11 +11,14 @@ import {
   formatIstDateTime,
   formatNumber,
 } from '@/shared/lib/format';
-import { Facts, type Fact } from '@/shared/ui';
+import { Facts, LoadingState, type Fact } from '@/shared/ui';
 import { monoFontFamily } from '@/theme';
 import { noDayChangeReasonOf } from '../lib/figures';
 import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
 import { LotsSection } from './LotsSection';
+
+// The trades of a holding (and the dialogs behind them) are loaded when the drawer first opens: most visits never get there.
+const HoldingTrades = lazy(async () => ({ default: (await import('./trades/HoldingTrades')).HoldingTrades }));
 
 const priceSourceLabel = (source: string): string => (source === 'quote' ? 'Quote' : 'Synced');
 
@@ -58,7 +62,7 @@ interface HoldingDrawerProps {
   onShowAlerts: () => void;
 }
 
-/** Side panel for one holding: its figures, then its lots with their dates. */
+/** Side panel for one holding: its figures, then its lots with their dates, then its trades. */
 export function HoldingDrawer({ id, holding, onClose, onSetAlert, onShowAlerts }: HoldingDrawerProps) {
   return (
     <Drawer
@@ -112,6 +116,11 @@ export function HoldingDrawer({ id, holding, onClose, onSetAlert, onShowAlerts }
         <Stack spacing={3}>
           {holding && <Facts items={factsOf(holding)} />}
           {id !== null && <LotsSection holdingId={id} />}
+          {id !== null && (
+            <Suspense fallback={<LoadingState label="Loading trades" />}>
+              <HoldingTrades holdingId={id} holding={holding} />
+            </Suspense>
+          )}
         </Stack>
       </Box>
     </Drawer>

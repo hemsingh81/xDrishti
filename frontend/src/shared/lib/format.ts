@@ -194,3 +194,6 @@ export function formatHoursMinutes(totalSeconds: number): string {
   if (hours === 0) return `${minutes} min`;
   return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`;
 }
+
+/** "3 hand-dated lots will be replaced" from "3 hand-dated…": the first letter in capitals, the rest as it is. */
+export const capitalise = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;

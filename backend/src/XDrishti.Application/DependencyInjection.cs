@@ -28,6 +28,7 @@ using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
+using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Application;
@@ -263,6 +264,18 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListPriceAlertsQuery, Result<PriceAlertPage>>, ListPriceAlertsHandler>();
         services.AddScoped<ICommandHandler<CancelPriceAlertCommand, PriceAlertView>, CancelPriceAlertHandler>();
         services.AddScoped<IQueryHandler<GetPortfolioNoticesQuery, PortfolioNotices>, GetPortfolioNoticesHandler>();
+
+        // Trades from a tradebook CSV or by hand, and the rebuild of a holding's lots from them (ADR 0023). The workspace is shared by the use cases.
+        services.AddScoped<TradeWorkspace>();
+        services.AddScoped<IQueryHandler<PreviewTradesQuery, Result<TradePreviewReport>>, PreviewTradesHandler>();
+        services.AddScoped<ICommandHandler<ImportTradesCommand, TradeImportResult>, ImportTradesHandler>();
+        services.AddScoped<IQueryHandler<ListTradeBatchesQuery, Result<TradeBatchPage>>, ListTradeBatchesHandler>();
+        services.AddScoped<ICommandHandler<UndoTradeBatchCommand, TradeUndoResult>, UndoTradeBatchHandler>();
+        services.AddScoped<IQueryHandler<ListHoldingTradesQuery, Result<TradePage>>, ListHoldingTradesHandler>();
+        services.AddScoped<ICommandHandler<AddManualTradeCommand, TradeView>, AddManualTradeHandler>();
+        services.AddScoped<ICommandHandler<VoidTradeCommand, TradeView>, VoidTradeHandler>();
+        services.AddScoped<ICommandHandler<RebuildLotsCommand, HoldingRebuildResult>, RebuildLotsHandler>();
+        services.AddScoped<IQueryHandler<GetTradeTemplateQuery, string>, GetTradeTemplateHandler>();
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();

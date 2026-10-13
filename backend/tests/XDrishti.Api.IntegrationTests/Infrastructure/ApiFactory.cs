@@ -76,6 +76,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Stands in for the Dhan Data API and the Data account when a test sets them; otherwise the real placeholders answer.</summary>
     public FakeDhan Dhan { get; } = new();
 
+    /// <summary>Lets a test change the data "meanwhile", inside the trade use cases' unit of work (see <see cref="TradeHooks"/>).</summary>
+    public TradeHooks TradeHooks { get; } = new();
+
     /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
     public string AdminConnectionString => _database.GetConnectionString();
 
@@ -133,6 +136,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             // The Dhan Data API source and the Data account: the real ones answer (over the fake Dhan server above) unless a test puts a fake in (FakeDhan).
             Dhan.Wrap(services);
+
+            // The trade use cases read the applied corporate actions inside their unit of work: a test can act at that moment (TradeHooks).
+            var reference = services.Single(d => d.ServiceType == typeof(ITradeReferenceData));
+            services.Remove(reference);
+            services.AddScoped<ITradeReferenceData>(sp => new HookedTradeReferenceData((ITradeReferenceData)ActivatorUtilities.CreateInstance(sp, reference.ImplementationType!), TradeHooks));
         });
     }
 
@@ -176,6 +184,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             await db.Database.ExecuteSqlRawAsync("""
                 DELETE FROM portfolio.price_alerts;
                 DELETE FROM portfolio.action_states;
+                DELETE FROM portfolio.transactions;
+                DELETE FROM portfolio.trade_batches;
                 DELETE FROM portfolio.holding_lots;
                 DELETE FROM portfolio.holdings;
                 DELETE FROM portfolio.holding_syncs;

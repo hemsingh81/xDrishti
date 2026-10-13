@@ -27,6 +27,8 @@ export function invalidateHoldings(queryClient: QueryClient) {
     queryClient.invalidateQueries({ queryKey: portfolioKeys.summary }),
     queryClient.invalidateQueries({ queryKey: portfolioKeys.history }),
     queryClient.invalidateQueries({ queryKey: portfolioKeys.lots }),
+    // The trades and the import history (a rebuild, an undo or a sync can change what they show).
+    queryClient.invalidateQueries({ queryKey: portfolioKeys.trades }),
     // The holdings looked up for the drawer and the alert dialog (their prices and figures changed too).
     queryClient.invalidateQueries({ queryKey: portfolioKeys.lookups }),
     invalidateActionCenter(queryClient),
@@ -74,6 +76,7 @@ export function useUpdateLotDate(holdingId: string) {
       ),
     onSuccess: () => invalidatePortfolio(queryClient),
     // "The lot was changed or closed meanwhile": load what it is now.
-    onError: (error) => (problemKind(error) === 'conflict' ? invalidateHoldings(queryClient) : undefined),
+    onError: (error) =>
+      ['conflict', 'lot_from_trade'].includes(problemKind(error)) ? invalidateHoldings(queryClient) : undefined,
   });
 }

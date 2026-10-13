@@ -2914,7 +2914,7 @@
         "tags": [
           "Holdings"
         ],
-        "summary": "Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date",
+        "summary": "Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date. A lot rebuilt from trades (source trade) takes its date from the trade: 409 portfolio.lot_from_trade; the opening lot of such a holding must stay before the earliest trade: 400 portfolio.invalid, field acquiredOn",
         "operationId": "UpdateHoldingLotDate",
         "parameters": [
           {
@@ -2969,6 +2969,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5940,6 +5950,497 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/template": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "The template of a tradebook file as a CSV download: the canonical header (Date, Symbol, ISIN, Side, Quantity, Price, Exchange, Trade ID, Time, Charges) and two example rows. Other header names are accepted too (any case, punctuation ignored); only date, symbol or ISIN, side, quantity and price are required",
+        "operationId": "GetTradeTemplate",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/preview": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Read a tradebook against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows). Returns the file (rows, parsed, skipped by reason, bad rows with line and reason - at most 200 listed, badTotal counts all -, duplicates, alreadyImported, newTrades), the securities - every held or master-listed one and at most 200 unmatched ones; securitiesTotal counts all, unmatchedListed the unmatched listed - (symbol, isin, matched, holdingId, trades, buys, sells, first and last trade date and the rebuild: status ok | unchanged | quantity_mismatch | no_holding | ambiguous, reason, lotsBefore, lotsAfter, handDatedLotsReplaced, syncLotsReplaced, realisedPnl, adjustedFor, q, net, openingQty {before, after}, openCostAfter, brokerCost, costDelta, costNote, digest), notHeld and unmatched {securities, trades} and the overall digest. 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off",
+        "operationId": "PreviewTradeImport",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePreviewReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/import": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Import a tradebook: body multipart/form-data with accountId, file, rebuild (true | false, default true) and digest (required with rebuild: the digest of the preview). Stores the trades the account does not have yet as one batch (a trade id of the file together with the trade date - exchanges number trades per day -, else a hash of the line, is the identity: the same file again stores nothing and makes no batch) and, with rebuild, replaces the lots of every holding whose result is ok by lots built from the real buy and sell dates. Trades of securities not held, of mismatching or ambiguous holdings are stored and not applied. 409 portfolio.preview_stale when holdings, lots, corporate actions or trades changed since the preview (extension report: the fresh preview; nothing applied); 409 portfolio.sync_running while the account's holdings sync runs; 400 portfolio.invalid; 404 portfolio.not_found. Audited with counts only",
+        "operationId": "ImportTrades",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Add one trade by hand: holdingId, or accountId with symbol and/or isin of an NSE share or ETF of the instrument master; side buy | sell, tradeDate (1990-01-02 to today), tradeTime (optional, India time), quantity (whole, above 0), price (above 0), charges (optional). Validated like a CSV row; identical manual trades are not deduplicated. Changes no lots - rebuild them afterwards. 400 portfolio.invalid with field errors; 404 portfolio.not_found. Audited",
+        "operationId": "AddTrade",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualTradeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trades/{id}/void": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Void a trade: it stops counting, is never deleted and can be imported again. Voiding a voided trade is a no-op. Changes no lots - rebuild them afterwards. 404 portfolio.not_found. Audited",
+        "operationId": "VoidTrade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trade-batches": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "The imports of tradebook files, newest first: accountId (optional), page, pageSize (max 100, default 50). Each has id, accountId, accountName, fileName, sha256, parsed, imported, duplicates, skipped, bad, status imported | undone, activeTrades, securities, createdBy, createdAt, undoneAt",
+        "operationId": "ListTradeBatches",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeBatchPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/trade-batches/{id}/undo": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Undo an import: voids its trades (nothing is deleted) and rebuilds from the remaining trades the lots of the affected holdings whose lots came from trades - with none left, one lot of the broker's quantity and cost dated by the first import date, flagged default. LIMITATION: an undo cannot bring back lots the owner dated by hand or a sync added that an earlier rebuild replaced; handDatedLotsReplaced and syncLotsReplaced say how many the rebuild removes (the lots of holdings it rebuilds). Holdings whose lots did not come from trades keep their lots; holdings that cannot be rebuilt (quantity mismatch, ambiguous) keep theirs and are listed in notRebuilt [{symbol, holdingId, reason}] (holdingsNotRebuilt counts them). dryRun=true (default false) changes nothing and returns the same result (dryRun, applied=false) so the confirmation can say what will happen. Undoing twice is a no-op (alreadyUndone). 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only",
+        "operationId": "UndoTradeBatch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "dryRun",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradeUndoResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/{id}/trades": {
+      "get": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "The trades of a holding's security (by ISIN, else symbol), newest first, voided ones included and flagged (voided, voidedAt, voidedBy): page, pageSize (max 200, default 50)",
+        "operationId": "ListHoldingTrades",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TradePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/{id}/rebuild-lots": {
+      "post": {
+        "tags": [
+          "Trades"
+        ],
+        "summary": "Rebuild a holding's lots from its stored trades. dryRun (default true) returns the rebuild block - status, counts of lots replaced, realised profit, adjustments, the broker's quantity against the trades - and changes nothing; dryRun=false replaces the lots when the status is ok (applied) and leaves them for unchanged, quantity_mismatch and ambiguous. A holding without trades is rebuilt into one default-dated lot. 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only",
+        "operationId": "RebuildHoldingLots",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "dryRun",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingRebuildResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -10393,6 +10894,26 @@
         },
         "description": "One page of holdings (Total counts all matches)."
       },
+      "HoldingRebuildResult": {
+        "required": [
+          "dryRun",
+          "applied",
+          "rebuild"
+        ],
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "rebuild": {
+            "$ref": "#/components/schemas/TradeRebuildView"
+          }
+        },
+        "description": "The rebuild of one holding's lots: with `DryRun` only what it would do; otherwise `Applied` says whether the lots were replaced (only an `ok` rebuild is)."
+      },
       "HoldingRow": {
         "required": [
           "id",
@@ -10730,7 +11251,7 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
           },
           "retryAfterSeconds": {
             "type": "integer",
@@ -10780,12 +11301,20 @@
             },
             "description": "Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text."
           },
+          "report": {
+            "type": "object",
+            "description": "Present on portfolio.preview_stale: the fresh preview of the file, in the shape of the response of POST /api/portfolio/trades/preview (TradePreviewReport)."
+          },
           "wouldClose": {
             "type": "integer",
             "description": "Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.",
             "format": "int32"
           }
         }
+      },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
       },
       "ImportCorporateActionsResult": {
         "required": [
@@ -11594,6 +12123,91 @@
         },
         "description": "A lot of a holding with its own figures: Invested is its cost, Value is its value now (open) or its sale proceeds (closed), Pnl the difference.\nStatus is \"open\" or \"closed\"; Source \"import\", \"added\" or \"manual\". Estimated: the sale price is the last price a sync saw."
       },
+      "ManualTradeInput": {
+        "required": [
+          "accountId",
+          "holdingId",
+          "symbol",
+          "isin",
+          "side",
+          "tradeDate",
+          "tradeTime",
+          "quantity",
+          "price",
+          "charges"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "side": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tradeDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "tradeTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "quantity": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "price": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "charges": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A trade typed in by the owner: for a holding (`HoldingId`) or for a security of an account (`AccountId` and `Symbol` and/or `Isin`, which must be an NSE share or ETF of the master list). `Side` buy or sell, the date not in the\nfuture, `Quantity` a whole number above 0, `Price` above 0, `Charges` optional (0)."
+      },
       "MembersOrderInput": {
         "required": [
           "instrumentIds"
@@ -11645,6 +12259,30 @@
           }
         },
         "description": "The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched."
+      },
+      "OpeningQtyView": {
+        "required": [
+          "before",
+          "after"
+        ],
+        "type": "object",
+        "properties": {
+          "before": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "after": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "The quantity the lots count as opening (the shares the trades do not explain): now, and after the rebuild. Null where it cannot be told (no holding, or a quantity that is not whole after a split or bonus)."
       },
       "ParameterView": {
         "required": [
@@ -12296,7 +12934,7 @@
           },
           "code": {
             "type": "string",
-            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
+            "description": "Stable machine-readable error code, e.g. auth.invalid_credentials, auth.locked, auth.session_expired, auth.csrf_invalid, auth.step_up_required, accounts.not_found, accounts.invalid (field errors in \"errors\"), accounts.conflict, accounts.app_not_configured, accounts.broker_error (502), accounts.connect_mismatch, accounts.consent_limit (429), accounts.connect_expired, accounts.connect_cancelled, portfolio.not_connected, portfolio.sync_running, portfolio.confirmation_required and portfolio.confirmation_stale (409, with listedHoldings, openHoldings and wouldClose), portfolio.conflict (409), portfolio.invalid, portfolio.not_found, portfolio.lot_from_trade (409), portfolio.preview_stale (409, with report), services.not_found (404), services.invalid (400, with issues), services.revision_changed (409), services.already_running (409), services.read_only (409)."
           },
           "retryAfterSeconds": {
             "type": "integer",
@@ -12345,6 +12983,10 @@
               }
             },
             "description": "Present on services.invalid: every error of the refused schedule - the service it is about (serviceId; absent for the service of the request), the field (a dotted path like the request, e.g. schedule.time, retries, parameters.x), severity (error), a stable code and the text."
+          },
+          "report": {
+            "type": "object",
+            "description": "Present on portfolio.preview_stale: the fresh preview of the file, in the shape of the response of POST /api/portfolio/trades/preview (TradePreviewReport)."
           },
           "wouldClose": {
             "type": "integer",
@@ -15023,6 +15665,733 @@
         },
         "description": "Instruments to track or untrack: 1 to 500 ids (duplicates are fine and count once)."
       },
+      "TradeBadRow": {
+        "required": [
+          "line",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A row that cannot be imported: the line of the file it starts on and why."
+      },
+      "TradeBatchPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeBatchView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of import batches, newest first."
+      },
+      "TradeBatchView": {
+        "required": [
+          "id",
+          "accountId",
+          "accountName",
+          "fileName",
+          "sha256",
+          "parsed",
+          "imported",
+          "duplicates",
+          "skipped",
+          "bad",
+          "status",
+          "activeTrades",
+          "securities",
+          "createdBy",
+          "createdAt",
+          "undoneAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "parsed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bad": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "type": "string"
+          },
+          "activeTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "securities": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "undoneAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "One import of a file. `Status` is `imported` or `undone`; `ActiveTrades` counts its trades that are not voided and `Securities` the securities among them."
+      },
+      "TradeCount": {
+        "required": [
+          "securities",
+          "trades"
+        ],
+        "type": "object",
+        "properties": {
+          "securities": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A number of securities and the number of trades of the file in them."
+      },
+      "TradeFileSummary": {
+        "required": [
+          "fileName",
+          "rows",
+          "parsed",
+          "skipped",
+          "bad",
+          "badTotal",
+          "duplicates",
+          "alreadyImported",
+          "newTrades"
+        ],
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parsed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "$ref": "#/components/schemas/TradeSkipped"
+          },
+          "bad": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeBadRow"
+            }
+          },
+          "badTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "newTrades": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What was in the file. `Rows` are the data rows (empty lines do not count), `Parsed` the valid trade rows, `Duplicates` the valid rows that repeat a trade id of the file, `AlreadyImported` the trades of the file that are stored already\n(and not voided), `NewTrades` the ones an import would store. `Bad` lists the first 200 bad rows (line, reason); `BadTotal` counts all of them."
+      },
+      "TradeImportResult": {
+        "required": [
+          "batch",
+          "imported",
+          "alreadyImported",
+          "rebuilt",
+          "holdingsRebuilt",
+          "lotsReplaced",
+          "report"
+        ],
+        "type": "object",
+        "properties": {
+          "batch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TradeBatchView"
+              }
+            ]
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rebuilt": {
+            "type": "boolean"
+          },
+          "holdingsRebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "report": {
+            "$ref": "#/components/schemas/TradePreviewReport"
+          }
+        },
+        "description": "What an import did. `Batch` is null when the file had nothing new. `Imported` trades were stored, `AlreadyImported` were there already. With `Rebuilt` the lots of `HoldingsRebuilt` holdings were replaced\n(`LotsReplaced` lots removed); `Report` is the preview the owner confirmed (statuses before the rebuild)."
+      },
+      "TradeNotRebuilt": {
+        "required": [
+          "symbol",
+          "holdingId",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A holding (or security) that an undo could not rebuild: its `Symbol`, the `HoldingId` when it is a single holding, and the `Reason` — `ambiguous` or the mismatch (`negative_opening`, `sell_exceeds_open`, `fractional_after_adjustment`)."
+      },
+      "TradePage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of the trades of a holding, newest first, voided ones included."
+      },
+      "TradePreviewReport": {
+        "required": [
+          "file",
+          "securities",
+          "notHeld",
+          "unmatched",
+          "digest"
+        ],
+        "type": "object",
+        "properties": {
+          "file": {
+            "$ref": "#/components/schemas/TradeFileSummary"
+          },
+          "securities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeSecurityView"
+            }
+          },
+          "notHeld": {
+            "$ref": "#/components/schemas/TradeCount"
+          },
+          "unmatched": {
+            "$ref": "#/components/schemas/TradeCount"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "securitiesTotal": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "unmatchedListed": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          }
+        },
+        "description": "The preview of a tradebook import — nothing is stored. `NotHeld`: securities the account does not hold now (their trades are stored by an import, not applied); `Unmatched`: those of them that are not even NSE shares or ETFs of the master list.\n`Digest` fingerprints everything the preview shows (all securities, listed or not); an import with `rebuild` must send it back. `Securities` lists every security that is a holding or an NSE share/ETF of the\nmaster list and at most int TradeCsvLimits.MaxListedUnmatched (200) of the unmatched ones; `SecuritiesTotal` counts all the securities of the file and `UnmatchedListed` the unmatched ones listed."
+      },
+      "TradeRebuildView": {
+        "required": [
+          "status",
+          "reason",
+          "lotsBefore",
+          "lotsAfter",
+          "handDatedLotsReplaced",
+          "syncLotsReplaced",
+          "realisedPnl",
+          "adjustedFor",
+          "q",
+          "net",
+          "openingQty",
+          "digest"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lotsBefore": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsAfter": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "handDatedLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "syncLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "realisedPnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "adjustedFor": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "q": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "net": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "openingQty": {
+            "$ref": "#/components/schemas/OpeningQtyView"
+          },
+          "digest": {
+            "type": "string"
+          },
+          "openCostAfter": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "brokerCost": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "costDelta": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "costNote": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "What rebuilding a holding's lots from its trades does. `Status`: `ok` (the lots would change), `unchanged`, `quantity_mismatch` (see `Reason`: `negative_opening`, `sell_exceeds_open`,\n`fractional_after_adjustment`; nothing is applied), `no_holding`, `ambiguous`. `Q` is the broker's quantity, `Net` bought minus sold (today's shares). `HandDatedLotsReplaced` counts the lots whose date the owner chose\nand `SyncLotsReplaced` the lots a sync added, among the `LotsBefore` lots that an `ok` rebuild replaces by `LotsAfter` lots. `RealisedPnl` is the profit of the pieces the trades sold. `AdjustedFor` counts the corporate\nactions that changed a trade. `Digest` fingerprints this rebuild. `OpenCostAfter` is what the open lots cost after the rebuild (Σ open quantity × unit cost; also for `unchanged`), `BrokerCost` the broker's `Q × A`\nand `CostDelta` their difference. The open quantities always add up to `Q`. With no sales in the file and an opening lot (the file does not explain the whole holding) `CostDelta` is 0, to within the rounding of the opening\nlot's unit cost to 4 decimals (0.0001 × its quantity); with sales — or without an opening lot — the first-in first-out cost basis of the trades can differ from the broker's average-cost figure (brokers keep the average by the\nweighted-average-cost method, a sale does not change it), which is shown, not hidden. `CostNote` is `opening_cost_fallback` when the trades cost more than the broker's average cost allows and the opening lot therefore costs the\naverage cost. The four are null unless the trades fit (`ok` or `unchanged`)."
+      },
+      "TradeSecurityView": {
+        "required": [
+          "symbol",
+          "isin",
+          "matched",
+          "holdingId",
+          "trades",
+          "buys",
+          "sells",
+          "firstTradeDate",
+          "lastTradeDate",
+          "rebuild"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "matched": {
+            "type": "boolean"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "buys": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sells": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstTradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "lastTradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "rebuild": {
+            "$ref": "#/components/schemas/TradeRebuildView"
+          }
+        },
+        "description": "A security of the file: its trades in the file and, when the account holds it, what the rebuild would do. `Matched` is true when it is a holding of the account or an NSE share or ETF of the master list."
+      },
+      "TradeSkipped": {
+        "required": [
+          "total",
+          "byReason"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "byReason": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "description": "Rows of the file that were left out because they are not NSE equity trades: how many, and how many for each reason (`derivatives`, `commodity`, `currency`, `bse`, `non_equity`)."
+      },
+      "TradeUndoResult": {
+        "required": [
+          "batch",
+          "alreadyUndone",
+          "voided",
+          "holdingsRebuilt",
+          "lotsReplaced",
+          "holdingsNotRebuilt",
+          "dryRun",
+          "applied",
+          "handDatedLotsReplaced",
+          "syncLotsReplaced",
+          "notRebuilt"
+        ],
+        "type": "object",
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/TradeBatchView"
+          },
+          "alreadyUndone": {
+            "type": "boolean"
+          },
+          "voided": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdingsRebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdingsNotRebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dryRun": {
+            "type": "boolean"
+          },
+          "applied": {
+            "type": "boolean"
+          },
+          "handDatedLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "syncLotsReplaced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notRebuilt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TradeNotRebuilt"
+            }
+          }
+        },
+        "description": "What undoing a batch did — or, with `DryRun`, would do (nothing is changed then; `Applied` is false). Undoing a batch again is a no-op (`AlreadyUndone`). Holdings whose lots came from trades are rebuilt from the remaining\ntrades; `NotRebuilt` lists those that could not be (a mismatch, or ambiguous) and keep their lots, `HoldingsNotRebuilt` counts them. <b>An undo cannot bring back</b> lots the owner dated by hand or a sync added that an\nearlier rebuild replaced: the holding returns to one default-dated lot of the broker's quantity and cost (or to the shape of the remaining trades); `HandDatedLotsReplaced` and `SyncLotsReplaced` count what the rebuild\nremoves (the lots of the holdings it rebuilds)."
+      },
+      "TradeUploadForm": {
+        "required": [
+          "accountId",
+          "file",
+          "rebuild",
+          "digest"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file": {
+            "$ref": "#/components/schemas/IFormFile"
+          },
+          "rebuild": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "digest": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "The multipart form of the trade preview and import, for the API contract only (the request is read by TradeUploads). `AccountId` is the account, `File` the tradebook (CSV), `Rebuild` and `Digest` are\nfor the import: whether to rebuild the lots (default true) and the digest of the preview, which is required with a rebuild."
+      },
+      "TradeView": {
+        "required": [
+          "id",
+          "accountId",
+          "symbol",
+          "isin",
+          "exchange",
+          "side",
+          "tradeDate",
+          "tradeTime",
+          "qty",
+          "price",
+          "charges",
+          "source",
+          "batchId",
+          "createdBy",
+          "createdAt",
+          "voided",
+          "voidedAt",
+          "voidedBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "exchange": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "tradeDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "tradeTime": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "time"
+          },
+          "qty": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          },
+          "charges": {
+            "type": "number",
+            "format": "double"
+          },
+          "source": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "voided": {
+            "type": "boolean"
+          },
+          "voidedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "voidedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A trade. `Side` is `buy` or `sell`, `Source` is `csv` or `manual`. A voided trade does not count."
+      },
       "TradingInput": {
         "required": [
           "mode",
@@ -15446,6 +16815,9 @@
     },
     {
       "name": "Services"
+    },
+    {
+      "name": "Trades"
     }
   ]
 }

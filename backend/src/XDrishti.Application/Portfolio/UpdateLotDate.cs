@@ -11,7 +11,8 @@ namespace XDrishti.Application.Portfolio;
 
 /// <summary>
 /// Sets the acquisition date of one lot (between 1990-01-01 and today in India; not after the day a closed lot was closed). The lot stops using the
-/// default date. Every figure is computed on read, so nothing else needs to be recalculated.
+/// default date. Every figure is computed on read, so nothing else needs to be recalculated. A lot rebuilt from trades takes its date from the trade
+/// (<c>409 portfolio.lot_from_trade</c>), and the opening lot of such a holding must stay before the earliest trade (<c>400 portfolio.invalid</c>, field <c>acquiredOn</c>); see <see cref="Holding.ChangeLotDate"/>.
 /// </summary>
 public sealed record UpdateLotDateCommand(Guid HoldingId, Guid LotId, LotDateInput Input, string Actor) : ICommand;
 

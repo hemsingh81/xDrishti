@@ -1,0 +1,6 @@
+﻿Date,Scrip,Buy/Sell,Qty,Rate,Brokerage,STT,Stamp Duty,Exchange
+05/03/2024,NSE:EXMPL-EQ,B,"1,000","1,250.50",20,12.5,3,NSE
+"06-Mar-2024",acme,SALE,"12,34,567",95.4,0,0,0,NSE
+2024-03-07,ACME,purchase,10,96,1,1,1,NSE
+
+13/25/2024,ACME,buy,10,96,0,0,0,NSE

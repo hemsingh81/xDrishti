@@ -1,4 +1,5 @@
-import { Box } from '@mui/material';
+import ReceiptIcon from '@mui/icons-material/ReceiptLongOutlined';
+import { Box, Button } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { bucketsQuery, useNow } from '@/features/accounts';
@@ -66,6 +67,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const overlays = usePortfolioOverlays();
   const holdingsStart = useRef<HTMLDivElement>(null);
   const [alertDialog, setAlertDialog] = useState<AlertTarget | 'pick' | null>(null);
+  const [addingTrade, setAddingTrade] = useState(false);
   const scope = { account: filters.account, bucket: filters.bucket };
   const history = usePortfolioHistory(scope, market.pollMs);
 
@@ -95,7 +97,19 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
-      <PortfolioHeader />
+      <PortfolioHeader
+        actions={
+          <Button
+            variant="outlined"
+            startIcon={<ReceiptIcon />}
+            onClick={() => {
+              overlays.openTrades();
+            }}
+          >
+            Trades
+          </Button>
+        }
+      />
       {acting && !connected && <NotConnectedNotice accountId={acting.id} accountName={acting.name} />}
       <ScopeBar
         filters={filters}
@@ -220,6 +234,20 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
         }}
         onCloseDialog={() => {
           setAlertDialog(null);
+        }}
+        trades={{
+          tab: overlays.tradesTab,
+          onTab: overlays.changeTradesTab,
+          onClose: overlays.closeTrades,
+          accounts: portfolio,
+          scopeAccountId: account,
+          adding: addingTrade,
+          onAdd: () => {
+            setAddingTrade(true);
+          },
+          onCloseAdd: () => {
+            setAddingTrade(false);
+          },
         }}
       />
     </Box>

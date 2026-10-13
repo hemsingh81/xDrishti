@@ -190,8 +190,7 @@ services; the LLM only explains (<a href="14-ai-assistant.html">doc 14</a>).</p>
 </tbody></table>
 <p>Checks are shown on the ticket card; &quot;approved despite&quot; reasons are stored and appear in the Decisions report.</p>
 <h2 id="3-portfolio-action-center">3. Portfolio Action center<a class="hash" href="#3-portfolio-action-center" aria-label="Link to this section">#</a></h2>
-<p>Evaluated per account by the <strong>Price alerts &amp; action center</strong> service (every minute in market hours, and after
-each sync). Thresholds are configurable (Settings → Action center thresholds).</p>
+<p><strong>Built in P2-09 (<a href="../adr/0022-action-center-and-price-alerts.html">ADR 0022</a>): evaluated on read, not by a service.</strong> <code>GET /api/portfolio/actions</code> computes the items from the current holdings, lots, prices, sectors, baskets and benchmark with pure functions (one rule = one function over a read model), exactly like the summary and the groups, so the card is always consistent with the numbers beside it and there is no job to run, lag or fail. Only the owner&#39;s <strong>decisions</strong> are stored (<code>portfolio.action_states</code>). Thresholds are configurable (Settings → Action center thresholds; stored as JSON in <code>platform.app_settings</code>, fixed ranges, <em>Restore defaults</em>, audited). <strong>Seven rules are built;</strong> <em>Max holding exceeded</em> (needs trading buckets and plans, P7) and <em>Results due</em> (needs events data, P15) are not, and the per-account tiles of doc 12 §10 are not part of this slice (Group by Account covers the figures).</p>
 <table>
 <thead>
 <tr>
@@ -221,12 +220,12 @@ each sync). Thresholds are configurable (Settings → Action center thresholds).
 <td>Diversify</td>
 </tr>
 <tr>
-<td>Max holding exceeded</td>
+<td>Max holding exceeded <em>(not built yet)</em></td>
 <td>Trading-bucket position older than the 5-session limit</td>
 <td>Exit per plan rules</td>
 </tr>
 <tr>
-<td>Results due</td>
+<td>Results due <em>(not built yet)</em></td>
 <td>Results within 7 days</td>
 <td>Decide before the event</td>
 </tr>
@@ -246,9 +245,24 @@ each sync). Thresholds are configurable (Settings → Action center thresholds).
 <td>Assign for basket analytics</td>
 </tr>
 </tbody></table>
-<p>Each item offers <strong>Open</strong>, <strong>Set alert</strong>, <strong>Add to basket</strong>, <strong>Snooze 7 days</strong> or <strong>Done</strong>; every action is
-audited. Per-account tiles on the Portfolio page show value, P&amp;L, XIRR, day change, top holding and the number
-of open action items, so you can focus on the account that needs attention.</p>
+<p>Each item offers <strong>Open</strong>, <strong>Set alert</strong>, <strong>Add to basket</strong>, <strong>Snooze 7 days</strong> or <strong>Done</strong>; snooze, done and reopen are
+audited. Per-account tiles on the Portfolio page (value, P&amp;L, XIRR, day change, top holding, number of open action items)
+come later; for now the Action center takes the Portfolio screen&#39;s account and bucket scope.</p>
+<p><strong>How the built rules behave (P2-09).</strong> Severity, text and numbers are recomputed on every read; an item has a stable,
+path-safe id (<code>{rule}:{holdingId}</code>, or <code>sector_concentration:{accountId}:{12 hex of SHA-1 of the lower-cased sector}</code>).
+Holdings without a usable price never fire a price-based rule (they are counted as &quot;no price&quot;). <em>Overweight</em> counts only
+priced positions and needs at least <code>min_positions</code> (3) of them in the account; <em>Sector concentration</em> is one item per
+account and sector, &quot;Unclassified&quot; never fires, and the item lists the share and the largest holding; <em>Long-term soon</em>
+uses calendar dates (India): a lot is 12 months old on the same date a year later (29 February → 28 February) and the
+text only asks to check the tax impact; <em>Lagging Nifty</em> compares the holding&#39;s XIRR with the XIRR of the same cash flows
+put into the benchmark index, and a holding whose benchmark has no bars from its first flow (or whose XIRR is not
+meaningful) is <strong>not evaluated</strong> and counted as unavailable, never as fine; <em>Not in a basket</em> ignores holdings that are
+not in the instrument master.</p>
+<p><strong>Order.</strong> Items are sorted by severity, then by the rule (below cost, lagging Nifty, overweight, sector concentration, large gain, long-term soon, not in a basket), then by the size of the trigger within the rule — the sizes of different rules are in different units (percent, rupees, days) and are never compared. <em>Long-term soon</em> lists a lot that cost nothing (bonus or transferred-in shares) as profitable, with no gain percentage.</p>
+<p><strong>Decisions.</strong> <em>Snooze</em> hides an item until the India date 7 days later; <em>Done</em> hides it <strong>for as long as the condition holds</strong> and is then set to <code>cleared</code> (an UPDATE — the runtime role has no DELETE) so a later recurrence fires again. The
+reconciliation runs after every quotes tick and every holdings sync, after every change of the thresholds, and opportunistically inside the Action-center read
+(the one write a read makes — idempotent, and a failure there never fails the read); edits of baskets and lots are reconciled at the next tick, sync or read. The tick, the sync and the threshold write look at <strong>every</strong> active Portfolio account, so a <code>done</code> decision about a holding that is no longer open (sold, or its account left the Portfolio) is cleared too — the same holding row is reopened by a later sync and its item must start open. The read of one scope cannot tell a closed holding from one outside its scope and leaves such decisions alone. A decision about something the
+evaluation could not judge (no benchmark bars, no price) is left alone. Two identical decisions sent at once are both successful (the second finds its decision stored).</p>
 <h2 id="4-price-alerts">4. Price alerts<a class="hash" href="#4-price-alerts" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>Conditions: price <strong>at or below</strong> / <strong>at or above</strong> a level (quick presets ±5/10/20%), optional note.</li>
@@ -256,6 +270,7 @@ of open action items, so you can focus on the account that needs attention.</p>
 alerts create a notification and audit entry. Alerts survive logout and browser close.</li>
 <li>Later: indicator alerts (e.g. close below 50 DMA), trailing alerts, alert on basket-level drawdown.</li>
 </ul>
+<p><strong>Built in P2-09 (<a href="../adr/0022-action-center-and-price-alerts.html">ADR 0022</a>).</strong> An alert is a master-list <strong>NSE share or ETF</strong> (not retired, quotable by Dhan; indices and futures are out of scope), a direction, a level (above 0, at most 10,000,000, 4 decimals), an optional note (200 characters of plain text) and a status <code>active → triggered | cancelled</code>; never deleted, at most <strong>200 active</strong>. It is <strong>one-shot</strong>. The <code>holdings-quotes</code> service quotes the <strong>union of the open holdings and the active alerts&#39; instruments</strong> in the same request (still at most 1,000 per call) and checks every active alert against the <strong>last price of that tick</strong>: <code>at_or_below</code> ⇒ last ≤ level, <code>at_or_above</code> ⇒ last ≥ level. A spike between two ticks is not seen, so the latency is <strong>up to one tick (5 minutes, market hours)</strong> — doc 15&#39;s &quot;every minute&quot; returns with the live feed (<code>xd-feed</code>). An alert that is hit becomes <code>triggered</code> with the trigger price and time <strong>in the same transaction as its audit event</strong>, by a conditional update on <code>status = &#39;active&#39;</code> (so it triggers once even with overlapping runs); an instrument with no quote in the answer stays active; a failed run triggers nothing; the run message adds &quot;N alerts triggered&quot;. Creation refuses a condition that already holds at the last known price (the holding&#39;s last price, else the last stored daily close if it is at most 5 trading days old; unknown: allowed) with the price in the message. The bell shows <code>price_alert_triggered</code> (warning, for 7 days after triggering) and <code>actions_need_decision</code> (information, at most once a day) from <code>GET /api/portfolio/notices</code>; the bell polls it every minute, so the count of open items is kept for at most 60 seconds in the portfolio cache (dropped at once by the writes that drop the cached histories, and by decisions and threshold changes), and a failure to count never hides the alert notices.</p>
 <h2 id="5-data-quality-gate">5. Data quality gate<a class="hash" href="#5-data-quality-gate" aria-label="Link to this section">#</a></h2>
 <p>After every end-of-day fetch the <strong>Data validation</strong> service re-checks the last N sessions of every tracked
 instrument (<a href="05-data-and-brokers.html">doc 05</a> §10b). Results drive:</p>
@@ -329,7 +344,7 @@ Errors block saving; warnings are shown.</li>
     <a class="prev" href="14-ai-assistant.html"><small>← Previous  [</small>14 · AI assistant</a>
     <a class="next" href="16-configuration.html"><small>Next  ] →</small>16 · Configuration</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/15-smart-insights-and-automation.md</code> · 2026-10-12 17:51</footer>
+  <footer class="foot">Generated from <code>docs/15-smart-insights-and-automation.md</code> · 2026-10-13 17:50</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-where-the-system-is-smart" class="d2">1. Where the system is &amp;quot;smart&amp;quot;</a>
 <a href="#2-pre-trade-checklist-per-proposed-ticket" class="d2">2. Pre-trade checklist (per proposed ticket)</a>

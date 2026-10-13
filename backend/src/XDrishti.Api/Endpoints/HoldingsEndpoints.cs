@@ -41,8 +41,8 @@ internal sealed class HoldingsEndpoints : IEndpointModule
 
         holdings.MapPut("/{id:guid}/lots/{lotId:guid}", UpdateLotDateAsync)
             .WithName("UpdateHoldingLotDate")
-            .WithSummary("Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date")
-            .ProducesRejections(conflict: false);
+            .WithSummary("Set the acquisition date of a lot (1990-01-01 to today); the lot stops using the default date. A lot rebuilt from trades (source trade) takes its date from the trade: 409 portfolio.lot_from_trade; the opening lot of such a holding must stay before the earliest trade: 400 portfolio.invalid, field acquiredOn")
+            .ProducesRejections(conflict: true);
 
         var account = api.MapGroup("/accounts/{id:guid}/holdings").WithTags("Holdings");
 

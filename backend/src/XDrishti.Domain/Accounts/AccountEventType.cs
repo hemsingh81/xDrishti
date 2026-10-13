@@ -59,4 +59,9 @@ public enum AccountEventType
     PriceAlertCreated,
     PriceAlertTriggered,
     PriceAlertCancelled,
+    TradesImported,
+    TradesUndone,
+    TradeAdded,
+    TradeVoided,
+    LotsRebuilt,
 }

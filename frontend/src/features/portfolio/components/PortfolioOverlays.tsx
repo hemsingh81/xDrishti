@@ -1,10 +1,15 @@
 import { lazy, Suspense } from 'react';
+import type { AccountSummary } from '@/shared/api';
+import { initialTradesAccount } from '../lib/accounts';
 import type { AlertStatus } from '../lib/alerts';
 import type { AlertTarget } from '../lib/alertTarget';
+import type { TradesTab } from '../lib/tradesTab';
 
-// The alert panel and dialog are loaded when first opened: most visits never open them.
+// The panels and dialogs are loaded when first opened: most visits never open them.
 const AlertsDrawer = lazy(async () => ({ default: (await import('./alerts/AlertsDrawer')).AlertsDrawer }));
 const AlertDialog = lazy(async () => ({ default: (await import('./alerts/AlertDialog')).AlertDialog }));
+const TradesDrawer = lazy(async () => ({ default: (await import('./trades/TradesDrawer')).TradesDrawer }));
+const AddTradeDialog = lazy(async () => ({ default: (await import('./trades/AddTradeDialog')).AddTradeDialog }));
 
 export interface PortfolioOverlaysProps {
   /** The tab of the open Alerts panel; null = closed. */
@@ -15,9 +20,21 @@ export interface PortfolioOverlaysProps {
   dialog: AlertTarget | 'pick' | null;
   onNewAlert: () => void;
   onCloseDialog: () => void;
+  /** The Trades panel: the open tab (null = closed), the accounts it can import for and the page's account. */
+  trades: {
+    tab: TradesTab | null;
+    onTab: (tab: TradesTab) => void;
+    onClose: () => void;
+    accounts: readonly AccountSummary[];
+    scopeAccountId: string | null;
+    /** The Add trade dialog is open. */
+    adding: boolean;
+    onAdd: () => void;
+    onCloseAdd: () => void;
+  };
 }
 
-/** The Alerts panel and the alert dialog on top of the Portfolio screen. */
+/** The Alerts and Trades panels and the alert and Add trade dialogs on top of the Portfolio screen. */
 export function PortfolioOverlays({
   alertsTab,
   onAlertsTab,
@@ -25,6 +42,7 @@ export function PortfolioOverlays({
   dialog,
   onNewAlert,
   onCloseDialog,
+  trades,
 }: PortfolioOverlaysProps) {
   return (
     <Suspense fallback={null}>
@@ -32,6 +50,23 @@ export function PortfolioOverlays({
         <AlertsDrawer tab={alertsTab} onTabChange={onAlertsTab} onClose={onCloseAlerts} onCreate={onNewAlert} />
       )}
       {dialog && <AlertDialog target={dialog === 'pick' ? null : dialog} onClose={onCloseDialog} />}
+      {trades.tab && (
+        <TradesDrawer
+          tab={trades.tab}
+          onTabChange={trades.onTab}
+          onClose={trades.onClose}
+          onAddTrade={trades.onAdd}
+          accounts={trades.accounts}
+          scopeAccountId={trades.scopeAccountId}
+        />
+      )}
+      {trades.adding && (
+        <AddTradeDialog
+          accounts={trades.accounts}
+          initialAccountId={initialTradesAccount(trades.accounts, trades.scopeAccountId)}
+          onClose={trades.onCloseAdd}
+        />
+      )}
     </Suspense>
   );
 }

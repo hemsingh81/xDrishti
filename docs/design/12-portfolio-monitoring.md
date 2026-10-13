@@ -10,14 +10,13 @@ XIRR, and totals — grouped by basket, account, strategy or sector.
 | Dhan **holdings** API (`GET /v2/holdings`) | Current holdings (delivery): quantity, average cost, last traded price, ISIN — **no purchase date** (P2-01) | On the first import (saving the account's Portfolio settings), "Sync now" and, per account, the daily automatic refresh (§3); positions API later |
 | Dhan **trade history** API | Every trade with date/time, price, quantity, side and full charge breakdown (paginated by date range) | Nightly incremental; one-time backfill |
 | Dhan **ledger** API | Cash credits/debits (funds added/withdrawn, dividends, charges) | Nightly |
-| **CSV import** | Older trades (before API history / other brokers), contract-note or tradebook exports | On demand |
-| **Manual entry** | Corrections, off-platform transactions | On demand |
+| **CSV import** | Older trades (before API history / other brokers), contract-note or tradebook exports — **built in P2-03** ([ADR 0023](../adr/0023-trade-import-and-lot-reconstruction.md)): a generic CSV with auto-detected headers, a preview, an import with Undo, and a template (§3 "Trades and the rebuild of lots") | On demand |
+| **Manual entry** | Corrections, off-platform transactions — **built in P2-03**: one trade at a time, voided (never edited) when wrong | On demand |
 | Corporate actions | Splits, bonuses, dividends | Nightly |
 | Prices | Live quotes for open trades & holdings; EOD close for valuation ([doc 05](05-data-and-brokers.md) §5) | Market hours / EOD |
 
 **History depth (decision Q5, amended by [ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)):** Dhan's holdings carry no purchase date, so the owner
-sets the acquisition date of each holding when the first import happens, in the account's Portfolio settings (§3 "Where acquisition dates come from"). Older lots can still be refined by CSV / contract-note
-import (P2-03) and a helper that derives dates from Dhan's trade history is a later, separate story.
+sets the acquisition date of each holding when the first import happens, in the account's Portfolio settings (§3 "Where acquisition dates come from"). Lots are refined from a tradebook CSV or from trades typed in by hand (P2-03, **built**: §3 "Trades and the rebuild of lots"); a helper that derives dates from Dhan's trade history is a later, separate story.
 
 ## 2. Domain model
 
@@ -31,7 +30,7 @@ flowchart LR
     POS --> GRP["Groupings<br/>account · bucket · basket · strategy · sector"]
 ```
 
-- **Transaction** — immutable record (source: broker / CSV / manual; charges attached).
+- **Transaction** — immutable record (source: broker / CSV / manual; charges attached). **Built in P2-03** for CSV and manual trades (`portfolio.transactions`, §9); the broker source follows with the Dhan trade-history sync.
 - **Lot** — each buy creates a lot; sells consume lots **FIFO** (matches Indian practice) → realised P&L per lot.
 - **Position** — open quantity, average cost (incl. charges), first-added date, linked plan ticket (if any).
 - **Valuation** — market value at a time; a daily snapshot after close builds the portfolio value history.
@@ -127,6 +126,77 @@ in `xd-api` looks once a minute at every Portfolio-role account whose refresh is
   `Portfolio:AutoRefresh:Enabled = false` ([doc 16](16-configuration.md)). `GET /api/accounts/{id}/holdings/sync-status` returns `refreshMode`, `refreshDailyTimeIst`, `firstImportDate`, `hasHoldings`, the next scheduled run, `running` and the last run.
 
 Not included in v1 (and stated in the UI): dividends, brokerage and taxes.
+
+### Trades and the rebuild of lots (P2-03, [ADR 0023](../adr/0023-trade-import-and-lot-reconstruction.md))
+
+A broker **tradebook (CSV)** or trades **typed in by hand** are stored as **transactions** and, on an explicit and previewed step, rebuild a holding's lots from the real buy and sell dates, so
+XIRR, returns, the value history and the benchmark use true dates and real sale prices (a sale closes a lot at its **real** price, `estimated = false`). The broker stays authoritative for
+the quantity and the total cost of a holding: trades can only *explain* a holding, never change what Dhan says is held.
+
+**Transactions.** `portfolio.transactions`: account, instrument (when mapped), ISIN, symbol, exchange, `side` buy/sell, India `trade_date` and optional `trade_time`, `qty` (whole shares, `bigint`),
+`price`, `charges` (one total, informational — **not** in cost, returns or XIRR yet), `source` csv/manual, `batch_id`, `seq` (the line of the file, 0 for a manual trade), `external_id`, who/when and
+`voided_at/by`. A transaction is immutable except for being **voided** — the runtime role has no DELETE. `external_id` is the trade's identity and is **unique per account among the trades that are
+not voided** (a partial unique index), so a voided trade (or an undone file) can be imported again: the trade id of the file together with the trade date (`t:yyyyMMdd:` + id — exchanges number trades per day, so the same id on two days is two trades) when it has such a column, else a hash of
+(account, date, time, symbol or ISIN, side, quantity, price, order id, how many identical lines came before in the file) (`h:` + 32 hex), so two genuine identical trades are both kept and the same file
+read again adds nothing; a manual trade has a random identity (`m:`) and is never deduplicated. **Import batches** (`portfolio.trade_batches`): file name, SHA-256 (the file itself is never stored),
+counts (parsed, imported, duplicates, skipped, bad), status imported/undone, who/when; a file that adds nothing new makes no batch. Neither table is ever deleted.
+
+**The file (generic, auto-detected, UTF-8 with or without BOM, comma separated, at most 10 MB and 20,000 data rows).** Headers match without regard to case or punctuation. Required: a date, a symbol or an
+ISIN, a side, a quantity, a price (a missing one refuses the file with `400 portfolio.invalid` on field `file`, naming what is missing and the accepted names). Accepted names, among others — date:
+`date`, `trade date`, `transaction date`, `order execution time`; symbol: `symbol`, `trading symbol`, `scrip`, `instrument`, `security`, `stock name`; `isin`; side: `trade type`, `side`, `buy/sell`,
+`transaction type`; quantity: `quantity`, `qty`, `traded quantity`; price: `price`, `trade price`, `rate`, `avg price`; optional: `exchange`, `trade id`/`trade no` (the identity), `order id` (only part of the
+line hash), `time`, `segment`/`instrument type` (to skip non-equity rows), charges. Unknown columns are ignored. Dates: `yyyy-MM-dd`, `dd-MM-yyyy`, `dd/MM/yyyy`, `dd-MMM-yyyy` — day first,
+**never** `MM/dd` (13/25/2024 is a bad row) — optionally followed by an India time; a date in the future is a bad row. Numbers take `.` for decimals and `,` only to group thousands (`1,234.50`,
+`12,34,567`). Side: buy/sell/b/s/purchase/sale. Symbols are upper-cased and trimmed; `NSE:` and `-EQ` are stripped. Quantity must be a **whole** number above 0, price above 0. **Charges:** a
+`total charges`/`charges` column is used as it is, otherwise the component columns (brokerage, STT, stamp duty, GST, taxes, …) are summed, never both. Rows for derivatives, commodity or currency segments
+(by the segment/instrument-type/exchange column, or by the shape of the symbol: expiry, strike, `FUT`, `CE`, `PE`) and **BSE** rows are **skipped with a reason** (counts per reason); a bad row (line, reason —
+at most 200 listed, all counted) is never imported; a trade id that repeats on the same day with identical details is counted as a duplicate, with different details it is a bad row. A cell longer than 64 characters in a date, time, number or ISIN column makes the row bad (no pattern ever looks at a huge cell). `GET /api/portfolio/trades/template`
+downloads a CSV with the canonical headers and two example rows (`Date,Symbol,ISIN,Side,Quantity,Price,Exchange,Trade ID,Time,Charges`).
+
+**Which holding a trade belongs to.** Among the account's **open** holdings: by ISIN; when no holding has the trade's ISIN (or the trade has none), by symbol — but a symbol never joins two different ISINs.
+More than one candidate is `ambiguous` (not applied). A security that matches no holding is *not held*: its trades are stored and listed ("12 trades for 4 securities not held"), not applied; if it matches
+neither a holding nor an NSE share/ETF of the instrument master it is also counted as *unmatched*. Closed positions are not created from trades.
+
+**Reconstruction** (pure, deterministic, idempotent; `LotReconstructor`). For a holding with the broker's quantity `Q` and average cost `A`, from its non-voided trades:
+1. Each trade is converted to **today's share basis** with the instrument's **applied** corporate actions whose ex-date is *after* the trade date (a trade on the ex-date or later is already on the new basis),
+   in the direction of the bar adjustment (`AdjustmentFactors`: bars before the ex-date are multiplied by the action's factor): **price × factor, quantity ÷ factor**, cumulative over the actions in
+   ex-date order (a 1:5 split has factor 0.2: 10 shares at 1,000 become 50 at 200; a 1:1 bonus has factor 0.5; a split and a bonus multiply). The quantity is computed exactly from the ratio and must come
+   out whole (`quantity_mismatch`, reason `fractional_after_adjustment`, otherwise — 3 shares before a 1:2 bonus are 4.5). Suggested and ignored actions are not used. The result says `adjustedFor: n`.
+2. `net` = bought − sold; the **opening quantity** `P0 = Q − net`. `P0 < 0`: the trades explain more shares than Dhan holds → `quantity_mismatch` (`negative_opening`), nothing applied.
+3. Trades are walked in order: date; on one day **buys before sells**, then time, then the order stored (file order). An **opening lot** of `P0` exists from the start, dated the account's first import
+   date or the day before the first trade when that is earlier, `source = import`, flagged **default date** (editable). Each buy opens a lot (`source = trade`, not default; cost = price on today's basis). Each
+   sell closes open lots **first in first out — the opening lot first** — into pieces closed on the sale day at the real sale price; a partial sale splits a lot (closed piece + open rest with the same date
+   and cost). A sale larger than everything open at that point is a `quantity_mismatch` (`sell_exceeds_open`).
+4. The opening lot's unit cost follows from `A`, which Indian brokers keep by the **weighted-average-cost method** (a sale does not change it): `c0 = (A × (P0 + B) − BC) ÷ P0`, with `B` the shares and `BC` the cost of all the buys of the
+   file on today's basis, rounded to 4 decimals. It holds whether or not sales used the opening lot up, and the pieces sold from the opening lot cost `c0` too (consistent realised profit). When `c0` is not above 0 the opening lot
+   costs `A` and the rebuild says `costNote: opening_cost_fallback`; with `P0 = 0` there is no opening lot. **Invariants:** the open lot quantities add up to `Q`; with no sales in the file and an opening lot, invested = `Q × A` to within
+   0.0001 × the opening quantity + 0.01; with sales the first-in first-out cost basis can differ from the broker's average-cost figure by nature (first-in first-out against the average-cost method; without an opening lot the real buy
+   costs stand), so the rebuild block carries `openCostAfter`, `brokerCost` and `costDelta` and the screen says "cost basis differs from broker by ₹x" (they are part of the digest).
+5. Without trades the result is one lot of `Q` at `A` dated the first import date, flagged default: the state before any import.
+
+**The flow.** *Preview* (`POST /api/portfolio/trades/preview`, multipart `accountId` + `file`) is read-only and returns the file (rows, parsed, skipped by reason, bad rows, duplicates, already imported, new),
+each security of the file (symbol, ISIN, matched, holdingId, trade counts and dates, and the **rebuild**: status `ok` | `unchanged` | `quantity_mismatch` | `no_holding` | `ambiguous`, lots before → after, hand-dated
+and sync-added lots that would be replaced, realised profit on the real sales, `adjustedFor`, `q`, `net`, opening quantity before → after, a per-holding digest), `notHeld` / `unmatched` counts and an overall
+`digest`; the list holds every held or master-listed security and at most 200 unmatched ones (`securitiesTotal`, `unmatchedListed` count them; the digest covers all). *Import* (`POST /api/portfolio/trades/import`, same body plus `rebuild` default true and `digest`) stores the new trades as one batch and, with `rebuild`, replaces the lots of every holding whose
+result is `ok` — **all lots of the holding** (hand-dated and sync-added ones too, which is why the preview counts them), deleted and re-inserted in the one unit of work of the whole import, the holding's
+`xmin` token guarding a concurrent sync or quote (the work then runs again once). **With `rebuild` the request must carry the preview's `digest`**: if holdings, lots, applied corporate actions or trades
+changed since, the answer is `409 portfolio.preview_stale` (extension `report`: the fresh preview) and nothing is applied. `409 portfolio.sync_running` while the account's holdings sync runs.
+*Undo* (`POST /api/portfolio/trade-batches/{id}/undo?dryRun=true|false`, default false) voids the batch's trades and rebuilds from the remaining trades the affected holdings **whose lots came from trades** (a holding imported without a
+rebuild keeps its lots); undoing twice is a no-op. **Undo derives, it does not snapshot:** it cannot bring back hand-dated or sync-added lots that an earlier rebuild replaced — the holding returns to one default-dated lot of `Q` at `A`
+(dated by the first import date) or to the shape of the remaining trades; the dry run returns the same result without changing anything (`handDatedLotsReplaced`, `syncLotsReplaced`, `notRebuilt[{symbol, holdingId, reason}]` for holdings that could
+not be rebuilt — a mismatch or ambiguous — and keep their lots). *Void* (`POST /api/portfolio/trades/{id}/void`) and *add* (`POST /api/portfolio/trades`: holding or security, side, date, quantity, price, charges;
+validated like a CSV row; the security must be a holding or an NSE share/ETF of the master) change no lots; the owner then rebuilds one holding with `POST /api/holdings/{id}/rebuild-lots?dryRun=true|false`
+(dry run by default; the same `rebuild` block). `GET /api/holdings/{id}/trades` lists a holding's trades (voided ones flagged), `GET /api/portfolio/trade-batches` the import history. History, benchmark, groups and
+actions caches are dropped by every one of these (the unit of work); the Action center and the notices reconcile on the next tick/read as usual. Audit events record **counts only** (`TradesImported`,
+`TradesUndone`, `TradeAdded`, `TradeVoided`, `LotsRebuilt`).
+
+**Lots after a rebuild.** Lots made from buys have `source = trade`, are not flagged default and their dates are read-only (`PUT /api/holdings/{id}/lots/{lotId}` → `409 portfolio.lot_from_trade`); the
+**opening lot** stays editable but its date must be before the earliest trade (`400 portfolio.invalid`, field `acquiredOn`); lots a later sync adds are like any other. The first-import-date re-dating
+(ADR 0015) **skips holdings that have trade lots** (counted as skipped). A later sync that changes the quantity keeps its behaviour; the next rebuild recomputes `P0 = Q − net`, and its preview shows the
+opening quantity before → after, so a change the trades do not explain is visible.
+
+**Not built:** the Dhan trade-history and ledger sync, cash flows and dividends, charges in cost basis or XIRR (stored only), broker-specific CSV profiles (the generic format and the template come first),
+editing a trade (void and add again), positions and intraday P&L, creating closed holdings from trades, tax reports. The limits (10 MB, 20,000 rows, 200 listed bad rows) are fixed, not configuration.
 
 ### Per group (basket / bucket / account / strategy / sector / total)
 Invested · current value · realised · unrealised · total return % · **XIRR** · day change (sum of the holdings' ₹; % = Σ₹ / Σ qty × previous close of the included holdings, not an average of percentages; holdings without a previous close are left out and counted as `dayChangeExcluded`) · number of open
@@ -243,7 +313,7 @@ move on a holding · data or token issue for an account.
 qty, avg cost, last price and time, status open/closed, first seen / closed / synced), `portfolio.holding_lots` (holding, acquired on, qty, unit cost, source
 import/added/manual, uses default date, closed on, close price, estimated), `portfolio.holding_syncs` (account, trigger manual/auto/import, status
 running/succeeded/failed/skipped, counts, error, requested by; one running row per account) and the refresh columns of `accounts.portfolio_settings`
-(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). **Built in P2-06 (migration `AddHoldingQuotes`):** `portfolio.holdings.previous_close` (`numeric(18,4)`, null until a quote gave one; a sync never touches it) and `last_price_source` (`sync` | `quote`, default `sync`, CHECK), next to `last_price` / `last_price_at` — only the latest quote is stored, no price history. **Built in P2-07 (migration `AddPortfolioBenchmarkSetting`):** `platform.app_settings` (`key`, `value`, `updated_by`, `updated_at`; never deleted by the runtime role) holds the benchmark instrument (`portfolio.benchmark_instrument`, an index id); `valuations_daily` is **not** built, the history is computed on read. **Built in P2-09 (migration `AddActionCenterAndPriceAlerts`):** `portfolio.action_states` (`rule`, `key`, `state` snoozed/done/cleared, `snoozed_until`, `updated_by`, `updated_at`; primary key `(rule, key)`) holds the owner's decisions about Action-center items, `portfolio.price_alerts` (id, instrument id, direction `at_or_below`/`at_or_above`, level `numeric(18,4)`, note, status active/triggered/cancelled, created at/by, triggered at, trigger price; index on `(status, instrument_id)`) the one-shot price alerts; neither is ever deleted by the runtime role (a decision is cleared and an alert triggered or cancelled by an update); the thresholds of the rules are one more `platform.app_settings` row (`portfolio.action_thresholds`, JSON). The fuller target model below (transactions, cash flows, valuations) grows from here.
+(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). **Built in P2-06 (migration `AddHoldingQuotes`):** `portfolio.holdings.previous_close` (`numeric(18,4)`, null until a quote gave one; a sync never touches it) and `last_price_source` (`sync` | `quote`, default `sync`, CHECK), next to `last_price` / `last_price_at` — only the latest quote is stored, no price history. **Built in P2-07 (migration `AddPortfolioBenchmarkSetting`):** `platform.app_settings` (`key`, `value`, `updated_by`, `updated_at`; never deleted by the runtime role) holds the benchmark instrument (`portfolio.benchmark_instrument`, an index id); `valuations_daily` is **not** built, the history is computed on read. **Built in P2-09 (migration `AddActionCenterAndPriceAlerts`):** `portfolio.action_states` (`rule`, `key`, `state` snoozed/done/cleared, `snoozed_until`, `updated_by`, `updated_at`; primary key `(rule, key)`) holds the owner's decisions about Action-center items, `portfolio.price_alerts` (id, instrument id, direction `at_or_below`/`at_or_above`, level `numeric(18,4)`, note, status active/triggered/cancelled, created at/by, triggered at, trigger price; index on `(status, instrument_id)`) the one-shot price alerts; neither is ever deleted by the runtime role (a decision is cleared and an alert triggered or cancelled by an update); the thresholds of the rules are one more `platform.app_settings` row (`portfolio.action_thresholds`, JSON). **Built in P2-03 (migration `AddTradeTransactions`, [ADR 0023](../adr/0023-trade-import-and-lot-reconstruction.md)):** `portfolio.transactions` (id, account id, optional instrument id, ISIN, symbol, exchange, `side` buy/sell, `trade_date`, `trade_time`, `qty` `bigint` > 0, `price` `numeric(18,4)` > 0, `charges` ≥ 0, `source` csv/manual, batch id, `seq`, `external_id`, created by/at, `voided_at/by`; a **partial unique index** on `(account_id, external_id)` where `voided_at IS NULL`; indexes on account × symbol / ISIN and on the batch) and `portfolio.trade_batches` (id, account id, file name, SHA-256, parsed / imported / duplicates / skipped / bad counts, status imported/undone, created by/at, `undone_at`); `holding_lots.source` gains `trade` (check constraint widened). The runtime role may read, insert and update the two new tables and can never delete from them (`holding_lots` keeps its DELETE: a rebuild replaces the lots of a holding). The target model's `transactions` row below is realised by the first table; its `lots` and `lot_closures` stay `holding_lots` (a closed piece is a closed lot). The fuller target model below (cash flows, valuations) grows from here.
 
 | Table | Key columns |
 |-------|------------|

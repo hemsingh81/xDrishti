@@ -7,6 +7,7 @@ import { buildHistory } from '@/test/historyFixtures';
 import { scrollToEnd } from '@/test/intersection';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
+import { createTradeFake, type TradeFakeOptions } from '@/test/tradeFake';
 import { PortfolioPage } from './components/PortfolioPage';
 
 /** Renders the Portfolio screen at `/portfolio` + `search` (e.g. "?status=closed") with the real providers. */
@@ -92,3 +93,24 @@ export async function actionCenterCard() {
 
 /** The list item of the Action center that is about `name` (a symbol, or the account and sector). */
 export const actionItem = (card: HTMLElement, name: RegExp | string) => within(card).getByRole('listitem', { name });
+
+/** Serves the trades API (preview, import, history, undo, a holding's trades, add, void, rebuild) from one stateful fake. */
+export function serveTrades(options: TradeFakeOptions = {}) {
+  const fake = createTradeFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
+/** The Trades panel, once the page has opened it from the URL (its code loads on demand). */
+export const tradesPanel = () => screen.findByRole('dialog', { name: 'Trades' });
+
+/**
+ * Loads the code of the lazy trade panels and dialogs before the first test. The first test of a file otherwise pays for
+ * transforming them (MUI included) inside its own waiting time, which a busy machine (several runs at once) can exceed.
+ */
+export const warmTrades = () =>
+  Promise.all([
+    import('./components/trades/TradesDrawer'),
+    import('./components/trades/AddTradeDialog'),
+    import('./components/trades/HoldingTrades'),
+  ]);
