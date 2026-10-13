@@ -13,6 +13,8 @@ public sealed class BrokerEndpointsTests
     [InlineData("GET", "https://API.DHAN.CO/v2/holdings")]
     [InlineData("POST", "https://api.dhan.co/v2/charts/intraday")] // the 1-minute chart data of the Data API (ADR 0016 §7)
     [InlineData("POST", "https://API.DHAN.CO/v2/charts/intraday")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote")] // the market quote of the holdings (ADR 0019)
+    [InlineData("POST", "https://API.DHAN.CO/v2/marketfeed/quote")]
     public void The_documented_endpoints_are_allowed(string method, string url) =>
         BrokerEndpoints.IsAllowed(new HttpMethod(method), new Uri(url)).ShouldBeTrue();
 
@@ -53,6 +55,25 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://auth.dhan.co/v2/charts/intraday")] // the path belongs to the API host only
     [InlineData("POST", "https://api.dhan.co.example.invalid/v2/charts/intraday")] // other host
     [InlineData("POST", "https://api.dhan.co/v2/charts/intraday#x")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/ohlc")] // the quote is the only market-feed path
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/depth")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote/")] // paths are exact
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/Quote")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote/1")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote?x=1")] // no query
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote?")]
+    [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote#x")]
+    [InlineData("GET", "https://api.dhan.co/v2/marketfeed/quote")] // the quote is a POST with a body
+    [InlineData("PUT", "https://api.dhan.co/v2/marketfeed/quote")]
+    [InlineData("DELETE", "https://api.dhan.co/v2/marketfeed/quote")]
+    [InlineData("POST", "http://api.dhan.co/v2/marketfeed/quote")] // not HTTPS
+    [InlineData("POST", "https://api.dhan.co:8443/v2/marketfeed/quote")] // other port
+    [InlineData("POST", "https://user@api.dhan.co/v2/marketfeed/quote")]
+    [InlineData("POST", "https://auth.dhan.co/v2/marketfeed/quote")] // the path belongs to the API host only
+    [InlineData("POST", "https://api.dhan.co.example.invalid/v2/marketfeed/quote")] // other host
+    [InlineData("POST", "https://api.upstox.com/v2/marketfeed/quote")]
     [InlineData("GET", "https://api.dhan.co/v2/fundlimit")] // funds
     [InlineData("GET", "https://api.dhan.co/v2/profile")] // no longer used
     [InlineData("GET", "https://api.dhan.co/v2/RenewToken")] // no longer used

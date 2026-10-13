@@ -242,6 +242,6 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
             l.Id, l.AcquiredOn, l.Qty, l.UnitCost, l.Source.ToString().ToLowerInvariant(), l.UsesDefaultDate, l.ClosedOn, l.ClosePrice, l.Estimated)).ToList();
         return (new HoldingData(
             h.Id, h.AccountId, account.Name, h.BucketId, bucket?.Name ?? "?", h.InstrumentId, h.InstrumentId is null ? null : h.TradingSymbol, h.Exchange, h.SecurityId,
-            h.Isin, h.TradingSymbol, h.Name, h.Qty, h.AvgCost, h.LastPrice, h.LastPriceAt, h.Status.ToString().ToLowerInvariant(), h.FirstSeenAt, h.ClosedAt, h.SyncedAt, lots), account);
+            h.Isin, h.TradingSymbol, h.Name, h.Qty, h.AvgCost, h.LastPrice, h.LastPriceAt, h.Status.ToString().ToLowerInvariant(), h.FirstSeenAt, h.ClosedAt, h.SyncedAt, lots, h.PreviousClose, h.LastPriceSource.ToString().ToLowerInvariant()), account);
     }
 }

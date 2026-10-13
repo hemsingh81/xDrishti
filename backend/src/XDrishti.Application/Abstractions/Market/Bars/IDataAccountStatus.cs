@@ -25,3 +25,13 @@ public interface IDataAccountStatus
     /// <summary>The access token of the primary Data account; null when it has none that works (see <see cref="GetAsync"/>). The caller only puts it into a request header.</summary>
     ValueTask<SecretValue?> GetAccessTokenAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>What a Data API call that identifies the account needs (the market-quote request sends both as headers): the access token and the Dhan client id. Neither is ever logged or returned to the API.</summary>
+public sealed record DataAccountCredentials(SecretValue AccessToken, string ClientId);
+
+/// <summary>The credentials of the primary Data account, for the calls that carry the client id as well as the token (the quote API). Separate from <see cref="IDataAccountStatus"/>, whose callers need the token only.</summary>
+public interface IDataAccountCredentials
+{
+    /// <summary>The token and client id of the primary Data account; null when it has no connection that works (see <see cref="IDataAccountStatus.GetAsync"/> for the reason).</summary>
+    ValueTask<DataAccountCredentials?> GetCredentialsAsync(CancellationToken cancellationToken);
+}

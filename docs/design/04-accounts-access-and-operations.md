@@ -179,7 +179,7 @@ flowchart LR
 | Service / job | Default schedule | Runs as |
 |---------------|------------------|---------|
 | Live feed (active set) | Window 09:00–15:35, trading days | `xd-feed` |
-| Holdings quote refresh | Every 5 min, 09:15–15:30 | `xd-feed` |
+| Holdings quote refresh | Every 5 min, 09:15–15:30 on trading days; **built** as the service `holdings-quotes` (P2-06, [ADR 0019](../adr/0019-holdings-quotes-day-change-and-the-first-interval-service.md); the first `interval` service: retries 0, timeout 2 min, no catch-up, overlapping ticks dropped) | `xd-api` today (`xd-feed` later) |
 | **Pre-open check & arming** | **09:10** (after the 09:05 review cutoff and NSE pre-open price discovery, before the 09:15 open) | `xd-worker` |
 | Price alerts & action center | Every 1 min, 09:15–15:30 | `xd-worker` |
 | End-of-day fetch & aggregation (with gap backfill) | 15:50 on trading days of the calendar, never before the session has ended ([doc 05](05-data-and-brokers.md) §6; **built** as the service `eod` (P1-13): the job `dhan → aggregate → quality`, trigger `daily`) | `xd-api` today (`xd-worker` later) |

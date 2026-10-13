@@ -22,4 +22,8 @@ internal static class HoldingFixtures
             Guid.NewGuid(), Account, "Example One", Bucket, "Example One · Portfolio", instrument, instrument is null ? null : symbol, "ALL", "1001", "INE000A01011",
             symbol, symbol, lots.Where(l => l.IsOpen).Sum(l => l.Qty), 0m, lastPrice, new DateTimeOffset(2026, 10, 11, 4, 0, 0, TimeSpan.Zero), status,
             new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero), null, new DateTimeOffset(2026, 10, 11, 4, 0, 0, TimeSpan.Zero), lots);
+
+    /// <summary>The holding as a quote left it: the previous close and the source of the price.</summary>
+    public static HoldingData Quoted(this HoldingData holding, decimal? previousClose, string source = HoldingData.QuoteSource) =>
+        holding with { PreviousClose = previousClose, PriceSource = source };
 }

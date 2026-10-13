@@ -1,0 +1,9 @@
+{
+  "_status": "UNVERIFIED: written from the Dhan documentation, not recorded from the real API",
+  "http_status": 401,
+  "response": {
+    "errorType": "Invalid_Authentication",
+    "errorCode": "DH-901",
+    "errorMessage": "Client ID or user generated access token is invalid or expired."
+  }
+}

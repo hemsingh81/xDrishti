@@ -1,11 +1,21 @@
 import CloseIcon from '@mui/icons-material/Close';
 import { Box, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
 import type { HoldingRow } from '@/shared/api';
-import { formatDate, formatDateTime, formatInr, formatInrPrecise, formatNumber } from '@/shared/lib/format';
+import {
+  formatDate,
+  formatDateTime,
+  formatInr,
+  formatInrPrecise,
+  formatIstDateTime,
+  formatNumber,
+} from '@/shared/lib/format';
 import { Facts, type Fact } from '@/shared/ui';
 import { monoFontFamily } from '@/theme';
-import { Pnl, PnlPercent, Xirr } from './Figures';
+import { noDayChangeReasonOf } from '../lib/figures';
+import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
 import { LotsSection } from './LotsSection';
+
+const priceSourceLabel = (source: string): string => (source === 'quote' ? 'Quote' : 'Synced');
 
 function factsOf(h: HoldingRow): Fact[] {
   const { returns } = h;
@@ -14,10 +24,12 @@ function factsOf(h: HoldingRow): Fact[] {
     { label: 'Bucket', value: h.bucketName },
     { label: 'Quantity', value: formatNumber(h.qty) },
     { label: 'Average cost', value: formatInrPrecise(h.avgCost) },
-    {
-      label: 'Last price',
-      value: `${formatInrPrecise(h.lastPrice)}${h.lastPriceAt ? ` · ${formatDateTime(h.lastPriceAt)}` : ''}`,
-    },
+    { label: 'Last price', value: formatInrPrecise(h.lastPrice) },
+    { label: 'Previous close', value: h.previousClose === null ? '—' : formatInrPrecise(h.previousClose) },
+    { label: 'Day change', value: <DayChangeAmount value={h.dayChange} reason={noDayChangeReasonOf(h)} focusable /> },
+    { label: 'Day change %', value: h.dayChange === null ? '—' : <PnlPercent value={h.dayChangePct} /> },
+    { label: 'Price time (IST)', value: h.priceAt === null ? '—' : formatIstDateTime(h.priceAt) },
+    { label: 'Price source', value: priceSourceLabel(h.priceSource) },
     { label: 'Invested', value: formatInr(returns.invested) },
     { label: 'Value', value: returns.value === null ? '—' : formatInr(returns.value) },
     { label: 'Profit / loss', value: <Pnl value={returns.pnl} focusable /> },

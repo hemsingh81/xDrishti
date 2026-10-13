@@ -58,9 +58,10 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
 
     /// <summary>
     /// Starts one run of the service in the background and returns at once with its run record. When the service is running already (or waits for a retry) nothing starts and a skipped run is recorded
-    /// (<see cref="ServiceStart.AlreadyRunning"/>). <paramref name="cancellationToken"/> only matters before the start: once the run record is written the work goes on whatever happens to the caller.
+    /// (<see cref="ServiceStart.AlreadyRunning"/>). With <paramref name="dropWhenBusy"/> (the ticks of an interval or window schedule, ADR 0019 §5) a start that finds the service busy is only logged
+    /// (<c>service.tick_dropped</c>) and leaves no run record. <paramref name="cancellationToken"/> only matters before the start: once the run record is written the work goes on whatever happens to the caller.
     /// </summary>
-    public async ValueTask<ServiceStart> StartAsync(string serviceId, ServiceRunTrigger trigger, string requestedBy, CancellationToken cancellationToken)
+    public async ValueTask<ServiceStart> StartAsync(string serviceId, ServiceRunTrigger trigger, string requestedBy, CancellationToken cancellationToken, bool dropWhenBusy = false)
     {
         cancellationToken.ThrowIfCancellationRequested();
         if (registry.Find(serviceId) is not { } service)
@@ -71,7 +72,7 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
         var sequence = new Sequence(trigger, requestedBy);
         if (!TryReserve(serviceId, sequence))
         {
-            return ServiceStart.Busy(await RecordSkippedAsync(serviceId, trigger, AlreadyRunningMessage));
+            return await BusyAsync(serviceId, trigger, dropWhenBusy);
         }
 
         try
@@ -90,6 +91,18 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
         }
 
         Release(serviceId);
+        return await BusyAsync(serviceId, trigger, dropWhenBusy);
+    }
+
+    private async ValueTask<ServiceStart> BusyAsync(string serviceId, ServiceRunTrigger trigger, bool dropWhenBusy)
+    {
+        if (dropWhenBusy)
+        {
+            var triggerCode = trigger.ToCode();
+            ServicesLog.TickDropped(logger, serviceId, triggerCode);
+            return ServiceStart.Busy(null);
+        }
+
         return ServiceStart.Busy(await RecordSkippedAsync(serviceId, trigger, AlreadyRunningMessage));
     }
 

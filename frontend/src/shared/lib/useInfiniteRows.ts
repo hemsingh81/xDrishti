@@ -30,6 +30,8 @@ export interface InfiniteRowsOptions<T, Page extends PageResult<T> = PageResult<
    */
   keepPreviousRows?: boolean;
   enabled?: boolean;
+  /** Reload every loaded page this often (ms) while the page is visible; false (default) never. */
+  refetchInterval?: number | false;
 }
 
 export interface InfiniteRows<T, Page extends PageResult<T> = PageResult<T>> {
@@ -73,10 +75,12 @@ export function useInfiniteRows<T, Page extends PageResult<T> = PageResult<T>>({
   getRowId,
   keepPreviousRows = true,
   enabled = true,
+  refetchInterval = false,
 }: InfiniteRowsOptions<T, Page>): InfiniteRows<T, Page> {
   const query = useInfiniteQuery({
     queryKey,
     enabled,
+    refetchInterval,
     initialPageParam: 1,
     queryFn: ({ pageParam, signal }) => fetchPage(pageParam, { pageSize, signal }),
     getNextPageParam: (last) =>

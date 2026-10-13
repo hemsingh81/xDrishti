@@ -6,7 +6,7 @@ namespace XDrishti.Application.Tests.Platform.Services;
 
 /// <summary>
 /// A small service provider for tests (the unit-test project has the DI abstractions only): singletons and scoped services built by <see cref="ActivatorUtilities"/>, one scope per
-/// <see cref="CreateScope"/>, loggers that log nothing.
+/// <see cref="CreateScope"/>, loggers that log nothing (unless one is registered for the type).
 /// </summary>
 internal sealed class MiniProvider : IServiceProvider, IServiceScopeFactory, IDisposable
 {
@@ -57,7 +57,7 @@ internal sealed class MiniProvider : IServiceProvider, IServiceScopeFactory, IDi
             return this;
         }
 
-        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ILogger<>))
+        if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ILogger<>) && !_registrations.ContainsKey(type))
         {
             return Activator.CreateInstance(typeof(NullLogger<>).MakeGenericType(type.GetGenericArguments()));
         }

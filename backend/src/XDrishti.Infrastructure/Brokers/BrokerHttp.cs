@@ -58,6 +58,20 @@ internal static partial class BrokerHttp
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
+    /// <summary>Upper bound for one quote request (15 seconds).</summary>
+    public static readonly TimeSpan QuoteTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>A quote answer for 1,000 securities is a few hundred kilobytes with the order book; anything beyond 4 MB is refused.</summary>
+    public const int MaxQuoteResponseBytes = 4 * 1024 * 1024;
+
+    public static void ConfigureQuote(HttpClient client)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        client.Timeout = QuoteTimeout;
+        client.MaxResponseContentBufferSize = MaxQuoteResponseBytes;
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    }
+
     public static HttpMessageHandler CreatePrimaryHandler() => new SocketsHttpHandler
     {
         // A redirect would leave the allow-list unchecked (it is followed inside this handler): never follow one.

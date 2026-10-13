@@ -576,7 +576,7 @@ public sealed class ServiceHandlersTests : IDisposable
         var notice = (await NoticesAsync()).Items.ShouldHaveSingleItem();
 
         var run = _world.Data.RunsOf("eod").Single();
-        (notice.Id, notice.Kind, notice.Severity, notice.ServiceId).ShouldBe(($"service:failed:{run.Id}", "service_failed", "error", "eod"));
+        (notice.Id, notice.Kind, notice.Severity, notice.ServiceId).ShouldBe(("service:failed:eod:2026-10-12", "service_failed", "error", "eod"));
         notice.Text.ShouldBe("Eod failed on 12 Oct: Dhan refused the token");
 
         _world.SetClock(At(12, 11, 30));

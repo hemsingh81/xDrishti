@@ -2,7 +2,7 @@ import type { HoldingRow } from '@/shared/api';
 import { formatInr, formatInrPrecise, formatNumber } from '@/shared/lib/format';
 import type { GridColumn } from '@/shared/ui/grid';
 import { Pnl, PnlPercent, Xirr } from './Figures';
-import { Acquired, LastPrice, Symbol } from './HoldingCells';
+import { Acquired, DayChange, LastPrice, Symbol } from './HoldingCells';
 
 const base: readonly GridColumn<HoldingRow>[] = [
   { id: 'symbol', header: 'Symbol', sortable: true, minWidth: 150, render: (h) => <Symbol holding={h} /> },
@@ -17,6 +17,14 @@ const base: readonly GridColumn<HoldingRow>[] = [
     accessor: (h) => formatInrPrecise(h.avgCost),
   },
   { id: 'lastPrice', header: 'LTP', sortable: true, numeric: true, render: (h) => <LastPrice holding={h} /> },
+  {
+    id: 'dayChange',
+    header: 'Day change',
+    sortable: true,
+    numeric: true,
+    hideBelow: 'lg',
+    render: (h) => <DayChange holding={h} />,
+  },
   {
     id: 'invested',
     header: 'Invested',

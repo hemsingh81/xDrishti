@@ -49,7 +49,7 @@ flowchart LR
 | Unrealised P&L (₹, %) | Market value − remaining cost |
 | Realised P&L (₹) | From FIFO-closed lots, net of charges |
 | Total return % | (Realised + unrealised + dividends) / total invested |
-| Day change (₹, %) | vs previous close |
+| Day change (₹, %) | vs previous close (**built**, P2-06): ₹ = qty × (last − previous close), % = (last − previous close) / previous close; unavailable (never zero) when there is no previous close. **Known limitation:** `previous_close` comes only from quotes and a holdings sync never touches it, so on a day without a quote (the poll off, failed or outside its window) a sync moves the price while the previous close stays from an earlier session, and the day change then spans sessions; the row exposes `priceAt` and `priceSource` so the screen can say so |
 | **XIRR** | Annualised return from dated cash flows (§4) |
 | CAGR | For holdings > 1 year |
 | Weight % | Share of portfolio (or bucket) value |
@@ -129,7 +129,7 @@ in `xd-api` looks once a minute at every Portfolio-role account whose refresh is
 Not included in v1 (and stated in the UI): dividends, brokerage and taxes, corporate-action adjustments, a "day change" (needs the previous close, P2-07).
 
 ### Per group (basket / bucket / account / strategy / sector / total)
-Invested · current value · realised · unrealised · total return % · **XIRR** · day change · number of open
+Invested · current value · realised · unrealised · total return % · **XIRR** · day change (sum of the holdings' ₹; % = Σ₹ / Σ qty × previous close of the included holdings, not an average of percentages; holdings without a previous close are left out and counted as `dayChangeExcluded`) · number of open
 positions · win rate & expectancy of closed trades · **benchmark XIRR** (same cash flows invested in Nifty 50)
 and **alpha** (XIRR − benchmark XIRR) · max drawdown of the group's value history.
 
@@ -194,7 +194,9 @@ basket, account, strategy or sector with the metrics in §3.
 | Long-term holdings | Dhan quote API (up to 1,000 instruments/request) | Every `holdings_refresh_minutes` (default 5) |
 | Portfolio snapshot | EOD official close | Daily after close |
 
-The React Portfolio screen receives updates via SignalR; values recalculate incrementally.
+**Built (P2-06, [ADR 0019](../adr/0019-holdings-quotes-day-change-and-the-first-interval-service.md)):** the quote poll of the long-term holdings is the service `holdings-quotes` (the first `interval` service: every 5 min from 09:15 to 15:30 IST on trading days, retries 0, timeout 2 min, catch-up off, a tick that falls while the previous run goes on is dropped with a log line and no run record). It writes `last_price`, `previous_close`, `last_price_at` and `last_price_source = quote` into every open holding of a quoted instrument in one statement; a holdings sync keeps a quote of the same India day. The Portfolio screen re-reads once a minute while the market is open (no SignalR until the live feed exists).
+
+The React Portfolio screen receives updates via SignalR once the live feed exists; values recalculate incrementally.
 
 ## 7. Alerts
 
@@ -215,7 +217,7 @@ move on a holding · data or token issue for an account.
 qty, avg cost, last price and time, status open/closed, first seen / closed / synced), `portfolio.holding_lots` (holding, acquired on, qty, unit cost, source
 import/added/manual, uses default date, closed on, close price, estimated), `portfolio.holding_syncs` (account, trigger manual/auto/import, status
 running/succeeded/failed/skipped, counts, error, requested by; one running row per account) and the refresh columns of `accounts.portfolio_settings`
-(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). The fuller target model below (transactions, cash flows, valuations) grows from here.
+(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). **Built in P2-06 (migration `AddHoldingQuotes`):** `portfolio.holdings.previous_close` (`numeric(18,4)`, null until a quote gave one; a sync never touches it) and `last_price_source` (`sync` | `quote`, default `sync`, CHECK), next to `last_price` / `last_price_at` — only the latest quote is stored, no price history. The fuller target model below (transactions, cash flows, valuations) grows from here.
 
 | Table | Key columns |
 |-------|------------|

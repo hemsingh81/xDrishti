@@ -45,6 +45,13 @@ const istDateTime = new Intl.DateTimeFormat('en-IN', {
   hourCycle: 'h23',
 });
 const istDate = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' });
+const istDayMonth = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' });
+const istTimeOfDay = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Kolkata',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
 const compact = new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 });
 
 // en-CA formats as yyyy-MM-dd.
@@ -88,6 +95,16 @@ export function formatIstDateTime(value: string | Date): string {
 /** "12 Oct 2026": the calendar day of a moment in India time. */
 export function formatIstDate(value: string | Date): string {
   return istDate.format(typeof value === 'string' ? new Date(value) : value);
+}
+
+/** "10 Oct": the calendar day of a moment in India time, without the year (for a price or figure of the last days). */
+export function formatIstDayMonth(value: string | Date | number): string {
+  return istDayMonth.format(typeof value === 'string' ? new Date(value) : value);
+}
+
+/** "10:35": the time of day of a moment in India time (the caller adds "IST"). */
+export function formatIstTime(value: string | Date | number): string {
+  return istTimeOfDay.format(typeof value === 'string' ? new Date(value) : value);
 }
 
 /** Indian rupees with lakh/crore grouping: 200000 -> "₹2,00,000". */

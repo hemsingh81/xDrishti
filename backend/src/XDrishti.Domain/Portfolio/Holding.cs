@@ -1,4 +1,5 @@
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market;
 
 namespace XDrishti.Domain.Portfolio;
 
@@ -70,6 +71,12 @@ public sealed class Holding : Entity<Guid>
 
     public DateTimeOffset? LastPriceAt { get; private set; }
 
+    /// <summary>The previous session's close as the last quote reported it (ADR 0019); null until a quote has given one. A sync never touches it.</summary>
+    public decimal? PreviousClose { get; private set; }
+
+    /// <summary>Where <see cref="LastPrice"/> came from: the holdings list at the last sync, or a quote.</summary>
+    public PriceSource LastPriceSource { get; private set; } = PriceSource.Sync;
+
     public HoldingStatus Status { get; private set; }
 
     public DateTimeOffset FirstSeenAt { get; private set; }
@@ -112,6 +119,8 @@ public sealed class Holding : Entity<Guid>
             throw new InvalidOperationException("The holding is open already.");
         }
 
+        // The previous close belongs to the session of the quote that gave it: a holding that comes back must not show a day change against it.
+        PreviousClose = null;
         Describe(row, instrumentId, name);
         Begin(row, acquiredOn, usesDefaultDate, source, now);
     }
@@ -156,6 +165,29 @@ public sealed class Holding : Entity<Guid>
         SetPrice(row.LastPrice, now);
         SyncedAt = now;
         return change;
+    }
+
+    /// <summary>
+    /// A market quote for the holding (ADR 0019 §3): the price, the previous session's close and the time of the fetch, source <see cref="PriceSource.Quote"/>. A closed holding is not priced, and a last price that is
+    /// zero or negative is no quote at all (nothing changes, false). A previous close that is missing, zero or negative is ignored: the one held stays. The batch update of the store applies the same rules
+    /// to many holdings in one statement (<c>IHoldingQuotes.ApplyAsync</c>).
+    /// </summary>
+    public bool ApplyQuote(decimal last, decimal? previousClose, DateTimeOffset at)
+    {
+        if (Status != HoldingStatus.Open || last <= 0)
+        {
+            return false;
+        }
+
+        LastPrice = Round(last);
+        LastPriceAt = at;
+        LastPriceSource = PriceSource.Quote;
+        if (previousClose is > 0)
+        {
+            PreviousClose = Round(previousClose.Value);
+        }
+
+        return true;
     }
 
     /// <summary>The broker no longer lists the holding: all lots are closed oldest first at the last known price (estimated). False when it was closed already.</summary>
@@ -228,13 +260,20 @@ public sealed class Holding : Entity<Guid>
         Name = Cut(string.IsNullOrWhiteSpace(name) ? row.TradingSymbol : name, MaxNameLength);
     }
 
+    /// <summary>
+    /// The price from a holdings sync (ADR 0019 §3): a price of zero or less is no price. A quote of the same India day stays — it is newer than anything the sync knows — otherwise the broker's price is taken, source
+    /// <see cref="PriceSource.Sync"/>. The previous close is never touched.
+    /// </summary>
     private void SetPrice(decimal price, DateTimeOffset now)
     {
-        if (price > 0)
+        if (price <= 0 || (LastPriceSource == PriceSource.Quote && LastPriceAt is { } at && IndiaTime.Today(at) == IndiaTime.Today(now)))
         {
-            LastPrice = Round(price);
-            LastPriceAt = now;
+            return;
         }
+
+        LastPrice = Round(price);
+        LastPriceAt = now;
+        LastPriceSource = PriceSource.Sync;
     }
 
     private void CloseFifo(long qty, DateOnly on, decimal price, bool estimated, DateTimeOffset now)

@@ -18,6 +18,7 @@ import {
   withConnection,
   buildConnection,
 } from '@/test/fixtures';
+import { setNow } from '@/test/clock';
 import { scrollToEnd } from '@/test/intersection';
 import { problemResponse, server } from '@/test/server';
 import { smallPage, threePages } from '@/test/smallPages';
@@ -212,6 +213,7 @@ describe('Portfolio page: totals', () => {
 
 describe('Portfolio page: holdings', () => {
   it('lists the open holdings with every column, flags and dashes', async () => {
+    setNow('2026-10-11T10:30:00Z'); // the day of the prices: no date under the day change
     renderPortfolio();
 
     await screen.findByRole('gridcell', { name: 'RELIANCE' });
@@ -223,6 +225,7 @@ describe('Portfolio page: holdings', () => {
       'Qty',
       'Avg cost',
       'LTP',
+      'Day change',
       'Invested',
       'Value',
       'P&L',
@@ -241,6 +244,7 @@ describe('Portfolio page: holdings', () => {
       '40',
       '₹2,500.00',
       '₹2,902.50',
+      '▲+₹900▲+0.78%',
       '₹1,00,000',
       '₹1,16,100',
       '▲+₹16,100',
@@ -255,17 +259,17 @@ describe('Portfolio page: holdings', () => {
     renderPortfolio();
 
     const tcs = await rowTexts('TCS');
-    expect(tcs[7]).toBe('▼−₹1,200');
-    expect(tcs[8]).toBe('▼−3.00%');
-    expect(tcs[9]).toBe('▼−2.50%');
+    expect(tcs[8]).toBe('▼−₹1,200');
+    expect(tcs[9]).toBe('▼−3.00%');
+    expect(tcs[10]).toBe('▼−2.50%');
 
     const infy = await rowTexts('INFY');
-    expect(infy[9]).toBe('—'); // too young for an XIRR
-    expect(infy[10]).toBe('1 Jan 2025Default date2 lots');
+    expect(infy[10]).toBe('—'); // too young for an XIRR
+    expect(infy[11]).toBe('1 Jan 2025Default date2 lots');
 
     const small = await rowTexts('SMALLCO');
     expect(small[0]).toBe('SMALLCONot in master list');
-    expect(small[9]).toBe('n/m'); // beyond ±1,000 %
+    expect(small[10]).toBe('n/m'); // beyond ±1,000 %
   });
 
   it('shows an unpriced holding as "No price yet", with dashes instead of a loss of 100 %', async () => {
@@ -282,7 +286,8 @@ describe('Portfolio page: holdings', () => {
     expect(cells[0]).toBe('NOPRICENo price yet');
     expect(cells[2]).toBe('10');
     expect(cells[4]).toBe('—'); // last price
-    expect(cells.slice(5, 10)).toEqual(['₹2,000', '—', '—', '—', '—']); // invested, value, P&L, P&L %, XIRR
+    expect(cells[5]).toBe('—'); // day change
+    expect(cells.slice(6, 11)).toEqual(['₹2,000', '—', '—', '—', '—']); // invested, value, P&L, P&L %, XIRR
     expect(cells.join(' ')).not.toMatch(/100\.00%|−₹2,000/);
     const row = screen.getByRole('row', { name: /^NOPRICE/ });
     expect(within(row).getAllByRole('img', { name: /No price yet/ }).length).toBeGreaterThan(0);

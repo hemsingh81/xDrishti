@@ -15,7 +15,10 @@ public sealed record LotData(
     public bool IsOpen => ClosedOn is null;
 }
 
-/// <summary>A holding as read for calculations and display: its identity, names, the broker's figures and all its lots. Status is open or closed.</summary>
+/// <summary>
+/// A holding as read for calculations and display: its identity, names, the broker's figures and all its lots. Status is open or closed. <see cref="PreviousClose"/> is the previous session's close as the last quote
+/// reported it (null: none yet); <see cref="PriceSource"/> says whether <see cref="LastPrice"/> came from the sync (<c>sync</c>) or from a quote (<c>quote</c>), at <see cref="LastPriceAt"/>.
+/// </summary>
 public sealed record HoldingData(
     Guid Id,
     Guid AccountId,
@@ -37,8 +40,16 @@ public sealed record HoldingData(
     DateTimeOffset FirstSeenAt,
     DateTimeOffset? ClosedAt,
     DateTimeOffset SyncedAt,
-    IReadOnlyList<LotData> Lots)
+    IReadOnlyList<LotData> Lots,
+    decimal? PreviousClose = null,
+    string PriceSource = HoldingData.SyncSource)
 {
+    /// <summary>The price came from the broker's holdings list at the last sync.</summary>
+    public const string SyncSource = "sync";
+
+    /// <summary>The price came from a market quote (ADR 0019).</summary>
+    public const string QuoteSource = "quote";
+
     public bool IsOpen => Status == "open";
 
     /// <summary>

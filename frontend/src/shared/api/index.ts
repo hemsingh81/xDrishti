@@ -3,6 +3,13 @@ export { dataIdlePollMs, dataJobQuery, dataOverviewQuery } from './dataJobs';
 export { dataNoticesPollMs, dataNoticesQuery } from './dataNotices';
 export { queryRoots } from './queryRoots';
 export { serviceNoticesPollMs, serviceNoticesQuery } from './serviceNotices';
+export {
+  runServiceNow,
+  servicesListQuery,
+  servicesPortKeys,
+  servicesTimelineQuery,
+  showStartedRun,
+} from './servicesPort';
 export type {
   AccountDetail,
   AccountEvent,

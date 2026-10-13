@@ -123,6 +123,14 @@ public static class DependencyInjection
             .RemoveAllLoggers();
         services.AddScoped<IBrokerHoldings, DhanHoldingsClient>();
 
+        // The market quote of the holdings (ADR 0019): the guard allows only POST /v2/marketfeed/quote; one request a second, shared by every run (a singleton throttle, apart from the bar fetch's).
+        services.AddHttpClient(BrokerHttpClientNames.DhanQuote, BrokerHttp.ConfigureQuote)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddSingleton<QuoteThrottle>();
+        services.AddScoped<IQuoteSource, DhanQuoteClient>();
+
         // The 1-minute chart data of the Data API (ADR 0016 §7): 15-second timeout, answers up to 16 MB; the guard allows only POST /v2/charts/intraday.
         services.AddHttpClient(BrokerHttpClientNames.DhanChart, BrokerHttp.ConfigureChart)
             .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
@@ -141,6 +149,7 @@ public static class DependencyInjection
         services.AddScoped<IHoldingStore, HoldingStore>();
         services.AddScoped<IHoldingQueries, HoldingQueries>();
         services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
+        services.AddScoped<IHoldingQuotes, HoldingQuotes>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
         services.AddScoped<IInstrumentMapper, InstrumentMapper>();
     }
@@ -218,7 +227,9 @@ public static class DependencyInjection
         services.AddScoped<IDailySeries, DailySeries>();
         services.AddScoped<IObservedDays, ObservedDays>();
         services.AddScoped<IFetchTargets, FetchTargets>();
-        services.AddScoped<IDataAccountStatus, DataAccountStatus>();
+        services.AddScoped<DataAccountStatus>();
+        services.AddScoped<IDataAccountStatus>(sp => sp.GetRequiredService<DataAccountStatus>());
+        services.AddScoped<IDataAccountCredentials>(sp => sp.GetRequiredService<DataAccountStatus>());
         services.AddSingleton(sp => new RequestThrottle(sp.GetRequiredService<IDataSettings>().DhanRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
         services.AddScoped<DhanIntradayChartClient>();
         services.AddScoped<IIntradayBarSource, DhanIntradayBarSource>();

@@ -701,7 +701,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Holdings with lots summary, profit/loss and XIRR: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort, page, pageSize (max 100) */
+    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100). Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote) */
     get: operations['ListHoldings'];
     put?: never;
     post?: never;
@@ -718,7 +718,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, counts, lots on the default date, last sync */
+    /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync */
     get: operations['GetHoldingsSummary'];
     put?: never;
     post?: never;
@@ -1332,7 +1332,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What the owner should know about the services for the notification bell: service_failed for the latest run of each service with notify on failure when it failed and no retry follows; the next run of the service clears it */
+    /** What the owner should know about the services for the notification bell: service_failed for the latest run of each service with notify on failure when it failed and no retry follows (id service:failed:{serviceId}:{yyyy-MM-dd}: one notice per service per India day, text and time of the latest failure); the next run of the service clears it */
     get: operations['GetServiceNotices'];
     put?: never;
     post?: never;
@@ -2608,6 +2608,9 @@ export interface components {
      * @description One holding. Status is "open" or "closed". Mapped is false when the holding is not in the instrument master (InstrumentId and CanonicalSymbol are
      *     then null). LotCount counts open lots; EarliestAcquiredOn is the oldest open lot's date; UsesDefaultDate is true when any open lot has the
      *     import's default date. Returns cover all lots (closed lots add to RealisedPnl and to the XIRR).
+     *     PreviousClose is the previous session's close as the last quote reported it (null until a quote gave one). DayChange (rupees) and DayChangePct (percent number) are
+     *     against it, for an open, priced holding with a previous close; otherwise both are null and the holding is left out of the summary's day change. PriceAt is the time of
+     *     LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync) or "quote" (a market quote).
      */
     HoldingRow: {
       /** Format: uuid */
@@ -2649,10 +2652,21 @@ export interface components {
       usesDefaultDate: boolean;
       priced: boolean;
       returns: components['schemas']['ReturnsView'];
+      /** Format: double */
+      previousClose: null | number;
+      /** Format: double */
+      dayChange: null | number;
+      /** Format: double */
+      dayChangePct: null | number;
+      /** Format: date-time */
+      priceAt: null | string;
+      priceSource: string;
     };
     /**
      * @description Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that
      *     still have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).
+     *     DayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no
+     *     holding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings.
      */
     HoldingsSummary: {
       returns: components['schemas']['ReturnsView'];
@@ -2669,6 +2683,13 @@ export interface components {
       /** Format: date */
       valuationDate: string;
       lastSync: null | components['schemas']['SyncRunView'];
+      /** Format: double */
+      dayChange: null | number;
+      /** Format: double */
+      dayChangePct: null | number;
+      /** Format: int32 */
+      dayChangeExcluded: number;
+      pricesAsOf: components['schemas']['PricesAsOf'];
     };
     HttpValidationProblemDetails: {
       type?: null | string;
@@ -3035,6 +3056,13 @@ export interface components {
       alreadyImported: boolean;
       /** Format: date */
       suggestedDate: string;
+    };
+    /** @description The oldest and the newest time of the prices of the open holdings (null when none has a priced time). */
+    PricesAsOf: {
+      /** Format: date-time */
+      oldest: null | string;
+      /** Format: date-time */
+      newest: null | string;
     };
     ProblemDetails: {
       type?: null | string;
@@ -3587,7 +3615,7 @@ export interface components {
     ServiceList: {
       items: components['schemas']['ServiceView'][];
     };
-    /** @description A failure to tell the owner of (the bell). `id` is `service:failed:{runId}`, so a newer failed run is a new notice. `kind` is service_failed; `severity` error. */
+    /** @description A failure to tell the owner of (the bell). `id` is `service:failed:{serviceId}:{yyyy-MM-dd}` (the India date of the failed run): one notice per service per day, with the text and time of the latest failure. `kind` is service_failed; `severity` error. */
     ServiceNotice: {
       id: string;
       kind: string;

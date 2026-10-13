@@ -91,3 +91,20 @@ export function Xirr({
   if ('value' in xirr) return <Trend direction={directionOf(xirr.value, 2)}>{signedPercent(xirr.value)}</Trend>;
   return <Unavailable label={xirr.label} reason={xirr.reason} focusable={focusable} />;
 }
+
+/**
+ * Day change in rupees: "▲ +₹900" / "▼ −₹200"; "—" with the reason when there is none (no previous close). The sign and
+ * the arrow carry the meaning, the colour only helps.
+ */
+export function DayChangeAmount({
+  value,
+  reason,
+  focusable = false,
+}: {
+  value: number | null;
+  reason: string;
+  focusable?: boolean;
+}) {
+  if (value === null) return <Unavailable label="—" reason={reason} focusable={focusable} />;
+  return <Trend direction={directionOf(value)}>{signedInr(value)}</Trend>;
+}

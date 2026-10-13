@@ -7,12 +7,14 @@ interface SummaryNotesProps {
   defaultDateLots: number;
   /** Open holdings without a usable price: left out of value, P&L and XIRR. */
   unpricedCount: number;
+  /** Open holdings left out of the day change for lack of a previous close. */
+  dayChangeExcluded: number;
   /** Show those holdings first: oldest purchase date first. */
   onReviewDates: () => void;
 }
 
 /** Under the tiles: the lots whose date was never chosen (a way to find them), and what the figures leave out. */
-export function SummaryNotes({ defaultDateLots, unpricedCount, onReviewDates }: SummaryNotesProps) {
+export function SummaryNotes({ defaultDateLots, unpricedCount, dayChangeExcluded, onReviewDates }: SummaryNotesProps) {
   return (
     <Stack direction="row" sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.5 }}>
       {defaultDateLots > 0 && (
@@ -32,6 +34,11 @@ export function SummaryNotes({ defaultDateLots, unpricedCount, onReviewDates }: 
           {unpricedCount === 1
             ? '1 holding without a price is left out of value, P&L and XIRR.'
             : `${formatNumber(unpricedCount)} holdings without a price are left out of value, P&L and XIRR.`}
+        </Typography>
+      )}
+      {dayChangeExcluded > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          {`Day change excludes ${formatNumber(dayChangeExcluded)} ${dayChangeExcluded === 1 ? 'holding' : 'holdings'} without a previous close`}
         </Typography>
       )}
       <Typography variant="caption" color="text.secondary">

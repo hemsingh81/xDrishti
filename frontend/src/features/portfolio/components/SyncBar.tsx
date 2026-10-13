@@ -6,6 +6,7 @@ import { syncStatusQuery } from '../api/portfolioQueries';
 import { useRefreshOnNewRun } from '../hooks/useRefreshOnNewRun';
 import { useSyncFlow } from '../hooks/useSyncFlow';
 import { ProblemNotice } from './ProblemNotice';
+import { RefreshPricesButton } from './RefreshPricesButton';
 import { SyncConfirmDialog } from './SyncConfirmDialog';
 import { SyncStatusLine } from './SyncStatusLine';
 
@@ -16,10 +17,12 @@ interface SyncBarProps {
   connected: boolean;
   /** The latest run of any account, shown when no single account is in play. */
   fallbackRun: SyncRun | null;
+  /** Refresh prices: runs the quote service now. */
+  refresh: { available: boolean; busy: boolean; onRefresh: () => void };
 }
 
-/** Last sync, the daily-refresh setting and next run, and the Sync now button. */
-export function SyncBar({ account, connected, fallbackRun }: SyncBarProps) {
+/** Last sync, the daily-refresh setting and next run, and the Sync now and Refresh prices buttons. */
+export function SyncBar({ account, connected, fallbackRun, refresh }: SyncBarProps) {
   const accountId = account?.id ?? null;
   const status = useQuery({ ...syncStatusQuery(accountId ?? ''), enabled: accountId !== null });
   const flow = useSyncFlow(accountId);
@@ -37,15 +40,18 @@ export function SyncBar({ account, connected, fallbackRun }: SyncBarProps) {
             sx={{ gap: 1.5, alignItems: { md: 'center' }, justifyContent: 'space-between' }}
           >
             <SyncStatusLine status={status.data ?? null} fallbackRun={fallbackRun} />
-            <Button
-              variant="contained"
-              startIcon={<SyncIcon />}
-              loading={running}
-              disabled={!canSync}
-              onClick={flow.run}
-            >
-              {running ? 'Syncing…' : 'Sync now'}
-            </Button>
+            <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', flexShrink: 0 }}>
+              <RefreshPricesButton available={refresh.available} busy={refresh.busy} onRefresh={refresh.onRefresh} />
+              <Button
+                variant="contained"
+                startIcon={<SyncIcon />}
+                loading={running}
+                disabled={!canSync}
+                onClick={flow.run}
+              >
+                {running ? 'Syncing…' : 'Sync now'}
+              </Button>
+            </Stack>
           </Stack>
           {!account && (
             <Typography variant="body2" color="text.secondary">
