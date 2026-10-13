@@ -4,17 +4,21 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
+using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Domain.Platform.Services;
 
 namespace XDrishti.Application.Portfolio.Quotes;
 
 /// <summary>
-/// The quote poll of the open holdings as a service (<see cref="Id"/>, ADR 0019, ADR 0018): one run reads which securities the open holdings hold, asks the quote source (Dhan's market-quote API with the primary
+/// The quote poll of the open holdings as a service (<see cref="Id"/>, ADR 0019, ADR 0018, price alerts ADR 0022): one run reads which securities the open holdings hold, asks the quote source (Dhan's market-quote API with the primary
 /// Data account) for the ones that Dhan lists on the NSE, and writes last price, previous close and the fetch time into every open holding of those securities across accounts, in one statement. Holdings that
 /// are not on the NSE (BSE only, retired, not in the master list) are not quoted and keep their synced price; the message counts them ("Quoted 41 of 43 holdings; 2 not on NSE" — securities, so a stock held in
 /// two accounts counts once). Without open holdings the run succeeds and makes no request; without a usable Data account it is skipped with the reason; a failed request ends the run failed with the source's safe
 /// message and changes no price (the next tick tries again — retries are 0). <b>When</b> it runs is the scheduler's: by default every 5 minutes from 09:15 to 15:30 on trading days (the last run is the closing price);
-/// Run now works at any time. Nothing secret is logged or put into a message.
+/// Run now works at any time. <b>Price alerts</b> (ADR 0022): the securities of the active alerts join the same request (still at most 1,000 per call); after the holdings are updated, every alert whose condition holds on the quoted last price is triggered
+/// (once, in the transaction of its audit event; an alert without a quote stays active; a failed run triggers nothing) and the message adds "N alerts triggered"; then the Action center's done decisions whose condition ended are cleared.
+/// Nothing secret is logged or put into a message.
 /// </summary>
 public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvider clock, ILogger<HoldingQuotesService> logger) : IScheduledService
 {
@@ -52,15 +56,20 @@ public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvid
         await using var scope = scopes.CreateAsyncScope();
         var services = scope.ServiceProvider;
         var holdings = services.GetRequiredService<IHoldingQuotes>();
+        var alerts = services.GetRequiredService<PriceAlertChecker>();
         var targets = await holdings.ListTargetsAsync(cancellationToken);
-        if (targets.OpenSecurities == 0)
+
+        // The active price alerts join the quoted set (ADR 0022); one that Dhan cannot quote (no NSE equity id) stays active and is never asked for.
+        var active = await alerts.ListActiveAsync(cancellationToken);
+        var quotableAlerts = active.Where(a => a.SecurityId is not null).ToList();
+        if (targets.OpenSecurities == 0 && quotableAlerts.Count == 0)
         {
             HoldingQuotesLog.NoHoldings(logger);
             return ServiceOutcome.Succeeded(NoHoldingsMessage);
         }
 
         var notOnNse = targets.OpenSecurities - targets.Nse.Count;
-        if (targets.Nse.Count == 0)
+        if (targets.Nse.Count == 0 && quotableAlerts.Count == 0)
         {
             HoldingQuotesLog.Quoted(logger, 0, targets.OpenSecurities, notOnNse, 0, 0, 0);
             return ServiceOutcome.Succeeded(Describe(0, targets.OpenSecurities, notOnNse, 0));
@@ -79,9 +88,17 @@ public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvid
             byInstrument.TryAdd(target.SecurityId, target.InstrumentId);
         }
 
+        var held = byInstrument.Count;
+        var heldInstruments = targets.Nse.Select(t => t.InstrumentId).ToHashSet();
+        foreach (var alert in quotableAlerts)
+        {
+            byInstrument.TryAdd(alert.SecurityId!, alert.InstrumentId);
+        }
+
         var result = await services.GetRequiredService<IQuoteSource>().QuoteAsync([.. byInstrument.Keys], cancellationToken);
         if (result.Failure is { } failure)
         {
+            // A failed run changes no price and triggers no alert.
             HoldingQuotesLog.Failed(logger, failure.Kind.ToString().ToLowerInvariant(), result.Requests);
             return ServiceOutcome.Failed(failure.Message);
         }
@@ -97,9 +114,19 @@ public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvid
             return ServiceOutcome.Failed(NoUsableQuotesMessage);
         }
 
-        var updated = await holdings.ApplyAsync(quotes, clock.GetUtcNow(), cancellationToken);
-        var withoutQuote = byInstrument.Count - quotes.Count;
-        HoldingQuotesLog.Quoted(logger, quotes.Count, targets.OpenSecurities, notOnNse, withoutQuote, updated, result.Requests);
-        return ServiceOutcome.Succeeded(Describe(quotes.Count, targets.OpenSecurities, notOnNse, withoutQuote));
+        var at = clock.GetUtcNow();
+        var heldQuotes = quotes.Where(q => heldInstruments.Contains(q.InstrumentId)).ToList();
+        var updated = heldQuotes.Count == 0 ? 0 : await holdings.ApplyAsync(heldQuotes, at, cancellationToken);
+        var withoutQuote = held - heldQuotes.Count;
+        HoldingQuotesLog.Quoted(logger, heldQuotes.Count, targets.OpenSecurities, notOnNse, withoutQuote, updated, result.Requests);
+
+        // The alerts are checked against the same answer, after the holdings were updated; then the done decisions whose condition the new prices ended are cleared.
+        var triggered = await alerts.CheckAsync(active, quotes.ToDictionary(q => q.InstrumentId, q => q.LastPrice), at, cancellationToken);
+        await services.GetRequiredService<ActionReconciler>().ReconcileAsync("quotes", cancellationToken);
+        var message = targets.OpenSecurities == 0 ? NoHoldingsMessage : Describe(heldQuotes.Count, targets.OpenSecurities, notOnNse, withoutQuote);
+        return ServiceOutcome.Succeeded(triggered > 0 ? message + "; " + DescribeTriggered(triggered) : message);
     }
+
+    /// <summary>"1 alert triggered" · "3 alerts triggered".</summary>
+    public static string DescribeTriggered(int triggered) => string.Create(CultureInfo.InvariantCulture, $"{triggered} {(triggered == 1 ? "alert" : "alerts")} triggered");
 }

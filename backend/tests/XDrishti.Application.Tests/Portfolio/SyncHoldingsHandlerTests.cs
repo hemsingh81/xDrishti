@@ -473,4 +473,23 @@ public sealed class SyncHoldingsHandlerTests
 
         removed.ShouldBe(SyncHoldingsHandler.PruneBatch);
     }
+
+    [Fact]
+    public async Task A_sync_clears_the_done_decisions_whose_condition_no_longer_holds_and_keeps_the_others()
+    {
+        var (account, _) = await ImportedAccountAsync(Row("EXMPL", 100, 50m, 60m), Row("LOSER", 10, 50m, 30m, "2", "INE000B01012"));
+        var gone = _fx.HoldingOf("EXMPL"); // up 20 %: not below cost
+        var still = _fx.HoldingOf("LOSER"); // down 40 %: below cost
+        foreach (var holding in new[] { gone, still })
+        {
+            await _fx.Actions.SetAsync("below_cost", holding.Id.ToString(), ActionDecision.Done, null, Actor, _fx.Clock.GetUtcNow(), CancellationToken.None);
+        }
+
+        await _fx.Actions.SaveAsync(CancellationToken.None);
+
+        Ok(await _fx.SyncAsync(account.Id));
+
+        _fx.Actions.StateOf("below_cost", gone.Id.ToString())!.State.ShouldBe(ActionDecision.Cleared);
+        _fx.Actions.StateOf("below_cost", still.Id.ToString())!.State.ShouldBe(ActionDecision.Done);
+    }
 }

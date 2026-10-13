@@ -1,5 +1,6 @@
 import CloseIcon from '@mui/icons-material/Close';
-import { Box, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/NotificationsNoneOutlined';
+import { Box, Button, Chip, Drawer, IconButton, Stack, Typography } from '@mui/material';
 import type { HoldingRow } from '@/shared/api';
 import {
   formatDate,
@@ -51,10 +52,14 @@ interface HoldingDrawerProps {
   /** Its row in the list, when it is on the current page (the summary needs it; the lots do not). */
   holding: HoldingRow | undefined;
   onClose: () => void;
+  /** Set a price alert on this holding (offered when it is in the master list). */
+  onSetAlert: (holding: HoldingRow) => void;
+  /** Open the Alerts panel. */
+  onShowAlerts: () => void;
 }
 
 /** Side panel for one holding: its figures, then its lots with their dates. */
-export function HoldingDrawer({ id, holding, onClose }: HoldingDrawerProps) {
+export function HoldingDrawer({ id, holding, onClose, onSetAlert, onShowAlerts }: HoldingDrawerProps) {
   return (
     <Drawer
       anchor="right"
@@ -77,6 +82,25 @@ export function HoldingDrawer({ id, holding, onClose }: HoldingDrawerProps) {
                 <Chip size="small" variant="outlined" color="warning" label="No price yet" />
               )}
               {holding.status === 'closed' && <Chip size="small" variant="outlined" label="Closed" />}
+            </Stack>
+          )}
+          {holding && (
+            <Stack direction="row" sx={{ mt: 1, gap: 1, flexWrap: 'wrap' }}>
+              {holding.instrumentId !== null && holding.status === 'open' && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<NotificationsIcon />}
+                  onClick={() => {
+                    onSetAlert(holding);
+                  }}
+                >
+                  Set price alert
+                </Button>
+              )}
+              <Button size="small" onClick={onShowAlerts}>
+                View alerts
+              </Button>
             </Stack>
           )}
         </Box>

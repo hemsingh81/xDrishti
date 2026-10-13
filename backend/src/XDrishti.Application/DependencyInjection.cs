@@ -23,6 +23,8 @@ using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
+using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
@@ -243,6 +245,24 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<SetBenchmarkCommand, BenchmarkView>, SetBenchmarkHandler>();
         services.AddScoped<ICommandHandler<TrackPortfolioHoldingsCommand, PortfolioTrackResult>, TrackPortfolioHoldingsHandler>();
         services.AddScoped<ICommandHandler<TrackBenchmarkCommand, PortfolioTrackResult>, TrackBenchmarkHandler>();
+
+        // The Action center (ADR 0022): rules evaluated on read, the owner's decisions, the thresholds, the price alerts and the notices of the bell. The evaluator, the reconciler, the writer and the checker are shared by several use cases and the quote poll.
+        services.AddScoped<ActionEvaluator>();
+        services.AddScoped<ActionReconciler>();
+        services.AddScoped<ActionDecisions>();
+        services.AddScoped<ActionThresholdsWriter>();
+        services.AddScoped<PriceAlertChecker>();
+        services.AddScoped<IQueryHandler<GetActionItemsQuery, Result<ActionList>>, GetActionItemsHandler>();
+        services.AddScoped<ICommandHandler<SnoozeActionCommand, ActionDecisionView>, SnoozeActionHandler>();
+        services.AddScoped<ICommandHandler<MarkActionDoneCommand, ActionDecisionView>, MarkActionDoneHandler>();
+        services.AddScoped<ICommandHandler<ReopenActionCommand, ActionDecisionView>, ReopenActionHandler>();
+        services.AddScoped<IQueryHandler<GetActionThresholdsQuery, ActionThresholdsView>, GetActionThresholdsHandler>();
+        services.AddScoped<ICommandHandler<SaveActionThresholdsCommand, ActionThresholdsView>, SaveActionThresholdsHandler>();
+        services.AddScoped<ICommandHandler<ResetActionThresholdsCommand, ActionThresholdsView>, ResetActionThresholdsHandler>();
+        services.AddScoped<ICommandHandler<CreatePriceAlertCommand, PriceAlertView>, CreatePriceAlertHandler>();
+        services.AddScoped<IQueryHandler<ListPriceAlertsQuery, Result<PriceAlertPage>>, ListPriceAlertsHandler>();
+        services.AddScoped<ICommandHandler<CancelPriceAlertCommand, PriceAlertView>, CancelPriceAlertHandler>();
+        services.AddScoped<IQueryHandler<GetPortfolioNoticesQuery, PortfolioNotices>, GetPortfolioNoticesHandler>();
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();

@@ -1,9 +1,12 @@
 import { Box } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
+import { useRef, useState } from 'react';
 import { bucketsQuery, useNow } from '@/features/accounts';
 import type { AccountSummary } from '@/shared/api';
 import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { holdingsList, summaryQuery } from '../api/portfolioQueries';
+import type { HoldingRef } from '../api/lookupQueries';
+import { useDrawerHolding } from '../hooks/useDrawerHolding';
 import { useMarket } from '../hooks/useMarket';
 import { usePortfolioHistory } from '../hooks/usePortfolioHistory';
 import { useQuotesService } from '../hooks/useQuotesService';
@@ -11,14 +14,19 @@ import { useRefreshOnQuoteRun } from '../hooks/useRefreshOnQuoteRun';
 import { useCachedHolding } from '../hooks/useCachedHolding';
 import { useRefreshPrices } from '../hooks/useRefreshPrices';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
+import { usePortfolioOverlays } from '../hooks/usePortfolioOverlays';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
+import type { AlertTarget } from '../lib/alertTarget';
+import { alertTargetOfHolding } from '../lib/alertTarget';
 import { activeFilterCount } from '../lib/filters';
+import { ActionCenter } from './actions/ActionCenter';
 import { HistoryCard } from './HistoryCard';
 import { GroupedHoldings } from './GroupedHoldings';
 import { HoldingDrawer } from './HoldingDrawer';
 import { HoldingsGrid, NoMatches } from './HoldingsGrid';
 import { EmptyHoldings, NoGroups, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
 import { PortfolioHeader } from './PortfolioHeader';
+import { PortfolioOverlays } from './PortfolioOverlays';
 import { PricesLine } from './PricesLine';
 import { ScopeBar } from './ScopeBar';
 import { SummaryNotes } from './SummaryNotes';
@@ -48,6 +56,16 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const grouped = filters.groupBy !== 'none';
   const holdings = useInfiniteRows({ ...holdingsList(filters), enabled: !grouped, refetchInterval: market.pollMs });
   const groupedHolding = useCachedHolding(grouped ? openId : null);
+  // The Action center opens holdings that the list may not have loaded: the item names them, the drawer looks them up.
+  const [openHint, setOpenHint] = useState<HoldingRef | null>(null);
+  const drawerHolding = useDrawerHolding(
+    openId,
+    grouped ? groupedHolding : holdings.rows.find((h) => h.id === openId),
+    openHint,
+  );
+  const overlays = usePortfolioOverlays();
+  const holdingsStart = useRef<HTMLDivElement>(null);
+  const [alertDialog, setAlertDialog] = useState<AlertTarget | 'pick' | null>(null);
   const scope = { account: filters.account, bucket: filters.bucket };
   const history = usePortfolioHistory(scope, market.pollMs);
 
@@ -67,6 +85,13 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
     : (history.query.data?.coverage.holdings ?? 0) > 0;
   const actingTarget = acting ? { id: acting.id, name: acting.name } : null;
   const showAccount = account === null && portfolio.length > 1;
+  const scopeLabel =
+    [
+      acting && account !== null ? acting.name : null,
+      filters.bucket === null ? null : (buckets.data?.find((b) => b.id === filters.bucket)?.name ?? null),
+    ]
+      .filter((part): part is string => part !== null)
+      .join(' · ') || null;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
@@ -100,6 +125,32 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
         />
       )}
       {hasHoldings && (
+        <ActionCenter
+          scope={scope}
+          scopeLabel={scopeLabel}
+          pollMs={market.pollMs}
+          focusRequested={overlays.focusActions}
+          onFocusHandled={overlays.focusHandled}
+          onOpenHolding={(holding) => {
+            setOpenHint(holding);
+            open(holding.id);
+          }}
+          onShowSector={(accountId) => {
+            update({ groupBy: 'sector', account: accountId });
+            // The grouped holdings are below the cards: take the owner to them.
+            requestAnimationFrame(() => {
+              if (typeof holdingsStart.current?.scrollIntoView === 'function') {
+                holdingsStart.current.scrollIntoView({ block: 'start' });
+              }
+            });
+          }}
+          onSetAlert={setAlertDialog}
+          onOpenAlerts={() => {
+            overlays.openAlerts();
+          }}
+        />
+      )}
+      {hasHoldings && (
         <HistoryCard
           query={history.query}
           range={history.range}
@@ -114,6 +165,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
         fallbackRun={summary.data?.lastSync ?? null}
         refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
       />
+      <div ref={holdingsStart} aria-hidden />
       {filters.groupBy === 'none' ? (
         <HoldingsGrid
           result={holdings}
@@ -146,9 +198,28 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
       )}
       <HoldingDrawer
         id={openId}
-        holding={grouped ? groupedHolding : holdings.rows.find((h) => h.id === openId)}
+        holding={drawerHolding}
         onClose={() => {
           open(null);
+        }}
+        onSetAlert={(holding) => {
+          const target = alertTargetOfHolding(holding);
+          if (target) setAlertDialog(target);
+        }}
+        onShowAlerts={() => {
+          overlays.openAlerts();
+        }}
+      />
+      <PortfolioOverlays
+        alertsTab={overlays.alertsTab}
+        onAlertsTab={overlays.changeAlertsTab}
+        onCloseAlerts={overlays.closeAlerts}
+        dialog={alertDialog}
+        onNewAlert={() => {
+          setAlertDialog('pick');
+        }}
+        onCloseDialog={() => {
+          setAlertDialog(null);
         }}
       />
     </Box>

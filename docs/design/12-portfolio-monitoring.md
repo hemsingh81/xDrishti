@@ -224,6 +224,8 @@ The React Portfolio screen receives updates via SignalR once the live feed exist
 
 ## 7. Alerts
 
+**Built in P2-09 ([ADR 0022](../adr/0022-action-center-and-price-alerts.md)):** price alerts on NSE shares and ETFs (`/api/portfolio/alerts`; one-shot, checked on the last price of every quotes tick, so up to 5 minutes late — [doc 15](15-smart-insights-and-automation.md) §4) and the bell notices `price_alert_triggered` and `actions_need_decision` (`GET /api/portfolio/notices`). The other alerts below need data that does not exist yet (plans, events).
+
 Price reaches a plan's stop/target level · swing position at max holding (5 sessions) · results date within
 N days for a holding · position weight > `max_position_weight_pct` · bucket drawdown > threshold · large day
 move on a holding · data or token issue for an account.
@@ -241,7 +243,7 @@ move on a holding · data or token issue for an account.
 qty, avg cost, last price and time, status open/closed, first seen / closed / synced), `portfolio.holding_lots` (holding, acquired on, qty, unit cost, source
 import/added/manual, uses default date, closed on, close price, estimated), `portfolio.holding_syncs` (account, trigger manual/auto/import, status
 running/succeeded/failed/skipped, counts, error, requested by; one running row per account) and the refresh columns of `accounts.portfolio_settings`
-(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). **Built in P2-06 (migration `AddHoldingQuotes`):** `portfolio.holdings.previous_close` (`numeric(18,4)`, null until a quote gave one; a sync never touches it) and `last_price_source` (`sync` | `quote`, default `sync`, CHECK), next to `last_price` / `last_price_at` — only the latest quote is stored, no price history. **Built in P2-07 (migration `AddPortfolioBenchmarkSetting`):** `platform.app_settings` (`key`, `value`, `updated_by`, `updated_at`; never deleted by the runtime role) holds the benchmark instrument (`portfolio.benchmark_instrument`, an index id); `valuations_daily` is **not** built, the history is computed on read. The fuller target model below (transactions, cash flows, valuations) grows from here.
+(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). **Built in P2-06 (migration `AddHoldingQuotes`):** `portfolio.holdings.previous_close` (`numeric(18,4)`, null until a quote gave one; a sync never touches it) and `last_price_source` (`sync` | `quote`, default `sync`, CHECK), next to `last_price` / `last_price_at` — only the latest quote is stored, no price history. **Built in P2-07 (migration `AddPortfolioBenchmarkSetting`):** `platform.app_settings` (`key`, `value`, `updated_by`, `updated_at`; never deleted by the runtime role) holds the benchmark instrument (`portfolio.benchmark_instrument`, an index id); `valuations_daily` is **not** built, the history is computed on read. **Built in P2-09 (migration `AddActionCenterAndPriceAlerts`):** `portfolio.action_states` (`rule`, `key`, `state` snoozed/done/cleared, `snoozed_until`, `updated_by`, `updated_at`; primary key `(rule, key)`) holds the owner's decisions about Action-center items, `portfolio.price_alerts` (id, instrument id, direction `at_or_below`/`at_or_above`, level `numeric(18,4)`, note, status active/triggered/cancelled, created at/by, triggered at, trigger price; index on `(status, instrument_id)`) the one-shot price alerts; neither is ever deleted by the runtime role (a decision is cleared and an alert triggered or cancelled by an update); the thresholds of the rules are one more `platform.app_settings` row (`portfolio.action_thresholds`, JSON). The fuller target model below (transactions, cash flows, valuations) grows from here.
 
 | Table | Key columns |
 |-------|------------|
@@ -262,13 +264,13 @@ running/succeeded/failed/skipped, counts, error, requested by; one running row p
   whole page on that account.
 - **Action center:** positions that need a decision, per account — below cost, large gain, overweight, sector
   concentration, max holding exceeded, results due, long-term soon, lagging Nifty, not in a basket — with
-  Open / Set alert / Add to basket / Snooze / Done ([doc 15](15-smart-insights-and-automation.md) §3).
+  Open / Set alert / Add to basket / Snooze / Done ([doc 15](15-smart-insights-and-automation.md) §3). **P2-09 (API built; card in the frontend part of the story):** seven of the nine rules, evaluated on read by `GET /api/portfolio/actions` (status open/snoozed/done/all, the account and bucket scope, counts per rule and severity, "not evaluated" holdings), decisions by `POST /api/portfolio/actions/{id}/snooze|done|reopen`, thresholds by `GET/PUT /api/portfolio/action-thresholds`; the per-account tiles above are not part of that slice.
 - **Header tiles:** total value · invested · total P&L (₹, %) · **XIRR** · day change · benchmark XIRR / alpha / max drawdown (API built in P2-07).
 - **Group by:** Bucket · Basket · Account · Strategy · Sector · None — with tree-grid (expand to lots and
   transactions) and column chooser. **P2-08 (API built; screen in the frontend part of the story):** None · Account · Bucket · Sector · Basket, group rows that expand to their holdings (`GET /api/holdings/groups`, `groupBy` / `groupKey` on the holdings list, §3), a total row, and the note "Baskets overlap — totals do not add up to the portfolio" on the basket view; strategy, lots as tree levels and the column chooser come later.
 - **Charts:** allocation by group, sector exposure stacked by account, portfolio value vs the same cash flows in
   Nifty 50 (API built in P2-07), XIRR by group. **P2-08:** the data of the allocation donut (the groups' `value` / `weightPct`) and of the sector-by-account stacked bar (`stackBy` → `parts`) is served by `GET /api/holdings/groups`.
-- **Price alerts:** create from the Action center or a position; evaluated by the services; list in an Alerts panel.
+- **Price alerts:** create from the Action center or a position; evaluated by the services; list in an Alerts panel. **P2-09 (API built):** `GET/POST /api/portfolio/alerts`, `POST /api/portfolio/alerts/{id}/cancel`; checked by the quotes service every 5 minutes in market hours.
 - **Position drawer:** transaction timeline, price chart with buy/sell markers, lots, alerts, linked plan ticket.
 - **Filters:** date range (for realised results), account, bucket, basket, status (open/closed), source.
 - **Exports:** CSV/Excel of positions, transactions and realised P&L.

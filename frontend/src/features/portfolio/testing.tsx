@@ -1,6 +1,7 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import type { PortfolioHistory } from '@/shared/api';
+import { createActionCenterFake, type ActionCenterFakeOptions } from '@/test/actionCenterFake';
 import { buildAccountDetail, buildSwingAccount, buildSyncStatus, noValueReturns, summaryOf } from '@/test/fixtures';
 import { buildHistory } from '@/test/historyFixtures';
 import { scrollToEnd } from '@/test/intersection';
@@ -72,3 +73,22 @@ export async function revealChart() {
   scrollToEnd();
   return screen.findByTestId('chart-canvas');
 }
+
+/** Serves the Action center, the alerts, the thresholds and the notices from one stateful fake (see `createActionCenterFake`). */
+export function serveActionCenter(options: ActionCenterFakeOptions = {}) {
+  const fake = createActionCenterFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
+/** The Action center card, once the page has shown it (its code loads on demand) and its list has arrived. */
+export async function actionCenterCard() {
+  const card = await screen.findByRole('region', { name: 'Action center' });
+  await waitFor(() => {
+    expect(within(card).queryByText('Loading the Action center')).not.toBeInTheDocument();
+  });
+  return card;
+}
+
+/** The list item of the Action center that is about `name` (a symbol, or the account and sector). */
+export const actionItem = (card: HTMLElement, name: RegExp | string) => within(card).getByRole('listitem', { name });

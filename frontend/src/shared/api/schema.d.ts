@@ -1564,6 +1564,161 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/portfolio/actions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The holdings that need a decision, evaluated on read by seven rules (below_cost, large_gain, overweight, sector_concentration, long_term_soon, lagging_nifty, not_in_basket): items[{id, rule, severity high|medium|info, accountId, accountName, holdingId, instrumentId, symbol (null for the account-level sector_concentration), title, detail, numbers (the figures behind the item; which are set depends on the rule), suggestions[open|set_alert|add_to_basket|snooze|done], state open|snoozed|done, snoozedUntil}] most important first (severity, then the size of the trigger), and counts {open, snoozed, done, byRule, bySeverity (of the open items; every rule and severity present), unavailable {lagging: holdings held long enough for lagging_nifty that could not be judged because the benchmark has no bars from the first flow or an XIRR is not ok}, noPrice (open holdings without a usable price: no price-based rule fires for them)}. Filters: accountId (404 accounts.not_found when unknown; without it the accounts that count in totals), bucketId (the items about its holdings; weights and sector shares stay shares of the whole account), status open (default) | snoozed | done | all (the counts always cover the whole scope). A snoozed item shows again on its snoozedUntil date. One write is made by this read: a done decision whose condition no longer holds is cleared, so a recurrence shows again */
+    get: operations['GetPortfolioActions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/actions/{id}/snooze': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Hide an item for 7 days (it shows again on that India date if a rule still produces it): answers {id, state, snoozedUntil, item}. Idempotent; audited. 404 portfolio.not_found for an id that no rule produces now (stale) */
+    post: operations['SnoozePortfolioAction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/actions/{id}/done': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Mark an item done: it stays hidden for as long as the condition holds and the decision is cleared when it stops holding (a later recurrence is open again). Answers {id, state, snoozedUntil, item}. Idempotent; audited. 404 portfolio.not_found for an id that no rule produces now (stale) */
+    post: operations['MarkPortfolioActionDone'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/actions/{id}/reopen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Take a snooze or done decision back: the item is open again. Answers {id, state open, item (null when no rule produces the id now)}. Idempotent; audited when it changes something; allowed for an item that is gone; 404 portfolio.not_found only for an id that is not the id of any rule's item */
+    post: operations['ReopenPortfolioAction'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/action-thresholds': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The thresholds of the Action-center rules in force: values {belowCostPct, belowCostHighPct, gainPct, overweightFloorPct, overweightMultiple, minPositions, concentrationPct, lagPp, lagDays, longTermWindowDays}, the documented defaults, isDefault, updatedBy and updatedAt (null while none are stored) */
+    get: operations['GetPortfolioActionThresholds'];
+    /** Save the thresholds (all ten required): below cost 1-90 %, high 2-95 % and above below cost, gain 1-1000 %, overweight floor 1-100 %, multiple 1-10, minimum positions 2-50, concentration 5-100 %, lag 1-100 points, lag days 30-3650, long-term window 1-365 days; at most 2 decimals, minPositions/lagDays/longTermWindowDays whole numbers. 400 portfolio.invalid with a field error per problem. The next read of the actions uses them at once. Audited */
+    put: operations['SavePortfolioActionThresholds'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/action-thresholds/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Restore defaults: writes the documented default thresholds. Audited; nothing changes when they are already in force */
+    post: operations['ResetPortfolioActionThresholds'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/notices': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the owner should know about the portfolio, for the notification bell: price_alert_triggered (warn; one per alert, id portfolio:alert:{alertId}, listed for 7 days after it triggered; carries alertId and instrumentId) and actions_need_decision (info; "N holdings need a decision" when the accounts that count in totals have open Action-center items; id portfolio:actions:{India date}, so it is raised again at most once a day) */
+    get: operations['GetPortfolioNotices'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/alerts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The price alerts, newest first: status active | triggered | cancelled | all (default all), page, pageSize (max 100, default 50). Each alert has id, instrumentId, symbol, name, direction (at_or_below | at_or_above), level, note, status, createdAt, triggeredAt and triggerPrice (the last price of the tick that hit the level). The page also carries activeCount of activeLimit (200) */
+    get: operations['ListPortfolioAlerts'];
+    put?: never;
+    /** Create an active alert: body {instrumentId (an NSE share or ETF of the instrument master that is not retired and that Dhan can quote), direction at_or_below | at_or_above, level (above 0, at most 10,000,000, at most 4 decimals), note (optional, at most 200 characters of plain text)}. Checked on each quotes tick's last price (at_or_below: last <= level; at_or_above: last >= level). 400 portfolio.invalid with field errors, including field level when the condition already holds at the last known price (the holding's last price, else the last stored daily close; unknown: allowed) with the price in the message; 409 portfolio.alert_limit at 200 active alerts. Audited */
+    post: operations['CreatePortfolioAlert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/alerts/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel an alert. Idempotent: a cancelled alert stays cancelled and a triggered one stays triggered (the answer shows the real status). Audited when it cancels. 404 portfolio.not_found for an unknown id */
+    post: operations['CancelPortfolioAlert'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1635,6 +1790,169 @@ export interface components {
       apiKeyExpiresOn: string;
       tokenStatus: string;
       connection: components['schemas']['ConnectionView'];
+    };
+    /**
+     * @description What the Action center counts for the scope (before the status filter): items by state, and for the <i>open</i> items by rule (all seven rules, zeros included) and by severity (high, medium, info). `NoPrice` counts open holdings without a usable price
+     *     (no price-based rule can fire for them).
+     */
+    ActionCounts: {
+      /** Format: int32 */
+      open: number;
+      /** Format: int32 */
+      snoozed: number;
+      /** Format: int32 */
+      done: number;
+      byRule: {
+        [key: string]: number;
+      };
+      bySeverity: {
+        [key: string]: number;
+      };
+      unavailable: components['schemas']['ActionUnavailable'];
+      /** Format: int32 */
+      noPrice: number;
+    };
+    /** @description The outcome of a decision: `State``open|snoozed|done`, `SnoozedUntil`, and the item as it is now (null when the id is not produced by a rule now, which only a reopen can still ask about). */
+    ActionDecisionView: {
+      id: string;
+      state: string;
+      /** Format: date */
+      snoozedUntil: null | string;
+      item: null | components['schemas']['ActionItem'];
+    };
+    /**
+     * @description One Action-center item. `Id` is stable (`{rule}:{holdingId}`, or `sector_concentration:{accountId}:{12 hex}`) and safe in a URL path. `Rule` is one of `below_cost`, `large_gain`, `overweight`, `sector_concentration`,
+     *     `long_term_soon`, `lagging_nifty`, `not_in_basket`; `Severity``high|medium|info`; `HoldingId`, `InstrumentId` and `Symbol` are null for an account-level item (concentration) and `InstrumentId` for a holding that is not in the
+     *     master list. `Title` and `Detail` are plain sentences; `Numbers` the figures behind them; `Suggestions` the buttons that make sense (`open|set_alert|add_to_basket|snooze|done`). `State` is `open|snoozed|done`;
+     *     `SnoozedUntil` the India date a snoozed item shows again. Severity, text and numbers are recomputed on every read.
+     */
+    ActionItem: {
+      id: string;
+      rule: string;
+      severity: string;
+      /** Format: uuid */
+      accountId: string;
+      accountName: string;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      title: string;
+      detail: string;
+      numbers: components['schemas']['ActionNumbers'];
+      suggestions: string[];
+      state: string;
+      /** Format: date */
+      snoozedUntil: null | string;
+    };
+    /** @description The items of the status asked for, most important first, and the counts of the whole scope. */
+    ActionList: {
+      items: components['schemas']['ActionItem'][];
+      counts: components['schemas']['ActionCounts'];
+    };
+    /**
+     * @description The figures that made an item fire; which ones are set depends on the rule, the others are null. <b>below_cost</b>, <b>large_gain</b>: `PnlPct`, `Pnl`, `Invested`, `Value`, `ThresholdPct` (the band reached: 10 or 20 / 25).
+     *     <b>overweight</b>: `WeightPct` of the account's priced value, `ThresholdPct` (the limit), `Positions` (priced positions of the account), `Value`. <b>sector_concentration</b>: `Sector`, `SectorSharePct` of the account's priced value,
+     *     `ThresholdPct`, `SectorValue`, `Positions` (in the sector), `LargestSymbol`, `LargestHoldingId` and `LargestValue` of the largest holding in it. <b>long_term_soon</b>: `Lots`, `PnlPct`. <b>lagging_nifty</b>: `HeldDays`,
+     *     `XirrPct`, `BenchmarkXirrPct`, `GapPp` (holding minus benchmark, negative), `ThresholdPp`. <b>not_in_basket</b>: `Invested`, `Value` (null when unpriced).
+     */
+    ActionNumbers: {
+      /** Format: double */
+      pnlPct?: null | number;
+      /** Format: double */
+      pnl?: null | number;
+      /** Format: double */
+      invested?: null | number;
+      /** Format: double */
+      value?: null | number;
+      /** Format: double */
+      thresholdPct?: null | number;
+      /** Format: double */
+      weightPct?: null | number;
+      /** Format: int32 */
+      positions?: null | number;
+      sector?: null | string;
+      /** Format: double */
+      sectorSharePct?: null | number;
+      /** Format: double */
+      sectorValue?: null | number;
+      largestSymbol?: null | string;
+      /** Format: uuid */
+      largestHoldingId?: null | string;
+      /** Format: double */
+      largestValue?: null | number;
+      lots?: null | components['schemas']['LongTermLot'][];
+      /** Format: int32 */
+      heldDays?: null | number;
+      /** Format: double */
+      xirrPct?: null | number;
+      /** Format: double */
+      benchmarkXirrPct?: null | number;
+      /** Format: double */
+      gapPp?: null | number;
+      /** Format: double */
+      thresholdPp?: null | number;
+    };
+    /** @description The thresholds of the Action-center rules (ADR 0022, doc 15 §3): percentages are percent numbers (10 = 10 %). The defaults are the ones of the design; the owner edits them in Settings within the fixed ranges below. */
+    ActionThresholds: {
+      /** Format: double */
+      belowCostPct: number;
+      /** Format: double */
+      belowCostHighPct: number;
+      /** Format: double */
+      gainPct: number;
+      /** Format: double */
+      overweightFloorPct: number;
+      /** Format: double */
+      overweightMultiple: number;
+      /** Format: int32 */
+      minPositions: number;
+      /** Format: double */
+      concentrationPct: number;
+      /** Format: double */
+      lagPp: number;
+      /** Format: int32 */
+      lagDays: number;
+      /** Format: int32 */
+      longTermWindowDays: number;
+    };
+    /** @description The thresholds to save: every value is required. `MinPositions`, `LagDays` and `LongTermWindowDays` must be whole numbers. */
+    ActionThresholdsInput: {
+      /** Format: double */
+      belowCostPct: null | number;
+      /** Format: double */
+      belowCostHighPct: null | number;
+      /** Format: double */
+      gainPct: null | number;
+      /** Format: double */
+      overweightFloorPct: null | number;
+      /** Format: double */
+      overweightMultiple: null | number;
+      /** Format: double */
+      minPositions: null | number;
+      /** Format: double */
+      concentrationPct: null | number;
+      /** Format: double */
+      lagPp: null | number;
+      /** Format: double */
+      lagDays: null | number;
+      /** Format: double */
+      longTermWindowDays: null | number;
+    };
+    /** @description The thresholds in force with the documented defaults; `IsDefault` when they are the defaults; `UpdatedBy`/`UpdatedAt` null while none are stored. */
+    ActionThresholdsView: {
+      values: components['schemas']['ActionThresholds'];
+      defaults: components['schemas']['ActionThresholds'];
+      isDefault: boolean;
+      updatedBy: null | string;
+      /** Format: date-time */
+      updatedAt: null | string;
+    };
+    /** @description Rules that could not be evaluated: `Lagging` holdings held long enough for the lagging-Nifty rule but without a usable benchmark or XIRR. */
+    ActionUnavailable: {
+      /** Format: int32 */
+      lagging: number;
     };
     /**
      * @description Adds a day to the calendar, confirmed (source manual), replacing what the date had before. `date` is `yyyy-MM-dd`; `kind` is holiday (a weekday,
@@ -3181,6 +3499,19 @@ export interface components {
       email: string;
       password: string;
     };
+    /** @description A profitable open lot that turns 12 months old soon (the `long_term_soon` rule): `LongTermOn` is the date it is 12 months old, `DaysLeft` the days until then, `GainPct` its unrealised gain in percent (null for a lot that cost nothing, for example bonus shares: the gain is then the whole value and has no percentage). */
+    LongTermLot: {
+      /** Format: date */
+      acquiredOn: string;
+      /** Format: int64 */
+      qty: number;
+      /** Format: date */
+      longTermOn: string;
+      /** Format: int32 */
+      daysLeft: number;
+      /** Format: double */
+      gainPct: null | number;
+    };
     /** @description Sets the acquisition date of a lot (between 1990-01-01 and today, India). */
     LotDateInput: {
       /** Format: date */
@@ -3279,6 +3610,22 @@ export interface components {
       firstImportDate?: null | string;
       firstImport?: null | components['schemas']['FirstImportInput'];
     };
+    /** @description One notice of the Portfolio module for the top-bar bell. `Kind` is `price_alert_triggered` (`Severity` warn; `AlertId` and `InstrumentId` set) or `actions_need_decision` (info). `Id` is stable, so the bell keeps what was read by id. */
+    PortfolioNotice: {
+      id: string;
+      kind: string;
+      severity: string;
+      text: string;
+      /** Format: date-time */
+      at: null | string;
+      /** Format: uuid */
+      alertId: null | string;
+      /** Format: uuid */
+      instrumentId: null | string;
+    };
+    PortfolioNotices: {
+      items: components['schemas']['PortfolioNotice'][];
+    };
     PortfolioRoleView: {
       enabled: boolean;
     };
@@ -3353,6 +3700,52 @@ export interface components {
       alreadyImported: boolean;
       /** Format: date */
       suggestedDate: string;
+    };
+    /** @description A new price alert: the master-list share or ETF, `Direction``at_or_below|at_or_above`, the `Level` in rupees (above 0, at most 10,000,000, at most 4 decimals) and an optional plain-text `Note` of at most 200 characters. */
+    PriceAlertInput: {
+      /** Format: uuid */
+      instrumentId: null | string;
+      direction: null | string;
+      /** Format: double */
+      level: null | number;
+      note: null | string;
+    };
+    /** @description One page of alerts, newest first (`Total` counts all matches). `ActiveCount` of `ActiveLimit` alerts are active, whatever the filter. */
+    PriceAlertPage: {
+      items: components['schemas']['PriceAlertView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+      /** Format: int32 */
+      activeCount: number;
+      /** Format: int32 */
+      activeLimit: number;
+    };
+    /**
+     * @description A price alert. `Status` is `active`, `triggered` (with `TriggeredAt` and `TriggerPrice`, the last price of the tick that hit the level) or `cancelled`. It is checked on the last price of each quotes tick only (every 5 minutes while the market
+     *     is open): a spike between two ticks is not seen.
+     */
+    PriceAlertView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      instrumentId: string;
+      symbol: string;
+      name: string;
+      direction: string;
+      /** Format: double */
+      level: number;
+      note: null | string;
+      status: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      triggeredAt: null | string;
+      /** Format: double */
+      triggerPrice: null | number;
     };
     /** @description The oldest and the newest time of the prices of the open holdings (null when none has a priced time). */
     PricesAsOf: {
@@ -8308,6 +8701,385 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioActions: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+        status?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionList'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SnoozePortfolioAction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionDecisionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  MarkPortfolioActionDone: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionDecisionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ReopenPortfolioAction: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionDecisionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioActionThresholds: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionThresholdsView'];
+        };
+      };
+    };
+  };
+  SavePortfolioActionThresholds: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ActionThresholdsInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionThresholdsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ResetPortfolioActionThresholds: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ActionThresholdsView'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioNotices: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioNotices'];
+        };
+      };
+    };
+  };
+  ListPortfolioAlerts: {
+    parameters: {
+      query?: {
+        status?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceAlertPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  CreatePortfolioAlert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PriceAlertInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceAlertView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelPortfolioAlert: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PriceAlertView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

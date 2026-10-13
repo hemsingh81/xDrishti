@@ -74,6 +74,10 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<HoldingSync> HoldingSyncs => Set<HoldingSync>();
 
+    public DbSet<ActionState> ActionStates => Set<ActionState>();
+
+    public DbSet<PriceAlert> PriceAlerts => Set<PriceAlert>();
+
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
 

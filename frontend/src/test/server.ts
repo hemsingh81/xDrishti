@@ -23,6 +23,7 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
@@ -97,6 +98,8 @@ export const handlers = [
   http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus())),
   // The value history (P2-07): a complete one over the same holdings; tests of the History card replace it.
   ...historyHandlers,
+  // The Action center, price alerts, thresholds and the Portfolio notices of the bell (P2-09): none by default.
+  ...actionCenterHandlers,
   // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),

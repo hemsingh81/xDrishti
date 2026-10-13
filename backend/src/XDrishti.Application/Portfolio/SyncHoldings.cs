@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
@@ -31,6 +32,7 @@ internal sealed class SyncHoldingsHandler(
     IHoldingStore holdings,
     IHoldingSyncStore syncs,
     IAccountEventLog events,
+    ActionReconciler reconciler,
     TimeProvider clock,
     ILogger<SyncHoldingsHandler> logger) : ICommandHandler<SyncHoldingsCommand, SyncRunView>
 {
@@ -193,6 +195,9 @@ internal sealed class SyncHoldingsHandler(
         {
             await PruneAsync(cancellationToken);
         }
+
+        // Prices and lots have changed: a done decision whose condition no longer holds is cleared (ADR 0022). Never fails the sync.
+        await reconciler.ReconcileAsync("sync", cancellationToken);
 
         var finished = await syncs.GetAsync(runId, cancellationToken);
         return finished is null ? Result.Failure<SyncRunView>(PortfolioErrors.SyncFailed) : Result.Success(HoldingViews.Run(finished));

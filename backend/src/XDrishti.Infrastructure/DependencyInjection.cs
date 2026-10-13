@@ -152,6 +152,11 @@ public static class DependencyInjection
         services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
+        services.AddScoped<IActionStates, ActionStates>();
+        services.AddScoped<IActionSettings, ActionSettings>();
+        services.AddScoped<PriceAlertStore>();
+        services.AddScoped<IPriceAlerts>(sp => sp.GetRequiredService<PriceAlertStore>());
+        services.AddScoped<IPriceAlertStore>(sp => sp.GetRequiredService<PriceAlertStore>());
         services.AddScoped<IPortfolioPrices, PortfolioPrices>();
         services.AddScoped<IPortfolioBenchmark, PortfolioBenchmarkStore>();
         services.AddSingleton<IPortfolioHistoryCache, PortfolioHistoryCache>();

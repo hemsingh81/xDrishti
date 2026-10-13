@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Application.Tests.Accounts.Connections;
@@ -44,7 +45,13 @@ internal sealed class PortfolioFixture
 
     public HoldingsImporter Importer => Connections.Accounts.Importer;
 
-    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Clock, NullLogger<SyncHoldingsHandler>.Instance);
+    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Reconciler(), Clock, NullLogger<SyncHoldingsHandler>.Instance);
+
+    /// <summary>The Action-center reconciliation a sync ends with; there are no decisions in these tests, so it reads them (none) and stops.</summary>
+    public ActionReconciler Reconciler() => new(
+        new ActionEvaluator(Data, Classifications, Actions, Actions, Benchmarks, Prices, new FakeTradingCalendar(HistoryData.Weekdays), Clock), Actions, Clock, NullLogger<ActionReconciler>.Instance);
+
+    public XDrishti.Application.Tests.Portfolio.Actions.InMemoryActionData Actions { get; } = new();
 
     /// <summary>The master's sectors and the baskets' members of the holdings' instruments (empty: every holding is unclassified and in no basket).</summary>
     public FakeHoldingClassifications Classifications { get; } = new();

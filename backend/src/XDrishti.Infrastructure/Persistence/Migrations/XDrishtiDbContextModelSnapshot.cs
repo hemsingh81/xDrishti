@@ -1567,6 +1567,49 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.ActionState", b =>
+                {
+                    b.Property<string>("Rule")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("rule");
+
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<DateOnly?>("SnoozedUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("snoozed_until");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Rule", "Key")
+                        .HasName("pk_action_states");
+
+                    b.ToTable("action_states", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_action_states_snoozed_until", "(state = 'snoozed') = (snoozed_until IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_action_states_state", "state IN ('snoozed', 'done', 'cleared')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1847,6 +1890,75 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_holding_syncs_status", "status IN ('running', 'succeeded', 'failed', 'skipped')");
 
                             t.HasCheckConstraint("ck_holding_syncs_trigger", "trigger IN ('manual', 'auto', 'import')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.PriceAlert", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("direction");
+
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<decimal>("Level")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("level");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal?>("TriggerPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("trigger_price");
+
+                    b.Property<DateTimeOffset?>("TriggeredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("triggered_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_alerts");
+
+                    b.HasIndex("Status", "InstrumentId")
+                        .HasDatabaseName("ix_price_alerts_status_instrument");
+
+                    b.ToTable("price_alerts", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_price_alerts_direction", "direction IN ('at_or_below', 'at_or_above')");
+
+                            t.HasCheckConstraint("ck_price_alerts_level", "level > 0 AND level <= 10000000");
+
+                            t.HasCheckConstraint("ck_price_alerts_status", "status IN ('active', 'triggered', 'cancelled')");
+
+                            t.HasCheckConstraint("ck_price_alerts_triggered", "status <> 'triggered' OR (triggered_at IS NOT NULL AND trigger_price IS NOT NULL)");
                         });
                 });
 

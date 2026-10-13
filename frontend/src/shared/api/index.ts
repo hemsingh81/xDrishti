@@ -1,6 +1,7 @@
 export { api, ApiError, configureApiAuth, ensureOk, unwrap, type ApiAuthHooks } from './client';
 export { dataIdlePollMs, dataJobQuery, dataOverviewQuery } from './dataJobs';
 export { dataNoticesPollMs, dataNoticesQuery } from './dataNotices';
+export { portfolioNoticesPollMs, portfolioNoticesQuery } from './portfolioNotices';
 export { queryRoots } from './queryRoots';
 export { serviceNoticesPollMs, serviceNoticesQuery } from './serviceNotices';
 export {
@@ -15,6 +16,13 @@ export type {
   AccountEvent,
   AccountOverrides,
   AccountSummary,
+  ActionCounts,
+  ActionItem,
+  ActionList,
+  ActionNumbers,
+  ActionThresholds,
+  ActionThresholdsInput,
+  ActionThresholdsView,
   ActionsImportResult,
   AddMembersResult,
   AggregatePhase,
@@ -93,13 +101,19 @@ export type {
   InstrumentFacets,
   InstrumentPage,
   InstrumentSummary,
+  LongTermLot,
   LotRow,
   PortfolioBenchmark,
   PortfolioBucket,
   PortfolioHistory,
   PortfolioInput,
+  PortfolioNotice,
+  PortfolioNotices,
   PortfolioSaved,
   PortfolioTrackResult,
+  PriceAlert,
+  PriceAlertInput,
+  PriceAlertPage,
   Problem,
   RefreshRun,
   RemoveMembersResult,

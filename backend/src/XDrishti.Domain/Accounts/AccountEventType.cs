@@ -52,4 +52,11 @@ public enum AccountEventType
     ServiceResumed,
     ServiceRunRequested,
     PortfolioBenchmarkChanged,
+    ActionSnoozed,
+    ActionDone,
+    ActionReopened,
+    ActionThresholdsChanged,
+    PriceAlertCreated,
+    PriceAlertTriggered,
+    PriceAlertCancelled,
 }

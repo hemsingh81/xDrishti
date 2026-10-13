@@ -33,18 +33,18 @@ public abstract class HoldingsTestBase(ApiFactory factory) : IAsyncLifetime
         Owner = await Factory.SignInElevatedAsync(Ct);
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         Factory.Brokers.Reset();
         await Factory.ResetClockAsync();
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>An account with the Portfolio role on, connected to the fake Dhan through the real sign-in flow.</summary>
-    protected async Task<AccountDetail> ConnectedAccountAsync(string name = "Example One", string clientId = AccountsApi.ClientId, object? portfolio = null)
+    /// <summary>An account with the Portfolio role on (or the given <paramref name="roles"/>), connected to the fake Dhan through the real sign-in flow.</summary>
+    protected async Task<AccountDetail> ConnectedAccountAsync(string name = "Example One", string clientId = AccountsApi.ClientId, object? portfolio = null, object? roles = null)
     {
         Factory.Brokers.DhanClientId = clientId;
-        var account = await Client.CreateAccountAsync(AccountsApi.NewAccount(name, clientId, roles: new { portfolio = new { enabled = true } }, portfolio: portfolio), Ct);
+        var account = await Client.CreateAccountAsync(AccountsApi.NewAccount(name, clientId, roles: roles ?? new { portfolio = new { enabled = true } }, portfolio: portfolio), Ct);
         await Client.StartConnectAsync(account.Id, Ct);
         using var callback = await Client.DhanCallbackAsync(TokenId, Ct);
         callback.Location().ShouldBe(ConnectApi.Connected(account.Id));

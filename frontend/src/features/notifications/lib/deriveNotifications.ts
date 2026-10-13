@@ -12,7 +12,9 @@ export type NotificationKind =
   | 'data_gaps_open'
   | 'data_quality_failed'
   | 'data_corporate_actions_pending'
-  | 'service_failed';
+  | 'service_failed'
+  | 'price_alert_triggered'
+  | 'actions_need_decision';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 export interface AppNotification {

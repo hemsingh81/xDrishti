@@ -1,6 +1,5 @@
 using Npgsql;
 using XDrishti.Api.IntegrationTests.Infrastructure;
-using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Api.IntegrationTests.Platform;
 
@@ -8,21 +7,7 @@ namespace XDrishti.Api.IntegrationTests.Platform;
 [Collection(ApiTestSuite.Name)]
 public sealed class AppSettingsTableTests(ApiFactory factory)
 {
-    private const string ScratchDatabase = "xd_app_settings_grants_probe";
-
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
-    private static async Task ExecuteAsync(NpgsqlConnection connection, string sql)
-    {
-        await using var command = new NpgsqlCommand(sql, connection);
-        await command.ExecuteNonQueryAsync(Ct);
-    }
-
-    private static async Task<object?> ScalarAsync(NpgsqlConnection connection, string sql)
-    {
-        await using var command = new NpgsqlCommand(sql, connection);
-        return await command.ExecuteScalarAsync(Ct);
-    }
 
     [Fact]
     public async Task The_table_has_the_columns_of_a_key_value_setting_with_its_author_and_time()
@@ -40,51 +25,23 @@ public sealed class AppSettingsTableTests(ApiFactory factory)
         }
 
         columns.ShouldBe(["key", "value", "updated_by", "updated_at"]);
-        (await ScalarAsync(connection, "SELECT count(*) FROM pg_indexes WHERE schemaname = 'platform' AND tablename = 'app_settings' AND indexname = 'pk_app_settings'")).ShouldBe(1L);
+        (await AppRoleProbe.ScalarAsync(connection, "SELECT count(*) FROM pg_indexes WHERE schemaname = 'platform' AND tablename = 'app_settings' AND indexname = 'pk_app_settings'", Ct)).ShouldBe(1L);
     }
 
     [Fact]
     public async Task The_app_role_can_read_insert_and_update_the_settings_but_never_delete_them()
     {
-        var admin = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString);
-        var scratch = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString) { Database = ScratchDatabase, Pooling = false };
-        await using (var connection = new NpgsqlConnection(admin.ConnectionString))
-        {
-            await connection.OpenAsync(Ct);
-            await ExecuteAsync(connection, "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'xd_app') THEN CREATE ROLE xd_app NOLOGIN; END IF; END $$");
-            await ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {ScratchDatabase} WITH (FORCE)");
-            await ExecuteAsync(connection, $"CREATE DATABASE {ScratchDatabase}");
-        }
-
-        try
-        {
-            await using (var setup = new NpgsqlConnection(scratch.ConnectionString))
+        await AppRoleProbe.RunAsync(
+            factory,
+            async connection =>
             {
-                await setup.OpenAsync(Ct);
-                await ExecuteAsync(setup, "ALTER DEFAULT PRIVILEGES GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO xd_app");
-                await ExecuteAsync(setup, "ALTER DEFAULT PRIVILEGES GRANT USAGE, SELECT ON SEQUENCES TO xd_app");
-            }
+                await AppRoleProbe.ExecuteAsync(connection, "INSERT INTO platform.app_settings (key, value, updated_by, updated_at) VALUES ('portfolio.benchmark_instrument', 'abc', 'owner@example.invalid', now())", Ct);
+                await AppRoleProbe.ExecuteAsync(connection, "UPDATE platform.app_settings SET value = 'def'", Ct);
+                (await AppRoleProbe.ScalarAsync(connection, "SELECT value FROM platform.app_settings", Ct)).ShouldBe("def");
 
-            await using (var migrated = factory.WithWebHostBuilder(b => b.UseSetting("Database:ConnectionString", scratch.ConnectionString)))
-            {
-                await DatabaseMigrator.MigrateAsync(migrated.Services, Ct);
-            }
-
-            await using var connection = new NpgsqlConnection(scratch.ConnectionString);
-            await connection.OpenAsync(Ct);
-            await ExecuteAsync(connection, "SET ROLE xd_app");
-            await ExecuteAsync(connection, "INSERT INTO platform.app_settings (key, value, updated_by, updated_at) VALUES ('portfolio.benchmark_instrument', 'abc', 'owner@example.invalid', now())");
-            await ExecuteAsync(connection, "UPDATE platform.app_settings SET value = 'def'");
-            (await ScalarAsync(connection, "SELECT value FROM platform.app_settings")).ShouldBe("def");
-
-            var refused = await Should.ThrowAsync<PostgresException>(() => ExecuteAsync(connection, "DELETE FROM platform.app_settings"));
-            refused.SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege);
-        }
-        finally
-        {
-            await using var connection = new NpgsqlConnection(admin.ConnectionString);
-            await connection.OpenAsync(Ct);
-            await ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {ScratchDatabase} WITH (FORCE)");
-        }
+                var refused = await Should.ThrowAsync<PostgresException>(() => AppRoleProbe.ExecuteAsync(connection, "DELETE FROM platform.app_settings", Ct));
+                refused.SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege);
+            },
+            Ct);
     }
 }

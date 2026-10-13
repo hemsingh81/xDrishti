@@ -209,3 +209,21 @@ export type TimelineEntry = Schemas['TimelineEntry'];
 /** A failed run to tell the owner of (the bell). */
 export type ServiceNotice = Schemas['ServiceNotice'];
 export type ServiceNotices = Schemas['ServiceNotices'];
+
+/** The Portfolio Action center (P2-09, ADR 0022): holdings that need a decision, with the figures behind each. */
+export type ActionList = Schemas['ActionList'];
+export type ActionItem = Schemas['ActionItem'];
+export type ActionNumbers = Schemas['ActionNumbers'];
+export type ActionCounts = Schemas['ActionCounts'];
+/** A profitable open lot that turns 12 months old soon. */
+export type LongTermLot = Schemas['LongTermLot'];
+export type ActionThresholds = Schemas['ActionThresholds'];
+export type ActionThresholdsInput = Schemas['ActionThresholdsInput'];
+export type ActionThresholdsView = Schemas['ActionThresholdsView'];
+/** One-shot price alerts, checked on every quotes tick. */
+export type PriceAlert = Schemas['PriceAlertView'];
+export type PriceAlertPage = Schemas['PriceAlertPage'];
+export type PriceAlertInput = Schemas['PriceAlertInput'];
+/** What the Portfolio module tells the bell: a triggered alert, items waiting for a decision. */
+export type PortfolioNotice = Schemas['PortfolioNotice'];
+export type PortfolioNotices = Schemas['PortfolioNotices'];

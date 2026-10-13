@@ -22,6 +22,8 @@ using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Actions;
+using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.Groups;
 
 namespace XDrishti.Api.Infrastructure;
@@ -127,6 +129,19 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(BenchmarkInput))]
 [JsonSerializable(typeof(BenchmarkView))]
 [JsonSerializable(typeof(PortfolioTrackResult))]
+[JsonSerializable(typeof(ActionList))]
+[JsonSerializable(typeof(ActionItem))]
+[JsonSerializable(typeof(ActionNumbers))]
+[JsonSerializable(typeof(LongTermLot))]
+[JsonSerializable(typeof(ActionCounts))]
+[JsonSerializable(typeof(ActionUnavailable))]
+[JsonSerializable(typeof(ActionDecisionView))]
+[JsonSerializable(typeof(ActionThresholdsView))]
+[JsonSerializable(typeof(ActionThresholdsInput))]
+[JsonSerializable(typeof(PriceAlertInput))]
+[JsonSerializable(typeof(PriceAlertView))]
+[JsonSerializable(typeof(PriceAlertPage))]
+[JsonSerializable(typeof(PortfolioNotices))]
 [JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(ServiceView))]
 [JsonSerializable(typeof(ServiceRunView))]

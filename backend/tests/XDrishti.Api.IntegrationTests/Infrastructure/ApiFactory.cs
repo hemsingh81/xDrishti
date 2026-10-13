@@ -174,6 +174,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM portfolio.price_alerts;
+                DELETE FROM portfolio.action_states;
                 DELETE FROM portfolio.holding_lots;
                 DELETE FROM portfolio.holdings;
                 DELETE FROM portfolio.holding_syncs;
@@ -241,6 +243,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.quality_runs;
                 DELETE FROM market.bar_gaps;
                 DELETE FROM platform.app_settings;
+                DELETE FROM portfolio.price_alerts;
+                DELETE FROM portfolio.action_states;
                 DELETE FROM market.corporate_actions;
                 DELETE FROM market.trading_days;
                 DELETE FROM market.csv_files;
@@ -250,7 +254,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
-                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%' OR event = 'PortfolioBenchmarkChanged';
+                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%' OR event = 'PortfolioBenchmarkChanged' OR event LIKE 'Action%' OR event LIKE 'PriceAlert%';
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;
