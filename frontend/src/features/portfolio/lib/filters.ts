@@ -14,6 +14,8 @@ export const sortFields = [
   'pnl',
   'pnlPct',
   'xirr',
+  'dayChange',
+  'dayChangePct',
   'acquiredOn',
   'bucket',
   'account',

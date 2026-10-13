@@ -1589,11 +1589,24 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_price_at");
 
+                    b.Property<string>("LastPriceSource")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasDefaultValue("sync")
+                        .HasColumnName("last_price_source");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<decimal?>("PreviousClose")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("previous_close");
 
                     b.Property<long>("Qty")
                         .HasColumnType("bigint")
@@ -1621,6 +1634,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("trading_symbol");
 
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.HasKey("Id")
                         .HasName("pk_holdings");
 
@@ -1639,6 +1658,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("holdings", "portfolio", t =>
                         {
+                            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote')");
+
                             t.HasCheckConstraint("ck_holdings_qty", "qty >= 0");
 
                             t.HasCheckConstraint("ck_holdings_status", "status IN ('open', 'closed')");

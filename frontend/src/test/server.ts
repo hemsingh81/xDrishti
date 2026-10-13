@@ -23,6 +23,7 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
 
 /** A made-up Dhan consent page URL (the documented form, with a fake consentAppId). */
 export const dhanAuthorizeUrl = 'https://auth.dhan.co/login/consentApp-login?consentAppId=fake-consent-0001';
@@ -87,6 +88,10 @@ export const handlers = [
       : problemResponse({ title: 'The holding does not exist.', code: 'portfolio.not_found' }, 404);
   }),
   http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus())),
+  // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
+  // fake replaces both when a test needs them to change.
+  http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),
+  http.get('/api/services/timeline', () => HttpResponse.json(buildTimeline())),
   // Data notices (bell): none by default; the Data fake and the bell tests bring their own.
   http.get('/api/data/notices', () => HttpResponse.json({ items: [] })),
   // Service notices (bell): none by default; the Services fake and the bell tests bring their own.

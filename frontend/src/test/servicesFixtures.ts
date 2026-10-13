@@ -10,7 +10,12 @@ import type {
 } from '@/shared/api';
 
 /** Ids of the sample services: the end-of-day run and the instrument refresh are registered, the account sync is read-only. */
-export const serviceIds = { eod: 'eod', master: 'instrument-master', sync: 'account-sync' } as const;
+export const serviceIds = {
+  eod: 'eod',
+  master: 'instrument-master',
+  sync: 'account-sync',
+  quotes: 'holdings-quotes',
+} as const;
 
 export const serviceRunId = (n: number) => `00000000-0000-4000-8000-0000000009${String(n).padStart(2, '0')}`;
 
@@ -178,11 +183,45 @@ export const buildAccountSyncService = (overrides: Partial<ServiceView> = {}): S
     ...overrides,
   });
 
+/** The holdings quote service: every 5 minutes 09:15-15:30 on trading days, last run succeeded at 10:00 on 13 Oct. */
+export const buildQuotesService = (overrides: Partial<ServiceView> = {}): ServiceView =>
+  buildServiceView({
+    id: serviceIds.quotes,
+    name: 'Holdings quotes',
+    description: 'Fetches the last price and the previous close of the open holdings from Dhan every few minutes.',
+    runsAs: 'xd-api',
+    schedule: buildScheduleSpec({
+      type: 'interval',
+      time: null,
+      days: weekdaySet,
+      from: '09:15',
+      to: '15:30',
+      everyMinutes: 5,
+    }),
+    scheduleWords: 'Every 5 min 09:15–15:30 IST on trading days',
+    allowedScheduleTypes: ['interval'],
+    execution: { retries: 0, timeoutMinutes: 2, catchUp: false, notifyOnFailure: true },
+    parameters: [],
+    lastRun: buildServiceRun({
+      id: serviceRunId(4),
+      serviceId: serviceIds.quotes,
+      startedAt: '2026-10-13T10:00:00+05:30',
+      finishedAt: '2026-10-13T10:00:04+05:30',
+      message: 'Quoted 41 of 43 holdings; 2 not on NSE',
+    }),
+    nextRun: '2026-10-13T10:05:00+05:30',
+    revision: 1,
+    ...overrides,
+  });
+
 export const sampleServices = (): ServiceView[] => [
   buildServiceView(),
   buildMasterService(),
   buildAccountSyncService(),
 ];
+
+/** The services list of a Portfolio test: the quote service among the others. */
+export const sampleServicesWithQuotes = (): ServiceView[] => [...sampleServices(), buildQuotesService()];
 
 export const buildTimelineEntry = (overrides: Partial<TimelineEntry> = {}): TimelineEntry => ({
   serviceId: serviceIds.eod,

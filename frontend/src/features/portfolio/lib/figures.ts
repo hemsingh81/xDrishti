@@ -1,4 +1,4 @@
-import type { Returns } from '@/shared/api';
+import type { HoldingRow, Returns } from '@/shared/api';
 import { formatInr, formatPercent } from '@/shared/lib/format';
 
 /** A proper minus sign, so a loss is never mistaken for a hyphen. */
@@ -52,6 +52,17 @@ export const xirrShortReasons: Record<Exclude<XirrState, 'ok'>, string> = {
 
 /** Why an unpriced holding or lot shows no value and no profit. */
 export const noPriceReason = 'No price yet, so there is no current value, profit or loss to show.';
+
+/** Why the totals have no day change: no open holding has a previous close yet (it arrives with the first quote). */
+export const noDayChangeReason =
+  'No holding has a previous close yet, so there is no day change. It arrives with the next quote: press Refresh prices.';
+
+/** Why one holding shows no day change. */
+export function noDayChangeReasonOf(holding: Pick<HoldingRow, 'status' | 'priced'>): string {
+  if (holding.status === 'closed') return 'A closed holding has no day change.';
+  if (!holding.priced) return noPriceReason;
+  return 'No previous close yet, so there is no day change. It arrives with the next quote.';
+}
 
 export type XirrFigure = { value: number } | { reason: string; short: string; label: '—' | 'n/m' };
 

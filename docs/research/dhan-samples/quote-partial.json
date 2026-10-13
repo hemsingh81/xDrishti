@@ -1,0 +1,13 @@
+{
+  "_status": "UNVERIFIED: written from the Dhan documentation, not recorded from the real API",
+  "note": "1333 has a price; 2885 has none (last_price 0: a suspended or new listing); 11536 is not in the answer. Only 1333 is a quote.",
+  "response": {
+    "data": {
+      "NSE_EQ": {
+        "1333": { "last_price": 1662.4, "ohlc": { "open": 1655.0, "close": 1650.0, "high": 1668.0, "low": 1648.5 } },
+        "2885": { "last_price": 0, "ohlc": { "open": 0, "close": 0, "high": 0, "low": 0 } }
+      }
+    },
+    "status": "success"
+  }
+}

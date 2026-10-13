@@ -9,6 +9,8 @@ import {
   formatIstDate,
   formatIstDateTime,
   formatIstDayAndTime,
+  formatIstDayMonth,
+  formatIstTime,
   formatIstTimeAndDay,
   formatPercent,
   formatPrice,
@@ -93,6 +95,15 @@ describe('formatIstDateTime and formatIstDate', () => {
     expect(formatIstDateTime('2026-10-12T09:59:00Z')).toBe('12 Oct 2026, 15:29 IST');
     expect(formatIstDateTime('2026-10-12T15:29:00+05:30')).toBe('12 Oct 2026, 15:29 IST');
     expect(formatIstDate('2026-10-11T19:00:00Z')).toBe('12 Oct 2026');
+  });
+});
+
+describe('formatIstDayMonth and formatIstTime', () => {
+  it('show the day and the time of day in India time, whatever the viewer zone', () => {
+    expect(formatIstDayMonth('2026-10-11T19:00:00Z')).toBe('12 Oct');
+    expect(formatIstDayMonth(Date.parse('2026-10-10T09:55:00Z'))).toBe('10 Oct');
+    expect(formatIstTime('2026-10-13T05:05:00Z')).toBe('10:35');
+    expect(formatIstTime('2026-10-13T18:30:00Z')).toBe('00:00');
   });
 });
 

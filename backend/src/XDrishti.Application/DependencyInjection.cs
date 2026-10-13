@@ -23,6 +23,7 @@ using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Domain.Common;
 
@@ -63,6 +64,7 @@ public static class DependencyInjection
         // The services, in the order of the Services screen; each module's work is a singleton that the scheduler runs when its schedule says so.
         services.AddSingleton<IScheduledService, EodService>();
         services.AddSingleton<IScheduledService, InstrumentMasterService>();
+        services.AddSingleton<IScheduledService, HoldingQuotesService>();
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();

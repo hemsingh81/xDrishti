@@ -25,6 +25,10 @@ internal sealed class StubBroker : HttpMessageHandler, IHttpClientFactory
         {
             BrokerHttp.ConfigureChart(client);
         }
+        else if (name == BrokerHttpClientNames.DhanQuote)
+        {
+            BrokerHttp.ConfigureQuote(client);
+        }
         else
         {
             BrokerHttp.Configure(client);

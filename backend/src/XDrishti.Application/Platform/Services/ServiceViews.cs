@@ -79,7 +79,7 @@ public sealed record TimelineEntry(string ServiceId, string Name, string Kind, I
 /// <summary>The trading-day timeline: market hours (null on a day without a session), the review cutoff, whether the date is a trading day and every enabled service's starts and bands.</summary>
 public sealed record ServicesTimeline(string Date, bool TradingDay, string? MarketOpen, string? MarketClose, string ReviewCutoff, IReadOnlyList<TimelineEntry> Entries);
 
-/// <summary>A failure to tell the owner of (the bell). <c>id</c> is <c>service:failed:{runId}</c>, so a newer failed run is a new notice. <c>kind</c> is service_failed; <c>severity</c> error.</summary>
+/// <summary>A failure to tell the owner of (the bell). <c>id</c> is <c>service:failed:{serviceId}:{yyyy-MM-dd}</c> (the India date of the failed run): one notice per service per day, with the text and time of the latest failure. <c>kind</c> is service_failed; <c>severity</c> error.</summary>
 public sealed record ServiceNotice(string Id, string Kind, string Severity, string Text, string ServiceId, DateTimeOffset? At);
 
 public sealed record ServiceNotices(IReadOnlyList<ServiceNotice> Items);

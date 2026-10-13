@@ -266,7 +266,7 @@ public sealed class DataEodRunTests(ApiFactory factory) : DataTestBase(factory)
         var failedRun = (await EodRunsAsync()).ShouldHaveSingleItem();
         (failedRun.Status, failedRun.Message).ShouldBe(("failed", job.Error));
         var notice = (await ServiceNoticesAsync()).Items.ShouldHaveSingleItem();
-        (notice.Kind, notice.Severity, notice.Id).ShouldBe(("service_failed", "error", $"service:failed:{failedRun.Id}"));
+        (notice.Kind, notice.Severity, notice.Id).ShouldBe(("service_failed", "error", "service:failed:eod:2026-10-12"));
         notice.Text.ShouldStartWith("End-of-day data run failed on 12 Oct: ");
 
         // A manual failure is the owner's own business and a later successful scheduled run clears the notice.

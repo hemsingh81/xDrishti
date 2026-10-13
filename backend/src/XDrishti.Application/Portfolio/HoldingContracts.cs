@@ -19,6 +19,9 @@ public sealed record ReturnsView(
 /// One holding. Status is "open" or "closed". Mapped is false when the holding is not in the instrument master (InstrumentId and CanonicalSymbol are
 /// then null). LotCount counts open lots; EarliestAcquiredOn is the oldest open lot's date; UsesDefaultDate is true when any open lot has the
 /// import's default date. Returns cover all lots (closed lots add to RealisedPnl and to the XIRR).
+/// PreviousClose is the previous session's close as the last quote reported it (null until a quote gave one). DayChange (rupees) and DayChangePct (percent number) are
+/// against it, for an open, priced holding with a previous close; otherwise both are null and the holding is left out of the summary's day change. PriceAt is the time of
+/// LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync) or "quote" (a market quote).
 /// </summary>
 public sealed record HoldingRow(
     Guid Id,
@@ -46,7 +49,12 @@ public sealed record HoldingRow(
     DateOnly? EarliestAcquiredOn,
     bool UsesDefaultDate,
     bool Priced,
-    ReturnsView Returns);
+    ReturnsView Returns,
+    decimal? PreviousClose,
+    decimal? DayChange,
+    decimal? DayChangePct,
+    DateTimeOffset? PriceAt,
+    string PriceSource);
 
 /// <summary>One page of holdings (Total counts all matches).</summary>
 public sealed record HoldingPage(IReadOnlyList<HoldingRow> Items, int Page, int PageSize, int Total);
@@ -77,6 +85,8 @@ public sealed record SyncRunView(
 /// <summary>
 /// Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that
 /// still have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).
+/// DayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no
+/// holding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings.
 /// </summary>
 public sealed record HoldingsSummary(
     ReturnsView Returns,
@@ -86,7 +96,14 @@ public sealed record HoldingsSummary(
     int UnpricedCount,
     int DefaultDateLots,
     DateOnly ValuationDate,
-    SyncRunView? LastSync);
+    SyncRunView? LastSync,
+    decimal? DayChange,
+    decimal? DayChangePct,
+    int DayChangeExcluded,
+    PricesAsOf PricesAsOf);
+
+/// <summary>The oldest and the newest time of the prices of the open holdings (null when none has a priced time).</summary>
+public sealed record PricesAsOf(DateTimeOffset? Oldest, DateTimeOffset? Newest);
 
 /// <summary>
 /// A lot of a holding with its own figures: Invested is its cost, Value is its value now (open) or its sale proceeds (closed), Pnl the difference.

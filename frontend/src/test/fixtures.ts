@@ -697,6 +697,11 @@ export function buildHolding(overrides: Partial<HoldingRow> = {}): HoldingRow {
     earliestAcquiredOn: '2024-03-05',
     usesDefaultDate: false,
     returns: buildReturns(),
+    previousClose: 2_880,
+    dayChange: 900,
+    dayChangePct: 0.78,
+    priceAt: '2026-10-11T09:55:00Z',
+    priceSource: 'sync',
     ...overrides,
   };
 }
@@ -713,6 +718,9 @@ export const sampleHoldings: HoldingRow[] = [
     qty: 10,
     avgCost: 4_000,
     lastPrice: 3_880,
+    previousClose: 3_900,
+    dayChange: -200,
+    dayChangePct: -0.51,
     returns: buildReturns({ invested: 40_000, value: 38_800, pnl: -1_200, pnlPct: -3, xirr: -2.5 }),
   }),
   buildHolding({
@@ -724,6 +732,9 @@ export const sampleHoldings: HoldingRow[] = [
     qty: 25,
     avgCost: 1_600,
     lastPrice: 1_700,
+    previousClose: null,
+    dayChange: null,
+    dayChangePct: null,
     lotCount: 2,
     earliestAcquiredOn: '2025-01-01',
     usesDefaultDate: true,
@@ -749,6 +760,9 @@ export const sampleHoldings: HoldingRow[] = [
     qty: 100,
     avgCost: 50,
     lastPrice: 60,
+    previousClose: 58,
+    dayChange: 200,
+    dayChangePct: 3.45,
     returns: buildReturns({ invested: 5_000, value: 6_000, pnl: 1_000, pnlPct: 20, xirr: 1_500, xirrState: 'n_m' }),
   }),
   buildHolding({
@@ -760,6 +774,9 @@ export const sampleHoldings: HoldingRow[] = [
     qty: 0,
     avgCost: 100,
     lastPrice: 120,
+    previousClose: null,
+    dayChange: null,
+    dayChangePct: null,
     status: 'closed',
     closedAt: '2026-09-30T05:00:00Z',
     lotCount: 0,
@@ -787,6 +804,8 @@ const sortValue = (h: HoldingRow, field: string): number | string => {
     pnl: h.returns.pnl ?? Number.NEGATIVE_INFINITY,
     pnlPct: h.returns.pnlPct ?? Number.NEGATIVE_INFINITY,
     xirr: h.returns.xirr ?? Number.NEGATIVE_INFINITY,
+    dayChange: h.dayChange ?? Number.NEGATIVE_INFINITY,
+    dayChangePct: h.dayChangePct ?? Number.NEGATIVE_INFINITY,
   };
   const texts: Record<string, string> = {
     symbol: h.symbol,
@@ -833,6 +852,10 @@ export const buildUnpricedHolding = (overrides: Partial<HoldingRow> = {}): Holdi
     lastPrice: 0,
     lastPriceAt: null,
     priced: false,
+    previousClose: null,
+    dayChange: null,
+    dayChangePct: null,
+    priceAt: null,
     returns: noValueReturns({ invested: 2_000 }),
     ...overrides,
   });
@@ -887,6 +910,11 @@ export function buildSummary(overrides: Partial<HoldingsSummary> = {}): Holdings
     defaultDateLots: 2,
     valuationDate: '2026-10-11',
     lastSync: buildSyncRun(),
+    // RELIANCE +900, TCS −200 and SMALLCO +200 against 1,60,000 of previous closes; INFY has no previous close.
+    dayChange: 900,
+    dayChangePct: 0.56,
+    dayChangeExcluded: 1,
+    pricesAsOf: { oldest: '2026-10-11T09:55:00Z', newest: '2026-10-11T09:55:00Z' },
     ...overrides,
   };
 }

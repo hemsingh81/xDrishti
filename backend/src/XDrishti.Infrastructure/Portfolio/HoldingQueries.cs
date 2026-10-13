@@ -102,7 +102,9 @@ internal sealed class HoldingQueries(XDrishtiDbContext db) : IHoldingQueries
                 r.Holding.ClosedAt,
                 r.Holding.SyncedAt,
                 [.. lots[r.Holding.Id].Select(l => new LotData(
-                    l.Id, l.AcquiredOn, l.Qty, l.UnitCost, l.Source.ToString().ToLowerInvariant(), l.UsesDefaultDate, l.ClosedOn, l.ClosePrice, l.Estimated))])),
+                    l.Id, l.AcquiredOn, l.Qty, l.UnitCost, l.Source.ToString().ToLowerInvariant(), l.UsesDefaultDate, l.ClosedOn, l.ClosePrice, l.Estimated))],
+                r.Holding.PreviousClose,
+                r.Holding.LastPriceSource.ToString().ToLowerInvariant())),
         ];
     }
 

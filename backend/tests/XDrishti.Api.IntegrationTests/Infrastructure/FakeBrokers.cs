@@ -26,6 +26,9 @@ public sealed class FakeBrokers
     /// <summary>What the fake Dhan reports at <c>GET /v2/holdings</c> (for a request that carries the fake access token).</summary>
     public List<FakeHolding> Holdings { get; } = [];
 
+    /// <summary>What the fake Dhan quotes at <c>POST /v2/marketfeed/quote</c> by Dhan security id (last price, previous close; a null close is left out of the answer). Needs the fake access token and a client id.</summary>
+    public Dictionary<string, (decimal Last, decimal? Close)> Quotes { get; } = [];
+
     /// <summary>Runs before the fake Dhan answers a holdings request (a test holds the answer back to make a sync slow).</summary>
     public Func<Task>? BeforeHoldingsAnswer { get; set; }
 
@@ -43,6 +46,7 @@ public sealed class FakeBrokers
         _requests.Clear();
         _overrides.Clear();
         Holdings.Clear();
+        Quotes.Clear();
         BeforeHoldingsAnswer = null;
         DhanClientId = AccountsApi.ClientId;
     }
@@ -70,8 +74,24 @@ public sealed class FakeBrokers
             "/v2/holdings" => request.Header("access-token") == DhanAccessToken
                 ? Json(HttpStatusCode.OK, HoldingsJson())
                 : Json(HttpStatusCode.Unauthorized, """{"errorType":"Invalid_Authentication","errorCode":"DH-901","errorMessage":"Client ID or user generated access token is invalid or expired."}"""),
+            "/v2/marketfeed/quote" => request.Header("access-token") == DhanAccessToken && request.Header("client-id").Length > 0
+                ? Json(HttpStatusCode.OK, QuoteJson(request.Body))
+                : Json(HttpStatusCode.Unauthorized, """{"errorType":"Invalid_Authentication","errorCode":"DH-901","errorMessage":"Client ID or user generated access token is invalid or expired."}"""),
             _ => Json(HttpStatusCode.NotFound, """{"errorCode":"NOT_FAKED"}"""),
         };
+    }
+
+    /// <summary>Dhan's documented market-quote answer for the asked NSE_EQ ids that <see cref="Quotes"/> knows (made-up values).</summary>
+    private string QuoteJson(string? body)
+    {
+        var asked = System.Text.Json.JsonDocument.Parse(body ?? "{}").RootElement.GetProperty("NSE_EQ").EnumerateArray().Select(e => e.GetInt64().ToString(CultureInfo.InvariantCulture));
+        var entries = asked.Where(Quotes.ContainsKey).Select(id =>
+        {
+            var (last, close) = Quotes[id];
+            var ohlc = close is { } c ? string.Create(CultureInfo.InvariantCulture, $"\"ohlc\":{{\"open\":0,\"high\":0,\"low\":0,\"close\":{c}}},") : string.Empty;
+            return string.Create(CultureInfo.InvariantCulture, $"\"{id}\":{{{ohlc}\"last_price\":{last},\"volume\":0}}");
+        });
+        return "{\"data\":{\"NSE_EQ\":{" + string.Join(",", entries) + "}},\"status\":\"success\"}";
     }
 
     private string HoldingsJson() => "[" + string.Join(",", Holdings.ToArray().Select(h => h.ToJson())) + "]";

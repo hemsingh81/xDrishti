@@ -1,0 +1,37 @@
+{
+  "_status": "UNVERIFIED: written from the Dhan documentation, not recorded from the real API",
+  "request": {
+    "method": "POST",
+    "url": "https://api.dhan.co/v2/marketfeed/quote",
+    "headers": { "access-token": "<token>", "client-id": "<client id>", "Content-Type": "application/json" },
+    "body": { "NSE_EQ": [1333, 11536] }
+  },
+  "response": {
+    "data": {
+      "NSE_EQ": {
+        "1333": {
+          "average_price": 1650.25,
+          "buy_quantity": 120000,
+          "depth": { "buy": [], "sell": [] },
+          "last_price": 1662.4,
+          "last_quantity": 20,
+          "last_trade_time": "12/10/2026 10:35:12",
+          "lower_circuit_limit": 1500.0,
+          "net_change": 12.4,
+          "ohlc": { "open": 1655.0, "close": 1650.0, "high": 1668.0, "low": 1648.5 },
+          "oi": 0,
+          "sell_quantity": 98000,
+          "upper_circuit_limit": 1800.0,
+          "volume": 2310000
+        },
+        "11536": {
+          "average_price": 4510.0,
+          "last_price": 4520.0,
+          "ohlc": { "open": 4500.0, "close": 4506.0, "high": 4530.0, "low": 4495.0 },
+          "volume": 410000
+        }
+      }
+    },
+    "status": "success"
+  }
+}

@@ -2,7 +2,8 @@ namespace XDrishti.Infrastructure.Brokers;
 
 /// <summary>
 /// The only broker endpoints xDrishti calls (ADR 0008, 0009, 0012, 0016): Dhan's consent-flow authentication, the read of the account's holdings
-/// (<c>GET /v2/holdings</c>, no query) and the 1-minute chart data of the Data API (<c>POST /v2/charts/intraday</c>, no query) — never orders, positions or funds. Enforced for every request of the broker HTTP clients by <see cref="BrokerEndpointGuard"/>. The two login pages are opened by the owner's
+/// (<c>GET /v2/holdings</c>, no query), the 1-minute chart data of the Data API (<c>POST /v2/charts/intraday</c>, no query) and the market quote of the holdings
+/// (<c>POST /v2/marketfeed/quote</c>, no query; ADR 0019) — never orders, positions or funds, and no other market-feed path (<c>ltp</c>, <c>ohlc</c>). Enforced for every request of the broker HTTP clients by <see cref="BrokerEndpointGuard"/>. The two login pages are opened by the owner's
 /// browser, never by the server.
 /// </summary>
 internal static class BrokerEndpoints
@@ -17,6 +18,9 @@ internal static class BrokerEndpoints
     /// <summary>1-minute bars of an instrument for a period of at most 90 days (JSON body, header <c>access-token</c>; ADR 0016 §7). Read-only despite the POST; no other chart path is allowed.</summary>
     public static readonly Uri DhanIntradayChart = new("https://api.dhan.co/v2/charts/intraday");
 
+    /// <summary>The market quote of up to 1,000 securities (JSON body <c>{"NSE_EQ":[ids]}</c>, headers <c>access-token</c> and <c>client-id</c>; ADR 0019 §1). Read-only despite the POST; <c>ltp</c>, <c>ohlc</c> and every other market-feed path stay refused.</summary>
+    public static readonly Uri DhanMarketQuote = new("https://api.dhan.co/v2/marketfeed/quote");
+
     /// <summary>Browser page: Dhan's consent login (query <c>consentAppId</c>).</summary>
     public const string DhanLoginPage = "https://auth.dhan.co/login/consentApp-login";
 
@@ -27,6 +31,7 @@ internal static class BrokerEndpoints
         (HttpMethod.Post, DhanConsumeConsent, "tokenId"),
         (HttpMethod.Get, DhanHoldings, null),
         (HttpMethod.Post, DhanIntradayChart, null),
+        (HttpMethod.Post, DhanMarketQuote, null),
     ];
 
     /// <summary>True only for an allowed method and exact HTTPS endpoint (host, default port, path) with nothing but its own query parameter.</summary>

@@ -31,29 +31,43 @@ internal sealed class PortfolioUnitOfWork(XDrishtiDbContext db) : IPortfolioUnit
         var strategy = db.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async token =>
         {
-            db.ChangeTracker.Clear();
-            await using var transaction = await db.Database.BeginTransactionAsync(token);
             try
             {
-                var result = await work(token);
-                if (result.IsSuccess)
-                {
-                    await transaction.CommitAsync(token);
-                }
-                else
-                {
-                    await transaction.RollbackAsync(token);
-                    db.ChangeTracker.Clear();
-                }
-
-                return result;
+                return await AttemptAsync(work, token);
             }
-            catch
+            catch (DbUpdateConcurrencyException)
             {
-                // Leaving the block rolls the transaction back; what was collected must not be saved by a later use of the context.
-                db.ChangeTracker.Clear();
-                throw;
+                // A holding the work changed was changed by someone else meanwhile (a quote written between the work's read and its save, ADR 0019): the transaction is rolled back,
+                // and the work runs once more from scratch, reading the rows as they are now (the work reads its own state). A second conflict is a failure of the run.
+                return await AttemptAsync(work, token);
             }
         }, cancellationToken);
+    }
+
+    private async Task<Result> AttemptAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken token)
+    {
+        db.ChangeTracker.Clear();
+        await using var transaction = await db.Database.BeginTransactionAsync(token);
+        try
+        {
+            var result = await work(token);
+            if (result.IsSuccess)
+            {
+                await transaction.CommitAsync(token);
+            }
+            else
+            {
+                await transaction.RollbackAsync(token);
+                db.ChangeTracker.Clear();
+            }
+
+            return result;
+        }
+        catch
+        {
+            // Leaving the block rolls the transaction back; what was collected must not be saved by a later use of the context.
+            db.ChangeTracker.Clear();
+            throw;
+        }
     }
 }

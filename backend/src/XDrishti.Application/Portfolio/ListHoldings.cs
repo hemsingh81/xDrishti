@@ -11,7 +11,7 @@ public sealed record HoldingsRequest(Guid? AccountId, Guid? BucketId, string? St
 
 /// <summary>
 /// Lists holdings with their lots summary and returns. <c>status</c> is <c>open</c> (default), <c>closed</c> or <c>all</c>; <c>q</c> matches symbol,
-/// name and ISIN; <c>sort</c> is one of <c>symbol|name|qty|avgCost|lastPrice|invested|value|pnl|pnlPct|xirr|acquiredOn|bucket|account</c>, prefix
+/// name and ISIN; <c>sort</c> is one of <c>symbol|name|qty|avgCost|lastPrice|invested|value|pnl|pnlPct|xirr|dayChange|dayChangePct|acquiredOn|bucket|account</c>, prefix
 /// <c>-</c> for descending (default <c>symbol</c>; rows without a value come last); <c>page</c> from 1, <c>pageSize</c> up to 100.
 /// </summary>
 public sealed record ListHoldingsQuery(HoldingsRequest Request) : IQuery<Result<HoldingPage>>;
@@ -38,6 +38,8 @@ internal sealed class ListHoldingsHandler(IHoldingQueries queries, TimeProvider 
         ["pnl"] = r => r.Returns.Pnl,
         ["pnlPct"] = r => r.Returns.PnlPct,
         ["xirr"] = r => r.Returns.Xirr,
+        ["dayChange"] = r => r.DayChange,
+        ["dayChangePct"] = r => r.DayChangePct,
         ["acquiredOn"] = r => r.EarliestAcquiredOn,
         ["bucket"] = r => r.BucketName,
         ["account"] = r => r.AccountName,
@@ -97,7 +99,7 @@ internal sealed class ListHoldingsHandler(IHoldingQueries queries, TimeProvider 
             sort = descending ? wanted[1..] : wanted;
             if (!SortKeys.ContainsKey(sort))
             {
-                errors.Add("sort", "Use symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, acquiredOn, bucket or account, optionally with a leading '-'.");
+                errors.Add("sort", "Use symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket or account, optionally with a leading '-'.");
             }
         }
 

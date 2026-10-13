@@ -2,8 +2,9 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import {
   api,
   queryRoots,
+  runServiceNow,
+  showStartedRun,
   unwrap,
-  type ServiceRun,
   type ServiceScheduleInput,
   type ServiceList,
   type ServiceView,
@@ -74,27 +75,11 @@ export function useResumeService() {
   });
 }
 
-/** Shows a run that was just accepted at once: a read that started before the click must not bring back "not running". */
-async function showStartedRun(queryClient: QueryClient, run: ServiceRun) {
-  await queryClient.cancelQueries({ queryKey: servicesKeys.list });
-  if (run.status !== 'running') return;
-  queryClient.setQueryData<ServiceList>(servicesKeys.list, (list) =>
-    list
-      ? {
-          ...list,
-          items: list.items.map((item) =>
-            item.id === run.serviceId ? { ...item, status: 'running', lastRun: run } : item,
-          ),
-        }
-      : list,
-  );
-}
-
 /** Run now (202, the run, which goes on in the background). 409 `services.already_running` when it runs. */
 export function useRunService() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => unwrap(await api.POST('/api/services/{id}/run', { params: { path: { id } } })),
+    mutationFn: runServiceNow,
     onSuccess: (run) => showStartedRun(queryClient, run),
     onSettled: () => reload(queryClient),
   });

@@ -118,6 +118,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(BrokerHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanHoldings).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanChart).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
+            services.AddHttpClient(BrokerHttpClientNames.DhanQuote).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
 
             // Same for the instrument master's two file servers and NSE's holiday list; refreshes are run by the tests, not by the background worker.
             services.AddHttpClient(MasterDataHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);

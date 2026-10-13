@@ -20,6 +20,7 @@ internal static class HoldingViews
     public static HoldingRow Row(HoldingData holding, DateOnly valuationDate)
     {
         var open = holding.Lots.Where(l => l.IsOpen).ToList();
+        var dayChange = DayChangeCalculator.ForHolding(holding);
         return new HoldingRow(
             holding.Id,
             holding.AccountId,
@@ -46,7 +47,18 @@ internal static class HoldingViews
             open.Count == 0 ? null : open.Min(l => l.AcquiredOn),
             open.Any(l => l.UsesDefaultDate),
             holding.IsPriced,
-            Returns(ReturnsCalculator.ForHolding(holding, valuationDate)));
+            Returns(ReturnsCalculator.ForHolding(holding, valuationDate)),
+            holding.PreviousClose,
+            dayChange?.Amount,
+            dayChange?.Pct,
+            holding.LastPriceAt,
+            holding.PriceSource);
+    }
+
+    public static PricesAsOf PriceTimes(IEnumerable<HoldingData> holdings)
+    {
+        var times = holdings.Where(h => h.IsOpen && h.IsPriced && h.LastPriceAt is not null).Select(h => h.LastPriceAt!.Value).ToList();
+        return times.Count == 0 ? new PricesAsOf(null, null) : new PricesAsOf(times.Min(), times.Max());
     }
 
     public static LotRow Lot(HoldingData holding, LotData lot, DateOnly valuationDate) => new(

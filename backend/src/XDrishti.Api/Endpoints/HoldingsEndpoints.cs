@@ -20,12 +20,12 @@ internal sealed class HoldingsEndpoints : IEndpointModule
 
         holdings.MapGet("/", ListAsync)
             .WithName("ListHoldings")
-            .WithSummary("Holdings with lots summary, profit/loss and XIRR: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort, page, pageSize (max 100)")
+            .WithSummary("Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100). Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote)")
             .ProducesValidationProblem();
 
         holdings.MapGet("/summary", GetSummaryAsync)
             .WithName("GetHoldingsSummary")
-            .WithSummary("Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, counts, lots on the default date, last sync")
+            .WithSummary("Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
         holdings.MapGet("/{id:guid}/lots", GetLotsAsync)

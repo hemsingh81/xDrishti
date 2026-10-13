@@ -24,7 +24,7 @@ public abstract class HoldingsTestBase(ApiFactory factory) : IAsyncLifetime
 
     protected FakeBrokers Dhan => Factory.Brokers;
 
-    public async ValueTask InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         await Factory.ResetAccountsAsync();
         await Factory.ResetInstrumentsAsync();

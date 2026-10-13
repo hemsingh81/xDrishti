@@ -110,6 +110,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ImportCorporateActionsResult))]
 [JsonSerializable(typeof(HoldingPage))]
 [JsonSerializable(typeof(HoldingsSummary))]
+[JsonSerializable(typeof(PricesAsOf))]
 [JsonSerializable(typeof(HoldingLots))]
 [JsonSerializable(typeof(LotRow))]
 [JsonSerializable(typeof(LotDateInput))]

@@ -11,7 +11,8 @@ namespace XDrishti.Application.Platform.Services;
 /// services that have no row, and makes up once for each service whose scheduled time passed while the application was down (trigger <c>catch_up</c>; never for a paused service, never more than one
 /// per service per start). Then it looks at the schedules at least once a minute and at the next start: it re-reads the stored rows each time, so an edit counts at the next look without a restart,
 /// starts the services whose time came since the last look, starts the retries that are due and leaves the rest to <see cref="ServiceRunner"/>. A paused service is not started, and its past times
-/// are not made up for when it is resumed. The API's hosted service only calls <see cref="RunAsync"/>.
+/// are not made up for when it is resumed. The ticks of an interval or window schedule are never made up for, and one that falls while the service still runs is dropped with a log line and no run record
+/// (ADR 0019 §5). The API's hosted service only calls <see cref="RunAsync"/>.
 /// </summary>
 public sealed class ServiceScheduler(
     IServiceScopeFactory scopes,
@@ -112,7 +113,8 @@ public sealed class ServiceScheduler(
                 {
                     if (now - due <= LateAfter)
                     {
-                        await StartAsync(service.Id, ServiceRunTrigger.Scheduled, cancellationToken);
+                        // a tick of an interval or window schedule that finds the service busy is dropped (log, no run record); a daily, weekly or run-after start is recorded as skipped
+                        await StartAsync(service.Id, ServiceRunTrigger.Scheduled, cancellationToken, dropWhenBusy: schedule.Type is ScheduleType.Interval or ScheduleType.Window);
                     }
                     else if (service.Settings.CatchUp
                         && !_caughtUp.Contains(service.Id)
@@ -288,11 +290,11 @@ public sealed class ServiceScheduler(
         }
     }
 
-    private async Task StartAsync(string serviceId, ServiceRunTrigger trigger, CancellationToken cancellationToken)
+    private async Task StartAsync(string serviceId, ServiceRunTrigger trigger, CancellationToken cancellationToken, bool dropWhenBusy = false)
     {
         try
         {
-            _ = await runner.StartAsync(serviceId, trigger, ServiceRunner.SchedulerRequester, cancellationToken);
+            _ = await runner.StartAsync(serviceId, trigger, ServiceRunner.SchedulerRequester, cancellationToken, dropWhenBusy);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

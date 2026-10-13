@@ -55,4 +55,7 @@ internal static partial class ServicesLog
 
     [LoggerMessage(EventId = 3417, Level = LogLevel.Information, Message = "service.retry_resumed service={ServiceId} attempt={Attempt} at {DueAt}: the sequence of retries went on after a restart")]
     public static partial void RetryResumed(ILogger logger, string serviceId, int attempt, DateTimeOffset dueAt);
+
+    [LoggerMessage(EventId = 3418, Level = LogLevel.Information, Message = "service.tick_dropped service={ServiceId} trigger={Trigger}: the previous run was still going")]
+    public static partial void TickDropped(ILogger logger, string serviceId, string trigger);
 }

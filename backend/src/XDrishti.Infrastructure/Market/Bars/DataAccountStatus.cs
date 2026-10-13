@@ -6,9 +6,9 @@ namespace XDrishti.Infrastructure.Market.Bars;
 
 /// <summary>
 /// The primary Data account as the Dhan phase needs it: the account with the primary Data role, whether its connection (token) is usable, and the token itself
-/// from the broker vault. The token is only handed to the caller, never logged or returned to the API.
+/// from the broker vault (with the account's client id, for the calls that send both: <see cref="IDataAccountCredentials"/>). The token and the client id are only handed to the caller, never logged or returned to the API.
 /// </summary>
-internal sealed class DataAccountStatus(IAccountStore accounts, IBrokerConnectionStore connections, IBrokerSecretVault vault, TimeProvider clock) : IDataAccountStatus
+internal sealed class DataAccountStatus(IAccountStore accounts, IBrokerConnectionStore connections, IBrokerSecretVault vault, TimeProvider clock) : IDataAccountStatus, IDataAccountCredentials
 {
     public async ValueTask<DataAccountState> GetAsync(CancellationToken cancellationToken)
     {
@@ -31,5 +31,19 @@ internal sealed class DataAccountStatus(IAccountStore accounts, IBrokerConnectio
     {
         var state = await GetAsync(cancellationToken);
         return state is { CanFetch: true, AccountId: { } id } ? await vault.GetAsync(id, BrokerSecretName.AccessToken, cancellationToken) : null;
+    }
+
+    public async ValueTask<DataAccountCredentials?> GetCredentialsAsync(CancellationToken cancellationToken)
+    {
+        // The connection status has one source, GetAsync; the client id is read from the account it names.
+        if (await GetAsync(cancellationToken) is not { CanFetch: true, AccountId: { } id })
+        {
+            return null;
+        }
+
+        var account = await accounts.FindReadOnlyAsync(id, cancellationToken);
+        return account is not null && await vault.GetAsync(id, BrokerSecretName.AccessToken, cancellationToken) is { } token
+            ? new DataAccountCredentials(token, account.ClientId)
+            : null;
     }
 }

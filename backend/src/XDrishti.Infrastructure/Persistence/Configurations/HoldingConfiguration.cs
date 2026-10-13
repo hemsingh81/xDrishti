@@ -13,6 +13,7 @@ internal sealed class HoldingConfiguration : IEntityTypeConfiguration<Holding>
         {
             t.HasCheckConstraint("ck_holdings_status", "status IN ('open', 'closed')");
             t.HasCheckConstraint("ck_holdings_qty", "qty >= 0");
+            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
@@ -32,6 +33,10 @@ internal sealed class HoldingConfiguration : IEntityTypeConfiguration<Holding>
         builder.Property(x => x.AvgCost).HasPrecision(18, 4).IsRequired();
         builder.Property(x => x.LastPrice).HasPrecision(18, 4).IsRequired();
         builder.Property(x => x.LastPriceAt);
+
+        // The latest quote only (ADR 0019): the previous session's close and where the last price came from.
+        builder.Property(x => x.PreviousClose).HasPrecision(18, 4);
+        builder.Property(x => x.LastPriceSource).HasConversion(EnumConversions.Lowercase<PriceSource>()).HasMaxLength(8).IsRequired().HasDefaultValue(PriceSource.Sync);
         builder.Property(x => x.Status).HasConversion(EnumConversions.Lowercase<HoldingStatus>()).HasMaxLength(8).IsRequired();
         builder.Property(x => x.FirstSeenAt).IsRequired();
         builder.Property(x => x.ClosedAt);
@@ -42,6 +47,10 @@ internal sealed class HoldingConfiguration : IEntityTypeConfiguration<Holding>
         builder.HasIndex(x => new { x.AccountId, x.Status }).HasDatabaseName("ix_holdings_account_status");
         builder.HasIndex(x => x.BucketId);
         builder.HasIndex(x => x.InstrumentId);
+
+        // Optimistic concurrency: PostgreSQL's system column xmin changes with every update of the row. A sync that read a holding before a quote was written into it cannot save its
+        // (older) view over the quote: the save matches nothing and is refused, and the sync reads again (PortfolioUnitOfWork.RunAsync).
+        builder.Property<uint>("xmin").HasColumnName("xmin").HasColumnType("xid").ValueGeneratedOnAddOrUpdate().IsConcurrencyToken();
 
         builder.HasMany(x => x.Lots).WithOne().HasForeignKey(x => x.HoldingId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(x => x.Lots).HasField("_lots").UsePropertyAccessMode(PropertyAccessMode.Field);

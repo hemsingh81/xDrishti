@@ -10,7 +10,7 @@ namespace XDrishti.Application.Portfolio;
 
 /// <summary>
 /// Totals of the holdings of one account, one bucket, or (without an account) every active account that has the Portfolio role and counts in totals:
-/// invested, current value, unrealised and realised P&amp;L, XIRR from the union of all cash flows, counts, lots on the default date and the last sync.
+/// invested, current value, unrealised and realised P&amp;L, XIRR from the union of all cash flows, day change, counts, lots on the default date, the price times and the last sync.
 /// </summary>
 public sealed record GetHoldingsSummaryQuery(Guid? AccountId, Guid? BucketId) : IQuery<Result<HoldingsSummary>>;
 
@@ -31,6 +31,7 @@ internal sealed class GetHoldingsSummaryHandler(
         var holdings = await queries.ListAsync(new HoldingFilter(query.AccountId, query.BucketId, null, null, TotalsOnly: query.AccountId is null), cancellationToken);
         var figures = ReturnsCalculator.ForGroup(holdings, valuationDate);
         var open = holdings.Where(h => h.IsOpen).ToList();
+        var dayChange = DayChangeCalculator.ForGroup(holdings);
         var last = await syncs.GetLastAsync(query.AccountId, cancellationToken);
         return Result.Success(new HoldingsSummary(
             HoldingViews.Returns(figures),
@@ -40,6 +41,10 @@ internal sealed class GetHoldingsSummaryHandler(
             open.Count(h => !h.IsPriced),
             open.Sum(h => h.Lots.Count(l => l.IsOpen && l.UsesDefaultDate)),
             valuationDate,
-            last is null ? null : HoldingViews.Run(last)));
+            last is null ? null : HoldingViews.Run(last),
+            dayChange.Amount,
+            dayChange.Pct,
+            dayChange.Excluded,
+            HoldingViews.PriceTimes(holdings)));
     }
 }

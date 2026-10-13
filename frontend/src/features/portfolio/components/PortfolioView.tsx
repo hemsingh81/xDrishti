@@ -4,6 +4,10 @@ import { bucketsQuery, useNow } from '@/features/accounts';
 import type { AccountSummary } from '@/shared/api';
 import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { holdingsList, summaryQuery } from '../api/portfolioQueries';
+import { useMarket } from '../hooks/useMarket';
+import { useQuotesService } from '../hooks/useQuotesService';
+import { useRefreshOnQuoteRun } from '../hooks/useRefreshOnQuoteRun';
+import { useRefreshPrices } from '../hooks/useRefreshPrices';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
 import { activeFilterCount } from '../lib/filters';
@@ -11,6 +15,7 @@ import { HoldingDrawer } from './HoldingDrawer';
 import { HoldingsGrid, NoMatches } from './HoldingsGrid';
 import { EmptyHoldings, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
 import { PortfolioHeader } from './PortfolioHeader';
+import { PricesLine } from './PricesLine';
 import { ScopeBar } from './ScopeBar';
 import { SummaryNotes } from './SummaryNotes';
 import { SummaryTiles } from './SummaryTiles';
@@ -29,8 +34,13 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const connected = acting !== null && isConnected(acting, now);
 
   const buckets = useQuery(bucketsQuery);
-  const summary = useQuery(summaryQuery(filters));
-  const holdings = useInfiniteRows(holdingsList(filters));
+  // While the market is open the totals and the holdings are read again every minute (not in a hidden tab).
+  const market = useMarket();
+  const quotes = useQuotesService(market.open);
+  const refresh = useRefreshPrices(quotes.service);
+  useRefreshOnQuoteRun(quotes.service);
+  const summary = useQuery({ ...summaryQuery(filters), refetchInterval: market.pollMs });
+  const holdings = useInfiniteRows({ ...holdingsList(filters), refetchInterval: market.pollMs });
 
   if (portfolio.length === 0) {
     return (
@@ -57,15 +67,30 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
       />
       <SummaryTiles query={summary} />
       {summary.data && (
+        <PricesLine
+          summary={summary.data}
+          now={market.now}
+          marketOpen={market.open}
+          quotes={quotes.service}
+          quotesUnknown={quotes.isError}
+        />
+      )}
+      {summary.data && (
         <SummaryNotes
           defaultDateLots={summary.data.defaultDateLots}
           unpricedCount={summary.data.unpricedCount}
+          dayChangeExcluded={summary.data.dayChangeExcluded}
           onReviewDates={() => {
             update({ status: 'open', sort: { field: 'acquiredOn', descending: false } });
           }}
         />
       )}
-      <SyncBar account={actingTarget} connected={connected} fallbackRun={summary.data?.lastSync ?? null} />
+      <SyncBar
+        account={actingTarget}
+        connected={connected}
+        fallbackRun={summary.data?.lastSync ?? null}
+        refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
+      />
       <HoldingsGrid
         result={holdings}
         filters={filters}

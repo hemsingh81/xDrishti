@@ -23,3 +23,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0016](0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md) | Market bars: CSV folder load, Dhan intraday fetch, app-managed aggregates for every timeframe | Accepted |
 | [0017](0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md) | Trading calendar, scheduled end-of-day run with gap backfill, data quality, price adjustments, CSV undo | Accepted |
 | [0018](0018-services-framework-and-editable-schedules.md) | Services framework: schedules in the database, one scheduler, the Services screen | Accepted |
+| [0019](0019-holdings-quotes-day-change-and-the-first-interval-service.md) | Holdings quotes every 5 minutes (Dhan quote API), day change, and the first interval service | Accepted |

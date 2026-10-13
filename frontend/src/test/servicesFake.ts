@@ -31,6 +31,8 @@ export interface ServicesFakeOptions {
   notices?: readonly ServiceNotice[];
   /** How the next Run now ends (default succeeded). */
   runOutcome?: 'succeeded' | 'failed' | 'skipped';
+  /** The message of a run that succeeded (default none). */
+  runMessage?: string;
   /** A started run ends by itself the second time the list is read (default). Off: only `fake.advance()` ends it. */
   autoAdvance?: boolean;
   /** More findings for a draft (the dependent-service checks the fake does not know). */
@@ -292,7 +294,7 @@ export function createServicesFake(options: ServicesFakeOptions = {}) {
           ? 'Dhan refused the access token.'
           : outcome === 'skipped'
             ? 'The Data account is not connected.'
-            : null,
+            : (options.runMessage ?? null),
     };
     runs.set(serviceId, [finished, ...(runs.get(serviceId) ?? []).filter((r) => r.id !== run.id)]);
     replace({ ...service, lastRun: finished, status: statusOf({ ...service, status: 'idle', lastRun: finished }) });

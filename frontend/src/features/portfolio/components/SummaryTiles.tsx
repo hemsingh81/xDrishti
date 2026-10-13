@@ -3,18 +3,34 @@ import DonutSmallIcon from '@mui/icons-material/DonutSmallOutlined';
 import PaidIcon from '@mui/icons-material/PaidOutlined';
 import SavingsIcon from '@mui/icons-material/SavingsOutlined';
 import ShowChartIcon from '@mui/icons-material/ShowChartOutlined';
+import TodayIcon from '@mui/icons-material/TodayOutlined';
 import TrendingUpIcon from '@mui/icons-material/TrendingUpOutlined';
 import { Alert, Box, Button } from '@mui/material';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { HoldingsSummary } from '@/shared/api';
-import { formatDate, formatInr, formatNumber } from '@/shared/lib/format';
+import { formatDate, formatInr, formatIstDayMonth, formatNumber } from '@/shared/lib/format';
+import { useWallClock } from '@/shared/lib/useWallClock';
 import { LoadingState, StatTile } from '@/shared/ui';
 import { problemText } from '../lib/errors';
-import { xirrOf } from '../lib/figures';
-import { Pnl, PnlPercent, Xirr } from './Figures';
+import { noDayChangeReason, xirrOf } from '../lib/figures';
+import { isEarlierDay } from '../lib/prices';
+import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
+
+/** "1.2% · as of 10 Oct" style hint: the percentage, and the date of the session when the prices are from an earlier day. */
+function DayChangeHint({ data, now }: { data: HoldingsSummary; now: number }) {
+  if (data.dayChange === null) return <>No previous close yet</>;
+  const newest = data.pricesAsOf.newest;
+  return (
+    <>
+      <PnlPercent value={data.dayChangePct} />
+      {newest !== null && isEarlierDay(newest, now) && ` · as of ${formatIstDayMonth(newest)}`}
+    </>
+  );
+}
 
 function Tiles({ data }: { data: HoldingsSummary }) {
   const { returns } = data;
+  const now = useWallClock(60_000);
   const xirr = xirrOf(returns);
   const unmapped = data.unmappedCount > 0 ? ` · ${formatNumber(data.unmappedCount)} not in master list` : '';
   return (
@@ -28,6 +44,13 @@ function Tiles({ data }: { data: HoldingsSummary }) {
         hint={`as of ${formatDate(data.valuationDate)}`}
         icon={AccountBalanceWalletIcon}
         hue="sky"
+      />
+      <StatTile
+        label="Day change"
+        value={<DayChangeAmount value={data.dayChange} reason={noDayChangeReason} focusable />}
+        hint={<DayChangeHint data={data} now={now} />}
+        icon={TodayIcon}
+        hue="today"
       />
       <StatTile
         label="Unrealised P&L"

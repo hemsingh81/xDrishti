@@ -8,7 +8,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Api.Endpoints;
 
 /// <summary>
-/// The Services screen (ADR 0018, P1-13): what runs by itself and when. The services (end-of-day data run, instrument master refresh) with their schedule in words, retries, timeout, catch-up, parameters, status,
+/// The Services screen (ADR 0018, P1-13): what runs by itself and when. The services (end-of-day data run, instrument master refresh, holdings quotes) with their schedule in words, retries, timeout, catch-up, parameters, status,
 /// latest run, next run and findings, plus the read-only per-account sync; the history of runs; the trading-day timeline; the notices for the bell; and the changes: save a schedule (checked against all services,
 /// optimistic revision), the dry run of a schedule, restore default, pause, resume and run now. Every change is audited. All routes need a session; the changes also need the CSRF token; none needs a step-up (a
 /// schedule is not a credential or a role). Part of the platform module.
@@ -30,7 +30,7 @@ internal sealed class ServicesEndpoints : IEndpointModule
 
         group.MapGet("/notices", GetNoticesAsync)
             .WithName("GetServiceNotices")
-            .WithSummary("What the owner should know about the services for the notification bell: service_failed for the latest run of each service with notify on failure when it failed and no retry follows; the next run of the service clears it");
+            .WithSummary("What the owner should know about the services for the notification bell: service_failed for the latest run of each service with notify on failure when it failed and no retry follows (id service:failed:{serviceId}:{yyyy-MM-dd}: one notice per service per India day, text and time of the latest failure); the next run of the service clears it");
 
         group.MapGet("/{id}", GetAsync)
             .WithName("GetService")
