@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { appliedCss } from '@/test/css';
+import { stubPhoneWidth } from '@/test/matchMedia';
 import { problemResponse } from '@/test/server';
 import { createServicesFake } from '@/test/servicesFake';
 import {
@@ -13,37 +14,55 @@ import {
   serviceIds,
   serviceRunId,
 } from '@/test/servicesFixtures';
-import { renderServices, serviceRow, servicesGrid, stubPhone } from './testing';
+import { chooseAction, passMinutes, renderServices, serviceCard, servicesList, setNow } from './testing';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-describe('Services: the table', () => {
-  it('has the title row and one row per service with the columns of the prototype', async () => {
+describe('Services: the cards', () => {
+  it('has the title row and one card per service, each headed by its name', async () => {
     renderServices();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Services' })).toBeInTheDocument();
-    const grid = await servicesGrid();
-    const headers = within(grid)
-      .getAllByRole('columnheader')
-      .map((h) => h.textContent);
-    expect(headers).toEqual(['Service', 'Schedule', 'Runs as', 'Status', 'Last run', 'Next run (IST)', 'Actions']);
-    expect(within(grid).getAllByRole('row')).toHaveLength(4);
+    const list = await servicesList();
+    expect(within(list).getAllByRole('listitem', { name: /./ })).toHaveLength(3);
+    for (const name of ['End-of-day data run', 'Instrument master refresh', 'Account & portfolio sync']) {
+      const card = within(list).getByRole('listitem', { name });
+      expect(within(card).getByRole('heading', { level: 3, name })).toBeInTheDocument();
+    }
   });
 
-  it('shows the name and what it does, the schedule in words with retries, timeout and catch-up, and who it runs as', async () => {
+  it('shows the name and what it does, the schedule in words with retries, timeout and catch-up as chips, and who it runs as', async () => {
     renderServices();
 
-    const row = await serviceRow('End-of-day data run');
+    const card = await serviceCard('End-of-day data run');
     expect(
-      within(row).getByText('Loads the day from Dhan, builds every timeframe and checks the data.'),
+      within(card).getByText('Loads the day from Dhan, builds every timeframe and checks the data.'),
     ).toBeInTheDocument();
-    expect(within(row).getByText('Every trading day at 15:50 IST')).toBeInTheDocument();
-    expect(within(row).getByText('retries 2 · timeout 60 min · catch-up')).toBeInTheDocument();
-    expect(within(row).getByText('service identity')).toBeInTheDocument();
-    const master = await serviceRow('Instrument master refresh');
-    expect(within(master).getByText('retries 1 · timeout 30 min · catch-up')).toBeInTheDocument();
+    expect(within(card).getByText('Every trading day at 15:50 IST')).toBeInTheDocument();
+    expect(within(card).getByText('2 retries')).toBeInTheDocument();
+    expect(within(card).getByText('60 min timeout')).toBeInTheDocument();
+    expect(within(card).getByText('Catches up')).toBeInTheDocument();
+    expect(within(card).getByText('service identity')).toBeInTheDocument();
+    const master = await serviceCard('Instrument master refresh');
+    expect(within(master).getByText('1 retry')).toBeInTheDocument();
+    expect(within(master).getByText('30 min timeout')).toBeInTheDocument();
+  });
+
+  it('leaves the Catch-up chip out when the service does not catch up', async () => {
+    renderServices({
+      fake: createServicesFake({
+        services: [
+          buildServiceView({ execution: { retries: 0, timeoutMinutes: 5, catchUp: false, notifyOnFailure: false } }),
+        ],
+      }),
+    });
+
+    const card = await serviceCard('End-of-day data run');
+    expect(within(card).getByText('0 retries')).toBeInTheDocument();
+    expect(within(card).queryByText('Catches up')).not.toBeInTheDocument();
   });
 
   it('says the status in a word with an icon, not by colour alone', async () => {
@@ -62,15 +81,26 @@ describe('Services: the table', () => {
       }),
     });
 
-    const healthy = await serviceRow('End-of-day data run');
+    const healthy = await serviceCard('End-of-day data run');
     expect(within(healthy).getByText('Healthy')).toBeInTheDocument();
     expect(within(healthy).getByTestId('CheckCircleOutlinedIcon')).toBeInTheDocument();
-    const paused = await serviceRow('Instrument master refresh');
+    const paused = await serviceCard('Instrument master refresh');
     expect(within(paused).getByText('Paused')).toBeInTheDocument();
     expect(within(paused).getByTestId('PauseCircleOutlineOutlinedIcon')).toBeInTheDocument();
-    const failed = await serviceRow('Price alerts');
+    const failed = await serviceCard('Price alerts');
     expect(within(failed).getByText('Failed')).toBeInTheDocument();
-    expect(within(failed).getByTestId('ErrorOutlineOutlinedIcon')).toBeInTheDocument();
+    expect(within(failed).getAllByTestId('ErrorOutlineOutlinedIcon').length).toBeGreaterThan(0);
+  });
+
+  it('draws a paused card with a dashed border and the others solid', async () => {
+    renderServices({
+      fake: createServicesFake({
+        services: [buildServiceView(), buildMasterService({ enabled: false, status: 'paused', nextRun: null })],
+      }),
+    });
+
+    expect(getComputedStyle(await serviceCard('Instrument master refresh')).borderStyle).toBe('dashed');
+    expect(getComputedStyle(await serviceCard('End-of-day data run')).borderStyle).toBe('solid');
   });
 
   it('shows the last run in India time with its trigger chip, and why a failed run failed', async () => {
@@ -86,11 +116,11 @@ describe('Services: the table', () => {
       }),
     });
 
-    const failed = await serviceRow('End-of-day data run');
+    const failed = await serviceCard('End-of-day data run');
     expect(within(failed).getByText('Mon 12 Oct 15:51')).toHaveAttribute('datetime', '2026-10-12T15:51:00+05:30');
     expect(within(failed).getByText('Catch-up')).toBeInTheDocument();
     expect(within(failed).getByText('Failed: Dhan refused the access token.')).toBeInTheDocument();
-    const fine = await serviceRow('Instrument master refresh');
+    const fine = await serviceCard('Instrument master refresh');
     expect(within(fine).getByText('Mon 12 Oct 18:31')).toBeInTheDocument();
     expect(within(fine).getByText('Scheduled')).toBeInTheDocument();
   });
@@ -110,12 +140,37 @@ describe('Services: the table', () => {
       }),
     });
 
-    const eod = await serviceRow('End-of-day data run');
+    const eod = await serviceCard('End-of-day data run');
     expect(within(eod).getByText('Tue 13 Oct 15:50')).toHaveAttribute('datetime', '2026-10-13T15:50:00+05:30');
+    expect(within(eod).getByText('Next run (IST)')).toBeInTheDocument();
+    expect(within(eod).getByText('Last run (IST)')).toBeInTheDocument();
     expect(
-      within(await serviceRow('Instrument master refresh')).getByText('After End-of-day data run'),
+      within(await serviceCard('Instrument master refresh')).getByText('After End-of-day data run'),
     ).toBeInTheDocument();
-    expect(within(await serviceRow('Quiet service')).getByText('Not scheduled')).toBeInTheDocument();
+    expect(within(await serviceCard('Quiet service')).getByText('Not scheduled')).toBeInTheDocument();
+  });
+
+  it('says how long until the next run, and counts down as the minutes pass', async () => {
+    // 14:05 in India.
+    setNow('2026-10-13T08:35:00Z');
+    renderServices();
+
+    const card = await serviceCard('End-of-day data run');
+    expect(within(card).getByText('in 1 h 45 min')).toBeInTheDocument();
+    expect(within(await serviceCard('Instrument master refresh')).getByText('in 4 h 25 min')).toBeInTheDocument();
+
+    passMinutes(1);
+
+    expect(await within(card).findByText('in 1 h 44 min')).toBeInTheDocument();
+  });
+
+  it('says "due now" for a start that has come and not yet been read again', async () => {
+    setNow('2026-10-13T10:21:00Z');
+    renderServices({
+      fake: createServicesFake({ services: [buildServiceView({ nextRun: '2026-10-13T15:50:00+05:30' })] }),
+    });
+
+    expect(within(await serviceCard('End-of-day data run')).getByText('due now')).toBeInTheDocument();
   });
 
   it('shows a service that never ran', async () => {
@@ -123,7 +178,7 @@ describe('Services: the table', () => {
       fake: createServicesFake({ services: [buildServiceView({ lastRun: null, status: 'healthy' })] }),
     });
 
-    expect(within(await serviceRow('End-of-day data run')).getByText('Never run')).toBeInTheDocument();
+    expect(within(await serviceCard('End-of-day data run')).getByText('Never run')).toBeInTheDocument();
   });
 
   it('shows the findings of the checks under the schedule of the service they are about', async () => {
@@ -147,32 +202,39 @@ describe('Services: the table', () => {
       }),
     });
 
-    const row = await serviceRow('End-of-day data run');
-    const list = within(row).getByRole('list', { name: 'Schedule checks' });
+    const card = await serviceCard('End-of-day data run');
+    const list = within(card).getByRole('list', { name: 'Schedule checks' });
     expect(within(list).getByText('The end-of-day fetch before 15:35 may miss bars.')).toBeInTheDocument();
     expect(within(list).getByText('Warning:')).toBeInTheDocument();
     expect(
-      within(await serviceRow('Instrument master refresh')).queryByRole('list', { name: 'Schedule checks' }),
+      within(await serviceCard('Instrument master refresh')).queryByRole('list', { name: 'Schedule checks' }),
     ).toBeNull();
   });
 
-  it('puts the table in a card that takes the rest of the height, from md', async () => {
+  it('lays the cards out in as many columns as fit, and gives the grid the rest of the height from md', async () => {
     renderServices();
 
-    const card = await screen.findByRole('region', { name: 'Services' });
-    expect(appliedCss(card).base).toContain('flex: 1 1 auto');
+    const list = await servicesList();
+    expect(appliedCss(list).base).toContain('grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr))');
+    const area = list.parentElement!;
+    expect(appliedCss(area).base).toContain('flex: 1 1 auto');
+    expect(
+      appliedCss(area).responsive.some((r) => r.query.includes('min-width') && r.css.includes('overflow-y: auto')),
+    ).toBe(true);
   });
 });
 
 describe('Services: an entry that is set elsewhere', () => {
-  it('has a link instead of the actions', async () => {
+  it('has Settings and a menu instead of Run now, Configure, Pause and History', async () => {
     const { router } = renderServices();
 
-    const row = await serviceRow('Account & portfolio sync');
-    expect(within(row).queryByRole('button')).toBeNull();
-    const link = within(row).getByRole('link', { name: 'Manage in Accounts: Account & portfolio sync' });
-    expect(link).toHaveAttribute('href', '/accounts');
-    await userEvent.click(link);
+    const card = await serviceCard('Account & portfolio sync');
+    expect(within(card).getByRole('button', { name: 'Settings: Account & portfolio sync' })).toBeInTheDocument();
+    expect(within(card).queryByRole('button', { name: /^Run now/ })).not.toBeInTheDocument();
+    // Retries and timeout are not its own, so no chips.
+    expect(within(card).queryByText(/retries|timeout/)).not.toBeInTheDocument();
+
+    await chooseAction('Account & portfolio sync', 'Manage in Accounts');
     expect(await screen.findByText('Accounts screen')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/accounts');
   });
@@ -188,9 +250,9 @@ describe('Services: an entry that is set elsewhere', () => {
       }),
     });
 
-    const row = await serviceRow('Account & portfolio sync');
-    expect(within(row).getByText('Tue 13 Oct 16:00')).toBeInTheDocument();
-    expect(within(row).getByText('Mon 12 Oct 15:58')).toBeInTheDocument();
+    const card = await serviceCard('Account & portfolio sync');
+    expect(within(card).getByText('Tue 13 Oct 16:00')).toBeInTheDocument();
+    expect(within(card).getByText('Mon 12 Oct 15:58')).toBeInTheDocument();
   });
 });
 
@@ -199,7 +261,8 @@ describe('Services: loading, errors and nothing to show', () => {
     renderServices({ handlers: [http.get('/api/services', () => new Promise<never>(() => undefined))] });
 
     expect(await screen.findByRole('progressbar', { name: 'Loading services' })).toBeInTheDocument();
-    expect(screen.queryByRole('grid', { name: 'Services' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Services' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Services summary' })).not.toBeInTheDocument();
   });
 
   it('says the list could not be read, with Retry that loads it', async () => {
@@ -211,7 +274,7 @@ describe('Services: loading, errors and nothing to show', () => {
     fake.failures.list = false;
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
-    expect(await screen.findByRole('grid', { name: 'Services' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Services' })).toBeInTheDocument();
     expect(screen.queryByText('The services are not available.')).not.toBeInTheDocument();
   });
 
@@ -219,7 +282,7 @@ describe('Services: loading, errors and nothing to show', () => {
     renderServices({ fake: createServicesFake({ services: [] }) });
 
     expect(await screen.findByText('No services')).toBeInTheDocument();
-    expect(screen.queryByRole('grid', { name: 'Services' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Services' })).not.toBeInTheDocument();
   });
 
   it('explains a failure to reach the server', async () => {
@@ -240,31 +303,25 @@ describe('Services: loading, errors and nothing to show', () => {
 });
 
 describe('Services: on a phone', () => {
-  it('shows each service as a card with its facts and actions instead of a table', async () => {
-    stubPhone();
+  it('shows the same cards, with their facts, Run now and the menu', async () => {
+    stubPhoneWidth();
     renderServices();
 
     const list = await screen.findByRole('list', { name: 'Services' });
-    expect(screen.queryByRole('grid', { name: 'Services' })).not.toBeInTheDocument();
-    const cards = within(list).getAllByRole('listitem');
-    expect(cards).toHaveLength(3);
     const card = within(list).getByRole('listitem', { name: 'End-of-day data run' });
     expect(within(card).getByText('Healthy')).toBeInTheDocument();
     expect(within(card).getByText('Every trading day at 15:50 IST')).toBeInTheDocument();
     expect(within(card).getByText('Tue 13 Oct 15:50')).toBeInTheDocument();
     expect(within(card).getByText('Scheduled')).toBeInTheDocument();
-    for (const name of ['Run now', 'Configure', 'Pause', 'History']) {
-      expect(within(card).getByRole('button', { name: `${name}: End-of-day data run` })).toBeInTheDocument();
-    }
-    const sync = within(list).getByRole('listitem', { name: 'Account & portfolio sync' });
-    expect(within(sync).getByRole('link', { name: /Manage in Accounts/ })).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Run now: End-of-day data run' })).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Actions for End-of-day data run' })).toBeInTheDocument();
   });
 
-  it('opens Configure from a card', async () => {
-    stubPhone();
+  it('opens Configure from the menu of a card', async () => {
+    stubPhoneWidth();
     renderServices();
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Configure: End-of-day data run' }));
+    await chooseAction('End-of-day data run', 'Configure');
 
     expect(await screen.findByRole('dialog', { name: 'Configure — End-of-day data run' })).toBeInTheDocument();
     await waitFor(() => {

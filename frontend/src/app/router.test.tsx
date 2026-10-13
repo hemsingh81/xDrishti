@@ -67,7 +67,7 @@ describe('app routes', () => {
     renderRoutes(routes, { initialPath: '/services' });
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Services' })).toBeInTheDocument();
-    expect(await screen.findByRole('grid', { name: 'Services' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Services' })).toBeInTheDocument();
     expect(await screen.findByRole('region', { name: 'Trading-day timeline' })).toBeInTheDocument();
     expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
     const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!;

@@ -17,13 +17,13 @@ export function ChecksBanner({ services }: { services: readonly ServiceView[] })
 
   if (issues.length === 0) {
     return (
-      <Alert severity="success" role="status" sx={{ mb: 1.5, flexShrink: 0 }}>
+      <Alert severity="success" role="status" sx={{ mb: 1.5, flexShrink: 0, py: 0, alignItems: 'center' }}>
         Schedule checks passed — dependencies and timing are consistent.
       </Alert>
     );
   }
   return (
-    <Alert severity={errors > 0 ? 'error' : 'warning'} sx={{ mb: 1.5, flexShrink: 0 }}>
+    <Alert severity={errors > 0 ? 'error' : 'warning'} sx={{ mb: 1.5, flexShrink: 0, py: 0.5 }}>
       <AlertTitle sx={{ mb: 0.5 }}>
         Schedule checks:{' '}
         {[errors > 0 && plural(errors, 'error', 'errors'), warnings > 0 && plural(warnings, 'warning', 'warnings')]

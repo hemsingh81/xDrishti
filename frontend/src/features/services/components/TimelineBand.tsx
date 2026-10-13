@@ -2,9 +2,13 @@ import { ButtonBase, Tooltip } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { percentOf, type TimelineBandItem } from '../lib/timeline';
 
-export const bandLaneHeight = 20;
+export const bandLaneHeight = 28;
+const pillHeight = 22;
 
-/** A part of the day a service is up (a window; an interval is dashed). A button only so that the keyboard reaches it. */
+/**
+ * A part of the day a service is up, as a pill under the track (a window is solid, an interval dashed). A button only
+ * so that the keyboard reaches it: its name (and the tooltip) says how long it is up.
+ */
 export function TimelineBand({ band }: { band: TimelineBandItem }) {
   const left = percentOf(band.from);
   const width = percentOf(band.to) - left;
@@ -17,19 +21,21 @@ export function TimelineBand({ band }: { band: TimelineBandItem }) {
           top: band.lane * bandLaneHeight,
           left: `${left.toFixed(2)}%`,
           width: `${width.toFixed(2)}%`,
-          height: bandLaneHeight - 4,
+          height: pillHeight,
           justifyContent: 'flex-start',
-          px: 0.75,
+          px: 1,
           overflow: 'hidden',
           whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
           border: 1,
           borderStyle: band.dashed ? 'dashed' : 'solid',
           borderColor: 'primary.main',
-          borderRadius: 0.75,
-          bgcolor: alpha(theme.palette.primary.main, 0.1),
+          borderRadius: '999px',
+          bgcolor: alpha(theme.palette.primary.main, 0.12),
           color: 'primary.main',
           fontSize: theme.typography.caption.fontSize,
-          fontWeight: 600,
+          fontWeight: 650,
+          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
         })}
       >
         <span aria-hidden>{band.label}</span>

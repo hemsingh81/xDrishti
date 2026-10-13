@@ -11,7 +11,7 @@ import {
 } from '@/test/servicesFixtures';
 import { actionErrorText, issuesOf, problemText, saveErrorText } from './errors';
 import { errorsByField, fieldName, listedIssues, mergeIssues, namedIssues, shownFields } from './issues';
-import { executionText } from './labels';
+import { executionFacts } from './labels';
 import { nextRunText } from './nextRun';
 import { earliestNextRun, outcomeOf } from './outcome';
 import { formErrors, formOfService, inputOfForm } from './scheduleForm';
@@ -288,13 +288,16 @@ describe('issues', () => {
 });
 
 describe('words', () => {
-  it('says retries, timeout and catch-up', () => {
-    expect(executionText({ retries: 2, timeoutMinutes: 60, catchUp: true, notifyOnFailure: true })).toBe(
-      'retries 2 · timeout 60 min · catch-up',
-    );
-    expect(executionText({ retries: 0, timeoutMinutes: 5, catchUp: false, notifyOnFailure: false })).toBe(
-      'retries 0 · timeout 5 min',
-    );
+  it('says retries, timeout and catch-up as chips', () => {
+    expect(executionFacts({ retries: 2, timeoutMinutes: 60, catchUp: true, notifyOnFailure: true })).toEqual([
+      '2 retries',
+      '60 min timeout',
+      'Catches up',
+    ]);
+    expect(executionFacts({ retries: 1, timeoutMinutes: 5, catchUp: false, notifyOnFailure: false })).toEqual([
+      '1 retry',
+      '5 min timeout',
+    ]);
   });
 
   it('says the next run, or why there is none', () => {

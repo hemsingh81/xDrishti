@@ -70,9 +70,12 @@ const statusLabels: Readonly<Record<string, string>> = {
 
 export const serviceStatusLabel = (status: string): string => statusLabels[status] ?? status;
 
-/** "retries 2 · timeout 60 min · catch-up" under the schedule in words. */
-export function executionText(execution: ServiceView['execution']): string {
-  const parts = [`retries ${String(execution.retries)}`, `timeout ${String(execution.timeoutMinutes)} min`];
-  if (execution.catchUp) parts.push('catch-up');
-  return parts.join(' · ');
+/** The chips under the schedule: "2 retries", "60 min timeout" and, when it is on, "Catch-up". */
+export function executionFacts(execution: ServiceView['execution']): string[] {
+  const facts = [
+    `${String(execution.retries)} ${execution.retries === 1 ? 'retry' : 'retries'}`,
+    `${String(execution.timeoutMinutes)} min timeout`,
+  ];
+  if (execution.catchUp) facts.push('Catches up');
+  return facts;
 }

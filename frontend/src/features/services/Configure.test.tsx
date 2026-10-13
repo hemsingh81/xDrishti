@@ -4,7 +4,7 @@ import { http } from 'msw';
 import { problemResponse } from '@/test/server';
 import { createServicesFake } from '@/test/servicesFake';
 import { buildMasterService, buildServiceView, serviceIds } from '@/test/servicesFixtures';
-import { openConfigure, renderServices, serviceRow } from './testing';
+import { openConfigure, renderServices, serviceCard } from './testing';
 
 const preview = () => screen.getByRole('region', { name: 'Preview' });
 const save = () => screen.getByRole('button', { name: 'Save schedule' });
@@ -147,9 +147,11 @@ describe('Configure: saving', () => {
         revision: 3,
       },
     });
-    const row = await serviceRow('End-of-day data run');
+    const row = await serviceCard('End-of-day data run');
     expect(await within(row).findByText('Every trading day at 16:05 IST')).toBeInTheDocument();
-    expect(within(row).getByText('retries 3 · timeout 45 min')).toBeInTheDocument();
+    expect(within(row).getByText('3 retries')).toBeInTheDocument();
+    expect(within(row).getByText('45 min timeout')).toBeInTheDocument();
+    expect(within(row).queryByText('Catches up')).not.toBeInTheDocument();
   });
 
   it('saves a paused service: enabled off', async () => {
@@ -163,7 +165,7 @@ describe('Configure: saving', () => {
       expect(fake.calls.saves).toHaveLength(1);
     });
     expect(fake.calls.saves[0]!.body.enabled).toBe(false);
-    expect(within(await serviceRow('End-of-day data run')).getByText('Paused')).toBeInTheDocument();
+    expect(within(await serviceCard('End-of-day data run')).getByText('Paused')).toBeInTheDocument();
   });
 
   it('keeps the warnings on the list after saving: the banner names them', async () => {
@@ -175,7 +177,7 @@ describe('Configure: saving', () => {
     await userEvent.click(save());
 
     expect(await screen.findByText('Schedule checks: 1 warning')).toBeInTheDocument();
-    const row = await serviceRow('End-of-day data run');
+    const row = await serviceCard('End-of-day data run');
     expect(within(row).getByRole('list', { name: 'Schedule checks' })).toHaveTextContent('before 15:35');
   });
 

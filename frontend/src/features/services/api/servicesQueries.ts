@@ -17,10 +17,13 @@ export const servicesQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/services', { signal })),
 });
 
-/** The trading-day timeline of a date (YYYY-MM-DD); left out, the server's today. */
-export const timelineQuery = (date?: string) =>
+/**
+ * The trading-day timeline of a date (YYYY-MM-DD); left out, the server's today. `istDay` is the calendar day in India
+ * now: it is part of the key of "today", so a page left open past midnight reads the new day's timeline.
+ */
+export const timelineQuery = (date?: string, istDay?: string) =>
   queryOptions({
-    queryKey: [...servicesKeys.timeline, date ?? 'today'] as const,
+    queryKey: [...servicesKeys.timeline, date ?? 'today', istDay ?? ''] as const,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/services/timeline', { params: { query: date ? { date } : {} }, signal })),
   });

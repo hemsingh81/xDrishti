@@ -10,7 +10,7 @@ import {
   buildTimelineEntry,
   serviceIds,
 } from '@/test/servicesFixtures';
-import { renderServices } from './testing';
+import { passMinutes, renderServices, setNow } from './testing';
 
 const card = () => screen.findByRole('region', { name: 'Trading-day timeline' });
 
@@ -159,8 +159,8 @@ describe('Services: the trading-day timeline', () => {
 
     const timeline = await card();
     expect(await within(timeline).findByText('The services are not available.')).toBeInTheDocument();
-    // The services table is still there.
-    expect(await screen.findByRole('grid', { name: 'Services' })).toBeInTheDocument();
+    // The service cards are still there.
+    expect(await screen.findByRole('list', { name: 'Services' })).toBeInTheDocument();
     fake.failures.timeline = false;
     await userEvent.click(within(timeline).getByRole('button', { name: 'Retry' }));
     expect(
@@ -172,7 +172,7 @@ describe('Services: the trading-day timeline', () => {
     renderServices({ handlers: [http.get('/api/services/timeline', () => new Promise<never>(() => undefined))] });
 
     expect(await within(await card()).findByRole('progressbar', { name: 'Loading the timeline' })).toBeInTheDocument();
-    expect(await screen.findByRole('grid', { name: 'Services' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Services' })).toBeInTheDocument();
   });
 
   it('shows nothing but the track when no service is enabled', async () => {
@@ -184,5 +184,120 @@ describe('Services: the trading-day timeline', () => {
     const timeline = await card();
     await within(timeline).findByText(/market 09:15–15:30/);
     expect(within(timeline).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('draws the market session and the review cutoff on the track, with their times', async () => {
+    renderServices();
+
+    const timeline = await card();
+    expect(await within(timeline).findByText('Market 09:15–15:30')).toBeInTheDocument();
+    expect(within(timeline).getByText('Review cutoff 16:30')).toBeInTheDocument();
+    // The hours under the track.
+    for (const hour of ['00', '03', '06', '09', '12', '15', '18', '21', '24']) {
+      expect(within(timeline).getAllByText(hour).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('draws no market band on a day without a session', async () => {
+    renderServices({
+      fake: createServicesFake({
+        timeline: buildTimeline({ date: '2026-10-17', tradingDay: false, marketOpen: null, marketClose: null }),
+      }),
+    });
+
+    const timeline = await card();
+    await within(timeline).findByText('Review cutoff 16:30');
+    expect(within(timeline).queryByText(/^Market /)).not.toBeInTheDocument();
+  });
+});
+
+describe('Services: the "now" marker of the timeline', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  it('shows the time in India on the track for today, and moves it on as the minutes pass', async () => {
+    // 14:05 in India.
+    setNow('2026-10-13T08:35:00Z');
+    renderServices();
+
+    const timeline = await card();
+    expect(await within(timeline).findByText('Now 14:05 IST')).toBeInTheDocument();
+
+    passMinutes(1);
+
+    expect(await within(timeline).findByText('Now 14:06 IST')).toBeInTheDocument();
+    expect(within(timeline).queryByText('Now 14:05 IST')).not.toBeInTheDocument();
+  });
+
+  it('is India time whatever the zone of the browser', async () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    setNow('2026-10-13T08:35:00Z');
+    expect(new Date(Date.now()).getHours()).toBe(1);
+    renderServices();
+
+    expect(await within(await card()).findByText('Now 14:05 IST')).toBeInTheDocument();
+  });
+
+  it('is left out when the timeline is of another day', async () => {
+    // 14 Oct in India, while the timeline is of 13 Oct.
+    setNow('2026-10-14T08:35:00Z');
+    renderServices();
+
+    const timeline = await card();
+    await within(timeline).findByText('Market 09:15–15:30');
+    expect(within(timeline).queryByText(/^Now /)).not.toBeInTheDocument();
+  });
+
+  it('keeps the starts reachable as buttons next to it', async () => {
+    setNow('2026-10-13T08:35:00Z');
+    renderServices();
+
+    const timeline = await card();
+    await within(timeline).findByText('Now 14:05 IST');
+    expect(within(timeline).getByRole('button', { name: 'End-of-day data run starts at 15:50' })).toBeInTheDocument();
+  });
+
+  it('reads the timeline again when the day changes in India, for a page left open past midnight', async () => {
+    // 23:59 on 13 Oct in India.
+    setNow('2026-10-13T18:29:00Z');
+    let reads = 0;
+    renderServices({
+      handlers: [
+        http.get('/api/services/timeline', () => {
+          reads += 1;
+          return HttpResponse.json(reads === 1 ? buildTimeline() : buildTimeline({ date: '2026-10-14', entries: [] }));
+        }),
+      ],
+    });
+    const timeline = await card();
+    expect(await within(timeline).findByText(/^Tue 13 Oct 2026 · market/)).toBeInTheDocument();
+    expect(within(timeline).getByText('Now 23:59 IST')).toBeInTheDocument();
+
+    passMinutes(2);
+
+    expect(await within(timeline).findByText(/^Wed 14 Oct 2026 · market/)).toBeInTheDocument();
+    expect(reads).toBe(2);
+    expect(await within(timeline).findByText('Now 00:01 IST')).toBeInTheDocument();
+  });
+
+  it('does not read it again while the day stays the same', async () => {
+    setNow('2026-10-13T08:35:00Z');
+    let reads = 0;
+    renderServices({
+      handlers: [
+        http.get('/api/services/timeline', () => {
+          reads += 1;
+          return HttpResponse.json(buildTimeline());
+        }),
+      ],
+    });
+    await within(await card()).findByText('Now 14:05 IST');
+
+    passMinutes(30);
+
+    expect(await within(await card()).findByText('Now 14:35 IST')).toBeInTheDocument();
+    expect(reads).toBe(1);
   });
 });

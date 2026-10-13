@@ -17,3 +17,8 @@ export { RoleMatrixView } from './components/RoleMatrixView';
 export const HeaderAccounts = lazy(async () => ({
   default: (await import('./components/HeaderAccounts')).HeaderAccounts,
 }));
+
+/** The automatic refresh of the accounts with the Portfolio role, as a dialog. Loaded on demand; render inside <Suspense>. */
+export const PortfolioRefreshDialog = lazy(async () => ({
+  default: (await import('./components/PortfolioRefreshDialog')).PortfolioRefreshDialog,
+}));

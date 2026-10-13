@@ -15,8 +15,10 @@ export const percentOf = (time: string): number => (minutesOf(time) / minutesPer
 export interface TimelineMarkItem {
   key: string;
   serviceId: string;
-  /** What is printed next to the dot. */
+  /** What is printed in the pill: "15:50 End-of-day data run", with "↳ " in front when it follows another service. */
   label: string;
+  /** The service's name (the label without the time). */
+  name: string;
   time: string;
   /** Starts when another service ends. */
   after: boolean;
@@ -45,8 +47,10 @@ export interface TimelineLayout {
   markLanes: number;
 }
 
-/** How many minutes of the day a label of this text covers on a track of about 900 px (7 px a character). */
-const labelMinutes = (text: string): number => Math.ceil(((text.length + 7) * 7 * minutesPerDay) / 900);
+/** The width the track is laid out for (px): below it the track scrolls. Labels are measured against it. */
+export const trackWidth = 900;
+/** How many minutes of the day a pill with this text covers on that track (6.5 px a character, plus padding, dot and gap). */
+const labelMinutes = (text: string): number => Math.ceil(((text.length * 6.5 + 44) * minutesPerDay) / trackWidth);
 const maxMarkLanes = 4;
 const flipFrom = 0.72 * minutesPerDay;
 
@@ -93,6 +97,7 @@ export function layoutTimeline(timeline: ServicesTimeline): TimelineLayout {
       key: `${item.entry.serviceId}-${item.time}-${String(index)}`,
       serviceId: item.entry.serviceId,
       label: item.label,
+      name: item.entry.name,
       time: item.time,
       after: item.after,
       lane,
@@ -127,3 +132,6 @@ export function timelineSummary(timeline: ServicesTimeline): string {
       : 'no market session';
   return `${market} · review cutoff ${timeline.reviewCutoff}`;
 }
+
+/** The hours with a tick on the track (every hour, 00 to 24); every third one is a major tick with its number. */
+export const hourTicks = Array.from({ length: 25 }, (_, hour) => ({ hour, major: hour % 3 === 0 }));

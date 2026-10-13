@@ -1,3 +1,5 @@
+import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined';
+import SkippedIcon from '@mui/icons-material/RemoveCircleOutlineOutlined';
 import { Box, Stack, Typography } from '@mui/material';
 import type { ServiceRun } from '@/shared/api';
 import { formatIstDayAndTime } from '@/shared/lib/format';
@@ -8,17 +10,19 @@ import { TriggerChip } from './TriggerChip';
 export function LastRun({ run }: { run: ServiceRun | null }) {
   if (run === null) {
     return (
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="subtitle1" color="text.secondary" sx={{ fontWeight: 600 }}>
         Never run
       </Typography>
     );
   }
   const at = run.finishedAt ?? run.startedAt;
-  const why = run.status === 'failed' || run.status === 'skipped';
+  const failed = run.status === 'failed';
+  const why = failed || run.status === 'skipped';
+  const Icon = failed ? ErrorIcon : SkippedIcon;
   return (
-    <Box sx={{ whiteSpace: 'normal', minWidth: 0, maxWidth: 260 }}>
+    <Box sx={{ whiteSpace: 'normal', minWidth: 0 }}>
       <Stack direction="row" sx={{ gap: 0.75, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Typography component="time" variant="body2" dateTime={at}>
+        <Typography component="time" variant="subtitle1" dateTime={at} sx={{ fontWeight: 700 }}>
           {formatIstDayAndTime(at)}
         </Typography>
         <TriggerChip run={run} />
@@ -27,10 +31,19 @@ export function LastRun({ run }: { run: ServiceRun | null }) {
         <Typography
           variant="caption"
           component="div"
-          sx={{ color: run.status === 'failed' ? 'error.main' : 'text.secondary', overflowWrap: 'anywhere' }}
+          sx={{
+            display: 'flex',
+            gap: 0.5,
+            alignItems: 'flex-start',
+            color: failed ? 'error.main' : 'text.secondary',
+            overflowWrap: 'anywhere',
+          }}
         >
-          {runStatusLabel(run.status)}
-          {run.message ? `: ${run.message}` : ''}
+          <Icon aria-hidden sx={{ fontSize: 15, mt: '1px', flex: 'none' }} />
+          <span>
+            {runStatusLabel(run.status)}
+            {run.message ? `: ${run.message}` : ''}
+          </span>
         </Typography>
       )}
     </Box>

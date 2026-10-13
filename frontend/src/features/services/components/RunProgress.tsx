@@ -20,7 +20,7 @@ export function RunProgress({ jobId }: { jobId: string }) {
   const title = progress?.title ?? 'Starting';
   const determinate = progress !== null && progress.total > 0;
   return (
-    <Box role="status" sx={{ mt: 0.75, minWidth: 160, maxWidth: 240, whiteSpace: 'normal' }}>
+    <Box role="status" sx={{ minWidth: 160, whiteSpace: 'normal' }}>
       <Typography variant="caption" component="div" sx={{ fontWeight: 600, ...numeric }}>
         {title}
         {determinate ? `: ${formatNumber(progress.done)} of ${formatNumber(progress.total)} ${progress.unit}` : '…'}

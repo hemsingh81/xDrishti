@@ -11,7 +11,7 @@ import {
   serviceIds,
 } from '@/test/servicesFixtures';
 import { smallPage, threePages } from '@/test/smallPages';
-import { renderServices } from './testing';
+import { chooseAction, openActions, renderServices } from './testing';
 
 // Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
 vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
@@ -20,7 +20,7 @@ vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
 
 const shown = (count: number) => `Showing ${String(count)} of ${String(threePages)}`;
 const openHistory = async (name: string) => {
-  await userEvent.click(await screen.findByRole('button', { name: `History: ${name}` }));
+  await chooseAction(name, 'History');
   return screen.findByRole('dialog', { name: 'Run history' });
 };
 
@@ -140,10 +140,11 @@ describe('Services: the History drawer', () => {
     expect(fake.calls.runPages.map((c) => c.id)).toEqual([serviceIds.eod, serviceIds.master]);
   });
 
-  it('has no History button on the entry that is set elsewhere', async () => {
+  it('has no History item in the menu of the entry that is set elsewhere', async () => {
     renderServices();
 
-    await screen.findByRole('grid', { name: 'Services' });
-    expect(screen.queryByRole('button', { name: 'History: Account & portfolio sync' })).not.toBeInTheDocument();
+    const menu = await openActions('Account & portfolio sync');
+
+    expect(within(menu).queryByRole('menuitem', { name: 'History' })).not.toBeInTheDocument();
   });
 });
