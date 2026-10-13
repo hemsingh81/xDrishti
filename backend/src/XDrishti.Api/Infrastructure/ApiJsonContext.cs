@@ -22,6 +22,7 @@ using XDrishti.Application.Market.Tracking;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Groups;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -110,6 +111,10 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ImportCorporateActionsResult))]
 [JsonSerializable(typeof(HoldingPage))]
 [JsonSerializable(typeof(HoldingsSummary))]
+[JsonSerializable(typeof(HoldingGroups))]
+[JsonSerializable(typeof(HoldingGroup))]
+[JsonSerializable(typeof(HoldingGroupTotal))]
+[JsonSerializable(typeof(GroupPart))]
 [JsonSerializable(typeof(PricesAsOf))]
 [JsonSerializable(typeof(HoldingLots))]
 [JsonSerializable(typeof(LotRow))]

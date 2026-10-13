@@ -5,6 +5,7 @@ using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Application.Tests.Accounts.Connections;
+using XDrishti.Application.Tests.Portfolio.Groups;
 using XDrishti.Application.Tests.Portfolio.History;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -45,7 +46,12 @@ internal sealed class PortfolioFixture
 
     public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Clock, NullLogger<SyncHoldingsHandler>.Instance);
 
-    public ListHoldingsHandler List() => new(Data, Clock);
+    /// <summary>The master's sectors and the baskets' members of the holdings' instruments (empty: every holding is unclassified and in no basket).</summary>
+    public FakeHoldingClassifications Classifications { get; } = new();
+
+    public ListHoldingsHandler List() => new(Data, Classifications, Clock);
+
+    public GetHoldingGroupsHandler Groups() => new(Data, Classifications, Clock, NullLogger<GetHoldingGroupsHandler>.Instance);
 
     /// <summary>The benchmark setting and the stored day closes the summary's benchmark XIRR reads (empty: no benchmark index).</summary>
     public FakePortfolioBenchmark Benchmarks { get; } = new();

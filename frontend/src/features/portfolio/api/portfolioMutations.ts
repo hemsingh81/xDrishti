@@ -3,10 +3,11 @@ import { api, unwrap } from '@/shared/api';
 import { problemKind } from '../lib/errors';
 import { portfolioKeys } from './portfolioQueries';
 
-/** The holdings changed: reload the list, the totals, the value history and any open lots. */
+/** The holdings changed: reload the list, the groups (and their opened holdings), the totals, the value history and any open lots. */
 export function invalidateHoldings(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: portfolioKeys.holdings }),
+    queryClient.invalidateQueries({ queryKey: portfolioKeys.groups }),
     queryClient.invalidateQueries({ queryKey: portfolioKeys.summary }),
     queryClient.invalidateQueries({ queryKey: portfolioKeys.history }),
     queryClient.invalidateQueries({ queryKey: portfolioKeys.lots }),

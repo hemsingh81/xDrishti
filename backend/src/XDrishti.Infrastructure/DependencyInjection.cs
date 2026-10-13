@@ -148,6 +148,7 @@ public static class DependencyInjection
         services.AddSingleton<IPortfolioRefreshSettings, PortfolioRefreshSettings>();
         services.AddScoped<IHoldingStore, HoldingStore>();
         services.AddScoped<IHoldingQueries, HoldingQueries>();
+        services.AddScoped<IHoldingClassifications, HoldingClassifications>();
         services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();

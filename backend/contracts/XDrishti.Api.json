@@ -2639,7 +2639,7 @@
         "tags": [
           "Holdings"
         ],
-        "summary": "Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100). Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote)",
+        "summary": "Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote)",
         "operationId": "ListHoldings",
         "parameters": [
           {
@@ -2693,6 +2693,20 @@
             "schema": {
               "type": "integer",
               "format": "int32"
+            }
+          },
+          {
+            "name": "groupBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "groupKey",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2762,6 +2776,90 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/holdings/groups": {
+      "get": {
+        "tags": [
+          "Holdings"
+        ],
+        "summary": "The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0)",
+        "operationId": "GetHoldingGroups",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "by",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stackBy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldingGroups"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
                 }
               }
             }
@@ -8837,6 +8935,27 @@
         },
         "description": "How many instrument-sessions are in each state (the Dhan phase's gap table): `open` (missing bars a refetch may still add), `unfillable` (a refetch added\nnothing), `filled`; `lastDetectedAt` is when a gap was last found (null while there never was one)."
       },
+      "GroupPart": {
+        "required": [
+          "key",
+          "name",
+          "value"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value."
+      },
       "HistoryBenchmark": {
         "required": [
           "state",
@@ -8965,6 +9084,244 @@
           }
         },
         "description": "One day of the portfolio history (rupees; `Nav` and `BenchmarkNav` start at 100). `Value` is what the lots held that day were worth at the day's close (adjusted prices), `Invested` what\nthey cost. `BenchmarkValue` is the same cash flows put into the benchmark index; it and `BenchmarkNav` are null when the benchmark has no history for the series."
+      },
+      "HoldingGroup": {
+        "required": [
+          "key",
+          "name",
+          "holdings",
+          "unpriced",
+          "invested",
+          "value",
+          "pnl",
+          "pnlPct",
+          "realised",
+          "xirr",
+          "xirrState",
+          "dayChange",
+          "dayChangePct",
+          "dayChangeExcluded",
+          "weightPct",
+          "parts"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "holdings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpriced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invested": {
+            "type": "number",
+            "format": "double"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnlPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "realised": {
+            "type": "number",
+            "format": "double"
+          },
+          "xirr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "xirrState": {
+            "type": "string"
+          },
+          "dayChange": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangeExcluded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "weightPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "parts": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/GroupPart"
+            }
+          }
+        },
+        "description": "One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector \"Unclassified\" and the basket \"No basket\". Holdings counts every holding of the group in the scope;\nUnpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`."
+      },
+      "HoldingGroupTotal": {
+        "required": [
+          "holdings",
+          "unpriced",
+          "invested",
+          "value",
+          "pnl",
+          "pnlPct",
+          "realised",
+          "xirr",
+          "xirrState",
+          "dayChange",
+          "dayChangePct",
+          "dayChangeExcluded",
+          "weightPct"
+        ],
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpriced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "invested": {
+            "type": "number",
+            "format": "double"
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnl": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "pnlPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "realised": {
+            "type": "number",
+            "format": "double"
+          },
+          "xirr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "xirrState": {
+            "type": "string"
+          },
+          "dayChange": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangePct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "dayChangeExcluded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "weightPct": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value."
+      },
+      "HoldingGroups": {
+        "required": [
+          "by",
+          "additive",
+          "stackBy",
+          "groups",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "by": {
+            "type": "string"
+          },
+          "additive": {
+            "type": "boolean"
+          },
+          "stackBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HoldingGroup"
+            }
+          },
+          "total": {
+            "$ref": "#/components/schemas/HoldingGroupTotal"
+          }
+        },
+        "description": "The groups of the scope. By is `account`, `bucket`, `sector` or `basket`; Additive is false for baskets (a holding is in every basket that contains it, so the groups overlap). StackBy is the second dimension of the\nparts, when asked for. At most 200 groups are returned."
       },
       "HoldingLots": {
         "required": [

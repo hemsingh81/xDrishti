@@ -701,7 +701,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100). Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote) */
+    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote) */
     get: operations['ListHoldings'];
     put?: never;
     post?: never;
@@ -720,6 +720,23 @@ export interface paths {
     };
     /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync */
     get: operations['GetHoldingsSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/groups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0) */
+    get: operations['GetHoldingGroups'];
     put?: never;
     post?: never;
     delete?: never;
@@ -2679,6 +2696,13 @@ export interface components {
       /** Format: date-time */
       lastDetectedAt: null | string;
     };
+    /** @description The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value. */
+    GroupPart: {
+      key: string;
+      name: string;
+      /** Format: double */
+      value: number;
+    };
     /**
      * @description The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has
      *     no such index). `Tracked`: tracking is on; `HasBars`: 1-minute bars are stored (the day bars follow when the aggregates are built). A screen offers "Track the benchmark" when it is unavailable and not tracked.
@@ -2727,6 +2751,79 @@ export interface components {
       nav: number;
       /** Format: double */
       benchmarkNav: null | number;
+    };
+    /**
+     * @description One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector "Unclassified" and the basket "No basket". Holdings counts every holding of the group in the scope;
+     *     Unpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`.
+     */
+    HoldingGroup: {
+      key: string;
+      name: string;
+      /** Format: int32 */
+      holdings: number;
+      /** Format: int32 */
+      unpriced: number;
+      /** Format: double */
+      invested: number;
+      /** Format: double */
+      value: null | number;
+      /** Format: double */
+      pnl: null | number;
+      /** Format: double */
+      pnlPct: null | number;
+      /** Format: double */
+      realised: number;
+      /** Format: double */
+      xirr: null | number;
+      xirrState: string;
+      /** Format: double */
+      dayChange: null | number;
+      /** Format: double */
+      dayChangePct: null | number;
+      /** Format: int32 */
+      dayChangeExcluded: number;
+      /** Format: double */
+      weightPct: null | number;
+      parts: null | components['schemas']['GroupPart'][];
+    };
+    /** @description The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value. */
+    HoldingGroupTotal: {
+      /** Format: int32 */
+      holdings: number;
+      /** Format: int32 */
+      unpriced: number;
+      /** Format: double */
+      invested: number;
+      /** Format: double */
+      value: null | number;
+      /** Format: double */
+      pnl: null | number;
+      /** Format: double */
+      pnlPct: null | number;
+      /** Format: double */
+      realised: number;
+      /** Format: double */
+      xirr: null | number;
+      xirrState: string;
+      /** Format: double */
+      dayChange: null | number;
+      /** Format: double */
+      dayChangePct: null | number;
+      /** Format: int32 */
+      dayChangeExcluded: number;
+      /** Format: double */
+      weightPct: null | number;
+    };
+    /**
+     * @description The groups of the scope. By is `account`, `bucket`, `sector` or `basket`; Additive is false for baskets (a holding is in every basket that contains it, so the groups overlap). StackBy is the second dimension of the
+     *     parts, when asked for. At most 200 groups are returned.
+     */
+    HoldingGroups: {
+      by: string;
+      additive: boolean;
+      stackBy: null | string;
+      groups: components['schemas']['HoldingGroup'][];
+      total: components['schemas']['HoldingGroupTotal'];
     };
     /** @description The lots of a holding, open lots first (oldest first), then closed ones. */
     HoldingLots: {
@@ -6278,6 +6375,8 @@ export interface operations {
         sort?: string;
         page?: number;
         pageSize?: number;
+        groupBy?: string;
+        groupKey?: string;
       };
       header?: never;
       path?: never;
@@ -6333,6 +6432,43 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetHoldingGroups: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+        status?: string;
+        q?: string;
+        by?: string;
+        sort?: string;
+        stackBy?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HoldingGroups'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
         };
       };
     };

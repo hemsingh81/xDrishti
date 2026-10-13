@@ -5,6 +5,7 @@ import { appliedCss } from '@/test/css';
 import { buildQualityRun, qualityRunId, sampleQualityRows } from '@/test/qualityFixtures';
 import { createQualityFake } from '@/test/qualityFake';
 import { renderQuality } from './testing';
+import { pendingResponse } from '@/test/gate';
 
 const ready = () => screen.findByRole('region', { name: 'Quality summary' });
 const gateChip = () => screen.findByRole('button', { name: /^Gate: / });
@@ -371,7 +372,7 @@ describe('Data quality: run history', () => {
   });
 
   it('shows a loading indicator while the runs load', async () => {
-    renderQuality({ handlers: [http.get('/api/data/quality/runs', () => new Promise(() => undefined))] });
+    renderQuality({ handlers: [http.get('/api/data/quality/runs', () => pendingResponse())] });
     await ready();
 
     const drawer = await openHistory();

@@ -1,10 +1,11 @@
-import { Alert, Box, Button, Skeleton, Stack, useMediaQuery } from '@mui/material';
+import { Alert, Box, Button, Stack, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { formatDate } from '@/shared/lib/format';
 import { useInView } from '@/shared/lib/useInView';
 import { stateAlpha } from '@/theme';
 import { ChartBoundary } from './ChartBoundary';
+import { ChartSkeleton } from './ChartSkeleton';
 import { alignedValues, axisDateLabel, chartDates } from './chartData';
 import { buildChartOption } from './chartOption';
 import { chartSummary } from './chartSummary';
@@ -38,14 +39,6 @@ export interface TimeSeriesChartProps {
   busy?: boolean;
   /** Load the chart library only when the chart is about to scroll into view. */
   deferUntilVisible?: boolean;
-}
-
-function ChartSkeleton({ height }: { height: number }) {
-  return (
-    <Box role="status" aria-label="Loading chart">
-      <Skeleton variant="rounded" width="100%" height={height} animation="wave" />
-    </Box>
-  );
 }
 
 /**

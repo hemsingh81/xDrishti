@@ -16,6 +16,7 @@ const rupeesPrecise = new Intl.NumberFormat('en-IN', {
 });
 const price = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percent = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const share = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 // Broker token expiries are defined in India time (Dhan: 24 h after sign-in), so they are shown in IST whatever the viewer's zone.
 const istTimeAndDay = new Intl.DateTimeFormat('en-IN', {
@@ -138,6 +139,11 @@ export function formatPrice(value: number): string {
 /** A percentage with two decimals and Indian grouping: 16.1 -> "16.10". The caller adds the sign and the % sign. */
 export function formatPercent(value: number): string {
   return percent.format(value);
+}
+
+/** A share of a whole with one decimal, for weights and allocations: 32.14 -> "32.1". The caller adds the % sign. */
+export function formatShare(value: number): string {
+  return share.format(value);
 }
 
 /** "3 hours 5 minutes" style duration from seconds. */

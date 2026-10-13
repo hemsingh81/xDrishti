@@ -18,6 +18,7 @@ import { benchmarkQuery } from './api/historyQueries';
 import { captureHistory, renderPortfolio } from './testing';
 import type { HoldingsSummary } from '@/shared/api';
 import { useQuery } from '@tanstack/react-query';
+import { pendingResponse } from '@/test/gate';
 
 const summaryWith = (overrides: Partial<HoldingsSummary>) => {
   server.use(http.get('/api/holdings/summary', () => HttpResponse.json(buildSummary(overrides))));
@@ -184,7 +185,7 @@ describe('Benchmark and drawdown tiles', () => {
   });
 
   it('waits for the history before showing the drawdown', async () => {
-    server.use(http.get('/api/portfolio/history', () => new Promise<never>(() => undefined)));
+    server.use(http.get('/api/portfolio/history', () => pendingResponse()));
     renderPortfolio();
 
     const drawdown = await tile('Max drawdown (All)');

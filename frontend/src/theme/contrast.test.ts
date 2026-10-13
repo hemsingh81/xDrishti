@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { elevation, iconChip, iconHues, palettes, stateAlpha, table, type ColorMode } from './tokens';
+import {
+  categorical,
+  categoricalSeries,
+  elevation,
+  iconChip,
+  iconHues,
+  palettes,
+  stateAlpha,
+  table,
+  type ColorMode,
+} from './tokens';
 
 function channel(v: number): number {
   const c = v / 255;
@@ -140,6 +150,30 @@ describe.each<ColorMode>(['light', 'dark'])('%s icon hue contrast', (mode) => {
 
   it.each(pairs)('%s icon is at least 2.4:1 on its chip over the selected row (accentSoft)', (_name, color) => {
     expect(contrast(color, blend(color, p.accentSoft, tint))).toBeGreaterThanOrEqual(2.4);
+  });
+});
+
+describe.each<ColorMode>(['light', 'dark'])('%s categorical palette', (mode) => {
+  const p = palettes[mode];
+  const colours = categorical[mode];
+
+  it('has eight series colours and a ninth for "Other"', () => {
+    expect(colours).toHaveLength(categoricalSeries + 1);
+    expect(new Set(colours).size).toBe(colours.length);
+  });
+
+  it.each(colours.map((colour, index) => [index, colour] as const))(
+    'colour %i (%s) is at least 3:1 on the card (surface), the same as the series colours of the charts',
+    (_index, colour) => {
+      expect(contrast(colour, p.surface)).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  it('stays at least 3:1 on the page background and on surfaceAlt (a chart in a tinted card)', () => {
+    for (const colour of colours) {
+      expect(contrast(colour, p.background)).toBeGreaterThanOrEqual(3);
+      expect(contrast(colour, p.surfaceAlt)).toBeGreaterThanOrEqual(3);
+    }
   });
 });
 

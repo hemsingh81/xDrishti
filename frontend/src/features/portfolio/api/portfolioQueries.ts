@@ -7,6 +7,8 @@ import { formatSort, type PortfolioFilters } from '../lib/filters';
 export const portfolioKeys = {
   all: ['portfolio'] as const,
   holdings: ['portfolio', 'holdings'] as const,
+  /** The groups of the Group by view and the holdings of each opened group (P2-08). */
+  groups: ['portfolio', 'groups'] as const,
   summary: ['portfolio', 'summary'] as const,
   history: ['portfolio', 'history'] as const,
   benchmark: ['portfolio', 'benchmark'] as const,

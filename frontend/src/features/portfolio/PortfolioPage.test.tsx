@@ -23,6 +23,7 @@ import { scrollToEnd } from '@/test/intersection';
 import { problemResponse, server } from '@/test/server';
 import { smallPage, threePages } from '@/test/smallPages';
 import { noHoldingsHandlers, renderPortfolio, twoPortfolioAccounts } from './testing';
+import { pendingResponse, releasePending } from '@/test/gate';
 
 // Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
 vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
@@ -208,7 +209,7 @@ describe('Portfolio page: totals', () => {
   });
 
   it('shows a progress indicator while the totals load', async () => {
-    server.use(http.get('/api/holdings/summary', () => new Promise(() => undefined)));
+    server.use(http.get('/api/holdings/summary', () => pendingResponse()));
     renderPortfolio();
 
     expect(await screen.findByRole('progressbar', { name: 'Loading totals' })).toBeInTheDocument();
@@ -457,9 +458,11 @@ describe('Portfolio page: holdings', () => {
   });
 
   it('shows skeleton rows on the first load and an error with Retry when the list fails', async () => {
-    server.use(http.get('/api/holdings', () => new Promise(() => undefined)));
+    server.use(http.get('/api/holdings', () => pendingResponse()));
     const { unmount } = renderPortfolio();
     expect(await screen.findByRole('grid', { name: gridName })).toHaveAttribute('aria-busy', 'true');
+    // Answer the held request before the screen goes: an aborted, hanging request can let the next one escape the mock.
+    await releasePending();
     unmount();
 
     let fail = true;

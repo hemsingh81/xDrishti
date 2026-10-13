@@ -4,6 +4,7 @@ import { delay, http, HttpResponse } from 'msw';
 import { buildBucket, buildSummary, ids } from '@/test/fixtures';
 import { setNow } from '@/test/clock';
 import { drawnSeries } from '@/test/chartStub';
+import { pendingResponse } from '@/test/gate';
 import {
   buildEmptyHistory,
   buildHistory,
@@ -47,7 +48,7 @@ describe('History card', () => {
   });
 
   it('shows a skeleton of the chart while the history loads', async () => {
-    server.use(http.get('/api/portfolio/history', () => new Promise<never>(() => undefined)));
+    server.use(http.get('/api/portfolio/history', () => pendingResponse()));
     renderPortfolio();
 
     const card = await historyCard();
@@ -597,15 +598,29 @@ describe('History card on a phone', () => {
     return status.firstElementChild as HTMLElement;
   };
 
-  it('draws a 240 px chart area; a wider screen gets 300 px', async () => {
-    server.use(http.get('/api/portfolio/history', () => new Promise<never>(() => undefined)));
-    const { unmount } = renderPortfolio();
-    expect(await skeletonHeight()).toHaveStyle({ height: '300px' });
-    unmount();
-
-    stubPhoneWidth();
+  // The history is held back with a gate (not a request that never ends): a request left hanging and aborted at unmount can
+  // let the next request to the same URL escape the network mock. The gate is opened and the answer awaited before the end.
+  it.each([
+    ['a wider screen', false, '300px'],
+    ['a phone', true, '240px'],
+  ])('draws the chart area of %s at %s', async (_name, phone, height) => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get('/api/portfolio/history', async () => {
+        await gate;
+        return HttpResponse.json(buildHistory());
+      }),
+    );
+    if (phone) stubPhoneWidth();
     renderPortfolio();
-    expect(await skeletonHeight()).toHaveStyle({ height: '240px' });
+
+    expect(await skeletonHeight()).toHaveStyle({ height });
+
+    release();
+    expect(await screen.findByRole('list', { name: 'History coverage' })).toBeInTheDocument();
   });
 
   it('lets the title and the range chips wrap, and keeps every chip', async () => {

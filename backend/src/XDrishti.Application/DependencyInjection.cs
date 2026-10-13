@@ -23,6 +23,7 @@ using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Domain.Common;
@@ -230,6 +231,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RecoverInterruptedSyncsCommand>, RecoverInterruptedSyncsHandler>();
         services.AddScoped<IQueryHandler<ListHoldingsQuery, Result<HoldingPage>>, ListHoldingsHandler>();
         services.AddScoped<IQueryHandler<GetHoldingsSummaryQuery, Result<HoldingsSummary>>, GetHoldingsSummaryHandler>();
+        services.AddScoped<IQueryHandler<GetHoldingGroupsQuery, Result<HoldingGroups>>, GetHoldingGroupsHandler>();
         services.AddScoped<IQueryHandler<GetHoldingLotsQuery, Result<HoldingLots>>, GetHoldingLotsHandler>();
         services.AddScoped<ICommandHandler<UpdateLotDateCommand, LotRow>, UpdateLotDateHandler>();
         services.AddScoped<IQueryHandler<GetSyncStatusQuery, Result<SyncStatusView>>, GetSyncStatusHandler>();

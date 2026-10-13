@@ -14,6 +14,7 @@ import { scrollToEnd } from '@/test/intersection';
 import { server } from '@/test/server';
 import { smallPage, threePages } from '@/test/smallPages';
 import { renderInstruments } from './testing';
+import { pendingResponse } from '@/test/gate';
 
 // Lists page by a few rows here instead of 100 (the default of 100 is asserted in useInfiniteRows.test.tsx).
 vi.mock('@/shared/lib/useInfiniteRows', async (importOriginal) =>
@@ -118,7 +119,7 @@ describe('Instruments page: results', () => {
   });
 
   it('shows skeleton rows on the first load', async () => {
-    server.use(http.get('/api/instruments', async () => new Promise(() => undefined)));
+    server.use(http.get('/api/instruments', async () => pendingResponse()));
     renderInstruments();
 
     expect(await grid()).toHaveAttribute('aria-busy', 'true');

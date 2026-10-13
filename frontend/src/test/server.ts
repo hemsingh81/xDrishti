@@ -23,6 +23,7 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
 
@@ -78,9 +79,14 @@ export const handlers = [
   ),
   http.get('/api/instruments/:id/baskets', () => HttpResponse.json([])),
   // Portfolio (read side): holdings are searched in memory; writes (import, sync, date edits) are mocked per test.
-  http.get('/api/holdings', ({ request }) =>
-    HttpResponse.json(searchHoldings(sampleHoldings, new URL(request.url).searchParams)),
-  ),
+  http.get('/api/holdings', ({ request }) => {
+    const params = new URL(request.url).searchParams;
+    // A list of one group (groupBy + groupKey, P2-08) answers that group's holdings; otherwise the whole scope.
+    return HttpResponse.json(
+      params.has('groupBy') ? answerGroupHoldings(params) : searchHoldings(sampleHoldings, params),
+    );
+  }),
+  ...groupHandlers,
   http.get('/api/holdings/summary', () => HttpResponse.json(buildSummary())),
   http.get('/api/holdings/:id/lots', ({ params }) => {
     const found = sampleHoldings.find((h) => h.id === params.id);

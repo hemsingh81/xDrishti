@@ -11,6 +11,7 @@ import {
   serviceIds,
 } from '@/test/servicesFixtures';
 import { passMinutes, renderServices, setNow } from './testing';
+import { pendingResponse } from '@/test/gate';
 
 const card = () => screen.findByRole('region', { name: 'Trading-day timeline' });
 
@@ -169,7 +170,7 @@ describe('Services: the trading-day timeline', () => {
   });
 
   it('shows a loading indicator while the timeline is read', async () => {
-    renderServices({ handlers: [http.get('/api/services/timeline', () => new Promise<never>(() => undefined))] });
+    renderServices({ handlers: [http.get('/api/services/timeline', () => pendingResponse())] });
 
     expect(await within(await card()).findByRole('progressbar', { name: 'Loading the timeline' })).toBeInTheDocument();
     expect(await screen.findByRole('list', { name: 'Services' })).toBeInTheDocument();

@@ -25,3 +25,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0018](0018-services-framework-and-editable-schedules.md) | Services framework: schedules in the database, one scheduler, the Services screen | Accepted |
 | [0019](0019-holdings-quotes-day-change-and-the-first-interval-service.md) | Holdings quotes every 5 minutes (Dhan quote API), day change, and the first interval service | Accepted |
 | [0020](0020-portfolio-value-history-benchmark-and-charts.md) | Portfolio value history and benchmark computed from lots and stored daily bars; ECharts for charts | Accepted |
+| [0021](0021-portfolio-grouping-and-allocation-charts.md) | Portfolio grouping by account, bucket, sector or basket, computed on the server, with allocation charts | Accepted |

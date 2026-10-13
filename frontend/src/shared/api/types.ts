@@ -52,6 +52,12 @@ export type Returns = Schemas['ReturnsView'];
 export type HoldingRow = Schemas['HoldingRow'];
 export type HoldingPage = Schemas['HoldingPage'];
 export type HoldingsSummary = Schemas['HoldingsSummary'];
+/** The holdings of a scope grouped by account, bucket, sector or basket, with the scope total (P2-08, ADR 0021). */
+export type HoldingGroups = Schemas['HoldingGroups'];
+export type HoldingGroup = Schemas['HoldingGroup'];
+export type HoldingGroupTotal = Schemas['HoldingGroupTotal'];
+/** One part of a group's value in the second dimension (the sector of an account, the account of a sector). */
+export type GroupPart = Schemas['GroupPart'];
 export type HoldingLots = Schemas['HoldingLots'];
 /** The value history of a scope with its benchmark and coverage (P2-07, ADR 0020). */
 export type PortfolioHistory = Schemas['PortfolioHistory'];

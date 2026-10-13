@@ -8,8 +8,9 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-// The chart library is imported by exactly one module (shared/ui/chart/EChartsCanvas.tsx), which TimeSeriesChart loads
-// with a dynamic import: anything else importing it would pull it into another chunk (ADR 0020 §5).
+// The chart library is imported by exactly two modules (shared/ui/chart/EChartsCanvas.tsx for the line chart and
+// shared/ui/chart/CategoryChartCanvas.tsx for the donut and the bars), which their wrappers load with a dynamic import:
+// anything else importing it would pull it into another chunk (ADR 0020 §5, ADR 0021 §5).
 const featureIndexOnly = {
   group: ['@/features/*/*'],
   message: 'Import a feature only through its public index: @/features/<name>.',
@@ -21,7 +22,7 @@ const sharedIsLeaf = {
 const chartLibrary = {
   group: ['echarts', 'echarts/*', 'zrender', 'zrender/*'],
   message:
-    'Use <TimeSeriesChart> from @/shared/ui/chart; only shared/ui/chart/EChartsCanvas.tsx imports the chart library.',
+    'Use <TimeSeriesChart> or <CategoryChart> from @/shared/ui/chart; only shared/ui/chart/EChartsCanvas.tsx and CategoryChartCanvas.tsx import the chart library.',
 };
 
 export default defineConfig([
@@ -70,8 +71,8 @@ export default defineConfig([
     },
   },
   {
-    // The one module allowed to import the chart library.
-    files: ['src/shared/ui/chart/EChartsCanvas.tsx'],
+    // The two modules allowed to import the chart library.
+    files: ['src/shared/ui/chart/EChartsCanvas.tsx', 'src/shared/ui/chart/CategoryChartCanvas.tsx'],
     rules: {
       'no-restricted-imports': ['error', { patterns: [featureIndexOnly, sharedIsLeaf] }],
     },

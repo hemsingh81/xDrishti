@@ -58,3 +58,6 @@ export const observedCount = () => [...FakeIntersectionObserver.live].filter((o)
 
 /** The `rootMargin` of the live observers, for a test of the look-ahead. */
 export const observerMargins = () => [...FakeIntersectionObserver.live].map((o) => o.rootMargin);
+
+/** Every element the live observers watch: a test can tell whether a part of the page is observed at all. */
+export const observedElements = (): Element[] => [...FakeIntersectionObserver.live].flatMap((o) => [...o.targets]);

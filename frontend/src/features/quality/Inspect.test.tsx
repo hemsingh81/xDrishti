@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw';
 import { buildQualityDetail, buildQualityRow, qualityId, sampleQualityRows } from '@/test/qualityFixtures';
 import { createQualityFake } from '@/test/qualityFake';
 import { renderQuality } from './testing';
+import { pendingResponse } from '@/test/gate';
 
 const [reliance, tcs, infy, hdfc, newco] = sampleQualityRows as [
   (typeof sampleQualityRows)[number],
@@ -206,7 +207,7 @@ describe('Inspect drawer: header and checks', () => {
   it('shows a loading indicator while the checks load', async () => {
     renderQuality({
       search: `?id=${infy.instrumentId}`,
-      handlers: [http.get('/api/data/quality/instruments/:id', () => new Promise(() => undefined))],
+      handlers: [http.get('/api/data/quality/instruments/:id', () => pendingResponse())],
     });
 
     const drawer = await screen.findByRole('dialog', { name: 'Inspect' });

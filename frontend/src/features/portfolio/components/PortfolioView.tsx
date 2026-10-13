@@ -8,14 +8,16 @@ import { useMarket } from '../hooks/useMarket';
 import { usePortfolioHistory } from '../hooks/usePortfolioHistory';
 import { useQuotesService } from '../hooks/useQuotesService';
 import { useRefreshOnQuoteRun } from '../hooks/useRefreshOnQuoteRun';
+import { useCachedHolding } from '../hooks/useCachedHolding';
 import { useRefreshPrices } from '../hooks/useRefreshPrices';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
 import { activeFilterCount } from '../lib/filters';
 import { HistoryCard } from './HistoryCard';
+import { GroupedHoldings } from './GroupedHoldings';
 import { HoldingDrawer } from './HoldingDrawer';
 import { HoldingsGrid, NoMatches } from './HoldingsGrid';
-import { EmptyHoldings, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
+import { EmptyHoldings, NoGroups, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
 import { PortfolioHeader } from './PortfolioHeader';
 import { PricesLine } from './PricesLine';
 import { ScopeBar } from './ScopeBar';
@@ -42,7 +44,10 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const refresh = useRefreshPrices(quotes.service);
   useRefreshOnQuoteRun(quotes.service);
   const summary = useQuery({ ...summaryQuery(filters), refetchInterval: market.pollMs });
-  const holdings = useInfiniteRows({ ...holdingsList(filters), refetchInterval: market.pollMs });
+  // The flat list is for Group by None; a grouping loads the groups and, per opened group, its holdings.
+  const grouped = filters.groupBy !== 'none';
+  const holdings = useInfiniteRows({ ...holdingsList(filters), enabled: !grouped, refetchInterval: market.pollMs });
+  const groupedHolding = useCachedHolding(grouped ? openId : null);
   const scope = { account: filters.account, bucket: filters.bucket };
   const history = usePortfolioHistory(scope, market.pollMs);
 
@@ -61,6 +66,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
     ? summary.data.openCount + summary.data.closedCount > 0
     : (history.query.data?.coverage.holdings ?? 0) > 0;
   const actingTarget = acting ? { id: acting.id, name: acting.name } : null;
+  const showAccount = account === null && portfolio.length > 1;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
@@ -108,24 +114,39 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
         fallbackRun={summary.data?.lastSync ?? null}
         refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
       />
-      <HoldingsGrid
-        result={holdings}
-        filters={filters}
-        openId={openId}
-        showAccount={account === null && portfolio.length > 1}
-        emptyState={
-          nothingAtAll ? (
-            <EmptyHoldings accountId={acting?.id ?? null} />
-          ) : (
-            <NoMatches canClear={activeFilterCount(filters) > 0} onClear={clear} />
-          )
-        }
-        onChange={update}
-        onOpen={open}
-      />
+      {filters.groupBy === 'none' ? (
+        <HoldingsGrid
+          result={holdings}
+          filters={filters}
+          openId={openId}
+          showAccount={showAccount}
+          emptyState={
+            nothingAtAll ? (
+              <EmptyHoldings accountId={acting?.id ?? null} />
+            ) : (
+              <NoMatches canClear={activeFilterCount(filters) > 0} onClear={clear} />
+            )
+          }
+          onChange={update}
+          onOpen={open}
+        />
+      ) : (
+        <GroupedHoldings
+          by={filters.groupBy}
+          scope={{ filters, by: filters.groupBy, pollMs: market.pollMs, showAccount, openId, onOpen: open }}
+          emptyState={
+            nothingAtAll ? (
+              <EmptyHoldings accountId={acting?.id ?? null} />
+            ) : (
+              <NoGroups canClear={activeFilterCount(filters) > 0} onClear={clear} />
+            )
+          }
+          onChange={update}
+        />
+      )}
       <HoldingDrawer
         id={openId}
-        holding={holdings.rows.find((h) => h.id === openId)}
+        holding={grouped ? groupedHolding : holdings.rows.find((h) => h.id === openId)}
         onClose={() => {
           open(null);
         }}

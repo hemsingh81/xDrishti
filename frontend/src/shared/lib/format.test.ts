@@ -13,6 +13,7 @@ import {
   formatIstTime,
   formatIstTimeAndDay,
   formatPercent,
+  formatShare,
   formatPrice,
   formatDayMonth,
   formatMonthYear,
@@ -57,6 +58,14 @@ describe('formatPercent', () => {
   it('shows two decimals', () => {
     expect(formatPercent(16.1)).toBe('16.10');
     expect(formatPercent(1_234.5)).toBe('1,234.50');
+  });
+});
+
+describe('formatShare', () => {
+  it('shows one decimal', () => {
+    expect(formatShare(32.14)).toBe('32.1');
+    expect(formatShare(100)).toBe('100.0');
+    expect(formatShare(0)).toBe('0.0');
   });
 });
 

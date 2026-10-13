@@ -5,7 +5,7 @@ import { emptyFilters, parseFilters, toParams, type PortfolioFilters } from '../
 type Patch = Partial<PortfolioFilters>;
 
 /**
- * The page state (account, bucket, status, search, sort, open holding) kept in the URL. Typing replaces the history entry, every other change adds one so Back steps through the views.
+ * The page state (account, bucket, status, search, sort, group by, open holding) kept in the URL. Typing replaces the history entry, every other change adds one so Back steps through the views.
  */
 export function usePortfolioFilters() {
   const [params, setParams] = useSearchParams();
@@ -22,8 +22,8 @@ export function usePortfolioFilters() {
   );
 
   const clear = useCallback(() => {
-    update({ ...emptyFilters, account: filters.account, sort: filters.sort });
-  }, [update, filters.account, filters.sort]);
+    update({ ...emptyFilters, account: filters.account, sort: filters.sort, groupBy: filters.groupBy });
+  }, [update, filters.account, filters.sort, filters.groupBy]);
 
   const open = useCallback(
     (id: string | null) => {
