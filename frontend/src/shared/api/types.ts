@@ -53,6 +53,16 @@ export type HoldingRow = Schemas['HoldingRow'];
 export type HoldingPage = Schemas['HoldingPage'];
 export type HoldingsSummary = Schemas['HoldingsSummary'];
 export type HoldingLots = Schemas['HoldingLots'];
+/** The value history of a scope with its benchmark and coverage (P2-07, ADR 0020). */
+export type PortfolioHistory = Schemas['PortfolioHistory'];
+export type HistoryPoint = Schemas['HistoryPoint'];
+export type HistoryBenchmark = Schemas['HistoryBenchmark'];
+export type HistoryCoverage = Schemas['HistoryCoverage'];
+/** The largest fall of a unit-value series: `pct` is a positive number (a fall of pct %), with the peak and low dates. */
+export type Drawdown = Schemas['Drawdown'];
+/** The benchmark index in force. */
+export type PortfolioBenchmark = Schemas['BenchmarkView'];
+export type PortfolioTrackResult = Schemas['PortfolioTrackResult'];
 export type LotRow = Schemas['LotRow'];
 /** One run of the holdings sync (manual, automatic or the import). */
 export type SyncRun = Schemas['SyncRunView'];

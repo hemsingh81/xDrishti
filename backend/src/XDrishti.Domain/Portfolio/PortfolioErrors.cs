@@ -19,6 +19,8 @@ public static class PortfolioErrors
 
     public static readonly Error HoldingNotFound = Error.NotFound(NotFoundCode, "The holding does not exist.");
 
+    public static readonly Error BenchmarkNotFound = Error.NotFound(NotFoundCode, "The benchmark index is not in the instrument master. Refresh the instrument list or choose another index.");
+
     public static readonly Error LotNotFound = Error.NotFound(NotFoundCode, "The lot does not exist.");
 
     public static readonly Error NotConnected = Error.Conflict(
@@ -35,6 +37,8 @@ public static class PortfolioErrors
     public static readonly Error RoleOff = Error.Conflict(RoleOffCode, "Switch on the Portfolio role of this account first.");
 
     public static readonly Error NoBucket = Error.Conflict(NoBucketCode, "The account has no portfolio bucket to put holdings in. Switch the Portfolio role off and on again.");
+
+    public static readonly Error BenchmarkChanged = Error.Conflict(ConflictCode, "The benchmark was changed meanwhile. Reload and try again.");
 
     public static readonly Error LotChanged = Error.Conflict(ConflictCode, "The lot was changed or closed meanwhile. Reload and try again.");
 

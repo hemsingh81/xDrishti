@@ -54,6 +54,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, InstrumentsEndpoints>();
         services.AddSingleton<IEndpointModule, BasketsEndpoints>();
         services.AddSingleton<IEndpointModule, HoldingsEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioHistoryEndpoints>();
         services.AddSingleton<IEndpointModule, DataEndpoints>();
         services.AddSingleton<IEndpointModule, DataQualityEndpoints>();
         services.AddSingleton<IEndpointModule, DataCsvEndpoints>();

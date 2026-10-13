@@ -12,6 +12,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Api.Platform;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Auth;
 using XDrishti.Domain.Market.Baskets;
 using XDrishti.Infrastructure.Brokers;
@@ -184,6 +185,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 """);
             return 0;
         });
+        Services.GetRequiredService<IPortfolioHistoryCache>().Invalidate();
     }
 
     /// <summary>
@@ -238,6 +240,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.quality_results;
                 DELETE FROM market.quality_runs;
                 DELETE FROM market.bar_gaps;
+                DELETE FROM platform.app_settings;
                 DELETE FROM market.corporate_actions;
                 DELETE FROM market.trading_days;
                 DELETE FROM market.csv_files;
@@ -247,7 +250,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.basket_members;
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
-                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%';
+                DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%' OR event = 'PortfolioBenchmarkChanged';
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;
@@ -263,6 +266,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             return 0;
         });
+        Services.GetRequiredService<IPortfolioHistoryCache>().Invalidate();
     }
 
     /// <summary>Resets the owner to the factory's credentials: clears a lockout and ends every session. For tests that lock or change the account.</summary>

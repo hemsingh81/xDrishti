@@ -915,6 +915,12 @@ export function buildSummary(overrides: Partial<HoldingsSummary> = {}): Holdings
     dayChangePct: 0.56,
     dayChangeExcluded: 1,
     pricesAsOf: { oldest: '2026-10-11T09:55:00Z', newest: '2026-10-11T09:55:00Z' },
+    // The same cash flows in Nifty 50 returned 9.1 % a year against the portfolio's 11.3 %.
+    benchmarkXirr: 9.1,
+    alpha: 2.2,
+    benchmarkState: 'ok',
+    benchmarkAsOf: '2026-10-09',
+    alphaBasis: 'last_close',
     ...overrides,
   };
 }

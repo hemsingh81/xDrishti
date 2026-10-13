@@ -3074,6 +3074,256 @@
         }
       }
     },
+    "/api/portfolio/history": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Value history of the lots of a scope (accountId, bucketId; all accounts that count in totals when neither is given) from the lots and the stored day bars adjusted for splits and bonuses: points {date, value, invested, benchmarkValue (the same cash flows in the benchmark index, null when unavailable), nav, benchmarkNav} (NAV starts at 100 and ignores cash flows), coverage {holdings, covered, unpriced, lateStart}, partial, benchmark {state ok|unavailable, instrumentId, symbol, name, tracked, hasBars, reason}, maxDrawdown and benchmarkMaxDrawdown {pct, from, to} (a fall of pct %), firstDate, lastPriceAt (set when the last point is today's live one) and resolution. from/to yyyy-MM-dd; resolution day|week|month (last trading day of the period; default the finest with at most 2,000 points, 400 portfolio.invalid when a given one gives more). An unknown account or bucket gives an empty history",
+        "operationId": "GetPortfolioHistory",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resolution",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioHistory"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/benchmark": {
+      "get": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "The benchmark index the portfolio is compared with (Nifty 50 until another is chosen): instrumentId, symbol, name, isDefault, tracked, hasBars; all null when the instrument master has no such index yet",
+        "operationId": "GetPortfolioBenchmark",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkView"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Choose the benchmark index: body {instrumentId} of any index of the instrument master that is still listed; 400 portfolio.invalid for no id, an unknown id, a non-index or a retired index. Audited; the cached histories are dropped",
+        "operationId": "SetPortfolioBenchmark",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BenchmarkInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/history/track-holdings": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Track my holdings: tracks the instruments of the open holdings of the scope (accountId, bucketId) that are in the instrument master, with the bulk tracking command; idempotent. Answers how many were added, how many holdings are not in the master (notInMaster) and how many instruments are retired and skipped; starts no job, the hint says the next Update data builds the bars",
+        "operationId": "TrackPortfolioHoldings",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "bucketId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioTrackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/history/track-benchmark": {
+      "post": {
+        "tags": [
+          "Portfolio"
+        ],
+        "summary": "Track the benchmark: tracks the benchmark index with the bulk tracking command; idempotent. Answers how many were added; starts no job, the hint says the next Update data builds the bars. 404 portfolio.not_found when the instrument master has no benchmark index",
+        "operationId": "TrackPortfolioBenchmark",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioTrackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data/overview": {
       "get": {
         "tags": [
@@ -6211,6 +6461,64 @@
         },
         "description": "A basket. `purpose`: trading · long_term · watch. `position` = place among the active baskets (0 first; the system baskets count on their own, in their group).\n`memberCount` = instruments in it now. `archivedAt` is null for an active basket (archived ones are only listed on request).\n`kind`: manual (the owner's) · portfolio (an account's portfolio bucket, ADR 0014); `system` = true for the latter: read-only, never archived, its members are the\nbucket's current holdings. `accountId`/`accountName` are set for the default bucket of an account."
       },
+      "BenchmarkInput": {
+        "required": [
+          "instrumentId"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        },
+        "description": "Sets the benchmark: the id of a master-list index."
+      },
+      "BenchmarkView": {
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "isDefault",
+          "tracked",
+          "hasBars"
+        ],
+        "type": "object",
+        "properties": {
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "hasBars": {
+            "type": "boolean"
+          }
+        },
+        "description": "The benchmark in force (all null when the master list has no such index yet). `IsDefault`: the owner has not chosen one, Nifty 50 applies."
+      },
       "BrokerIdView": {
         "required": [
           "broker",
@@ -8146,6 +8454,35 @@
         },
         "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
       },
+      "Drawdown": {
+        "required": [
+          "pct",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "pct": {
+            "type": "number",
+            "format": "double"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)\ngives 0 and no dates."
+      },
       "EodOverview": {
         "required": [
           "enabled",
@@ -8500,6 +8837,135 @@
         },
         "description": "How many instrument-sessions are in each state (the Dhan phase's gap table): `open` (missing bars a refetch may still add), `unfillable` (a refetch added\nnothing), `filled`; `lastDetectedAt` is when a gap was last found (null while there never was one)."
       },
+      "HistoryBenchmark": {
+        "required": [
+          "state",
+          "instrumentId",
+          "symbol",
+          "name",
+          "tracked",
+          "hasBars",
+          "reason",
+          "asOf"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tracked": {
+            "type": "boolean"
+          },
+          "hasBars": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "asOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has\nno such index). `Tracked`: tracking is on; `HasBars`: 1-minute bars are stored (the day bars follow when the aggregates are built). A screen offers \"Track the benchmark\" when it is unavailable and not tracked.\n`AsOf` is the date of the last index close the benchmark lines were valued at (null when unavailable): the index has no live quote, so the benchmark lines end there and a live point of today (portfolio at today's prices) has no benchmark value."
+      },
+      "HistoryCoverage": {
+        "required": [
+          "holdings",
+          "covered",
+          "unpriced",
+          "lateStart"
+        ],
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "covered": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unpriced": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lateStart": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "How much of the open holdings the history covers: `Holdings` open holdings, `Covered` of them have stored day bars, `Unpriced` have none (not tracked, not in the instrument master, or bars not fetched yet:\nthey are left out and never valued at zero). `LateStart` counts covered holdings whose bars begin after their earliest lot, so part of their history is missing."
+      },
+      "HistoryPoint": {
+        "required": [
+          "date",
+          "value",
+          "invested",
+          "benchmarkValue",
+          "nav",
+          "benchmarkNav"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "invested": {
+            "type": "number",
+            "format": "double"
+          },
+          "benchmarkValue": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "nav": {
+            "type": "number",
+            "format": "double"
+          },
+          "benchmarkNav": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "One day of the portfolio history (rupees; `Nav` and `BenchmarkNav` start at 100). `Value` is what the lots held that day were worth at the day's close (adjusted prices), `Invested` what\nthey cost. `BenchmarkValue` is the same cash flows put into the benchmark index; it and `BenchmarkNav` are null when the benchmark has no history for the series."
+      },
       "HoldingLots": {
         "required": [
           "holdingId",
@@ -8756,7 +9222,12 @@
           "dayChange",
           "dayChangePct",
           "dayChangeExcluded",
-          "pricesAsOf"
+          "pricesAsOf",
+          "benchmarkXirr",
+          "alpha",
+          "benchmarkState",
+          "benchmarkAsOf",
+          "alphaBasis"
         ],
         "type": "object",
         "properties": {
@@ -8817,9 +9288,39 @@
           },
           "pricesAsOf": {
             "$ref": "#/components/schemas/PricesAsOf"
+          },
+          "benchmarkXirr": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "alpha": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "benchmarkState": {
+            "type": "string"
+          },
+          "benchmarkAsOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "alphaBasis": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         },
-        "description": "Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that\nstill have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).\nDayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no\nholding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings."
+        "description": "Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that\nstill have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).\nDayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no\nholding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings.\nBenchmarkXirr (percent number) is the XIRR of the same cash flows put into the benchmark index (Nifty 50 by default, ADR 0020 §2), Alpha the portfolio's XIRR minus it in percentage points; BenchmarkState is \"ok\", \"unavailable\" (the index has no history\nfrom the first cash flow: track it and run Update data), \"insufficient\" (the same reasons as for XIRR) or \"n_m\" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState \"ok\").\nBenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which\nit is when Alpha is set: \"last_close\" (portfolio and index are both as of their last close) or \"live_vs_last_close\" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only)."
       },
       "HttpValidationProblemDetails": {
         "type": "object",
@@ -9798,6 +10299,91 @@
         },
         "description": "A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default."
       },
+      "PortfolioHistory": {
+        "required": [
+          "points",
+          "coverage",
+          "partial",
+          "benchmark",
+          "maxDrawdown",
+          "benchmarkMaxDrawdown",
+          "firstDate",
+          "lastPriceAt",
+          "resolution",
+          "rangeFrom",
+          "rangeTo"
+        ],
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryPoint"
+            }
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/HistoryCoverage"
+          },
+          "partial": {
+            "type": "boolean"
+          },
+          "benchmark": {
+            "$ref": "#/components/schemas/HistoryBenchmark"
+          },
+          "maxDrawdown": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Drawdown"
+              }
+            ]
+          },
+          "benchmarkMaxDrawdown": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Drawdown"
+              }
+            ]
+          },
+          "firstDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastPriceAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "resolution": {
+            "type": "string"
+          },
+          "rangeFrom": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "rangeTo": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The value history of a scope (all accounts that count in totals, one account, one bucket). `Points` are in date order at `Resolution` (`day`, `week` or `month`: the last trading day of the period); `Value` is what the\nlots held that day were worth at that day's close (adjusted for splits and bonuses), `Invested` what they cost, `BenchmarkValue` the same cash flows in the benchmark index, `Nav` and `BenchmarkNav` unit values starting at 100\nthat cash flows do not move. `Coverage` says how many open holdings have price history; `Partial` is true when anything is left out (holdings without bars, history that starts late). `MaxDrawdown` / `BenchmarkMaxDrawdown`: the largest\nfall of the NAV measured within the requested range (`Pct` 12.5 = fell 12.5 %; the peak must lie inside the range too) between the peak on `From` and the low on `To`, daily, whatever the resolution; `RangeFrom` and `RangeTo` are the first and\nthe last day of that range as returned (null when there is no point). `FirstDate` is the first day of the whole history (before the range is cut). `LastPriceAt` is set when the last point is today's live one: the time of the newest price in it."
+      },
       "PortfolioInput": {
         "required": [
           "defaultBucket",
@@ -9916,6 +10502,48 @@
           }
         },
         "description": "Portfolio configuration. DefaultBucket is the name of the bucket imports go to (the account's own default bucket unless a custom bucket was chosen);\nAutoBucketName is the name of the account's own default bucket (\"{account name} · Portfolio\") — the one that exists, or, while the account has none yet,\nthe name it would get now (with a numeric suffix when the plain name is taken); it is chosen for real when the role is switched on.\nThe holdings refresh by themselves according to RefreshMode: \"off\" (default) or \"daily\" (once a day from RefreshDailyTimeIst, \"HH:mm\" India time, default 16:00;\nthe time is kept while the mode is off). FirstImportDate is the date holdings get when they are imported for the first time without a date of their own\n(2025-01-01 until the owner chooses another). HasHoldings is true once the account has any holding; the first import has happened then and\nFirstImportDate no longer affects existing holdings (ADR 0013)."
+      },
+      "PortfolioTrackResult": {
+        "required": [
+          "requested",
+          "added",
+          "alreadyTracked",
+          "notInMaster",
+          "retired",
+          "totalTracked",
+          "hint"
+        ],
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "added": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notInMaster": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalTracked": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hint": {
+            "type": "string"
+          }
+        },
+        "description": "What a track action did. `Requested` distinct master-list instruments were asked to be tracked, `Added` of them are newly tracked (or tracked again), `AlreadyTracked` were; `NotInMaster` open holdings in scope\nare not in the instrument master (nothing to track), `Retired` instruments are no longer listed and were skipped. `TotalTracked` is the number tracked now. No job is started: `Hint` says the next <i>Update data</i> builds the bars."
       },
       "PreviewCsvFilesRequest": {
         "required": [
@@ -13197,6 +13825,9 @@
     },
     {
       "name": "Holdings"
+    },
+    {
+      "name": "Portfolio"
     },
     {
       "name": "Data"

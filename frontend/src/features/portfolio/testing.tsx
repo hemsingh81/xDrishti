@@ -1,6 +1,11 @@
+import { screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
+import type { PortfolioHistory } from '@/shared/api';
 import { buildAccountDetail, buildSwingAccount, buildSyncStatus, noValueReturns, summaryOf } from '@/test/fixtures';
+import { buildHistory } from '@/test/historyFixtures';
+import { scrollToEnd } from '@/test/intersection';
 import { renderRoutes } from '@/test/render';
+import { server } from '@/test/server';
 import { PortfolioPage } from './components/PortfolioPage';
 
 /** Renders the Portfolio screen at `/portfolio` + `search` (e.g. "?status=closed") with the real providers. */
@@ -30,7 +35,40 @@ export const noHoldingsHandlers = () => [
       dayChangePct: null,
       dayChangeExcluded: 0,
       pricesAsOf: { oldest: null, newest: null },
+      benchmarkXirr: null,
+      alpha: null,
+      benchmarkState: 'insufficient',
+      benchmarkAsOf: null,
+      alphaBasis: null,
     }),
   ),
   http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus({ last: null }))),
 ];
+
+/**
+ * Answers the value history with `history` (or what a function makes of the request's parameters) and returns the
+ * parameters of every request, so a test can say which range and scope were asked for.
+ */
+export function captureHistory(
+  history: PortfolioHistory | ((params: URLSearchParams) => PortfolioHistory) = buildHistory(),
+) {
+  const requests: URLSearchParams[] = [];
+  server.use(
+    http.get('/api/portfolio/history', ({ request }) => {
+      const params = new URL(request.url).searchParams;
+      requests.push(params);
+      return HttpResponse.json(typeof history === 'function' ? history(params) : history);
+    }),
+  );
+  return requests;
+}
+
+/** The History card, once the page has shown it. */
+export const historyCard = () => screen.findByRole('region', { name: 'History' });
+
+/** Scrolls the page far enough that the History card's chart is loaded, and returns the drawn canvas. */
+export async function revealChart() {
+  await historyCard();
+  scrollToEnd();
+  return screen.findByTestId('chart-canvas');
+}

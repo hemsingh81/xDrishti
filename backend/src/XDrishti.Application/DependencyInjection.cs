@@ -235,6 +235,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetSyncStatusQuery, Result<SyncStatusView>>, GetSyncStatusHandler>();
         services.AddScoped<IAccountSyncSource, AccountSyncSource>();
 
+        // Value history, benchmark and max drawdown (ADR 0020): computed on read from the lots and the stored day bars; the benchmark setting and the two track actions.
+        services.AddScoped<IQueryHandler<GetPortfolioHistoryQuery, Result<PortfolioHistory>>, GetPortfolioHistoryHandler>();
+        services.AddScoped<IQueryHandler<GetBenchmarkQuery, BenchmarkView>, GetBenchmarkHandler>();
+        services.AddScoped<ICommandHandler<SetBenchmarkCommand, BenchmarkView>, SetBenchmarkHandler>();
+        services.AddScoped<ICommandHandler<TrackPortfolioHoldingsCommand, PortfolioTrackResult>, TrackPortfolioHoldingsHandler>();
+        services.AddScoped<ICommandHandler<TrackBenchmarkCommand, PortfolioTrackResult>, TrackBenchmarkHandler>();
+
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();
     }

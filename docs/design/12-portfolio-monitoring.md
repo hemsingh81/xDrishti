@@ -126,12 +126,12 @@ in `xd-api` looks once a minute at every Portfolio-role account whose refresh is
 - runs never overlap (accounts one after the other, one running row per account); "Sync now" works at any time; the whole mechanism is switched off with
   `Portfolio:AutoRefresh:Enabled = false` ([doc 16](16-configuration.md)). `GET /api/accounts/{id}/holdings/sync-status` returns `refreshMode`, `refreshDailyTimeIst`, `firstImportDate`, `hasHoldings`, the next scheduled run, `running` and the last run.
 
-Not included in v1 (and stated in the UI): dividends, brokerage and taxes, corporate-action adjustments, a "day change" (needs the previous close, P2-07).
+Not included in v1 (and stated in the UI): dividends, brokerage and taxes.
 
 ### Per group (basket / bucket / account / strategy / sector / total)
 Invested · current value · realised · unrealised · total return % · **XIRR** · day change (sum of the holdings' ₹; % = Σ₹ / Σ qty × previous close of the included holdings, not an average of percentages; holdings without a previous close are left out and counted as `dayChangeExcluded`) · number of open
 positions · win rate & expectancy of closed trades · **benchmark XIRR** (same cash flows invested in Nifty 50)
-and **alpha** (XIRR − benchmark XIRR) · max drawdown of the group's value history.
+and **alpha** (XIRR − benchmark XIRR) · max drawdown of the group's value history. **Built in P2-07** for the total, one account and one bucket (grouping by basket / strategy / sector follows in P2-08): see *Value history, benchmark and drawdown* in §4.
 
 ## 4. Returns and XIRR
 
@@ -162,7 +162,19 @@ date. XIRR is the rate *r* where
   `n_m` (shown "n/m": the rate is beyond ±1,000 % a year, also when it is above the solver's range); `no_data` (no flows).
 - Computed for any set of cash flows: one lot, a holding, a bucket, an account, the total. Percentages in the API are percent numbers (16.1 = 16.1 %).
 - Example: buy ₹1,00,000 on 1 Jan; add ₹50,000 on 1 Apr; value ₹1,72,000 on 31 Dec → XIRR ≈ 16.1% (absolute return 14.7%).
-- Later (not v1): dividends as inflows, charges in the cost, corporate-action adjustments, benchmark XIRR and alpha.
+- Later (not v1): dividends as inflows, charges in the cost, a stored `valuations_daily` snapshot, grouping the history by basket / strategy / sector (P2-08), per-holding price charts with buy/sell markers, rolling returns, intraday value. (Benchmark XIRR, alpha and the value history are built, P2-07, below; the lots' quantities are the broker's, so the history uses prices adjusted for splits and bonuses.)
+
+### Value history, benchmark and drawdown (P2-07, [ADR 0020](../adr/0020-portfolio-value-history-benchmark-and-charts.md))
+
+Computed on read, with no snapshot table and no job, by pure functions in `Application/Portfolio/Returns` (`PortfolioHistoryCalculator`, `NavSeries`, `DrawdownCalculator`, `BenchmarkReturns`, `AdjustedCloses`, `HistoryResolutions`) from the lots and the stored `1D` aggregates.
+
+- **Held on a day.** A lot is held on *d* when `acquired_on ≤ d` and (`closed_on` is null or `> d`). Value(d) = Σ qty × adjusted close(d); Invested(d) = Σ qty × unit cost of the same lots. A lot bought and sold before a trading day comes never counts. A day without a close carries the last earlier close forward. The dates are the calendar's trading days from the earliest lot to the last stored close, plus **today's live point** (prices of today from a quote or the last sync, from the session's open, only when such prices exist; it replaces a stored close of the same day).
+- **Adjusted prices.** Stored closes are raw; the applied corporate actions of each instrument (one read for all instruments) multiply the closes before an ex-date by their factor ([ADR 0017](../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md) §5), so a lot's value is continuous across a split or bonus and an action the owner confirms changes the next read.
+- **Coverage.** An open holding without any stored day bar (not tracked, not in the master, bars not fetched) is left out and counted (`coverage.unpriced`), the series is `partial`; it is never valued at zero. A lot acquired before its instrument's first stored close counts from that close (`coverage.lateStart`), not at an invented price. Closed holdings without bars make the series partial without being counted.
+- **Benchmark (default master-list Nifty 50, `NSE:NIFTY`; stored in `platform.app_settings`).** The same cash flows go into the index: a purchase (at its cost) buys units at that day's close, a sale (at its proceeds) sells units, at most the units held (the benchmark never goes short); BenchmarkValue = units × close, the index close carried forward. If the index has no close on or before the first flow the benchmark is unavailable (reason given), never zero. **Benchmark XIRR** = XIRR of the flows of the priced holdings (the same set as the portfolio XIRR) with the benchmark's value at the valuation date (last close on or before it) as the closing inflow; **alpha** = XIRR − benchmark XIRR in percentage points. States `ok | unavailable | insufficient | n_m` (summary field `benchmarkState`); alpha only when both rates are `ok`. **The index has no live quote:** on a live day the benchmark lines end at the index's last close (`benchmark.asOf`; the live point has no benchmark value, the benchmark NAV and drawdown use the days the index has), the summary reports `benchmarkAsOf`, and `alphaBasis` is `last_close` or `live_vs_last_close` (the portfolio at prices of a later trading day than that close). Chart and XIRR put a cash flow into the index at the close of the first trading day on or after its date; a lot bought and sold before a trading day comes leaves no flows.
+- **NAV (unit method) and max drawdown.** The first NAV is 100. NAV(d) = value of what was held the day before, at d's prices ÷ units issued so far (the previous NAV when no units exist). The day's net flow (purchases − sales, valued at d's close, so it does not move the NAV) issues `flow ÷ NAV(d)` units; all units are cancelled when nothing is held and the NAV carries on from where it was. **Max drawdown** = max over d of `(peak − NAV(d)) / peak` × 100 with the peak and trough dates (`pct` is a fall of pct %; flat or rising gives 0); the benchmark's NAV and drawdown use the same method. A deposit during a drawdown therefore neither hides nor deepens it. The drawdown is measured within the requested range (the peak must lie inside it; `rangeFrom` / `rangeTo` are its first and last day), on daily points whatever the resolution.
+- **API.** `GET /api/portfolio/history?accountId&bucketId&from&to&resolution` → points `{date, value, invested, benchmarkValue, nav, benchmarkNav}`, `coverage`, `partial`, `benchmark`, `maxDrawdown`, `benchmarkMaxDrawdown`, `firstDate`, `lastPriceAt`, `resolution`; `week` / `month` keep the last trading day of the period; at most 2,000 points (default: the finest resolution that fits; a given one that does not is `400 portfolio.invalid`); an unknown account or bucket gives an empty history. `GET/PUT /api/portfolio/benchmark` (any listed master-list index; audited as `PortfolioBenchmarkChanged`); `POST /api/portfolio/history/track-holdings` and `/track-benchmark` use the bulk tracking command (idempotent, no job: the next *Update data* builds the bars). `GET /api/holdings/summary` adds `benchmarkXirr`, `alpha`, `benchmarkState`.
+- **Cost.** A request that would read more than 2,000,000 daily prices is `400 portfolio.invalid`. Typically about 100 ms server-side (about 90 ms measured for 300 holdings over 521 days). One query for the holdings and lots, one for the day bars of every instrument of the scope and the benchmark, one for their applied actions; the result is cached 60 seconds per scope, range and resolution and dropped by anything that saves lots, holdings, accounts (first import date, Portfolio role, archive), quotes, the benchmark setting or corporate actions. Reference values: [`BenchmarkReturnsTests`](../../backend/tests/XDrishti.Application.Tests/Portfolio/History/BenchmarkReturnsTests.cs) (independent 60-digit bisection in Python, ≤ 1e-6).
 
 ## 5. Grouping: baskets vs portfolio buckets
 
@@ -217,7 +229,7 @@ move on a holding · data or token issue for an account.
 qty, avg cost, last price and time, status open/closed, first seen / closed / synced), `portfolio.holding_lots` (holding, acquired on, qty, unit cost, source
 import/added/manual, uses default date, closed on, close price, estimated), `portfolio.holding_syncs` (account, trigger manual/auto/import, status
 running/succeeded/failed/skipped, counts, error, requested by; one running row per account) and the refresh columns of `accounts.portfolio_settings`
-(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). **Built in P2-06 (migration `AddHoldingQuotes`):** `portfolio.holdings.previous_close` (`numeric(18,4)`, null until a quote gave one; a sync never touches it) and `last_price_source` (`sync` | `quote`, default `sync`, CHECK), next to `last_price` / `last_price_at` — only the latest quote is stored, no price history. The fuller target model below (transactions, cash flows, valuations) grows from here.
+(`refresh_mode` off/daily, `refresh_daily_time_ist`, and `first_import_date` since migration `PortfolioDailyRefreshAndFirstImportDate`, ADR 0013). **Built in P2-06 (migration `AddHoldingQuotes`):** `portfolio.holdings.previous_close` (`numeric(18,4)`, null until a quote gave one; a sync never touches it) and `last_price_source` (`sync` | `quote`, default `sync`, CHECK), next to `last_price` / `last_price_at` — only the latest quote is stored, no price history. **Built in P2-07 (migration `AddPortfolioBenchmarkSetting`):** `platform.app_settings` (`key`, `value`, `updated_by`, `updated_at`; never deleted by the runtime role) holds the benchmark instrument (`portfolio.benchmark_instrument`, an index id); `valuations_daily` is **not** built, the history is computed on read. The fuller target model below (transactions, cash flows, valuations) grows from here.
 
 | Table | Key columns |
 |-------|------------|
@@ -239,11 +251,11 @@ running/succeeded/failed/skipped, counts, error, requested by; one running row p
 - **Action center:** positions that need a decision, per account — below cost, large gain, overweight, sector
   concentration, max holding exceeded, results due, long-term soon, lagging Nifty, not in a basket — with
   Open / Set alert / Add to basket / Snooze / Done ([doc 15](15-smart-insights-and-automation.md) §3).
-- **Header tiles:** total value · invested · total P&L (₹, %) · **XIRR** · day change · benchmark XIRR / alpha.
+- **Header tiles:** total value · invested · total P&L (₹, %) · **XIRR** · day change · benchmark XIRR / alpha / max drawdown (API built in P2-07).
 - **Group by:** Bucket · Basket · Account · Strategy · Sector · None — with tree-grid (expand to lots and
   transactions) and column chooser.
 - **Charts:** allocation by group, sector exposure stacked by account, portfolio value vs the same cash flows in
-  Nifty 50, XIRR by group.
+  Nifty 50 (API built in P2-07), XIRR by group.
 - **Price alerts:** create from the Action center or a position; evaluated by the services; list in an Alerts panel.
 - **Position drawer:** transaction timeline, price chart with buy/sell markers, lots, alerts, linked plan ticket.
 - **Filters:** date range (for realised results), account, bucket, basket, status (open/closed), source.

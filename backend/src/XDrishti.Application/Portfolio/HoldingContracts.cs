@@ -87,6 +87,10 @@ public sealed record SyncRunView(
 /// still have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).
 /// DayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no
 /// holding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings.
+/// BenchmarkXirr (percent number) is the XIRR of the same cash flows put into the benchmark index (Nifty 50 by default, ADR 0020 §2), Alpha the portfolio's XIRR minus it in percentage points; BenchmarkState is "ok", "unavailable" (the index has no history
+/// from the first cash flow: track it and run Update data), "insufficient" (the same reasons as for XIRR) or "n_m" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState "ok").
+/// BenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which
+/// it is when Alpha is set: "last_close" (portfolio and index are both as of their last close) or "live_vs_last_close" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only).
 /// </summary>
 public sealed record HoldingsSummary(
     ReturnsView Returns,
@@ -100,7 +104,12 @@ public sealed record HoldingsSummary(
     decimal? DayChange,
     decimal? DayChangePct,
     int DayChangeExcluded,
-    PricesAsOf PricesAsOf);
+    PricesAsOf PricesAsOf,
+    decimal? BenchmarkXirr,
+    decimal? Alpha,
+    string BenchmarkState,
+    DateOnly? BenchmarkAsOf,
+    string? AlphaBasis);
 
 /// <summary>The oldest and the newest time of the prices of the open holdings (null when none has a priced time).</summary>
 public sealed record PricesAsOf(DateTimeOffset? Oldest, DateTimeOffset? Newest);

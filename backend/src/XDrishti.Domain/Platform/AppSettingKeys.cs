@@ -1,0 +1,8 @@
+namespace XDrishti.Domain.Platform;
+
+/// <summary>The keys of the <see cref="AppSetting"/> rows in use.</summary>
+public static class AppSettingKeys
+{
+    /// <summary>The master-list instrument (an index) the portfolio is compared with: its id as text (ADR 0020 §2).</summary>
+    public const string PortfolioBenchmarkInstrument = "portfolio.benchmark_instrument";
+}

@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { installFakeIntersectionObserver } from './intersection';
+import { chartStub } from './chartStub';
 import { server } from './server';
 
 // Flows such as "save → password dialog → retry → toast" pass through several MUI transitions; under the parallel
@@ -9,12 +10,16 @@ configure({ asyncUtilTimeout: 5000 });
 
 installFakeIntersectionObserver();
 
+// jsdom has no canvas: every test gets a stand-in for the lazy ECharts module (EChartsCanvas.test.tsx brings the real one).
+vi.mock('@/shared/ui/chart/EChartsCanvas', async () => ({ default: (await import('./chartStub')).default }));
+
 // jsdom resolves relative fetch URLs against this origin.
 beforeAll(() => {
   server.listen({ onUnhandledFrame: 'error' }); // any unmocked request fails the test
 });
 afterEach(() => {
   cleanup();
+  chartStub.reset();
   server.resetHandlers();
 });
 afterAll(() => {

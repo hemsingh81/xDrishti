@@ -14,6 +14,8 @@ import {
   formatIstTimeAndDay,
   formatPercent,
   formatPrice,
+  formatDayMonth,
+  formatMonthYear,
   formatWeekdayDate,
 } from './format';
 
@@ -72,6 +74,14 @@ describe('formatWeekdayDate', () => {
   it('adds the weekday to a calendar date, without shifting it by the time zone', () => {
     expect(formatWeekdayDate('2026-10-20')).toBe('Tue 20 Oct 2026');
     expect(formatWeekdayDate('2026-11-14')).toBe('Sat 14 Nov 2026');
+  });
+});
+
+describe('chart axis dates', () => {
+  it('writes a calendar date as day and month, or as month and year, without a zone shift', () => {
+    expect(formatDayMonth('2026-10-13')).toBe('13 Oct');
+    expect(formatMonthYear('2026-10-13')).toBe('Oct 2026');
+    expect(formatMonthYear('2025-01-01')).toBe('Jan 2025');
   });
 });
 

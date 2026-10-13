@@ -84,6 +84,15 @@ export function fieldMessages(error: unknown): Record<string, string> {
   return errors ? Object.fromEntries(Object.entries(errors).map(([field, list]) => [field, list.join(' ')])) : {};
 }
 
+/**
+ * The history call refuses a scope with too many bars (400 `portfolio.invalid`, field `scope`): the message of the field,
+ * else null. The server's guard does not depend on the range, so neither a chip nor Retry clears it: the screen shows the
+ * server's own words (which carry the advice) and no Retry.
+ */
+export function scopeTooLarge(error: unknown): string | null {
+  return problemKind(error) === 'invalid' ? (fieldMessages(error).scope ?? null) : null;
+}
+
 /** Where to fix a connection problem: the account's tab in Accounts. */
 export const accountTabPath = (accountId: string, tab: 'connection' | 'roles' | 'portfolio'): string =>
   `/accounts?account=${accountId}&tab=${tab}`;

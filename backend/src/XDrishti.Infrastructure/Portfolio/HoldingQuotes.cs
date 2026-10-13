@@ -10,7 +10,7 @@ namespace XDrishti.Infrastructure.Portfolio;
 /// (price, previous close kept when the quote has none, price time, source quote; open holdings only) for all quoted instruments at once, whatever the number of accounts and holdings, and reads the same
 /// accounts as <see cref="ListTargetsAsync"/> (active, Portfolio role on).
 /// </summary>
-internal sealed class HoldingQuotes(XDrishtiDbContext db) : IHoldingQuotes
+internal sealed class HoldingQuotes(XDrishtiDbContext db, IPortfolioHistoryCache histories) : IHoldingQuotes
 {
     private const string DhanBroker = "dhan";
 
@@ -62,7 +62,7 @@ internal sealed class HoldingQuotes(XDrishtiDbContext db) : IHoldingQuotes
         // when the quote has none. The rows are locked first, in holding id order, with SKIP LOCKED: the statement never waits for a row, so it cannot deadlock with a holdings sync that holds several
         // of them (the sync's updates follow the order of .NET's Guid comparison, PostgreSQL's uuid order differs, so no common lock order could be promised). A row a sync holds is left for the next
         // tick; the sync writes a price as fresh as the quote, and a sync that read a row before this statement changed it is refused by the row version and reads again (PortfolioUnitOfWork).
-        return await db.Database.ExecuteSqlAsync(
+        var updated = await db.Database.ExecuteSqlAsync(
             $"""
             WITH target AS (
                 SELECT h.id, q.last_price, q.previous_close
@@ -85,6 +85,12 @@ internal sealed class HoldingQuotes(XDrishtiDbContext db) : IHoldingQuotes
             WHERE h.id = t.id
             """,
             cancellationToken);
+        if (updated > 0)
+        {
+            histories.Invalidate(); // today's point of the cached histories used the older prices
+        }
+
+        return updated;
     }
 
     private static decimal Round(decimal value) => Math.Round(value, 4, MidpointRounding.AwayFromZero);

@@ -813,6 +813,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/portfolio/history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Value history of the lots of a scope (accountId, bucketId; all accounts that count in totals when neither is given) from the lots and the stored day bars adjusted for splits and bonuses: points {date, value, invested, benchmarkValue (the same cash flows in the benchmark index, null when unavailable), nav, benchmarkNav} (NAV starts at 100 and ignores cash flows), coverage {holdings, covered, unpriced, lateStart}, partial, benchmark {state ok|unavailable, instrumentId, symbol, name, tracked, hasBars, reason}, maxDrawdown and benchmarkMaxDrawdown {pct, from, to} (a fall of pct %), firstDate, lastPriceAt (set when the last point is today's live one) and resolution. from/to yyyy-MM-dd; resolution day|week|month (last trading day of the period; default the finest with at most 2,000 points, 400 portfolio.invalid when a given one gives more). An unknown account or bucket gives an empty history */
+    get: operations['GetPortfolioHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/benchmark': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The benchmark index the portfolio is compared with (Nifty 50 until another is chosen): instrumentId, symbol, name, isDefault, tracked, hasBars; all null when the instrument master has no such index yet */
+    get: operations['GetPortfolioBenchmark'];
+    /** Choose the benchmark index: body {instrumentId} of any index of the instrument master that is still listed; 400 portfolio.invalid for no id, an unknown id, a non-index or a retired index. Audited; the cached histories are dropped */
+    put: operations['SetPortfolioBenchmark'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/history/track-holdings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Track my holdings: tracks the instruments of the open holdings of the scope (accountId, bucketId) that are in the instrument master, with the bulk tracking command; idempotent. Answers how many were added, how many holdings are not in the master (notInMaster) and how many instruments are retired and skipped; starts no job, the hint says the next Update data builds the bars */
+    post: operations['TrackPortfolioHoldings'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/history/track-benchmark': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Track the benchmark: tracks the benchmark index with the bulk tracking command; idempotent. Answers how many were added; starts no job, the hint says the next Update data builds the bars. 404 portfolio.not_found when the instrument master has no benchmark index */
+    post: operations['TrackPortfolioBenchmark'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/data/overview': {
     parameters: {
       query?: never;
@@ -1833,6 +1902,21 @@ export interface components {
       accountId: null | string;
       accountName: null | string;
     };
+    /** @description Sets the benchmark: the id of a master-list index. */
+    BenchmarkInput: {
+      /** Format: uuid */
+      instrumentId: null | string;
+    };
+    /** @description The benchmark in force (all null when the master list has no such index yet). `IsDefault`: the owner has not chosen one, Nifty 50 applies. */
+    BenchmarkView: {
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      name: null | string;
+      isDefault: boolean;
+      tracked: boolean;
+      hasBars: boolean;
+    };
     /** @description The id a broker uses for the instrument (Dhan: security id + exchange segment). */
     BrokerIdView: {
       broker: string;
@@ -2450,6 +2534,18 @@ export interface components {
       redirectUrl: string;
     };
     /**
+     * @description The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)
+     *     gives 0 and no dates.
+     */
+    Drawdown: {
+      /** Format: double */
+      pct: number;
+      /** Format: date */
+      from: null | string;
+      /** Format: date */
+      to: null | string;
+    };
+    /**
      * @description The scheduled end-of-day run (ADR 0017 §2) as set on the Services screen (ADR 0018): `enabled` (the service is not paused), `timeIst` (`HH:mm`, India time; empty when the schedule has no time of its own),
      *     `nextRunAt` (the next scheduled start; null when paused or none ahead), `lastRun` (the latest automatic data job, null before the first) and `scheduleWords` (the schedule in words).
      */
@@ -2583,6 +2679,55 @@ export interface components {
       /** Format: date-time */
       lastDetectedAt: null | string;
     };
+    /**
+     * @description The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has
+     *     no such index). `Tracked`: tracking is on; `HasBars`: 1-minute bars are stored (the day bars follow when the aggregates are built). A screen offers "Track the benchmark" when it is unavailable and not tracked.
+     *     `AsOf` is the date of the last index close the benchmark lines were valued at (null when unavailable): the index has no live quote, so the benchmark lines end there and a live point of today (portfolio at today's prices) has no benchmark value.
+     */
+    HistoryBenchmark: {
+      state: string;
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      name: null | string;
+      tracked: boolean;
+      hasBars: boolean;
+      reason: null | string;
+      /** Format: date */
+      asOf: null | string;
+    };
+    /**
+     * @description How much of the open holdings the history covers: `Holdings` open holdings, `Covered` of them have stored day bars, `Unpriced` have none (not tracked, not in the instrument master, or bars not fetched yet:
+     *     they are left out and never valued at zero). `LateStart` counts covered holdings whose bars begin after their earliest lot, so part of their history is missing.
+     */
+    HistoryCoverage: {
+      /** Format: int32 */
+      holdings: number;
+      /** Format: int32 */
+      covered: number;
+      /** Format: int32 */
+      unpriced: number;
+      /** Format: int32 */
+      lateStart: number;
+    };
+    /**
+     * @description One day of the portfolio history (rupees; `Nav` and `BenchmarkNav` start at 100). `Value` is what the lots held that day were worth at the day's close (adjusted prices), `Invested` what
+     *     they cost. `BenchmarkValue` is the same cash flows put into the benchmark index; it and `BenchmarkNav` are null when the benchmark has no history for the series.
+     */
+    HistoryPoint: {
+      /** Format: date */
+      date: string;
+      /** Format: double */
+      value: number;
+      /** Format: double */
+      invested: number;
+      /** Format: double */
+      benchmarkValue: null | number;
+      /** Format: double */
+      nav: number;
+      /** Format: double */
+      benchmarkNav: null | number;
+    };
     /** @description The lots of a holding, open lots first (oldest first), then closed ones. */
     HoldingLots: {
       /** Format: uuid */
@@ -2667,6 +2812,10 @@ export interface components {
      *     still have the import's default date. UnpricedCount counts open holdings without a usable price: they are left out of Returns (invested, value, P&amp;L, XIRR). ValuationDate is the day the values are as of (today in India).
      *     DayChange (rupees) is the sum of the day changes of the included open holdings and DayChangePct (percent number) is that sum over the sum of qty x previous close of the same holdings; both are null when no
      *     holding is included. DayChangeExcluded counts the open holdings left out (no previous close or no usable price). PricesAsOf holds the oldest and the newest price time of the open priced holdings.
+     *     BenchmarkXirr (percent number) is the XIRR of the same cash flows put into the benchmark index (Nifty 50 by default, ADR 0020 §2), Alpha the portfolio's XIRR minus it in percentage points; BenchmarkState is "ok", "unavailable" (the index has no history
+     *     from the first cash flow: track it and run Update data), "insufficient" (the same reasons as for XIRR) or "n_m" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState "ok").
+     *     BenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which
+     *     it is when Alpha is set: "last_close" (portfolio and index are both as of their last close) or "live_vs_last_close" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only).
      */
     HoldingsSummary: {
       returns: components['schemas']['ReturnsView'];
@@ -2690,6 +2839,14 @@ export interface components {
       /** Format: int32 */
       dayChangeExcluded: number;
       pricesAsOf: components['schemas']['PricesAsOf'];
+      /** Format: double */
+      benchmarkXirr: null | number;
+      /** Format: double */
+      alpha: null | number;
+      benchmarkState: string;
+      /** Format: date */
+      benchmarkAsOf: null | string;
+      alphaBasis: null | string;
     };
     HttpValidationProblemDetails: {
       type?: null | string;
@@ -2985,6 +3142,30 @@ export interface components {
       unit: null | string;
     };
     /**
+     * @description The value history of a scope (all accounts that count in totals, one account, one bucket). `Points` are in date order at `Resolution` (`day`, `week` or `month`: the last trading day of the period); `Value` is what the
+     *     lots held that day were worth at that day's close (adjusted for splits and bonuses), `Invested` what they cost, `BenchmarkValue` the same cash flows in the benchmark index, `Nav` and `BenchmarkNav` unit values starting at 100
+     *     that cash flows do not move. `Coverage` says how many open holdings have price history; `Partial` is true when anything is left out (holdings without bars, history that starts late). `MaxDrawdown` / `BenchmarkMaxDrawdown`: the largest
+     *     fall of the NAV measured within the requested range (`Pct` 12.5 = fell 12.5 %; the peak must lie inside the range too) between the peak on `From` and the low on `To`, daily, whatever the resolution; `RangeFrom` and `RangeTo` are the first and
+     *     the last day of that range as returned (null when there is no point). `FirstDate` is the first day of the whole history (before the range is cut). `LastPriceAt` is set when the last point is today's live one: the time of the newest price in it.
+     */
+    PortfolioHistory: {
+      points: components['schemas']['HistoryPoint'][];
+      coverage: components['schemas']['HistoryCoverage'];
+      partial: boolean;
+      benchmark: components['schemas']['HistoryBenchmark'];
+      maxDrawdown: null | components['schemas']['Drawdown'];
+      benchmarkMaxDrawdown: null | components['schemas']['Drawdown'];
+      /** Format: date */
+      firstDate: null | string;
+      /** Format: date-time */
+      lastPriceAt: null | string;
+      resolution: string;
+      /** Format: date */
+      rangeFrom: null | string;
+      /** Format: date */
+      rangeTo: null | string;
+    };
+    /**
      * @description The portfolio configuration to change. <b>Every field that is left out (null) keeps the account's current value</b>, on update. DefaultBucket: the name of
      *     the bucket imports go to — a custom bucket's name; an empty string "" (or the name of the account's own "{account name} · Portfolio" bucket) selects the account's
      *     own default bucket; null or omitted keeps the current choice. IncludeInTotals: true or false; null keeps it. At account creation, omitted means the account's own
@@ -3028,6 +3209,25 @@ export interface components {
       /** Format: date */
       firstImportDate: string;
       hasHoldings: boolean;
+    };
+    /**
+     * @description What a track action did. `Requested` distinct master-list instruments were asked to be tracked, `Added` of them are newly tracked (or tracked again), `AlreadyTracked` were; `NotInMaster` open holdings in scope
+     *     are not in the instrument master (nothing to track), `Retired` instruments are no longer listed and were skipped. `TotalTracked` is the number tracked now. No job is started: `Hint` says the next <i>Update data</i> builds the bars.
+     */
+    PortfolioTrackResult: {
+      /** Format: int32 */
+      requested: number;
+      /** Format: int32 */
+      added: number;
+      /** Format: int32 */
+      alreadyTracked: number;
+      /** Format: int32 */
+      notInMaster: number;
+      /** Format: int32 */
+      retired: number;
+      /** Format: int32 */
+      totalTracked: number;
+      hint: string;
     };
     /** @description The files to preview: names from the folder listing, at most int PreviewCsvFilesHandler.MaxFiles. */
     PreviewCsvFilesRequest: {
@@ -6346,6 +6546,191 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioHistory: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+        from?: string;
+        to?: string;
+        resolution?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioHistory'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPortfolioBenchmark: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BenchmarkView'];
+        };
+      };
+    };
+  };
+  SetPortfolioBenchmark: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BenchmarkInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BenchmarkView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  TrackPortfolioHoldings: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        bucketId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioTrackResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  TrackPortfolioBenchmark: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PortfolioTrackResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

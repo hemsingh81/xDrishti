@@ -16,7 +16,7 @@ interface StatTileProps {
 
 const toneColor = { default: 'text.primary', good: 'success.main', bad: 'error.main' } as const;
 
-/** Small KPI tile (label, big value, optional hint). */
+/** Small KPI tile (label, big value, optional hint). A grid can reserve room for a wrapping label with `--stat-tile-label-min`. */
 export function StatTile({ label, value, hint, tone = 'default', icon, hue }: StatTileProps) {
   return (
     <Card sx={{ position: 'relative' }}>
@@ -25,8 +25,12 @@ export function StatTile({ label, value, hint, tone = 'default', icon, hue }: St
           <IconChip icon={icon} hue={hue} size="md" />
         </Box>
       )}
-      <CardContent sx={icon && hue ? { pr: 7.5 } : undefined}>
-        <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+      <CardContent sx={icon && hue ? { pr: 6.5 } : undefined}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontWeight: 600, minHeight: 'var(--stat-tile-label-min, 0)' }}
+        >
           {label}
         </Typography>
         <Typography

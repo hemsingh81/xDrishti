@@ -23,6 +23,7 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
 
 /** A made-up Dhan consent page URL (the documented form, with a fake consentAppId). */
@@ -88,6 +89,8 @@ export const handlers = [
       : problemResponse({ title: 'The holding does not exist.', code: 'portfolio.not_found' }, 404);
   }),
   http.get('/api/accounts/:id/holdings/sync-status', () => HttpResponse.json(buildSyncStatus())),
+  // The value history (P2-07): a complete one over the same holdings; tests of the History card replace it.
+  ...historyHandlers,
   // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),

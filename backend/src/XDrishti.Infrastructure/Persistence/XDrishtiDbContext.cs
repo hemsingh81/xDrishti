@@ -28,6 +28,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<ServiceRun> ServiceRuns => Set<ServiceRun>();
 
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
+
     public DbSet<OwnerAccount> OwnerAccounts => Set<OwnerAccount>();
 
     public DbSet<AuthSession> AuthSessions => Set<AuthSession>();

@@ -51,4 +51,5 @@ public enum AccountEventType
     ServicePaused,
     ServiceResumed,
     ServiceRunRequested,
+    PortfolioBenchmarkChanged,
 }

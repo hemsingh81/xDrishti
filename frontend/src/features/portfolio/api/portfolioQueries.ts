@@ -8,6 +8,8 @@ export const portfolioKeys = {
   all: ['portfolio'] as const,
   holdings: ['portfolio', 'holdings'] as const,
   summary: ['portfolio', 'summary'] as const,
+  history: ['portfolio', 'history'] as const,
+  benchmark: ['portfolio', 'benchmark'] as const,
   lots: ['portfolio', 'lots'] as const,
   lotsOf: (holdingId: string) => ['portfolio', 'lots', holdingId] as const,
   syncStatuses: ['portfolio', 'sync-status'] as const,

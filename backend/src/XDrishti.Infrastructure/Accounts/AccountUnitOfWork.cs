@@ -1,13 +1,17 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Common;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Infrastructure.Accounts;
 
-/// <summary>The scoped context tracks the accounts, profiles, broker secrets and events of one use case; saving commits them in one transaction.</summary>
-internal sealed class AccountUnitOfWork(XDrishtiDbContext db) : IAccountUnitOfWork
+/// <summary>
+/// The scoped context tracks the accounts, profiles, broker secrets and events of one use case; saving commits them in one transaction. A save here can re-date lots (the first import date), switch the Portfolio role or
+/// "count in totals" or archive an account, which change what the portfolio histories show, so the cached histories are dropped after every commit (<see cref="IPortfolioHistoryCache"/>).
+/// </summary>
+internal sealed class AccountUnitOfWork(XDrishtiDbContext db, IPortfolioHistoryCache histories) : IAccountUnitOfWork
 {
     /// <summary>Key of the transaction-scoped advisory lock that serialises <see cref="RunSerializedAsync"/> (switching the primary Data account, deleting a risk profile).</summary>
     internal const long SerializedWriteLockKey = 7_207_001L;
@@ -20,6 +24,7 @@ internal sealed class AccountUnitOfWork(XDrishtiDbContext db) : IAccountUnitOfWo
         try
         {
             await db.SaveChangesAsync(cancellationToken);
+            histories.Invalidate();
             return true;
         }
         catch (DbUpdateConcurrencyException)
@@ -40,7 +45,7 @@ internal sealed class AccountUnitOfWork(XDrishtiDbContext db) : IAccountUnitOfWo
     {
         // The retrying execution strategy requires user transactions to run inside it; it may run the whole block again after a transient failure.
         var strategy = db.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async token =>
+        var outcome = await strategy.ExecuteAsync(async token =>
         {
             db.ChangeTracker.Clear();
             await using var transaction = await db.Database.BeginTransactionAsync(token);
@@ -61,5 +66,11 @@ internal sealed class AccountUnitOfWork(XDrishtiDbContext db) : IAccountUnitOfWo
 
             return result;
         }, cancellationToken);
+        if (outcome.IsSuccess)
+        {
+            histories.Invalidate();
+        }
+
+        return outcome;
     }
 }

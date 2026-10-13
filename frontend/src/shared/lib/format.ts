@@ -71,6 +71,19 @@ export function formatDate(value: string): string {
   return isoDay.test(value) ? calendarDate.format(new Date(`${value}T00:00:00Z`)) : date.format(new Date(value));
 }
 
+const calendarDayMonth = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const calendarMonthYear = new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+/** "13 Oct": a calendar date (yyyy-MM-dd) without the year, for the axis of a chart over a few months. */
+export function formatDayMonth(value: string): string {
+  return calendarDayMonth.format(new Date(`${value}T00:00:00Z`));
+}
+
+/** "Oct 2026": the month of a calendar date (yyyy-MM-dd), for the axis of a chart over years. */
+export function formatMonthYear(value: string): string {
+  return calendarMonthYear.format(new Date(`${value}T00:00:00Z`));
+}
+
 const calendarWeekday = new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' });
 
 /** "Tue 20 Oct 2026": a calendar date (yyyy-MM-dd) with its weekday. */

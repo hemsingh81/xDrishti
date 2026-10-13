@@ -5,12 +5,14 @@ import type { AccountSummary } from '@/shared/api';
 import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { holdingsList, summaryQuery } from '../api/portfolioQueries';
 import { useMarket } from '../hooks/useMarket';
+import { usePortfolioHistory } from '../hooks/usePortfolioHistory';
 import { useQuotesService } from '../hooks/useQuotesService';
 import { useRefreshOnQuoteRun } from '../hooks/useRefreshOnQuoteRun';
 import { useRefreshPrices } from '../hooks/useRefreshPrices';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
 import { activeFilterCount } from '../lib/filters';
+import { HistoryCard } from './HistoryCard';
 import { HoldingDrawer } from './HoldingDrawer';
 import { HoldingsGrid, NoMatches } from './HoldingsGrid';
 import { EmptyHoldings, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
@@ -21,7 +23,7 @@ import { SummaryNotes } from './SummaryNotes';
 import { SummaryTiles } from './SummaryTiles';
 import { SyncBar } from './SyncBar';
 
-/** The page once the accounts are known: scope, totals, sync bar, holdings, the and the holding drawer. */
+/** The page once the accounts are known: scope, totals, value history, sync bar, holdings and the holding drawer. */
 export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[] }) {
   const { filters: requested, update, clear, openId, open } = usePortfolioFilters();
 
@@ -41,6 +43,8 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   useRefreshOnQuoteRun(quotes.service);
   const summary = useQuery({ ...summaryQuery(filters), refetchInterval: market.pollMs });
   const holdings = useInfiniteRows({ ...holdingsList(filters), refetchInterval: market.pollMs });
+  const scope = { account: filters.account, bucket: filters.bucket };
+  const history = usePortfolioHistory(scope, market.pollMs);
 
   if (portfolio.length === 0) {
     return (
@@ -52,6 +56,10 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   }
 
   const nothingAtAll = summary.data?.openCount === 0 && summary.data.closedCount === 0 && filters.q.trim() === '';
+  // While the totals of a new scope load, the card stays if the history already knows holdings (it does not blink away).
+  const hasHoldings = summary.data
+    ? summary.data.openCount + summary.data.closedCount > 0
+    : (history.query.data?.coverage.holdings ?? 0) > 0;
   const actingTarget = acting ? { id: acting.id, name: acting.name } : null;
 
   return (
@@ -65,7 +73,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
         bucketsLoading={buckets.isPending}
         onChange={update}
       />
-      <SummaryTiles query={summary} />
+      <SummaryTiles query={summary} history={{ query: history.query, rangeLabel: history.range }} />
       {summary.data && (
         <PricesLine
           summary={summary.data}
@@ -83,6 +91,15 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
           onReviewDates={() => {
             update({ status: 'open', sort: { field: 'acquiredOn', descending: false } });
           }}
+        />
+      )}
+      {hasHoldings && (
+        <HistoryCard
+          query={history.query}
+          range={history.range}
+          onRangeChange={history.setRange}
+          defaultDateLots={summary.data?.defaultDateLots ?? 0}
+          scope={scope}
         />
       )}
       <SyncBar

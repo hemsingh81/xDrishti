@@ -5,6 +5,7 @@ using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Application.Tests.Accounts.Connections;
+using XDrishti.Application.Tests.Portfolio.History;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Portfolio;
@@ -46,7 +47,12 @@ internal sealed class PortfolioFixture
 
     public ListHoldingsHandler List() => new(Data, Clock);
 
-    public GetHoldingsSummaryHandler Summary() => new(Data, Data, Accounts, Clock);
+    /// <summary>The benchmark setting and the stored day closes the summary's benchmark XIRR reads (empty: no benchmark index).</summary>
+    public FakePortfolioBenchmark Benchmarks { get; } = new();
+
+    public FakePortfolioPrices Prices { get; } = new();
+
+    public GetHoldingsSummaryHandler Summary() => new(Data, Data, Accounts, Benchmarks, Prices, new FakeTradingCalendar(HistoryData.Weekdays), Clock);
 
     public GetHoldingLotsHandler Lots() => new(Data, Clock);
 
