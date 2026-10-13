@@ -140,6 +140,45 @@ describe('Lots after a rebuild from trades', () => {
     });
   });
 
+  it('still calls the opening lot “before the first trade” when the holding was rebuilt from sells alone', async () => {
+    const { table } = await openLots(
+      buildLots({
+        lots: [
+          buildLot({
+            id: lot(1),
+            acquiredOn: '2024-06-09',
+            qty: 5,
+            unitCost: 1_500,
+            usesDefaultDate: true,
+            source: 'import',
+          }),
+          buildLot({
+            id: lot(2),
+            acquiredOn: '2024-06-09',
+            qty: 5,
+            unitCost: 1_500,
+            source: 'import',
+            status: 'closed',
+            closedOn: '2026-09-20',
+            closePrice: 1_700,
+            estimated: false,
+          }),
+        ],
+      }),
+    );
+
+    const open = within(table.getByRole('row', { name: /Default date/ }));
+    expect(open.getByText('Before the first trade')).toBeInTheDocument();
+    // The closed piece (sold at the real price) is not the opening lot.
+    expect(table.getAllByText('Before the first trade')).toHaveLength(1);
+  });
+
+  it('does not call a lot “before the first trade” when its closures are only estimates', async () => {
+    const { table } = await openLots(buildLots());
+
+    expect(table.queryByText('Before the first trade')).not.toBeInTheDocument();
+  });
+
   it('does not call a lot “before the first trade” when no lot came from trades', async () => {
     const { table } = await openLots(buildLots());
 

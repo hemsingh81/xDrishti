@@ -69,7 +69,9 @@ describe('useImportWizard: answers that arrive after the choice changed', () => 
     await act(async () => {
       await result.current.preview();
     });
-    expect(result.current.report).not.toBeNull();
+    await waitFor(() => {
+      expect(result.current.report).not.toBeNull();
+    });
     let running: Promise<void> = Promise.resolve();
     act(() => {
       running = result.current.runImport(true);
@@ -107,7 +109,9 @@ describe('useImportWizard: answers that arrive after the choice changed', () => 
       await result.current.runImport(false);
     });
 
-    expect(result.current.importing.isError).toBe(true);
+    await waitFor(() => {
+      expect(result.current.importing.isError).toBe(true);
+    });
     expect(result.current.report).not.toBeNull();
   });
 });
