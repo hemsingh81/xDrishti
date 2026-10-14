@@ -11,10 +11,18 @@ interface SummaryNotesProps {
   dayChangeExcluded: number;
   /** Show those holdings first: oldest purchase date first. */
   onReviewDates: () => void;
+  /** While the live feed runs: how many holdings have no live tick (unmapped, beyond the cap, not traded yet); undefined when not live. */
+  notLive?: { count: number; truncated: boolean };
 }
 
 /** Under the tiles: the lots whose date was never chosen (a way to find them), and what the figures leave out. */
-export function SummaryNotes({ defaultDateLots, unpricedCount, dayChangeExcluded, onReviewDates }: SummaryNotesProps) {
+export function SummaryNotes({
+  defaultDateLots,
+  unpricedCount,
+  dayChangeExcluded,
+  onReviewDates,
+  notLive,
+}: SummaryNotesProps) {
   return (
     <Stack direction="row" sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.5 }}>
       {defaultDateLots > 0 && (
@@ -39,6 +47,11 @@ export function SummaryNotes({ defaultDateLots, unpricedCount, dayChangeExcluded
       {dayChangeExcluded > 0 && (
         <Typography variant="caption" color="text.secondary">
           {`Day change excludes ${formatNumber(dayChangeExcluded)} ${dayChangeExcluded === 1 ? 'holding' : 'holdings'} without a previous close`}
+        </Typography>
+      )}
+      {notLive !== undefined && notLive.count > 0 && (
+        <Typography variant="caption" color="text.secondary">
+          {`${formatNumber(notLive.count)} ${notLive.count === 1 ? 'holding is' : 'holdings are'} not live: ${notLive.count === 1 ? 'it keeps' : 'they keep'} the last quote or synced price${notLive.truncated ? ' (a connection follows at most 1,000 prices)' : ''}`}
         </Typography>
       )}
       <Typography variant="caption" color="text.secondary">

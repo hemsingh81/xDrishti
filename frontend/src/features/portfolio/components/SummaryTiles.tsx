@@ -133,8 +133,15 @@ function Tiles({ data, history }: { data: HoldingsSummary; history: HistoryTiles
   );
 }
 
+interface SummaryTilesProps {
+  query: UseQueryResult<HoldingsSummary>;
+  history: HistoryTiles;
+  /** The totals at the prices the live hub pushed since the last read; shown instead of the query's data. */
+  live?: HoldingsSummary;
+}
+
 /** The totals of the chosen account and bucket: invested, value, P&L, XIRR, benchmark XIRR, alpha, max drawdown, realised and the counts. */
-export function SummaryTiles({ query, history }: { query: UseQueryResult<HoldingsSummary>; history: HistoryTiles }) {
+export function SummaryTiles({ query, history, live }: SummaryTilesProps) {
   if (query.isPending) return <LoadingState label="Loading totals" />;
   if (query.isError) {
     return (
@@ -157,5 +164,5 @@ export function SummaryTiles({ query, history }: { query: UseQueryResult<Holding
       </Alert>
     );
   }
-  return <Tiles data={query.data} history={history} />;
+  return <Tiles data={live ?? query.data} history={history} />;
 }

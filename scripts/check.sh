@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # All quality gates — must pass before every commit (Definition of Done, docs/engineering).
-#   backend: format check, build (warnings = errors), unit + architecture + integration tests
+#   backend: format check, build (warnings = errors), unit + architecture + integration tests, proxy config
 #   frontend: type check, lint, format check, tests, production build
 set -euo pipefail
 source "$(dirname "$0")/_env.sh"
@@ -13,6 +13,7 @@ say "Backend: build"
 dotnet build XDrishti.slnx -c Release --nologo -v q
 say "Backend: tests (integration tests use TimescaleDB in Podman)"
 dotnet test --solution XDrishti.slnx -c Release --no-build
+"$ROOT/scripts/check-proxy.sh"
 
 cd "$ROOT/frontend"
 # Reinstall only when dependencies are missing or the lock file changed since the last install.

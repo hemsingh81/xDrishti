@@ -20,12 +20,26 @@
 		-Server
 	}
 
-	# API, OpenAPI docs and health → xd-api (later also /hubs for SignalR and /hangfire).
+	# API, OpenAPI docs and health → xd-api.
 	@api path /api/* /health/*
 	handle @api {
 		reverse_proxy xd-api:8080 {
 			health_uri /health/live
 			health_interval 15s
+		}
+	}
+
+	# SignalR hub (/hubs/events, ADR 0024 §7) → xd-api. Caddy's reverse_proxy upgrades WebSocket connections by itself (no
+	# directive needed); the connection is long-lived, so it is flushed at once and a config reload does not cut it for 5 minutes.
+	# The Host and Origin headers reach xd-api unchanged: it refuses any other origin (HubOriginMiddleware). The owner's session
+	# cookie is checked by xd-api; the hub is not reachable without it. scripts/check-proxy.sh keeps this block in place.
+	@hubs path /hubs/*
+	handle @hubs {
+		reverse_proxy xd-api:8080 {
+			health_uri /health/live
+			health_interval 15s
+			flush_interval -1
+			stream_close_delay 5m
 		}
 	}
 

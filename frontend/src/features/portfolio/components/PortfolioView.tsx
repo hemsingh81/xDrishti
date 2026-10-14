@@ -1,13 +1,15 @@
 import ReceiptIcon from '@mui/icons-material/ReceiptLongOutlined';
 import { Box, Button } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { bucketsQuery, useNow } from '@/features/accounts';
 import type { AccountSummary } from '@/shared/api';
 import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { holdingsList, summaryQuery } from '../api/portfolioQueries';
 import type { HoldingRef } from '../api/lookupQueries';
 import { useDrawerHolding } from '../hooks/useDrawerHolding';
+import { useLiveScope } from '../hooks/useLiveFeed';
+import { useLivePolling } from '../hooks/useLivePolling';
 import { useMarket } from '../hooks/useMarket';
 import { usePortfolioHistory } from '../hooks/usePortfolioHistory';
 import { useQuotesService } from '../hooks/useQuotesService';
@@ -22,16 +24,15 @@ import { alertTargetOfHolding } from '../lib/alertTarget';
 import { activeFilterCount } from '../lib/filters';
 import { ActionCenter } from './actions/ActionCenter';
 import { HistoryCard } from './HistoryCard';
+import { LiveProvider } from './LiveProvider';
+import { LiveSummary } from './LiveSummary';
 import { GroupedHoldings } from './GroupedHoldings';
 import { HoldingDrawer } from './HoldingDrawer';
 import { HoldingsGrid, NoMatches } from './HoldingsGrid';
 import { EmptyHoldings, NoGroups, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
 import { PortfolioHeader } from './PortfolioHeader';
 import { PortfolioOverlays } from './PortfolioOverlays';
-import { PricesLine } from './PricesLine';
 import { ScopeBar } from './ScopeBar';
-import { SummaryNotes } from './SummaryNotes';
-import { SummaryTiles } from './SummaryTiles';
 import { SyncBar } from './SyncBar';
 
 /** The page once the accounts are known: scope, totals, value history, sync bar, holdings and the holding drawer. */
@@ -52,10 +53,22 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const quotes = useQuotesService(market.open);
   const refresh = useRefreshPrices(quotes.service);
   useRefreshOnQuoteRun(quotes.service);
-  const summary = useQuery({ ...summaryQuery(filters), refetchInterval: market.pollMs });
+  // The live hub (pre-open to the close, page visible): while it follows the screen, prices move by themselves and the
+  // figures are read every 5 minutes; without it they are read once a minute, as before.
+  const { live, liveScope, listPollMs, totalsPollMs } = useLivePolling(
+    market,
+    filters,
+    portfolio.map((a) => a.id),
+  );
+  const summary = useQuery({ ...summaryQuery(filters), refetchInterval: totalsPollMs });
   // The flat list is for Group by None; a grouping loads the groups and, per opened group, its holdings.
   const grouped = filters.groupBy !== 'none';
-  const holdings = useInfiniteRows({ ...holdingsList(filters), enabled: !grouped, refetchInterval: market.pollMs });
+  const holdings = useInfiniteRows({ ...holdingsList(filters), enabled: !grouped, refetchInterval: listPollMs });
+  const shownIds = useMemo(
+    () => [...(grouped ? [] : holdings.rows.map((h) => h.id)), ...(openId === null ? [] : [openId])],
+    [grouped, holdings.rows, openId],
+  );
+  useLiveScope({ enabled: live.enabled, account: filters.account, bucket: filters.bucket, holdingIds: shownIds });
   const groupedHolding = useCachedHolding(grouped ? openId : null);
   // The Action center opens holdings that the list may not have loaded: the item names them, the drawer looks them up.
   const [openHint, setOpenHint] = useState<HoldingRef | null>(null);
@@ -96,160 +109,153 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
       .join(' · ') || null;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
-      <PortfolioHeader
-        actions={
-          <Button
-            variant="outlined"
-            startIcon={<ReceiptIcon />}
-            onClick={() => {
-              overlays.openTrades();
-            }}
-          >
-            Trades
-          </Button>
-        }
-      />
-      {acting && !connected && <NotConnectedNotice accountId={acting.id} accountName={acting.name} />}
-      <ScopeBar
-        filters={filters}
-        accounts={portfolio}
-        buckets={buckets.data}
-        bucketsLoading={buckets.isPending}
-        onChange={update}
-      />
-      <SummaryTiles query={summary} history={{ query: history.query, rangeLabel: history.range }} />
-      {summary.data && (
-        <PricesLine
-          summary={summary.data}
-          now={market.now}
-          marketOpen={market.open}
+    <LiveProvider feed={live} scope={liveScope}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
+        <PortfolioHeader
+          actions={
+            <Button
+              variant="outlined"
+              startIcon={<ReceiptIcon />}
+              onClick={() => {
+                overlays.openTrades();
+              }}
+            >
+              Trades
+            </Button>
+          }
+        />
+        {acting && !connected && <NotConnectedNotice accountId={acting.id} accountName={acting.name} />}
+        <ScopeBar
+          filters={filters}
+          accounts={portfolio}
+          buckets={buckets.data}
+          bucketsLoading={buckets.isPending}
+          onChange={update}
+        />
+        <LiveSummary
+          summary={summary}
+          history={{ query: history.query, rangeLabel: history.range }}
+          market={market}
           quotes={quotes.service}
           quotesUnknown={quotes.isError}
-        />
-      )}
-      {summary.data && (
-        <SummaryNotes
-          defaultDateLots={summary.data.defaultDateLots}
-          unpricedCount={summary.data.unpricedCount}
-          dayChangeExcluded={summary.data.dayChangeExcluded}
+          feed={live}
           onReviewDates={() => {
             update({ status: 'open', sort: { field: 'acquiredOn', descending: false } });
           }}
         />
-      )}
-      {hasHoldings && (
-        <ActionCenter
-          scope={scope}
-          scopeLabel={scopeLabel}
-          pollMs={market.pollMs}
-          focusRequested={overlays.focusActions}
-          onFocusHandled={overlays.focusHandled}
-          onOpenHolding={(holding) => {
-            setOpenHint(holding);
-            open(holding.id);
+        {hasHoldings && (
+          <ActionCenter
+            scope={scope}
+            scopeLabel={scopeLabel}
+            pollMs={market.pollMs}
+            focusRequested={overlays.focusActions}
+            onFocusHandled={overlays.focusHandled}
+            onOpenHolding={(holding) => {
+              setOpenHint(holding);
+              open(holding.id);
+            }}
+            onShowSector={(accountId) => {
+              update({ groupBy: 'sector', account: accountId });
+              // The grouped holdings are below the cards: take the owner to them.
+              requestAnimationFrame(() => {
+                if (typeof holdingsStart.current?.scrollIntoView === 'function') {
+                  holdingsStart.current.scrollIntoView({ block: 'start' });
+                }
+              });
+            }}
+            onSetAlert={setAlertDialog}
+            onOpenAlerts={() => {
+              overlays.openAlerts();
+            }}
+          />
+        )}
+        {hasHoldings && (
+          <HistoryCard
+            query={history.query}
+            range={history.range}
+            onRangeChange={history.setRange}
+            defaultDateLots={summary.data?.defaultDateLots ?? 0}
+            scope={scope}
+          />
+        )}
+        <SyncBar
+          account={actingTarget}
+          connected={connected}
+          fallbackRun={summary.data?.lastSync ?? null}
+          refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
+        />
+        <div ref={holdingsStart} aria-hidden />
+        {filters.groupBy === 'none' ? (
+          <HoldingsGrid
+            result={holdings}
+            filters={filters}
+            openId={openId}
+            showAccount={showAccount}
+            emptyState={
+              nothingAtAll ? (
+                <EmptyHoldings accountId={acting?.id ?? null} />
+              ) : (
+                <NoMatches canClear={activeFilterCount(filters) > 0} onClear={clear} />
+              )
+            }
+            onChange={update}
+            onOpen={open}
+          />
+        ) : (
+          <GroupedHoldings
+            by={filters.groupBy}
+            scope={{ filters, by: filters.groupBy, pollMs: totalsPollMs, showAccount, openId, onOpen: open }}
+            emptyState={
+              nothingAtAll ? (
+                <EmptyHoldings accountId={acting?.id ?? null} />
+              ) : (
+                <NoGroups canClear={activeFilterCount(filters) > 0} onClear={clear} />
+              )
+            }
+            onChange={update}
+          />
+        )}
+        <HoldingDrawer
+          id={openId}
+          holding={drawerHolding}
+          onClose={() => {
+            open(null);
           }}
-          onShowSector={(accountId) => {
-            update({ groupBy: 'sector', account: accountId });
-            // The grouped holdings are below the cards: take the owner to them.
-            requestAnimationFrame(() => {
-              if (typeof holdingsStart.current?.scrollIntoView === 'function') {
-                holdingsStart.current.scrollIntoView({ block: 'start' });
-              }
-            });
+          onSetAlert={(holding) => {
+            const target = alertTargetOfHolding(holding);
+            if (target) setAlertDialog(target);
           }}
-          onSetAlert={setAlertDialog}
-          onOpenAlerts={() => {
+          onShowAlerts={() => {
             overlays.openAlerts();
           }}
         />
-      )}
-      {hasHoldings && (
-        <HistoryCard
-          query={history.query}
-          range={history.range}
-          onRangeChange={history.setRange}
-          defaultDateLots={summary.data?.defaultDateLots ?? 0}
-          scope={scope}
+        <PortfolioOverlays
+          alertsTab={overlays.alertsTab}
+          onAlertsTab={overlays.changeAlertsTab}
+          onCloseAlerts={overlays.closeAlerts}
+          dialog={alertDialog}
+          onNewAlert={() => {
+            setAlertDialog('pick');
+          }}
+          onCloseDialog={() => {
+            setAlertDialog(null);
+          }}
+          trades={{
+            tab: overlays.tradesTab,
+            onTab: overlays.changeTradesTab,
+            onClose: overlays.closeTrades,
+            accounts: portfolio,
+            scopeAccountId: account,
+            adding: addingTrade,
+            onAdd: () => {
+              setAddingTrade(true);
+            },
+            onCloseAdd: () => {
+              setAddingTrade(false);
+            },
+          }}
         />
-      )}
-      <SyncBar
-        account={actingTarget}
-        connected={connected}
-        fallbackRun={summary.data?.lastSync ?? null}
-        refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
-      />
-      <div ref={holdingsStart} aria-hidden />
-      {filters.groupBy === 'none' ? (
-        <HoldingsGrid
-          result={holdings}
-          filters={filters}
-          openId={openId}
-          showAccount={showAccount}
-          emptyState={
-            nothingAtAll ? (
-              <EmptyHoldings accountId={acting?.id ?? null} />
-            ) : (
-              <NoMatches canClear={activeFilterCount(filters) > 0} onClear={clear} />
-            )
-          }
-          onChange={update}
-          onOpen={open}
-        />
-      ) : (
-        <GroupedHoldings
-          by={filters.groupBy}
-          scope={{ filters, by: filters.groupBy, pollMs: market.pollMs, showAccount, openId, onOpen: open }}
-          emptyState={
-            nothingAtAll ? (
-              <EmptyHoldings accountId={acting?.id ?? null} />
-            ) : (
-              <NoGroups canClear={activeFilterCount(filters) > 0} onClear={clear} />
-            )
-          }
-          onChange={update}
-        />
-      )}
-      <HoldingDrawer
-        id={openId}
-        holding={drawerHolding}
-        onClose={() => {
-          open(null);
-        }}
-        onSetAlert={(holding) => {
-          const target = alertTargetOfHolding(holding);
-          if (target) setAlertDialog(target);
-        }}
-        onShowAlerts={() => {
-          overlays.openAlerts();
-        }}
-      />
-      <PortfolioOverlays
-        alertsTab={overlays.alertsTab}
-        onAlertsTab={overlays.changeAlertsTab}
-        onCloseAlerts={overlays.closeAlerts}
-        dialog={alertDialog}
-        onNewAlert={() => {
-          setAlertDialog('pick');
-        }}
-        onCloseDialog={() => {
-          setAlertDialog(null);
-        }}
-        trades={{
-          tab: overlays.tradesTab,
-          onTab: overlays.changeTradesTab,
-          onClose: overlays.closeTrades,
-          accounts: portfolio,
-          scopeAccountId: account,
-          adding: addingTrade,
-          onAdd: () => {
-            setAddingTrade(true);
-          },
-          onCloseAdd: () => {
-            setAddingTrade(false);
-          },
-        }}
-      />
-    </Box>
+      </Box>
+    </LiveProvider>
   );
 }

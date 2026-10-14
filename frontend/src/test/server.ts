@@ -107,6 +107,8 @@ export const handlers = [
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),
   http.get('/api/services/timeline', () => HttpResponse.json(buildTimeline())),
+  // The live feed's state over REST (the Portfolio screen reads it while the live hub is not connected).
+  http.get('/api/live/status', () => HttpResponse.json({ state: 'not_running', subscribed: 0, lastTickAt: null })),
   // Data notices (bell): none by default; the Data fake and the bell tests bring their own.
   http.get('/api/data/notices', () => HttpResponse.json({ items: [] })),
   // Service notices (bell): none by default; the Services fake and the bell tests bring their own.

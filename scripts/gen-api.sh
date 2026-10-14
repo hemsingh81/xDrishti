@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Regenerates the API contract (backend/contracts/XDrishti.Api.json) and the frontend's typed client from it.
-# Run after any endpoint or DTO change, and commit both files with the change.
+# It also carries the SignalR hub (OpenAPI cannot describe one): the backend writes the hub's methods, events and message types
+# into the contract (extension x-xdrishti-hubs, schemas) and frontend/scripts/gen-hub-contract.mjs writes
+# frontend/src/shared/realtime/hubContract.generated.ts from it.
+# Run after any endpoint, DTO or hub change, and commit the generated files with the change.
 set -euo pipefail
 source "$(dirname "$0")/_env.sh"
 say "Generating OpenAPI contract"

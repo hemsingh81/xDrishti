@@ -16,3 +16,21 @@ export function isMarketOpen(now: number, timeline: ServicesTimeline | undefined
   const minutes = istMinutesOfDay(now);
   return minutes >= minutesOf(timeline.marketOpen) && minutes <= minutesOf(timeline.marketClose);
 }
+
+/** The live feed starts this long before the open: prices of the call auction (pre-open) are indicative (ADR 0024 §4). */
+export const preOpenMinutes = 15;
+
+export type MarketPhase = 'closed' | 'preopen' | 'open';
+
+/**
+ * Where the India clock is in the session of the timeline's day: `preopen` from 15 minutes before the open (09:00) to the
+ * open, `open` from the open to the close (inclusive, as `isMarketOpen`), `closed` otherwise and on a day without a session.
+ * The live hub is wanted in the first two.
+ */
+export function marketPhase(now: number, timeline: ServicesTimeline | undefined): MarketPhase {
+  if (isMarketOpen(now, timeline)) return 'open';
+  if (!timeline?.tradingDay || !timeline.marketOpen) return 'closed';
+  const minutes = istMinutesOfDay(now);
+  const open = minutesOf(timeline.marketOpen);
+  return minutes >= open - preOpenMinutes && minutes < open ? 'preopen' : 'closed';
+}

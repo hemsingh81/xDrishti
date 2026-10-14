@@ -8,6 +8,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
@@ -35,6 +36,11 @@ namespace XDrishti.Api.Infrastructure;
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, NumberHandling = JsonNumberHandling.Strict)]
 [JsonSerializable(typeof(SystemStatusResponse))]
+[JsonSerializable(typeof(LiveFeedStatus))]
+[JsonSerializable(typeof(LiveScope))]
+[JsonSerializable(typeof(SubscribeAck))]
+[JsonSerializable(typeof(PricesChanged))]
+[JsonSerializable(typeof(InstrumentPrice))]
 [JsonSerializable(typeof(LoginRequest))]
 [JsonSerializable(typeof(StepUpRequest))]
 [JsonSerializable(typeof(StepUpResult))]

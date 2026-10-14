@@ -2,7 +2,8 @@
 # One build stage for the whole solution, one small runtime image per host (target: api | worker | feed).
 # Runtime images are Ubuntu "chiseled": no shell, no package manager, non-root user — minimal attack surface.
 ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.400-noble
-ARG ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.12-noble-chiseled
+# 10.0.13: SignalR (the hub of xd-api) in 10.0.12 and earlier has a known denial-of-service vulnerability (GHSA-334f-vvp4-7g6p).
+ARG ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.13-noble-chiseled
 ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:10.0.12-noble-chiseled
 
 FROM ${SDK_IMAGE} AS build

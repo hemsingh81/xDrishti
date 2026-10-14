@@ -3,6 +3,7 @@ import type { HoldingGroup, HoldingRow } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
 import { Grid, type GridSort } from '@/shared/ui/grid';
 import { groupPageSize } from '../api/groupQueries';
+import { useLiveRows } from '../hooks/liveContext';
 import { useGroupHoldings } from '../hooks/useGroupHoldings';
 import { problemText } from '../lib/errors';
 import type { GroupBy, PortfolioFilters } from '../lib/filters';
@@ -37,6 +38,7 @@ interface GroupChildrenProps {
 export function GroupChildren({ group, scope, id }: GroupChildrenProps) {
   const { filters, by } = scope;
   const result = useGroupHoldings(filters, by, group.key, scope.pollMs);
+  const rows = useLiveRows(result.rows);
   const sort: GridSort = { columnId: filters.sort.field, descending: filters.sort.descending };
   const left = result.total - result.rows.length;
   const pageSize = result.lastPage?.pageSize ?? groupPageSize;
@@ -55,7 +57,7 @@ export function GroupChildren({ group, scope, id }: GroupChildrenProps) {
       <Grid
         label={`${group.name} holdings`}
         columns={scope.showAccount ? holdingColumnsWithAccount : holdingColumns}
-        rows={result.rows}
+        rows={rows}
         getRowId={getRowId}
         getRowLabel={getRowLabel}
         sort={sort}

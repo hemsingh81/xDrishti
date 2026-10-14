@@ -4,3 +4,4 @@ node_modules
 package-lock.json
 *.md
 .vitest
+src/test/fixtures/liveGolden.json

@@ -13,5 +13,6 @@
 - Database: `xd_owner` owns schemas and runs migrations (`xd-migrate`); apps use `xd_app` (DML only).
   `db/init/*.sh` runs only when the volume is created.
 - Proxy (Caddy): the only HTTP entry; compression, security headers, immutable caching for hashed assets,
-  SPA fallback. Add new backend paths (e.g. `/hubs`) in `caddy/Caddyfile`.
+  SPA fallback. `/hubs/*` (SignalR, WebSocket upgrade) and `/api`, `/health` go to `xd-api`; add new backend paths in `caddy/Caddyfile`
+  (a test in `Api.IntegrationTests/Live/CaddyfileTests` and `scripts/check-proxy.sh` keep the hub route honest).
 - Changing a port, image or service → update `docs/design/17-deployment-and-operations.md`.

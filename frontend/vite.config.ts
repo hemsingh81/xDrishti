@@ -17,6 +17,19 @@ export default defineConfig({
     proxy: {
       '/api': { target: apiTarget, changeOrigin: true },
       '/health': { target: apiTarget, changeOrigin: true },
+      // The SignalR hub (WebSocket). xd-api refuses any origin but its own host, so the dev server presents the target as the origin.
+      '/hubs': {
+        target: apiTarget,
+        changeOrigin: true,
+        ws: true,
+        configure: (proxy) => {
+          const asTarget = (request: { setHeader: (name: string, value: string) => void }) => {
+            request.setHeader('origin', apiTarget);
+          };
+          proxy.on('proxyReq', asTarget);
+          proxy.on('proxyReqWs', asTarget);
+        },
+      },
     },
   },
   build: {

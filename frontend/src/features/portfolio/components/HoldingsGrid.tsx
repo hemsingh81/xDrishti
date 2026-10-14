@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { HoldingRow } from '@/shared/api';
 import type { InfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { Grid, type GridSort } from '@/shared/ui/grid';
+import { useLiveRows } from '../hooks/liveContext';
 import { problemText } from '../lib/errors';
 import { holdingsParams } from '../api/portfolioQueries';
 import { isSortField, type PortfolioFilters } from '../lib/filters';
@@ -34,7 +35,9 @@ export function HoldingsGrid({
   onChange,
   onOpen,
 }: HoldingsGridProps) {
-  const { rows, isPending, isError, isPlaceholderData, error, loadMoreError } = result;
+  const { isPending, isError, isPlaceholderData, error, loadMoreError } = result;
+  // Rows at the prices the hub pushed since the last read; the order stays the read's (rows do not jump while it is read).
+  const rows = useLiveRows(result.rows);
   const sort: GridSort = { columnId: filters.sort.field, descending: filters.sort.descending };
 
   return (

@@ -12,7 +12,11 @@ import {
   formatNumber,
 } from '@/shared/lib/format';
 import { Facts, LoadingState, type Fact } from '@/shared/ui';
+import { useWallClock } from '@/shared/lib/useWallClock';
 import { monoFontFamily } from '@/theme';
+import { useLive, useLiveRow } from '../hooks/liveContext';
+import { istSecondText } from '../lib/liveChip';
+import { notLiveReason } from '../lib/liveNotes';
 import { noDayChangeReasonOf } from '../lib/figures';
 import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
 import { LotsSection } from './LotsSection';
@@ -20,9 +24,14 @@ import { LotsSection } from './LotsSection';
 // The trades of a holding (and the dialogs behind them) are loaded when the drawer first opens: most visits never get there.
 const HoldingTrades = lazy(async () => ({ default: (await import('./trades/HoldingTrades')).HoldingTrades }));
 
-const priceSourceLabel = (source: string): string => (source === 'quote' ? 'Quote' : 'Synced');
+const priceSourceLabel = (source: string): string =>
+  source === 'live' ? 'Live tick' : source === 'quote' ? 'Quote' : 'Synced';
 
-function factsOf(h: HoldingRow): Fact[] {
+/** The price time to the second for a live tick (they are that precise), else to the minute. */
+const priceTime = (source: string, at: string): string =>
+  source === 'live' ? istSecondText(Date.parse(at)) : formatIstDateTime(at);
+
+function factsOf(h: HoldingRow, liveNote: string | null): Fact[] {
   const { returns } = h;
   return [
     { label: 'Account', value: h.accountName },
@@ -33,8 +42,9 @@ function factsOf(h: HoldingRow): Fact[] {
     { label: 'Previous close', value: h.previousClose === null ? '—' : formatInrPrecise(h.previousClose) },
     { label: 'Day change', value: <DayChangeAmount value={h.dayChange} reason={noDayChangeReasonOf(h)} focusable /> },
     { label: 'Day change %', value: h.dayChange === null ? '—' : <PnlPercent value={h.dayChangePct} /> },
-    { label: 'Price time (IST)', value: h.priceAt === null ? '—' : formatIstDateTime(h.priceAt) },
+    { label: 'Price time (IST)', value: h.priceAt === null ? '—' : priceTime(h.priceSource, h.priceAt) },
     { label: 'Price source', value: priceSourceLabel(h.priceSource) },
+    ...(liveNote === null ? [] : [{ label: 'Live price', value: liveNote }]),
     { label: 'Invested', value: formatInr(returns.invested) },
     { label: 'Value', value: returns.value === null ? '—' : formatInr(returns.value) },
     { label: 'Profit / loss', value: <Pnl value={returns.pnl} focusable /> },
@@ -63,7 +73,12 @@ interface HoldingDrawerProps {
 }
 
 /** Side panel for one holding: its figures, then its lots with their dates, then its trades. */
-export function HoldingDrawer({ id, holding, onClose, onSetAlert, onShowAlerts }: HoldingDrawerProps) {
+export function HoldingDrawer({ id, holding: read, onClose, onSetAlert, onShowAlerts }: HoldingDrawerProps) {
+  // At the price the hub pushed last, and, while the screen is live, why this holding has no live tick (if it has none).
+  const holding = useLiveRow(read);
+  const { following } = useLive();
+  const now = useWallClock(60_000);
+  const liveNote = following && holding ? notLiveReason(holding, now) : null;
   return (
     <Drawer
       anchor="right"
@@ -114,7 +129,7 @@ export function HoldingDrawer({ id, holding, onClose, onSetAlert, onShowAlerts }
       </Stack>
       <Box sx={{ px: 2, pb: 3, overflowY: 'auto' }}>
         <Stack spacing={3}>
-          {holding && <Facts items={factsOf(holding)} />}
+          {holding && <Facts items={factsOf(holding, liveNote)} />}
           {id !== null && <LotsSection holdingId={id} />}
           {id !== null && (
             <Suspense fallback={<LoadingState label="Loading trades" />}>

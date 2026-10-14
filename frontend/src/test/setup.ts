@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
+import { setHubTransport } from '@/shared/realtime';
 import { installFakeIntersectionObserver } from './intersection';
 import { categoryStub, chartStub } from './chartStub';
 import { releasePending } from './gate';
@@ -50,10 +51,16 @@ beforeAll(() => {
     }
   };
 });
+// The live hub: unless a test installs its own (see hubFake.ts), a connection never completes, which for the screens is the
+// same as having no hub (they read once a minute, as before it existed).
+beforeEach(() => {
+  setHubTransport(() => new Promise(() => undefined));
+});
 afterEach(async () => {
   // Answer what a test left hanging while the screen is still there (see gate.ts), then take the screen down.
   await releasePending();
   cleanup();
+  setHubTransport();
   if (escaped.length > 0) {
     throw new Error(`A request escaped the network mock and reached the real network: ${escaped.splice(0).join(', ')}`);
   }

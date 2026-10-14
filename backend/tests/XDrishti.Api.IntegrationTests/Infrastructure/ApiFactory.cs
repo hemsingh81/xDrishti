@@ -16,6 +16,7 @@ using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Live.Push;
 using XDrishti.Domain.Market.Baskets;
 using XDrishti.Infrastructure;
 using XDrishti.Infrastructure.Brokers;
@@ -148,6 +149,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddFeedEngine();
             services.AddSingleton(LiveFeedSettings.Default with { FlushInterval = TimeSpan.FromMilliseconds(200), SubscribeSpacing = TimeSpan.Zero });
             services.AddSingleton<ILiveFeedConnector>(FeedSocket);
+
+            // The SignalR hub's push runs in this host (as in xd-api): its waits are shortened so that a test does not wait seconds for a push; the sweep stays at its 30 seconds, so a push in a test comes from a notification.
+            services.AddSingleton(PushSettings.Default with
+            {
+                MinPushInterval = TimeSpan.FromMilliseconds(100),
+                StatusPollInterval = TimeSpan.FromMilliseconds(200),
+                StatusRefreshInterval = TimeSpan.FromSeconds(2),
+                SessionCheckInterval = TimeSpan.FromMilliseconds(300),
+            });
 
             // The trade use cases read the applied corporate actions inside their unit of work: a test can act at that moment (TradeHooks).
             var reference = services.Single(d => d.ServiceType == typeof(ITradeReferenceData));

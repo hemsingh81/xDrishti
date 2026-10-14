@@ -1923,6 +1923,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/live/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** State of the live price feed from its heartbeat (same fields as the hub event feedStatus): state (connected, idle, connecting, reconnecting, closed, paused, no_token, token_refused, flapping, or not_running when it has not reported for 60 seconds), subscribed instruments and the exchange time of its latest tick */
+    get: operations['GetLiveStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3683,6 +3700,20 @@ export interface components {
       /** Format: int32 */
       total: number;
     };
+    /**
+     * @description The latest known price of an instrument: `lastPrice` at `priceAt` (the time of the exchange's tick for `live`, the time of the quote for `quote`, the time of the sync for `sync`; UTC) and where it came from:
+     *     `live` (the live feed), `quote` (the 5-minute quote poll) or `sync` (the broker's holdings list). The same values as `lastPrice`, `priceAt` and `priceSource` of the holdings list. An older price never follows a newer one
+     *     for the same instrument; a client that gets one anyway ignores it.
+     */
+    InstrumentPrice: {
+      /** Format: uuid */
+      instrumentId: string;
+      /** Format: double */
+      lastPrice: number;
+      /** Format: date-time */
+      priceAt: string;
+      source: string;
+    };
     /** @description A row of the master list. `type`: share · etf · index · future. */
     InstrumentSummary: {
       /** Format: uuid */
@@ -3721,6 +3752,34 @@ export interface components {
       csv: null | components['schemas']['DataJobView'];
       dhan: null | components['schemas']['DataJobView'];
       aggregate: null | components['schemas']['DataJobView'];
+    };
+    /**
+     * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
+     *     `state` is the feed's own word: `connected` (streaming), `idle` (connected, nothing to follow), `connecting`, `reconnecting`, `closed` (outside its window), `paused` (the owner paused the service), `no_token`, `token_refused`,
+     *     `flapping`; or `not_running` when the feed reports nothing (never started, stopped, crashed: no heartbeat in the last 60 seconds). `subscribed` is the number of instruments the feed follows (0 unless it reports); `lastTickAt` the exchange
+     *     time of its latest tick of any instrument (UTC), null when none yet.
+     */
+    LiveFeedStatus: {
+      state: string;
+      /** Format: int32 */
+      subscribed: number;
+      /** Format: date-time */
+      lastTickAt: null | string;
+    };
+    /**
+     * @description What a Portfolio screen asks the hub to follow (argument of `Subscribe`, ADR 0024 §7): the prices of the instruments of these holdings are pushed, nothing else.
+     *     `accountId` and `bucketId` are the screen's scope, with the meaning they have for `GET /api/holdings/summary`: without `accountId` every open holding of the accounts that count in totals, with it every open holding of that account
+     *     (any account that is not archived); `bucketId` narrows either to one bucket. This is the set the tiles and the group rows are made of.
+     *     `holdingIds` are the holdings the screen shows (rows of the grid, the open drawer); they are added to the scope's holdings even when the scope would not include them (an account that does not count in totals, a filter applied on the screen only).
+     *     At most 1000 are read; holdings that are closed or have no instrument are ignored. Leave `accountId`, `bucketId` and `holdingIds` null or empty for all accounts that count in totals.
+     *     The server turns holdings into instruments; the messages carry instrument ids (as `instrumentId` of the holdings list). A second `Subscribe` replaces the first.
+     */
+    LiveScope: {
+      /** Format: uuid */
+      accountId: null | string;
+      /** Format: uuid */
+      bucketId: null | string;
+      holdingIds: null | string[];
     };
     /** @description Body of `POST /api/auth/login`. */
     LoginRequest: {
@@ -4011,6 +4070,23 @@ export interface components {
       oldest: null | string;
       /** Format: date-time */
       newest: null | string;
+    };
+    /**
+     * @description Hub event `pricesChanged`: the prices that changed for the instruments the connection follows since the last message sent to it (the first messages after `Subscribe` carry all of them). At most one burst a second;
+     *     at most 500 instruments and 32 KB per message (a larger change comes as several messages with the same `asOf`). `asOf` is the server's time when it read the prices (UTC).
+     */
+    PricesChanged: {
+      /** Format: date-time */
+      asOf: string;
+      instruments: {
+        /** Format: uuid */
+        instrumentId: string;
+        /** Format: double */
+        lastPrice: number;
+        /** Format: date-time */
+        priceAt: string;
+        source: string;
+      }[];
     };
     ProblemDetails: {
       type?: null | string;
@@ -4789,6 +4865,17 @@ export interface components {
        * @description End of the window in which sensitive actions are allowed.
        */
       elevatedUntil: string;
+    };
+    /**
+     * @description The answer to `Subscribe`: how many instruments the connection now follows, whether the scope had more than the server follows per connection (1000 instruments, 1000 holding ids), in which case the rest get no pushes and the screen
+     *     keeps their prices from its reads, and `failed` when the server could not read the scope (the database is unavailable): the connection then follows nothing and the screen should subscribe again later. After a good answer the server sends the
+     *     current price of every followed instrument (one or more `pricesChanged` messages, within about a second), then only changes.
+     */
+    SubscribeAck: {
+      /** Format: int32 */
+      subscribed: number;
+      truncated: boolean;
+      failed: boolean;
     };
     /**
      * @description Body of "Sync now" (optional). Confirm: true applies an answer that would close all or most open holdings, which is otherwise refused with
@@ -10143,6 +10230,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveFeedStatus'];
         };
       };
     };

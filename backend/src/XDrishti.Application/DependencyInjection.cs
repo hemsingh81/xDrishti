@@ -9,6 +9,7 @@ using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Live;
+using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutHandler>();
         services.AddScoped<ICommandHandler<StepUpCommand, StepUpResult>, StepUpHandler>();
         services.AddScoped<IQueryHandler<VerifySessionQuery, Result<VerifiedSession>>, VerifySessionHandler>();
+        services.AddScoped<IQueryHandler<ListEndedSessionsQuery, IReadOnlyList<Guid>>, ListEndedSessionsHandler>();
         services.AddScoped<IQueryHandler<GetOwnerAccountQuery, Result<AccountResponse>>, GetOwnerAccountHandler>();
         services.AddScoped<ICommandHandler<ChangePasswordCommand>, ChangePasswordHandler>();
         services.AddScoped<ICommandHandler<UpdateProfileCommand, AccountResponse>, UpdateProfileHandler>();
@@ -83,6 +85,20 @@ public static class DependencyInjection
         services.AddSingleton<FeedConnectionManager>();
         services.AddSingleton<IFeedSession>(sp => sp.GetRequiredService<FeedConnectionManager>());
         services.AddSingleton<IFeedSupervisor, LiveFeedSupervisor>();
+        return services;
+    }
+
+    /// <summary>
+    /// The SignalR hub's push (ADR 0024 §7, P2-10a) - only for the <c>xd-api</c> host: the coordinator that follows the connected screens (a singleton; the host runs its loop) and the status query. The host provides <see cref="ILiveClients"/>
+    /// (the way out to the connections); <c>AddInfrastructure</c> provides the listener, the scope resolver and the price reader.
+    /// </summary>
+    public static IServiceCollection AddLivePush(this IServiceCollection services)
+    {
+        services.AddSingleton(PushSettings.Default);
+        services.AddSingleton<LivePushCoordinator>();
+        services.AddSingleton<ILiveSubscriptions>(sp => sp.GetRequiredService<LivePushCoordinator>());
+        services.AddSingleton<ILivePushLoop>(sp => sp.GetRequiredService<LivePushCoordinator>());
+        services.AddScoped<IQueryHandler<GetLiveStatusQuery, LiveFeedStatus>, GetLiveStatusHandler>();
         return services;
     }
 

@@ -45,7 +45,7 @@ The open Portfolio screen shows prices, value, P&L and day change moving within 
 - Security: owner session only, same origin, bounded payloads, no per-user data other than prices of what the screen shows.
 
 ## Test plan
-- **Unit/frontend (Vitest + a fake hub):** recompute equals the server for random prices; chip states by clock/status; flash and reduced motion; drawer, selection, sort kept; fallback to polling and back; scope subscribe/unsubscribe on filter change; 5-minute exact re-read.
+- **Unit/frontend (Vitest + a fake hub):** recompute equals the server for random prices, exactly (golden fixtures written by the real C# calculators - `frontend/src/test/fixtures/liveGolden.json`, test `liveGolden.test.ts`, guarded by the backend `LiveGoldenTests` - plus a wider seeded property test against a TypeScript model); chip states by clock/status; flash and reduced motion; drawer, selection, sort kept; fallback to polling and back; scope subscribe/unsubscribe on filter change; 5-minute exact re-read.
 - **Integration:** hub 401 without session, `Subscribe` scoping, coalescing, payload bounds and splitting, listener restart, status endpoint; proxy upgrade check.
 - **Architecture:** the hub depends on abstractions; no Api → Feed reference.
 - **Manual (owner), in a market session with P2-10:** watch prices, chip states and the fallback with the feed stopped (`podman stop xd-feed`).
@@ -53,9 +53,12 @@ The open Portfolio screen shows prices, value, P&L and day change moving within 
 ## Open questions (owner) — answered 2026-10-14: all as written
 None open; the questions of P2-10 (pre-open labelled, indices stored only, no market strip) apply.
 
+## Follow-ups (not in this slice)
+- A **slim read endpoint** for the live totals: per open holding only id, instrumentId, quantities, invested, previousClose, previousCloseAt and the sector and basket ids (no XIRR, no paging). Today the browser pages through every open holding of the scope (100 per page, a few requests at a time, on a 5-minute timer and after real changes) and, for sector and basket groupings, the members of each group; see the ADR 0024 P2-10a amendments ("Load of the live totals").
+
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Contract regenerated (`scripts/gen-api.sh`); Caddyfile updated
-- [ ] Design docs updated (03 §6, 12 §6/§10, 13 Portfolio screen), ADR 0024 followed
+- [x] Contract regenerated (`scripts/gen-api.sh`); Caddyfile updated *(hub contract, `GET /api/live/status`, `/hubs/*` in the Caddyfile; the screen uses the generated `hubContract.generated.ts`)*
+- [x] Design docs updated (03 §6, 12 §6/§10, 13 Portfolio screen), ADR 0024 followed
 - [ ] Deployed; the owner watches a real session and compares the Live chip, prices and day change with the Dhan app

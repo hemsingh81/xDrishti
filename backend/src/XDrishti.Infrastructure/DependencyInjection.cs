@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IPlatformUnitOfWork, PlatformUnitOfWork>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();
         services.AddScoped<ILiveNotifier, LiveNotifier>();
+        services.AddSingleton<ILivePriceChanges, LivePriceChanges>(); // the API's listener on live_prices (ADR 0024 §6)
 
         // The live feed runs in xd-feed, but the API shows it on the Services screen and its Run now writes the marker the feed reads (ADR 0024 §1).
         services.AddScoped<IFeedManualRun, FeedManualRun>();
@@ -166,6 +167,8 @@ public static class DependencyInjection
         services.AddScoped<ITradeReferenceData, TradeReferenceData>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();
         services.AddScoped<ILivePrices, LivePrices>();
+        services.AddScoped<ILivePriceReader, LivePriceReader>();
+        services.AddScoped<ILiveScopeResolver, LiveScopeResolver>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
         services.AddScoped<IActionStates, ActionStates>();
         services.AddScoped<IActionSettings, ActionSettings>();
