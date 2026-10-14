@@ -12,7 +12,8 @@ namespace XDrishti.Application.Platform.Services;
 /// per service per start). Then it looks at the schedules at least once a minute and at the next start: it re-reads the stored rows each time, so an edit counts at the next look without a restart,
 /// starts the services whose time came since the last look, starts the retries that are due and leaves the rest to <see cref="ServiceRunner"/>. A paused service is not started, and its past times
 /// are not made up for when it is resumed. The ticks of an interval or window schedule are never made up for, and one that falls while the service still runs is dropped with a log line and no run record
-/// (ADR 0019 §5). The API's hosted service only calls <see cref="RunAsync"/>.
+/// (ADR 0019 §5). The API's hosted service only calls <see cref="RunAsync"/>. A service that another process runs (<see cref="IExternallyRunService"/>, the live feed) is looked at by nobody here: it is never started,
+/// retried or made up for, and the recovery leaves its open run alone - the process that owns the run closes it.
 /// </summary>
 public sealed class ServiceScheduler(
     IServiceScopeFactory scopes,
@@ -100,9 +101,9 @@ public sealed class ServiceScheduler(
             {
                 var since = _lookedAt.TryGetValue(service.Id, out var seen) && seen <= now ? seen : now;
                 _lookedAt[service.Id] = now;
-                if (!service.Settings.Enabled)
+                if (!service.Settings.Enabled || registry.IsExternal(service.Id))
                 {
-                    continue;
+                    continue; // paused, or run by another process (its own host starts it)
                 }
 
                 var schedule = service.Settings.Schedule;
@@ -216,7 +217,7 @@ public sealed class ServiceScheduler(
             var all = await scope.ServiceProvider.GetRequiredService<ServiceSettingsReader>().ReadAllAsync(cancellationToken);
             var latest = await scope.ServiceProvider.GetRequiredService<IServiceRunStore>().GetLatestAsync(registry.Ids, cancellationToken);
             var now = clock.GetUtcNow();
-            foreach (var service in all.Where(s => s.Settings.Enabled && latest.TryGetValue(s.Id, out var run) && !ServiceRetryRules.IsOver(run, s.Settings.Retries, true, now)))
+            foreach (var service in all.Where(s => s.Settings.Enabled && !registry.IsExternal(s.Id) && latest.TryGetValue(s.Id, out var run) && !ServiceRetryRules.IsOver(run, s.Settings.Retries, true, now)))
             {
                 var failed = latest[service.Id];
                 runner.ResumeRetry(service.Id, failed.Trigger, ServiceRunner.RetryRequester, failed.Attempt + 1, ServiceRetryRules.NextDue(failed));
@@ -239,7 +240,7 @@ public sealed class ServiceScheduler(
         try
         {
             await using var scope = scopes.CreateAsyncScope();
-            var count = await scope.ServiceProvider.GetRequiredService<IServiceRunStore>().FailInterruptedAsync(application.StartedAt, clock.GetUtcNow(), InterruptedMessage, cancellationToken);
+            var count = await scope.ServiceProvider.GetRequiredService<IServiceRunStore>().FailInterruptedAsync(application.StartedAt, clock.GetUtcNow(), InterruptedMessage, registry.ExternalIds, cancellationToken);
             if (count > 0)
             {
                 ServicesLog.Recovered(logger, count);
@@ -267,7 +268,7 @@ public sealed class ServiceScheduler(
             var latest = await scope.ServiceProvider.GetRequiredService<IServiceRunStore>().GetLatestAsync(registry.Ids, cancellationToken);
             var calendar = await scope.ServiceProvider.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
             var now = clock.GetUtcNow();
-            foreach (var service in all.Where(s => s.Settings is { Enabled: true, CatchUp: true } && !_caughtUp.Contains(s.Id) && !runner.IsActive(s.Id)))
+            foreach (var service in all.Where(s => s.Settings is { Enabled: true, CatchUp: true } && !registry.IsExternal(s.Id) && !_caughtUp.Contains(s.Id) && !runner.IsActive(s.Id)))
             {
                 var lastStart = HandledAt(service, latest.GetValueOrDefault(service.Id));
                 if (ScheduleCalculator.MissedOccurrence(service.Settings.Schedule, now, lastStart, calendar, service.NotBeforeSessionEnd, service.Definition.Constraints.CatchUpReach) is { } missed)

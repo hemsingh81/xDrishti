@@ -126,7 +126,7 @@ power, wired network, small UPS recommended.</li>
 <td><code>xd-feed</code></td>
 <td>.NET 10</td>
 <td>core</td>
-<td>Market hours: Dhan WebSocket for the active set, quote polling for holdings, live bars &amp; alerts (later also depth recording)</td>
+<td>Market hours: Dhan WebSocket for the active set (<strong>built</strong>, P2-10, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>): live prices written into the holdings and <code>market.live_quotes</code>, price alerts on every flush, heartbeat in <code>platform.service_heartbeats</code>; the vault key and the app DB password as secret files, networks <code>back</code> + <code>egress</code>, 256 MB, health check = heartbeat &lt; 60 s old. The quote poll of holdings stays in <code>xd-api</code> (service <code>holdings-quotes</code>); live bars and depth recording come later</td>
 </tr>
 <tr>
 <td><code>xd-sandbox</code></td>
@@ -342,7 +342,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 </tr>
 <tr>
 <td>Market hours</td>
-<td><code>xd-feed</code> starts 09:00 and stops 15:35 on trading days (scheduled); Mac must be awake</td>
+<td><code>xd-feed</code> runs all day and connects between 09:00 and 15:35 on trading days (the window of the service <code>live-feed</code>, editable on the Services screen); it heartbeats outside the window. Mac must be awake (the owner&#39;s job; <code>xd-up.sh</code> holds no keep-awake)</td>
 </tr>
 <tr>
 <td>Remote access</td>
@@ -392,7 +392,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-13 17:50</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-14 07:37</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

@@ -116,7 +116,7 @@ services:
     secrets:
       - source: db_app_password
         target: Database__Password
-      # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API gets it: the API refuses to start without it.
+      # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API and the live feed (ADR 0024) get it: the API refuses to start without it.
       - source: broker_vault_key
         target: BrokerVault__Key
     # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009), the read of the account's holdings (GET api.dhan.co/v2/holdings
@@ -149,6 +149,36 @@ services:
     mem_limit: 2g
     depends_on:
       xd-migrate: { condition: service_completed_successfully }
+    <<: *hardening
+
+  # The live feed (P2-10, ADR 0024): the Dhan WebSocket for the active set during market hours (09:00-15:35 IST on trading days; the window is the service
+  # `live-feed` on the Services screen). It reads the Data account's token through the broker vault, so it gets the vault key like xd-api, and it writes
+  # prices into the database only. Outbound to api-feed.dhan.co (wss) only: its client refuses every other endpoint. No published port.
+  xd-feed:
+    image: localhost/xdrishti/feed:${XD_VERSION:-0.1.0}
+    build:
+      context: ../backend
+      target: feed
+      args: { VERSION: "${XD_VERSION:-0.1.0}" }
+    restart: unless-stopped
+    environment: *dotnet-env
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+      - source: broker_vault_key
+        target: BrokerVault__Key
+    networks: [back, egress]
+    mem_limit: 256m
+    # Shutdown ends the window run and sends a last heartbeat (up to ~30 s); the default 10 s would kill it and leave the run to be closed as interrupted.
+    stop_grace_period: 30s
+    depends_on:
+      xd-migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, dotnet, XDrishti.Feed.dll, --healthcheck]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
     <<: *hardening
 
   xd-proxy:
@@ -194,7 +224,7 @@ networks:
   front: {}
   back:
     internal: true
-  # Outbound internet for xd-api only (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010). Not internal, no published ports, no other member.
+  # Outbound internet for xd-api (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010) and xd-feed (the market-data WebSocket, ADR 0024). Not internal, no published ports, no other member.
   egress: {}
 
 volumes:

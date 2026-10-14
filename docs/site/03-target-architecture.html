@@ -791,6 +791,7 @@ via SignalR → instruments auto-tracked. Details: <a href="05-data-and-brokers.
 <h3 id="live-active-set">Live active set<a class="hash" href="#live-active-set" aria-label="Link to this section">#</a></h3>
 <p>Planning (armed tickets) + Portfolio (open positions, holdings) + context indices + pins → <code>xd-feed</code> diffs the set
 and (un)subscribes on the Dhan WebSocket → ticks → live 1-minute bars + LTP → Portfolio/alerts → SignalR to React.</p>
+<p><strong>Built in P2-10 (<a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>):</strong> <code>xd-feed</code> → ticks → last price per instrument (every 2 s) into the holdings, <code>market.live_quotes</code> and the price alerts → <code>NOTIFY live_prices</code> → (P2-10a) <code>xd-api</code> reads what changed and pushes it over SignalR. The feed and the API never call each other; the database is the only meeting point. Live 1-minute bars are not built yet.</p>
 <h3 id="strategy-lab-run">Strategy Lab run<a class="hash" href="#strategy-lab-run" aria-label="Link to this section">#</a></h3>
 <p>React editor → <code>POST /api/lab/runs</code> → Hangfire job in <code>xd-worker</code> (plugins in <code>xd-sandbox</code>) → progress over
 SignalR → results in <code>lab</code> schema → report page. Details: <a href="11-strategy-lab.html">11-strategy-lab.md</a>.</p>
@@ -812,7 +813,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-13 17:50</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-14 07:37</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

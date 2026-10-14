@@ -337,6 +337,21 @@ Each account chooses its own schedule in the app (Accounts → Portfolio, and on
 (Monday–Friday 09:15–15:30 India time) or *Daily at HH:MM IST*; it is stored in `accounts.portfolio_settings`, not in this file ([doc 04](04-accounts-access-and-operations.md) §1, [doc 12](12-portfolio-monitoring.md) §3).
 The Dhan holdings endpoint (`GET https://api.dhan.co/v2/holdings`) is fixed in the code and on the allow-list ([doc 17](17-deployment-and-operations.md) §3).
 
+### Live feed (`Live:*`, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md), P2-10)
+
+`appsettings.json` of `xd-feed` (and `Live:ManualRunMinutes` of `xd-api` too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service `live-feed` on the Services screen, not a setting here.
+
+```yaml
+Live:
+  MaxWsInstruments: 200          # 1–5000: the cap of the active set (alerts, then indices, then holdings by value)
+  FlushSeconds: 2                # 1–30: how often the latest ticks are written
+  SilenceSeconds: 30             # 5–300: no packet for this long in market hours = dead connection (when an index is subscribed)
+  BackoffInitialSeconds: 1       # 1–60: reconnect back-off 1, 2, 4 … BackoffMaxSeconds, jittered
+  BackoffMaxSeconds: 30          # 1–300
+  SubscribeSpacingMilliseconds: 250   # 0–5000: gap between subscription messages (≤ 100 instruments each)
+  ManualRunMinutes: 30           # 1–240: how long Run now keeps the connection open outside the window
+```
+
 ## 4. Most-used settings
 
 | Setting | Meaning | Default |

@@ -5,5 +5,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The constructed packets of docs/research/dhan-samples (hex text, UNVERIFIED), so the parser tests and the documentation cannot drift apart. -->
+    <EmbeddedResource Include="..\..\..\docs\research\dhan-samples\feed-*.hex" LogicalName="DhanFeed/%(Filename)%(Extension)" />
+  </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>

@@ -7,7 +7,7 @@ namespace XDrishti.Infrastructure.Portfolio;
 
 /// <summary>
 /// The portfolio module's side of the quote poll (ADR 0019): which securities the open holdings hold, and the one-statement write of the quotes into them. The statement mirrors the rules of <c>Holding.ApplyQuote</c>
-/// (price, previous close kept when the quote has none, price time, source quote; open holdings only) for all quoted instruments at once, whatever the number of accounts and holdings, and reads the same
+/// (price, previous close kept when the quote has none - and the time it was taken, <c>previous_close_at</c>, set to the fetch time whenever the quote carries one - price time, source quote; open holdings only; a live price newer than the fetch time keeps its price, time and source - only the previous close is taken, ADR 0024) for all quoted instruments at once, whatever the number of accounts and holdings, and reads the same
 /// accounts as <see cref="ListTargetsAsync"/> (active, Portfolio role on).
 /// </summary>
 internal sealed class HoldingQuotes(XDrishtiDbContext db, IPortfolioHistoryCache histories) : IHoldingQuotes
@@ -77,10 +77,11 @@ internal sealed class HoldingQuotes(XDrishtiDbContext db, IPortfolioHistoryCache
                 FOR UPDATE OF h SKIP LOCKED
             )
             UPDATE portfolio.holdings AS h
-            SET last_price = t.last_price,
+            SET last_price = CASE WHEN h.last_price_source = 'live' AND h.last_price_at > {time} THEN h.last_price ELSE t.last_price END,
                 previous_close = COALESCE(t.previous_close, h.previous_close),
-                last_price_at = {time},
-                last_price_source = 'quote'
+                previous_close_at = CASE WHEN t.previous_close IS NOT NULL THEN {time} ELSE h.previous_close_at END,
+                last_price_at = CASE WHEN h.last_price_source = 'live' AND h.last_price_at > {time} THEN h.last_price_at ELSE {time} END,
+                last_price_source = CASE WHEN h.last_price_source = 'live' AND h.last_price_at > {time} THEN h.last_price_source ELSE 'quote' END
             FROM target AS t
             WHERE h.id = t.id
             """,

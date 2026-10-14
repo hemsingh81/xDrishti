@@ -6,7 +6,7 @@
 #      (hidden input for the password) or must exist already — see scripts/auth-secrets.sh.
 #   3. Writes them as files for the containers (private folder, never in the repo or images). The broker vault key
 #      (xdrishti/broker/vault-key, created on the first run and never replaced) encrypts the broker API keys, secrets and
-#      tokens the owner enters in the app (ADR 0008); only xd-api gets it.
+#      tokens the owner enters in the app (ADR 0008); only xd-api and xd-feed get it (ADR 0024).
 #   4. Builds images and starts the stack, waits until healthy, prints the URLs.
 # Usage: deploy/xd-up.sh [--no-dev] [--no-build] [--owner-reset]
 #   --owner-reset  after the stack is up, replace the owner's password with the one now in the Keychain and

@@ -41,6 +41,14 @@ internal sealed class MiniProvider : IServiceProvider, IServiceScopeFactory, IDi
         where TService : class =>
         Scoped<TService, TService>();
 
+    /// <summary>A scoped service that is the same instance in every scope (a fake the test holds on to).</summary>
+    public MiniProvider ScopedInstance<TService>(TService instance)
+        where TService : class
+    {
+        _registrations[typeof(TService)] = new Registration(true, _ => instance);
+        return this;
+    }
+
     public object? GetService(Type serviceType) => Resolve(serviceType, this, scope: null);
 
     public IServiceScope CreateScope() => new Scope(this);

@@ -153,7 +153,10 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
 
         var list = await response.ReadAsync<ServiceList>(Ct);
 
-        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "fake-job", "account-sync"]);
+        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "live-feed", "fake-job", "account-sync"]);
+        var feed = list.Items.Single(s => s.Id == "live-feed");
+        (feed.Name, feed.RunsAs, feed.Enabled, feed.Schedule.Type, feed.Schedule.From, feed.Schedule.To).ShouldBe(("Live feed", "xd-feed", true, "window", "09:00", "15:35")); // run by xd-feed, shown and edited here
+        feed.Live.ShouldNotBeNull();
         var fake = list.Items.Single(s => s.Id == FakeJobService.Id);
         (fake.Name, fake.RunsAs, fake.Enabled, fake.Status, fake.IsDefault, fake.Revision, fake.NextRun).ShouldBe(("Fake job", "xd-test", true, "healthy", true, 0L, new DateTimeOffset(2026, 10, 13, 10, 0, 0, TimeSpan.FromMinutes(330))));
         fake.Parameters.Single().Name.ShouldBe("lookback");
@@ -381,10 +384,12 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
         var timeline = await response.ReadAsync<ServicesTimeline>(Ct);
 
         (timeline.TradingDay, timeline.MarketOpen, timeline.MarketClose, timeline.ReviewCutoff).ShouldBe((true, "09:15", "15:30", "09:05"));
-        timeline.Entries.Select(e => e.ServiceId).ShouldBe(["holdings-quotes", FakeJobService.Id]); // eod and the instrument master are seeded paused
+        timeline.Entries.Select(e => e.ServiceId).ShouldBe(["holdings-quotes", "live-feed", FakeJobService.Id]); // eod and the instrument master are seeded paused
         var quotes = timeline.Entries[0];
         (quotes.Kind, quotes.Band, quotes.EveryMinutes).ShouldBe(("band", new TimelineBand("09:15", "15:30"), 5));
-        var entry = timeline.Entries[1];
+        var feed = timeline.Entries[1];
+        (feed.Kind, feed.Band).ShouldBe(("band", new TimelineBand("09:00", "15:35")));
+        var entry = timeline.Entries[2];
         (entry.ServiceId, entry.Kind, entry.Marks.Single().Time).ShouldBe((FakeJobService.Id, "mark", "10:00"));
         using var saturday = await _client.GetAsync("/api/services/timeline?date=2026-10-10", Ct);
         (await saturday.ReadAsync<ServicesTimeline>(Ct)).TradingDay.ShouldBeFalse();

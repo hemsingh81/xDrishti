@@ -27,6 +27,29 @@ describe('SystemStatusPage', () => {
     expect(screen.getByText('Unhealthy')).toBeInTheDocument();
   });
 
+  it('calls a service that said it was stopping on purpose Stopped, not Not reporting', async () => {
+    const status = buildSystemStatus({
+      services: [
+        {
+          name: 'xd-feed',
+          instance: 'f1',
+          version: '0.1.0',
+          startedAt: '2026-10-08T09:00:00Z',
+          lastSeenAt: '2026-10-08T10:00:00Z',
+          isAlive: false,
+          state: 'stopped',
+        },
+      ],
+    });
+    server.use(http.get('/api/system/status', () => HttpResponse.json(status)));
+
+    renderWithProviders(<SystemStatusPage />);
+
+    expect(await screen.findByRole('cell', { name: 'xd-feed' })).toBeInTheDocument();
+    expect(screen.getByText('Stopped')).toBeInTheDocument();
+    expect(screen.queryByText('Not reporting')).not.toBeInTheDocument();
+  });
+
   it('shows an error when the API fails', async () => {
     server.use(
       http.get('/api/system/status', () => HttpResponse.json({ title: 'Service unavailable' }, { status: 503 })),

@@ -9,5 +9,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="XDrishti.Application.Tests" />
+    <InternalsVisibleTo Include="XDrishti.Api.IntegrationTests" />
   </ItemGroup>
 </Project>

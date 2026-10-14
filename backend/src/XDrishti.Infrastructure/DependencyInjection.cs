@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -21,6 +22,7 @@ using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Actions;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Calendar;
+using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
@@ -63,6 +65,15 @@ public static class DependencyInjection
         services.AddScoped<IServiceRunStore, ServiceRunStore>();
         services.AddScoped<IPlatformUnitOfWork, PlatformUnitOfWork>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();
+        services.AddScoped<ILiveNotifier, LiveNotifier>();
+
+        // The live feed runs in xd-feed, but the API shows it on the Services screen and its Run now writes the marker the feed reads (ADR 0024 §1).
+        services.AddScoped<IFeedManualRun, FeedManualRun>();
+        services.AddOptions<LiveManualRunOptions>()
+            .Bind(configuration.GetSection(LiveManualRunOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton(sp => new FeedManualRunSettings(TimeSpan.FromMinutes(sp.GetRequiredService<IOptions<LiveManualRunOptions>>().Value.ManualRunMinutes)));
 
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ITokenGenerator, TokenGenerator>();
@@ -154,6 +165,7 @@ public static class DependencyInjection
         services.AddScoped<ITradeBatches, TradeBatches>();
         services.AddScoped<ITradeReferenceData, TradeReferenceData>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();
+        services.AddScoped<ILivePrices, LivePrices>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
         services.AddScoped<IActionStates, ActionStates>();
         services.AddScoped<IActionSettings, ActionSettings>();
@@ -233,6 +245,7 @@ public static class DependencyInjection
         services.AddScoped<IQualityRuns, QualityRunStore>();
         services.AddScoped<IQualityQueries, QualityQueries>();
         services.AddScoped<IListedInstruments, ListedInstruments>();
+        services.AddScoped<ILiveQuotes, LiveQuotes>();
         services.AddScoped<ITradingDayStore, TradingDayStore>();
         services.AddScoped<ICorporateActionStore, CorporateActionStore>();
         services.AddScoped<ICorporateActionQueries, CorporateActionQueries>();
@@ -245,6 +258,18 @@ public static class DependencyInjection
         services.AddSingleton(sp => new RequestThrottle(sp.GetRequiredService<IDataSettings>().DhanRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
         services.AddScoped<DhanIntradayChartClient>();
         services.AddScoped<IIntradayBarSource, DhanIntradayBarSource>();
+    }
+
+    /// <summary>
+    /// The adapters of the live feed (ADR 0024) - for the <c>xd-feed</c> host: the Dhan feed connector (the WebSocket client behind its allow-list), the <c>LISTEN</c> listener and the index lookup. The sink's own
+    /// ports (<c>ILivePrices</c>, <c>ILiveQuotes</c>, <c>ILiveNotifier</c>) are registered with the modules by <see cref="AddInfrastructure"/>.
+    /// </summary>
+    public static IServiceCollection AddLiveFeed(this IServiceCollection services)
+    {
+        services.AddSingleton<ILiveFeedConnector, DhanFeedConnector>();
+        services.AddSingleton<IActiveSetChanges, ActiveSetChanges>();
+        services.AddScoped<IIndexSecurities, IndexSecurities>();
+        return services;
     }
 
     /// <summary>

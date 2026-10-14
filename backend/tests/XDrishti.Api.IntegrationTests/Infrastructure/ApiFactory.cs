@@ -10,11 +10,14 @@ using Serilog.Core;
 using Testcontainers.PostgreSql;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Platform;
+using XDrishti.Application;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Auth;
 using XDrishti.Domain.Market.Baskets;
+using XDrishti.Infrastructure;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Persistence;
@@ -79,6 +82,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Lets a test change the data "meanwhile", inside the trade use cases' unit of work (see <see cref="TradeHooks"/>).</summary>
     public TradeHooks TradeHooks { get; } = new();
 
+    /// <summary>Dhan's market-data socket: the live feed's engine (registered here as in the xd-feed host) connects to this one.</summary>
+    public FakeFeedSocket FeedSocket { get; } = new();
+
     /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
     public string AdminConnectionString => _database.GetConnectionString();
 
@@ -136,6 +142,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             // The Dhan Data API source and the Data account: the real ones answer (over the fake Dhan server above) unless a test puts a fake in (FakeDhan).
             Dhan.Wrap(services);
+
+            // The live feed's adapters and engine run in the xd-feed host; here they run over the real database with the Dhan socket replaced, and the flush fast enough for a test to wait for.
+            services.AddLiveFeed();
+            services.AddFeedEngine();
+            services.AddSingleton(LiveFeedSettings.Default with { FlushInterval = TimeSpan.FromMilliseconds(200), SubscribeSpacing = TimeSpan.Zero });
+            services.AddSingleton<ILiveFeedConnector>(FeedSocket);
 
             // The trade use cases read the applied corporate actions inside their unit of work: a test can act at that moment (TradeHooks).
             var reference = services.Single(d => d.ServiceType == typeof(ITradeReferenceData));
@@ -265,6 +277,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
                 DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%' OR event = 'PortfolioBenchmarkChanged' OR event LIKE 'Action%' OR event LIKE 'PriceAlert%';
+                DELETE FROM market.live_quotes;
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;

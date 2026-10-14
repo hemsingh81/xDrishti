@@ -1,0 +1,3 @@
+# UNVERIFIED layouts (constructed), but the SHAPE is what was observed on 2026-10-14: one WebSocket frame holds several packets back to back, each header's length field being the length of that packet including its header.
+# One frame of 116 bytes = quote (50, security 2885) + quote (50, security 1333) + previous close (16, security 1594).
+04 32 00 01 45 0b 00 00 00 68 38 45 19 00 50 69 cc 6a 9a 41 38 45 87 d6 12 00 50 c3 00 00 48 ee 00 00 00 c0 37 45 00 30 37 45 00 bc 38 45 00 a8 37 45 04 32 00 01 35 05 00 00 00 48 ce 44 0a 00 50 69 cc 6a 00 30 ce 44 55 f8 06 00 20 4e 00 00 30 75 00 00 00 a0 cd 44 00 00 cd 44 00 f0 ce 44 00 48 cd 44 06 10 00 01 3a 06 00 00 00 80 bb 44 00 00 00 00

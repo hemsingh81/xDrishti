@@ -701,7 +701,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote) */
+    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync, quote or live) */
     get: operations['ListHoldings'];
     put?: never;
     post?: never;
@@ -1556,7 +1556,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only */
+    /** Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). For the live feed, which another container runs, nothing starts here: the request is audited, the manual-run marker is written (Live:ManualRunMinutes, default 30) and the answer is a run with status queued and an empty id (the feed opens its run record within 15 seconds). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only */
     post: operations['RunServiceNow'];
     delete?: never;
     options?: never;
@@ -3329,7 +3329,7 @@ export interface components {
      *     import's default date. Returns cover all lots (closed lots add to RealisedPnl and to the XIRR).
      *     PreviousClose is the previous session's close as the last quote reported it (null until a quote gave one). DayChange (rupees) and DayChangePct (percent number) are
      *     against it, for an open, priced holding with a previous close; otherwise both are null and the holding is left out of the summary's day change. PriceAt is the time of
-     *     LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync) or "quote" (a market quote).
+     *     LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync), "quote" (a market quote) or "live" (a tick of the live feed).
      */
     HoldingRow: {
       /** Format: uuid */
@@ -4500,6 +4500,24 @@ export interface components {
     ServiceList: {
       items: components['schemas']['ServiceView'][];
     };
+    /**
+     * @description What a service that another process runs (the live feed) says about itself, from that process's heartbeat: `state` is its state word (connected · idle · connecting · reconnecting · closed · paused · no_token · token_refused · flapping ·
+     *     stopped · not_running when it reports nothing), `connected` whether it holds a connection, `subscribed` the instruments it carries, `lastTickAt` the time of the last price, `ticksPerSecond` its rate, `lastSeenAt` the
+     *     time of the heartbeat (null when it has never reported) and `summary` the one line the card shows.
+     */
+    ServiceLiveView: {
+      state: string;
+      connected: boolean;
+      /** Format: int32 */
+      subscribed: number;
+      /** Format: date-time */
+      lastTickAt: null | string;
+      /** Format: double */
+      ticksPerSecond: number;
+      /** Format: date-time */
+      lastSeenAt: null | string;
+      summary: string;
+    };
     /** @description A failure to tell the owner of (the bell). `id` is `service:failed:{serviceId}:{yyyy-MM-dd}` (the India date of the failed run): one notice per service per day, with the text and time of the latest failure. `kind` is service_failed; `severity` error. */
     ServiceNotice: {
       id: string;
@@ -4523,7 +4541,10 @@ export interface components {
       /** Format: int32 */
       total: number;
     };
-    /** @description One run (or attempt) of a service. `trigger`: scheduled · catch_up · after · manual. `status`: running · succeeded · failed · skipped. `dataJobId` links the data job a run started. */
+    /**
+     * @description One run (or attempt) of a service. `trigger`: scheduled · catch_up · after · manual. `status`: running · succeeded · failed · skipped; `queued` only in the answer to Run now for a service that another process runs (the live feed):
+     *     the request was accepted and the record does not exist yet (`id` is empty). `dataJobId` links the data job a run started.
+     */
     ServiceRunView: {
       /** Format: uuid */
       id: string;
@@ -4560,6 +4581,10 @@ export interface components {
        */
       revision: number;
     };
+    /**
+     * @description A background process by its heartbeat. `isAlive`: it reported within the last 60 seconds. `state`: what it says about itself (the feed: connected, idle, closed, paused, …; `stopped` in the last beat of a process that was told
+     *     to stop on purpose, which does not make the system unhealthy for ten minutes); null for a process that only says it is alive (the worker).
+     */
     ServiceStatus: {
       name: string;
       instance: string;
@@ -4569,12 +4594,14 @@ export interface components {
       /** Format: date-time */
       lastSeenAt: string;
       isAlive: boolean;
+      state?: null | string;
     };
     /**
      * @description A service on the Services screen (ADR 0018). `status`: healthy · running · failed (its latest run failed) · paused. `schedule` is the stored form (`scheduleWords` says it in words);
      *     `allowedScheduleTypes` are the types the owner may choose; `isDefault` says the choices are the definition's defaults; `lastRun` is the latest run of any kind, `nextRun` the next
      *     scheduled start (null when paused, when it follows another service, is always up or has no day ahead). `revision` is sent back with a save (0 until the first save or seed). A `readOnly`
-     *     entry is set elsewhere (`manageUrl`) and refuses writes.
+     *     entry is set elsewhere (`manageUrl`) and refuses writes. `live` is only given for a service that another process runs (the live feed): what its heartbeat says; its `status` is then derived from the stored row, the
+     *     latest run and that heartbeat (failed when it should be up and does not report).
      */
     ServiceView: {
       id: string;
@@ -4597,6 +4624,7 @@ export interface components {
       isDefault: boolean;
       /** Format: int64 */
       revision: number;
+      live?: null | components['schemas']['ServiceLiveView'];
     };
     /** @description The trading-day timeline: market hours (null on a day without a session), the review cutoff, whether the date is a trading day and every enabled service's starts and bands. */
     ServicesTimeline: {

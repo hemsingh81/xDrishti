@@ -27,7 +27,7 @@ broker/exchange APIs.
 | `xd-owner-reset` | API image, `owner-reset` | tools | On-demand one-shot (`xd-up.sh --owner-reset`): replaces the owner's password from the secrets, revokes all sessions |
 | `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (`BrokerVault__Key`, refuses to start without it); `Brokers__PublicBaseUrl` = `http://localhost:${XD_HTTP_PORT}` (broker redirect URLs); background workers for the instrument master (manual and daily refresh, `Instruments__AutoRefresh__*`, [doc 06](06-instruments-and-baskets.md) §2.2); networks `back` + `egress` (broker sign-in, master files) |
 | `xd-worker` | .NET 10 + Hangfire | core | CSV import (watches `data/inbox`), EOD fetch, aggregation, account & portfolio sync, nightly pipeline, backtests, Lab runs, ML.NET training; scale replicas |
-| `xd-feed` | .NET 10 | core | Market hours: Dhan WebSocket for the active set, quote polling for holdings, live bars & alerts (later also depth recording) |
+| `xd-feed` | .NET 10 | core | Market hours: Dhan WebSocket for the active set (**built**, P2-10, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md)): live prices written into the holdings and `market.live_quotes`, price alerts on every flush, heartbeat in `platform.service_heartbeats`; the vault key and the app DB password as secret files, networks `back` + `egress`, 256 MB, health check = heartbeat < 60 s old. The quote poll of holdings stays in `xd-api` (service `holdings-quotes`); live bars and depth recording come later |
 | `xd-sandbox` | .NET 10 worker | core | User C# plugins; **no network**, read-only data, CPU/memory/time limits |
 | `xd-db` | PostgreSQL + TimescaleDB (official image) | core | Named volume; read-only role for tools |
 | `xd-seq` | Seq | ops | Logs |
@@ -104,7 +104,7 @@ Nothing else is needed for the master: no published port, no volume (the file is
 | Disk | Timescale compression; tick data (later) ~50–100 GB/year → external SSD volume |
 | CSV inbox | Host folder `data/inbox/` bind-mounted into `xd-worker`; processed files moved to `data/processed/<job-id>/` |
 | CSV folder (P1-17a) | Host folder `data/Stocks_CSV/` (`XD_CSV_DIR`) bind-mounted **read-only** at `/data/csv` into `xd-api` (`Data__CsvFolder`); `xd-up.sh` creates it when missing; nothing is written there ([ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)) |
-| Market hours | `xd-feed` starts 09:00 and stops 15:35 on trading days (scheduled); Mac must be awake |
+| Market hours | `xd-feed` runs all day and connects between 09:00 and 15:35 on trading days (the window of the service `live-feed`, editable on the Services screen); it heartbeats outside the window. Mac must be awake (the owner's job; `xd-up.sh` holds no keep-awake) |
 | Remote access | Off by default; optional WireGuard on home router |
 | Dev loop | `dotnet watch` and Vite dev server on the host against containerised db/llm/ml; same images for "prod" |
 

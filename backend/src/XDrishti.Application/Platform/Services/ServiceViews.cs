@@ -9,7 +9,10 @@ public sealed record ExecutionView(int Retries, int TimeoutMinutes, bool CatchUp
 /// <summary>A parameter of a service with its schema: <c>kind</c> integer · number · boolean, the bounds of a number, the current value and the default.</summary>
 public sealed record ParameterView(string Name, string Label, string Kind, double Min, double Max, JsonElement Value, JsonElement Default, string? Description, string? Unit);
 
-/// <summary>One run (or attempt) of a service. <c>trigger</c>: scheduled · catch_up · after · manual. <c>status</c>: running · succeeded · failed · skipped. <c>dataJobId</c> links the data job a run started.</summary>
+/// <summary>
+/// One run (or attempt) of a service. <c>trigger</c>: scheduled · catch_up · after · manual. <c>status</c>: running · succeeded · failed · skipped; <c>queued</c> only in the answer to Run now for a service that another process runs (the live feed):
+/// the request was accepted and the record does not exist yet (<c>id</c> is empty). <c>dataJobId</c> links the data job a run started.
+/// </summary>
 public sealed record ServiceRunView(Guid Id, string ServiceId, string Trigger, int Attempt, DateTimeOffset StartedAt, DateTimeOffset? FinishedAt, string Status, string? Message, Guid? DataJobId)
 {
     public static ServiceRunView From(ServiceRun run)
@@ -33,7 +36,8 @@ public sealed record ServiceIssueView(string ServiceId, string Field, string Sev
 /// A service on the Services screen (ADR 0018). <c>status</c>: healthy · running · failed (its latest run failed) · paused. <c>schedule</c> is the stored form (<c>scheduleWords</c> says it in words);
 /// <c>allowedScheduleTypes</c> are the types the owner may choose; <c>isDefault</c> says the choices are the definition's defaults; <c>lastRun</c> is the latest run of any kind, <c>nextRun</c> the next
 /// scheduled start (null when paused, when it follows another service, is always up or has no day ahead). <c>revision</c> is sent back with a save (0 until the first save or seed). A <c>readOnly</c>
-/// entry is set elsewhere (<c>manageUrl</c>) and refuses writes.
+/// entry is set elsewhere (<c>manageUrl</c>) and refuses writes. <c>live</c> is only given for a service that another process runs (the live feed): what its heartbeat says; its <c>status</c> is then derived from the stored row, the
+/// latest run and that heartbeat (failed when it should be up and does not report).
 /// </summary>
 public sealed record ServiceView(
     string Id,
@@ -53,7 +57,15 @@ public sealed record ServiceView(
     DateTimeOffset? NextRun,
     IReadOnlyList<ServiceIssueView> Issues,
     bool IsDefault,
-    long Revision);
+    long Revision,
+    ServiceLiveView? Live = null);
+
+/// <summary>
+/// What a service that another process runs (the live feed) says about itself, from that process's heartbeat: <c>state</c> is its state word (connected · idle · connecting · reconnecting · closed · paused · no_token · token_refused · flapping ·
+/// stopped · not_running when it reports nothing), <c>connected</c> whether it holds a connection, <c>subscribed</c> the instruments it carries, <c>lastTickAt</c> the time of the last price, <c>ticksPerSecond</c> its rate, <c>lastSeenAt</c> the
+/// time of the heartbeat (null when it has never reported) and <c>summary</c> the one line the card shows.
+/// </summary>
+public sealed record ServiceLiveView(string State, bool Connected, int Subscribed, DateTimeOffset? LastTickAt, double TicksPerSecond, DateTimeOffset? LastSeenAt, string Summary);
 
 /// <summary>Every service: the registered ones in screen order, then the read-only entries.</summary>
 public sealed record ServiceList(IReadOnlyList<ServiceView> Items);

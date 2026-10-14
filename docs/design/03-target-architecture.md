@@ -334,6 +334,8 @@ via SignalR → instruments auto-tracked. Details: [05-data-and-brokers.md](05-d
 Planning (armed tickets) + Portfolio (open positions, holdings) + context indices + pins → `xd-feed` diffs the set
 and (un)subscribes on the Dhan WebSocket → ticks → live 1-minute bars + LTP → Portfolio/alerts → SignalR to React.
 
+**Built in P2-10 ([ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md)):** `xd-feed` → ticks → last price per instrument (every 2 s) into the holdings, `market.live_quotes` and the price alerts → `NOTIFY live_prices` → (P2-10a) `xd-api` reads what changed and pushes it over SignalR. The feed and the API never call each other; the database is the only meeting point. Live 1-minute bars are not built yet.
+
 ### Strategy Lab run
 React editor → `POST /api/lab/runs` → Hangfire job in `xd-worker` (plugins in `xd-sandbox`) → progress over
 SignalR → results in `lab` schema → report page. Details: [11-strategy-lab.md](11-strategy-lab.md).

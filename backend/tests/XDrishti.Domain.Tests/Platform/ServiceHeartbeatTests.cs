@@ -66,4 +66,55 @@ public sealed class ServiceHeartbeatTests
     [InlineData("svc", "host", "")]
     public void Start_rejects_missing_values(string name, string instance, string version) =>
         Should.Throw<ArgumentException>(() => ServiceHeartbeat.Start(name, instance, version, T0));
+
+    [Fact]
+    public void A_new_heartbeat_has_no_state_and_no_details()
+    {
+        var beat = ServiceHeartbeat.Start("xd-worker", "host-1", "0.1.0", T0);
+
+        (beat.State, beat.Details).ShouldBe((null, null));
+    }
+
+    [Fact]
+    public void Beat_with_state_and_details_replaces_both_and_moves_last_seen()
+    {
+        var beat = ServiceHeartbeat.Start("xd-feed", "host-1", "0.1.0", T0);
+
+        beat.Beat("host-1", "0.1.0", T0.AddSeconds(15), "connected", """{"subscribed":3}""");
+        beat.Beat("host-1", "0.1.0", T0.AddSeconds(30), "idle", """{"subscribed":0}""");
+
+        (beat.State, beat.Details, beat.LastSeenAt).ShouldBe(("idle", """{"subscribed":0}""", T0.AddSeconds(30)));
+    }
+
+    [Fact]
+    public void A_plain_beat_keeps_the_state_and_details_of_the_last_detailed_one()
+    {
+        var beat = ServiceHeartbeat.Start("xd-feed", "host-1", "0.1.0", T0);
+        beat.Beat("host-1", "0.1.0", T0.AddSeconds(15), "connected", "{}");
+
+        beat.Beat("host-1", "0.1.0", T0.AddSeconds(30));
+
+        (beat.State, beat.Details, beat.LastSeenAt).ShouldBe(("connected", "{}", T0.AddSeconds(30)));
+    }
+
+    [Fact]
+    public void An_out_of_order_detailed_beat_changes_nothing()
+    {
+        var beat = ServiceHeartbeat.Start("xd-feed", "host-1", "0.1.0", T0);
+        beat.Beat("host-1", "0.1.0", T0.AddSeconds(30), "connected", "{}");
+
+        beat.Beat("host-1", "0.1.0", T0.AddSeconds(15), "idle", """{"x":1}""");
+
+        (beat.State, beat.Details, beat.LastSeenAt).ShouldBe(("connected", "{}", T0.AddSeconds(30)));
+    }
+
+    [Fact]
+    public void A_state_longer_than_the_column_is_cut()
+    {
+        var beat = ServiceHeartbeat.Start("xd-feed", "host-1", "0.1.0", T0);
+
+        beat.Beat("host-1", "0.1.0", T0.AddSeconds(15), new string('s', 100), "{}");
+
+        beat.State!.Length.ShouldBe(ServiceHeartbeat.MaxStateLength);
+    }
 }

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Feed\XDrishti.Feed.csproj" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

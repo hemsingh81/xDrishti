@@ -21,7 +21,7 @@ public sealed record ReturnsView(
 /// import's default date. Returns cover all lots (closed lots add to RealisedPnl and to the XIRR).
 /// PreviousClose is the previous session's close as the last quote reported it (null until a quote gave one). DayChange (rupees) and DayChangePct (percent number) are
 /// against it, for an open, priced holding with a previous close; otherwise both are null and the holding is left out of the summary's day change. PriceAt is the time of
-/// LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync) or "quote" (a market quote).
+/// LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync), "quote" (a market quote) or "live" (a tick of the live feed).
 /// </summary>
 public sealed record HoldingRow(
     Guid Id,

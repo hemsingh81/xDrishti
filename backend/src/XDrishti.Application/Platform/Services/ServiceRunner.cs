@@ -11,7 +11,8 @@ namespace XDrishti.Application.Platform.Services;
 /// 30 s, 2 min, 10 min, 30 min, 1 h (the scheduler starts the retry when it is due, see <see cref="StartDueRetriesAsync"/>, and takes the sequence up again after a restart, see <see cref="ResumeRetry"/>). An
 /// attempt past its timeout is cancelled and recorded as failed (timed out): when the work was handed to a background worker that cannot be stopped, the record says the job is still running; a timeout is never
 /// retried. A run that succeeds starts the services set to run after it. Settings are read again for every attempt, so an edit counts at once. The run records are written under the application's own token, never
-/// under the token of the request that asked for the run: a client that disconnects cannot leave a half-made start.
+/// under the token of the request that asked for the run: a client that disconnects cannot leave a half-made start. A service that another process runs (<see cref="IExternallyRunService"/>) is refused
+/// (<see cref="ServiceStart.NotRunHere"/>).
 /// </summary>
 public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry registry, TimeProvider clock, ILogger<ServiceRunner> logger) : IDisposable
 {
@@ -69,6 +70,11 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
             return ServiceStart.NoSuchService;
         }
 
+        if (service is IExternallyRunService)
+        {
+            return ServiceStart.NotRunHere; // another process runs it and owns its run records
+        }
+
         var sequence = new Sequence(trigger, requestedBy);
         if (!TryReserve(serviceId, sequence))
         {
@@ -112,6 +118,11 @@ public sealed class ServiceRunner(IServiceScopeFactory scopes, ServiceRegistry r
     /// </summary>
     public bool ResumeRetry(string serviceId, ServiceRunTrigger trigger, string requestedBy, int nextAttempt, DateTimeOffset dueAt)
     {
+        if (registry.IsExternal(serviceId))
+        {
+            return false;
+        }
+
         var resumed = TryReserve(serviceId, new Sequence(trigger, requestedBy) { NextAttempt = nextAttempt, RetryAt = dueAt });
         if (resumed)
         {

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <!-- Live market-data host (xd-feed, ADR 0024): the Dhan WebSocket, the active set and the price sink. Thin: wiring and one background loop; the logic is in Application, the sockets in Infrastructure. -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Infrastructure\XDrishti.Infrastructure.csproj" />
+    <ProjectReference Include="..\XDrishti.Hosting\XDrishti.Hosting.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Feed.Tests" />
+  </ItemGroup>
+</Project>

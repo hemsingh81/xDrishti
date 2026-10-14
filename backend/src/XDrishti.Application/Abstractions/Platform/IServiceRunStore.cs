@@ -30,6 +30,9 @@ public interface IServiceRunStore
 
     ValueTask<int> CountAsync(string serviceId, CancellationToken cancellationToken);
 
-    /// <summary>Marks every run still <c>running</c> that started before <paramref name="processStartedAt"/> as failed (interrupted); returns how many.</summary>
-    ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, string message, CancellationToken cancellationToken);
+    /// <summary>
+    /// Marks every run still <c>running</c> that started before <paramref name="processStartedAt"/> as failed (interrupted); returns how many. The runs of <paramref name="exceptServiceIds"/> are left alone: they belong to a
+    /// process that is still up (the live feed's window run survives a restart of the API).
+    /// </summary>
+    ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, string message, IReadOnlyCollection<string> exceptServiceIds, CancellationToken cancellationToken);
 }

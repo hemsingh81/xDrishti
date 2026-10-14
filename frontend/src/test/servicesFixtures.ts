@@ -15,6 +15,7 @@ export const serviceIds = {
   master: 'instrument-master',
   sync: 'account-sync',
   quotes: 'holdings-quotes',
+  feed: 'live-feed',
 } as const;
 
 export const serviceRunId = (n: number) => `00000000-0000-4000-8000-0000000009${String(n).padStart(2, '0')}`;
@@ -260,3 +261,37 @@ export const buildServiceNotice = (overrides: Partial<ServiceNotice> = {}): Serv
   at: '2026-10-12T15:51:00+05:30',
   ...overrides,
 });
+
+/** The live feed: a window service run by xd-feed (09:00-15:35 on trading days), streaming 58 instruments, with the line its heartbeat gives. */
+export const buildLiveFeedService = (overrides: Partial<ServiceView> = {}): ServiceView =>
+  buildServiceView({
+    id: serviceIds.feed,
+    name: 'Live feed',
+    description: "Streams the prices of the open holdings, the alerts and a few indices from Dhan's market feed.",
+    runsAs: 'xd-feed',
+    status: 'running',
+    schedule: buildScheduleSpec({ type: 'window', time: null, days: weekdaySet, from: '09:00', to: '15:35' }),
+    scheduleWords: 'Up 09:00–15:35 IST on trading days',
+    allowedScheduleTypes: ['window'],
+    execution: { retries: 0, timeoutMinutes: 240, catchUp: false, notifyOnFailure: true },
+    parameters: [],
+    lastRun: buildServiceRun({
+      id: serviceRunId(5),
+      serviceId: serviceIds.feed,
+      startedAt: '2026-10-13T09:00:00+05:30',
+      finishedAt: null,
+      status: 'running',
+    }),
+    nextRun: '2026-10-14T09:00:00+05:30',
+    live: {
+      state: 'connected',
+      connected: true,
+      subscribed: 58,
+      lastTickAt: '2026-10-13T10:00:12+05:30',
+      ticksPerSecond: 4.3,
+      lastSeenAt: '2026-10-13T10:00:15+05:30',
+      summary: 'Connected · 58 instruments · last tick 10:00:12 IST · 4.3 ticks/s',
+    },
+    revision: 1,
+    ...overrides,
+  });

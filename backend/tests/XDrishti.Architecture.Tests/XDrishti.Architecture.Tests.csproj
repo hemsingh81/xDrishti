@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\XDrishti.Api\XDrishti.Api.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Worker\XDrishti.Worker.csproj" />
+    <ProjectReference Include="..\..\src\XDrishti.Feed\XDrishti.Feed.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />

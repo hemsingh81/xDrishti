@@ -178,10 +178,10 @@ flowchart LR
 
 | Service / job | Default schedule | Runs as |
 |---------------|------------------|---------|
-| Live feed (active set) | Window 09:00–15:35, trading days | `xd-feed` |
+| Live feed (active set) | Window 09:00–15:35, trading days; **built** as the service `live-feed` (P2-10, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md)): `xd-feed` supervises its own window and writes its own run rows, the Services screen lists, edits, pauses and resumes it through the stored row (the feed re-reads it every 15 s), *Run now* opens the connection for `Live:ManualRunMinutes` (30) outside the window, and its status comes from the feed's heartbeat | `xd-feed` |
 | Holdings quote refresh | Every 5 min, 09:15–15:30 on trading days; **built** as the service `holdings-quotes` (P2-06, [ADR 0019](../adr/0019-holdings-quotes-day-change-and-the-first-interval-service.md); the first `interval` service: retries 0, timeout 2 min, no catch-up, overlapping ticks dropped) | `xd-api` today (`xd-feed` later) |
 | **Pre-open check & arming** | **09:10** (after the 09:05 review cutoff and NSE pre-open price discovery, before the 09:15 open) | `xd-worker` |
-| Price alerts & action center | Every 1 min, 09:15–15:30 | `xd-worker` |
+| Price alerts & action center | Every 1 min, 09:15–15:30; **price alerts are built** (P2-09, [ADR 0022](../adr/0022-action-center-and-price-alerts.md)) and, since P2-10 ([ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md)), checked on every live flush (every 2 s while the feed is connected) as well as on the 5-minute quote tick; the Action center is evaluated on read | `xd-feed` / `xd-api` |
 | End-of-day fetch & aggregation (with gap backfill) | 15:50 on trading days of the calendar, never before the session has ended ([doc 05](05-data-and-brokers.md) §6; **built** as the service `eod` (P1-13): the job `dhan → aggregate → quality`, trigger `daily`) | `xd-api` today (`xd-worker` later) |
 | Data validation | Runs after the EOD fetch and aggregation, as the last step of the same data job ([doc 05](05-data-and-brokers.md) §10b; built in P1-14a: `dhan → aggregate → quality`, trigger `daily`; on demand from the Data quality screen; `Data:Quality:*`) | `xd-worker` |
 | Account & portfolio sync | 16:30 (designed); **built** per account, once a day at the time set under Accounts ([ADR 0013](../adr/0013-portfolio-import-with-settings-and-daily-refresh.md)) and shown on the Services screen as a **read-only row** with a link | `xd-api` today |

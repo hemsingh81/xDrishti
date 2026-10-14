@@ -56,6 +56,66 @@ public sealed class GetSystemStatusHandlerTests
         status.Services.ShouldHaveSingleItem().IsAlive.ShouldBeFalse();
     }
 
+    private static ServiceHeartbeat Feed(string state, DateTimeOffset seen)
+    {
+        var beat = ServiceHeartbeat.Start("xd-feed", "f1", "0.1.0", seen.AddHours(-3));
+        beat.Beat("f1", "0.1.0", seen, state, "{}");
+        return beat;
+    }
+
+    [Fact]
+    public async Task The_feed_is_listed_like_the_worker_and_is_up_while_it_beats_even_when_it_only_says_closed()
+    {
+        _database.GetAsync(Arg.Any<CancellationToken>()).Returns(Connected());
+        _heartbeats.ListAsync(Arg.Any<CancellationToken>())
+            .Returns([ServiceHeartbeat.Start("xd-worker", "w1", "0.1.0", Now.AddSeconds(-10)), Feed("closed", Now.AddSeconds(-12))]);
+
+        var status = await CreateHandler().HandleAsync(new GetSystemStatusQuery(), CancellationToken.None);
+
+        status.IsHealthy.ShouldBeTrue();
+        status.Services.Select(s => (s.Name, s.IsAlive, s.State)).ShouldBe([("xd-worker", true, null), ("xd-feed", true, "closed")]);
+    }
+
+    [Fact]
+    public async Task A_feed_that_stopped_reporting_without_saying_so_makes_the_system_unhealthy()
+    {
+        _database.GetAsync(Arg.Any<CancellationToken>()).Returns(Connected());
+        _heartbeats.ListAsync(Arg.Any<CancellationToken>()).Returns([Feed("connected", Now.AddMinutes(-3))]);
+
+        var status = await CreateHandler().HandleAsync(new GetSystemStatusQuery(), CancellationToken.None);
+
+        status.IsHealthy.ShouldBeFalse();
+        status.Services.ShouldHaveSingleItem().IsAlive.ShouldBeFalse();
+    }
+
+    [Theory]
+    [InlineData(5)]
+    [InlineData(600)] // ten minutes: the last moment of the grace
+    public async Task A_feed_that_said_it_was_stopping_is_down_but_does_not_make_the_system_unhealthy_for_ten_minutes(int secondsAgo)
+    {
+        _database.GetAsync(Arg.Any<CancellationToken>()).Returns(Connected());
+        _heartbeats.ListAsync(Arg.Any<CancellationToken>()).Returns([Feed("stopped", Now.AddSeconds(-secondsAgo))]);
+
+        var status = await CreateHandler().HandleAsync(new GetSystemStatusQuery(), CancellationToken.None);
+
+        status.IsHealthy.ShouldBeTrue();
+        var feed = status.Services.ShouldHaveSingleItem();
+        feed.IsAlive.ShouldBeFalse();
+        feed.State.ShouldBe("stopped");
+    }
+
+    [Fact]
+    public async Task A_stopped_feed_that_has_stayed_down_for_more_than_ten_minutes_is_down_like_any_stale_row()
+    {
+        _database.GetAsync(Arg.Any<CancellationToken>()).Returns(Connected());
+        _heartbeats.ListAsync(Arg.Any<CancellationToken>()).Returns([Feed("stopped", Now.AddSeconds(-601))]);
+
+        var status = await CreateHandler().HandleAsync(new GetSystemStatusQuery(), CancellationToken.None);
+
+        status.IsHealthy.ShouldBeFalse();
+        status.Services.ShouldHaveSingleItem().State.ShouldBe("stopped");
+    }
+
     [Fact]
     public async Task Unhealthy_when_migrations_are_pending()
     {

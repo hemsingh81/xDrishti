@@ -8,7 +8,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Api.Endpoints;
 
 /// <summary>
-/// The Services screen (ADR 0018, P1-13): what runs by itself and when. The services (end-of-day data run, instrument master refresh, holdings quotes) with their schedule in words, retries, timeout, catch-up, parameters, status,
+/// The Services screen (ADR 0018, P1-13): what runs by itself and when. The services (end-of-day data run, instrument master refresh, holdings quotes, and the live feed, which the xd-feed container runs: shown and edited here, its status from its heartbeat) with their schedule in words, retries, timeout, catch-up, parameters, status,
 /// latest run, next run and findings, plus the read-only per-account sync; the history of runs; the trading-day timeline; the notices for the bell; and the changes: save a schedule (checked against all services,
 /// optimistic revision), the dry run of a schedule, restore default, pause, resume and run now. Every change is audited. All routes need a session; the changes also need the CSRF token; none needs a step-up (a
 /// schedule is not a credential or a role). Part of the platform module.
@@ -77,7 +77,7 @@ internal sealed class ServicesEndpoints : IEndpointModule
 
         group.MapPost("/{id}/run", RunAsync)
             .WithName("RunServiceNow")
-            .WithSummary("Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only")
+            .WithSummary("Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). For the live feed, which another container runs, nothing starts here: the request is audited, the manual-run marker is written (Live:ManualRunMinutes, default 30) and the answer is a run with status queued and an empty id (the feed opens its run record within 15 seconds). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only")
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
     }

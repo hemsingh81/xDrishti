@@ -104,4 +104,74 @@ public sealed class BrokerEndpointsTests
         error.Message.ShouldContain("api.dhan.co/v2/fundlimit");
         error.Message.ShouldNotContain("FAKE-SECRET-MARKER");
     }
+
+    // ---- the market-data WebSocket (ADR 0024 §8) ----
+
+    [Theory]
+    [InlineData("wss://api-feed.dhan.co?version=2&token=abc&clientId=1000000001&authType=2")]
+    [InlineData("wss://api-feed.dhan.co/?version=2&token=abc&clientId=1000000001&authType=2")]
+    [InlineData("wss://API-FEED.DHAN.CO?version=2&token=abc&clientId=1000000001&authType=2")]
+    [InlineData("wss://api-feed.dhan.co?authType=2&clientId=1000000001&token=abc&version=2")] // any order
+    public void The_feed_url_with_exactly_its_four_query_keys_is_allowed(string url) =>
+        BrokerEndpoints.IsAllowedWebSocket(new Uri(url)).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("ws://api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2")] // not TLS
+    [InlineData("https://api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2")] // not a socket scheme
+    [InlineData("wss://api-feed.dhan.co:8443?version=2&token=abc&clientId=1&authType=2")] // other port
+    [InlineData("wss://user@api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2")]
+    [InlineData("wss://api-feed.dhan.co.example.invalid?version=2&token=abc&clientId=1&authType=2")] // other host
+    [InlineData("wss://api.dhan.co?version=2&token=abc&clientId=1&authType=2")]
+    [InlineData("wss://depth-api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2")] // the depth feed is not carried
+    [InlineData("wss://api-feed.dhan.co/feed?version=2&token=abc&clientId=1&authType=2")] // other path
+    [InlineData("wss://api-feed.dhan.co//?version=2&token=abc&clientId=1&authType=2")]
+    [InlineData("wss://api-feed.dhan.co")] // no query at all
+    [InlineData("wss://api-feed.dhan.co?")]
+    [InlineData("wss://api-feed.dhan.co?version=2&token=abc&clientId=1")] // a key missing
+    [InlineData("wss://api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2&extra=1")] // another key
+    [InlineData("wss://api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2&token=def")] // a key twice
+    [InlineData("wss://api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2&")]
+    [InlineData("wss://api-feed.dhan.co?version=2&token=abc&clientid=1&authType=2")] // keys are spelled exactly
+    [InlineData("wss://api-feed.dhan.co?version=2&Token=abc&clientId=1&authType=2")]
+    [InlineData("wss://api-feed.dhan.co?version=2&token=&clientId=1&authType=2")] // a key needs a value
+    [InlineData("wss://api-feed.dhan.co?version=2&token&clientId=1&authType=2")]
+    [InlineData("wss://api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2#x")] // no fragment
+    public void Every_other_socket_is_refused(string url) =>
+        BrokerEndpoints.IsAllowedWebSocket(new Uri(url)).ShouldBeFalse();
+
+    [Fact]
+    public void No_socket_endpoint_is_also_a_plain_http_endpoint()
+    {
+        BrokerEndpoints.IsAllowed(HttpMethod.Get, new Uri("https://api-feed.dhan.co?version=2&token=abc&clientId=1&authType=2")).ShouldBeFalse();
+        BrokerEndpoints.IsAllowedWebSocket(new Uri("wss://api.dhan.co/v2/holdings")).ShouldBeFalse();
+        BrokerEndpoints.IsAllowedWebSocket(null).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_feed_url_is_built_from_the_credentials_and_passes_the_allow_list()
+    {
+        var uri = BrokerEndpoints.BuildFeedUri("1000000001", "abc.def-ghi");
+
+        BrokerEndpoints.IsAllowedWebSocket(uri).ShouldBeTrue();
+        uri.Query.ShouldBe("?version=2&token=abc.def-ghi&clientId=1000000001&authType=2");
+    }
+
+    [Fact]
+    public void Values_that_try_to_add_a_query_key_are_escaped_and_cannot_widen_the_url()
+    {
+        var uri = BrokerEndpoints.BuildFeedUri("1&token=evil#frag", "a&extra=1=b c");
+
+        BrokerEndpoints.IsAllowedWebSocket(uri).ShouldBeTrue();
+        uri.Query.Split('&').Length.ShouldBe(4);
+        uri.Fragment.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_socket_refusal_names_no_query()
+    {
+        var error = BrokerEndpointNotAllowedException.ForSocket(new Uri("wss://evil.example.invalid/feed?token=FAKE-SECRET-MARKER"));
+
+        error.Message.ShouldContain("evil.example.invalid/feed");
+        error.Message.ShouldNotContain("FAKE-SECRET-MARKER");
+    }
 }

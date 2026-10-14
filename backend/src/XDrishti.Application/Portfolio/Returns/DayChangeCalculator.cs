@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Domain.Market;
 
 namespace XDrishti.Application.Portfolio.Returns;
 
@@ -6,6 +7,9 @@ namespace XDrishti.Application.Portfolio.Returns;
 /// Day change against the previous close (design doc 12 §3, ADR 0019 §4). Pure: no I/O, no clock. Per holding: <c>qty × (last − previousClose)</c> and <c>(last − previousClose) / previousClose</c>; it is unavailable when the
 /// previous close is missing or not positive, when the holding has no usable price or is closed. Per group and in total: the sum of the amounts, with the percentage on the sum of <c>qty × previousClose</c> of the
 /// included holdings (not an average of percentages); a holding left out is counted in <see cref="GroupDayChange.Excluded"/> and never taken as zero. Amounts and percentages are given to four decimals.
+/// A holding priced by a live tick (ADR 0024) counts only when its previous close was taken on the same India day as the tick (<see cref="HoldingData.PreviousCloseAt"/> - only a quote writes a previous close): until the first quote of
+/// the day has run (or all day if the quote poll fails) the stored close is the one of the session before the last, and "live price minus that" would show two sessions as one day. A previous close without a time (rows from before the
+/// time was kept) is "not the same day" for a live-priced holding. Holdings priced by a quote or a sync behave as before (ADR 0019, the known limitation of a quote taken after the close).
 /// </summary>
 public static class DayChangeCalculator
 {
@@ -51,7 +55,10 @@ public static class DayChangeCalculator
     }
 
     private static bool Counts(HoldingData holding) =>
-        holding.IsOpen && holding.Qty > 0 && holding.LastPrice > 0m && holding.PreviousClose is > 0m;
+        holding.IsOpen && holding.Qty > 0 && holding.LastPrice > 0m && holding.PreviousClose is > 0m && (holding.PriceSource != HoldingData.LiveSource || PreviousCloseIsOfTheTicksDay(holding));
+
+    private static bool PreviousCloseIsOfTheTicksDay(HoldingData holding) =>
+        holding is { PreviousCloseAt: { } taken, LastPriceAt: { } tick } && IndiaTime.Today(taken) == IndiaTime.Today(tick);
 
     private static decimal Round(decimal value) => Math.Round(value, Decimals, MidpointRounding.AwayFromZero);
 }

@@ -454,6 +454,16 @@ Broker API keys, secrets and tokens are not configuration: they are entered in t
 <p>Each account chooses its own schedule in the app (Accounts → Portfolio, and on the Portfolio screen): <em>Off</em> (default), <em>Every 5 / 15 / 30 / 60 minutes during market hours</em>
 (Monday–Friday 09:15–15:30 India time) or <em>Daily at HH:MM IST</em>; it is stored in <code>accounts.portfolio_settings</code>, not in this file (<a href="04-accounts-access-and-operations.html">doc 04</a> §1, <a href="12-portfolio-monitoring.html">doc 12</a> §3).
 The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is fixed in the code and on the allow-list (<a href="17-deployment-and-operations.html">doc 17</a> §3).</p>
+<h3 id="live-feed-live-adr-0024-p2-10">Live feed (<code>Live:*</code>, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>, P2-10)<a class="hash" href="#live-feed-live-adr-0024-p2-10" aria-label="Link to this section">#</a></h3>
+<p><code>appsettings.json</code> of <code>xd-feed</code> (and <code>Live:ManualRunMinutes</code> of <code>xd-api</code> too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service <code>live-feed</code> on the Services screen, not a setting here.</p>
+<div class="code"><pre><code class="language-yaml">Live:
+  MaxWsInstruments: 200          # 1–5000: the cap of the active set (alerts, then indices, then holdings by value)
+  FlushSeconds: 2                # 1–30: how often the latest ticks are written
+  SilenceSeconds: 30             # 5–300: no packet for this long in market hours = dead connection (when an index is subscribed)
+  BackoffInitialSeconds: 1       # 1–60: reconnect back-off 1, 2, 4 … BackoffMaxSeconds, jittered
+  BackoffMaxSeconds: 30          # 1–300
+  SubscribeSpacingMilliseconds: 250   # 0–5000: gap between subscription messages (≤ 100 instruments each)
+  ManualRunMinutes: 30           # 1–240: how long Run now keeps the connection open outside the window</code></pre></div>
 <h2 id="4-most-used-settings">4. Most-used settings<a class="hash" href="#4-most-used-settings" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -530,7 +540,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-13 17:50</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-14 07:37</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>
@@ -538,6 +548,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
 <a href="#instrument-master-instruments-adr-0010-p1-03" class="d3">Instrument master (Instruments:*, ADR 0010, P1-03)</a>
 <a href="#end-of-day-run-dataeod-adr-0017-2-adr-0018" class="d3">End-of-day run (Data:Eod:*, ADR 0017 §2, ADR 0018)</a>
 <a href="#holdings-refresh-portfolio-adr-0012-p2-01" class="d3">Holdings refresh (Portfolio:*, ADR 0012, P2-01)</a>
+<a href="#live-feed-live-adr-0024-p2-10" class="d3">Live feed (Live:*, ADR 0024, P2-10)</a>
 <a href="#4-most-used-settings" class="d2">4. Most-used settings</a></aside>
 </div>
 <div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>

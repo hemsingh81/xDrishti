@@ -1,10 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Tests.Live;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Calendar;
 
@@ -40,6 +42,9 @@ internal sealed class ServicesWorld : IDisposable
             .Singleton<ITradingCalendar>(new FixedTradingCalendar(this))
             .Singleton<IApplicationInfo>(Application)
             .Singleton(NoAccountSync())
+            .Singleton<IFeedHeartbeats>(Heartbeats)
+            .Singleton<IFeedManualRun>(Manual)
+            .Singleton(FeedManualRunSettings.Default)
             .Singleton<ServiceRunner, ServiceRunner>()
             .Singleton<ServiceScheduler, ServiceScheduler>()
             .Scoped<ServiceSettingsReader>()
@@ -74,6 +79,12 @@ internal sealed class ServicesWorld : IDisposable
     public TradingCalendar Calendar { get; set; } = new();
 
     public FakeApplicationInfo Application { get; } = new();
+
+    /// <summary>The heartbeat of the feed as the Services screen reads it (none until a test sets one).</summary>
+    public FakeFeedHeartbeats Heartbeats { get; } = new();
+
+    /// <summary>The manual-run marker of the live feed.</summary>
+    public FakeManualRun Manual { get; } = new();
 
     public ServiceScheduler Scheduler => _provider.GetRequiredService<ServiceScheduler>();
 

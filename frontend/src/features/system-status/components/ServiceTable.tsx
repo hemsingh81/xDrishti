@@ -31,7 +31,11 @@ export function ServiceTable({ services }: { services: readonly ServiceStatus[] 
             <TableRow key={s.name}>
               <TableCell sx={{ fontWeight: 600 }}>{s.name}</TableCell>
               <TableCell>
-                <StatusChip ok={s.isAlive} okLabel="Running" badLabel="Not reporting" />
+                <StatusChip
+                  ok={s.isAlive}
+                  okLabel="Running"
+                  badLabel={s.state === 'stopped' ? 'Stopped' : 'Not reporting'}
+                />
               </TableCell>
               <TableCell>{s.version}</TableCell>
               <TableCell sx={{ fontFamily: monoFontFamily }}>{s.instance}</TableCell>

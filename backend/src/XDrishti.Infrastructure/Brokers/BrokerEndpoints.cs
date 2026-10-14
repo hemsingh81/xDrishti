@@ -21,6 +21,15 @@ internal static class BrokerEndpoints
     /// <summary>The market quote of up to 1,000 securities (JSON body <c>{"NSE_EQ":[ids]}</c>, headers <c>access-token</c> and <c>client-id</c>; ADR 0019 §1). Read-only despite the POST; <c>ltp</c>, <c>ohlc</c> and every other market-feed path stay refused.</summary>
     public static readonly Uri DhanMarketQuote = new("https://api.dhan.co/v2/marketfeed/quote");
 
+    /// <summary>
+    /// Dhan's market-data WebSocket (ADR 0024 §8; unverified until the owner's first real session): <c>wss://api-feed.dhan.co</c> with exactly the query keys <see cref="FeedQueryKeys"/> (<c>version</c>, <c>token</c>, <c>clientId</c>,
+    /// <c>authType</c>). The only socket the application may open, checked by <see cref="IsAllowedWebSocket"/> before the connection is made.
+    /// </summary>
+    public static readonly Uri DhanFeed = new("wss://api-feed.dhan.co");
+
+    /// <summary>The query keys of the feed URL, each exactly once and nothing else.</summary>
+    public static readonly IReadOnlyList<string> FeedQueryKeys = ["version", "token", "clientId", "authType"];
+
     /// <summary>Browser page: Dhan's consent login (query <c>consentAppId</c>).</summary>
     public const string DhanLoginPage = "https://auth.dhan.co/login/consentApp-login";
 
@@ -55,6 +64,46 @@ internal static class BrokerEndpoints
         }
 
         return false;
+    }
+
+    /// <summary>The URL of the feed for a Data account: <c>wss://api-feed.dhan.co?version=2&amp;token=…&amp;clientId=…&amp;authType=2</c>. The values are escaped; the result is never logged.</summary>
+    public static Uri BuildFeedUri(string clientId, string token)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        return new Uri($"{DhanFeed.Scheme}://{DhanFeed.Host}?version=2&token={Uri.EscapeDataString(token)}&clientId={Uri.EscapeDataString(clientId)}&authType=2");
+    }
+
+    /// <summary>
+    /// True only for the exact feed endpoint: scheme <c>wss</c>, host <c>api-feed.dhan.co</c>, the default port, an empty or root path, no user info or fragment, and a query of exactly the keys <see cref="FeedQueryKeys"/> - each once, with
+    /// a value, in any order, spelled exactly (case matters) - and nothing else.
+    /// </summary>
+    public static bool IsAllowedWebSocket(Uri? uri)
+    {
+        if (uri is null || !uri.IsAbsoluteUri || uri.Scheme != "wss" || !uri.IsDefaultPort || uri.UserInfo.Length > 0 || uri.Fragment.Length > 0
+            || !string.Equals(uri.Host, DhanFeed.Host, StringComparison.OrdinalIgnoreCase) || uri.AbsolutePath != "/")
+        {
+            return false;
+        }
+
+        if (uri.OriginalString.Contains('#', StringComparison.Ordinal) || uri.Query.Length < 2 || uri.Query[0] != '?')
+        {
+            return false;
+        }
+
+        var keys = new List<string>();
+        foreach (var pair in uri.Query[1..].Split('&'))
+        {
+            var separator = pair.IndexOf('=', StringComparison.Ordinal);
+            if (separator <= 0 || separator == pair.Length - 1)
+            {
+                return false;
+            }
+
+            keys.Add(pair[..separator]);
+        }
+
+        return keys.Count == FeedQueryKeys.Count && keys.Order(StringComparer.Ordinal).SequenceEqual(FeedQueryKeys.Order(StringComparer.Ordinal), StringComparer.Ordinal);
     }
 
     private static bool QueryIsAllowed(Uri uri, string? parameter)

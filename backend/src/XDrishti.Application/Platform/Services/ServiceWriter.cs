@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -6,8 +7,11 @@ using XDrishti.Domain.Platform.Services;
 
 namespace XDrishti.Application.Platform.Services;
 
-/// <summary>Stores new settings for a service and writes the audit event with them, in one save: creates the row on the first save, refuses a save made on an older revision.</summary>
-internal sealed class ServiceWriter(IServiceScheduleStore store, IAccountEventLog events, IPlatformUnitOfWork unitOfWork, TimeProvider clock)
+/// <summary>
+/// Stores new settings for a service and writes the audit event with them, in one save: creates the row on the first save, refuses a save made on an older revision. A service that another process runs (the live feed) that is
+/// switched off by the change also loses its manual-run marker in the same save: a "Run now" in force must not keep a paused service up.
+/// </summary>
+internal sealed class ServiceWriter(ServiceRegistry registry, IServiceScheduleStore store, IFeedManualRun manualRun, IAccountEventLog events, IPlatformUnitOfWork unitOfWork, TimeProvider clock)
 {
     /// <summary>Stores the (checked) settings as they are.</summary>
     /// <param name="service">The service with the settings now in force.</param>
@@ -26,6 +30,13 @@ internal sealed class ServiceWriter(IServiceScheduleStore store, IAccountEventLo
     /// </summary>
     public ValueTask<Result> ChangeAsync(EffectiveService service, Func<ServiceSettings, ServiceSettings> change, AccountEventType type, Func<ServiceSettings, ServiceSettings, string> describe, string actor, CancellationToken cancellationToken) =>
         ApplyAsync(service, change, null, type, null, actor, cancellationToken, describe);
+
+    /// <summary>Ends the manual run of a service that another process runs (see the summary): for a pause of a service that is paused already, while a "Run now" keeps it up. Saved at once; nothing happens when there is no marker.</summary>
+    public async ValueTask EndManualRunAsync(string actor, CancellationToken cancellationToken)
+    {
+        await manualRun.ClearAsync(actor, clock.GetUtcNow(), cancellationToken);
+        await unitOfWork.TrySaveAsync(cancellationToken);
+    }
 
     private async ValueTask<Result> ApplyAsync(
         EffectiveService service,
@@ -58,6 +69,11 @@ internal sealed class ServiceWriter(IServiceScheduleStore store, IAccountEventLo
             }
 
             row.Apply(next, actor, now);
+        }
+
+        if (!next.Enabled && registry.IsExternal(service.Id))
+        {
+            await manualRun.ClearAsync(actor, now, cancellationToken);
         }
 
         events.Record(AccountEvent.Record(type, null, describe is null ? detail!(next) : describe(current, next), actor, now));

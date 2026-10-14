@@ -368,7 +368,7 @@ has no effect on scheduled work.</li>
 </thead>
 <tbody><tr>
 <td>Live feed (active set)</td>
-<td>Window 09:00–15:35, trading days</td>
+<td>Window 09:00–15:35, trading days; <strong>built</strong> as the service <code>live-feed</code> (P2-10, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>): <code>xd-feed</code> supervises its own window and writes its own run rows, the Services screen lists, edits, pauses and resumes it through the stored row (the feed re-reads it every 15 s), <em>Run now</em> opens the connection for <code>Live:ManualRunMinutes</code> (30) outside the window, and its status comes from the feed&#39;s heartbeat</td>
 <td><code>xd-feed</code></td>
 </tr>
 <tr>
@@ -383,8 +383,8 @@ has no effect on scheduled work.</li>
 </tr>
 <tr>
 <td>Price alerts &amp; action center</td>
-<td>Every 1 min, 09:15–15:30</td>
-<td><code>xd-worker</code></td>
+<td>Every 1 min, 09:15–15:30; <strong>price alerts are built</strong> (P2-09, <a href="../adr/0022-action-center-and-price-alerts.html">ADR 0022</a>) and, since P2-10 (<a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>), checked on every live flush (every 2 s while the feed is connected) as well as on the 5-minute quote tick; the Action center is evaluated on read</td>
+<td><code>xd-feed</code> / <code>xd-api</code></td>
 </tr>
 <tr>
 <td>End-of-day fetch &amp; aggregation (with gap backfill)</td>
@@ -608,7 +608,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-13 17:50</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-14 07:37</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

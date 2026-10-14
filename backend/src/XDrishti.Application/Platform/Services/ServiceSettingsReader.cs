@@ -15,6 +15,21 @@ internal sealed class ServiceSettingsReader(ServiceRegistry registry, IServiceSc
             : new EffectiveService(service.Definition, service.FirstStartSettings() ?? service.Definition.Defaults, null))];
     }
 
+    /// <summary>
+    /// The settings now in force for a service that is described by a definition but not necessarily registered here (the live feed runs in its own host, which reads its own schedule row): the stored row, else the definition's
+    /// defaults - the same rules as <see cref="ReadAllAsync"/>.
+    /// </summary>
+    public async ValueTask<EffectiveService> ReadAsync(XDrishti.Domain.Platform.Services.ServiceDefinition definition, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        var row = (await store.ListAsync(cancellationToken)).FirstOrDefault(r => string.Equals(r.Id, definition.Id, StringComparison.Ordinal));
+        return row is null
+            ? new EffectiveService(definition, definition.Defaults, null)
+            : row.ScheduleReadable
+                ? new EffectiveService(definition, row.Settings, row)
+                : new EffectiveService(definition, definition.Defaults with { Enabled = row.Enabled }, row, StoredInvalid: true);
+    }
+
     /// <summary>One registered service with the settings now in force.</summary>
     public async ValueTask<EffectiveService> ReadAsync(string serviceId, CancellationToken cancellationToken) =>
         (await ReadAllAsync(cancellationToken)).First(s => s.Id == serviceId);

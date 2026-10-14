@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
@@ -7,6 +8,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Live;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
@@ -26,6 +28,7 @@ using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Portfolio.Live;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Portfolio.Trades;
@@ -42,6 +45,7 @@ public static class DependencyInjection
 
         services.AddScoped<IQueryHandler<GetSystemStatusQuery, SystemStatusResponse>, GetSystemStatusHandler>();
         services.AddScoped<ICommandHandler<RecordHeartbeatCommand>, RecordHeartbeatHandler>();
+        services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
 
         services.AddScoped<ICommandHandler<LoginCommand, LoginResult>, LoginHandler>();
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutHandler>();
@@ -60,6 +64,26 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// The live feed's engine (ADR 0024) - only for the <c>xd-feed</c> host: the active set (providers, loader), the connection manager, the supervisor that owns the window, the run record and the heartbeat, and their figures. The host provides
+    /// <see cref="LiveFeedSettings"/> (from its options) and, through <c>AddInfrastructure</c> and <c>AddLiveFeed</c>, the ports they use.
+    /// </summary>
+    public static IServiceCollection AddFeedEngine(this IServiceCollection services)
+    {
+        services.AddScoped<IActiveSetProvider, HoldingsProvider>();
+        services.AddScoped<IActiveSetProvider, AlertsProvider>();
+        services.AddScoped<IActiveSetProvider, IndicesProvider>();
+        services.AddSingleton<MissingIndexReport>();
+        services.AddSingleton<ActiveSetLoader>();
+        services.AddSingleton<FeedPacketStats>();
+        services.AddSingleton<FeedMetrics>();
+        services.AddSingleton<ReconnectBackoff>();
+        services.AddSingleton<FeedConnectionManager>();
+        services.AddSingleton<IFeedSession>(sp => sp.GetRequiredService<FeedConnectionManager>());
+        services.AddSingleton<IFeedSupervisor, LiveFeedSupervisor>();
+        return services;
+    }
+
+    /// <summary>
     /// The services framework (ADR 0018): the registry of the services other modules register as <see cref="IScheduledService"/>, the runner and the scheduler (singletons: the API's hosted service runs the
     /// scheduler for the lifetime of the process), the reads of the Services screen and the use cases behind its endpoints.
     /// </summary>
@@ -69,6 +93,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, EodService>();
         services.AddSingleton<IScheduledService, InstrumentMasterService>();
         services.AddSingleton<IScheduledService, HoldingQuotesService>();
+        services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();
@@ -276,6 +301,10 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<VoidTradeCommand, TradeView>, VoidTradeHandler>();
         services.AddScoped<ICommandHandler<RebuildLotsCommand, HoldingRebuildResult>, RebuildLotsHandler>();
         services.AddScoped<IQueryHandler<GetTradeTemplateQuery, string>, GetTradeTemplateHandler>();
+
+        // The live price sink (ADR 0024): a singleton for the lifetime of the feed process; it resolves the scoped ports per flush.
+        services.AddSingleton<LiveFlush>();
+        services.AddSingleton<ILiveFlush>(sp => sp.GetRequiredService<LiveFlush>());
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();

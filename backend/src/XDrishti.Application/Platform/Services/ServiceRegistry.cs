@@ -27,7 +27,13 @@ public sealed class ServiceRegistry
     /// <summary>The ids of every registered service.</summary>
     public IReadOnlyCollection<string> Ids => _byId.Keys;
 
+    /// <summary>The ids of the services that another process runs (<see cref="IExternallyRunService"/>): shown and edited here, never started, retried or closed by this process.</summary>
+    public IReadOnlyCollection<string> ExternalIds => [.. All.Where(s => s is IExternallyRunService).Select(s => s.Definition.Id)];
+
     public IScheduledService? Find(string id) => _byId.GetValueOrDefault(id);
+
+    /// <summary>Whether the service is registered and run by another process.</summary>
+    public bool IsExternal(string id) => _byId.GetValueOrDefault(id) is IExternallyRunService;
 
     public string NameOf(string id) => _byId.TryGetValue(id, out var service) ? service.Definition.Name : id;
 }

@@ -13,6 +13,7 @@ using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
+using XDrishti.Infrastructure.Market.Live;
 
 namespace XDrishti.Infrastructure.Persistence;
 
@@ -92,6 +93,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<BarAggRecord> BarsAgg => Set<BarAggRecord>();
 
     internal DbSet<BarCoverageRecord> BarCoverage => Set<BarCoverageRecord>();
+
+    internal DbSet<LiveQuoteRecord> LiveQuotes => Set<LiveQuoteRecord>();
 
     internal DbSet<CsvFileRecord> CsvFiles => Set<CsvFileRecord>();
 

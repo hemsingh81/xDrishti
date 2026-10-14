@@ -1408,6 +1408,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("service_name");
 
+                    b.Property<string>("Details")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details");
+
                     b.Property<string>("Instance")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -1421,6 +1425,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("started_at");
+
+                    b.Property<string>("State")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
 
                     b.Property<string>("Version")
                         .IsRequired()
@@ -1680,6 +1689,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("previous_close");
 
+                    b.Property<DateTimeOffset?>("PreviousCloseAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("previous_close_at");
+
                     b.Property<long>("Qty")
                         .HasColumnType("bigint")
                         .HasColumnName("qty");
@@ -1730,7 +1743,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("holdings", "portfolio", t =>
                         {
-                            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote')");
+                            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote', 'live')");
 
                             t.HasCheckConstraint("ck_holdings_qty", "qty >= 0");
 
@@ -2640,6 +2653,32 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Live.LiveQuoteRecord", b =>
+                {
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<decimal>("LastPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("last_price");
+
+                    b.Property<DateTimeOffset>("TickAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tick_at");
+
+                    b.HasKey("InstrumentId")
+                        .HasName("pk_live_quotes");
+
+                    b.ToTable("live_quotes", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_live_quotes_last_price", "last_price > 0");
+                        });
+
+                    NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -3012,6 +3051,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_instrument_broker_ids_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Live.LiveQuoteRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Infrastructure.Market.Live.LiveQuoteRecord", "InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_quotes_instruments_instrument_id");
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>

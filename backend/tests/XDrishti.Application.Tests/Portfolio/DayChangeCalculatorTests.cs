@@ -123,4 +123,65 @@ public sealed class DayChangeCalculatorTests
         b.Xirr.Rate!.Value.ShouldBe(0.14891, 1e-4); // 6,600 / 5,000 over 730 days: sqrt(1.32) - 1
         DayChangeCalculator.ForHolding(after)!.Amount.ShouldBe(700m); // 100 x (66 - 59)
     }
+
+    // ---- a live price needs a previous close of its own day (ADR 0024) ----
+
+    private static readonly DateTimeOffset TickDay = new(2026, 10, 12, 4, 30, 0, TimeSpan.Zero); // Monday 10:00 India time
+
+    private static HoldingData Live(decimal last, decimal? previous, DateTimeOffset? previousAt, string symbol = "EXMPL", long qty = 100) =>
+        Held(last, previous, qty, symbol) with { LastPriceAt = TickDay, PriceSource = HoldingData.LiveSource, PreviousCloseAt = previousAt };
+
+    [Fact]
+    public void A_live_price_counts_when_the_previous_close_was_taken_on_the_same_india_day()
+    {
+        var sameDay = TickDay.AddMinutes(-40); // a quote at 09:20
+
+        var change = DayChangeCalculator.ForHolding(Live(110m, 100m, sameDay)).ShouldNotBeNull();
+
+        (change.Amount, change.Pct).ShouldBe((1000m, 10m));
+    }
+
+    [Fact]
+    public void A_live_price_with_a_previous_close_from_an_earlier_day_has_no_day_change_it_would_be_two_sessions()
+    {
+        DayChangeCalculator.ForHolding(Live(110m, 100m, TickDay.AddDays(-1))).ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_live_price_with_a_previous_close_of_no_known_time_has_no_day_change()
+    {
+        DayChangeCalculator.ForHolding(Live(110m, 100m, null)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void The_day_is_the_india_day_a_close_taken_at_23_30_utc_belongs_to_the_next_india_day()
+    {
+        var late = new DateTimeOffset(2026, 10, 11, 23, 30, 0, TimeSpan.Zero); // 05:00 on the 12th in India
+        DayChangeCalculator.ForHolding(Live(110m, 100m, late)).ShouldNotBeNull();
+
+        var before = new DateTimeOffset(2026, 10, 11, 18, 0, 0, TimeSpan.Zero); // 23:30 on the 11th in India
+        DayChangeCalculator.ForHolding(Live(110m, 100m, before)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_quote_after_the_live_price_makes_it_count_and_a_quote_priced_or_synced_holding_behaves_as_before()
+    {
+        DayChangeCalculator.ForHolding(Live(110m, 100m, TickDay.AddMinutes(-30))).ShouldNotBeNull(); // live price, then the quote poll took the close of the day
+        DayChangeCalculator.ForHolding(Held(110m, 100m) with { PriceSource = HoldingData.QuoteSource, PreviousCloseAt = null }).ShouldNotBeNull();
+        DayChangeCalculator.ForHolding(Held(110m, 100m) with { PriceSource = HoldingData.SyncSource, PreviousCloseAt = TickDay.AddDays(-3) }).ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void Excluded_live_holdings_are_counted_in_the_group_never_taken_as_zero_and_the_total_matches_the_rows()
+    {
+        var counted = Live(110m, 100m, TickDay.AddMinutes(-40), "AAA", 10); // +100
+        var stale = Live(210m, 200m, TickDay.AddDays(-1), "BBB", 10); // would be +100, left out
+        var quoted = Held(55m, 50m, 10, "CCC"); // +50
+
+        var group = DayChangeCalculator.ForGroup([counted, stale, quoted]);
+
+        (group.Amount, group.Included, group.Excluded).ShouldBe((150m, 2, 1));
+        DayChangeCalculator.ForHolding(stale).ShouldBeNull();
+        new[] { counted, stale, quoted }.Sum(h => DayChangeCalculator.ForHolding(h)?.Amount ?? 0m).ShouldBe(group.Amount!.Value);
+    }
 }
