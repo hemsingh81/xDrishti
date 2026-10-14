@@ -252,6 +252,7 @@ services:
   eod-fetch:        { schedule: { type: daily, time: "15:50", days: trading }, params: { throttle_per_sec: 5, gap_lookback_days: 5 } }
   validation:       { schedule: { type: after, after: eod-fetch }, params: { days_to_check: 5, tolerance_pct: 0.05, spike_multiple: 8 } }
   portfolio-sync:   { schedule: { type: daily, time: "16:30", days: trading } }
+  broker-history:   { schedule: { type: daily, time: "16:30", days: trading } }   # built in P2-13 (ADR 0025), service id portfolio-broker-history, "Portfolio trades & ledger": Dhan trades and ledger of the Portfolio accounts; first-start seed Portfolio:BrokerHistory:Enabled
   nightly:          { schedule: { type: daily, time: "18:30", days: trading } }
   suggestions:      { schedule: { type: after, after: nightly } }
   retrain:          { schedule: { type: weekly, weekday: Sat, time: "10:00" } }
@@ -336,6 +337,15 @@ The other `Data:*` options (CSV folder and limits, Dhan fetch, gap look-back, da
 Each account chooses its own schedule in the app (Accounts → Portfolio, and on the Portfolio screen): *Off* (default), *Every 5 / 15 / 30 / 60 minutes during market hours*
 (Monday–Friday 09:15–15:30 India time) or *Daily at HH:MM IST*; it is stored in `accounts.portfolio_settings`, not in this file ([doc 04](04-accounts-access-and-operations.md) §1, [doc 12](12-portfolio-monitoring.md) §3).
 The Dhan holdings endpoint (`GET https://api.dhan.co/v2/holdings`) is fixed in the code and on the allow-list ([doc 17](17-deployment-and-operations.md) §3).
+
+### Trades and ledger from Dhan (`Portfolio:BrokerHistory:*`, [ADR 0025](../adr/0025-dhan-trade-history-and-ledger-sync.md), P2-13)
+
+| Option (`appsettings` / environment) | Meaning | Default | Check |
+|--------------------------------------|---------|---------|-------|
+| `Portfolio:BrokerHistory:Enabled` (`Portfolio__BrokerHistory__Enabled`; compose: `XD_PORTFOLIO_BROKER_HISTORY`) | **First-start setting** (ADR 0018): whether the service `portfolio-broker-history` ("Portfolio trades & ledger", daily 16:30 IST on trading days) starts enabled; read once, when the service has no stored row, and ignored after it (then the Services screen decides). `false` starts it paused; "Sync trades & ledger" per account keeps working | `true` | boolean |
+| `Portfolio:BrokerHistory:CallSpacingMs` (`Portfolio__BrokerHistory__CallSpacingMs`; no compose variable) | The least time between two calls to Dhan's trade history and ledger, kept by one throttle for the whole process; `0` switches the spacing off (tests) | `250` | integer 0 to 60,000 |
+
+The window length (30 days), the page cap (200), the 30 s timeout and the 5 MB answer limit are fixed in the code, not configuration (tuned after the first real read). The two Dhan endpoints are on the allow-list ([doc 05](05-data-and-brokers.md) §8.3, [doc 17](17-deployment-and-operations.md) §3).
 
 ### Live feed (`Live:*`, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md), P2-10)
 

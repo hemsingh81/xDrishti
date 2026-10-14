@@ -64,4 +64,5 @@ public enum AccountEventType
     TradeAdded,
     TradeVoided,
     LotsRebuilt,
+    BrokerHistorySynced,
 }

@@ -44,10 +44,15 @@ internal sealed class HoldingSyncStore(XDrishtiDbContext db, NpgsqlDataSource da
             await stale.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // A trade or ledger read of the account (ADR 0025) takes the same turn: it holds the advisory lock while it starts, and a holdings sync does not start while one runs (one that ran past its limit counts as dead).
         await using (var running = new NpgsqlCommand(
-            "SELECT EXISTS (SELECT 1 FROM portfolio.holding_syncs WHERE account_id = @account AND status = 'running')", connection, transaction))
+            """
+            SELECT EXISTS (SELECT 1 FROM portfolio.holding_syncs WHERE account_id = @account AND status = 'running')
+                OR EXISTS (SELECT 1 FROM portfolio.broker_sync_runs WHERE account_id = @account AND status = 'running' AND started_at > @brokerCutoff)
+            """, connection, transaction))
         {
             running.Parameters.AddWithValue("account", run.AccountId);
+            running.Parameters.AddWithValue("brokerCutoff", now - SyncLimits.BrokerHistoryStaleAfter);
             if (await running.ExecuteScalarAsync(cancellationToken) is true)
             {
                 return false;

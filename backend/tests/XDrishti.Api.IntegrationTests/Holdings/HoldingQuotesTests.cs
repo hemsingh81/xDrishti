@@ -375,6 +375,8 @@ public sealed class HoldingQuotesTests(ApiFactory factory) : HoldingsTestBase(fa
 
         public ValueTask<bool> AnyForAccountAsync(Guid accountId, CancellationToken cancellationToken) => inner.AnyForAccountAsync(accountId, cancellationToken);
 
+        public ValueTask<bool> AnyAppearedSinceAsync(Guid accountId, DateTimeOffset since, CancellationToken cancellationToken) => inner.AnyAppearedSinceAsync(accountId, since, cancellationToken);
+
         public async ValueTask<IReadOnlyList<XDrishti.Domain.Portfolio.Holding>> ListForAccountAsync(Guid accountId, CancellationToken cancellationToken)
         {
             var read = await inner.ListForAccountAsync(accountId, cancellationToken);

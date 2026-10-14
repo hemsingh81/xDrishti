@@ -23,6 +23,7 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { brokerHistoryHandlers } from './brokerHistoryFixtures';
 import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
@@ -103,6 +104,8 @@ export const handlers = [
   ...actionCenterHandlers,
   // Trades (P2-03): no imports and no trades of a holding by default; the trade fake brings stateful ones.
   ...tradeHandlers,
+  // Dhan trade history and ledger (P2-13): both read, nothing running, an empty ledger.
+  ...brokerHistoryHandlers,
   // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),

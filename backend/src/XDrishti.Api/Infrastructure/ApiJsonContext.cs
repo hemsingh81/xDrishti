@@ -25,8 +25,10 @@ using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Trades;
+using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -168,6 +170,16 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(TradePage))]
 [JsonSerializable(typeof(ManualTradeInput))]
 [JsonSerializable(typeof(HoldingRebuildResult))]
+[JsonSerializable(typeof(BrokerHistoryInput))]
+[JsonSerializable(typeof(BrokerHistoryRunView))]
+[JsonSerializable(typeof(BrokerSyncRunView))]
+[JsonSerializable(typeof(BrokerSyncCounts))]
+[JsonSerializable(typeof(BrokerNotRebuilt))]
+[JsonSerializable(typeof(BrokerHistoryStatusView))]
+[JsonSerializable(typeof(BrokerKindStatus))]
+[JsonSerializable(typeof(LedgerPage))]
+[JsonSerializable(typeof(LedgerEntryView))]
+[JsonSerializable(typeof(LedgerClassTotal))]
 [JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(ServiceView))]
 [JsonSerializable(typeof(ServiceRunView))]

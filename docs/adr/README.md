@@ -29,3 +29,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0022](0022-action-center-and-price-alerts.md) | Portfolio Action center evaluated on read, and one-shot price alerts checked by the quotes service | Accepted |
 | [0023](0023-trade-import-and-lot-reconstruction.md) | Trades from CSV or by hand are stored as transactions and rebuild a holding's lots with real dates | Accepted |
 | [0024](0024-live-feed-xd-feed-and-live-prices.md) | Live feed in its own container (`xd-feed`), live prices in the holding price columns, SignalR hub for the Portfolio screen | Accepted |
+| [0025](0025-dhan-trade-history-and-ledger-sync.md) | Dhan trade history and ledger are read nightly; lots are rebuilt automatically where it is safe | Accepted |

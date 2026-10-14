@@ -5,11 +5,13 @@ import { isTradesTab, type TradesTab } from '../lib/tradesTab';
 import { usePanelParam } from './usePanelParam';
 
 const parseAlerts = (value: string | null): AlertStatus | null => (isAlertStatus(value) ? value : null);
+const parseCash = (value: string | null): 'open' | null => (value === 'open' ? 'open' : null);
 const parseTrades = (value: string | null): TradesTab | null => (isTradesTab(value) ? value : null);
 
 /**
  * The panels that sit on top of the Portfolio screen and are addressed by the URL, so the bell (and a shared link) can lead
  * to them: `?alerts=active|triggered|cancelled` opens the Alerts panel on a tab, `?trades=import|history` the Trades panel,
+ * `?cash=open` the Cash & dividends panel,
  * `?focus=actions` takes the owner to the Action center once (the card removes it when it has done so). See `usePanelParam`
  * for how opening, closing and Back agree.
  */
@@ -17,6 +19,7 @@ export function usePortfolioOverlays() {
   const [params, setParams] = useSearchParams();
   const alerts = usePanelParam('alerts', parseAlerts);
   const trades = usePanelParam('trades', parseTrades);
+  const cash = usePanelParam('cash', parseCash);
   const focusActions = params.get('focus') === 'actions';
 
   const focusHandled = useCallback(() => {
@@ -43,6 +46,11 @@ export function usePortfolioOverlays() {
     },
     changeTradesTab: trades.change,
     closeTrades: trades.close,
+    cashOpen: cash.value !== null,
+    openCash: () => {
+      cash.open('open');
+    },
+    closeCash: cash.close,
     focusActions,
     focusHandled,
   };

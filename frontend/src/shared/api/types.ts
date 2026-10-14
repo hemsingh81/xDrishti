@@ -248,3 +248,17 @@ export type Trade = Schemas['TradeView'];
 export type TradePage = Schemas['TradePage'];
 export type ManualTradeInput = Schemas['ManualTradeInput'];
 export type HoldingRebuildResult = Schemas['HoldingRebuildResult'];
+
+/** Dhan trade history and ledger (P2-13, ADR 0025): a run reads one kind (trades | ledger); the status says how far each is read. */
+export type BrokerSyncRun = Schemas['BrokerSyncRunView'];
+export type BrokerSyncCounts = Schemas['BrokerSyncCounts'];
+/** The answer of "Sync now": the trades run as it begins and, once it has been carried on to it, the ledger run. */
+export type BrokerHistoryRuns = Schemas['BrokerHistoryRunView'];
+export type BrokerKindStatus = Schemas['BrokerKindStatus'];
+export type BrokerHistoryStatus = Schemas['BrokerHistoryStatusView'];
+/** A holding the automatic rebuild left alone, and why (needs_review, quantity_mismatch, ambiguous, no_holding, changed_meanwhile). */
+export type BrokerNotRebuilt = Schemas['BrokerNotRebuilt'];
+/** A cash movement of the account read from Dhan's ledger; `amount` is signed, `narration` is untrusted free text. */
+export type LedgerEntry = Schemas['LedgerEntryView'];
+export type LedgerPage = Schemas['LedgerPage'];
+export type LedgerClassTotal = Schemas['LedgerClassTotal'];

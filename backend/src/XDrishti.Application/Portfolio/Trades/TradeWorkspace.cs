@@ -114,8 +114,43 @@ internal sealed class TradeWorkspace(
         return new RebuildApplied(changed, replaced, created, handDated, sync);
     }
 
-    /// <summary>Audits a rebuild (counts only): nothing per lot, nothing about the securities.</summary>
-    public void RecordRebuilt(Guid accountId, RebuildApplied applied, string actor, DateTimeOffset now)
+    /// <summary>
+    /// Works out the rebuild of one holding from its stored trades (ADR 0023): reads the account's holdings (tracked, so applying the result changes what is saved), the holding's security's trades and the applied corporate actions. Used by the owner's
+    /// rebuild and by the automatic rebuild after a broker trade sync (ADR 0025), so both decide the same way.
+    /// </summary>
+    public async ValueTask<HoldingRebuild> RebuildOfAsync(Guid accountId, Guid holdingId, DateOnly firstImportDate, CancellationToken cancellationToken)
+    {
+        var all = await holdings.ListForAccountAsync(accountId, cancellationToken);
+        return await RebuildOfAsync(accountId, all.Single(h => h.Id == holdingId), new HoldingMatcher(all), firstImportDate, cancellationToken);
+    }
+
+    /// <summary>
+    /// The same for a holding the caller has read already (tracked, with its lots) and the matcher over the account's holdings: the automatic rebuild reads the account's holdings once for all its candidates and then only the one holding
+    /// of each candidate inside that candidate's unit of work.
+    /// </summary>
+    public async ValueTask<HoldingRebuild> RebuildOfAsync(Guid accountId, Holding holding, HoldingMatcher matcher, DateOnly firstImportDate, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(holding);
+        ArgumentNullException.ThrowIfNull(matcher);
+        if (holding.Status != HoldingStatus.Open)
+        {
+            return HoldingRebuild.Without(RebuildStatuses.NoHolding, holding.Id.ToString("N"));
+        }
+
+        if (matcher.Find(holding.Isin, holding.TradingSymbol) is not { Kind: MatchKind.One })
+        {
+            return HoldingRebuild.Without(RebuildStatuses.Ambiguous, holding.Id.ToString("N"));
+        }
+
+        // Only this security's trades are read, not the account's whole history.
+        var candidates = await trades.ListActiveForSecurityAsync(accountId, TradeRules.NormaliseIsin(holding.Isin), TradeRules.NormaliseSymbol(holding.TradingSymbol), cancellationToken);
+        var mine = HoldingRebuilds.Of(matcher, holding, candidates);
+        var actions = await ActionsOfAsync([holding], cancellationToken);
+        return HoldingRebuilds.Compute(holding, mine, holding.InstrumentId is { } instrument ? actions.GetValueOrDefault(instrument) ?? [] : [], firstImportDate);
+    }
+
+    /// <summary>Audits a rebuild (counts only): nothing per lot, nothing about the securities. <paramref name="trigger"/> says what started it when it was not the owner's own request (<c>broker_sync</c>).</summary>
+    public void RecordRebuilt(Guid accountId, RebuildApplied applied, string actor, DateTimeOffset now, string? trigger = null)
     {
         ArgumentNullException.ThrowIfNull(applied);
         if (applied.Holdings == 0)
@@ -126,7 +161,7 @@ internal sealed class TradeWorkspace(
         events.Record(AccountEvent.Record(
             AccountEventType.LotsRebuilt,
             accountId,
-            $"Lots rebuilt from trades: {applied.Holdings} {(applied.Holdings == 1 ? "holding" : "holdings")}, {applied.LotsReplaced} lots replaced by {applied.LotsCreated} ({applied.HandDated} hand-dated, {applied.Sync} added by syncs)",
+            $"Lots rebuilt from trades: {applied.Holdings} {(applied.Holdings == 1 ? "holding" : "holdings")}, {applied.LotsReplaced} lots replaced by {applied.LotsCreated} ({applied.HandDated} hand-dated, {applied.Sync} added by syncs){(trigger is null ? string.Empty : $", trigger {trigger}")}",
             actor,
             now));
     }

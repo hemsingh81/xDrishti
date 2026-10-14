@@ -14,7 +14,7 @@ interface ProblemNoticeProps {
 export function ProblemNotice({ error, accountId, fallback, onRetry }: ProblemNoticeProps) {
   const kind = problemKind(error);
   const to =
-    accountId && kind === 'not_connected'
+    accountId && (kind === 'not_connected' || kind === 'token_expired')
       ? { path: accountTabPath(accountId, 'connection'), label: 'Open the Connection tab' }
       : accountId && (kind === 'role_off' || kind === 'no_bucket')
         ? { path: accountTabPath(accountId, 'roles'), label: 'Open the Roles tab' }

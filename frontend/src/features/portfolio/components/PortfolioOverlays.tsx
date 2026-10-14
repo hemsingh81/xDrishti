@@ -9,6 +9,7 @@ import type { TradesTab } from '../lib/tradesTab';
 const AlertsDrawer = lazy(async () => ({ default: (await import('./alerts/AlertsDrawer')).AlertsDrawer }));
 const AlertDialog = lazy(async () => ({ default: (await import('./alerts/AlertDialog')).AlertDialog }));
 const TradesDrawer = lazy(async () => ({ default: (await import('./trades/TradesDrawer')).TradesDrawer }));
+const CashDrawer = lazy(async () => ({ default: (await import('./broker/CashDrawer')).CashDrawer }));
 const AddTradeDialog = lazy(async () => ({ default: (await import('./trades/AddTradeDialog')).AddTradeDialog }));
 
 export interface PortfolioOverlaysProps {
@@ -32,9 +33,11 @@ export interface PortfolioOverlaysProps {
     onAdd: () => void;
     onCloseAdd: () => void;
   };
+  /** The Cash & dividends panel: open or not, the accounts it can show and the page's account. */
+  cash: { open: boolean; onClose: () => void; accounts: readonly AccountSummary[]; scopeAccountId: string | null };
 }
 
-/** The Alerts and Trades panels and the alert and Add trade dialogs on top of the Portfolio screen. */
+/** The Alerts, Trades and Cash & dividends panels and the alert and Add trade dialogs on top of the Portfolio screen. */
 export function PortfolioOverlays({
   alertsTab,
   onAlertsTab,
@@ -43,6 +46,7 @@ export function PortfolioOverlays({
   onNewAlert,
   onCloseDialog,
   trades,
+  cash,
 }: PortfolioOverlaysProps) {
   return (
     <Suspense fallback={null}>
@@ -60,6 +64,7 @@ export function PortfolioOverlays({
           scopeAccountId={trades.scopeAccountId}
         />
       )}
+      {cash.open && <CashDrawer onClose={cash.onClose} accounts={cash.accounts} scopeAccountId={cash.scopeAccountId} />}
       {trades.adding && (
         <AddTradeDialog
           accounts={trades.accounts}

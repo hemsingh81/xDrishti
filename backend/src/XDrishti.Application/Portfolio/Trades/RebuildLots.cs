@@ -17,7 +17,6 @@ public sealed record RebuildLotsCommand(Guid HoldingId, bool DryRun, string Acto
 internal sealed class RebuildLotsHandler(
     TradeWorkspace workspace,
     IHoldingStore holdings,
-    ITradeStore trades,
     IAccountStore accounts,
     IHoldingSyncStore syncs,
     IPortfolioUnitOfWork unitOfWork,
@@ -74,26 +73,6 @@ internal sealed class RebuildLotsHandler(
         return Result.Success(new HoldingRebuildResult(DryRun: false, Applied: result.WillReplace, TradeViews.Rebuild(result)));
     }
 
-    /// <summary>Reads the account's holdings (tracked), trades and corporate actions and works out the rebuild of one holding; the holding is the tracked one, so applying the result changes what is saved.</summary>
-    private async ValueTask<HoldingRebuild> ComputeAsync(Guid accountId, Guid holdingId, DateOnly firstImportDate, CancellationToken cancellationToken)
-    {
-        var all = await holdings.ListForAccountAsync(accountId, cancellationToken);
-        var holding = all.Single(h => h.Id == holdingId);
-        if (holding.Status != HoldingStatus.Open)
-        {
-            return HoldingRebuild.Without(RebuildStatuses.NoHolding, holding.Id.ToString("N"));
-        }
-
-        var matcher = new HoldingMatcher(all);
-        if (matcher.Find(holding.Isin, holding.TradingSymbol) is not { Kind: MatchKind.One })
-        {
-            return HoldingRebuild.Without(RebuildStatuses.Ambiguous, holding.Id.ToString("N"));
-        }
-
-        // Only this security's trades are read, not the account's whole history.
-        var candidates = await trades.ListActiveForSecurityAsync(accountId, TradeRules.NormaliseIsin(holding.Isin), TradeRules.NormaliseSymbol(holding.TradingSymbol), cancellationToken);
-        var mine = HoldingRebuilds.Of(matcher, holding, candidates);
-        var actions = await workspace.ActionsOfAsync([holding], cancellationToken);
-        return HoldingRebuilds.Compute(holding, mine, holding.InstrumentId is { } instrument ? actions.GetValueOrDefault(instrument) ?? [] : [], firstImportDate);
-    }
+    private ValueTask<HoldingRebuild> ComputeAsync(Guid accountId, Guid holdingId, DateOnly firstImportDate, CancellationToken cancellationToken) =>
+        workspace.RebuildOfAsync(accountId, holdingId, firstImportDate, cancellationToken);
 }

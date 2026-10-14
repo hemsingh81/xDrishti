@@ -8,6 +8,12 @@ import { tradeName } from '../../lib/tradeText';
 const number = { ...numeric, textAlign: 'right', whiteSpace: 'nowrap' } as const;
 const sources: Record<string, string> = { csv: 'CSV import', manual: 'By hand' };
 
+/** Where a trade came from: a word, and for the trades read from Dhan a chip that marks them in the list. */
+function Source({ source }: { source: string }) {
+  if (source === 'broker') return <Chip size="small" variant="outlined" color="info" label="Dhan" />;
+  return <>{sources[source] ?? source}</>;
+}
+
 /** The time of day of a trade without the seconds ("09:15"). */
 const timeOf = (time: string): string => time.slice(0, 5);
 
@@ -54,7 +60,9 @@ export function TradeRow({ trade, onVoid }: TradeRowProps) {
       <TableCell sx={{ ...number, ...struck }}>{formatNumber(trade.qty)}</TableCell>
       <TableCell sx={{ ...number, ...struck }}>{formatInrPrecise(trade.price)}</TableCell>
       <TableCell sx={{ ...number, ...struck }}>{formatInrPrecise(trade.charges)}</TableCell>
-      <TableCell>{sources[trade.source] ?? trade.source}</TableCell>
+      <TableCell>
+        <Source source={trade.source} />
+      </TableCell>
       <TableCell sx={{ textAlign: 'right' }}>
         {!trade.voided &&
           (asking ? (

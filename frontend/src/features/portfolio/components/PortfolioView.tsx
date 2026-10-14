@@ -1,5 +1,4 @@
-import ReceiptIcon from '@mui/icons-material/ReceiptLongOutlined';
-import { Box, Button } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useRef, useState } from 'react';
 import { bucketsQuery, useNow } from '@/features/accounts';
@@ -30,7 +29,7 @@ import { GroupedHoldings } from './GroupedHoldings';
 import { HoldingDrawer } from './HoldingDrawer';
 import { HoldingsGrid, NoMatches } from './HoldingsGrid';
 import { EmptyHoldings, NoGroups, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
-import { PortfolioHeader } from './PortfolioHeader';
+import { PortfolioHeader, PortfolioHeaderActions } from './PortfolioHeader';
 import { PortfolioOverlays } from './PortfolioOverlays';
 import { ScopeBar } from './ScopeBar';
 import { SyncBar } from './SyncBar';
@@ -112,17 +111,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
     <LiveProvider feed={live} scope={liveScope}>
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: { md: '100%' } }}>
         <PortfolioHeader
-          actions={
-            <Button
-              variant="outlined"
-              startIcon={<ReceiptIcon />}
-              onClick={() => {
-                overlays.openTrades();
-              }}
-            >
-              Trades
-            </Button>
-          }
+          actions={<PortfolioHeaderActions onCash={overlays.openCash} onTrades={overlays.openTrades} />}
         />
         {acting && !connected && <NotConnectedNotice accountId={acting.id} accountName={acting.name} />}
         <ScopeBar
@@ -239,6 +228,12 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
           }}
           onCloseDialog={() => {
             setAlertDialog(null);
+          }}
+          cash={{
+            open: overlays.cashOpen,
+            onClose: overlays.closeCash,
+            accounts: portfolio,
+            scopeAccountId: account,
           }}
           trades={{
             tab: overlays.tradesTab,

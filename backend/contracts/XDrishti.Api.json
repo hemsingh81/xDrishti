@@ -6598,6 +6598,217 @@
         }
       }
     },
+    "/api/accounts/{id}/sync/broker-history": {
+      "post": {
+        "tags": [
+          "Broker history"
+        ],
+        "summary": "Sync now: read the account's trades and then its ledger from Dhan (needs the Portfolio role and a connected Dhan token). Optional body {from} (an India date from 1990-01-02 to today): the first date to read instead of the watermark - for an account never read, its first import date. An earlier date than the watermark reads dates again (nothing is stored twice); a date later than the day after the watermark of either kind is refused, because the dates in between would never be read (when only one kind was read so far, also a date later than the account's first import date, because the other kind would then begin at the chosen date). The dates are read in windows of at most 30 days; new trades are stored next to the imported ones (source broker) and the lots of the holdings are rebuilt from the real dates where that is safe. Answers at once with the trades run as it begins (status running); poll the status. 409 portfolio.sync_running while a holdings sync or another trades or ledger run of the account runs; 409 portfolio.not_connected or portfolio.token_expired without a usable Dhan token; 400 portfolio.invalid (field from: not a plausible date, or leaves a hole after the watermark); 404 accounts.not_found. Audited with counts only",
+        "operationId": "SyncAccountBrokerHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BrokerHistoryInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrokerHistoryRunView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/sync/broker-history/status": {
+      "get": {
+        "tags": [
+          "Broker history"
+        ],
+        "summary": "The status of the trades and ledger sync: running, for each kind the watermark (last date read), the latest run (status, dates, counts, error) and windowsDone / windowsTotal, the next scheduled run (null when the service is paused) and, from the latest SUCCEEDED trades run and no other (nothing is carried forward from older runs; a skipped, failed or running run neither changes nor erases them): holdingsRebuilt, holdingsNeedingReview (a hand-dated lot; use the holding's rebuild preview) and needsReviewSymbols (their trading symbols, at most 50; holdingsNeedingReview says how many in all)",
+        "operationId": "GetAccountBrokerHistoryStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrokerHistoryStatusView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{id}/ledger": {
+      "get": {
+        "tags": [
+          "Broker history"
+        ],
+        "summary": "The account's ledger entries read from Dhan, newest first: from, to (India dates, inclusive), class (funds_in, funds_out, dividend, charges, other), page, pageSize (max 200, default 50). Each entry has date, voucherNo, description, narration (Dhan's free text - show as plain text), exchange, amount (signed: credit minus debit), class and runningBalance. totals lists the count and signed amount of every class for the period from to to, whatever class is filtered. Dividends and charges are shown, not part of returns",
+        "operationId": "ListAccountLedger",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "class",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/live/status": {
       "get": {
         "tags": [
@@ -8317,6 +8528,90 @@
         },
         "description": "The benchmark in force (all null when the master list has no such index yet). `IsDefault`: the owner has not chosen one, Nifty 50 applies."
       },
+      "BrokerHistoryInput": {
+        "required": [
+          "from"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "Optional body of \"Sync now\" for the broker history: the first date to read, instead of the watermark (or, for an account never read, the first import date)."
+      },
+      "BrokerHistoryRunView": {
+        "required": [
+          "trades",
+          "ledger"
+        ],
+        "type": "object",
+        "properties": {
+          "trades": {
+            "$ref": "#/components/schemas/BrokerSyncRunView"
+          },
+          "ledger": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BrokerSyncRunView"
+              }
+            ]
+          }
+        },
+        "description": "The answer of \"Sync now\": the trades run and, when it succeeded and has been carried on to it, the ledger run. Started over the API, the answer holds the trades run as it begins (`running`); the status says how far both are."
+      },
+      "BrokerHistoryStatusView": {
+        "required": [
+          "running",
+          "trades",
+          "ledger",
+          "nextRunAt",
+          "holdingsRebuilt",
+          "holdingsNeedingReview",
+          "needsReviewSymbols"
+        ],
+        "type": "object",
+        "properties": {
+          "running": {
+            "type": "boolean"
+          },
+          "trades": {
+            "$ref": "#/components/schemas/BrokerKindStatus"
+          },
+          "ledger": {
+            "$ref": "#/components/schemas/BrokerKindStatus"
+          },
+          "nextRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "holdingsRebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdingsNeedingReview": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "needsReviewSymbols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The status of the broker history sync of an account: whether a run is running, both kinds, the next scheduled run (null when the service is paused or there is none) and three figures that come from <b>the latest <i>succeeded</i> trades run</b> and\nfrom no other (nothing is carried forward from older runs, and a run that was skipped, failed or is still running does not change them): `HoldingsRebuilt` (rebuilt automatically by that run), `HoldingsNeedingReview` (a hand-dated lot; the owner\nuses the holding's rebuild preview) and `NeedsReviewSymbols`, the trading symbols of those holdings (at most 50, in the order the run listed them: alphabetical; `HoldingsNeedingReview` says how many there are in all). A quiet run that skipped the rebuild\nbecause nothing changed reports 0 rebuilt (holdings that need review are never skipped: every run looks at them again)."
+      },
       "BrokerIdView": {
         "required": [
           "broker",
@@ -8336,6 +8631,195 @@
           }
         },
         "description": "The id a broker uses for the instrument (Dhan: security id + exchange segment)."
+      },
+      "BrokerKindStatus": {
+        "required": [
+          "watermark",
+          "lastRun",
+          "windowsDone",
+          "windowsTotal"
+        ],
+        "type": "object",
+        "properties": {
+          "watermark": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "lastRun": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BrokerSyncRunView"
+              }
+            ]
+          },
+          "windowsDone": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "windowsTotal": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "How far one kind is read: the `Watermark` (last date read; null when nothing was read yet), the latest run and its windows done of total."
+      },
+      "BrokerNotRebuilt": {
+        "required": [
+          "symbol",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A holding (or security) the automatic rebuild after a trade sync left alone, and why: `needs_review`, `quantity_mismatch`, `ambiguous`, `no_holding` or `changed_meanwhile`. The symbol is a ticker, never trade content."
+      },
+      "BrokerSyncCounts": {
+        "type": "object",
+        "properties": {
+          "windowsDone": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "windowsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "halved": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "read": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stored": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "dropped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "emptyByNoData": {
+            "type": "integer",
+            "description": "Windows (or half-windows) taken as empty only because Dhan answered DH-907 to the first page.",
+            "format": "int32"
+          },
+          "skippedByReason": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "rebuilt": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "needsReview": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notRebuiltTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "notRebuilt": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BrokerNotRebuilt"
+            }
+          }
+        },
+        "description": "What a broker history run did (ADR 0025), kept as JSON on the run. int BrokerSyncCounts.WindowsDone of int BrokerSyncCounts.WindowsTotal date windows are read and stored; int BrokerSyncCounts.Halved windows were split in half because Dhan refused them as too large or answered \"no data\" for a stretch of several dates (the halves settle which).\nint BrokerSyncCounts.Read rows came from Dhan, int BrokerSyncCounts.Stored are new, int BrokerSyncCounts.Duplicates were stored already, int BrokerSyncCounts.Dropped were unusable rows and int BrokerSyncCounts.Skipped were not NSE equity trades (by reason in\nIReadOnlyDictionary&lt;string, int&gt; BrokerSyncCounts.SkippedByReason). After a trade run the automatic rebuild adds int BrokerSyncCounts.Rebuilt holdings rebuilt, int BrokerSyncCounts.Unchanged already right, int BrokerSyncCounts.NeedsReview holdings with a hand-dated lot that were left alone and the\nfirst int BrokerSyncCounts.MaxNotRebuiltListed of the holdings or securities that were left alone with their reason (int BrokerSyncCounts.NotRebuiltTotal counts all of them). int BrokerSyncCounts.EmptyByNoData counts the windows (or half-windows) that were taken as\nempty only because Dhan answered DH-907 (\"incorrect parameters or no data present\") to the first page: that code means both \"nothing there\" and \"bad request\", so the owner can see how often an empty stretch rested on it alone. Counts only: no trade or ledger content."
+      },
+      "BrokerSyncRunView": {
+        "required": [
+          "id",
+          "accountId",
+          "kind",
+          "trigger",
+          "status",
+          "from",
+          "to",
+          "startedAt",
+          "finishedAt",
+          "counts",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "trigger": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/BrokerSyncCounts"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A run that reads an account's trades or its ledger. `Kind``trades` or `ledger`; `Trigger``manual`, `scheduled` or `first` (the scheduled backfill of an account never read); `Status``running`,\n`succeeded`, `failed` or `skipped`; `From` and `To` the dates it reads. `Counts` says what it did (windows done of total, rows read, new, already stored, unusable, skipped by reason; after a trade run the holdings\nrebuilt, unchanged and needing review). `Error` is a short safe text."
       },
       "BucketInput": {
         "required": [
@@ -12226,6 +12710,119 @@
           }
         },
         "description": "The latest job in which each phase ran to an end (null when none did yet)."
+      },
+      "LedgerClassTotal": {
+        "required": [
+          "class",
+          "count",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "class": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The entries of one class in the period and their signed total."
+      },
+      "LedgerEntryView": {
+        "required": [
+          "id",
+          "date",
+          "voucherNo",
+          "description",
+          "narration",
+          "exchange",
+          "amount",
+          "class",
+          "runningBalance"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "voucherNo": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "narration": {
+            "type": "string"
+          },
+          "exchange": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "class": {
+            "type": "string"
+          },
+          "runningBalance": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "A ledger entry. `Class` is `funds_in`, `funds_out`, `dividend`, `charges` or `other`; `Amount` is signed (credit minus debit). `Description` and `Narration` are Dhan's free text (untrusted: show as plain text)."
+      },
+      "LedgerPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEntryView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerClassTotal"
+            }
+          }
+        },
+        "description": "One page of the ledger, newest first, and the totals of every class for the period (`from` to `to`, whatever class is filtered)."
       },
       "LiveFeedStatus": {
         "required": [
@@ -17258,6 +17855,9 @@
     },
     {
       "name": "Trades"
+    },
+    {
+      "name": "Broker history"
     },
     {
       "name": "Live"

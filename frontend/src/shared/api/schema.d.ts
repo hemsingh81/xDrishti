@@ -1923,6 +1923,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/accounts/{id}/sync/broker-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sync now: read the account's trades and then its ledger from Dhan (needs the Portfolio role and a connected Dhan token). Optional body {from} (an India date from 1990-01-02 to today): the first date to read instead of the watermark - for an account never read, its first import date. An earlier date than the watermark reads dates again (nothing is stored twice); a date later than the day after the watermark of either kind is refused, because the dates in between would never be read (when only one kind was read so far, also a date later than the account's first import date, because the other kind would then begin at the chosen date). The dates are read in windows of at most 30 days; new trades are stored next to the imported ones (source broker) and the lots of the holdings are rebuilt from the real dates where that is safe. Answers at once with the trades run as it begins (status running); poll the status. 409 portfolio.sync_running while a holdings sync or another trades or ledger run of the account runs; 409 portfolio.not_connected or portfolio.token_expired without a usable Dhan token; 400 portfolio.invalid (field from: not a plausible date, or leaves a hole after the watermark); 404 accounts.not_found. Audited with counts only */
+    post: operations['SyncAccountBrokerHistory'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/sync/broker-history/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The status of the trades and ledger sync: running, for each kind the watermark (last date read), the latest run (status, dates, counts, error) and windowsDone / windowsTotal, the next scheduled run (null when the service is paused) and, from the latest SUCCEEDED trades run and no other (nothing is carried forward from older runs; a skipped, failed or running run neither changes nor erases them): holdingsRebuilt, holdingsNeedingReview (a hand-dated lot; use the holding's rebuild preview) and needsReviewSymbols (their trading symbols, at most 50; holdingsNeedingReview says how many in all) */
+    get: operations['GetAccountBrokerHistoryStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The account's ledger entries read from Dhan, newest first: from, to (India dates, inclusive), class (funds_in, funds_out, dividend, charges, other), page, pageSize (max 200, default 50). Each entry has date, voucherNo, description, narration (Dhan's free text - show as plain text), exchange, amount (signed: credit minus debit), class and runningBalance. totals lists the count and signed amount of every class for the period from to to, whatever class is filtered. Dividends and charges are shown, not part of returns */
+    get: operations['ListAccountLedger'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/live/status': {
     parameters: {
       query?: never;
@@ -2482,11 +2533,120 @@ export interface components {
       tracked: boolean;
       hasBars: boolean;
     };
+    /** @description Optional body of "Sync now" for the broker history: the first date to read, instead of the watermark (or, for an account never read, the first import date). */
+    BrokerHistoryInput: {
+      /** Format: date */
+      from: null | string;
+    };
+    /** @description The answer of "Sync now": the trades run and, when it succeeded and has been carried on to it, the ledger run. Started over the API, the answer holds the trades run as it begins (`running`); the status says how far both are. */
+    BrokerHistoryRunView: {
+      trades: components['schemas']['BrokerSyncRunView'];
+      ledger: null | components['schemas']['BrokerSyncRunView'];
+    };
+    /**
+     * @description The status of the broker history sync of an account: whether a run is running, both kinds, the next scheduled run (null when the service is paused or there is none) and three figures that come from <b>the latest <i>succeeded</i> trades run</b> and
+     *     from no other (nothing is carried forward from older runs, and a run that was skipped, failed or is still running does not change them): `HoldingsRebuilt` (rebuilt automatically by that run), `HoldingsNeedingReview` (a hand-dated lot; the owner
+     *     uses the holding's rebuild preview) and `NeedsReviewSymbols`, the trading symbols of those holdings (at most 50, in the order the run listed them: alphabetical; `HoldingsNeedingReview` says how many there are in all). A quiet run that skipped the rebuild
+     *     because nothing changed reports 0 rebuilt (holdings that need review are never skipped: every run looks at them again).
+     */
+    BrokerHistoryStatusView: {
+      running: boolean;
+      trades: components['schemas']['BrokerKindStatus'];
+      ledger: components['schemas']['BrokerKindStatus'];
+      /** Format: date-time */
+      nextRunAt: null | string;
+      /** Format: int32 */
+      holdingsRebuilt: number;
+      /** Format: int32 */
+      holdingsNeedingReview: number;
+      needsReviewSymbols: string[];
+    };
     /** @description The id a broker uses for the instrument (Dhan: security id + exchange segment). */
     BrokerIdView: {
       broker: string;
       brokerId: string;
       segment: string;
+    };
+    /** @description How far one kind is read: the `Watermark` (last date read; null when nothing was read yet), the latest run and its windows done of total. */
+    BrokerKindStatus: {
+      /** Format: date */
+      watermark: null | string;
+      lastRun: null | components['schemas']['BrokerSyncRunView'];
+      /** Format: int32 */
+      windowsDone: number;
+      /** Format: int32 */
+      windowsTotal: number;
+    };
+    /** @description A holding (or security) the automatic rebuild after a trade sync left alone, and why: `needs_review`, `quantity_mismatch`, `ambiguous`, `no_holding` or `changed_meanwhile`. The symbol is a ticker, never trade content. */
+    BrokerNotRebuilt: {
+      symbol: string;
+      reason: string;
+    };
+    /**
+     * @description What a broker history run did (ADR 0025), kept as JSON on the run. int BrokerSyncCounts.WindowsDone of int BrokerSyncCounts.WindowsTotal date windows are read and stored; int BrokerSyncCounts.Halved windows were split in half because Dhan refused them as too large or answered "no data" for a stretch of several dates (the halves settle which).
+     *     int BrokerSyncCounts.Read rows came from Dhan, int BrokerSyncCounts.Stored are new, int BrokerSyncCounts.Duplicates were stored already, int BrokerSyncCounts.Dropped were unusable rows and int BrokerSyncCounts.Skipped were not NSE equity trades (by reason in
+     *     IReadOnlyDictionary&lt;string, int&gt; BrokerSyncCounts.SkippedByReason). After a trade run the automatic rebuild adds int BrokerSyncCounts.Rebuilt holdings rebuilt, int BrokerSyncCounts.Unchanged already right, int BrokerSyncCounts.NeedsReview holdings with a hand-dated lot that were left alone and the
+     *     first int BrokerSyncCounts.MaxNotRebuiltListed of the holdings or securities that were left alone with their reason (int BrokerSyncCounts.NotRebuiltTotal counts all of them). int BrokerSyncCounts.EmptyByNoData counts the windows (or half-windows) that were taken as
+     *     empty only because Dhan answered DH-907 ("incorrect parameters or no data present") to the first page: that code means both "nothing there" and "bad request", so the owner can see how often an empty stretch rested on it alone. Counts only: no trade or ledger content.
+     */
+    BrokerSyncCounts: {
+      /** Format: int32 */
+      windowsDone?: number;
+      /** Format: int32 */
+      windowsTotal?: number;
+      /** Format: int32 */
+      halved?: number;
+      /** Format: int32 */
+      read?: number;
+      /** Format: int32 */
+      stored?: number;
+      /** Format: int32 */
+      duplicates?: number;
+      /** Format: int32 */
+      dropped?: number;
+      /** Format: int32 */
+      skipped?: number;
+      /**
+       * Format: int32
+       * @description Windows (or half-windows) taken as empty only because Dhan answered DH-907 to the first page.
+       */
+      emptyByNoData?: number;
+      skippedByReason?: {
+        [key: string]: number;
+      };
+      /** Format: int32 */
+      rebuilt?: number;
+      /** Format: int32 */
+      unchanged?: number;
+      /** Format: int32 */
+      needsReview?: number;
+      /** Format: int32 */
+      notRebuiltTotal?: number;
+      notRebuilt?: components['schemas']['BrokerNotRebuilt'][];
+    };
+    /**
+     * @description A run that reads an account's trades or its ledger. `Kind``trades` or `ledger`; `Trigger``manual`, `scheduled` or `first` (the scheduled backfill of an account never read); `Status``running`,
+     *     `succeeded`, `failed` or `skipped`; `From` and `To` the dates it reads. `Counts` says what it did (windows done of total, rows read, new, already stored, unusable, skipped by reason; after a trade run the holdings
+     *     rebuilt, unchanged and needing review). `Error` is a short safe text.
+     */
+    BrokerSyncRunView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      kind: string;
+      trigger: string;
+      status: string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      counts: components['schemas']['BrokerSyncCounts'];
+      error: null | string;
     };
     /** @description A new custom bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case. */
     BucketInput: {
@@ -3752,6 +3912,41 @@ export interface components {
       csv: null | components['schemas']['DataJobView'];
       dhan: null | components['schemas']['DataJobView'];
       aggregate: null | components['schemas']['DataJobView'];
+    };
+    /** @description The entries of one class in the period and their signed total. */
+    LedgerClassTotal: {
+      class: string;
+      /** Format: int32 */
+      count: number;
+      /** Format: double */
+      amount: number;
+    };
+    /** @description A ledger entry. `Class` is `funds_in`, `funds_out`, `dividend`, `charges` or `other`; `Amount` is signed (credit minus debit). `Description` and `Narration` are Dhan's free text (untrusted: show as plain text). */
+    LedgerEntryView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date */
+      date: string;
+      voucherNo: string;
+      description: string;
+      narration: string;
+      exchange: null | string;
+      /** Format: double */
+      amount: number;
+      class: string;
+      /** Format: double */
+      runningBalance: null | number;
+    };
+    /** @description One page of the ledger, newest first, and the totals of every class for the period (`from` to `to`, whatever class is filtered). */
+    LedgerPage: {
+      items: components['schemas']['LedgerEntryView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+      totals: components['schemas']['LedgerClassTotal'][];
     };
     /**
      * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
@@ -10225,6 +10420,136 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SyncAccountBrokerHistory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['BrokerHistoryInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrokerHistoryRunView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAccountBrokerHistoryStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrokerHistoryStatusView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAccountLedger: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        class?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

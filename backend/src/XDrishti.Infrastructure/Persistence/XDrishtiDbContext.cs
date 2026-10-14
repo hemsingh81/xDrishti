@@ -83,6 +83,12 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<TradeBatch> TradeBatches => Set<TradeBatch>();
 
+    public DbSet<BrokerSyncRun> BrokerSyncRuns => Set<BrokerSyncRun>();
+
+    public DbSet<BrokerSyncState> BrokerSyncStates => Set<BrokerSyncState>();
+
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
 

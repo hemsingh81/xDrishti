@@ -7,6 +7,7 @@ using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Application.Tests.Accounts.Connections;
+using XDrishti.Application.Tests.Portfolio.BrokerHistory;
 using XDrishti.Application.Tests.Portfolio.Groups;
 using XDrishti.Application.Tests.Portfolio.History;
 using XDrishti.Application.Tests.Portfolio.Trades;
@@ -90,13 +91,25 @@ internal sealed class PortfolioFixture
 
     public VoidTradeHandler VoidTrade() => new(Trades, Accounts, Accounts, Data, Clock, NullLogger<VoidTradeHandler>.Instance);
 
-    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Trades, Accounts, Data, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
+    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Accounts, Data, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
 
     public UpdateLotDateHandler UpdateLotDate() => new(Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UpdateLotDateHandler>.Instance);
 
     public GetSyncStatusHandler SyncStatus() => new(Accounts, Data, Data, Clock);
 
-    public RecoverInterruptedSyncsHandler Recover() => new(Data, Clock, NullLogger<RecoverInterruptedSyncsHandler>.Instance);
+    public RecoverInterruptedSyncsHandler Recover() => new(Data, BrokerData, Clock, NullLogger<RecoverInterruptedSyncsHandler>.Instance);
+
+    /// <summary>The broker history runs, watermarks and ledger entries (ADR 0025).</summary>
+    public InMemoryBrokerData BrokerData { get; }
+
+    public PortfolioFixture()
+    {
+        BrokerData = new InMemoryBrokerData(Data);
+
+        // The database rolls back what a refused save had collected; the in-memory trades must too.
+        Data.OnSaved = () => Trades.ForgetCollected();
+        Data.OnRefusedSave = () => Trades.RollBackCollected();
+    }
 
     /// <summary>An account with the Portfolio role on (so it has its default bucket), connected to Dhan.</summary>
     public async Task<BrokerAccount> ConnectedAsync(string name = "Example One", string clientId = AccountsFixture.ClientId, bool connect = true, PortfolioInput? portfolio = null)

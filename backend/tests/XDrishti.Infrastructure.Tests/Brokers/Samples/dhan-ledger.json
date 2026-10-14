@@ -1,0 +1,78 @@
+[
+  {
+    "dhanClientId": "1000000001",
+    "narration": "OPENING BALANCE",
+    "voucherdate": "Sep 1, 2026",
+    "exchange": "NSE-CAPITAL",
+    "voucherdesc": "OPENING",
+    "vouchernumber": "",
+    "debit": "0.00",
+    "credit": "0.00",
+    "runbal": "957.29"
+  },
+  {
+    "dhanClientId": "1000000001",
+    "narration": "FUNDS DEPOSIT THROUGH UPI",
+    "voucherdate": "Sep 2, 2026",
+    "exchange": "NSE-CAPITAL",
+    "voucherdesc": "RECEIPT",
+    "vouchernumber": "202600036701",
+    "debit": "0.00",
+    "credit": "25,000.00",
+    "runbal": "25957.29"
+  },
+  {
+    "dhanClientId": "1000000001",
+    "narration": "BILL FOR 02-SEP-2026 NSE-CAPITAL EQUITY PURCHASE",
+    "voucherdate": "Sep 2, 2026",
+    "exchange": "NSE-CAPITAL",
+    "voucherdesc": "BILL",
+    "vouchernumber": "202600036702",
+    "debit": "905.00",
+    "credit": "0.00",
+    "runbal": "25052.29"
+  },
+  {
+    "dhanClientId": "1000000001",
+    "narration": "FUNDS WITHDRAWAL",
+    "voucherdate": "2026-09-20",
+    "exchange": "NSE-CAPITAL",
+    "voucherdesc": "PAYBLE",
+    "vouchernumber": "202600036703",
+    "debit": 10000,
+    "credit": 0,
+    "runbal": 15052.29
+  },
+  {
+    "Narration": "DIVIDEND CREDIT EXMPL FINAL DIV",
+    "VoucherDate": "21/09/2026",
+    "Exchange": "NSE-CAPITAL",
+    "VoucherDesc": "JOURNAL",
+    "VoucherNumber": 202600036704,
+    "Debit": "",
+    "Credit": "1500",
+    "RunBal": "16552.29"
+  },
+  {
+    "narration": "BAD AMOUNT",
+    "voucherdate": "Sep 22, 2026",
+    "voucherdesc": "JOURNAL",
+    "vouchernumber": "202600036705",
+    "debit": "n/a",
+    "credit": "0.00"
+  },
+  {
+    "narration": "BAD DATE",
+    "voucherdate": "someday",
+    "voucherdesc": "JOURNAL",
+    "vouchernumber": "202600036706",
+    "debit": "10.00",
+    "credit": "0.00"
+  },
+  {
+    "narration": "NO AMOUNTS",
+    "voucherdate": "Sep 23, 2026",
+    "voucherdesc": "JOURNAL",
+    "vouchernumber": "202600036707"
+  }
+]

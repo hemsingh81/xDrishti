@@ -3,7 +3,7 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Domain.Portfolio;
 
 /// <summary>
-/// One trade of an account: a buy or a sell of a security on an India date, from a tradebook CSV or typed in by the owner (ADR 0023). Immutable except for being voided: a mistake is voided and
+/// One trade of an account: a buy or a sell of a security on an India date, from a tradebook CSV, typed in by the owner (ADR 0023) or read from the broker's trade history (ADR 0025). Immutable except for being voided: a mistake is voided and
 /// entered again, never edited, and the runtime role cannot delete it. <see cref="ExternalId"/> is the trade's identity (the trade id of the file, a hash of the line, or a random id for a manual
 /// trade); it is unique among the account's trades that are not voided. <see cref="Seq"/> is the line of the file (0 for a manual trade) and orders trades that tie on date, side and time.
 /// </summary>
@@ -30,7 +30,8 @@ public sealed class Transaction : Entity<Guid>
         int seq,
         string externalId,
         string createdBy,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? runId)
         : base(id)
     {
         AccountId = accountId;
@@ -50,6 +51,7 @@ public sealed class Transaction : Entity<Guid>
         ExternalId = externalId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
+        RunId = runId;
     }
 
     public Guid AccountId { get; private set; }
@@ -91,6 +93,9 @@ public sealed class Transaction : Entity<Guid>
 
     public DateTimeOffset CreatedAt { get; private set; }
 
+    /// <summary>The broker history run (<c>portfolio.broker_sync_runs</c>) that read the trade; null for a trade from a file or typed in (ADR 0025).</summary>
+    public Guid? RunId { get; private set; }
+
     public DateTimeOffset? VoidedAt { get; private set; }
 
     public string? VoidedBy { get; private set; }
@@ -114,7 +119,8 @@ public sealed class Transaction : Entity<Guid>
         int seq,
         string externalId,
         string createdBy,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? runId = null)
     {
         if (accountId == Guid.Empty)
         {
@@ -171,7 +177,8 @@ public sealed class Transaction : Entity<Guid>
             seq,
             externalId,
             actor,
-            now);
+            now,
+            runId);
     }
 
     /// <summary>Voids the trade (it stops counting, it is never deleted). False when it was voided already.</summary>

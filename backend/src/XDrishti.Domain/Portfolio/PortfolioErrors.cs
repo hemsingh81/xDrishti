@@ -19,6 +19,8 @@ public static class PortfolioErrors
     public const string AlertLimitCode = "portfolio.alert_limit";
     public const string LotFromTradeCode = "portfolio.lot_from_trade";
     public const string PreviewStaleCode = "portfolio.preview_stale";
+    public const string TokenExpiredCode = "portfolio.token_expired";
+    public const string HistoryTooLargeCode = "portfolio.history_too_large";
 
     /// <summary>The most active price alerts there can be (ADR 0022).</summary>
     public const int MaxActiveAlerts = 200;
@@ -52,10 +54,14 @@ public static class PortfolioErrors
     public static readonly Error TokenRefused = Error.Conflict(
         NotConnectedCode, "Dhan refused the saved access token. Sign in to Dhan again (Accounts, Connection) and retry.");
 
+    /// <summary>The account's Dhan access token ran out (they last a day): the scheduled trade and ledger read reports it as <c>token_expired</c> and the owner signs in again.</summary>
+    public static readonly Error TokenExpired = Error.Conflict(
+        TokenExpiredCode, "The Dhan access token has expired. Sign in to Dhan again (Accounts, Connection) and retry.");
+
     /// <summary>Only an automatic first import gets this; it never reaches the API.</summary>
     public static readonly Error Settling = Error.Conflict(SettlingCode, "The account's settings changed a moment ago; the automatic first import waits.");
 
-    public static readonly Error SyncRunning = Error.Conflict(SyncRunningCode, "A holdings sync or import of this account is already running.");
+    public static readonly Error SyncRunning = Error.Conflict(SyncRunningCode, "A sync of this account (holdings, trades or ledger) is already running.");
 
     public static readonly Error RoleOff = Error.Conflict(RoleOffCode, "Switch on the Portfolio role of this account first.");
 
@@ -63,7 +69,20 @@ public static class PortfolioErrors
 
     public static readonly Error BenchmarkChanged = Error.Conflict(ConflictCode, "The benchmark was changed meanwhile. Reload and try again.");
 
-    public static readonly Error LotChanged = Error.Conflict(ConflictCode, "The lot was changed or closed meanwhile. Reload and try again.");
+    /// <summary>A holding changed (a sync or a quote saved it) between the automatic rebuild reading it and saving; the rebuild is skipped and the next run retries (ADR 0025).</summary>
+    public static readonly Error HoldingChanged = Error.Conflict(ConflictCode, "The holding was changed meanwhile. The next run tries again.");
+
+    /// <summary>A lot edit that collided with a change of the lot or of its holding (a close, a sync, a quote, a rebuild), also after the one repeat.</summary>
+    public static readonly Error LotChanged = Error.Conflict(ConflictCode, "The holding changed while you edited; reload and try again");
+
+    /// <summary>Dhan answered more pages for one window than the 200 a window may have, even after the window was halved: nothing of it is stored and the watermark stays (ADR 0025).</summary>
+    public static readonly Error HistoryTooLarge = Error.Upstream(HistoryTooLargeCode, "Dhan returned more trades for one stretch of dates than can be read in one go. Nothing was stored for it and the next run reads it again; if it keeps failing, the size of the date windows has to be made smaller (a setting of the application).");
+
+    /// <summary>
+    /// The database refused to save a window's rows in one go (the same trades or entries were stored meanwhile by a tradebook import, or a row broke a rule of the table). Internal to the broker history run: the window is then saved row by row
+    /// (a row that is stored already counts as a duplicate, a row the database refuses is dropped and counted), so one bad row never keeps a window - and every later one - from being read.
+    /// </summary>
+    public static readonly Error HistoryChanged = Error.Conflict(ConflictCode, "The trades or ledger entries were changed while the window was saved. The next run reads the window again.");
 
     public static readonly Error SyncFailed = new(SyncFailedCode, "The sync failed unexpectedly; nothing was changed. See the API log.");
 
@@ -98,6 +117,10 @@ public static class PortfolioErrors
         ArgumentNullException.ThrowIfNull(fields);
         return fields.ToError(InvalidCode, "Some values are not valid.");
     }
+
+    /// <summary>The start date of a trades or ledger read leaves a hole after the dates already read (the watermark): the dates in between would never be read.</summary>
+    public static Error HistoryStartTooLate(DateOnly latestStart) =>
+        Invalid("from", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Start on or before {latestStart:yyyy-MM-dd}: dates in between were never read."));
 
     public static Error Invalid(string field, string message)
     {

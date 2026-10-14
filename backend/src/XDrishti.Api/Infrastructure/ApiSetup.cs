@@ -69,6 +69,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PortfolioActionsEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioAlertsEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioTradesEndpoints>();
+        services.AddSingleton<IEndpointModule, BrokerHistoryEndpoints>();
         services.AddSingleton<IEndpointModule, LiveEndpoints>();
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes.
@@ -82,6 +83,9 @@ internal static class ApiSetup
 
         // Holdings (ADR 0012): the automatic refresh of the accounts that switched it on.
         services.AddHostedService<PortfolioRefreshService>();
+
+        // Trades and ledger read from Dhan (ADR 0025): the worker that carries out the runs "Sync now" registered; the nightly read is a service of the scheduler above.
+        services.AddHostedService<BrokerHistoryWorker>();
 
         services.AddLiveHub();
         return services;

@@ -1619,6 +1619,115 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Counts")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("counts");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("StartedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("started_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("trigger");
+
+                    b.HasKey("Id")
+                        .HasName("pk_broker_sync_runs");
+
+                    b.HasIndex("AccountId", "Kind", "StartedAt")
+                        .HasDatabaseName("ix_broker_sync_runs_account_kind_started");
+
+                    b.HasIndex(new[] { "AccountId" }, "ux_broker_sync_runs_one_running")
+                        .IsUnique()
+                        .HasDatabaseName("ux_broker_sync_runs_one_running")
+                        .HasFilter("status = 'running'");
+
+                    b.ToTable("broker_sync_runs", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_broker_sync_runs_kind", "kind IN ('trades', 'ledger')");
+
+                            t.HasCheckConstraint("ck_broker_sync_runs_status", "status IN ('running', 'succeeded', 'failed', 'skipped')");
+
+                            t.HasCheckConstraint("ck_broker_sync_runs_trigger", "trigger IN ('manual', 'scheduled', 'first')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncState", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateOnly>("WatermarkDate")
+                        .HasColumnType("date")
+                        .HasColumnName("watermark_date");
+
+                    b.HasKey("AccountId", "Kind")
+                        .HasName("pk_broker_sync_state");
+
+                    b.ToTable("broker_sync_state", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_broker_sync_state_kind", "kind IN ('trades', 'ledger')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1906,6 +2015,92 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.LedgerEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("EntryClass")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("class");
+
+                    b.Property<DateOnly>("EntryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("entry_date");
+
+                    b.Property<string>("Exchange")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("exchange");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("Narration")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("narration");
+
+                    b.Property<Guid>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<decimal?>("RunningBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("running_balance");
+
+                    b.Property<string>("VoucherNo")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("voucher_no");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ledger_entries");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_ledger_entries_run");
+
+                    b.HasIndex("AccountId", "EntryDate")
+                        .HasDatabaseName("ix_ledger_entries_account_date");
+
+                    b.HasIndex("AccountId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ledger_entries_account_external");
+
+                    b.ToTable("ledger_entries", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_ledger_entries_class", "class IN ('funds_in', 'funds_out', 'dividend', 'charges', 'other')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.PriceAlert", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2112,6 +2307,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("qty");
 
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
                     b.Property<int>("Seq")
                         .HasColumnType("integer")
                         .HasColumnName("seq");
@@ -2157,6 +2356,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasIndex("BatchId")
                         .HasDatabaseName("ix_transactions_batch");
 
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_transactions_run")
+                        .HasFilter("run_id IS NOT NULL");
+
                     b.HasIndex("AccountId", "ExternalId")
                         .IsUnique()
                         .HasDatabaseName("ux_transactions_account_external_active")
@@ -2178,7 +2381,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_transactions_side", "side IN ('buy', 'sell')");
 
-                            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual')");
+                            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual', 'broker')");
 
                             t.HasCheckConstraint("ck_transactions_voided", "(voided_at IS NULL) = (voided_by IS NULL)");
                         });
@@ -2951,6 +3154,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tracked_instruments_instruments_instrument_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncRun", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_broker_sync_runs_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncState", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_broker_sync_state_broker_accounts_account_id");
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -2988,6 +3211,23 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_holding_syncs_broker_accounts_account_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.LedgerEntry", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_entries_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.BrokerSyncRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_entries_broker_sync_runs_run_id");
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.TradeBatch", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -3012,6 +3252,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("BatchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_transactions_trade_batches_batch_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.BrokerSyncRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_transactions_broker_sync_runs_run_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Accounts.BrokerSecretRecord", b =>

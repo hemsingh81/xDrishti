@@ -24,6 +24,32 @@ internal sealed class TradeStore(XDrishtiDbContext db) : ITradeStore
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.Seq).ThenBy(x => x.Id)
             .ToListAsync(cancellationToken);
 
+    public async ValueTask<IReadOnlyList<TradeSecurity>> ListBrokerSecuritiesAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        var pairs = await db.Transactions.AsNoTracking()
+            .Where(x => x.AccountId == accountId && x.VoidedAt == null && x.Source == TradeSource.Broker)
+            .Select(x => new { x.Isin, x.TradingSymbol })
+            .Distinct()
+            .OrderBy(x => x.Isin).ThenBy(x => x.TradingSymbol)
+            .ToListAsync(cancellationToken);
+        return [.. pairs.Select(x => new TradeSecurity(x.Isin, x.TradingSymbol))];
+    }
+
+    public async ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(externalIds);
+        if (externalIds.Count == 0)
+        {
+            return new HashSet<string>();
+        }
+
+        var ids = externalIds as string[] ?? [.. externalIds];
+        return (await db.Transactions.AsNoTracking()
+            .Where(x => x.AccountId == accountId && x.VoidedAt == null && ids.Contains(x.ExternalId))
+            .Select(x => x.ExternalId)
+            .ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
+    }
+
     public async ValueTask<IReadOnlyList<Transaction>> ListActiveOfBatchAsync(Guid batchId, CancellationToken cancellationToken) =>
         await db.Transactions.AsNoTracking()
             .Where(x => x.BatchId == batchId && x.VoidedAt == null)

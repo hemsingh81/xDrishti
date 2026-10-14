@@ -494,7 +494,7 @@ two days before the instrument&#39;s last stored bar (the overlap proves the tim
 </tr>
 <tr>
 <td>Errors</td>
-<td>401/403, or DH-901/DH-902 on a 4xx → the token or Data API subscription is refused: the phase ends (<code>data.dhan_not_connected</code>, reconnect under Accounts); <strong>429, 5xx or DH-904 → one retry after 2 s</strong>, then the instrument fails; every other 4xx is never retried and fails only that instrument (the run goes on). <code>DH-907</code> is <em>not</em> read as &quot;no data&quot; here (it also means wrong parameters): it is a visible failure of that instrument</td>
+<td>401/403, or DH-901/DH-902 on a 4xx → the token or Data API subscription is refused: the phase ends (<code>data.dhan_not_connected</code>, reconnect under Accounts); <strong>429, 5xx or DH-904 → one retry after 2 s</strong>, then the instrument fails; every other 4xx is never retried and fails only that instrument (the run goes on). <code>DH-907</code> is <em>not</em> read as &quot;no data&quot; here (it also means wrong parameters): it is a visible failure of that instrument (the trade-history and ledger reads of §8.3 decide differently: there it is an empty result only after page 0)</td>
 </tr>
 <tr>
 <td>Leaks</td>
@@ -584,7 +584,7 @@ is a <strong>gap</strong> in <code>market.bar_gaps (instrument_id, date, expecte
 <tr>
 <td><code>IAccountReader</code></td>
 <td>funds, positions, holdings, trades (history), ledger</td>
-<td>Dhan</td>
+<td>Dhan (built so far: holdings §8.2; <strong>trade history and ledger, P2-13, §8.3</strong> as <code>IBrokerTrades</code> / <code>IBrokerLedger</code>; funds and positions not built)</td>
 </tr>
 <tr>
 <td><code>IBrokerConnector</code> (P1-16c)</td>
@@ -686,12 +686,36 @@ is &quot;broker unavailable&quot;; both surface as <code>502 accounts.broker_err
 <h3 id="82-reading-the-holdings-adr-0012-p2-01">8.2 Reading the holdings (ADR 0012, P2-01)<a class="hash" href="#82-reading-the-holdings-adr-0012-p2-01" aria-label="Link to this section">#</a></h3>
 <p><code>GET https://api.dhan.co/v2/holdings</code> with the header <code>access-token</code> (the account&#39;s stored token, read from the vault) answers an array of
 <code>{exchange, tradingSymbol, securityId, isin, totalQty, dpQty, t1Qty, mtf_t1_qty, mtf_qty, availableQty, collateralQty, avgCostPrice, lastTradedPrice}</code> — no purchase
-date and no previous close. xDrishti uses <code>exchange</code>, <code>tradingSymbol</code>, <code>securityId</code>, <code>isin</code>, <code>totalQty</code>, <code>avgCostPrice</code> and <code>lastTradedPrice</code>. It is the only <code>api.dhan.co</code>
-endpoint on the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB). A 401/403 means the saved token is expired or revoked
+date and no previous close. xDrishti uses <code>exchange</code>, <code>tradingSymbol</code>, <code>securityId</code>, <code>isin</code>, <code>totalQty</code>, <code>avgCostPrice</code> and <code>lastTradedPrice</code>. It is the holdings endpoint of the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB); the allow-list holds <code>api.dhan.co</code> paths for the chart data (§6), the quote (§5), and since P2-13 the trade history and the ledger (§8.3), never orders, positions or funds. A 401/403 means the saved token is expired or revoked
 (<code>409 portfolio.not_connected</code>, &quot;sign in to Dhan again&quot;); other 4xx and 5xx/timeouts are <code>502 accounts.broker_error</code>. An empty array (HTTP 200 <code>[]</code>) and Dhan&#39;s documented data error <code>DH-907</code> (&quot;incorrect parameters or no data present&quot;;
 this request has no parameters, so here it can only mean no data) both read as an empty list; <code>DH-1111</code> is not in Dhan&#39;s documentation and is only tolerated as an alias.
 An empty list is never trusted blindly: see the safeguard in <a href="12-portfolio-monitoring.html">doc 12</a> §3. Rows of one holding (same ISIN, or same security id and exchange) are added up (quantity summed, average cost weighted). Neither the token, the URL nor the
 raw answer is logged or returned.</p>
+<h3 id="83-trade-history-and-ledger-adr-0025-p2-13">8.3 Trade history and ledger (ADR 0025, P2-13)<a class="hash" href="#83-trade-history-and-ledger-adr-0025-p2-13" aria-label="Link to this section">#</a></h3>
+<p>Two more read-only endpoints are on the allow-list, both <code>GET</code>, HTTPS, host <code>api.dhan.co</code>, header <code>access-token</code> (the account&#39;s stored token), no redirects, <strong>30 s</strong> timeout, answers up to <strong>5 MB</strong>, calls kept at least <code>Portfolio:BrokerHistory:CallSpacingMs</code> (default 250 ms) apart by one process-wide throttle. The guard accepts exactly these shapes and still refuses every other path and method:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Shape accepted by the guard</th>
+<th>Answer (field names from Dhan&#39;s public documentation, <strong>not yet seen in a real answer</strong> of the owner&#39;s account)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Trade history</td>
+<td><code>GET /v2/trades/{yyyy-MM-dd}/{yyyy-MM-dd}/{page}</code>: two valid dates and a page number (digits, pages from 0, at most 10,000) in the path, <strong>no query</strong></td>
+<td>an array (or an object with it under <code>data</code>) of <code>exchangeTradeId</code> (else <code>tradeId</code>), <code>orderId</code>, <code>transactionType</code>, <code>exchangeSegment</code>, <code>productType</code>, <code>tradingSymbol</code>, <code>securityId</code>, <code>tradedQuantity</code>, <code>tradedPrice</code>, <code>exchangeTime</code> (else <code>createTime</code>, <code>updateTime</code>), India time; at most 20,000 rows per page, no charges</td>
+</tr>
+<tr>
+<td>Ledger</td>
+<td><code>GET /v2/ledger?from-date=…&amp;to-date=…</code>: <strong>exactly</strong> those two query keys, each once, valid dates</td>
+<td>an array of <code>voucherdate</code>, <code>voucherdesc</code>, <code>narration</code>, <code>vouchernumber</code>, <code>exchange</code>, <code>debit</code>, <code>credit</code>, <code>runbal</code> (numbers or text such as <code>&quot;20,000.00&quot;</code>; dates such as <code>Jun 22, 2022</code>); at most 50,000 rows</td>
+</tr>
+</tbody></table>
+<p>Names match in any case and numbers may be text; the mapping is tolerant because it is unverified. A trade row is kept when it is <code>NSE_EQ</code> and its product is <strong>not</strong> an intraday product — delivery (<code>CNC</code>, <code>MTF</code>), <code>MARGIN</code> and a row with no product are all kept: BSE, derivatives, currency, commodity and other segments are skipped per reason, and so are the intraday products (<code>INTRADAY</code>, <code>INTRA</code>, <code>MIS</code>, <code>CO</code>, <code>BO</code>), counted as <code>intraday</code>. A row without an id, symbol, side, whole positive quantity, positive price or readable date is dropped and counted. A ledger amount is one signed number, credit − debit; a row with an unreadable date or amount, or that moves nothing, is dropped and counted.</p>
+<p><strong>Errors.</strong> 401/403 or DH-901 (token refused): <code>portfolio.token_expired</code> for the owner; 429/DH-904, 5xx and timeouts are failures of the run with the existing back-off — none of these is ever turned into &quot;no data&quot;. Only the HTTP status and a well-formed Dhan code are logged; never the token, the URL, the rows or Dhan&#39;s text.</p>
+<p><strong>Window too large — DH-905.</strong> Dhan&#39;s real limit on the span of one request is not known; windows start at 30 days. DH-905 (&quot;input exception&quot;, how a too-wide range is expected to be refused; unverified), or 200 pages of trades without an empty one, halves the window once and each half is read on its own; if a half is too large too, the run fails and nothing of the window is stored.</p>
+<p><strong>No data — DH-907.</strong> &quot;Incorrect parameters or no data present&quot; cannot tell an empty window from a bad request. The decision (ADR 0025, amended after the first review): on <strong>page ≥ 1</strong> of a trades read it ends the paging (empty result); on <strong>page 0 of a window longer than one day</strong> it is <em>unclear</em> — the window is halved once and the halves are used, and a half that also answers DH-907 on page 0 is taken as empty and counted (<code>emptyByNoData</code>), so a systematic parameter error does not pass silently; on a one-day window it is an empty result (counted). <strong>The ledger has no paging</strong> (one call per window) and follows the same rule: a multi-day window answering DH-907 is halved once, and a half or a one-day window answering it is empty and counted. The sync status line names the count (&quot;Dhan answered &quot;no data&quot; for N date ranges&quot;) only when more ranges answered no data than windows were read. (The chart client of §6 reads DH-907 as a failure instead; the holdings read of §8.2 as an empty list.) The first real read settles whether Dhan answers <code>200 []</code> or DH-907 for a day without trades. How the run uses these reads — windows, watermark, gap refusal, rebuild — is in <a href="12-portfolio-monitoring.html">doc 12</a> §3 &quot;Dhan sync (P2-13)&quot;.</p>
 <h2 id="9-storage">9. Storage<a class="hash" href="#9-storage" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -966,7 +990,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-14 11:57</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-14 15:53</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>
@@ -985,6 +1009,7 @@ last closed bar; point-in-time regime), selection (basket rules are dated; point
 <a href="#8-accounts" class="d2">8. Accounts</a>
 <a href="#81-connecting-dhan39s-consent-flow" class="d3">8.1 Connecting: Dhan&amp;#39;s consent flow</a>
 <a href="#82-reading-the-holdings-adr-0012-p2-01" class="d3">8.2 Reading the holdings (ADR 0012, P2-01)</a>
+<a href="#83-trade-history-and-ledger-adr-0025-p2-13" class="d3">8.3 Trade history and ledger (ADR 0025, P2-13)</a>
 <a href="#9-storage" class="d2">9. Storage</a>
 <a href="#10-data-quality" class="d2">10. Data quality</a>
 <a href="#10b-data-quality-window-validation-workbench" class="d3">10b. Data quality window (validation workbench)</a>

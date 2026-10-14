@@ -114,6 +114,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
         builder.UseSetting("Data:Eod:Enabled", "false"); // first-start seed (ADR 0018): the end-of-day service starts paused; tests resume it and ask the scheduler themselves, with the clock pinned
+        builder.UseSetting("Portfolio:BrokerHistory:Enabled", "false"); // first-start seed (ADR 0018): the trades and ledger service starts paused; tests use Sync now or run it themselves
+        builder.UseSetting("Portfolio:BrokerHistory:CallSpacingMs", "0"); // no 250 ms between the calls to the fake Dhan
         builder.UseSetting("Data:CsvFolder", CsvFolder);
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);
@@ -130,6 +132,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(BrokerHttpClientNames.DhanHoldings).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanChart).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanQuote).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
+            services.AddHttpClient(BrokerHttpClientNames.DhanHistory).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
 
             // Same for the instrument master's two file servers and NSE's holiday list; refreshes are run by the tests, not by the background worker.
             services.AddHttpClient(MasterDataHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
@@ -206,7 +209,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             await db.Database.ExecuteSqlRawAsync("""
                 DELETE FROM portfolio.price_alerts;
                 DELETE FROM portfolio.action_states;
+                DELETE FROM portfolio.ledger_entries;
                 DELETE FROM portfolio.transactions;
+                DELETE FROM portfolio.broker_sync_state;
+                DELETE FROM portfolio.broker_sync_runs;
                 DELETE FROM portfolio.trade_batches;
                 DELETE FROM portfolio.holding_lots;
                 DELETE FROM portfolio.holdings;

@@ -4,6 +4,7 @@ using Npgsql;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Persistence;
 
 namespace XDrishti.Infrastructure.Portfolio;
@@ -44,6 +45,32 @@ internal sealed partial class PortfolioUnitOfWork(XDrishtiDbContext db, IPortfol
         }
     }
 
+    public async ValueTask<Result> RunOnceAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken)
+    {
+        // The same transaction and execution strategy as RunAsync, but a holding that was changed by someone else since the work read it (its concurrency token moved) ends the run as skipped: nothing is saved and nothing is repeated.
+        var strategy = db.Database.CreateExecutionStrategy();
+        var result = await strategy.ExecuteAsync(async token =>
+        {
+            try
+            {
+                return await AttemptAsync(work, token);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Result.Failure(PortfolioErrors.HoldingChanged);
+            }
+        }, cancellationToken);
+        var signal = result.IsSuccess && _signalPending;
+        _signalPending = false;
+        if (result.IsSuccess)
+        {
+            histories.Invalidate();
+        }
+
+        await SignalAsync(signal);
+        return result;
+    }
+
     public async ValueTask<Result> RunAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken)
     {
         // The retrying execution strategy requires user transactions to run inside it; it may run the whole block again after a transient failure.
@@ -57,8 +84,16 @@ internal sealed partial class PortfolioUnitOfWork(XDrishtiDbContext db, IPortfol
             catch (DbUpdateConcurrencyException)
             {
                 // A holding the work changed was changed by someone else meanwhile (a quote written between the work's read and its save, ADR 0019): the transaction is rolled back,
-                // and the work runs once more from scratch, reading the rows as they are now (the work reads its own state). A second conflict is a failure of the run.
-                return await AttemptAsync(work, token);
+                // and the work runs once more from scratch, reading the rows as they are now (the work reads its own state). A second conflict is a failure of the run: a result
+                // (PortfolioErrors.HoldingChanged, a 409 for the caller to reload and try again), never an exception that surfaces as a 500.
+                try
+                {
+                    return await AttemptAsync(work, token);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    return Result.Failure(PortfolioErrors.HoldingChanged);
+                }
             }
         }, cancellationToken);
         var signal = result.IsSuccess && _signalPending;

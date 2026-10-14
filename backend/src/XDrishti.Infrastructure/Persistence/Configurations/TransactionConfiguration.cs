@@ -6,7 +6,7 @@ using XDrishti.Domain.Portfolio;
 namespace XDrishti.Infrastructure.Persistence.Configurations;
 
 /// <summary>
-/// <c>portfolio.transactions</c> (ADR 0023): the trades of the accounts, immutable except for <c>voided_at</c>/<c>voided_by</c>. The runtime role may read, insert and update them, never delete. The identity of a trade (<c>external_id</c>) is unique
+/// <c>portfolio.transactions</c> (ADR 0023, 0025): the trades of the accounts (tradebook files, the owner's hand, the broker's trade history), immutable except for <c>voided_at</c>/<c>voided_by</c>. The runtime role may read, insert and update them, never delete. The identity of a trade (<c>external_id</c>) is unique
 /// per account among the trades that are not voided (a partial unique index), so a voided trade can be imported again.
 /// </summary>
 internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
@@ -16,7 +16,7 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.ToTable("transactions", Schemas.Portfolio, t =>
         {
             t.HasCheckConstraint("ck_transactions_side", "side IN ('buy', 'sell')");
-            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual')");
+            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual', 'broker')");
             t.HasCheckConstraint("ck_transactions_qty", "qty > 0");
             t.HasCheckConstraint("ck_transactions_price", "price > 0");
             t.HasCheckConstraint("ck_transactions_charges", "charges >= 0");
@@ -40,6 +40,10 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.Property(x => x.Charges).HasPrecision(18, 4).IsRequired();
         builder.Property(x => x.Source).HasConversion(EnumConversions.Lowercase<TradeSource>()).HasMaxLength(6).IsRequired();
         builder.Property(x => x.BatchId);
+
+        // The broker history run that read the trade (ADR 0025); null for a trade from a file or typed in.
+        builder.Property(x => x.RunId);
+        builder.HasOne<BrokerSyncRun>().WithMany().HasForeignKey(x => x.RunId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TradeBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(x => x.Seq).IsRequired();
         builder.Property(x => x.ExternalId).HasMaxLength(TradeRules.MaxExternalIdLength).IsRequired();
@@ -53,5 +57,6 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.HasIndex(x => new { x.AccountId, x.TradingSymbol }).HasDatabaseName("ix_transactions_account_symbol");
         builder.HasIndex(x => new { x.AccountId, x.Isin }).HasDatabaseName("ix_transactions_account_isin");
         builder.HasIndex(x => x.BatchId).HasDatabaseName("ix_transactions_batch");
+        builder.HasIndex(x => x.RunId).HasDatabaseName("ix_transactions_run").HasFilter("run_id IS NOT NULL");
     }
 }

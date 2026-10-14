@@ -17,6 +17,12 @@ public interface ITradeStore
     /// </summary>
     ValueTask<IReadOnlyList<Transaction>> ListActiveForSecurityAsync(Guid accountId, string? isin, string symbol, CancellationToken cancellationToken);
 
+    /// <summary>The securities (ISIN and symbol, each pair once, ordered) of the account's broker trades that are not voided: what the automatic rebuild after a broker sync needs to find the holdings to rebuild, without reading every trade.</summary>
+    ValueTask<IReadOnlyList<TradeSecurity>> ListBrokerSecuritiesAsync(Guid accountId, CancellationToken cancellationToken);
+
+    /// <summary>Which of these identities (<c>external_id</c>) the account has stored already among its trades that are not voided; for reading only. A voided trade's identity is free.</summary>
+    ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken);
+
     /// <summary>The trades of the batch that are not voided; for reading only.</summary>
     ValueTask<IReadOnlyList<Transaction>> ListActiveOfBatchAsync(Guid batchId, CancellationToken cancellationToken);
 

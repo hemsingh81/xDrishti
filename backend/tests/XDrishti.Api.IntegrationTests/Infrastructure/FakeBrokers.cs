@@ -23,11 +23,31 @@ public sealed class FakeBrokers
 
     public IReadOnlyCollection<RecordedRequest> Requests => _requests;
 
+    /// <summary>Forgets the requests seen so far (a test looks only at what follows).</summary>
+    public void ClearRequests() => _requests.Clear();
+
     /// <summary>What the fake Dhan reports at <c>GET /v2/holdings</c> (for a request that carries the fake access token).</summary>
     public List<FakeHolding> Holdings { get; } = [];
 
     /// <summary>What the fake Dhan quotes at <c>POST /v2/marketfeed/quote</c> by Dhan security id (last price, previous close; a null close is left out of the answer). Needs the fake access token and a client id.</summary>
     public Dictionary<string, (decimal Last, decimal? Close)> Quotes { get; } = [];
+
+    /// <summary>What the fake Dhan reports at <c>GET /v2/trades/{from}/{to}/{page}</c> (those whose date is in the asked dates, a page of <see cref="TradePageSize"/> at a time; for a request that carries the fake access token).</summary>
+    public List<FakeTrade> Trades { get; } = [];
+
+    public int TradePageSize { get; set; } = 100;
+
+    /// <summary>What the fake Dhan reports at <c>GET /v2/ledger</c> (those whose date is in the asked dates).</summary>
+    public List<FakeLedgerLine> Ledger { get; } = [];
+
+    /// <summary>When true an empty page of trades is Dhan's documented data error DH-907 (a 400) instead of an empty list.</summary>
+    public bool EmptyPageIsNoDataError { get; set; }
+
+    /// <summary>Answers a request of the trade history or the ledger instead of the fake data (return null to let the normal answer go out).</summary>
+    public Func<RecordedRequest, HttpResponseMessage?>? HistoryOverride { get; set; }
+
+    /// <summary>Runs before the fake Dhan answers a trade history request (a test holds the answer back to make a run slow).</summary>
+    public Func<Task>? BeforeTradesAnswer { get; set; }
 
     /// <summary>Runs before the fake Dhan answers a holdings request (a test holds the answer back to make a sync slow).</summary>
     public Func<Task>? BeforeHoldingsAnswer { get; set; }
@@ -47,6 +67,12 @@ public sealed class FakeBrokers
         _overrides.Clear();
         Holdings.Clear();
         Quotes.Clear();
+        Trades.Clear();
+        Ledger.Clear();
+        TradePageSize = 100;
+        EmptyPageIsNoDataError = false;
+        HistoryOverride = null;
+        BeforeTradesAnswer = null;
         BeforeHoldingsAnswer = null;
         DhanClientId = AccountsApi.ClientId;
     }
@@ -61,6 +87,11 @@ public sealed class FakeBrokers
         if (_overrides.TryGetValue(request.Uri.AbsolutePath, out var respond))
         {
             return respond(request);
+        }
+
+        if (request.Uri.AbsolutePath.StartsWith("/v2/trades/", StringComparison.Ordinal) || request.Uri.AbsolutePath == "/v2/ledger")
+        {
+            return HistoryOverride?.Invoke(request) ?? HistoryAnswer(request);
         }
 
         var dhanExpiry = Clock.GetUtcNow().ToOffset(Ist).AddHours(20);
@@ -79,6 +110,36 @@ public sealed class FakeBrokers
                 : Json(HttpStatusCode.Unauthorized, """{"errorType":"Invalid_Authentication","errorCode":"DH-901","errorMessage":"Client ID or user generated access token is invalid or expired."}"""),
             _ => Json(HttpStatusCode.NotFound, """{"errorCode":"NOT_FAKED"}"""),
         };
+    }
+
+    private static HttpResponseMessage Refused() =>
+        Json(HttpStatusCode.Unauthorized, """{"errorType":"Invalid_Authentication","errorCode":"DH-901","errorMessage":"Client ID or user generated access token is invalid or expired."}""");
+
+    /// <summary>The trade history (<c>/v2/trades/{from}/{to}/{page}</c>) and the ledger (<c>/v2/ledger?from-date=…&amp;to-date=…</c>) as Dhan's documentation shows them, with made-up values.</summary>
+    private HttpResponseMessage HistoryAnswer(RecordedRequest request)
+    {
+        if (request.Header("access-token") != DhanAccessToken)
+        {
+            return Refused();
+        }
+
+        var invariant = CultureInfo.InvariantCulture;
+        if (request.Uri.AbsolutePath == "/v2/ledger")
+        {
+            var query = System.Web.HttpUtility.ParseQueryString(request.Uri.Query);
+            var from = DateOnly.ParseExact(query["from-date"]!, "yyyy-MM-dd", invariant);
+            var to = DateOnly.ParseExact(query["to-date"]!, "yyyy-MM-dd", invariant);
+            return Json(HttpStatusCode.OK, "[" + string.Join(",", Ledger.ToArray().Where(l => l.Date >= from && l.Date <= to).Select(l => l.ToJson())) + "]");
+        }
+
+        var parts = request.Uri.AbsolutePath["/v2/trades/".Length..].Split('/');
+        var fromDate = DateOnly.ParseExact(parts[0], "yyyy-MM-dd", invariant);
+        var toDate = DateOnly.ParseExact(parts[1], "yyyy-MM-dd", invariant);
+        var page = int.Parse(parts[2], invariant);
+        var rows = Trades.ToArray().Where(t => t.Date >= fromDate && t.Date <= toDate).OrderBy(t => t.Date).ThenBy(t => t.TradeId, StringComparer.Ordinal).Skip(page * TradePageSize).Take(TradePageSize).ToList();
+        return rows.Count == 0 && EmptyPageIsNoDataError
+            ? Json(HttpStatusCode.BadRequest, """{"errorType":"Data_API_Error","errorCode":"DH-907","errorMessage":"Incorrect parameters or no data present"}""")
+            : Json(HttpStatusCode.OK, "[" + string.Join(",", rows.Select(t => t.ToJson())) + "]");
     }
 
     /// <summary>Dhan's documented market-quote answer for the asked NSE_EQ ids that <see cref="Quotes"/> knows (made-up values).</summary>
@@ -101,6 +162,22 @@ public sealed class FakeBrokers
     {
         public string ToJson() => string.Create(CultureInfo.InvariantCulture, $$"""
             {"exchange":"{{Exchange}}","tradingSymbol":"{{Symbol}}","securityId":"{{SecurityId}}","isin":{{(Isin is null ? "null" : $"\"{Isin}\"")}},"totalQty":{{Qty}},"dpQty":{{Qty}},"t1Qty":0,"mtf_t1_qty":0,"mtf_qty":0,"availableQty":{{Qty}},"collateralQty":0,"avgCostPrice":{{AvgCost}},"lastTradedPrice":{{Ltp}}}
+            """);
+    }
+
+    /// <summary>One trade as the trade history reports it (made-up values; segment and product as Dhan names them).</summary>
+    public sealed record FakeTrade(string TradeId, string Symbol, string Side, long Qty, decimal Price, DateOnly Date, TimeOnly Time, string Segment = "NSE_EQ", string Product = "CNC", string SecurityId = "1001")
+    {
+        public string ToJson() => string.Create(CultureInfo.InvariantCulture, $$"""
+            {"dhanClientId":"1000000001","orderId":"O-{{TradeId}}","exchangeOrderId":"X-{{TradeId}}","exchangeTradeId":"{{TradeId}}","transactionType":"{{Side}}","exchangeSegment":"{{Segment}}","productType":"{{Product}}","orderType":"LIMIT","tradingSymbol":"{{Symbol}}","customSymbol":"{{Symbol}}","securityId":"{{SecurityId}}","tradedQuantity":{{Qty}},"tradedPrice":{{Price}},"createTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","updateTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","exchangeTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","drvExpiryDate":null,"drvOptionType":null,"drvStrikePrice":0}
+            """);
+    }
+
+    /// <summary>One ledger line as the ledger reports it (made-up values; amounts as text, the date as <c>Sep 2, 2026</c>).</summary>
+    public sealed record FakeLedgerLine(DateOnly Date, string VoucherNo, string Description, string Narration, decimal Debit, decimal Credit, decimal Balance)
+    {
+        public string ToJson() => string.Create(CultureInfo.InvariantCulture, $$"""
+            {"dhanClientId":"1000000001","narration":"{{Narration}}","voucherdate":"{{Date.ToString("MMM d, yyyy", CultureInfo.InvariantCulture)}}","exchange":"NSE-CAPITAL","voucherdesc":"{{Description}}","vouchernumber":"{{VoucherNo}}","debit":"{{Debit:0.00}}","credit":"{{Credit:0.00}}","runbal":"{{Balance:0.00}}"}
             """);
     }
 
@@ -127,6 +204,11 @@ public sealed class FakeBrokers
             if (recorded.Uri.AbsolutePath == "/v2/holdings" && brokers.BeforeHoldingsAnswer is { } wait)
             {
                 await wait();
+            }
+
+            if (recorded.Uri.AbsolutePath.StartsWith("/v2/trades/", StringComparison.Ordinal) && brokers.BeforeTradesAnswer is { } waitForTrades)
+            {
+                await waitForTrades();
             }
 
             return brokers.Answer(recorded);

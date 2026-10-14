@@ -20,7 +20,7 @@ internal sealed record SyncRunOutcome<TResult>(Guid RunId, TResult Value);
 internal sealed class SyncRuns(IHoldingSyncStore syncs, IPortfolioUnitOfWork unitOfWork, TimeProvider clock, ILogger<SyncRuns> logger)
 {
     /// <summary>A run that has been "running" this long was interrupted (Dhan's timeout is 30 seconds).</summary>
-    public static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan StaleAfter = SyncLimits.HoldingsStaleAfter;
 
     private const string Interrupted = "The sync was interrupted because the application is stopping.";
 

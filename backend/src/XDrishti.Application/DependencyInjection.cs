@@ -28,6 +28,7 @@ using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Live;
 using XDrishti.Application.Portfolio.Quotes;
@@ -112,6 +113,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, EodService>();
         services.AddSingleton<IScheduledService, InstrumentMasterService>();
         services.AddSingleton<IScheduledService, HoldingQuotesService>();
+        services.AddSingleton<IScheduledService, PortfolioBrokerHistoryService>();
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
@@ -320,6 +322,17 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<VoidTradeCommand, TradeView>, VoidTradeHandler>();
         services.AddScoped<ICommandHandler<RebuildLotsCommand, HoldingRebuildResult>, RebuildLotsHandler>();
         services.AddScoped<IQueryHandler<GetTradeTemplateQuery, string>, GetTradeTemplateHandler>();
+
+        // The trades and the ledger read from Dhan, and the automatic rebuild of lots after a trade sync (ADR 0025). "Sync now" registers the run and a background worker carries it on; the scheduled service (AddServices) uses the waiting form.
+        services.AddScoped<BrokerHistoryAccess>();
+        services.AddScoped<BrokerHistoryReader>();
+        services.AddScoped<BrokerLotRebuilder>();
+        services.AddScoped<BrokerHistoryPipeline>();
+        services.AddScoped<ICommandHandler<StartBrokerHistoryCommand, BrokerHistoryRunView>, StartBrokerHistoryHandler>();
+        services.AddScoped<ICommandHandler<ExecuteBrokerHistoryCommand>, ExecuteBrokerHistoryHandler>();
+        services.AddScoped<ICommandHandler<SyncBrokerHistoryCommand, BrokerHistoryRunView>, SyncBrokerHistoryHandler>();
+        services.AddScoped<IQueryHandler<GetBrokerHistoryStatusQuery, Result<BrokerHistoryStatusView>>, GetBrokerHistoryStatusHandler>();
+        services.AddScoped<IQueryHandler<ListLedgerQuery, Result<LedgerPage>>, ListLedgerHandler>();
 
         // The live price sink (ADR 0024): a singleton for the lifetime of the feed process; it resolves the scoped ports per flush.
         services.AddSingleton<LiveFlush>();

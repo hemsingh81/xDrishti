@@ -1,21 +1,10 @@
-import CheckCircleIcon from '@mui/icons-material/CheckCircleOutlined';
-import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import InfoIcon from '@mui/icons-material/InfoOutlined';
-import SyncIcon from '@mui/icons-material/Sync';
-import WarningIcon from '@mui/icons-material/WarningAmberOutlined';
 import { Stack, Typography } from '@mui/material';
-import type { ReactElement } from 'react';
 import type { SyncRun, SyncStatus } from '@/shared/api';
 import { formatAgo, formatIstTimeAndDay } from '@/shared/lib/format';
 import { numeric } from '@/theme';
-import { describeSchedule, summariseRun, type RunTone } from '../lib/syncText';
-
-const toneLook: Record<RunTone, { icon: ReactElement; color: string }> = {
-  success: { icon: <CheckCircleIcon fontSize="small" />, color: 'success.main' },
-  error: { icon: <ErrorIcon fontSize="small" />, color: 'error.main' },
-  warning: { icon: <WarningIcon fontSize="small" />, color: 'warning.main' },
-  info: { icon: <SyncIcon fontSize="small" />, color: 'info.main' },
-};
+import { describeSchedule, summariseRun } from '../lib/syncText';
+import { toneLook } from './toneLook';
 
 /** "Synced 5 min ago — 2 new, 1 closed" / "Skipped 2 h ago — The account is not connected to Dhan." */
 function LastRun({ run, running }: { run: SyncRun | null; running: boolean }) {

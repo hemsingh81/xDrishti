@@ -135,6 +135,15 @@ public static class DependencyInjection
             .RemoveAllLoggers();
         services.AddScoped<IBrokerHoldings, DhanHoldingsClient>();
 
+        // The trade history and the ledger (ADR 0025) have the holdings read's limits (30 seconds, answers up to 5 MB); the guard allows only GET /v2/trades/{from}/{to}/{page} and GET /v2/ledger with its two dates. Calls are spaced (a singleton throttle).
+        services.AddHttpClient(BrokerHttpClientNames.DhanHistory, BrokerHttp.ConfigureHoldings)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddSingleton<DhanHistoryThrottle>();
+        services.AddScoped<IBrokerTrades, DhanTradesClient>();
+        services.AddScoped<IBrokerLedger, DhanLedgerClient>();
+
         // The market quote of the holdings (ADR 0019): the guard allows only POST /v2/marketfeed/quote; one request a second, shared by every run (a singleton throttle, apart from the bar fetch's).
         services.AddHttpClient(BrokerHttpClientNames.DhanQuote, BrokerHttp.ConfigureQuote)
             .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
@@ -158,6 +167,14 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<IPortfolioRefreshSettings, PortfolioRefreshSettings>();
+        services.AddOptions<BrokerHistoryOptions>()
+            .Bind(configuration.GetSection(BrokerHistoryOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IBrokerHistorySettings, BrokerHistorySettings>();
+        services.AddSingleton<IBrokerHistoryChannel, BrokerHistoryChannel>();
+        services.AddScoped<IBrokerSyncStore, BrokerSyncStore>();
+        services.AddScoped<ILedgerStore, LedgerStore>();
         services.AddScoped<IHoldingStore, HoldingStore>();
         services.AddScoped<IHoldingQueries, HoldingQueries>();
         services.AddScoped<IHoldingClassifications, HoldingClassifications>();

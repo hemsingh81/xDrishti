@@ -239,6 +239,8 @@ internal sealed class InMemoryActionData : IActionStates, IActionSettings, IPric
         return ValueTask.FromResult(true);
     }
 
+    public ValueTask<Result> RunOnceAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken) => RunAsync(work, cancellationToken);
+
     public async ValueTask<Result> RunAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken)
     {
         var states = _states.Select(s => ActionState.Create(s.Rule, s.Key, s.State, s.SnoozedUntil, s.UpdatedBy, s.UpdatedAt)).ToList();

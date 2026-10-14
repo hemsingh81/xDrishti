@@ -259,7 +259,7 @@ Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for
 > | Answer | parallel arrays `open, high, low, close` (float), `volume`, `timestamp` (and `open_interest`, ignored). The documentation does not state the time base: `timestamp` is read as **Unix seconds**, or milliseconds when it has 13 digits. Empty arrays are "no bars", arrays of different lengths are a failure |
 > | Proof | the bars of a window must lie within a day of the period asked for, and not be 5 h 30 min off: when most bars lie outside the regular session but all fit a session after adding or subtracting 5 h 30 min, or the bars include one stamped 15:30 and none 09:15 (stamped with the minute's end), that instrument **fails** with a message naming the suspicion — nothing is shifted or guessed. Bars outside sessions are rejected and counted by the pipeline; the minute still running is left for the next fetch |
 > | Limits | 15 s per request, answers up to 16 MB, no redirects, one request at a time through a shared throttle (`Data:Dhan:RequestsPerSecond`, default 4); the documentation states no rate limit |
-> | Errors | 401/403, or DH-901/DH-902 on a 4xx → the token or Data API subscription is refused: the phase ends (`data.dhan_not_connected`, reconnect under Accounts); **429, 5xx or DH-904 → one retry after 2 s**, then the instrument fails; every other 4xx is never retried and fails only that instrument (the run goes on). `DH-907` is *not* read as "no data" here (it also means wrong parameters): it is a visible failure of that instrument |
+> | Errors | 401/403, or DH-901/DH-902 on a 4xx → the token or Data API subscription is refused: the phase ends (`data.dhan_not_connected`, reconnect under Accounts); **429, 5xx or DH-904 → one retry after 2 s**, then the instrument fails; every other 4xx is never retried and fails only that instrument (the run goes on). `DH-907` is *not* read as "no data" here (it also means wrong parameters): it is a visible failure of that instrument (the trade-history and ledger reads of §8.3 decide differently: there it is an empty result only after page 0) |
 > | Leaks | only the HTTP status and a well-formed Dhan error code (`DH-905`) are logged or shown; never the token, the URL, the request body or the text of Dhan's answer |
 
 ### 6.1 Scheduled run and gap backfill (ADR 0017 §2–§3, P1-12a)
@@ -304,7 +304,7 @@ Adding new tracked instruments triggers a backfill job (CSV first, then Dhan for
 |-----------|---------|-----------|
 | `IMarketDataProvider` | instruments, intraday/daily history, quotes | Dhan (built so far: the 1-minute history behind `IIntradayBarSource`, §6) |
 | `ILiveFeed` | subscribe/unsubscribe, tick stream | Dhan WebSocket |
-| `IAccountReader` | funds, positions, holdings, trades (history), ledger | Dhan |
+| `IAccountReader` | funds, positions, holdings, trades (history), ledger | Dhan (built so far: holdings §8.2; **trade history and ledger, P2-13, §8.3** as `IBrokerTrades` / `IBrokerLedger`; funds and positions not built) |
 | `IBrokerConnector` (P1-16c) | start/complete the browser consent login | Dhan (API key & secret consent flow) — §8.1 |
 | `ITokenProvider` | get, refresh, expiry for the services | Reads the vault and `accounts.broker_connections` (P1-12) |
 | `IOrderExecutor` | place/modify/cancel (later phase) | — |
@@ -359,12 +359,28 @@ is "broker unavailable"; both surface as `502 accounts.broker_error` with a safe
 
 `GET https://api.dhan.co/v2/holdings` with the header `access-token` (the account's stored token, read from the vault) answers an array of
 `{exchange, tradingSymbol, securityId, isin, totalQty, dpQty, t1Qty, mtf_t1_qty, mtf_qty, availableQty, collateralQty, avgCostPrice, lastTradedPrice}` — no purchase
-date and no previous close. xDrishti uses `exchange`, `tradingSymbol`, `securityId`, `isin`, `totalQty`, `avgCostPrice` and `lastTradedPrice`. It is the only `api.dhan.co`
-endpoint on the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB). A 401/403 means the saved token is expired or revoked
+date and no previous close. xDrishti uses `exchange`, `tradingSymbol`, `securityId`, `isin`, `totalQty`, `avgCostPrice` and `lastTradedPrice`. It is the holdings endpoint of the allow-list (GET, HTTPS, exact path, no query, no redirects, 30 s, answers up to 5 MB); the allow-list holds `api.dhan.co` paths for the chart data (§6), the quote (§5), and since P2-13 the trade history and the ledger (§8.3), never orders, positions or funds. A 401/403 means the saved token is expired or revoked
 (`409 portfolio.not_connected`, "sign in to Dhan again"); other 4xx and 5xx/timeouts are `502 accounts.broker_error`. An empty array (HTTP 200 `[]`) and Dhan's documented data error `DH-907` ("incorrect parameters or no data present";
 this request has no parameters, so here it can only mean no data) both read as an empty list; `DH-1111` is not in Dhan's documentation and is only tolerated as an alias.
 An empty list is never trusted blindly: see the safeguard in [doc 12](12-portfolio-monitoring.md) §3. Rows of one holding (same ISIN, or same security id and exchange) are added up (quantity summed, average cost weighted). Neither the token, the URL nor the
 raw answer is logged or returned.
+
+### 8.3 Trade history and ledger (ADR 0025, P2-13)
+
+Two more read-only endpoints are on the allow-list, both `GET`, HTTPS, host `api.dhan.co`, header `access-token` (the account's stored token), no redirects, **30 s** timeout, answers up to **5 MB**, calls kept at least `Portfolio:BrokerHistory:CallSpacingMs` (default 250 ms) apart by one process-wide throttle. The guard accepts exactly these shapes and still refuses every other path and method:
+
+| Endpoint | Shape accepted by the guard | Answer (field names from Dhan's public documentation, **not yet seen in a real answer** of the owner's account) |
+|----------|-----------------------------|-----------|
+| Trade history | `GET /v2/trades/{yyyy-MM-dd}/{yyyy-MM-dd}/{page}`: two valid dates and a page number (digits, pages from 0, at most 10,000) in the path, **no query** | an array (or an object with it under `data`) of `exchangeTradeId` (else `tradeId`), `orderId`, `transactionType`, `exchangeSegment`, `productType`, `tradingSymbol`, `securityId`, `tradedQuantity`, `tradedPrice`, `exchangeTime` (else `createTime`, `updateTime`), India time; at most 20,000 rows per page, no charges |
+| Ledger | `GET /v2/ledger?from-date=…&to-date=…`: **exactly** those two query keys, each once, valid dates | an array of `voucherdate`, `voucherdesc`, `narration`, `vouchernumber`, `exchange`, `debit`, `credit`, `runbal` (numbers or text such as `"20,000.00"`; dates such as `Jun 22, 2022`); at most 50,000 rows |
+
+Names match in any case and numbers may be text; the mapping is tolerant because it is unverified. A trade row is kept when it is `NSE_EQ` and its product is **not** an intraday product — delivery (`CNC`, `MTF`), `MARGIN` and a row with no product are all kept: BSE, derivatives, currency, commodity and other segments are skipped per reason, and so are the intraday products (`INTRADAY`, `INTRA`, `MIS`, `CO`, `BO`), counted as `intraday`. A row without an id, symbol, side, whole positive quantity, positive price or readable date is dropped and counted. A ledger amount is one signed number, credit − debit; a row with an unreadable date or amount, or that moves nothing, is dropped and counted.
+
+**Errors.** 401/403 or DH-901 (token refused): `portfolio.token_expired` for the owner; 429/DH-904, 5xx and timeouts are failures of the run with the existing back-off — none of these is ever turned into "no data". Only the HTTP status and a well-formed Dhan code are logged; never the token, the URL, the rows or Dhan's text.
+
+**Window too large — DH-905.** Dhan's real limit on the span of one request is not known; windows start at 30 days. DH-905 ("input exception", how a too-wide range is expected to be refused; unverified), or 200 pages of trades without an empty one, halves the window once and each half is read on its own; if a half is too large too, the run fails and nothing of the window is stored.
+
+**No data — DH-907.** "Incorrect parameters or no data present" cannot tell an empty window from a bad request. The decision (ADR 0025, amended after the first review): on **page ≥ 1** of a trades read it ends the paging (empty result); on **page 0 of a window longer than one day** it is *unclear* — the window is halved once and the halves are used, and a half that also answers DH-907 on page 0 is taken as empty and counted (`emptyByNoData`), so a systematic parameter error does not pass silently; on a one-day window it is an empty result (counted). **The ledger has no paging** (one call per window) and follows the same rule: a multi-day window answering DH-907 is halved once, and a half or a one-day window answering it is empty and counted. The sync status line names the count ("Dhan answered \"no data\" for N date ranges") only when more ranges answered no data than windows were read. (The chart client of §6 reads DH-907 as a failure instead; the holdings read of §8.2 as an empty list.) The first real read settles whether Dhan answers `200 []` or DH-907 for a day without trades. How the run uses these reads — windows, watermark, gap refusal, rebuild — is in [doc 12](12-portfolio-monitoring.md) §3 "Dhan sync (P2-13)".
 
 ## 9. Storage
 

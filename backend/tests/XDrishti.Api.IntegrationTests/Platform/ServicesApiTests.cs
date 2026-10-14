@@ -153,7 +153,7 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
 
         var list = await response.ReadAsync<ServiceList>(Ct);
 
-        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "live-feed", "fake-job", "account-sync"]);
+        list.Items.Select(s => s.Id).ShouldBe(["eod", "instrument-master", "holdings-quotes", "portfolio-broker-history", "live-feed", "fake-job", "account-sync"]);
         var feed = list.Items.Single(s => s.Id == "live-feed");
         (feed.Name, feed.RunsAs, feed.Enabled, feed.Schedule.Type, feed.Schedule.From, feed.Schedule.To).ShouldBe(("Live feed", "xd-feed", true, "window", "09:00", "15:35")); // run by xd-feed, shown and edited here
         feed.Live.ShouldNotBeNull();
@@ -384,7 +384,7 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
         var timeline = await response.ReadAsync<ServicesTimeline>(Ct);
 
         (timeline.TradingDay, timeline.MarketOpen, timeline.MarketClose, timeline.ReviewCutoff).ShouldBe((true, "09:15", "15:30", "09:05"));
-        timeline.Entries.Select(e => e.ServiceId).ShouldBe(["holdings-quotes", "live-feed", FakeJobService.Id]); // eod and the instrument master are seeded paused
+        timeline.Entries.Select(e => e.ServiceId).ShouldBe(["holdings-quotes", "live-feed", FakeJobService.Id]); // eod, the instrument master and the trades and ledger read are seeded paused
         var quotes = timeline.Entries[0];
         (quotes.Kind, quotes.Band, quotes.EveryMinutes).ShouldBe(("band", new TimelineBand("09:15", "15:30"), 5));
         var feed = timeline.Entries[1];

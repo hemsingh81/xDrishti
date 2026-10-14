@@ -209,7 +209,7 @@ power, wired network, small UPS recommended.</li>
 </tr>
 </tbody></table>
 <p>*<code>xd-sandbox</code> has no egress and no access except its job inputs/outputs.
-<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>), for the read of the account&#39;s holdings (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>), for the 1-minute chart data of the Data API (<a href="../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.html">ADR 0016</a>) and for the instrument master files and NSE&#39;s trading-holiday list (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>, <a href="../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.html">ADR 0017</a>): outbound only, no
+<code>xd-api</code> joins <code>egress</code> for Dhan&#39;s sign-in (<a href="../adr/0008-broker-credentials-vault-and-connection.html">ADR 0008</a>, <a href="../adr/0009-dhan-consent-flow-only.html">0009</a>), for the read of the account&#39;s holdings (<a href="../adr/0012-holdings-acquisition-dates-and-returns-model.html">ADR 0012</a>), for the 1-minute chart data of the Data API (<a href="../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.html">ADR 0016</a>), for the trade history and the ledger of the account (<a href="../adr/0025-dhan-trade-history-and-ledger-sync.html">ADR 0025</a>) and for the instrument master files and NSE&#39;s trading-holiday list (<a href="../adr/0010-instrument-master-sources-and-scope.html">ADR 0010</a>, <a href="../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.html">ADR 0017</a>): outbound only, no
 published ports, no other member. The network itself does not filter hosts; the API&#39;s HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):</p>
 <table>
 <thead>
@@ -230,7 +230,19 @@ published ports, no other member. The network itself does not filter hosts; the 
 <td>Broker (Dhan holdings)</td>
 <td><code>api.dhan.co</code>: <code>/v2/holdings</code> only, no query (doc 05 §8.2)</td>
 <td>GET</td>
-<td>30 s, 5 MB; the stored access token goes in the <code>access-token</code> header and is never logged; nothing else of <code>api.dhan.co</code> is callable</td>
+<td>30 s, 5 MB; the stored access token goes in the <code>access-token</code> header and is never logged; the other <code>api.dhan.co</code> paths that are callable are the rows below, never an order, position or funds path</td>
+</tr>
+<tr>
+<td>Broker (Dhan trade history)</td>
+<td><code>api.dhan.co</code>: <code>/v2/trades/{yyyy-MM-dd}/{yyyy-MM-dd}/{page}</code> — two valid dates and a page number in the path, <strong>no query</strong> (doc 05 §8.3; ADR 0025)</td>
+<td>GET</td>
+<td>30 s, 5 MB; calls at least <code>Portfolio__BrokerHistory__CallSpacingMs</code> (250) apart; the account&#39;s access token goes in the <code>access-token</code> header and is never logged, nor are the URL or the rows</td>
+</tr>
+<tr>
+<td>Broker (Dhan ledger)</td>
+<td><code>api.dhan.co</code>: <code>/v2/ledger</code> with the query of <strong>exactly</strong> <code>from-date</code> and <code>to-date</code>, each once, valid dates (doc 05 §8.3; ADR 0025)</td>
+<td>GET</td>
+<td>same limits and spacing as the trade history</td>
 </tr>
 <tr>
 <td>Broker (Dhan chart data)</td>
@@ -252,7 +264,7 @@ published ports, no other member. The network itself does not filter hosts; the 
 </tr>
 <tr>
 <td>Trading calendar — NSE holidays</td>
-<td><code>www.nseindia.com</code>: <code>/api/holiday-master</code> with the query exactly <code>type=trading</code> (the only allow-listed URL that has a query; doc 05 §4.1, ADR 0017)</td>
+<td><code>www.nseindia.com</code>: <code>/api/holiday-master</code> with the query exactly <code>type=trading</code> (a fixed query text; the Dhan ledger above takes two date keys, the sign-in calls one key each; doc 05 §4.1, ADR 0017)</td>
 <td>GET</td>
 <td>20 s, 1 MB; browser-like <code>User-Agent</code> and <code>Accept: application/json</code>, <strong>no cookie</strong> (none is kept or sent, and nothing from a stored secret), no redirects; a refusal is only a warning</td>
 </tr>
@@ -392,7 +404,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-14 11:57</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-14 15:53</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

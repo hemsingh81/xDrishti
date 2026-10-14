@@ -2,6 +2,7 @@ import { ApiError } from '@/shared/api';
 
 export type ProblemKind =
   | 'not_connected'
+  | 'token_expired'
   | 'role_off'
   | 'no_bucket'
   | 'sync_running'
@@ -19,6 +20,7 @@ export type ProblemKind =
 
 const byCode: Record<string, ProblemKind> = {
   'portfolio.not_connected': 'not_connected',
+  'portfolio.token_expired': 'token_expired',
   'portfolio.role_off': 'role_off',
   'portfolio.no_bucket': 'no_bucket',
   'portfolio.sync_running': 'sync_running',
@@ -41,6 +43,7 @@ export function problemKind(error: unknown): ProblemKind {
 
 const friendly: Partial<Record<ProblemKind, string>> = {
   not_connected: 'Connect the account first. Dhan is not signed in for it (or the sign-in has expired).',
+  token_expired: 'The Dhan sign-in of this account has expired. Connect the account again, then read once more.',
   role_off: 'Switch on the Portfolio role of this account first.',
   no_bucket:
     'This account has no portfolio bucket to put holdings in. Switch its Portfolio role off and on again in Accounts.',

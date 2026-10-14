@@ -15,6 +15,11 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://API.DHAN.CO/v2/charts/intraday")]
     [InlineData("POST", "https://api.dhan.co/v2/marketfeed/quote")] // the market quote of the holdings (ADR 0019)
     [InlineData("POST", "https://API.DHAN.CO/v2/marketfeed/quote")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")] // the trade history, a page at a time (ADR 0025)
+    [InlineData("GET", "https://API.DHAN.CO/v2/trades/2026-09-01/2026-09-01/12")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2024-02-29/2026-09-30/10000")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30")] // the ledger of a period
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?to-date=2026-09-30&from-date=2026-09-01")]
     public void The_documented_endpoints_are_allowed(string method, string url) =>
         BrokerEndpoints.IsAllowed(new HttpMethod(method), new Uri(url)).ShouldBeTrue();
 
@@ -24,6 +29,51 @@ public sealed class BrokerEndpointsTests
     [InlineData("POST", "https://api.dhan.co/v2/super/orders")]
     [InlineData("POST", "https://api.dhan.co/v2/marketfeed/ltp")]
     [InlineData("GET", "https://api.dhan.co/v2/trades")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/")] // the history needs two dates and a page
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0/1")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/-1")] // a page is digits
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/x")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/10001")] // more pages than any window has
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/000000")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-9-1/2026-09-30/0")] // dates are yyyy-MM-dd
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-02-30/2026-09-30/0")] // and real dates
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/latest/0")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0?x=1")] // no query
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0?")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0#x")]
+    [InlineData("GET", "https://api.dhan.co/v2/Trades/2026-09-01/2026-09-30/0")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/../orders")]
+    [InlineData("GET", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0/../../../orders")]
+    [InlineData("POST", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")] // read only
+    [InlineData("DELETE", "https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")]
+    [InlineData("GET", "http://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")] // not HTTPS
+    [InlineData("GET", "https://api.dhan.co:8443/v2/trades/2026-09-01/2026-09-30/0")]
+    [InlineData("GET", "https://user@api.dhan.co/v2/trades/2026-09-01/2026-09-30/0")]
+    [InlineData("GET", "https://auth.dhan.co/v2/trades/2026-09-01/2026-09-30/0")] // the path belongs to the API host only
+    [InlineData("GET", "https://api.dhan.co.example.invalid/v2/trades/2026-09-01/2026-09-30/0")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger")] // the ledger needs exactly its two dates
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?to-date=2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&from-date=2026-09-02")] // each key once
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30&page=1")] // nothing else
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30&")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?fromDate=2026-09-01&toDate=2026-09-30")] // keys are spelled exactly
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?From-Date=2026-09-01&to-date=2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=soon")] // valid dates
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=&to-date=2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-02-30&to-date=2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger/?from-date=2026-09-01&to-date=2026-09-30")] // paths are exact
+    [InlineData("GET", "https://api.dhan.co/v2/Ledger?from-date=2026-09-01&to-date=2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger/1?from-date=2026-09-01&to-date=2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30#x")]
+    [InlineData("POST", "https://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30")] // read only
+    [InlineData("GET", "http://api.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30")]
+    [InlineData("GET", "https://api.dhan.co:8443/v2/ledger?from-date=2026-09-01&to-date=2026-09-30")]
+    [InlineData("GET", "https://auth.dhan.co/v2/ledger?from-date=2026-09-01&to-date=2026-09-30")]
     [InlineData("GET", "https://api.dhan.co/v2/positions")] // positions
     [InlineData("GET", "https://api.dhan.co/v2/holdings?x=1")] // holdings take no query
     [InlineData("GET", "https://api.dhan.co/v2/holdings?")]

@@ -48,31 +48,40 @@ internal sealed class HoldingsFetcher(
         return own is { ArchivedAt: null } ? Result.Success(own.Id) : Result.Failure<Guid>(PortfolioErrors.NoBucket);
     }
 
-    /// <summary>Success when the account has a connection that has not expired.</summary>
-    public async ValueTask<Result> ConnectedAsync(Guid accountId, CancellationToken cancellationToken)
+    /// <summary>The state of the account's Dhan connection now: connected, expired (its token ran out) or not connected.</summary>
+    public async ValueTask<ConnectionStatus> StatusAsync(Guid accountId, CancellationToken cancellationToken)
     {
         var all = await connections.ListAsync([accountId], cancellationToken);
-        return all.GetValueOrDefault(accountId)?.StatusAt(clock.GetUtcNow()) == ConnectionStatus.Connected
-            ? Result.Success()
-            : Result.Failure(PortfolioErrors.NotConnected);
+        return all.GetValueOrDefault(accountId)?.StatusAt(clock.GetUtcNow()) ?? ConnectionStatus.NotConnected;
+    }
+
+    /// <summary>Success when the account has a connection that has not expired.</summary>
+    public async ValueTask<Result> ConnectedAsync(Guid accountId, CancellationToken cancellationToken) =>
+        await StatusAsync(accountId, cancellationToken) == ConnectionStatus.Connected ? Result.Success() : Result.Failure(PortfolioErrors.NotConnected);
+
+    /// <summary>The account's saved Dhan access token, when the account has a connection that has not expired (the trade history and ledger reads use it too).</summary>
+    public async ValueTask<Result<SecretValue>> TokenAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        var connected = await ConnectedAsync(accountId, cancellationToken);
+        if (connected.IsFailure)
+        {
+            return Result.Failure<SecretValue>(connected.Error);
+        }
+
+        var token = await vault.GetAsync(accountId, BrokerSecretName.AccessToken, cancellationToken);
+        return token is null ? Result.Failure<SecretValue>(PortfolioErrors.NotConnected) : Result.Success(token);
     }
 
     /// <summary>Dhan's holdings of the account, merged to one row per holding and mapped to the master list.</summary>
     public async ValueTask<Result<FetchedHoldings>> FetchAsync(Guid accountId, CancellationToken cancellationToken)
     {
-        var connected = await ConnectedAsync(accountId, cancellationToken);
-        if (connected.IsFailure)
+        var token = await TokenAsync(accountId, cancellationToken);
+        if (token.IsFailure)
         {
-            return Result.Failure<FetchedHoldings>(connected.Error);
+            return Result.Failure<FetchedHoldings>(token.Error);
         }
 
-        var token = await vault.GetAsync(accountId, BrokerSecretName.AccessToken, cancellationToken);
-        if (token is null)
-        {
-            return Result.Failure<FetchedHoldings>(PortfolioErrors.NotConnected);
-        }
-
-        var response = await broker.FetchAsync(token, cancellationToken);
+        var response = await broker.FetchAsync(token.Value, cancellationToken);
         if (!response.IsSuccess)
         {
             var failure = response.Failure!;

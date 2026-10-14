@@ -37,6 +37,19 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
                 .OrderBy(t => t.CreatedAt).ThenBy(t => t.Seq).ThenBy(t => t.Id),
         ]);
 
+    /// <summary>How many times the securities of the broker trades were read (once per automatic rebuild that was not skipped).</summary>
+    public int BrokerSecurityReads { get; private set; }
+
+    public ValueTask<IReadOnlyList<TradeSecurity>> ListBrokerSecuritiesAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        BrokerSecurityReads++;
+        return ValueTask.FromResult<IReadOnlyList<TradeSecurity>>(
+            [.. Trades.Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Broker).Select(t => new TradeSecurity(t.Isin, t.TradingSymbol)).Distinct().OrderBy(t => t.Isin, StringComparer.Ordinal).ThenBy(t => t.TradingSymbol, StringComparer.Ordinal)]);
+    }
+
+    public ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlySet<string>>(Trades.Where(t => t.AccountId == accountId && !t.IsVoided && externalIds.Contains(t.ExternalId)).Select(t => t.ExternalId).ToHashSet(StringComparer.Ordinal));
+
     public ValueTask<IReadOnlyList<Transaction>> ListActiveOfBatchAsync(Guid batchId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<Transaction>>([.. Trades.Where(t => t.BatchId == batchId && !t.IsVoided).OrderBy(t => t.Seq)]);
 
@@ -61,7 +74,20 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
             }
 
             Trades.Add(trade);
+            _collected.Add(trade);
         }
+    }
+
+    private readonly List<Transaction> _collected = [];
+
+    /// <summary>A save went through: what was collected is committed.</summary>
+    public void ForgetCollected() => _collected.Clear();
+
+    /// <summary>A save was refused: the database rolls back what it had collected.</summary>
+    public void RollBackCollected()
+    {
+        Trades.RemoveAll(_collected.Contains);
+        _collected.Clear();
     }
 
     public ValueTask<int> VoidBatchAsync(Guid batchId, string by, DateTimeOffset at, CancellationToken cancellationToken)

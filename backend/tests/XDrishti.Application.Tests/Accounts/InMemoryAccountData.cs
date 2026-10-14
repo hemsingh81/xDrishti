@@ -42,7 +42,11 @@ internal sealed class InMemoryAccountData : IAccountStore, IRiskProfileStore, IB
     public ValueTask<IReadOnlyDictionary<Guid, string>> ListPortfolioAccountNamesAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyDictionary<Guid, string>>(Accounts.Where(a => a.ArchivedAt is null && a.Portfolio.Enabled).ToDictionary(a => a.Id, a => a.Name));
 
-    public ValueTask<BrokerAccount?> FindReadOnlyAsync(Guid id, CancellationToken cancellationToken) => FindAsync(id, cancellationToken);
+    /// <summary>Set to make reading an account for display or checks throw (the database is down).</summary>
+    public Exception? FailReadOnlyReadsWith { get; set; }
+
+    public ValueTask<BrokerAccount?> FindReadOnlyAsync(Guid id, CancellationToken cancellationToken) =>
+        FailReadOnlyReadsWith is { } failure ? throw failure : FindAsync(id, cancellationToken);
 
     public ValueTask<BrokerAccount?> FindAsync(Guid id, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Accounts.FirstOrDefault(a => a.Id == id && a.ArchivedAt is null));
