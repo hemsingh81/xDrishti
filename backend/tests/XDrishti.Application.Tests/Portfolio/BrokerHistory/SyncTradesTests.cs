@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Tests.Portfolio.Trades;
 using XDrishti.Domain.Accounts;
@@ -173,15 +174,15 @@ public sealed class SyncTradesTests
         s.Dhan.Trades.Add(Trade("T2", day, TradeSide.Buy, 0, 90m)); // no quantity
         s.Dhan.Trades.Add(Trade("T3", day, TradeSide.Buy, 5, 0m)); // no price
         s.Dhan.Trades.Add(Trade(new string('x', 70), day, TradeSide.Buy, 5, 10m)); // an id that cannot be an identity
-        s.Dhan.Trades.Add(Trade("T5", day, TradeSide.Buy, 5, 10m, symbol: " ")); // no ticker
+        s.Dhan.Trades.Add(Trade("T5", day, TradeSide.Buy, 5, 10m, symbol: " ")); // no ticker, no ISIN, a security id the master does not know: skipped as no_symbol
         s.Dhan.SkippedPerWindow["derivatives"] = 2;
         s.Dhan.SkippedPerWindow["bse"] = 1;
         s.Dhan.DroppedPerWindow = 1;
 
         var counts = (await s.SyncOkAsync(from: new DateOnly(2026, 10, 1))).Trades.Counts;
 
-        (counts.Stored, counts.Dropped, counts.Skipped).ShouldBe((1, 5, 3));
-        counts.SkippedByReason.ShouldBe(new Dictionary<string, int> { ["bse"] = 1, ["derivatives"] = 2 });
+        (counts.Stored, counts.Dropped, counts.Skipped).ShouldBe((1, 4, 4));
+        counts.SkippedByReason.ShouldBe(new Dictionary<string, int> { ["bse"] = 1, ["derivatives"] = 2, [BrokerSkipReasons.NoSymbol] = 1 });
         s.BrokerTrades().Count.ShouldBe(1);
     }
 
@@ -209,6 +210,196 @@ public sealed class SyncTradesTests
         var view = await s.SyncOkAsync();
 
         (view.Trades.Counts.Halved, view.Trades.Counts.Stored, view.Trades.Status).ShouldBe((1, 3, "succeeded"));
+    }
+
+    // ---- Dhan's published row: no ticker, an ISIN and a security id, charges ----
+
+    private const string TataIsin = "INE155A01022";
+
+    private static BrokerTrade Unnamed(string id, DateOnly date, string? isin, string? securityId, decimal charges = 0m, long qty = 1, decimal price = 390.9m) =>
+        Trade(id, date, TradeSide.Buy, qty, price, symbol: null, isin: isin, charges: charges, securityId: securityId);
+
+    [Fact]
+    public async Task A_trade_without_a_ticker_gets_the_ticker_of_the_share_its_dhan_security_id_names()
+    {
+        var s = await BrokerScenario.StartAsync();
+        var tata = new TradeInstrument(Guid.NewGuid(), "TATAMOTORS", TataIsin, "share");
+        s.Fx.Trades.Instruments.Add(tata);
+        s.Fx.Trades.DhanIds["3456"] = tata;
+        s.Dhan.Trades.Add(Unnamed("407958", new DateOnly(2026, 9, 2), TataIsin, "3456"));
+
+        var view = await s.SyncOkAsync();
+
+        var trade = s.BrokerTrades().ShouldHaveSingleItem();
+        (trade.TradingSymbol, trade.Isin, trade.InstrumentId).ShouldBe(("TATAMOTORS", TataIsin, tata.Id));
+        (view.Trades.Counts.Stored, view.Trades.Counts.Dropped, view.Trades.Counts.Skipped).ShouldBe((1, 0, 0));
+    }
+
+    [Fact]
+    public async Task A_trade_without_a_ticker_and_a_known_security_id_takes_the_isin_of_the_share_when_the_row_has_none()
+    {
+        var s = await BrokerScenario.StartAsync();
+        var tata = new TradeInstrument(Guid.NewGuid(), "TATAMOTORS", TataIsin, "share");
+        s.Fx.Trades.DhanIds["3456"] = tata;
+        s.Dhan.Trades.Add(Unnamed("T1", new DateOnly(2026, 9, 2), null, "3456"));
+
+        await s.SyncOkAsync();
+
+        var trade = s.BrokerTrades().ShouldHaveSingleItem();
+        (trade.TradingSymbol, trade.Isin, trade.InstrumentId).ShouldBe(("TATAMOTORS", TataIsin, tata.Id));
+    }
+
+    [Fact]
+    public async Task A_trade_without_a_ticker_falls_back_to_the_isin_when_the_security_id_is_not_in_the_master()
+    {
+        var s = await BrokerScenario.StartAsync();
+        var tata = new TradeInstrument(Guid.NewGuid(), "TATAMOTORS", TataIsin, "share");
+        s.Fx.Trades.Instruments.Add(tata);
+        s.Dhan.Trades.Add(Unnamed("T1", new DateOnly(2026, 9, 2), TataIsin, "9999"));
+
+        await s.SyncOkAsync();
+
+        var trade = s.BrokerTrades().ShouldHaveSingleItem();
+        (trade.TradingSymbol, trade.Isin, trade.InstrumentId).ShouldBe(("TATAMOTORS", TataIsin, tata.Id));
+    }
+
+    [Fact]
+    public async Task A_trade_without_a_ticker_that_no_instrument_matches_is_stored_with_its_isin_like_a_tradebook_line_with_an_isin_only()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.Add(Unnamed("T1", new DateOnly(2026, 9, 2), TataIsin, "3456"));
+
+        var view = await s.SyncOkAsync();
+
+        var trade = s.BrokerTrades().ShouldHaveSingleItem();
+        (trade.TradingSymbol, trade.Isin, trade.InstrumentId, trade.ExternalId).ShouldBe((string.Empty, TataIsin, null, "t:20260902:T1"));
+        (view.Trades.Counts.Stored, view.Trades.Counts.Skipped).ShouldBe((1, 0));
+        view.Trades.Counts.NotRebuilt.ShouldContain(n => n.Symbol == TataIsin); // no holding of it: named by its ISIN, not by an empty text
+    }
+
+    [Fact]
+    public async Task A_trade_without_a_ticker_still_reaches_its_holding_by_isin_and_is_rebuilt_into_its_lots()
+    {
+        var s = await BrokerScenario.StartAsync();
+        var instrument = new TradeInstrument(Guid.NewGuid(), "EXMPL", TradeScenario.Isin, "share");
+        s.Fx.Trades.Instruments.Add(instrument);
+        s.Dhan.Trades.Add(Trade("T1", new DateOnly(2026, 9, 2), TradeSide.Buy, 10, 90m, symbol: null, isin: TradeScenario.Isin));
+        s.Dhan.Trades.Add(Trade("T2", new DateOnly(2026, 9, 15), TradeSide.Buy, 5, 110m, symbol: null, isin: TradeScenario.Isin));
+        s.Dhan.Trades.Add(Trade("T3", new DateOnly(2026, 9, 20), TradeSide.Sell, 3, 130m, symbol: null, isin: TradeScenario.Isin));
+
+        var view = await s.SyncOkAsync();
+
+        s.BrokerTrades().Select(t => t.TradingSymbol).Distinct().ShouldBe(["EXMPL"]);
+        (view.Trades.Counts.Rebuilt, view.Trades.Counts.NotRebuiltTotal).ShouldBe((1, 0));
+        s.Holding.Lots.ShouldContain(l => l.AcquiredOn == new DateOnly(2026, 9, 2));
+    }
+
+    [Fact]
+    public async Task An_isin_only_trade_reaches_its_holding_by_isin_even_when_the_master_does_not_have_the_share()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.AddRange(BaseTrades().Select(t => t with { Symbol = null, Isin = TradeScenario.Isin }));
+
+        var view = await s.SyncOkAsync();
+
+        s.BrokerTrades().ShouldAllBe(t => t.TradingSymbol.Length == 0 && t.Isin == TradeScenario.Isin);
+        (view.Trades.Counts.Rebuilt, view.Trades.Counts.NotRebuiltTotal).ShouldBe((1, 0));
+        s.Holding.Lots.ShouldContain(l => l.AcquiredOn == new DateOnly(2026, 9, 2));
+    }
+
+    [Fact]
+    public async Task A_trade_with_neither_ticker_nor_isin_nor_a_known_security_id_is_not_stored_and_is_counted_as_no_symbol()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.Add(Unnamed("T1", new DateOnly(2026, 9, 2), null, "3456"));
+        s.Dhan.Trades.Add(Unnamed("T2", new DateOnly(2026, 9, 2), null, null));
+
+        var counts = (await s.SyncOkAsync()).Trades.Counts;
+
+        s.BrokerTrades().ShouldBeEmpty();
+        (counts.Stored, counts.Dropped, counts.Skipped).ShouldBe((0, 0, 2));
+        counts.SkippedByReason.ShouldBe(new Dictionary<string, int> { [BrokerSkipReasons.NoSymbol] = 2 });
+    }
+
+    [Fact]
+    public async Task A_trade_keeps_its_isin_beside_its_ticker_and_the_charges_it_carries()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.Add(Trade("T1", new DateOnly(2026, 9, 2), TradeSide.Buy, 10, 90m, isin: TradeScenario.Isin, charges: 0.0164m));
+
+        await s.SyncOkAsync();
+
+        var trade = s.BrokerTrades().ShouldHaveSingleItem();
+        (trade.TradingSymbol, trade.Isin, trade.Charges).ShouldBe(("EXMPL", TradeScenario.Isin, 0.0164m));
+    }
+
+    [Fact]
+    public async Task Charges_do_not_change_the_lots_a_rebuild_makes()
+    {
+        var plain = await BrokerScenario.StartAsync();
+        plain.Dhan.Trades.AddRange(BaseTrades());
+        await plain.SyncOkAsync();
+        var charged = await BrokerScenario.StartAsync();
+        charged.Dhan.Trades.AddRange(BaseTrades().Select(t => t with { Charges = 12.5m }));
+        await charged.SyncOkAsync();
+
+        charged.Holding.Lots.Select(l => (l.AcquiredOn, l.Qty, l.UnitCost)).ShouldBe(plain.Holding.Lots.Select(l => (l.AcquiredOn, l.Qty, l.UnitCost)));
+        charged.BrokerTrades().ShouldAllBe(t => t.Charges == 12.5m);
+    }
+
+    // ---- a start date far back ----
+
+    [Fact]
+    public async Task A_start_date_far_before_the_first_import_date_is_accepted_and_read_in_windows()
+    {
+        var s = await BrokerScenario.StartAsync(); // the first import date is 2025-01-01
+        s.Dhan.Trades.Add(Trade("OLD", new DateOnly(2015, 6, 3), TradeSide.Buy, 4, 50m));
+
+        var view = await s.SyncOkAsync(from: new DateOnly(2015, 1, 1));
+
+        (view.Trades.Status, view.Trades.From, view.Trades.Counts.Stored).ShouldBe(("succeeded", new DateOnly(2015, 1, 1), 1));
+        s.Dhan.TradeCalls[0].ShouldBe((new DateOnly(2015, 1, 1), new DateOnly(2015, 1, 30), 0));
+        s.Data.Watermarks[(s.Account.Id, BrokerSyncKind.Trades)].ShouldBe(new DateOnly(2026, 10, 10));
+    }
+
+    [Fact]
+    public async Task A_start_date_far_back_is_accepted_when_the_account_was_read_already_and_the_dates_in_between_are_read_again_without_storing_twice()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.AddRange(BaseTrades());
+        await s.SyncOkAsync();
+
+        var again = await s.SyncOkAsync(from: new DateOnly(2015, 1, 1));
+
+        again.Trades.Status.ShouldBe("succeeded");
+        (again.Trades.Counts.Stored, again.Trades.Counts.Duplicates).ShouldBe((0, 3));
+    }
+
+    [Fact]
+    public async Task A_window_dhan_refuses_as_too_old_ends_the_run_with_the_readable_error_and_keeps_what_was_stored()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.Add(Trade("T1", new DateOnly(2026, 9, 2), TradeSide.Buy, 10, 90m));
+        s.Dhan.TradeFailure = (from, _, _) => from.Year < 2020 ? new BrokerFailure(BrokerFailureKind.Rejected, "DH-905") : null;
+
+        var view = await s.SyncOkAsync(from: new DateOnly(2015, 1, 1));
+
+        (view.Trades.Status, view.Trades.Error).ShouldBe(("failed", PortfolioErrors.HistoryTooLarge.Message));
+        view.Ledger.ShouldBeNull();
+        s.BrokerTrades().ShouldBeEmpty();
+        s.Data.Watermarks.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_window_dhan_rejects_with_another_code_ends_the_run_with_the_broker_error_and_not_with_a_crash()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.TradeFailure = (from, _, _) => from.Year < 2020 ? new BrokerFailure(BrokerFailureKind.Rejected, "DH-906") : null;
+
+        var view = await s.SyncOkAsync(from: new DateOnly(2015, 1, 1));
+
+        view.Trades.Status.ShouldBe("failed");
+        view.Trades.Error.ShouldBe(XDrishti.Application.Accounts.Connections.ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Rejected, "DH-906")).Message);
     }
 
     // ---- failures ----

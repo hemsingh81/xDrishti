@@ -89,6 +89,10 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
 
+    public DbSet<Dividend> Dividends => Set<Dividend>();
+
+    public DbSet<DividendSuggestion> DividendSuggestions => Set<DividendSuggestion>();
+
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
 

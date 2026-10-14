@@ -24,6 +24,23 @@ public sealed class DhanLedgerMapperTests
         ]);
     }
 
+    [Fact]
+    public void Dhans_published_sample_is_one_object_and_maps_as_one_debit_with_its_voucher_description()
+    {
+        var read = DhanLedgerMapper.Map(DhanSamples.Json("dhan-published-ledger.json"));
+
+        (read.Received, read.Dropped).ShouldBe((1, 0));
+        read.Rows.ShouldBe([new BrokerLedgerRow(new DateOnly(2022, 6, 22), "202200036701", "PAYBNK", "FUNDS WITHDRAWAL", "NSE-CAPITAL", -20000m, 957.29m)]);
+    }
+
+    [Fact]
+    public void A_single_object_that_does_not_read_is_one_dropped_row()
+    {
+        var read = Map("""{"narration":"X","voucherdate":"not a date","debit":"1.00","credit":"0.00"}""");
+
+        (read.Received, read.Dropped, read.Rows.Count).ShouldBe((1, 1, 0));
+    }
+
     [Theory]
     [InlineData("Jun 22, 2022", "2022-06-22")]
     [InlineData("Jun 2, 2022", "2022-06-02")]

@@ -8,6 +8,7 @@ import { stateAlpha } from '@/theme';
 import { problemKind, problemText } from '../lib/errors';
 import type { GroupBy, PortfolioFilters } from '../lib/filters';
 import { groupSortOf, nextGroupSort, type GroupSortField } from '../lib/groups';
+import { isUnallocatedGroup } from '../lib/income';
 import type { GroupScope } from './GroupChildren';
 import { GroupCards } from './GroupCards';
 import { GroupTable } from './GroupTable';
@@ -63,7 +64,9 @@ export function GroupGrid({ query, by, scope, emptyState, onChange }: GroupGridP
   const data = query.data;
   const sort = groupSortOf(scope.filters.sort);
   // Keys of groups that are gone (another filter or order) do not count as open.
-  const openCount = data ? data.groups.filter((group) => open.has(group.key)).length : 0;
+  // The extra Unallocated row is not a group of holdings: it is not counted, opened or listed by Expand all.
+  const groupKeys = data ? data.groups.filter((group) => !isUnallocatedGroup(group)).map((group) => group.key) : [];
+  const openCount = groupKeys.filter((key) => open.has(key)).length;
 
   const toggle = (key: string) => {
     setOpen((previous) => {
@@ -88,7 +91,7 @@ export function GroupGrid({ query, by, scope, emptyState, onChange }: GroupGridP
     ) : (
       <LoadingState label="Loading groups" />
     );
-  } else if (data.groups.length === 0) {
+  } else if (groupKeys.length === 0) {
     body = emptyState;
   } else if (phone) {
     body = <GroupCards data={data} by={by} expanded={open} scope={scope} onToggle={toggle} />;
@@ -110,10 +113,10 @@ export function GroupGrid({ query, by, scope, emptyState, onChange }: GroupGridP
     >
       <GroupToolbar
         by={by}
-        groupCount={data?.groups.length ?? 0}
+        groupCount={groupKeys.length}
         openCount={openCount}
         onExpandAll={() => {
-          setOpen(new Set(data?.groups.map((g) => g.key)));
+          setOpen(new Set(groupKeys));
         }}
         onCollapseAll={() => {
           setOpen(new Set());

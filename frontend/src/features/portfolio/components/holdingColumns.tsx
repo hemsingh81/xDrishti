@@ -2,7 +2,7 @@ import type { HoldingRow } from '@/shared/api';
 import { formatInr, formatInrPrecise, formatNumber } from '@/shared/lib/format';
 import type { GridColumn } from '@/shared/ui/grid';
 import { Pnl, PnlPercent, Xirr } from './Figures';
-import { Acquired, DayChange, LastPrice, Symbol } from './HoldingCells';
+import { Acquired, DayChange, Dividends, LastPrice, Symbol } from './HoldingCells';
 
 const base: readonly GridColumn<HoldingRow>[] = [
   { id: 'symbol', header: 'Symbol', sortable: true, minWidth: 150, render: (h) => <Symbol holding={h} /> },
@@ -49,6 +49,14 @@ const base: readonly GridColumn<HoldingRow>[] = [
     render: (h) => <PnlPercent value={h.returns.pnlPct} />,
   },
   { id: 'xirr', header: 'XIRR', sortable: true, numeric: true, render: (h) => <Xirr returns={h.returns} /> },
+  {
+    id: 'dividends',
+    header: 'Dividends',
+    sortable: true,
+    numeric: true,
+    hideBelow: 'md',
+    render: (h) => <Dividends holding={h} />,
+  },
   {
     id: 'acquiredOn',
     header: 'Acquired',

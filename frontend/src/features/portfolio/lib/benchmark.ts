@@ -1,6 +1,7 @@
 import type { HistoryBenchmark, HoldingsSummary } from '@/shared/api';
 import { formatDayMonth, formatPercent } from '@/shared/lib/format';
 import { directionOf, xirrOf, xirrReasons, type Direction } from './figures';
+import { priceReturnBasis } from './income';
 
 /** The index name for labels: the master-list display name, else the symbol, else Nifty 50 (the default benchmark). */
 export const benchmarkName = (benchmark: Pick<HistoryBenchmark, 'name' | 'symbol'> | undefined): string =>
@@ -75,8 +76,9 @@ export function benchmarkXirrHint(summary: SummaryBenchmark, benchmark: Benchmar
 }
 
 /**
- * Under alpha. The index has no live quote: when the portfolio is valued at the prices of a later trading day than the
- * index close (`live_vs_last_close`), the hint says against which close alpha was worked out.
+ * Under alpha: what it is (the XIRR minus the benchmark's, both price returns before dividends and charges, ADR 0026). The index
+ * has no live quote: when the portfolio is valued at the prices of a later trading day than the index close
+ * (`live_vs_last_close`), the hint says against which close alpha was worked out.
  */
 export function alphaHint(
   summary: SummaryBenchmark & { returns: HoldingsSummary['returns'] },
@@ -85,7 +87,7 @@ export function alphaHint(
   const figure = alphaOf(summary, { name: benchmarkName(benchmark), reason: benchmark?.reason });
   if (!('value' in figure)) return figure.short;
   if (summary.alphaBasis === 'live_vs_last_close' && summary.benchmarkAsOf) {
-    return `Live prices vs ${benchmarkName(benchmark)} close of ${formatDayMonth(summary.benchmarkAsOf)}`;
+    return `Live prices vs ${benchmarkName(benchmark)} close of ${formatDayMonth(summary.benchmarkAsOf)} · ${priceReturnBasis}`;
   }
-  return 'XIRR minus benchmark XIRR';
+  return `XIRR minus benchmark XIRR · ${priceReturnBasis}`;
 }

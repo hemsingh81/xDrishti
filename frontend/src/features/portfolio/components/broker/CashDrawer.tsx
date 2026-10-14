@@ -5,6 +5,7 @@ import type { AccountSummary } from '@/shared/api';
 import { initialTradesAccount } from '../../lib/accounts';
 import { noLedgerFilter, type LedgerFilter } from '../../lib/ledger';
 import { CashView } from './CashView';
+import { DividendsPanel } from './DividendsPanel';
 
 interface CashDrawerProps {
   onClose: () => void;
@@ -12,16 +13,20 @@ interface CashDrawerProps {
   accounts: readonly AccountSummary[];
   /** The account of the page's scope (null = all accounts). */
   scopeAccountId: string | null;
+  /** Open the Add dividend form at once (the invitation under the tiles leads here). */
+  startAdding?: boolean;
 }
 
 /**
- * Cash & dividends in a side panel: what Dhan's ledger says about the account's money (funds in and out, dividends,
- * charges), by class and period. It is shown, not part of the returns.
+ * Cash & dividends in a side panel: the dividends you entered for the account (add, void, the suggestions of the ledger) and
+ * what Dhan's ledger says about its money (funds in and out, dividends, charges), by class and period. The ledger's costs are
+ * part of the net returns from the day the ledger was first read; its other entries are shown only.
  */
-export function CashDrawer({ onClose, accounts, scopeAccountId }: CashDrawerProps) {
+export function CashDrawer({ onClose, accounts, scopeAccountId, startAdding = false }: CashDrawerProps) {
   const titleId = useId();
   const [accountId, setAccountId] = useState(() => initialTradesAccount(accounts, scopeAccountId));
   const [filter, setFilter] = useState<LedgerFilter>(noLedgerFilter);
+  const account = accounts.find((a) => a.id === accountId);
   return (
     <Drawer
       anchor="right"
@@ -46,8 +51,9 @@ export function CashDrawer({ onClose, accounts, scopeAccountId }: CashDrawerProp
       <Divider />
       <Stack spacing={2} sx={{ px: 2.5, pt: 1.5, overflowY: 'auto', flex: 1, pb: 3 }}>
         <Alert severity="info">
-          Dividends and charges are not in returns yet. They are shown here as Dhan&rsquo;s ledger lists them; the
-          figures, XIRR and the value history do not use them.
+          Dhan credits dividends to your bank account, so they rarely appear here &mdash; enter them yourself. Dividends
+          you enter and the ledger&rsquo;s charges count in the net return and net XIRR; the other entries are shown
+          only.
         </Alert>
         {accounts.length > 1 && (
           <TextField
@@ -70,6 +76,7 @@ export function CashDrawer({ onClose, accounts, scopeAccountId }: CashDrawerProp
             ))}
           </TextField>
         )}
+        {account && <DividendsPanel key={`dividends-${account.id}`} account={account} startAdding={startAdding} />}
         {accountId ? (
           <CashView key={accountId} accountId={accountId} filter={filter} onFilter={setFilter} />
         ) : (

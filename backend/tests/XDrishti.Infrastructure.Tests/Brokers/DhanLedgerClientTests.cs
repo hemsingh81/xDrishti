@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using XDrishti.Application.Abstractions.Accounts;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Accounts;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Portfolio;
@@ -55,6 +56,35 @@ public sealed class DhanLedgerClientTests : IDisposable
         var read = (await Client.FetchAsync(Token, From, To, Ct)).Value;
 
         (read.Received, read.Rows.Count, read.Dropped).ShouldBe((8, 4, 4));
+    }
+
+    [Fact]
+    public async Task Dhans_published_sample_is_one_object_and_reads_as_one_line()
+    {
+        _broker.Respond = _ => StubBroker.Json(HttpStatusCode.OK, DhanSamples.Text("dhan-published-ledger.json"));
+
+        var read = (await Client.FetchAsync(Token, From, To, Ct)).Value;
+
+        (read.Received, read.Dropped, read.NoData).ShouldBe((1, 0, false));
+        read.Rows.ShouldBe([new BrokerLedgerRow(new DateOnly(2022, 6, 22), "202200036701", "PAYBNK", "FUNDS WITHDRAWAL", "NSE-CAPITAL", -20000m, 957.29m)]);
+    }
+
+    [Fact]
+    public async Task One_line_under_data_reads_as_one_line()
+    {
+        _broker.Respond = _ => StubBroker.Json(HttpStatusCode.OK, """{"status":"success","data":""" + DhanSamples.Text("dhan-published-ledger.json") + "}");
+
+        var read = (await Client.FetchAsync(Token, From, To, Ct)).Value;
+
+        read.Rows.ShouldHaveSingleItem().Amount.ShouldBe(-20000m);
+    }
+
+    [Fact]
+    public async Task An_object_that_is_not_a_ledger_line_is_still_unusable()
+    {
+        _broker.Respond = _ => StubBroker.Json(HttpStatusCode.OK, """{"status":"success","remarks":"ok"}""");
+
+        (await Client.FetchAsync(Token, From, To, Ct)).Failure.ShouldBe(new BrokerFailure(BrokerFailureKind.Unavailable));
     }
 
     [Fact]

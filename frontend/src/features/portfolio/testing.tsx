@@ -7,6 +7,7 @@ import { buildHistory } from '@/test/historyFixtures';
 import { scrollToEnd } from '@/test/intersection';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
+import { createDividendFake, type DividendFakeOptions } from '@/test/dividendFake';
 import { createTradeFake, type TradeFakeOptions } from '@/test/tradeFake';
 import { PortfolioPage } from './components/PortfolioPage';
 
@@ -113,4 +114,19 @@ export const warmTrades = () =>
     import('./components/trades/TradesDrawer'),
     import('./components/trades/AddTradeDialog'),
     import('./components/trades/HoldingTrades'),
+  ]);
+
+/** Serves the dividends API (a holding's and an account's list, add, void, the suggestions and their decisions) from one stateful fake. */
+export function serveDividends(options: DividendFakeOptions = {}) {
+  const fake = createDividendFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
+/** Loads the code of the lazy dividend section, dialogs and panel before the first test (see `warmTrades`). */
+export const warmDividends = () =>
+  Promise.all([
+    import('./components/income/HoldingDividends'),
+    import('./components/income/AddDividendDialog'),
+    import('./components/broker/CashDrawer'),
   ]);

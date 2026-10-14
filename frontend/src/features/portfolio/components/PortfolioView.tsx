@@ -15,6 +15,7 @@ import { useQuotesService } from '../hooks/useQuotesService';
 import { useRefreshOnQuoteRun } from '../hooks/useRefreshOnQuoteRun';
 import { useCachedHolding } from '../hooks/useCachedHolding';
 import { useRefreshPrices } from '../hooks/useRefreshPrices';
+import { useSyncBarFocus } from '../hooks/useSyncBarFocus';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { usePortfolioOverlays } from '../hooks/usePortfolioOverlays';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
@@ -78,6 +79,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   );
   const overlays = usePortfolioOverlays();
   const holdingsStart = useRef<HTMLDivElement>(null);
+  const [syncBarRef, accountInputRef, focusSyncBar] = useSyncBarFocus();
   const [alertDialog, setAlertDialog] = useState<AlertTarget | 'pick' | null>(null);
   const [addingTrade, setAddingTrade] = useState(false);
   const scope = { account: filters.account, bucket: filters.bucket };
@@ -119,6 +121,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
           accounts={portfolio}
           buckets={buckets.data}
           bucketsLoading={buckets.isPending}
+          accountInputRef={accountInputRef}
           onChange={update}
         />
         <LiveSummary
@@ -131,6 +134,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
           onReviewDates={() => {
             update({ status: 'open', sort: { field: 'acquiredOn', descending: false } });
           }}
+          income={{ onAddDividend: overlays.openCashToAdd, onReadLedger: focusSyncBar }}
         />
         {hasHoldings && (
           <ActionCenter
@@ -167,12 +171,14 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
             scope={scope}
           />
         )}
-        <SyncBar
-          account={actingTarget}
-          connected={connected}
-          fallbackRun={summary.data?.lastSync ?? null}
-          refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
-        />
+        <div ref={syncBarRef} tabIndex={-1}>
+          <SyncBar
+            account={actingTarget}
+            connected={connected}
+            fallbackRun={summary.data?.lastSync ?? null}
+            refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
+          />
+        </div>
         <div ref={holdingsStart} aria-hidden />
         {filters.groupBy === 'none' ? (
           <HoldingsGrid
@@ -231,6 +237,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
           }}
           cash={{
             open: overlays.cashOpen,
+            adding: overlays.cashAdding,
             onClose: overlays.closeCash,
             accounts: portfolio,
             scopeAccountId: account,

@@ -5,19 +5,23 @@ namespace XDrishti.Application.Portfolio.Returns;
 /// <summary>
 /// Profit/loss and XIRR from lots (ADR 0012, docs/design/12 §4). Pure: no I/O, no clock. Open lots are valued at the holding's last price on
 /// <c>valuationDate</c>; closed lots contributed their sale on the day they were closed. A group's XIRR comes from the union of all its
-/// members' cash flows, never from an average. Not included in v1: dividends, brokerage and taxes, corporate-action adjustments.
+/// members' cash flows, never from an average. These are the gross, price-only figures; dividends and charges are added beside them by <c>IncomeCalculator</c> (ADR 0026), never inside them.
 /// </summary>
 public static class ReturnsCalculator
 {
     /// <summary>Percentages and money are given to four decimals.</summary>
     private const int Decimals = 4;
 
-    public static ReturnFigures ForHolding(HoldingData holding, DateOnly valuationDate)
+    /// <summary>
+    /// The figures of one holding. With <paramref name="withXirr"/> false the XIRR (the one costly figure) is not worked out and <see cref="ReturnFigures.Xirr"/> is <see cref="XirrResult.NoData"/> — for callers that only order or filter by
+    /// the money figures; every other figure is the same.
+    /// </summary>
+    public static ReturnFigures ForHolding(HoldingData holding, DateOnly valuationDate, bool withXirr = true)
     {
         ArgumentNullException.ThrowIfNull(holding);
         if (holding.IsPriced)
         {
-            return ForGroup([holding], valuationDate);
+            return Of([holding], valuationDate, withXirr);
         }
 
         // Still held, but no usable price: the cost is known, the worth is not (and it is not a total loss).
@@ -35,7 +39,7 @@ public static class ReturnsCalculator
         ArgumentNullException.ThrowIfNull(holdings);
         var all = holdings.ToList();
         var unpriced = all.Where(h => !h.IsPriced).ToList();
-        var figures = Of([.. all.Where(h => h.IsPriced)], valuationDate);
+        var figures = Of([.. all.Where(h => h.IsPriced)], valuationDate, withXirr: true);
         if (unpriced.Count == 0)
         {
             return figures;
@@ -108,7 +112,7 @@ public static class ReturnsCalculator
         return (closed.Sum(l => l.Qty * ((l.ClosePrice ?? 0m) - l.UnitCost)), closed.Any(l => l.Estimated));
     }
 
-    private static ReturnFigures Of(IReadOnlyList<HoldingData> holdings, DateOnly valuationDate)
+    private static ReturnFigures Of(IReadOnlyList<HoldingData> holdings, DateOnly valuationDate, bool withXirr)
     {
         var invested = 0m;
         var value = 0m;
@@ -131,14 +135,14 @@ public static class ReturnsCalculator
             }
         }
 
-        return Build(invested, value, realised, estimated, FlowsOf(holdings, valuationDate));
+        return Build(invested, value, realised, estimated, FlowsOf(holdings, valuationDate), withXirr);
     }
 
-    private static ReturnFigures Build(decimal invested, decimal value, decimal realised, bool estimated, IReadOnlyList<CashFlow> flows)
+    private static ReturnFigures Build(decimal invested, decimal value, decimal realised, bool estimated, IReadOnlyList<CashFlow> flows, bool withXirr = true)
     {
         var pnl = value - invested;
         decimal? pct = invested > 0m ? Round(pnl / invested * 100m) : null;
-        return new ReturnFigures(Round(invested), Round(value), Round(pnl), pct, Xirr.Compute(flows), Round(realised), estimated);
+        return new ReturnFigures(Round(invested), Round(value), Round(pnl), pct, withXirr ? Xirr.Compute(flows) : XirrResult.NoData, Round(realised), estimated);
     }
 
     private static decimal Round(decimal value) => Math.Round(value, Decimals, MidpointRounding.AwayFromZero);

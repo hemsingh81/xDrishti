@@ -262,3 +262,13 @@ export type BrokerNotRebuilt = Schemas['BrokerNotRebuilt'];
 export type LedgerEntry = Schemas['LedgerEntryView'];
 export type LedgerPage = Schemas['LedgerPage'];
 export type LedgerClassTotal = Schemas['LedgerClassTotal'];
+export type BrokerHistoryInput = Schemas['BrokerHistoryInput'];
+
+/** Dividends and charges in the returns (P2-14, ADR 0026). */
+export type IncomeView = Schemas['IncomeView'];
+export type DividendView = Schemas['DividendView'];
+export type DividendInput = Schemas['DividendInput'];
+export type DividendPage = Schemas['DividendPage'];
+export type DividendSuggestionPage = Schemas['DividendSuggestionPage'];
+export type AcceptSuggestionInput = Schemas['AcceptSuggestionInput'];
+export type SuggestionDecision = Schemas['SuggestionDecisionView'];

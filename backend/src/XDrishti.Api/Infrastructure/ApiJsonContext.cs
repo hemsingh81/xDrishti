@@ -26,7 +26,9 @@ using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.BrokerHistory;
+using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Domain.Portfolio;
 
@@ -180,6 +182,13 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(LedgerPage))]
 [JsonSerializable(typeof(LedgerEntryView))]
 [JsonSerializable(typeof(LedgerClassTotal))]
+[JsonSerializable(typeof(IncomeView))]
+[JsonSerializable(typeof(DividendInput))]
+[JsonSerializable(typeof(DividendView))]
+[JsonSerializable(typeof(DividendPage))]
+[JsonSerializable(typeof(DividendSuggestionPage))]
+[JsonSerializable(typeof(AcceptSuggestionInput))]
+[JsonSerializable(typeof(SuggestionDecisionView))]
 [JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(ServiceView))]
 [JsonSerializable(typeof(ServiceRunView))]

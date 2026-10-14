@@ -5,7 +5,7 @@ using XDrishti.Application.Abstractions.Portfolio;
 namespace XDrishti.Infrastructure.Brokers;
 
 /// <summary>
-/// Turns Dhan's ledger (ADR 0025, <c>GET /v2/ledger</c>) into lines. A row is read by <c>voucherdate</c>, <c>voucherdesc</c>, <c>narration</c>, <c>vouchernumber</c>, <c>exchange</c>, <c>debit</c>, <c>credit</c> and <c>runbal</c> (names in any case; numbers as
+/// Turns Dhan's ledger (ADR 0025, <c>GET /v2/ledger</c>) into lines; the answer is a list of rows, the list under <c>data</c> or - as in Dhan's published sample - one row as a single object. A row is read by <c>voucherdate</c>, <c>voucherdesc</c>, <c>narration</c>, <c>vouchernumber</c>, <c>exchange</c>, <c>debit</c>, <c>credit</c> and <c>runbal</c> (names in any case; numbers as
 /// JSON numbers or text such as <c>"20,000.00"</c>; dates as <c>Jun 22, 2022</c>, <c>2022-06-22</c> and similar). The amount is one signed number, credit minus debit. A row whose date or an amount that is present does not read, a row with neither
 /// debit nor credit, and a row that moves nothing (an opening-balance line) is dropped and counted. Texts are Dhan's free text: kept as they are here (the store cleans and caps them). Dhan's field names are from its public documentation, not from a
 /// real answer of the owner's account. Pure.
@@ -16,6 +16,12 @@ internal static class DhanLedgerMapper
 
     public static BrokerLedgerRead Map(JsonElement rows)
     {
+        if (SingleRow(rows) is { } single)
+        {
+            // The published ledger sample is one object, not a list: an answer of one row is read as one.
+            return Read(single) is { } only ? new BrokerLedgerRead([only], 1, 0) : new BrokerLedgerRead([], 1, 1);
+        }
+
         if (rows.ValueKind != JsonValueKind.Array)
         {
             return BrokerLedgerRead.Empty;
@@ -33,6 +39,24 @@ internal static class DhanLedgerMapper
         }
 
         return new BrokerLedgerRead(lines, received, received - lines.Count);
+    }
+
+    private static readonly string[] RowFields = ["voucherdate", "voucherdesc", "vouchernumber", "narration", "debit", "credit", "runbal"];
+
+    /// <summary>The ledger row an answer is when it is one object (or one object under <c>data</c>) that has ledger fields; null for a list, an error body or anything else.</summary>
+    public static JsonElement? SingleRow(JsonElement body)
+    {
+        if (body.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        if (body.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
+        {
+            return SingleRow(data);
+        }
+
+        return body.EnumerateObject().Any(p => RowFields.Contains(p.Name, StringComparer.OrdinalIgnoreCase)) ? body : null;
     }
 
     private static BrokerLedgerRow? Read(JsonElement row)

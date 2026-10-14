@@ -62,8 +62,8 @@ internal sealed class BrokerScenario
 
     public async Task<BrokerHistoryRunView> SyncOkAsync(bool scheduled = false, DateOnly? from = null, bool defaultFrom = false) => Ok(await SyncAsync(scheduled, from, defaultFrom));
 
-    public static BrokerTrade Trade(string id, DateOnly date, TradeSide side, long qty, decimal price, string symbol = "EXMPL", TimeOnly? time = null) =>
-        new(id, "O-" + id, side, symbol, "1001", qty, price, date, time ?? new TimeOnly(10, 15, 2));
+    public static BrokerTrade Trade(string id, DateOnly date, TradeSide side, long qty, decimal price, string? symbol = "EXMPL", TimeOnly? time = null, string? isin = null, decimal charges = 0m, string? securityId = "1001") =>
+        new(id, "O-" + id, side, symbol, isin, securityId, qty, price, charges, date, time ?? new TimeOnly(10, 15, 2));
 
     public static BrokerLedgerRow Line(DateOnly date, string voucher, string description, string narration, decimal amount, decimal? balance = null) =>
         new(date, voucher, description, narration, "NSE-CAPITAL", amount, balance);

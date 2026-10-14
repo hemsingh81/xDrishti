@@ -171,6 +171,21 @@ public sealed class SyncLedgerTests
         page.Total.ShouldBe(1);
         page.Totals.Sum(t => t.Count).ShouldBe(4); // all the classes of September
         page.Totals.Single(t => t.Class == "funds_out").Count.ShouldBe(0);
+        page.CoverageFrom.ShouldBe(Sep2); // the first date stored, whatever the filters say
+    }
+
+    [Fact]
+    public async Task The_ledger_says_from_which_date_it_is_known_and_nothing_when_it_was_not_read()
+    {
+        var s = await BrokerScenario.StartAsync();
+        var empty = Ok(await s.Ledger().HandleAsync(new XDrishti.Application.Portfolio.BrokerHistory.ListLedgerQuery(s.Account.Id, null, null, null, null, null), CancellationToken.None));
+        s.Dhan.Ledger.AddRange(Samples.All);
+        await s.SyncOkAsync();
+
+        var read = Ok(await s.Ledger().HandleAsync(new XDrishti.Application.Portfolio.BrokerHistory.ListLedgerQuery(s.Account.Id, new DateOnly(2026, 10, 1), null, null, null, null), CancellationToken.None));
+
+        empty.CoverageFrom.ShouldBeNull();
+        (read.Items.Count, read.CoverageFrom).ShouldBe((1, Sep2));
     }
 
     [Fact]

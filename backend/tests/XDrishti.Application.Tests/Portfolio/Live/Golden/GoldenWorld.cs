@@ -6,15 +6,17 @@ using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Tests.Portfolio.Groups;
 using XDrishti.Application.Tests.Portfolio.History;
+using XDrishti.Application.Tests.Portfolio.Income;
 using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Application.Tests.Portfolio.Live.Golden;
 
 /// <summary>
 /// Runs the real handlers (holding rows, summary, holding groups) over holdings on in-memory ports and writes a price pushed over the hub into them with the real write rule (<see cref="LivePricePolicy"/>). The clock is Wednesday
-/// 2026-10-14 10:35:44 India time. XIRR is left out of the golden (a floating-point result the browser never works out): every <c>xirr</c> is null.
+/// 2026-10-14 10:35:44 India time. XIRR is left out of the golden (a floating-point result the browser never works out): every <c>xirr</c> and every <c>income.netXirr</c> is null (their states are the server's).
 /// </summary>
 internal static class GoldenWorld
 {
@@ -29,10 +31,11 @@ internal static class GoldenWorld
     public static DateTimeOffset Ist(int day, int hour, int minute, int second = 0) =>
         new DateTimeOffset(2026, 10, day, hour, minute, second, TimeSpan.FromHours(5.5)).ToUniversalTime();
 
-    public static GoldenScenario Scenario(string name, string description, IReadOnlyList<GoldenHolding> holdings, IReadOnlyList<InstrumentPrice> pushes)
+    public static GoldenScenario Scenario(string name, string description, IReadOnlyList<GoldenHolding> holdings, IReadOnlyList<InstrumentPrice> pushes, GoldenIncome? income = null)
     {
+        var recorded = income ?? GoldenIncome.None;
         var after = holdings.Select(h => pushes.Aggregate(h, Apply)).ToList();
-        return new GoldenScenario(name, description, holdings, pushes, StateOf(holdings), StateOf(after));
+        return new GoldenScenario(name, description, holdings, recorded, pushes, StateOf(holdings, recorded), StateOf(after, recorded));
     }
 
     /// <summary>The holding after a price pushed for its instrument: the write the feed (live) or the quote poll (quote) does, which only an open holding takes and only when the price policy says the new price wins.</summary>
@@ -57,9 +60,10 @@ internal static class GoldenWorld
             : holding;
     }
 
-    private static GoldenState StateOf(IReadOnlyList<GoldenHolding> holdings)
+    private static GoldenState StateOf(IReadOnlyList<GoldenHolding> holdings, GoldenIncome recorded)
     {
         var data = holdings.Select(Data).ToArray();
+        var incomes = IncomeOf(data, recorded);
         var queries = new StubHoldingQueries(data);
         var classifications = new FakeHoldingClassifications();
         foreach (var holding in holdings.Where(h => h.InstrumentId is not null && h.Sector != Unclassified))
@@ -68,14 +72,15 @@ internal static class GoldenWorld
         }
 
         var clock = new FakeTimeProvider(Now);
-        var groups = new GetHoldingGroupsHandler(queries, classifications, clock, NullLogger<GetHoldingGroupsHandler>.Instance);
+        var groups = new GetHoldingGroupsHandler(queries, classifications, incomes, clock, NullLogger<GetHoldingGroupsHandler>.Instance);
         var summary = new GetHoldingsSummaryHandler(
-            queries, Substitute.For<IHoldingSyncStore>(), Substitute.For<IAccountStore>(), Substitute.For<IPortfolioBenchmark>(), Substitute.For<IPortfolioPrices>(), new FakeTradingCalendar(HistoryData.Weekdays), clock);
+            queries, Substitute.For<IHoldingSyncStore>(), Substitute.For<IAccountStore>(), Substitute.For<IPortfolioBenchmark>(), Substitute.For<IPortfolioPrices>(), incomes, new FakeTradingCalendar(HistoryData.Weekdays), clock);
 
+        var book = IncomeBook.Build(incomes.ReadAsync(new IncomeScope(null, TotalsOnly: true), CancellationToken.None).AsTask().GetAwaiter().GetResult());
         var read = summary.HandleAsync(new GetHoldingsSummaryQuery(null, null), CancellationToken.None).AsTask().GetAwaiter().GetResult();
         return new GoldenState(
-            [.. data.Select(h => NoXirr(HoldingViews.Row(h, Valuation)))],
-            read.Value with { Returns = read.Value.Returns with { Xirr = null } },
+            [.. data.Select(h => NoXirr(HoldingViews.Row(h, Valuation, book)))],
+            read.Value with { Returns = read.Value.Returns with { Xirr = null }, Income = NoNetXirr(read.Value.Income) },
             new GoldenGroupings(Set(groups, "all"), Set(groups, "open")),
             Members(data, classifications));
     }
@@ -89,12 +94,26 @@ internal static class GoldenWorld
         var groups = result.Value;
         return groups with
         {
-            Groups = [.. groups.Groups.Select(g => g with { Xirr = null })],
-            Total = groups.Total with { Xirr = null },
+            Groups = [.. groups.Groups.Select(g => g with { Xirr = null, Income = NoNetXirr(g.Income) })],
+            Total = groups.Total with { Xirr = null, Income = NoNetXirr(groups.Total.Income) },
         };
     }
 
-    private static HoldingRow NoXirr(HoldingRow row) => row with { Returns = row.Returns with { Xirr = null } };
+    private static HoldingRow NoXirr(HoldingRow row) => row with { Returns = row.Returns with { Xirr = null }, Income = NoNetXirr(row.Income) };
+
+    private static IncomeView? NoNetXirr(IncomeView? income) => income is null ? null : income with { NetXirr = null };
+
+    /// <summary>The income port over the recorded dividends and costs: the keys of the holdings are their symbols (the golden holdings have no ISIN).</summary>
+    private static FakeIncomeQueries IncomeOf(HoldingData[] data, GoldenIncome recorded)
+    {
+        var fake = FakeIncomeQueries.For(data);
+        fake.ExtraAccounts.AddRange(recorded.ExtraAccounts);
+        fake.Dividends.AddRange(recorded.Dividends.Select(d => new IncomeDividend(d.AccountId, d.HoldingId, d.PayDate, d.Amount)));
+        fake.TradeCharges.AddRange(recorded.TradeCharges.Select(c => new IncomeTradeCharge(c.AccountId, null, c.Symbol, c.TradeDate, c.Amount)));
+        fake.LedgerCharges.AddRange(recorded.LedgerCharges.Select(c => new IncomeLedgerCharge(c.AccountId, c.Date, "DEBIT", "DP charges", c.Amount)));
+        fake.LedgerStarts.AddRange(recorded.LedgerStarts.Select(s => new IncomeLedgerStart(s.AccountId, s.From)));
+        return fake;
+    }
 
     /// <summary>The open holdings of each sector group, the lists the members endpoint gives (the server's own partition).</summary>
     private static SortedDictionary<string, IReadOnlyList<Guid>> Members(IReadOnlyList<HoldingData> holdings, FakeHoldingClassifications classifications)

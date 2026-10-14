@@ -5,6 +5,7 @@ import {
   rowOf,
   summaryOf,
   writePrice,
+  type ModelAccountIncome,
   type ModelDimension,
   type ModelHolding,
   type ModelLot,
@@ -119,6 +120,28 @@ function holdings(r: Random): ModelHolding[] {
   });
 }
 
+/**
+ * Dividends (to the paisa) on some holdings, charges of trades (four decimals) on some, and, for some accounts, dividends of
+ * no holding and costs of the ledger (a refund now and then): the world of the backend's golden generator, drawn from a
+ * generator of its own so the holdings and prices of a seed stay what they were.
+ */
+function income(seed: number, held: readonly ModelHolding[]) {
+  const r = generator(seed + 100_000);
+  const holdings = held.map((h): ModelHolding => {
+    const dividends4 = r.chance(0.45) ? r.int(1, 3) * r.int(1, 5_000_000) * 100 : 0;
+    const charges4 = r.chance(0.5) ? r.int(1, 3) * r.int(1, 400_000) : 0;
+    return { ...h, dividends4, charges4 };
+  });
+  const accountsIncome: ModelAccountIncome[] = accounts.flatMap((_, n) => {
+    const dividends4 = r.chance(0.3) ? r.int(1, 100_000) * 100 : 0;
+    const charges4 = r.chance(0.25) ? r.int(1, 50_000) : 0;
+    const ledger4 = r.chance(0.6) ? r.int(-2_000, 80_000) * 100 : 0;
+    const both = { accountId: uuid('aa', n), dividends4, charges4: charges4 + ledger4 };
+    return both.dividends4 !== 0 || both.charges4 !== 0 ? [both] : [];
+  });
+  return { holdings, accountsIncome };
+}
+
 interface Push {
   instrumentId: string;
   pricePaise: number;
@@ -171,6 +194,7 @@ const same = (actual: number | null, expected: number | null) => {
 };
 
 function expectRow(actual: HoldingRow, expected: HoldingRow) {
+  expect(actual.income).toEqual(expected.income);
   expect(actual.lastPrice).toBe(expected.lastPrice);
   expect(actual.priceAt).toBe(expected.priceAt);
   expect(actual.priceSource).toBe(expected.priceSource);
@@ -183,6 +207,7 @@ function expectRow(actual: HoldingRow, expected: HoldingRow) {
 }
 
 function expectGroup(actual: HoldingGroup, expected: HoldingGroup) {
+  expect(actual.income).toEqual(expected.income);
   expect(actual.holdings).toBe(expected.holdings);
   expect(actual.unpriced).toBe(expected.unpriced);
   expect(actual.dayChangeExcluded).toBe(expected.dayChangeExcluded);
@@ -200,7 +225,7 @@ describe('live recompute equals the server for the same prices', () => {
 
   it.each(seeds)('rows, tiles and groups (seed %i)', (seed) => {
     const r = generator(seed);
-    const before = holdings(r);
+    const { holdings: before, accountsIncome } = income(seed, holdings(r));
     const sent = pushes(r, before);
     const after = sent.reduce((state, p) => writePrice(state, p.instrumentId, p.pricePaise, p.at, p.source), before);
 
@@ -213,9 +238,10 @@ describe('live recompute equals the server for the same prices', () => {
       expectRow(live[index]!, expected);
     });
 
-    const summary = liveSummary(summaryOf(before), open);
+    const summary = liveSummary(summaryOf(before, undefined, accountsIncome), open);
     expect(summary).toBeDefined();
-    const expectedSummary = summaryOf(after);
+    const expectedSummary = summaryOf(after, undefined, accountsIncome);
+    expect(summary?.income).toEqual(expectedSummary.income);
     same(summary?.returns.invested ?? null, expectedSummary.returns.invested);
     same(summary?.returns.value ?? null, expectedSummary.returns.value);
     same(summary?.returns.pnl ?? null, expectedSummary.returns.pnl);
@@ -241,9 +267,9 @@ describe('live recompute equals the server for the same prices', () => {
         );
         const membership = membershipOf(by, lists);
         expect(membership).toBeDefined();
-        const groups = liveGroups(groupsOf(scope(before), by), open, membership!, statusOpen);
+        const groups = liveGroups(groupsOf(scope(before), by, accountsIncome), open, membership!, statusOpen);
         expect(groups).toBeDefined();
-        const expected = groupsOf(scope(after), by);
+        const expected = groupsOf(scope(after), by, accountsIncome);
         expect(groups?.groups.map((g) => g.key)).toEqual(expected.groups.map((g) => g.key));
         groups?.groups.forEach((group, index) => {
           expectGroup(group, expected.groups[index]!);
@@ -255,25 +281,34 @@ describe('live recompute equals the server for the same prices', () => {
 });
 
 describe('the generated cases are not trivial', () => {
-  it('move prices, count and leave out day changes, and include unpriced and unmapped holdings', () => {
+  it('move prices and the net total return, count and leave out day changes, and include unpriced and unmapped holdings and Unallocated rows', () => {
     let moved = 0;
     let counted = 0;
     let leftOut = 0;
     let unpriced = 0;
     let unmapped = 0;
+    let netMoved = 0;
+    let withUnallocated = 0;
     for (let seed = 1; seed <= 150; seed += 1) {
       const r = generator(seed);
-      const before = holdings(r);
+      const { holdings: before, accountsIncome } = income(seed, holdings(r));
       const sent = pushes(r, before);
       const rows = before.map(rowOf);
       const live = applyTicks(rows, ticksOf(sent));
+      netMoved += live.filter(
+        (row, index) => row.income && row.income.netTotalReturnPct !== rows[index]?.income?.netTotalReturnPct,
+      ).length;
+      withUnallocated += groupsOf(before, 'sector', accountsIncome).groups.filter(
+        (g) => g.key === '~unallocated',
+      ).length;
       moved += live.filter((row, index) => row !== rows[index]).length;
       counted += live.filter((row) => row.dayChange !== null).length;
       leftOut += live.filter((row) => row.status === 'open' && row.priced && row.dayChange === null).length;
       unpriced += live.filter((row) => row.status === 'open' && !row.priced).length;
       unmapped += live.filter((row) => row.instrumentId === null).length;
     }
-    for (const n of [moved, counted, leftOut, unpriced, unmapped]) expect(n).toBeGreaterThan(50);
+    for (const n of [moved, counted, leftOut, unpriced, unmapped, netMoved]) expect(n).toBeGreaterThan(50);
+    expect(withUnallocated).toBeGreaterThan(50);
   });
 });
 

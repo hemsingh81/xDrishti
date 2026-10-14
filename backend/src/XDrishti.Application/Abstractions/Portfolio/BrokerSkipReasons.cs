@@ -15,4 +15,7 @@ public static class BrokerSkipReasons
 
     /// <summary>An intraday, cover or bracket order: it nets out within the day and never reaches the holdings.</summary>
     public const string Intraday = "intraday";
+
+    /// <summary>A row with no trading symbol whose ISIN and Dhan security id could not be matched to a share either: it cannot be told which security it is, so it is not stored.</summary>
+    public const string NoSymbol = "no_symbol";
 }

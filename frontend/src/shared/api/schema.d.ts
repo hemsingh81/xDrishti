@@ -752,7 +752,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync, quote or live) */
+    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dividends, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync, quote or live) and income (null when the holding has no dividend and no trade charge recorded): dividends, charges (trade charges), totalReturnPct = (realised + unrealised + dividends) over invested, netTotalReturnPct (minus the charges), netXirr with netXirrState, and the dates coverageFrom, dividendsFrom and chargesFrom the figures are known from */
     get: operations['ListHoldings'];
     put?: never;
     post?: never;
@@ -769,7 +769,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync */
+    /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync. income (null when nothing is recorded): dividends, charges, unallocated (dividends of no holding), totalReturnPct, netTotalReturnPct, netXirr and netXirrState, coverageFrom / dividendsFrom / chargesFrom; for the portfolio or an account (no bucket) it includes the dividends of no holding and the ledger's costs, for a bucket only its holdings'. benchmarkXirr and alpha stay price returns, before dividends and charges */
     get: operations['GetHoldingsSummary'];
     put?: never;
     post?: never;
@@ -786,7 +786,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0) */
+    /** The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dividends, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0). Each group and the total have income (null when nothing is recorded; see the summary): a group by account also holds the account's dividends of no holding and its ledger costs; the dividends and costs of no group are in the total and in an extra last group with the key ~unallocated (name Unallocated, no holdings, no value, xirrState no_data) - only when no bucket and no q narrows the scope */
     get: operations['GetHoldingGroups'];
     put?: never;
     post?: never;
@@ -1964,10 +1964,129 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The account's ledger entries read from Dhan, newest first: from, to (India dates, inclusive), class (funds_in, funds_out, dividend, charges, other), page, pageSize (max 200, default 50). Each entry has date, voucherNo, description, narration (Dhan's free text - show as plain text), exchange, amount (signed: credit minus debit), class and runningBalance. totals lists the count and signed amount of every class for the period from to to, whatever class is filtered. Dividends and charges are shown, not part of returns */
+    /** The account's ledger entries read from Dhan, newest first: from, to (India dates, inclusive), class (funds_in, funds_out, dividend, charges, other), page, pageSize (max 200, default 50). Each entry has date, voucherNo, description, narration (Dhan's free text - show as plain text), exchange, amount (signed: credit minus debit), class and runningBalance. totals lists the count and signed amount of every class for the period from to to, whatever class is filtered. The ledger's entries of class charges count as costs in the net returns of an account and the portfolio, and an entry of class dividend is offered as a suggested dividend (see the dividends endpoints); nothing else of the ledger is part of returns */
     get: operations['ListAccountLedger'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add a dividend you received: holdingId (the account is then the holding's) or accountId alone (unallocated: no holding); payDate (1990-01-02 to today, India), amount (rupees, above 0), perShare (optional, above 0), note (optional plain text, at most 200 characters). The same account, holding, date and amount as a dividend that is not voided is a possible duplicate: 409 portfolio.possible_duplicate, repeat with confirm true to add the second payment. 400 portfolio.invalid with field errors; 404 portfolio.not_found (account); 409 portfolio.role_off. Audited with the id only, never the amount */
+    post: operations['AddDividend'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividends/{id}/void': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Void a dividend: it stops counting in the figures and is never deleted. Voiding a voided dividend is a no-op. 404 portfolio.not_found. Audited with the id only */
+    post: operations['VoidDividend'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/{id}/dividends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The dividends entered for a holding, newest first (pay date), voided ones included and flagged (voided, voidedAt, voidedBy): page, pageSize (max 200, default 50) */
+    get: operations['ListHoldingDividends'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The dividends entered for an account - every holding's and the unallocated ones (holdingId null) - newest first, voided ones included and flagged: page, pageSize (max 200, default 50) */
+    get: operations['ListAccountDividends'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends/suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The suggested dividends of an account: its ledger entries of class dividend that were not accepted or dismissed yet, newest first (the ledger entry shape: id, date, amount, description and narration - Dhan's free text, show as plain text): page, pageSize (max 200, default 50). Dhan's documented ledger has no entry for an ordinary dividend, so this is usually empty. Nothing is added without accepting */
+    get: operations['ListDividendSuggestions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends/suggestions/{entryId}/accept': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Accept a suggested dividend: creates a dividend of the ledger entry's amount and date, for the holding you choose in the optional body {holdingId, note} (one of the account's) or unallocated, and remembers the decision (final; voiding the dividend later does not bring the suggestion back). 404 portfolio.not_found (not a dividend entry of the account); 409 portfolio.conflict (decided meanwhile), portfolio.role_off. Audited with ids only */
+    post: operations['AcceptDividendSuggestion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends/suggestions/{entryId}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Dismiss a suggested dividend: it is not offered again; nothing else changes. The decision is final. 404 portfolio.not_found (not a dividend entry of the account); 409 portfolio.conflict (decided meanwhile). Audited with ids only */
+    post: operations['DismissDividendSuggestion'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1995,6 +2114,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** @description Accepting a suggested dividend: optionally the holding it is for (one of the account's; none: unallocated) and a note. The amount and the date are the ledger entry's. */
+    AcceptSuggestionInput: {
+      /** Format: uuid */
+      holdingId: null | string;
+      note: null | string;
+    };
     /**
      * @description Everything about one account. Secret values and tokens are never part of it (only set / not set); the client id is masked. ApiKeyIssuedOn and
      *     ApiKeyExpiresOn are the day the Dhan API key was generated and the first day it is no longer valid (12 months). TokenStatus repeats Connection.Status.
@@ -2584,7 +2709,7 @@ export interface components {
     };
     /**
      * @description What a broker history run did (ADR 0025), kept as JSON on the run. int BrokerSyncCounts.WindowsDone of int BrokerSyncCounts.WindowsTotal date windows are read and stored; int BrokerSyncCounts.Halved windows were split in half because Dhan refused them as too large or answered "no data" for a stretch of several dates (the halves settle which).
-     *     int BrokerSyncCounts.Read rows came from Dhan, int BrokerSyncCounts.Stored are new, int BrokerSyncCounts.Duplicates were stored already, int BrokerSyncCounts.Dropped were unusable rows and int BrokerSyncCounts.Skipped were not NSE equity trades (by reason in
+     *     int BrokerSyncCounts.Read rows came from Dhan, int BrokerSyncCounts.Stored are new, int BrokerSyncCounts.Duplicates were stored already, int BrokerSyncCounts.Dropped were unusable rows, int BrokerSyncCounts.Enriched of the int BrokerSyncCounts.Duplicates were completed (a trade stored by an earlier read without its ISIN or charges got them from this one; nothing else of it is touched) and int BrokerSyncCounts.Skipped were not NSE equity trades (by reason in
      *     IReadOnlyDictionary&lt;string, int&gt; BrokerSyncCounts.SkippedByReason). After a trade run the automatic rebuild adds int BrokerSyncCounts.Rebuilt holdings rebuilt, int BrokerSyncCounts.Unchanged already right, int BrokerSyncCounts.NeedsReview holdings with a hand-dated lot that were left alone and the
      *     first int BrokerSyncCounts.MaxNotRebuiltListed of the holdings or securities that were left alone with their reason (int BrokerSyncCounts.NotRebuiltTotal counts all of them). int BrokerSyncCounts.EmptyByNoData counts the windows (or half-windows) that were taken as
      *     empty only because Dhan answered DH-907 ("incorrect parameters or no data present") to the first page: that code means both "nothing there" and "bad request", so the owner can see how often an empty stretch rested on it alone. Counts only: no trade or ledger content.
@@ -2604,6 +2729,11 @@ export interface components {
       duplicates?: number;
       /** Format: int32 */
       dropped?: number;
+      /**
+       * Format: int32
+       * @description Trades stored already (counted in int BrokerSyncCounts.Duplicates too) that got an ISIN, charges or ticker they lacked from this read.
+       */
+      enriched?: number;
       /** Format: int32 */
       skipped?: number;
       /**
@@ -3264,6 +3394,74 @@ export interface components {
       redirectUrl: string;
     };
     /**
+     * @description A dividend typed in by the owner: for a holding (`HoldingId`; the account is then the holding's) or, left unallocated, for an account (`AccountId` alone). `PayDate` is the day the money was credited (not in the future),
+     *     `Amount` the rupees received (above 0, to the paisa), `PerShare` optional (above 0), `Note` optional plain text (at most 200 characters). The same account, holding, date and amount twice is allowed (two genuine payments) but the second asks
+     *     for a confirmation: `409 portfolio.possible_duplicate`, repeat with `Confirm` true.
+     */
+    DividendInput: {
+      /** Format: uuid */
+      accountId: null | string;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: date */
+      payDate: null | string;
+      /** Format: double */
+      amount: null | number;
+      /** Format: double */
+      perShare: null | number;
+      note: null | string;
+      confirm: null | boolean;
+    };
+    /** @description One page of dividends, newest first (pay date), voided ones included and flagged. */
+    DividendPage: {
+      items: components['schemas']['DividendView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /**
+     * @description The suggested dividends of an account: its ledger entries of class `dividend` the owner has not accepted or dismissed, newest first. Dhan's documented ledger has no entry for an ordinary dividend, so the list is usually empty. The entries'
+     *     `Description` and `Narration` are Dhan's free text: untrusted, show as plain text.
+     */
+    DividendSuggestionPage: {
+      items: components['schemas']['LedgerEntryView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description A dividend. `HoldingId` is null for an unallocated one; `Symbol` and `Isin` are the holding's at the time. `Source` is `manual`. A voided dividend does not count. */
+    DividendView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: uuid */
+      holdingId: null | string;
+      symbol: null | string;
+      isin: null | string;
+      /** Format: date */
+      payDate: string;
+      /** Format: double */
+      amount: number;
+      /** Format: double */
+      perShare: null | number;
+      note: null | string;
+      source: string;
+      createdBy: string;
+      /** Format: date-time */
+      createdAt: string;
+      voided: boolean;
+      /** Format: date-time */
+      voidedAt: null | string;
+      voidedBy: null | string;
+    };
+    /**
      * @description The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)
      *     gives 0 and no dates.
      */
@@ -3467,7 +3665,9 @@ export interface components {
     };
     /**
      * @description One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector "Unclassified" and the basket "No basket". Holdings counts every holding of the group in the scope;
-     *     Unpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`.
+     *     Unpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`. Income is the group's dividends and trade
+     *     charges and the net returns (ADR 0026), null when none is recorded; a group by account also holds the account's own dividends and costs (those of no holding). The group with the key `~unallocated` (name "Unallocated", no holdings,
+     *     no value) is added last when dividends and costs belong to no group, so that the columns add up to the total.
      */
     HoldingGroup: {
       key: string;
@@ -3498,8 +3698,9 @@ export interface components {
       /** Format: double */
       weightPct: null | number;
       parts: null | components['schemas']['GroupPart'][];
+      income?: null | components['schemas']['IncomeView'];
     };
-    /** @description The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value. */
+    /** @description The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value. Income includes the dividends and costs of no holding. */
     HoldingGroupTotal: {
       /** Format: int32 */
       holdings: number;
@@ -3526,6 +3727,7 @@ export interface components {
       dayChangeExcluded: number;
       /** Format: double */
       weightPct: null | number;
+      income?: null | components['schemas']['IncomeView'];
     };
     /**
      * @description The groups of the scope. By is `account`, `bucket`, `sector` or `basket`; Additive is false for baskets (a holding is in every basket that contains it, so the groups overlap). StackBy is the second dimension of the
@@ -3572,6 +3774,8 @@ export interface components {
      *     PreviousClose is the previous session's close as the last quote reported it (null until a quote gave one). DayChange (rupees) and DayChangePct (percent number) are
      *     against it, for an open, priced holding with a previous close; otherwise both are null and the holding is left out of the summary's day change. PriceAt is the time of
      *     LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync), "quote" (a market quote) or "live" (a tick of the live feed).
+     *     Income is the holding's dividends and trade charges and the net returns that include them (ADR 0026); null when nothing is recorded for the holding. It does not change with the price, except the two total return percentages: the
+     *     browser works those out again at a live price from Returns.RealisedPnl, Returns.Pnl, Returns.Invested and Income's Dividends and Charges.
      */
     HoldingRow: {
       /** Format: uuid */
@@ -3622,6 +3826,7 @@ export interface components {
       /** Format: date-time */
       priceAt: null | string;
       priceSource: string;
+      income?: null | components['schemas']['IncomeView'];
     };
     /**
      * @description Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that
@@ -3632,6 +3837,8 @@ export interface components {
      *     from the first cash flow: track it and run Update data), "insufficient" (the same reasons as for XIRR) or "n_m" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState "ok").
      *     BenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which
      *     it is when Alpha is set: "last_close" (portfolio and index are both as of their last close) or "live_vs_last_close" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only).
+     *     Alpha compares price returns: the gross XIRR and the index's price index, both before dividends and charges (ADR 0026). Income holds the dividends and costs of the scope and the net returns (null when nothing is recorded): for the whole portfolio or
+     *     an account (no bucket) it includes the dividends not allocated to a holding and the ledger's costs, for a bucket only its holdings'.
      */
     HoldingsSummary: {
       returns: components['schemas']['ReturnsView'];
@@ -3663,6 +3870,7 @@ export interface components {
       /** Format: date */
       benchmarkAsOf: null | string;
       alphaBasis: null | string;
+      income?: null | components['schemas']['IncomeView'];
     };
     HttpValidationProblemDetails: {
       type?: null | string;
@@ -3764,6 +3972,45 @@ export interface components {
       key: null | string;
       /** Format: date */
       acquiredOn: null | string;
+    };
+    /**
+     * @description What a scope (a holding, a group, an account, the portfolio) received and paid beyond its price return (ADR 0026, P2-14). Money is rupees, percentages are percent numbers (16.1 = 16.1 %), dates are India dates. `Dividends` are the
+     *     dividends the owner entered (not voided) and `Charges` the trade charges of the stored trades plus, for an account and the portfolio only, the ledger's costs of the account as such (DP charges, annual maintenance, delayed-payment interest ...;
+     *     never the costs of trades, which the trade rows already carry). `LedgerCharges` is that ledger part of `Charges` (0 when the account has none; null when the scope does not include account-level items: a holding, a bucket), so the screen can show
+     *     the ledger's costs apart from the charges of trades. `Unallocated` is the part of the dividends not allocated to a holding (set for an account and the portfolio only, otherwise null). `TotalReturnPct` is (realised + unrealised +
+     *     dividends) over invested, `NetTotalReturnPct` the same minus the charges; both are null when nothing is invested or the scope has no usable price. `NetXirr` is the XIRR of the lot cash flows plus the dividends (in) and the charges (out) on
+     *     their dates, with `NetXirrState` as for the gross XIRR (`ok`, `insufficient`, `n_m`, `no_data`, `no_price`).
+     *     Only what was entered or read is counted, and the dates say from when each source is known (null: the source has nothing for the scope): `DividendsFrom` is the first dividend the owner entered, `TradeChargesFrom` the first stored trade that
+     *     carries charges (trades read before charges were stored, and CSV or manual trades, carry none — so a trade without charges is "unknown", not "free"), `LedgerChargesFrom` the first ledger date stored. `ChargesFrom` is the later of
+     *     `TradeChargesFrom` and `LedgerChargesFrom` when both exist, otherwise the one that does. `CoverageFrom` is the LATER start of the sources that exist for the scope: the date from which every kind of income that is counted at all is known, so
+     *     the net figures are never presented as complete from before any of their sources begins. The whole object is null when the scope has no dividend and no charge recorded.
+     */
+    IncomeView: {
+      /** Format: double */
+      dividends: number;
+      /** Format: double */
+      charges: number;
+      /** Format: double */
+      ledgerCharges: null | number;
+      /** Format: double */
+      unallocated: null | number;
+      /** Format: double */
+      totalReturnPct: null | number;
+      /** Format: double */
+      netTotalReturnPct: null | number;
+      /** Format: double */
+      netXirr: null | number;
+      netXirrState: string;
+      /** Format: date */
+      coverageFrom: null | string;
+      /** Format: date */
+      dividendsFrom: null | string;
+      /** Format: date */
+      chargesFrom: null | string;
+      /** Format: date */
+      tradeChargesFrom: null | string;
+      /** Format: date */
+      ledgerChargesFrom: null | string;
     };
     /**
      * @description The latest bars of an instrument and timeframe, newest first. `adjustment` is set only when the read asked for adjusted prices (`adjusted=true`): the bars then have the open, high, low and close multiplied by
@@ -3937,7 +4184,10 @@ export interface components {
       /** Format: double */
       runningBalance: null | number;
     };
-    /** @description One page of the ledger, newest first, and the totals of every class for the period (`from` to `to`, whatever class is filtered). */
+    /**
+     * @description One page of the ledger, newest first, and the totals of every class for the period (`from` to `to`, whatever class is filtered). `CoverageFrom` is the earliest date of any ledger entry stored for the account, whatever the filters
+     *     (null: none stored): the ledger's costs are known from this date on, which reading from an earlier date can move back (ADR 0026).
+     */
     LedgerPage: {
       items: components['schemas']['LedgerEntryView'][];
       /** Format: int32 */
@@ -3947,6 +4197,8 @@ export interface components {
       /** Format: int32 */
       total: number;
       totals: components['schemas']['LedgerClassTotal'][];
+      /** Format: date */
+      coverageFrom?: null | string;
     };
     /**
      * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
@@ -5071,6 +5323,14 @@ export interface components {
       subscribed: number;
       truncated: boolean;
       failed: boolean;
+    };
+    /** @description The decision about a suggested dividend: `State` is `accepted` (with the `DividendId` created) or `dismissed`. */
+    SuggestionDecisionView: {
+      /** Format: uuid */
+      ledgerEntryId: string;
+      state: string;
+      /** Format: uuid */
+      dividendId: null | string;
     };
     /**
      * @description Body of "Sync now" (optional). Confirm: true applies an answer that would close all or most open holdings, which is otherwise refused with
@@ -10550,6 +10810,321 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AddDividend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DividendInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  VoidDividend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListHoldingDividends: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAccountDividends: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListDividendSuggestions: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendSuggestionPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AcceptDividendSuggestion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['AcceptSuggestionInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DismissDividendSuggestion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionDecisionView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

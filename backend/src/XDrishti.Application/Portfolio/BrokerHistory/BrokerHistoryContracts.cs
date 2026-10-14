@@ -61,5 +61,8 @@ public sealed record LedgerEntryView(
 /// <summary>The entries of one class in the period and their signed total.</summary>
 public sealed record LedgerClassTotal(string Class, int Count, decimal Amount);
 
-/// <summary>One page of the ledger, newest first, and the totals of every class for the period (<c>from</c> to <c>to</c>, whatever class is filtered).</summary>
-public sealed record LedgerPage(IReadOnlyList<LedgerEntryView> Items, int Page, int PageSize, int Total, IReadOnlyList<LedgerClassTotal> Totals);
+/// <summary>
+/// One page of the ledger, newest first, and the totals of every class for the period (<c>from</c> to <c>to</c>, whatever class is filtered). <c>CoverageFrom</c> is the earliest date of any ledger entry stored for the account, whatever the filters
+/// (null: none stored): the ledger's costs are known from this date on, which reading from an earlier date can move back (ADR 0026).
+/// </summary>
+public sealed record LedgerPage(IReadOnlyList<LedgerEntryView> Items, int Page, int PageSize, int Total, IReadOnlyList<LedgerClassTotal> Totals, DateOnly? CoverageFrom = null);

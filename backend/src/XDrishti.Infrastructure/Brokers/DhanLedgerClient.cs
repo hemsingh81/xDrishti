@@ -39,6 +39,12 @@ internal sealed class DhanLedgerClient(IHttpClientFactory httpClients, DhanHisto
             return BrokerResponse.Ok(DhanLedgerMapper.Map(list));
         }
 
+        // Dhan's published sample is a single row as an object: one row.
+        if (rows is null && DhanLedgerMapper.SingleRow(answer.Value) is { } single)
+        {
+            return BrokerResponse.Ok(DhanLedgerMapper.Map(single));
+        }
+
         // The same code in the body of a 200 means the same as with a 400.
         return rows is null && BrokerHttp.ErrorCode(answer.Value) == DhanTradesClient.NoDataCode
             ? BrokerResponse.Ok(BrokerLedgerRead.NoDataAnswer)

@@ -1,3 +1,5 @@
+using XDrishti.Application.Portfolio.Income;
+
 namespace XDrishti.Application.Portfolio;
 
 // Request and response shapes of the holdings API. Percentages (PnlPct, Xirr) are percent numbers: 16.1 means 16.1 %. Money is in rupees.
@@ -22,6 +24,8 @@ public sealed record ReturnsView(
 /// PreviousClose is the previous session's close as the last quote reported it (null until a quote gave one). DayChange (rupees) and DayChangePct (percent number) are
 /// against it, for an open, priced holding with a previous close; otherwise both are null and the holding is left out of the summary's day change. PriceAt is the time of
 /// LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync), "quote" (a market quote) or "live" (a tick of the live feed).
+/// Income is the holding's dividends and trade charges and the net returns that include them (ADR 0026); null when nothing is recorded for the holding. It does not change with the price, except the two total return percentages: the
+/// browser works those out again at a live price from Returns.RealisedPnl, Returns.Pnl, Returns.Invested and Income's Dividends and Charges.
 /// </summary>
 public sealed record HoldingRow(
     Guid Id,
@@ -54,7 +58,8 @@ public sealed record HoldingRow(
     decimal? DayChange,
     decimal? DayChangePct,
     DateTimeOffset? PriceAt,
-    string PriceSource);
+    string PriceSource,
+    IncomeView? Income = null);
 
 /// <summary>One page of holdings (Total counts all matches).</summary>
 public sealed record HoldingPage(IReadOnlyList<HoldingRow> Items, int Page, int PageSize, int Total);
@@ -91,6 +96,8 @@ public sealed record SyncRunView(
 /// from the first cash flow: track it and run Update data), "insufficient" (the same reasons as for XIRR) or "n_m" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState "ok").
 /// BenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which
 /// it is when Alpha is set: "last_close" (portfolio and index are both as of their last close) or "live_vs_last_close" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only).
+/// Alpha compares price returns: the gross XIRR and the index's price index, both before dividends and charges (ADR 0026). Income holds the dividends and costs of the scope and the net returns (null when nothing is recorded): for the whole portfolio or
+/// an account (no bucket) it includes the dividends not allocated to a holding and the ledger's costs, for a bucket only its holdings'.
 /// </summary>
 public sealed record HoldingsSummary(
     ReturnsView Returns,
@@ -109,7 +116,8 @@ public sealed record HoldingsSummary(
     decimal? Alpha,
     string BenchmarkState,
     DateOnly? BenchmarkAsOf,
-    string? AlphaBasis);
+    string? AlphaBasis,
+    IncomeView? Income = null);
 
 /// <summary>The oldest and the newest time of the prices of the open holdings (null when none has a priced time).</summary>
 public sealed record PricesAsOf(DateTimeOffset? Oldest, DateTimeOffset? Newest);

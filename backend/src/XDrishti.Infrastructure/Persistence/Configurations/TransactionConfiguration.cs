@@ -6,7 +6,7 @@ using XDrishti.Domain.Portfolio;
 namespace XDrishti.Infrastructure.Persistence.Configurations;
 
 /// <summary>
-/// <c>portfolio.transactions</c> (ADR 0023, 0025): the trades of the accounts (tradebook files, the owner's hand, the broker's trade history), immutable except for <c>voided_at</c>/<c>voided_by</c>. The runtime role may read, insert and update them, never delete. The identity of a trade (<c>external_id</c>) is unique
+/// <c>portfolio.transactions</c> (ADR 0023, 0025): the trades of the accounts (tradebook files, the owner's hand, the broker's trade history), immutable except for <c>voided_at</c>/<c>voided_by</c> and, for broker trades, the completion of a missing <c>isin</c>, empty <c>trading_symbol</c> or zero <c>charges</c> by a later read (<c>Transaction.EnrichFromBroker</c>). The runtime role may read, insert and update them, never delete. The identity of a trade (<c>external_id</c>) is unique
 /// per account among the trades that are not voided (a partial unique index), so a voided trade can be imported again.
 /// </summary>
 internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transaction>

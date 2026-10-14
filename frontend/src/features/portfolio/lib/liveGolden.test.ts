@@ -1,4 +1,4 @@
-import type { HoldingGroup, HoldingGroups, HoldingRow, HoldingsSummary } from '@/shared/api';
+import type { HoldingGroup, HoldingGroups, HoldingRow, HoldingsSummary, IncomeView } from '@/shared/api';
 import golden from '@/test/fixtures/liveGolden.json';
 import { applyTicks } from './liveFigures';
 import { applyPrices, noTicks, type LiveTickState } from './liveTicks';
@@ -11,7 +11,11 @@ import type { GroupBy } from './filters';
  * state read from the API (`before`), the pushes that follow and the state the API gives for the same prices (`after`). The
  * browser applies the pushes to `before` and must end up with `after` exactly: money and percentages are four decimals, halves
  * away from zero, on both sides, so there is no tolerance. What a push cannot change (XIRR, benchmark: null/"unavailable" in
- * the fixture) is not compared.
+ * the fixture) is not compared. Schema 2 adds the `income` of rows, tiles, groups and totals (dividends, charges, total return
+ * and net total return): the object is compared without the net XIRR and its state (the read's, like the gross ones), so the two
+ * percentages that move with a price must match to the last decimal and everything else must pass through unchanged. The
+ * extra `~unallocated` group is left as read and compared too. Schema 3 adds `ledgerCharges` (the ledger part of the charges)
+ * and the per-source dates: they never move with a price, so they must pass through unchanged and are compared with the rest.
  */
 
 interface GroupSet {
@@ -42,6 +46,15 @@ function ticksOf(pushes: Scenario['pushes']): LiveTickState {
   );
 }
 
+/**
+ * The income as a push leaves it: everything but the net XIRR and its state, which (like the XIRR and its state) are the
+ * read's - a holding priced for the first time by a push is `no_price` in the read and `ok` after, until the next read.
+ */
+const incomeFigures = (income: IncomeView | null | undefined) => {
+  if (!income) return income;
+  return { ...income, netXirr: undefined, netXirrState: undefined };
+};
+
 /** The figures a push can change; the rest of a row is the read's. */
 const rowFigures = (row: HoldingRow) => ({
   id: row.id,
@@ -55,6 +68,7 @@ const rowFigures = (row: HoldingRow) => ({
   pnlPct: row.returns.pnlPct,
   dayChange: row.dayChange,
   dayChangePct: row.dayChangePct,
+  income: incomeFigures(row.income),
 });
 
 const summaryFigures = (summary: HoldingsSummary) => ({
@@ -68,6 +82,7 @@ const summaryFigures = (summary: HoldingsSummary) => ({
   dayChangePct: summary.dayChangePct,
   dayChangeExcluded: summary.dayChangeExcluded,
   pricesAsOf: summary.pricesAsOf,
+  income: incomeFigures(summary.income),
 });
 
 function groupFigures(group: HoldingGroup | HoldingGroups['total']) {
@@ -82,6 +97,7 @@ function groupFigures(group: HoldingGroup | HoldingGroups['total']) {
     dayChangePct: group.dayChangePct,
     dayChangeExcluded: group.dayChangeExcluded,
     weightPct: group.weightPct,
+    income: incomeFigures(group.income),
   };
 }
 
@@ -97,8 +113,21 @@ const open = (rows: readonly HoldingRow[]) => rows.filter((row) => row.status ==
 
 describe('the browser recompute equals the server (golden file written by the real C# calculators)', () => {
   it('has the schema this test reads', () => {
-    expect(file.schema).toBe(1);
+    expect(file.schema).toBe(3);
     expect(file.scenarios.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('the pushes move the total return of holdings with dividends or charges, never the dividends and charges themselves', () => {
+    let moved = 0;
+    for (const { before, after } of file.scenarios) {
+      after.rows.forEach((row, index) => {
+        const was = before.rows[index]?.income;
+        if (!was || !row.income) return;
+        expect([row.income.dividends, row.income.charges]).toEqual([was.dividends, was.charges]);
+        if (row.income.totalReturnPct !== was.totalReturnPct) moved += 1;
+      });
+    }
+    expect(moved).toBeGreaterThan(10);
   });
 
   describe.each(file.scenarios.map((scenario) => [scenario.name, scenario] as const))('%s', (_name, scenario) => {

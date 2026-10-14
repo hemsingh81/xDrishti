@@ -32,6 +32,10 @@ internal static class GoldenCases
         int n, string symbol, Guid account, Guid bucket, int? instrument, string sector, long qty, decimal price, DateTimeOffset? at, string source, decimal? close, DateTimeOffset? closeAt, params GoldenLot[] lots) =>
         new(Id("11", n), account, bucket, instrument is null ? null : Id("ee", instrument.Value), sector, symbol, qty, lots.All(l => l.ClosedOn is not null) ? "closed" : "open", price, at, source, close, closeAt, lots);
 
+    private static GoldenDividend Div(Guid account, int? holding, DateOnly date, decimal amount) => new(account, holding is null ? null : Id("11", holding.Value), date, amount);
+
+    private static DateOnly D(int year, int month, int day) => new(year, month, day);
+
     private static InstrumentPrice Push(int instrument, decimal price, DateTimeOffset at, string source = "live") => new(Id("ee", instrument), price, at, source);
 
     private static GoldenScenario SourcesAndCloseDays()
@@ -69,11 +73,48 @@ internal static class GoldenCases
             Push(12, 0.0126m, Ist(14, 10, 36, 40)),
             Push(13, 100_500m, Ist(14, 10, 0), "live"),
         };
+        var income = new GoldenIncome(
+            [
+                Div(AccountOne, 1, D(2025, 12, 5), 250.5m),
+                Div(AccountOne, 1, D(2026, 6, 20), 310m),
+                Div(AccountOne, 2, D(2026, 3, 11), 1234.56m),
+                Div(AccountOne, 7, D(2026, 5, 1), 12m), // a holding with no price
+                Div(AccountTwo, 14, D(2026, 1, 9), 87.65m), // the same security in another account
+                Div(AccountThree, 9, D(2026, 2, 14), 40.01m),
+                Div(AccountThree, 10, D(2025, 11, 30), 99.99m), // a closed holding
+                Div(AccountThree, 12, D(2026, 9, 1), 0.01m),
+                Div(AccountOne, null, D(2025, 10, 2), 123.45m), // not allocated to a holding
+                Div(AccountThree, null, D(2024, 8, 15), 2000m),
+                Div(Id("aa", 3), null, D(2026, 4, 4), 77.77m), // an account without holdings
+            ],
+            [
+                new GoldenTradeCharge(AccountOne, "RELQ", D(2025, 9, 9), 12.3456m),
+                new GoldenTradeCharge(AccountOne, "RELQ", D(2026, 2, 3), 7.0001m),
+                new GoldenTradeCharge(AccountOne, "TCSL", D(2025, 9, 9), 31.5m),
+                new GoldenTradeCharge(AccountTwo, "RELQ", D(2025, 10, 1), 4.2222m),
+                new GoldenTradeCharge(AccountTwo, "SBIL", D(2025, 6, 6), 9.9999m),
+                new GoldenTradeCharge(AccountThree, "GONE", D(2025, 4, 4), 15.1m), // a security that is none of the account's holdings
+                new GoldenTradeCharge(AccountThree, "SOLD", D(2025, 3, 3), 3.3333m),
+            ],
+            [
+                new GoldenLedgerCharge(AccountOne, D(2025, 3, 31), 354m),
+                new GoldenLedgerCharge(AccountOne, D(2026, 3, 31), 354.5m),
+                new GoldenLedgerCharge(AccountOne, D(2026, 5, 1), -20m), // a refund
+                new GoldenLedgerCharge(AccountTwo, D(2026, 1, 15), 11.8m),
+                new GoldenLedgerCharge(Id("aa", 3), D(2026, 1, 1), 5m),
+            ],
+            [
+                new GoldenLedgerStart(AccountOne, D(2025, 1, 2)),
+                new GoldenLedgerStart(AccountTwo, D(2025, 6, 1)),
+                new GoldenLedgerStart(Id("aa", 3), D(2025, 12, 1)),
+            ],
+            [Id("aa", 3)]);
         return Scenario(
             "sources-and-close-days",
-            "Holdings priced by a sync, a quote and a live tick, with the previous close of the same day, of yesterday, of unknown day and none; partly and fully closed holdings; an unpriced and an unmapped one; a broker quantity that differs from the open lots'; one instrument in two accounts in different states; sub-paise prices; an older push that is ignored.",
+            "Holdings priced by a sync, a quote and a live tick, with the previous close of the same day, of yesterday, of unknown day and none; partly and fully closed holdings; an unpriced and an unmapped one; a broker quantity that differs from the open lots'; one instrument in two accounts in different states; sub-paise prices; an older push that is ignored. Dividends of holdings (also of a closed and of an unpriced one), unallocated dividends, an account with nothing but an unallocated dividend and ledger costs, trade charges (also of a security no holding has), ledger costs with a refund, and accounts with and without a ledger.",
             holdings,
-            pushes);
+            pushes,
+            income);
     }
 
     private static GoldenScenario PushOrdering()
@@ -95,7 +136,13 @@ internal static class GoldenCases
             Push(3, 305m, Ist(14, 10, 33)),
             Push(3, 303m, Ist(14, 10, 32)), // delivered late: ignored once the newer one is in
         };
-        return Scenario("push-ordering", "Older, equal and late pushes: only a newer price time, or the same time with another price, replaces.", holdings, pushes);
+        var income = new GoldenIncome(
+            [Div(AccountOne, 1, D(2026, 4, 10), 55m), Div(AccountOne, 1, D(2026, 4, 10), 55m), Div(AccountTwo, 3, D(2026, 7, 7), 15.25m)],
+            [new GoldenTradeCharge(AccountOne, "ORDB", D(2025, 8, 8), 20.5m)],
+            [],
+            [],
+            []);
+        return Scenario("push-ordering", "Older, equal and late pushes: only a newer price time, or the same time with another price, replaces. Two equal dividends (two genuine payments) and a trade charge: the income does not move with a push, its total return does.", holdings, pushes, income);
     }
 
     private static GoldenScenario UnpricedAndUnmapped()
@@ -118,7 +165,13 @@ internal static class GoldenCases
             Push(5, 51m, Ist(14, 10, 36)),
             Push(7, 81m, Ist(14, 10, 36)), // a closed holding is not repriced
         };
-        return Scenario("unpriced-and-unmapped", "Groups made only of unpriced holdings (no value, not zero), a mixed group, a zero previous close, an unmapped holding and a closed one.", holdings, pushes);
+        var income = new GoldenIncome(
+            [Div(AccountOne, 1, D(2026, 1, 1), 100m), Div(AccountTwo, 4, D(2026, 2, 2), 50m), Div(AccountTwo, 3, D(2026, 3, 3), 75m), Div(AccountThree, 7, D(2026, 4, 4), 10m)],
+            [new GoldenTradeCharge(AccountOne, "NOPB", D(2025, 5, 5), 8m), new GoldenTradeCharge(AccountTwo, "NONE", D(2025, 5, 5), 1.5m)],
+            [new GoldenLedgerCharge(AccountOne, D(2026, 1, 1), 10m)],
+            [new GoldenLedgerStart(AccountOne, D(2025, 1, 1))],
+            []);
+        return Scenario("unpriced-and-unmapped", "Groups made only of unpriced holdings (no value, not zero; their dividends and costs still count, their returns are unknown), a mixed group, a zero previous close, an unmapped holding and a closed one.", holdings, pushes, income);
     }
 
     private static GoldenScenario NoPreviousCloseAnywhere()

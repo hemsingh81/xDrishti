@@ -14,6 +14,9 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
     /// <summary>The NSE shares and ETFs of the master list.</summary>
     public List<TradeInstrument> Instruments { get; } = [];
 
+    /// <summary>The Dhan security ids (NSE equity segment) of the instruments, by security id.</summary>
+    public Dictionary<string, TradeInstrument> DhanIds { get; } = [];
+
     /// <summary>The applied actions by instrument.</summary>
     public Dictionary<Guid, List<AppliedAction>> Actions { get; } = [];
 
@@ -49,6 +52,12 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
 
     public ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlySet<string>>(Trades.Where(t => t.AccountId == accountId && !t.IsVoided && externalIds.Contains(t.ExternalId)).Select(t => t.ExternalId).ToHashSet(StringComparer.Ordinal));
+
+    public ValueTask<IReadOnlyList<Transaction>> ListBrokerAwaitingEnrichmentAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<Transaction>>(
+        [
+            .. Trades.Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Broker && externalIds.Contains(t.ExternalId) && (t.Isin is null || t.TradingSymbol.Length == 0 || t.Charges == 0m)),
+        ]);
 
     public ValueTask<IReadOnlyList<Transaction>> ListActiveOfBatchAsync(Guid batchId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<Transaction>>([.. Trades.Where(t => t.BatchId == batchId && !t.IsVoided).OrderBy(t => t.Seq)]);
@@ -115,6 +124,9 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
 
     public ValueTask<IReadOnlyList<TradeInstrument>> FindInstrumentsAsync(IReadOnlyCollection<string> isins, IReadOnlyCollection<string> symbols, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<TradeInstrument>>([.. Instruments.Where(i => (i.Isin is not null && isins.Contains(i.Isin)) || symbols.Contains(i.Symbol))]);
+
+    public ValueTask<IReadOnlyDictionary<string, TradeInstrument>> FindInstrumentsByDhanIdsAsync(IReadOnlyCollection<string> securityIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<string, TradeInstrument>>(DhanIds.Where(d => securityIds.Contains(d.Key)).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal));
 
     public ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<AppliedAction>>> ListAppliedActionsAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken)
     {

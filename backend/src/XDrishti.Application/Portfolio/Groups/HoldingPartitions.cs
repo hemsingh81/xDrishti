@@ -18,6 +18,11 @@ internal static class HoldingPartitions
 
     public const string NoBasket = "No basket";
 
+    /// <summary>The key of the extra row that holds the dividends and costs of no holding (ADR 0026).</summary>
+    public const string UnallocatedKey = "~unallocated";
+
+    public const string Unallocated = "Unallocated";
+
     public static IReadOnlyList<GroupSlice> Partition(IEnumerable<HoldingData> holdings, GroupDimension dimension, Classification classification)
     {
         ArgumentNullException.ThrowIfNull(holdings);

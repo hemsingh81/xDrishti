@@ -50,6 +50,21 @@ internal sealed class TradeStore(XDrishtiDbContext db) : ITradeStore
             .ToListAsync(cancellationToken)).ToHashSet(StringComparer.Ordinal);
     }
 
+    public async ValueTask<IReadOnlyList<Transaction>> ListBrokerAwaitingEnrichmentAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(externalIds);
+        if (externalIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = externalIds as string[] ?? [.. externalIds];
+        return await db.Transactions
+            .Where(x => x.AccountId == accountId && x.VoidedAt == null && x.Source == TradeSource.Broker && ids.Contains(x.ExternalId)
+                && (x.Isin == null || x.TradingSymbol == string.Empty || x.Charges == 0m))
+            .ToListAsync(cancellationToken);
+    }
+
     public async ValueTask<IReadOnlyList<Transaction>> ListActiveOfBatchAsync(Guid batchId, CancellationToken cancellationToken) =>
         await db.Transactions.AsNoTracking()
             .Where(x => x.BatchId == batchId && x.VoidedAt == null)

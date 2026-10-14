@@ -42,7 +42,9 @@ describe('Benchmark and drawdown tiles', () => {
 
     const alpha = await tile('Alpha');
     expect(alpha.getByText('+2.20 pp')).toHaveTextContent('▲+2.20 pp');
-    expect(alpha.getByText('XIRR minus benchmark XIRR')).toBeInTheDocument();
+    expect(
+      alpha.getByText('XIRR minus benchmark XIRR · price return, before dividends and charges'),
+    ).toBeInTheDocument();
 
     const drawdown = await tile('Max drawdown (All)');
     expect(await drawdown.findByText('−6.25%')).toHaveTextContent('▼−6.25%');
@@ -60,7 +62,11 @@ describe('Benchmark and drawdown tiles', () => {
     summaryWith({ alphaBasis: 'live_vs_last_close', benchmarkAsOf: '2026-10-12' });
     renderPortfolio();
 
-    expect((await tile('Alpha')).getByText('Live prices vs Nifty 50 close of 12 Oct')).toBeInTheDocument();
+    expect(
+      (await tile('Alpha')).getByText(
+        'Live prices vs Nifty 50 close of 12 Oct · price return, before dividends and charges',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('explains in a tooltip that the live alpha compares the portfolio now with the index close', async () => {

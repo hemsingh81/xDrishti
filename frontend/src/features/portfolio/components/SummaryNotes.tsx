@@ -1,5 +1,6 @@
 import WarningIcon from '@mui/icons-material/WarningAmberOutlined';
 import { Chip, Stack, Typography } from '@mui/material';
+import type { IncomeView } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
 
 interface SummaryNotesProps {
@@ -13,6 +14,8 @@ interface SummaryNotesProps {
   onReviewDates: () => void;
   /** While the live feed runs: how many holdings have no live tick (unmapped, beyond the cap, not traded yet); undefined when not live. */
   notLive?: { count: number; truncated: boolean };
+  /** The scope's dividends and costs; null when none is recorded (every figure is then a price return). */
+  income: IncomeView | null;
 }
 
 /** Under the tiles: the lots whose date was never chosen (a way to find them), and what the figures leave out. */
@@ -22,6 +25,7 @@ export function SummaryNotes({
   dayChangeExcluded,
   onReviewDates,
   notLive,
+  income,
 }: SummaryNotesProps) {
   return (
     <Stack direction="row" sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', columnGap: 1.5, rowGap: 0.5 }}>
@@ -55,8 +59,15 @@ export function SummaryNotes({
         </Typography>
       )}
       <Typography variant="caption" color="text.secondary">
-        Dividends, charges and corporate actions are not included.
+        {income === null
+          ? 'Dividends and charges are not recorded yet, so these are price returns. Corporate actions are not included.'
+          : 'Net figures count dividends and costs only from the dates on their tiles. Corporate actions are not included.'}
       </Typography>
+      {income !== null && notLive !== undefined && (
+        <Typography variant="caption" color="text.secondary">
+          Net total return moves with the live prices; XIRR and net XIRR are worked out at each read.
+        </Typography>
+      )}
     </Stack>
   );
 }

@@ -9,6 +9,7 @@ export type ProblemKind =
   | 'confirmation_required'
   | 'confirmation_stale'
   | 'conflict'
+  | 'possible_duplicate'
   | 'invalid'
   | 'not_found'
   | 'alert_limit'
@@ -27,6 +28,7 @@ const byCode: Record<string, ProblemKind> = {
   'portfolio.confirmation_required': 'confirmation_required',
   'portfolio.confirmation_stale': 'confirmation_stale',
   'portfolio.conflict': 'conflict',
+  'portfolio.possible_duplicate': 'possible_duplicate',
   'portfolio.invalid': 'invalid',
   'portfolio.not_found': 'not_found',
   'portfolio.alert_limit': 'alert_limit',

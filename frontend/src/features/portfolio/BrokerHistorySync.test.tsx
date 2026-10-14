@@ -43,6 +43,32 @@ describe('Trades and ledger sync line', () => {
     expect(await syncButton()).toBeEnabled();
   });
 
+  it('says how many stored trades a read completed (ISIN, charges), next to the new ones', async () => {
+    server.use(
+      http.get(statusPath, () =>
+        HttpResponse.json(
+          buildBrokerStatus({
+            trades: buildBrokerKind({
+              lastRun: buildBrokerRun({ counts: buildBrokerCounts({ stored: 0, enriched: 3 }) }),
+            }),
+          }),
+        ),
+      ),
+    );
+    renderPortfolio();
+
+    const line = await region();
+    expect(await line.findByText(/— nothing new · 3 trades completed/)).toBeInTheDocument();
+  });
+
+  it('leaves the completed trades out of the line when none were completed', async () => {
+    renderPortfolio();
+
+    const line = await region();
+    expect(await line.findByText(/— 4 new/)).toBeInTheDocument();
+    expect(line.queryByText(/completed/)).not.toBeInTheDocument();
+  });
+
   it('says so when nothing was read yet and nothing is planned', async () => {
     server.use(http.get(statusPath, () => HttpResponse.json(buildNeverReadStatus())));
     renderPortfolio();

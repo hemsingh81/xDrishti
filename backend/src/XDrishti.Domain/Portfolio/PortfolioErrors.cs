@@ -21,6 +21,7 @@ public static class PortfolioErrors
     public const string PreviewStaleCode = "portfolio.preview_stale";
     public const string TokenExpiredCode = "portfolio.token_expired";
     public const string HistoryTooLargeCode = "portfolio.history_too_large";
+    public const string PossibleDuplicateCode = "portfolio.possible_duplicate";
 
     /// <summary>The most active price alerts there can be (ADR 0022).</summary>
     public const int MaxActiveAlerts = 200;
@@ -40,6 +41,17 @@ public static class PortfolioErrors
     public static readonly Error AccountNotFound = Error.NotFound(NotFoundCode, "The account does not exist or has no Portfolio role.");
 
     public static readonly Error TradeNotFound = Error.NotFound(NotFoundCode, "The trade does not exist.");
+
+    public static readonly Error DividendNotFound = Error.NotFound(NotFoundCode, "The dividend does not exist.");
+
+    public static readonly Error SuggestionNotFound = Error.NotFound(NotFoundCode, "That suggested dividend does not exist (any more).");
+
+    /// <summary>The same account, holding, pay date and amount is entered already: two genuine payments are possible, so the owner confirms (<c>confirm: true</c>) to add the second.</summary>
+    public static readonly Error PossibleDuplicate = Error.Conflict(
+        PossibleDuplicateCode, "A dividend of the same amount on the same date is entered already for this holding. If it is a second payment, add it again with confirm.");
+
+    /// <summary>The suggestion was accepted or dismissed meanwhile.</summary>
+    public static readonly Error SuggestionDecided = Error.Conflict(ConflictCode, "That suggested dividend was accepted or dismissed meanwhile. Reload the list.");
 
     public static readonly Error TradeBatchNotFound = Error.NotFound(NotFoundCode, "The import does not exist.");
 

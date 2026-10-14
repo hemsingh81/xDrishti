@@ -29,6 +29,7 @@ using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.BrokerHistory;
+using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Live;
 using XDrishti.Application.Portfolio.Quotes;
@@ -333,6 +334,15 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<SyncBrokerHistoryCommand, BrokerHistoryRunView>, SyncBrokerHistoryHandler>();
         services.AddScoped<IQueryHandler<GetBrokerHistoryStatusQuery, Result<BrokerHistoryStatusView>>, GetBrokerHistoryStatusHandler>();
         services.AddScoped<IQueryHandler<ListLedgerQuery, Result<LedgerPage>>, ListLedgerHandler>();
+
+        // Dividends entered by the owner, and the suggestions from the ledger (ADR 0026).
+        services.AddScoped<ICommandHandler<AddDividendCommand, DividendView>, AddDividendHandler>();
+        services.AddScoped<ICommandHandler<VoidDividendCommand, DividendView>, VoidDividendHandler>();
+        services.AddScoped<IQueryHandler<ListHoldingDividendsQuery, Result<DividendPage>>, ListHoldingDividendsHandler>();
+        services.AddScoped<IQueryHandler<ListAccountDividendsQuery, Result<DividendPage>>, ListAccountDividendsHandler>();
+        services.AddScoped<IQueryHandler<ListDividendSuggestionsQuery, Result<DividendSuggestionPage>>, ListDividendSuggestionsHandler>();
+        services.AddScoped<ICommandHandler<AcceptDividendSuggestionCommand, DividendView>, AcceptDividendSuggestionHandler>();
+        services.AddScoped<ICommandHandler<DismissDividendSuggestionCommand, SuggestionDecisionView>, DismissDividendSuggestionHandler>();
 
         // The live price sink (ADR 0024): a singleton for the lifetime of the feed process; it resolves the scoped ports per flush.
         services.AddSingleton<LiveFlush>();

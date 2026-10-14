@@ -220,20 +220,20 @@ describe('Holding drawer: Void', () => {
     await askVoid(table, sellName);
     await confirmVoid(table, sellName);
     const rowOf = (text: RegExp) => within(table.getByRole('row', { name: text }));
-    expect(await rowOf(/5 Oct 2026/).findByText(/^Voided on /)).toBeInTheDocument();
+    expect(await rowOf(/\b5 Oct 2026/).findByText(/^Voided on /)).toBeInTheDocument();
     expect(await rowOf(/20 Sept 2026/).findByText(/^Voided on /)).toBeInTheDocument();
 
     await releaseStep(); // the first (the buy) is refused
     expect(await screen.findByText('Could not void that trade.')).toBeInTheDocument();
 
     // The buy is back; the sell, still on its way, stays struck out.
-    expect(rowOf(/5 Oct 2026/).getByRole('button', { name: `Void ${buyName}` })).toBeInTheDocument();
+    expect(rowOf(/\b5 Oct 2026/).getByRole('button', { name: `Void ${buyName}` })).toBeInTheDocument();
     expect(rowOf(/20 Sept 2026/).getByText(/^Voided on /)).toBeInTheDocument();
     expect(rowOf(/20 Sept 2026/).queryByRole('button', { name: /^Void/ })).not.toBeInTheDocument();
 
     await releaseStep(); // the sell goes through
     expect(await rowOf(/20 Sept 2026/).findByText('Voided by owner on 13 Oct 2026')).toBeInTheDocument();
-    expect(rowOf(/5 Oct 2026/).getByRole('button', { name: `Void ${buyName}` })).toBeInTheDocument();
+    expect(rowOf(/\b5 Oct 2026/).getByRole('button', { name: `Void ${buyName}` })).toBeInTheDocument();
   });
 
   it('puts the trade back and says why when the server says no', async () => {

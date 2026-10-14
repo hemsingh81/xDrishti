@@ -1,4 +1,5 @@
 import { Card, CardContent, Stack, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import type { Ref } from 'react';
 import type { AccountSummary, PortfolioBucket } from '@/shared/api';
 import { SearchField } from '@/shared/ui/SearchField';
 import { Typeahead, type TypeaheadOption } from '@/shared/ui/Typeahead';
@@ -12,6 +13,8 @@ interface ScopeBarProps {
   /** Undefined while loading or when they could not be loaded: the filter then offers nothing, the rest still works. */
   buckets: readonly PortfolioBucket[] | undefined;
   bucketsLoading: boolean;
+  /** The input of the Account picker, for a control elsewhere that sends the owner to it. */
+  accountInputRef?: Ref<HTMLInputElement>;
   onChange: (patch: Partial<PortfolioFilters>, options?: { replace?: boolean }) => void;
 }
 
@@ -24,13 +27,14 @@ const bucketOptions = (buckets: readonly PortfolioBucket[] | undefined): Typeahe
   (buckets ?? []).map((b) => ({ value: b.id, label: b.name }));
 
 /** Which holdings and how they are listed: the account, the bucket, open or closed, a search and Group by. Every change goes to the URL through `onChange`. */
-export function ScopeBar({ filters, accounts, buckets, bucketsLoading, onChange }: ScopeBarProps) {
+export function ScopeBar({ filters, accounts, buckets, bucketsLoading, accountInputRef, onChange }: ScopeBarProps) {
   return (
     <Card sx={{ mb: 2, flexShrink: 0 }}>
       <CardContent>
         <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
           <Typeahead
             label="Account"
+            inputRef={accountInputRef}
             placeholder="All accounts"
             options={accountOptions(accounts)}
             value={filters.account}

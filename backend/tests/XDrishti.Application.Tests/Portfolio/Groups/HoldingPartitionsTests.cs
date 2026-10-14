@@ -66,7 +66,7 @@ public sealed class HoldingPartitionsTests
         var bySymbols = SymbolsByGroup(GroupDimension.Basket);
 
         bySymbols[Core.ToString()].ShouldBe(["AAA", "BBB"]);
-        bySymbols[Dividend.ToString()].ShouldBe(["AAA"]);
+        bySymbols[DividendBasket.ToString()].ShouldBe(["AAA"]);
         bySymbols["~none"].ShouldBe(["CCC", "DDD", "EEE"]);
         HoldingPartitions.Partition(AllHoldings(), GroupDimension.Basket, Classes()).Single(g => g.Key == "~none").Name.ShouldBe("No basket");
     }
@@ -97,7 +97,7 @@ public sealed class HoldingPartitionsTests
         HoldingPartitions.InGroup(aaa, GroupDimension.Account, AccountTwo.ToString(), classes).ShouldBeFalse();
         HoldingPartitions.InGroup(aaa, GroupDimension.Bucket, BucketA.ToString(), classes).ShouldBeTrue();
         HoldingPartitions.InGroup(aaa, GroupDimension.Basket, Core.ToString(), classes).ShouldBeTrue();
-        HoldingPartitions.InGroup(aaa, GroupDimension.Basket, Dividend.ToString(), classes).ShouldBeTrue();
+        HoldingPartitions.InGroup(aaa, GroupDimension.Basket, DividendBasket.ToString(), classes).ShouldBeTrue();
         HoldingPartitions.InGroup(Ccc(), GroupDimension.Basket, "~none", classes).ShouldBeTrue();
     }
 }

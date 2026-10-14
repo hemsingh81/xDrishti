@@ -24,6 +24,7 @@ import {
   summaryOf,
 } from './fixtures';
 import { brokerHistoryHandlers } from './brokerHistoryFixtures';
+import { dividendHandlers } from './dividendFixtures';
 import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
@@ -106,6 +107,8 @@ export const handlers = [
   ...tradeHandlers,
   // Dhan trade history and ledger (P2-13): both read, nothing running, an empty ledger.
   ...brokerHistoryHandlers,
+  // Dividends (P2-14): none entered and none suggested by default; the dividend fake brings stateful ones.
+  ...dividendHandlers,
   // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),

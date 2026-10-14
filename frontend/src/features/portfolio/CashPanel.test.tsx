@@ -35,11 +35,14 @@ async function openPanel() {
 }
 
 describe('Cash & dividends panel', () => {
-  it('shows the totals of the five classes, the list newest first, and that dividends and charges are not in returns yet', async () => {
+  it('shows the totals of the five classes, the list newest first, and that Dhan rarely lists dividends', async () => {
     serveLedger();
     const panel = await openPanel();
 
-    expect(panel.getByText(/Dividends and charges are not in returns yet\./)).toBeInTheDocument();
+    expect(
+      panel.getByText(/Dhan credits dividends to your bank account, so they rarely appear here/),
+    ).toBeInTheDocument();
+    expect(panel.getByText(/enter them yourself/)).toBeInTheDocument();
     const totals = within(await panel.findByRole('region', { name: 'Totals by class' }));
     for (const [label, amount, hint] of [
       ['Funds in', '+₹20,000.00', '1 entry'],

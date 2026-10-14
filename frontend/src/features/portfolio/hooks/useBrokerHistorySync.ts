@@ -13,9 +13,12 @@ export function useBrokerHistorySync(accountId: string) {
   const sync = useSyncBrokerHistory(accountId);
   return {
     status,
-    start: () => {
-      sync.mutate();
+    /** Reads now; with `from` (an India date) from that day instead of the watermark. `onStarted` runs when the API took the run. */
+    start: (options?: { from?: string }, onStarted?: () => void) => {
+      sync.mutate(options, { onSuccess: onStarted });
     },
+    /** Forgets the last refusal (the dialog of an earlier start does so when it opens and when the date changes). */
+    reset: sync.reset,
     /** A run is running, or the request that starts one is on its way. */
     running: sync.isPending || (status.data?.running ?? false),
     error: sync.error,

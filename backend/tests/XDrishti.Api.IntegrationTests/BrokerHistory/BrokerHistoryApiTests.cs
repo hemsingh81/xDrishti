@@ -48,6 +48,24 @@ public sealed class BrokerHistoryApiTests(ApiFactory factory) : BrokerHistoryTes
     }
 
     [Fact]
+    public async Task Trades_without_a_ticker_as_in_dhans_published_sample_are_resolved_by_security_id_keep_the_isin_and_sum_the_charges()
+    {
+        var held = await HeldAsync();
+        Dhan.Trades.Add(new FakeBrokers.FakeTrade("T1", null, "BUY", 10, 90m, D(5), Morning, Isin: TradesApi.Isin, Brokerage: 12.5m));
+        Dhan.Trades.Add(new FakeBrokers.FakeTrade("T2", null, "BUY", 5, 110m, D(6), Morning, Isin: TradesApi.Isin));
+        Dhan.Trades.Add(new FakeBrokers.FakeTrade("T3", null, "SELL", 3, 130m, D(8), Morning, Isin: TradesApi.Isin));
+
+        var (_, status) = await SyncAndWaitAsync(held.Account.Id);
+
+        (status.Trades.LastRun!.Status, status.Trades.LastRun.Counts.Stored, status.Trades.LastRun.Counts.Dropped, status.Trades.LastRun.Counts.Skipped).ShouldBe(("succeeded", 3, 0, 0));
+        (status.HoldingsRebuilt, status.HoldingsNeedingReview).ShouldBe((1, 0));
+        (await TransactionsAsync($"source = 'broker' AND trading_symbol = 'EXMPL' AND isin = '{TradesApi.Isin}' AND instrument_id = '{held.Instrument}'")).ShouldBe(3);
+        (await TransactionsAsync("external_id = 't:20261005:T1' AND charges = 13.0")).ShouldBe(1); // 12.5 brokerage + 0.5 STT
+        (await TransactionsAsync("external_id <> 't:20261005:T1' AND charges = 0")).ShouldBe(2);
+        (await LotsOfAsync(held.HoldingId)).Lots.ShouldContain(l => l.AcquiredOn == D(5) && l.Source == "trade");
+    }
+
+    [Fact]
     public async Task The_calls_to_dhan_are_the_documented_ones_with_the_token_in_the_header_only_and_nothing_secret_is_logged()
     {
         var held = await HeldAsync();

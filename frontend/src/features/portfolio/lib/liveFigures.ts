@@ -1,4 +1,4 @@
-import type { HoldingRow } from '@/shared/api';
+import type { HoldingRow, IncomeView } from '@/shared/api';
 import { istDayIso } from '@/shared/lib/format';
 import type { LiveTick, LiveTicks } from './liveTicks';
 
@@ -8,8 +8,10 @@ import type { LiveTick, LiveTicks } from './liveTicks';
  * x last price, profit = value - invested, the percentage of invested), `DayChangeCalculator` (quantity x (last - previous
  * close), left out without a usable previous close, and for a live price when the previous close is not of the tick's India
  * day), and `GroupCalculator` (sums over the holdings of a group, the weight as a share of the scope's value). Money is
- * rounded to four decimals as the server rounds it. What cannot be worked out from a row (XIRR, the benchmark, the history)
- * stays as the last read gave it, and the read every five minutes makes everything exact again.
+ * rounded to four decimals as the server rounds it. What cannot be worked out from a row (XIRR, the net XIRR, the benchmark,
+ * the history) stays as the last read gave it, and the read every five minutes makes everything exact again. The dividends and
+ * charges of an `income` never change with a price; only its two total return percentages do (`incomeAt`, the twin of
+ * `IncomeCalculator.Percent`).
  */
 
 const scale = 10_000;
@@ -20,6 +22,28 @@ export const round4 = (value: number): number => {
   // A small negative that rounds to nothing is 0, not -0 (the server's decimal has no negative zero).
   return value < 0 && rounded !== 0 ? -rounded : rounded;
 };
+
+/**
+ * The income of a scope at a live profit (ADR 0026): the dividends, charges, dates and net XIRR are the read's; the total
+ * return % is (realised + profit + dividends) over invested and the net one is the same less the charges, rounded once, null
+ * without invested capital or without a usable price (`pnl` null: nothing of the scope is priced). The scope's own `realised`
+ * and `invested` are used. An income that is not there (nothing recorded) stays as it is.
+ */
+export function incomeAt(
+  income: IncomeView | null | undefined,
+  realised: number,
+  invested: number,
+  pnl: number | null,
+): IncomeView | null | undefined {
+  if (!income) return income;
+  const percent = (extra: number): number | null =>
+    invested > 0 && pnl !== null ? round4(((realised + pnl + extra) / invested) * 100) : null;
+  return {
+    ...income,
+    totalReturnPct: percent(income.dividends),
+    netTotalReturnPct: percent(income.dividends - income.charges),
+  };
+}
 
 export const isOpenRow = (row: HoldingRow): boolean => row.status === 'open';
 
@@ -74,6 +98,7 @@ export function applyTick(row: HoldingRow, tick: LiveTick | undefined): HoldingR
       pnl: round4(profit),
       pnlPct: invested > 0 ? round4((profit / invested) * 100) : null,
     },
+    income: incomeAt(row.income, row.returns.realisedPnl, invested, round4(profit)),
     dayChange: counts ? round4(row.qty * (tick.price - previous)) : null,
     dayChangePct: counts ? round4(((tick.price - previous) / previous) * 100) : null,
   };

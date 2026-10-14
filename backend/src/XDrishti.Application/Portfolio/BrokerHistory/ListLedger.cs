@@ -66,6 +66,6 @@ internal sealed class ListLedgerHandler(IAccountStore accounts, ILedgerStore led
 
         var (items, total) = await ledger.ListAsync(query.AccountId, query.From, query.To, entryClass, page, pageSize, cancellationToken);
         var totals = await ledger.TotalsAsync(query.AccountId, query.From, query.To, cancellationToken);
-        return Result.Success(new LedgerPage([.. items.Select(BrokerHistoryViews.Entry)], page, pageSize, total, BrokerHistoryViews.Totals(totals)));
+        return Result.Success(new LedgerPage([.. items.Select(BrokerHistoryViews.Entry)], page, pageSize, total, BrokerHistoryViews.Totals(totals), await ledger.FirstDateAsync(query.AccountId, cancellationToken)));
     }
 }

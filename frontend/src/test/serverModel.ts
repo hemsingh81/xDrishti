@@ -1,4 +1,4 @@
-import type { HoldingGroup, HoldingGroups, HoldingRow, HoldingsSummary } from '@/shared/api';
+import type { HoldingGroup, HoldingGroups, HoldingRow, HoldingsSummary, IncomeView } from '@/shared/api';
 import { istDayIso } from '@/shared/lib/format';
 import { buildHolding, buildReturns, buildSummary } from './fixtures';
 
@@ -35,6 +35,19 @@ export interface ModelHolding {
   previousClosePaise: number | null;
   /** When the previous close was written (only a quote writes it); null: not known. */
   previousCloseAt: number | null;
+  /** The holding's dividends (not voided) and the charges of its trades, in ten-thousandths of a rupee; 0 or absent: none recorded. */
+  dividends4?: number;
+  charges4?: number;
+}
+
+/**
+ * What belongs to an account and to none of its holdings (ADR 0026): dividends with no holding and the costs of the ledger (also
+ * the charges of a security no holding has), in ten-thousandths of a rupee. Zero is "nothing recorded"; a refund is negative.
+ */
+export interface ModelAccountIncome {
+  accountId: string;
+  dividends4: number;
+  charges4: number;
 }
 
 const money = (paise: number): number => paise / 100;
@@ -48,6 +61,78 @@ const round4 = (value: number): number => {
 const isOpen = (h: ModelHolding): boolean => h.status === 'open';
 const openLots = (h: ModelHolding): ModelLot[] => h.lots.filter((l) => !l.closed);
 const isPriced = (h: ModelHolding): boolean => h.pricePaise > 0 || h.lots.every((l) => l.closed);
+
+/** Money in ten-thousandths of a rupee (integers, so the sums are exact): a paisa is 100 of them. */
+const units4 = (paise: number): number => paise * 100;
+const rupees4 = (value4: number): number => value4 / 10_000;
+
+/** What a closed lot made: quantity x (closing price - unit cost). */
+const realisedPaise = (h: ModelHolding): number =>
+  h.lots.filter((l) => l.closed).reduce((sum, l) => sum + l.qty * (l.closePricePaise - l.unitCostPaise), 0);
+
+/** `x / y x 100` rounded to four decimals, halves away from zero, in exact integer arithmetic (the server's decimals). */
+function percent4(numerator4: number, invested4: number): number {
+  const n = BigInt(numerator4) * 1_000_000n;
+  const d = BigInt(invested4);
+  const magnitude = ((n < 0n ? -n : n) * 2n + d) / (2n * d);
+  return Number(n < 0n ? -magnitude : magnitude) / 10_000;
+}
+
+/** The two return percentages of a scope: null without invested capital or without a profit (nothing priced). */
+const returnPct = (realised4: number, pnl4: number | null, invested4: number, extra4: number): number | null =>
+  pnl4 === null || invested4 <= 0 ? null : percent4(realised4 + pnl4 + extra4, invested4);
+
+const noDates = {
+  coverageFrom: '2024-02-01',
+  dividendsFrom: '2024-02-01',
+  chargesFrom: '2024-01-01',
+  tradeChargesFrom: '2024-01-01',
+  ledgerChargesFrom: null,
+} as const;
+
+interface IncomeInput {
+  dividends4: number;
+  charges4: number;
+  /** Something was recorded: otherwise there is no income object. */
+  recorded: boolean;
+  unallocated4: number | null;
+  realised4: number;
+  invested4: number;
+  pnl4: number | null;
+}
+
+/** `IncomeCalculator.Of` + `IncomeViews.View`: null when nothing is recorded; the net XIRR is a constant (the browser never works it out). */
+function incomeView(i: IncomeInput): IncomeView | null {
+  if (!i.recorded) return null;
+  return {
+    dividends: rupees4(i.dividends4),
+    charges: rupees4(i.charges4),
+    ledgerCharges: null,
+    unallocated: i.unallocated4 === null ? null : rupees4(i.unallocated4),
+    totalReturnPct: returnPct(i.realised4, i.pnl4, i.invested4, i.dividends4),
+    netTotalReturnPct: returnPct(i.realised4, i.pnl4, i.invested4, i.dividends4 - i.charges4),
+    netXirr: 11.5,
+    netXirrState: 'ok',
+    ...noDates,
+  };
+}
+
+const holdingFlows = (holdings: readonly ModelHolding[]) => ({
+  dividends4: holdings.reduce((sum, h) => sum + (h.dividends4 ?? 0), 0),
+  charges4: holdings.reduce((sum, h) => sum + (h.charges4 ?? 0), 0),
+  recorded: holdings.some((h) => (h.dividends4 ?? 0) !== 0 || (h.charges4 ?? 0) !== 0),
+});
+
+/** The holdings' flows plus those of the accounts that are counted at this scope. */
+function flowsWith(holdings: readonly ModelHolding[], accounts: readonly ModelAccountIncome[]) {
+  const own = holdingFlows(holdings);
+  return {
+    dividends4: own.dividends4 + accounts.reduce((sum, a) => sum + a.dividends4, 0),
+    charges4: own.charges4 + accounts.reduce((sum, a) => sum + a.charges4, 0),
+    recorded: own.recorded || accounts.some((a) => a.dividends4 !== 0 || a.charges4 !== 0),
+    unallocated4: accounts.reduce((sum, a) => sum + a.dividends4, 0),
+  };
+}
 
 /** `DayChangeCalculator.Counts`. */
 function counts(h: ModelHolding): boolean {
@@ -123,7 +208,14 @@ export function rowOf(h: ModelHolding): HoldingRow {
       pnlPct: pnlRaw === null || invested <= 0 ? null : round4((pnlRaw / invested) * 100),
       xirr: 12.5,
       xirrState: 'ok',
-      realisedPnl: 0,
+      realisedPnl: money(realisedPaise(h)),
+    }),
+    income: incomeView({
+      ...holdingFlows([h]),
+      unallocated4: null,
+      realised4: units4(realisedPaise(h)),
+      invested4: units4(invested),
+      pnl4: pnlRaw === null ? null : units4(pnlRaw),
     }),
     dayChange: counted ? round4(money(h.qty * (h.pricePaise - (previous ?? 0)))) : null,
     dayChangePct: counted ? round4(((h.pricePaise - (previous ?? 0)) / (previous ?? 1)) * 100) : null,
@@ -157,8 +249,15 @@ function figures(holdings: readonly ModelHolding[]) {
   };
 }
 
-/** The summary of the holdings (the fields price moves change) merged into a full summary. */
-export function summaryOf(holdings: readonly ModelHolding[], base: HoldingsSummary = buildSummary()): HoldingsSummary {
+/**
+ * The summary of the holdings (the fields price moves change) merged into a full summary. With the accounts' own income given
+ * the summary carries an `income` (the realised result is then the holdings' closed lots'); without it the base's is kept.
+ */
+export function summaryOf(
+  holdings: readonly ModelHolding[],
+  base: HoldingsSummary = buildSummary(),
+  accounts?: readonly ModelAccountIncome[],
+): HoldingsSummary {
   const f = figures(holdings);
   const s = sums(holdings);
   const times = holdings
@@ -166,6 +265,10 @@ export function summaryOf(holdings: readonly ModelHolding[], base: HoldingsSumma
     .map((h) => h.priceAt!)
     .sort((a, b) => a - b);
   const iso = (ms: number | undefined) => (ms === undefined ? null : new Date(ms).toISOString());
+  const realised =
+    accounts === undefined ? base.returns.realisedPnl : money(holdings.reduce((n, h) => n + realisedPaise(h), 0));
+  const flows = flowsWith(holdings, accounts ?? []);
+  const nothingPriced = holdings.length > 0 && holdings.every((h) => !isPriced(h));
   return {
     ...base,
     returns: {
@@ -174,7 +277,18 @@ export function summaryOf(holdings: readonly ModelHolding[], base: HoldingsSumma
       value: round4(money(s.value)),
       pnl: round4(money(s.value - s.invested)),
       pnlPct: s.invested > 0 ? round4(((s.value - s.invested) / s.invested) * 100) : null,
+      realisedPnl: realised,
     },
+    ...(accounts === undefined
+      ? {}
+      : {
+          income: incomeView({
+            ...flows,
+            realised4: Math.round(realised * 10_000),
+            invested4: units4(s.invested),
+            pnl4: nothingPriced ? null : units4(s.value - s.invested),
+          }),
+        }),
     openCount: holdings.filter(isOpen).length,
     closedCount: holdings.filter((h) => !isOpen(h)).length,
     unpricedCount: f.unpriced,
@@ -190,31 +304,103 @@ export type ModelDimension = 'account' | 'bucket' | 'sector';
 const keyOf = (h: ModelHolding, by: ModelDimension): string =>
   by === 'account' ? h.accountId : by === 'bucket' ? h.bucketId : h.sector;
 
-/** The groups of the holdings by a dimension, in order of first appearance, with the total row (`GroupCalculator`). */
-export function groupsOf(holdings: readonly ModelHolding[], by: ModelDimension): HoldingGroups {
+/**
+ * The groups of the holdings by a dimension, in order of first appearance, with the total row (`GroupCalculator`) and, when the
+ * accounts' own income is given, the groups' `income` and the extra last group Unallocated: a group by account holds the
+ * income of its account, the Unallocated group the income of the accounts no group holds (every account for the other
+ * dimensions), and the total all of it.
+ */
+export function groupsOf(
+  holdings: readonly ModelHolding[],
+  by: ModelDimension,
+  accounts?: readonly ModelAccountIncome[],
+): HoldingGroups {
   const keys = [...new Set(holdings.map((h) => keyOf(h, by)))];
   const scope = scopeValue(holdings);
+  const withIncome = accounts !== undefined;
+  const incomeOf = (members: readonly ModelHolding[], own: readonly ModelAccountIncome[], unallocated: boolean) => {
+    if (!withIncome) return {};
+    const s = sums(members);
+    const nothingPriced = members.length > 0 && members.every((h) => !isPriced(h));
+    const flows = flowsWith(members, own);
+    return {
+      income: incomeView({
+        ...flows,
+        unallocated4: unallocated ? flows.unallocated4 : null,
+        realised4: units4(members.reduce((n, h) => n + realisedPaise(h), 0)),
+        invested4: units4(s.invested),
+        pnl4: nothingPriced ? null : units4(s.value - s.invested),
+      }),
+    };
+  };
+  const realised = (members: readonly ModelHolding[]) => money(members.reduce((n, h) => n + realisedPaise(h), 0));
   const groups: HoldingGroup[] = keys.map((key) => {
     const members = holdings.filter((h) => keyOf(h, by) === key);
     const f = figures(members);
+    const own = by === 'account' ? (accounts ?? []).filter((a) => a.accountId === key) : [];
     return {
       key,
       name: key,
       ...f,
-      realised: 0,
+      realised: realised(members),
       xirr: 12.5,
       xirrState: 'ok',
       weightPct: weight(f.value, scope),
       parts: null,
+      ...incomeOf(members, own, by === 'account'),
     };
   });
+  if (withIncome) {
+    // Accounts of a group by account are in their group; every other account's own income is in no group.
+    const absorbed = new Set(by === 'account' ? keys : []);
+    const loose = accounts.filter((a) => !absorbed.has(a.accountId));
+    const flows = flowsWith([], loose);
+    if (flows.recorded) {
+      groups.push({
+        key: '~unallocated',
+        name: 'Unallocated',
+        holdings: 0,
+        unpriced: 0,
+        invested: 0,
+        value: null,
+        pnl: null,
+        pnlPct: null,
+        realised: 0,
+        xirr: null,
+        xirrState: 'no_data',
+        dayChange: null,
+        dayChangePct: null,
+        dayChangeExcluded: 0,
+        weightPct: null,
+        parts: null,
+        income: {
+          dividends: rupees4(flows.dividends4),
+          charges: rupees4(flows.charges4),
+          ledgerCharges: null,
+          unallocated: rupees4(flows.dividends4),
+          totalReturnPct: null,
+          netTotalReturnPct: null,
+          netXirr: null,
+          netXirrState: 'no_data',
+          ...noDates,
+        },
+      });
+    }
+  }
   const total = figures(holdings);
   return {
     by,
     additive: true,
     stackBy: null,
     groups,
-    total: { ...total, realised: 0, xirr: 12.5, xirrState: 'ok', weightPct: weight(total.value, total.value) },
+    total: {
+      ...total,
+      realised: realised(holdings),
+      xirr: 12.5,
+      xirrState: 'ok',
+      weightPct: weight(total.value, total.value),
+      ...incomeOf(holdings, accounts ?? [], true),
+    },
   };
 }
 

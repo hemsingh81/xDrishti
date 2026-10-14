@@ -37,6 +37,21 @@ export function invalidateHoldings(queryClient: QueryClient) {
 }
 
 /**
+ * The income of holdings changed (a dividend was added, voided or accepted): only what carries an `income` is read again - the
+ * list, the groups, the totals and the holdings looked up for the drawer. The live reads are included on purpose (the live
+ * totals show the income they were read with, and nothing else would refresh them before the 5-minute timer); the value
+ * history, the lots, the trades, the Action center and the alerts do not depend on dividends and are left alone.
+ */
+export function invalidateIncome(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: portfolioKeys.holdings }),
+    queryClient.invalidateQueries({ queryKey: portfolioKeys.groups }),
+    queryClient.invalidateQueries({ queryKey: portfolioKeys.summary }),
+    queryClient.invalidateQueries({ queryKey: [...portfolioKeys.lookups, 'holding'] }),
+  ]);
+}
+
+/**
  * Only the figures that move with prices are read again: the list, the groups, the totals and the holdings looked up for the
  * drawer. Used when a quote arrives over the live hub and when the hub (re)connects, where the Action center, the history and
  * the trades need no new read.

@@ -162,6 +162,9 @@ internal sealed class InMemoryBrokerData(InMemoryPortfolioData portfolio) : IBro
         return ValueTask.FromResult<(IReadOnlyList<LedgerEntry>, int)>(([.. all.Skip((page - 1) * pageSize).Take(pageSize)], all.Count));
     }
 
+    public ValueTask<DateOnly?> FirstDateAsync(Guid accountId, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Entries.Where(e => e.AccountId == accountId).Select(e => (DateOnly?)e.EntryDate).Min());
+
     public ValueTask<IReadOnlyList<LedgerTotal>> TotalsAsync(Guid accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<LedgerTotal>>([.. Filter(accountId, from, to).GroupBy(e => e.EntryClass).Select(g => new LedgerTotal(g.Key, g.Count(), g.Sum(e => e.Amount)))]);
 

@@ -22,6 +22,7 @@ export const buildBrokerCounts = (overrides: Partial<BrokerSyncCounts> = {}): Br
   stored: 4,
   duplicates: 10,
   dropped: 0,
+  enriched: 0,
   skipped: 0,
   skippedByReason: {},
   rebuilt: 0,
@@ -165,7 +166,14 @@ export const totalsOfEntries = (entries: readonly LedgerEntry[]): LedgerClassTot
   });
 
 /** The ledger as the API answers it: the class filter narrows the items, the totals follow the period only. */
-export function answerLedger(entries: readonly LedgerEntry[], params: URLSearchParams): LedgerPage {
+export function answerLedger(
+  entries: readonly LedgerEntry[],
+  params: URLSearchParams,
+  coverageFrom: string | null = entries.reduce<string | null>(
+    (first, e) => (first === null || e.date < first ? e.date : first),
+    null,
+  ),
+): LedgerPage {
   const from = params.get('from');
   const to = params.get('to');
   const cls = params.get('class');
@@ -179,6 +187,7 @@ export function answerLedger(entries: readonly LedgerEntry[], params: URLSearchP
     pageSize,
     total: matching.length,
     totals: totalsOfEntries(inPeriod),
+    coverageFrom,
   };
 }
 

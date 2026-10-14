@@ -65,4 +65,8 @@ public enum AccountEventType
     TradeVoided,
     LotsRebuilt,
     BrokerHistorySynced,
+    DividendAdded,
+    DividendVoided,
+    DividendSuggestionAccepted,
+    DividendSuggestionDismissed,
 }

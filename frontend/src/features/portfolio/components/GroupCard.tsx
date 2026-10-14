@@ -7,6 +7,7 @@ import { GroupChildren, type GroupScope } from './GroupChildren';
 import { GroupExpander } from './GroupExpander';
 import {
   GroupDayChange,
+  GroupDividends,
   GroupInvested,
   GroupPnl,
   GroupValue,
@@ -16,7 +17,7 @@ import {
   type GroupFigures,
 } from './GroupFigures';
 
-function Figure({ label, children }: { label: string; children: ReactNode }) {
+export function Figure({ label, children }: { label: string; children: ReactNode }) {
   return (
     <Box sx={{ minWidth: 0 }}>
       <Typography component="dt" variant="caption" color="text.secondary">
@@ -48,6 +49,11 @@ function Figures({ figures }: { figures: GroupFigures }) {
       <Figure label="XIRR">
         <GroupXirr group={figures} align="flex-start" />
       </Figure>
+      {figures.income && (
+        <Figure label="Dividends">
+          <GroupDividends group={figures} align="flex-start" />
+        </Figure>
+      )}
       <Figure label="Day change">
         <GroupDayChange group={figures} align="flex-start" />
       </Figure>

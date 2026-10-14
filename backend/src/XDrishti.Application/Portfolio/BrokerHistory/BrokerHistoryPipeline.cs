@@ -228,7 +228,7 @@ internal sealed class BrokerHistoryPipeline(
     /// </summary>
     private async ValueTask<bool> RebuildOwedAsync(Guid accountId, BrokerSyncRun run, BrokerSyncCounts counts, CancellationToken cancellationToken)
     {
-        if (counts.Stored > 0)
+        if (counts.Stored > 0 || counts.Enriched > 0)
         {
             return true;
         }
@@ -262,16 +262,25 @@ internal sealed class BrokerHistoryPipeline(
         var dropped = read.Dropped;
         var repeated = 0;
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        var usable = new List<(BrokerTrade Row, string Id)>(read.Trades.Count);
-        foreach (var trade in read.Trades)
+        var skipped = new Dictionary<string, int>(read.Skipped, StringComparer.Ordinal);
+        var usable = new List<(ResolvedBrokerTrade Row, string Id)>(read.Trades.Count);
+        var resolved = await BrokerTradeSecurities.ResolveAsync(reference, read.Trades, cancellationToken);
+        foreach (var trade in resolved)
         {
-            if (!IsUsable(trade, today))
+            if (!IsUsable(trade.Trade, today))
             {
                 dropped++;
                 continue;
             }
 
-            var id = TradeIdentity.ForTradeId(trade.Date, trade.TradeId);
+            if (!trade.IsIdentified)
+            {
+                // Neither a ticker nor an ISIN, and the security id is not in the master: counted, never silently lost.
+                skipped[BrokerSkipReasons.NoSymbol] = skipped.GetValueOrDefault(BrokerSkipReasons.NoSymbol) + 1;
+                continue;
+            }
+
+            var id = TradeIdentity.ForTradeId(trade.Trade.Date, trade.Trade.TradeId);
             if (seen.Add(id))
             {
                 usable.Add((trade, id));
@@ -287,24 +296,23 @@ internal sealed class BrokerHistoryPipeline(
             window,
             usable,
             (ids, token) => trades.StoredIdsAsync(account.Id, ids, token),
-            async (batch, at, token) =>
+            (batch, at, _) =>
             {
-                var master = new TradeInstruments(await reference.FindInstrumentsAsync([], [.. batch.Select(f => TradeRules.NormaliseSymbol(f.Row.Symbol)).Distinct(StringComparer.Ordinal)], token));
                 var seq = 0;
                 trades.Add(
                 [
                     .. batch.Select(f => Transaction.Create(
                         account.Id,
-                        master.Find(null, f.Row.Symbol)?.Id,
-                        null,
+                        f.Row.InstrumentId,
+                        f.Row.Isin,
                         f.Row.Symbol,
                         "NSE",
-                        f.Row.Side,
-                        f.Row.Date,
-                        f.Row.Time,
-                        f.Row.Qty,
-                        f.Row.Price,
-                        0m,
+                        f.Row.Trade.Side,
+                        f.Row.Trade.Date,
+                        f.Row.Trade.Time,
+                        f.Row.Trade.Qty,
+                        f.Row.Trade.Price,
+                        f.Row.Trade.Charges,
                         TradeSource.Broker,
                         null,
                         ++seq,
@@ -313,10 +321,28 @@ internal sealed class BrokerHistoryPipeline(
                         at,
                         run.Id)),
                 ]);
+                return ValueTask.CompletedTask;
             },
-            placed => counts.AddWindow(read.Rows, placed.Stored, repeated + placed.Existing, dropped + placed.Refused, read.Skipped, read.Halved, read.EmptyByNoData),
-            cancellationToken);
+            placed => counts.AddWindow(read.Rows, placed.Stored, repeated + placed.Existing, dropped + placed.Refused, skipped, read.Halved, read.EmptyByNoData, placed.Enriched),
+            cancellationToken,
+            EnrichAsync(account.Id));
     }
+
+    /// <summary>
+    /// The completion of trades stored by an earlier read (ADR 0026): of the rows of a window that are stored already, those from the broker that lack an ISIN, a ticker or charges get them from this read - and nothing else changes (see
+    /// <see cref="Transaction.EnrichFromBroker"/>; a trade from a file or typed in, and a voided one, are not looked at). Saved in the unit of work of the window. Returns how many trades were completed.
+    /// </summary>
+    private Func<IReadOnlyList<(ResolvedBrokerTrade Row, string Id)>, CancellationToken, ValueTask<int>> EnrichAsync(Guid accountId) => async (existing, cancellationToken) =>
+    {
+        var incomplete = await trades.ListBrokerAwaitingEnrichmentAsync(accountId, [.. existing.Select(r => r.Id)], cancellationToken);
+        if (incomplete.Count == 0)
+        {
+            return 0;
+        }
+
+        var read = existing.ToDictionary(r => r.Id, r => r.Row, StringComparer.Ordinal);
+        return incomplete.Count(t => read.TryGetValue(t.ExternalId, out var row) && t.EnrichFromBroker(row.Isin, row.Symbol, row.Trade.Charges));
+    };
 
     /// <summary>Stores one window of the ledger with the run's progress and the watermark move, in one unit of work.</summary>
     private async ValueTask<Result<BrokerSyncCounts>> StoreLedgerAsync(
@@ -353,7 +379,7 @@ internal sealed class BrokerHistoryPipeline(
     }
 
     /// <summary>What became of the rows of a window: stored now, stored already, or refused by the database (and not stored by anyone else).</summary>
-    private sealed record Placed(int Stored, int Existing, int Refused);
+    private sealed record Placed(int Stored, int Existing, int Refused, int Enriched = 0);
 
     private enum Fate
     {
@@ -374,7 +400,8 @@ internal sealed class BrokerHistoryPipeline(
         Func<IReadOnlyCollection<string>, CancellationToken, ValueTask<IReadOnlySet<string>>> storedIds,
         Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask> add,
         Func<Placed, BrokerSyncCounts> countsOf,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<IReadOnlyList<(T Row, string Id)>, CancellationToken, ValueTask<int>>? enrich = null)
     {
         BrokerSyncCounts? saved = null;
         var refused = false;
@@ -390,7 +417,13 @@ internal sealed class BrokerHistoryPipeline(
                     await add(fresh, at, token);
                 }
 
-                var next = countsOf(new Placed(fresh.Count, rows.Count - fresh.Count, 0));
+                var enriched = 0;
+                if (enrich is not null && fresh.Count < rows.Count)
+                {
+                    enriched = await enrich([.. rows.Where(r => existing.Contains(r.Id))], token);
+                }
+
+                var next = countsOf(new Placed(fresh.Count, rows.Count - fresh.Count, 0, enriched));
                 if (!await unitOfWork.TrySaveAsync(token))
                 {
                     refused = true;
@@ -408,7 +441,7 @@ internal sealed class BrokerHistoryPipeline(
             return Result.Success(saved!);
         }
 
-        return refused ? await SaveRowByRowAsync(run, window, rows, storedIds, add, countsOf, cancellationToken) : Result.Failure<BrokerSyncCounts>(whole.Error);
+        return refused ? await SaveRowByRowAsync(run, window, rows, storedIds, add, countsOf, enrich, cancellationToken) : Result.Failure<BrokerSyncCounts>(whole.Error);
     }
 
     private async ValueTask<Result<BrokerSyncCounts>> SaveRowByRowAsync<T>(
@@ -418,9 +451,10 @@ internal sealed class BrokerHistoryPipeline(
         Func<IReadOnlyCollection<string>, CancellationToken, ValueTask<IReadOnlySet<string>>> storedIds,
         Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask> add,
         Func<Placed, BrokerSyncCounts> countsOf,
+        Func<IReadOnlyList<(T Row, string Id)>, CancellationToken, ValueTask<int>>? enrich,
         CancellationToken cancellationToken)
     {
-        int stored = 0, existing = 0, refused = 0;
+        int stored = 0, existing = 0, refused = 0, enriched = 0;
         foreach (var row in rows)
         {
             var fate = Fate.Stored;
@@ -430,6 +464,12 @@ internal sealed class BrokerHistoryPipeline(
                     if ((await storedIds([row.Id], token)).Count > 0)
                     {
                         fate = Fate.Existing;
+                        var completed = enrich is null ? 0 : await enrich([row], token);
+                        if (completed > 0 && await unitOfWork.TrySaveAsync(token))
+                        {
+                            enriched += completed;
+                        }
+
                         return Result.Success();
                     }
 
@@ -459,7 +499,7 @@ internal sealed class BrokerHistoryPipeline(
             async token =>
             {
                 var at = clock.GetUtcNow();
-                var next = countsOf(new Placed(stored, existing, refused));
+                var next = countsOf(new Placed(stored, existing, refused, enriched));
                 await runs.UpdateProgressAsync(run.Id, next, token);
                 await runs.MoveWatermarkAsync(run.AccountId, run.Kind, window.From, window.To, at, token);
                 saved = next;
@@ -497,7 +537,7 @@ internal sealed class BrokerHistoryPipeline(
     /// <summary>True when a run changed something: it stored rows or rebuilt holdings, or (trades) the holdings that need review are not the ones the last successful run reported.</summary>
     private async ValueTask<bool> IsNewsAsync(Guid accountId, BrokerSyncRun run, BrokerSyncCounts counts, CancellationToken cancellationToken)
     {
-        if (counts.Stored > 0 || counts.Rebuilt > 0)
+        if (counts.Stored > 0 || counts.Rebuilt > 0 || counts.Enriched > 0)
         {
             return true;
         }
@@ -519,8 +559,9 @@ internal sealed class BrokerHistoryPipeline(
         var trigger = BrokerHistoryViews.Name(run.Trigger);
         var halved = counts.Halved > 0 ? $", {counts.Halved} halved" : string.Empty;
         var noData = counts.EmptyByNoData > 0 ? $", {counts.EmptyByNoData} taken as empty on Dhan's no-data code" : string.Empty;
+        var completed = counts.Enriched > 0 ? $" ({counts.Enriched} completed with an ISIN, charges or ticker)" : string.Empty;
         return run.Kind == BrokerSyncKind.Trades
-            ? $"Broker trades read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new trades, {counts.Duplicates} already stored, {counts.Skipped} skipped, {counts.Dropped} unusable; {counts.Rebuilt} holdings rebuilt, {counts.NeedsReview} need review"
+            ? $"Broker trades read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new trades, {counts.Duplicates} already stored{completed}, {counts.Skipped} skipped, {counts.Dropped} unusable; {counts.Rebuilt} holdings rebuilt, {counts.NeedsReview} need review"
             : $"Broker ledger read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new entries, {counts.Duplicates} already stored, {counts.Dropped} unusable";
     }
 
@@ -534,9 +575,9 @@ internal sealed class BrokerHistoryPipeline(
     /// <summary>A trade the store would refuse (or that cannot be dated) is dropped and counted instead of failing the window.</summary>
     private static bool IsUsable(BrokerTrade trade, DateOnly today) =>
         trade.TradeId.Length is > 0 and <= TradeCsvLimits.MaxTradeIdLength
-        && TradeRules.NormaliseSymbol(trade.Symbol).Length > 0
         && TradeRules.QtyProblem(trade.Qty) is null
         && TradeRules.PriceProblem(TradeRules.Round(trade.Price)) is null
+        && TradeRules.ChargesProblem(TradeRules.Round(trade.Charges)) is null
         && trade.Date >= TradeRules.EarliestDate
         && trade.Date <= today;
 }

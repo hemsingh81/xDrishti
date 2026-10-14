@@ -180,6 +180,9 @@ public static class DependencyInjection
         services.AddScoped<IHoldingClassifications, HoldingClassifications>();
         services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
         services.AddScoped<ITradeStore, TradeStore>();
+        services.AddScoped<IDividendStore, DividendStore>();
+        services.AddScoped<IDividendSuggestionStore, DividendSuggestionStore>();
+        services.AddScoped<IIncomeQueries, IncomeQueries>();
         services.AddScoped<ITradeBatches, TradeBatches>();
         services.AddScoped<ITradeReferenceData, TradeReferenceData>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();

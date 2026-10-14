@@ -20,6 +20,8 @@ interface LiveSummaryProps {
   quotesUnknown: boolean;
   feed: LiveFeed;
   onReviewDates: () => void;
+  /** The invitation under the tiles (no dividend or charge recorded): add a dividend, read the ledger. */
+  income: { onAddDividend: () => void; onReadLedger: () => void };
 }
 
 /**
@@ -34,6 +36,7 @@ export function LiveSummary({
   quotesUnknown,
   feed,
   onReviewDates,
+  income,
 }: LiveSummaryProps) {
   const { ticks, skewMs } = useLive();
   const { rows, read } = useLiveBase();
@@ -67,7 +70,12 @@ export function LiveSummary({
 
   return (
     <>
-      <SummaryTiles query={summary} live={live} history={{ query: history.query, rangeLabel: history.rangeLabel }} />
+      <SummaryTiles
+        query={summary}
+        live={live}
+        history={{ query: history.query, rangeLabel: history.rangeLabel }}
+        income={income}
+      />
       {shown && (
         <PricesLine
           summary={shown}
@@ -90,6 +98,7 @@ export function LiveSummary({
           defaultDateLots={shown.defaultDateLots}
           unpricedCount={shown.unpricedCount}
           dayChangeExcluded={shown.dayChangeExcluded}
+          income={shown.income ?? null}
           onReviewDates={onReviewDates}
           notLive={notLive}
         />

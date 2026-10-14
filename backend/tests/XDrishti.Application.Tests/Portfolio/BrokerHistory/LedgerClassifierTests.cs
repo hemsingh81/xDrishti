@@ -17,6 +17,11 @@ public sealed class LedgerClassifierTests
     [InlineData("JOURNAL", "DP CHARGES 02-09-2026 EXMPL", -15.93, LedgerClass.Charges)]
     [InlineData("JOURNAL", "ANNUAL MAINTENANCE CHARGES (AMC) FY 2026", -354, LedgerClass.Charges)]
     [InlineData("JOURNAL", "Brokerage and GST for the month", -118.4, LedgerClass.Charges)]
+    [InlineData("PAYBNK", "FUNDS WITHDRAWAL", -20000, LedgerClass.FundsOut)] // Dhan's published sample
+    [InlineData("PAYBNK", "", -20000, LedgerClass.FundsOut)] // the voucher description alone says it
+    [InlineData("PAYIN", "", 5000, LedgerClass.FundsIn)]
+    [InlineData("RECEIPT", "FUNDS ADDED", 5000, LedgerClass.FundsIn)]
+    [InlineData("JOURNAL", "DPC Interest : 01/10/2022 to 07/10/2022 : ***", -12.5, LedgerClass.Charges)] // delayed payment charges
     [InlineData("BILL", "BILL FOR 02-SEP-2026 NSE-CAPITAL EQUITY PURCHASE", -9000, LedgerClass.Other)]
     [InlineData("BILL", "Sale settlement 20-SEP-2026", 11600, LedgerClass.Other)]
     [InlineData("", "", 100, LedgerClass.Other)]
@@ -30,6 +35,7 @@ public sealed class LedgerClassifierTests
     [InlineData("DIVIDEND RECOVERY", -80)] // a debit is not a dividend
     [InlineData("FUNDS DEPOSIT", -100)] // a debit is not a deposit
     [InlineData("DP CHARGES REVERSAL", 15.93)] // a credit is not a charge
+    [InlineData("DPC Interest : 01/10/2022 to 07/10/2022", 12.5)] // a credit is not a charge
     public void A_text_that_contradicts_the_sign_of_the_amount_is_other(string narration, double amount)
     {
         LedgerClassifier.Classify(string.Empty, narration, (decimal)amount).ShouldBe(LedgerClass.Other);

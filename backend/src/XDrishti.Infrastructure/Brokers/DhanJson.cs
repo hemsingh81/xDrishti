@@ -62,6 +62,23 @@ internal static class DhanJson
         return null;
     }
 
+    /// <summary>Like <see cref="Text"/>, but Dhan's "not available" texts (<c>NA</c>, <c>N/A</c>, <c>null</c>, <c>-</c>) count as missing: the published trade sample has <c>"createTime": "NA"</c>.</summary>
+    public static string? Known(JsonElement row, params string[] names)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+        foreach (var name in names)
+        {
+            if (Text(row, name) is { } text && !IsNotAvailable(text))
+            {
+                return text;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsNotAvailable(string text) => text.ToUpperInvariant() is "NA" or "N/A" or "NULL" or "NONE" or "-";
+
     /// <summary>A number from a JSON number or a string such as <c>"20,000.50"</c>; null when missing, not a number or beyond what a quantity or price can be (<paramref name="limit"/>).</summary>
     public static decimal? Number(JsonElement row, decimal limit, params string[] names)
     {

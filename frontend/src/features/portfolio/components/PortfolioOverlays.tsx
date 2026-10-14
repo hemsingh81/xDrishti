@@ -34,7 +34,14 @@ export interface PortfolioOverlaysProps {
     onCloseAdd: () => void;
   };
   /** The Cash & dividends panel: open or not, the accounts it can show and the page's account. */
-  cash: { open: boolean; onClose: () => void; accounts: readonly AccountSummary[]; scopeAccountId: string | null };
+  cash: {
+    open: boolean;
+    /** Opened to add a dividend straight away. */
+    adding: boolean;
+    onClose: () => void;
+    accounts: readonly AccountSummary[];
+    scopeAccountId: string | null;
+  };
 }
 
 /** The Alerts, Trades and Cash & dividends panels and the alert and Add trade dialogs on top of the Portfolio screen. */
@@ -64,7 +71,14 @@ export function PortfolioOverlays({
           scopeAccountId={trades.scopeAccountId}
         />
       )}
-      {cash.open && <CashDrawer onClose={cash.onClose} accounts={cash.accounts} scopeAccountId={cash.scopeAccountId} />}
+      {cash.open && (
+        <CashDrawer
+          onClose={cash.onClose}
+          accounts={cash.accounts}
+          scopeAccountId={cash.scopeAccountId}
+          startAdding={cash.adding}
+        />
+      )}
       {trades.adding && (
         <AddTradeDialog
           accounts={trades.accounts}

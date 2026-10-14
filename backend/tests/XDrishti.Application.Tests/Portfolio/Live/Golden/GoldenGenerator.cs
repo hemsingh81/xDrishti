@@ -45,7 +45,58 @@ internal static class GoldenGenerator
         var quotes = Enumerable.Range(0, instrumentCount).Select(_ => StateOf(r)).ToList();
         var sectors = Enumerable.Range(0, instrumentCount).Select(_ => r.Pick(SectorNames)).ToList();
         var holdings = Enumerable.Range(0, holdingCount).Select(n => HoldingOf(r, n, quotes, sectors, accountCount, bucketCount)).ToList();
-        return GoldenWorld.Scenario(name, description, holdings, PushesOf(r, holdings, instrumentCount));
+        var pushes = PushesOf(r, holdings, instrumentCount);
+        return GoldenWorld.Scenario(name, description, holdings, pushes, IncomeOf(r, holdings, accountCount));
+    }
+
+    /// <summary>
+    /// Dividends (to the paisa) on some holdings, charges of trades (four decimals) on some, a charge of a security no holding has, unallocated dividends and a ledger with costs for some accounts. Dates fall on both sides of the lots' dates, as a
+    /// real history can.
+    /// </summary>
+    private static GoldenIncome IncomeOf(GoldenRandom r, List<GoldenHolding> holdings, int accountCount)
+    {
+        var dividends = new List<GoldenDividend>();
+        var charges = new List<GoldenTradeCharge>();
+        foreach (var holding in holdings)
+        {
+            for (var i = r.Chance(45) ? r.Int(1, 3) : 0; i > 0; i--)
+            {
+                dividends.Add(new GoldenDividend(holding.AccountId, holding.Id, new DateOnly(2024, 3, 1).AddDays(r.Int(0, 950)), r.Int(1, 5_000_000) / 100m));
+            }
+
+            for (var i = r.Chance(50) ? r.Int(1, 3) : 0; i > 0; i--)
+            {
+                charges.Add(new GoldenTradeCharge(holding.AccountId, holding.Symbol, new DateOnly(2024, 1, 1).AddDays(r.Int(0, 800)), r.Int(1, 400_000) / 10_000m));
+            }
+        }
+
+        var ledgerCharges = new List<GoldenLedgerCharge>();
+        var starts = new List<GoldenLedgerStart>();
+        for (var account = 0; account < accountCount; account++)
+        {
+            var id = Id("aa", account);
+            if (r.Chance(30))
+            {
+                dividends.Add(new GoldenDividend(id, null, new DateOnly(2024, 6, 1).AddDays(r.Int(0, 800)), r.Int(1, 100_000) / 100m));
+            }
+
+            if (r.Chance(25))
+            {
+                charges.Add(new GoldenTradeCharge(id, "GONE" + account, new DateOnly(2024, 6, 1).AddDays(r.Int(0, 800)), r.Int(1, 50_000) / 10_000m));
+            }
+
+            if (r.Chance(60))
+            {
+                starts.Add(new GoldenLedgerStart(id, new DateOnly(2025, 1, 1).AddDays(r.Int(0, 300))));
+                for (var i = r.Int(0, 3); i > 0; i--)
+                {
+                    var amount = r.Int(-2_000, 80_000) / 100m;
+                    ledgerCharges.Add(new GoldenLedgerCharge(id, new DateOnly(2025, 6, 1).AddDays(r.Int(0, 400)), amount == 0m ? 1m : amount));
+                }
+            }
+        }
+
+        return new GoldenIncome(dividends, charges, ledgerCharges, starts, []);
     }
 
     private static Quote StateOf(GoldenRandom r)

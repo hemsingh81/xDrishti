@@ -209,6 +209,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             await db.Database.ExecuteSqlRawAsync("""
                 DELETE FROM portfolio.price_alerts;
                 DELETE FROM portfolio.action_states;
+                DELETE FROM portfolio.dividend_suggestions;
+                DELETE FROM portfolio.dividends;
                 DELETE FROM portfolio.ledger_entries;
                 DELETE FROM portfolio.transactions;
                 DELETE FROM portfolio.broker_sync_state;

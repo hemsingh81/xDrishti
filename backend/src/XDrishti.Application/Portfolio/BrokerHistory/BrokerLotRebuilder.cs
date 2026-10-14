@@ -53,7 +53,8 @@ internal sealed class BrokerLotRebuilder(
             }
             else if (listed.Add((security.Isin ?? security.TradingSymbol, match.Kind)))
             {
-                left.Add(new BrokerNotRebuilt(security.TradingSymbol, match.Kind == MatchKind.Ambiguous ? RebuildStatuses.Ambiguous : RebuildStatuses.NoHolding));
+                // A trade stored with its ISIN and no ticker (the share is not in the master list) is named by its ISIN.
+                left.Add(new BrokerNotRebuilt(security.TradingSymbol.Length > 0 ? security.TradingSymbol : security.Isin ?? string.Empty, match.Kind == MatchKind.Ambiguous ? RebuildStatuses.Ambiguous : RebuildStatuses.NoHolding));
             }
         }
 

@@ -1728,6 +1728,147 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Dividend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("HoldingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holding_id");
+
+                    b.Property<Guid?>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("Isin")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<DateOnly>("PayDate")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_date");
+
+                    b.Property<decimal?>("PerShare")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("per_share");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("TradingSymbol")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trading_symbol");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
+                    b.Property<string>("VoidedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("voided_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividends");
+
+                    b.HasIndex("AccountId", "PayDate")
+                        .HasDatabaseName("ix_dividends_account_pay_date");
+
+                    b.HasIndex("HoldingId", "PayDate")
+                        .HasDatabaseName("ix_dividends_holding_pay_date")
+                        .HasFilter("holding_id IS NOT NULL");
+
+                    b.ToTable("dividends", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividends_amount", "amount > 0");
+
+                            t.HasCheckConstraint("ck_dividends_per_share", "per_share IS NULL OR per_share > 0");
+
+                            t.HasCheckConstraint("ck_dividends_source", "source IN ('manual')");
+
+                            t.HasCheckConstraint("ck_dividends_voided", "(voided_at IS NULL) = (voided_by IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<Guid?>("DividendId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dividend_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividend_suggestions");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_dividend_suggestions_account");
+
+                    b.HasIndex("DividendId")
+                        .HasDatabaseName("ix_dividend_suggestions_dividend_id");
+
+                    b.ToTable("dividend_suggestions", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividend_suggestions_dividend", "(state = 'accepted') = (dividend_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_dividend_suggestions_state", "state IN ('accepted', 'dismissed')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3172,6 +3313,45 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_broker_sync_state_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Dividend", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividends_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.Holding", null)
+                        .WithMany()
+                        .HasForeignKey("HoldingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividends_holdings_holding_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendSuggestion", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_suggestions_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.Dividend", null)
+                        .WithMany()
+                        .HasForeignKey("DividendId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividend_suggestions_dividends_dividend_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.LedgerEntry", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Domain.Portfolio.DividendSuggestion", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_suggestions_ledger_entries_id");
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>

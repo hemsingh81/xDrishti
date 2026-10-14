@@ -3,7 +3,14 @@ import type { HoldingRow } from '@/shared/api';
 import { buildSummary, ids, searchHoldings } from './fixtures';
 import { instrumentOf } from './hubFake';
 import { server } from './server';
-import { groupsOf, rowOf, summaryOf, type ModelDimension, type ModelHolding } from './serverModel';
+import {
+  groupsOf,
+  rowOf,
+  summaryOf,
+  type ModelAccountIncome,
+  type ModelDimension,
+  type ModelHolding,
+} from './serverModel';
 
 /** 10:35:44 in India on Wednesday 14 Oct 2026 (a trading day): the page is read at this moment. */
 export const liveNow = '2026-10-14T10:35:44+05:30';
@@ -54,17 +61,34 @@ export const liveHoldings = (): ModelHolding[] => [
   }),
 ];
 
+/**
+ * The same three holdings with dividends and costs (P2-14): RELIANCE has ₹1,200 of dividends and ₹150 of trade charges, TCS
+ * ₹400 of charges only, SMALLCO nothing. Together with `liveAccountIncome` (dividends of no holding and ledger costs of the
+ * account) the totals and the groups carry an `income`, as the server's do.
+ */
+export const liveHoldingsWithIncome = (): ModelHolding[] => {
+  const [reliance, tcs, smallco] = liveHoldings() as [ModelHolding, ModelHolding, ModelHolding];
+  return [{ ...reliance, dividends4: 12_000_000, charges4: 1_500_000 }, { ...tcs, charges4: 4_000_000 }, smallco];
+};
+
+/** ₹200 of dividends of no holding and ₹25 of ledger costs for the main account. */
+export const liveAccountIncome = (): ModelAccountIncome[] => [
+  { accountId: ids.main, dividends4: 2_000_000, charges4: 250_000 },
+];
+
 export interface LiveServer {
   /** The holdings the API answers with; replace to change what a re-read returns. */
   holdings: ModelHolding[];
+  /** The income of the accounts that belongs to no holding; undefined: the API has no `income` at all. */
+  accounts: ModelAccountIncome[] | undefined;
   loads: { list: number; summary: number; groups: number; base: number };
   /** The `GET /api/holdings` requests, with their query. */
   lists: URLSearchParams[];
 }
 
 /** Serves the holdings list, the totals and the groups from a model of the server, so a re-read answers what the server would. */
-export function serveLive(holdings: ModelHolding[] = liveHoldings()): LiveServer {
-  const state: LiveServer = { holdings, loads: { list: 0, summary: 0, groups: 0, base: 0 }, lists: [] };
+export function serveLive(holdings: ModelHolding[] = liveHoldings(), accounts?: ModelAccountIncome[]): LiveServer {
+  const state: LiveServer = { holdings, accounts, loads: { list: 0, summary: 0, groups: 0, base: 0 }, lists: [] };
   const rows = (): HoldingRow[] => state.holdings.map(rowOf);
   server.use(
     http.get('/api/holdings', ({ request }) => {
@@ -85,13 +109,13 @@ export function serveLive(holdings: ModelHolding[] = liveHoldings()): LiveServer
     http.get('/api/holdings/summary', () => {
       state.loads.summary += 1;
       return HttpResponse.json(
-        summaryOf(state.holdings, buildSummary({ openCount: 3, closedCount: 0, unmappedCount: 1 })),
+        summaryOf(state.holdings, buildSummary({ openCount: 3, closedCount: 0, unmappedCount: 1 }), state.accounts),
       );
     }),
     http.get('/api/holdings/groups', ({ request }) => {
       state.loads.groups += 1;
       const by = new URL(request.url).searchParams.get('by') as ModelDimension;
-      return HttpResponse.json(groupsOf(state.holdings, by));
+      return HttpResponse.json(groupsOf(state.holdings, by, state.accounts));
     }),
   );
   return state;

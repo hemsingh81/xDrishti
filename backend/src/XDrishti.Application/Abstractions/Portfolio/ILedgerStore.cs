@@ -14,6 +14,9 @@ public interface ILedgerStore
     /// <summary>One page of the account's entries between the dates (inclusive; null is open) and of the class (null is all), newest first (date, then stored order, descending). Total counts all matches.</summary>
     ValueTask<(IReadOnlyList<LedgerEntry> Items, int Total)> ListAsync(Guid accountId, DateOnly? from, DateOnly? to, LedgerClass? entryClass, int page, int pageSize, CancellationToken cancellationToken);
 
+    /// <summary>The earliest date of any ledger entry stored for the account (whatever its class); null when there is none: the date the ledger is known from.</summary>
+    ValueTask<DateOnly?> FirstDateAsync(Guid accountId, CancellationToken cancellationToken);
+
     /// <summary>The count and total amount per class between the dates (inclusive; null is open); classes without entries are absent.</summary>
     ValueTask<IReadOnlyList<LedgerTotal>> TotalsAsync(Guid accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken);
 }

@@ -5,6 +5,7 @@ import { numeric } from '@/theme';
 import type { GroupSortField } from '../lib/groups';
 import {
   GroupDayChange,
+  GroupDividends,
   GroupInvested,
   GroupPnl,
   GroupValue,
@@ -36,7 +37,7 @@ export interface GroupColumn {
   render: (figures: GroupFigures) => ReactNode;
 }
 
-/** The figure columns after the name: same hiding rules as the holdings columns (invested and day change from lg). */
+/** The figure columns after the name: same hiding rules as the holdings columns (dividends from md, invested and day change from lg). */
 export const groupColumns: readonly GroupColumn[] = [
   {
     id: 'holdings',
@@ -84,6 +85,14 @@ export const groupColumns: readonly GroupColumn[] = [
     render: (g) => <GroupXirr group={g} />,
   },
   {
+    id: 'dividends',
+    header: 'Dividends',
+    width: 120,
+    hideBelow: 'md',
+    sorts: [{ field: 'dividends', label: 'Dividends' }],
+    render: (g) => <GroupDividends group={g} />,
+  },
+  {
     id: 'dayChange',
     header: 'Day change',
     width: 120,
@@ -115,8 +124,9 @@ export function figureCellSx(column: GroupColumn) {
 const nameColumnWidth = 200;
 const widthOf = (columns: readonly GroupColumn[]) => columns.reduce((sum, c) => sum + c.width, nameColumnWidth);
 
-/** The table's width without and with the columns that appear from lg: a narrow window scrolls sideways instead of squeezing the figures. */
+/** The table's width without and with the columns that appear from md and from lg: a narrow window scrolls sideways instead of squeezing the figures. */
 export const groupTableMinWidth = {
   xs: widthOf(groupColumns.filter((c) => c.hideBelow === undefined)),
+  md: widthOf(groupColumns.filter((c) => c.hideBelow !== 'lg')),
   lg: widthOf(groupColumns),
 };

@@ -23,6 +23,12 @@ public interface ITradeStore
     /// <summary>Which of these identities (<c>external_id</c>) the account has stored already among its trades that are not voided; for reading only. A voided trade's identity is free.</summary>
     ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Among these identities, the account's trades that came from the broker, are not voided and lack something a read of the broker can give (no ISIN, no ticker, or charges of 0); tracked, so that
+    /// <see cref="Transaction.EnrichFromBroker"/> can be saved by <see cref="IPortfolioUnitOfWork"/>.
+    /// </summary>
+    ValueTask<IReadOnlyList<Transaction>> ListBrokerAwaitingEnrichmentAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken);
+
     /// <summary>The trades of the batch that are not voided; for reading only.</summary>
     ValueTask<IReadOnlyList<Transaction>> ListActiveOfBatchAsync(Guid batchId, CancellationToken cancellationToken);
 

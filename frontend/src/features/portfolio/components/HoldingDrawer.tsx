@@ -19,10 +19,15 @@ import { istSecondText } from '../lib/liveChip';
 import { notLiveReason } from '../lib/liveNotes';
 import { noDayChangeReasonOf } from '../lib/figures';
 import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
+import { incomeFacts } from './income/incomeFacts';
 import { LotsSection } from './LotsSection';
 
 // The trades of a holding (and the dialogs behind them) are loaded when the drawer first opens: most visits never get there.
 const HoldingTrades = lazy(async () => ({ default: (await import('./trades/HoldingTrades')).HoldingTrades }));
+// So are the dividends (their list, the form and the void dialog).
+const HoldingDividends = lazy(async () => ({
+  default: (await import('./income/HoldingDividends')).HoldingDividends,
+}));
 
 const priceSourceLabel = (source: string): string =>
   source === 'live' ? 'Live tick' : source === 'quote' ? 'Quote' : 'Synced';
@@ -50,6 +55,7 @@ function factsOf(h: HoldingRow, liveNote: string | null): Fact[] {
     { label: 'Profit / loss', value: <Pnl value={returns.pnl} focusable /> },
     { label: 'Profit / loss %', value: <PnlPercent value={returns.pnlPct} /> },
     { label: 'XIRR', value: <Xirr returns={returns} focusable /> },
+    ...incomeFacts(h.income),
     {
       label: returns.realisedEstimated ? 'Realised (est.)' : 'Realised',
       value: <Pnl value={returns.realisedPnl} />,
@@ -72,7 +78,7 @@ interface HoldingDrawerProps {
   onShowAlerts: () => void;
 }
 
-/** Side panel for one holding: its figures, then its lots with their dates, then its trades. */
+/** Side panel for one holding: its figures, then its lots with their dates, its dividends and its trades. */
 export function HoldingDrawer({ id, holding: read, onClose, onSetAlert, onShowAlerts }: HoldingDrawerProps) {
   // At the price the hub pushed last, and, while the screen is live, why this holding has no live tick (if it has none).
   const holding = useLiveRow(read);
@@ -131,6 +137,11 @@ export function HoldingDrawer({ id, holding: read, onClose, onSetAlert, onShowAl
         <Stack spacing={3}>
           {holding && <Facts items={factsOf(holding, liveNote)} />}
           {id !== null && <LotsSection holdingId={id} />}
+          {id !== null && (
+            <Suspense fallback={<LoadingState label="Loading dividends" />}>
+              <HoldingDividends holdingId={id} holding={holding} />
+            </Suspense>
+          )}
           {id !== null && (
             <Suspense fallback={<LoadingState label="Loading trades" />}>
               <HoldingTrades holdingId={id} holding={holding} />

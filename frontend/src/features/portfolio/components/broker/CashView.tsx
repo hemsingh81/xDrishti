@@ -9,6 +9,7 @@ import {
   periodError,
   type LedgerFilter,
 } from '../../lib/ledger';
+import { LedgerCoverage } from './LedgerCoverage';
 import { LedgerList } from './LedgerList';
 import { LedgerTotals } from './LedgerTotals';
 
@@ -84,6 +85,7 @@ export function CashView({
       </Stack>
       {invalid === null && (
         <>
+          {list.lastPage && <LedgerCoverage coverageFrom={list.lastPage.coverageFrom} />}
           {list.lastPage && <LedgerTotals totals={list.lastPage.totals} />}
           <LedgerList list={list} filtered={filtered} />
         </>

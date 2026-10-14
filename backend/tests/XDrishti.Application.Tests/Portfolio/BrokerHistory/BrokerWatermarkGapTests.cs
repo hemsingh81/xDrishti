@@ -145,6 +145,25 @@ public sealed class BrokerWatermarkGapTests
     }
 
     [Fact]
+    public async Task An_earlier_start_date_also_reads_older_ledger_entries_and_moves_the_date_the_ledger_is_known_from_back()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Ledger.AddRange(
+        [
+            BrokerScenario.Line(new DateOnly(2026, 9, 5), "V9", "JOURNAL", "DP CHARGES 05-09-2026 EXMPL", -15.93m),
+            BrokerScenario.Line(new DateOnly(2026, 6, 2), "V1", "JOURNAL", "AMC CHARGES 02-06-2026", -295m),
+        ]);
+        await s.SyncOkAsync();
+        var coverageBefore = Ok(await s.Ledger().HandleAsync(new ListLedgerQuery(s.Account.Id, null, null, null, null, null), CancellationToken.None)).CoverageFrom;
+
+        var again = await s.SyncOkAsync(from: new DateOnly(2026, 5, 1));
+
+        var coverageAfter = Ok(await s.Ledger().HandleAsync(new ListLedgerQuery(s.Account.Id, null, null, null, null, null), CancellationToken.None)).CoverageFrom;
+        (again.Ledger!.From, again.Ledger.Counts.Stored, again.Ledger.Counts.Duplicates).ShouldBe((new DateOnly(2026, 5, 1), 1, 1));
+        (coverageBefore, coverageAfter).ShouldBe((new DateOnly(2026, 9, 5), new DateOnly(2026, 6, 2)));
+    }
+
+    [Fact]
     public async Task An_account_that_was_never_read_may_start_at_any_date()
     {
         var s = await BrokerScenario.StartAsync();

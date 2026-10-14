@@ -56,6 +56,9 @@ internal sealed class LedgerStore(XDrishtiDbContext db) : ILedgerStore
         return (items, total);
     }
 
+    public async ValueTask<DateOnly?> FirstDateAsync(Guid accountId, CancellationToken cancellationToken) =>
+        await db.LedgerEntries.AsNoTracking().Where(x => x.AccountId == accountId).MinAsync(x => (DateOnly?)x.EntryDate, cancellationToken);
+
     public async ValueTask<IReadOnlyList<LedgerTotal>> TotalsAsync(Guid accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
     {
         var query = db.LedgerEntries.AsNoTracking().Where(x => x.AccountId == accountId);

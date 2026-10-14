@@ -1,10 +1,12 @@
 import type { HoldingGroup, HoldingGroups, HoldingGroupTotal, HoldingRow, HoldingsSummary } from '@/shared/api';
-import { figuresOf, weightOf, type LiveFigures } from './liveFigures';
+import { figuresOf, incomeAt, weightOf, type LiveFigures } from './liveFigures';
 import type { GroupBy } from './filters';
+import { isUnallocatedKey } from './groups';
 
 /**
  * The tiles at the pushed prices, from every open holding of the scope (already at those prices). The counts, the XIRR, the
- * benchmark and the realised result are the last read's. Undefined when the holdings are not those the totals were made of
+ * benchmark, the realised result and the net XIRR are the last read's; the dividends and costs are too (they do not move with
+ * a price), the two total return percentages are worked out again. Undefined when the holdings are not those the totals were made of
  * (the two reads were of different moments, or the holdings changed): the totals then stay as read, until the next read.
  */
 export function liveSummary(summary: HoldingsSummary, rows: readonly HoldingRow[]): HoldingsSummary | undefined {
@@ -13,6 +15,7 @@ export function liveSummary(summary: HoldingsSummary, rows: readonly HoldingRow[
   return {
     ...summary,
     returns: { ...summary.returns, invested: f.invested, value: f.value, pnl: f.pnl, pnlPct: f.pnlPct },
+    income: incomeAt(summary.income, summary.returns.realisedPnl, f.invested, f.pnl),
     unpricedCount: f.open - f.priced,
     dayChange: f.dayChange,
     dayChangePct: f.dayChangePct,
@@ -68,8 +71,9 @@ function figuresFor(f: LiveFigures, holdings: number): Figures | undefined {
 /**
  * The groups and their total row at the pushed prices, from every open holding of the scope (already at those prices).
  * `holdings` and `realised`, the XIRR and the parts of the stacked bar are the last read's, and so is the order (rows do not
- * jump while the owner reads). Undefined when the holdings do not fit the groups (counts differ, a group's members are not
- * known): the groups then stay as read.
+ * jump while the owner reads). The Unallocated row (dividends and costs of no group, no holdings) is left as read: it has no
+ * price to move. Undefined when the holdings do not fit the groups (counts differ, a group's members are not known): the
+ * groups then stay as read.
  */
 export function liveGroups(
   data: HoldingGroups,
@@ -84,11 +88,29 @@ export function liveGroups(
   const scopeValue = total.value;
   const groups: HoldingGroup[] = [];
   for (const group of data.groups) {
+    if (isUnallocatedKey(group.key)) {
+      groups.push(group);
+      continue;
+    }
     const members = membersOf(group, rows, membership);
     if (!members) return undefined;
     const figures = figuresFor(figuresOf(members), group.holdings);
     if (!figures || (statusOpen && members.length !== group.holdings)) return undefined;
-    groups.push({ ...group, ...figures, weightPct: weightOf(figures.value, scopeValue) });
+    groups.push({
+      ...group,
+      ...figures,
+      weightPct: weightOf(figures.value, scopeValue),
+      income: incomeAt(group.income, group.realised, figures.invested, figures.pnl),
+    });
   }
-  return { ...data, groups, total: { ...data.total, ...total, weightPct: weightOf(total.value, total.value) } };
+  return {
+    ...data,
+    groups,
+    total: {
+      ...data.total,
+      ...total,
+      weightPct: weightOf(total.value, total.value),
+      income: incomeAt(data.total.income, data.total.realised, total.invested, total.pnl),
+    },
+  };
 }

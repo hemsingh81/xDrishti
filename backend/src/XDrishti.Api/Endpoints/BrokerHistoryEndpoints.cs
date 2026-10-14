@@ -29,7 +29,7 @@ internal sealed class BrokerHistoryEndpoints : IEndpointModule
 
         account.MapGet("/ledger", ListLedgerAsync)
             .WithName("ListAccountLedger")
-            .WithSummary("The account's ledger entries read from Dhan, newest first: from, to (India dates, inclusive), class (funds_in, funds_out, dividend, charges, other), page, pageSize (max 200, default 50). Each entry has date, voucherNo, description, narration (Dhan's free text - show as plain text), exchange, amount (signed: credit minus debit), class and runningBalance. totals lists the count and signed amount of every class for the period from to to, whatever class is filtered. Dividends and charges are shown, not part of returns")
+            .WithSummary("The account's ledger entries read from Dhan, newest first: from, to (India dates, inclusive), class (funds_in, funds_out, dividend, charges, other), page, pageSize (max 200, default 50). Each entry has date, voucherNo, description, narration (Dhan's free text - show as plain text), exchange, amount (signed: credit minus debit), class and runningBalance. totals lists the count and signed amount of every class for the period from to to, whatever class is filtered. The ledger's entries of class charges count as costs in the net returns of an account and the portfolio, and an entry of class dividend is offered as a suggested dividend (see the dividends endpoints); nothing else of the ledger is part of returns")
             .ProducesRejections(conflict: false);
     }
 

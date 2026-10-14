@@ -1,11 +1,15 @@
 import DownloadIcon from '@mui/icons-material/CloudDownloadOutlined';
 import { Button, Divider, Stack, Typography } from '@mui/material';
+import { lazy, Suspense, useState } from 'react';
 import { formatIstTimeAndDay } from '@/shared/lib/format';
 import { numeric } from '@/theme';
 import { useBrokerHistorySync } from '../../hooks/useBrokerHistorySync';
 import { needsReviewSymbols, rebuildText } from '../../lib/brokerText';
 import { ProblemNotice } from '../ProblemNotice';
 import { BrokerKindLine } from './BrokerKindLine';
+
+// The dialog is loaded when first opened: most visits never get there.
+const SyncFromDialog = lazy(async () => ({ default: (await import('./SyncFromDialog')).SyncFromDialog }));
 
 interface BrokerHistoryBarProps {
   account: { id: string; name: string };
@@ -20,7 +24,8 @@ interface BrokerHistoryBarProps {
  * the next scheduled read, and the button that reads now. Mount it per account (`key`): its error belongs to one account.
  */
 export function BrokerHistoryBar({ account, connected, holdingsRunning }: BrokerHistoryBarProps) {
-  const { status, start, running, error } = useBrokerHistorySync(account.id);
+  const { status, start, reset, running, error } = useBrokerHistorySync(account.id);
+  const [earlier, setEarlier] = useState(false);
   const data = status.data;
   const review = data ? needsReviewSymbols(data) : [];
   const rebuilt = data ? rebuildText(data) : null;
@@ -60,9 +65,20 @@ export function BrokerHistoryBar({ account, connected, holdingsRunning }: Broker
             startIcon={<DownloadIcon />}
             loading={running}
             disabled={!connected || running || holdingsRunning}
-            onClick={start}
+            onClick={() => {
+              start();
+            }}
           >
             {running ? 'Reading…' : 'Sync trades & ledger'}
+          </Button>
+          <Button
+            disabled={!connected || running || holdingsRunning}
+            onClick={() => {
+              reset();
+              setEarlier(true);
+            }}
+          >
+            Read from an earlier date
           </Button>
         </Stack>
       </Stack>
@@ -76,7 +92,26 @@ export function BrokerHistoryBar({ account, connected, holdingsRunning }: Broker
           }}
         />
       )}
-      {error ? <ProblemNotice error={error} accountId={account.id} fallback="The read did not start." /> : null}
+      {/* While the earlier-start dialog is open it says why a read was refused, at its own field. */}
+      {error && !earlier ? (
+        <ProblemNotice error={error} accountId={account.id} fallback="The read did not start." />
+      ) : null}
+      {earlier && (
+        <Suspense fallback={null}>
+          <SyncFromDialog
+            accountId={account.id}
+            accountName={account.name}
+            onStart={start}
+            busy={running}
+            error={error}
+            onReset={reset}
+            onClose={() => {
+              reset();
+              setEarlier(false);
+            }}
+          />
+        </Suspense>
+      )}
     </Stack>
   );
 }

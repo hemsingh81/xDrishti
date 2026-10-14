@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react';
 import type { HoldingGroups } from '@/shared/api';
 import { liveMembersQuery } from '../api/liveQueries';
 import type { GroupBy, PortfolioFilters } from '../lib/filters';
+import { isUnallocatedKey } from '../lib/groups';
 import { liveGroups, membershipOf } from '../lib/liveTotals';
 import { useLive, useLiveBase } from './liveContext';
 import { liveReadMs } from './useLiveFeed';
@@ -24,7 +25,8 @@ export function useLiveGroups(groups: UseQueryResult<HoldingGroups>, by: GroupBy
   const eligible =
     following && data !== undefined && rows !== undefined && filters.q.trim() === '' && filters.status !== 'closed';
   const byRows = by === 'account' || by === 'bucket';
-  const keys = data?.groups.map((group) => group.key) ?? [];
+  // The Unallocated row has no holdings: it is not asked for its members (and the recompute leaves it as read).
+  const keys = data?.groups.map((group) => group.key).filter((key) => !isUnallocatedKey(key)) ?? [];
   const members = useQuery({
     ...liveMembersQuery({ account: scope.account, bucket: scope.bucket, by, keys }),
     enabled: eligible && !byRows && keys.length > 0 && keys.length <= maxMemberGroups,

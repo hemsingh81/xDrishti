@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Portfolio.Returns;
 using XDrishti.Domain.Portfolio;
 
@@ -17,10 +18,12 @@ internal static class HoldingViews
         figures.RealisedPnl,
         figures.RealisedEstimated);
 
-    public static HoldingRow Row(HoldingData holding, DateOnly valuationDate)
+    public static HoldingRow Row(HoldingData holding, DateOnly valuationDate, IncomeBook book, ReturnFigures? figures = null)
     {
+        ArgumentNullException.ThrowIfNull(book);
         var open = holding.Lots.Where(l => l.IsOpen).ToList();
         var dayChange = DayChangeCalculator.ForHolding(holding);
+        var gross = figures ?? ReturnsCalculator.ForHolding(holding, valuationDate);
         return new HoldingRow(
             holding.Id,
             holding.AccountId,
@@ -47,12 +50,13 @@ internal static class HoldingViews
             open.Count == 0 ? null : open.Min(l => l.AcquiredOn),
             open.Any(l => l.UsesDefaultDate),
             holding.IsPriced,
-            Returns(ReturnsCalculator.ForHolding(holding, valuationDate)),
+            Returns(gross),
             holding.PreviousClose,
             dayChange?.Amount,
             dayChange?.Pct,
             holding.LastPriceAt,
-            holding.PriceSource);
+            holding.PriceSource,
+            IncomeViews.View(IncomeCalculator.Of(gross, [holding], book, [], valuationDate)));
     }
 
     public static PricesAsOf PriceTimes(IEnumerable<HoldingData> holdings)

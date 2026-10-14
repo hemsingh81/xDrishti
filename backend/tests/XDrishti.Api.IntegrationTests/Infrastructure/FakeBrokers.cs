@@ -166,10 +166,12 @@ public sealed class FakeBrokers
     }
 
     /// <summary>One trade as the trade history reports it (made-up values; segment and product as Dhan names them).</summary>
-    public sealed record FakeTrade(string TradeId, string Symbol, string Side, long Qty, decimal Price, DateOnly Date, TimeOnly Time, string Segment = "NSE_EQ", string Product = "CNC", string SecurityId = "1001")
+    public sealed record FakeTrade(
+        string TradeId, string? Symbol, string Side, long Qty, decimal Price, DateOnly Date, TimeOnly Time, string Segment = "NSE_EQ", string Product = "CNC", string SecurityId = "1001", string? Isin = null, decimal Brokerage = 0m)
     {
+        /// <summary>A null <see cref="Symbol"/> is sent as <c>"tradingSymbol": null</c> with a company name as <c>customSymbol</c>, like Dhan's published sample.</summary>
         public string ToJson() => string.Create(CultureInfo.InvariantCulture, $$"""
-            {"dhanClientId":"1000000001","orderId":"O-{{TradeId}}","exchangeOrderId":"X-{{TradeId}}","exchangeTradeId":"{{TradeId}}","transactionType":"{{Side}}","exchangeSegment":"{{Segment}}","productType":"{{Product}}","orderType":"LIMIT","tradingSymbol":"{{Symbol}}","customSymbol":"{{Symbol}}","securityId":"{{SecurityId}}","tradedQuantity":{{Qty}},"tradedPrice":{{Price}},"createTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","updateTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","exchangeTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","drvExpiryDate":null,"drvOptionType":null,"drvStrikePrice":0}
+            {"dhanClientId":"1000000001","orderId":"O-{{TradeId}}","exchangeOrderId":"X-{{TradeId}}","exchangeTradeId":"{{TradeId}}","transactionType":"{{Side}}","exchangeSegment":"{{Segment}}","productType":"{{Product}}","orderType":"LIMIT","tradingSymbol":{{(Symbol is null ? "null" : "\"" + Symbol + "\"")}},"customSymbol":"{{Symbol ?? "Example Industries"}}","securityId":"{{SecurityId}}",{{(Isin is null ? string.Empty : "\"isin\":\"" + Isin + "\",")}}{{(Brokerage == 0m ? string.Empty : "\"brokerageCharges\":" + Brokerage.ToString(CultureInfo.InvariantCulture) + ",\"stt\":\"0.5\",")}}"tradedQuantity":{{Qty}},"tradedPrice":{{Price}},"createTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","updateTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","exchangeTime":"{{Date:yyyy-MM-dd}} {{Time:HH:mm:ss}}","drvExpiryDate":null,"drvOptionType":null,"drvStrikePrice":0}
             """);
     }
 

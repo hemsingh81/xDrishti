@@ -3,6 +3,7 @@ import type { HoldingGroupTotal } from '@/shared/api';
 import { formatInr, formatShare } from '@/shared/lib/format';
 import { numeric } from '@/theme';
 import { noPriceReason, xirrOf } from '../lib/figures';
+import { dividendsHint } from '../lib/income';
 import { unpricedText } from '../lib/groups';
 import { DayChangeAmount, Pnl, PnlPercent, Unavailable, Xirr } from './Figures';
 
@@ -77,6 +78,23 @@ export function GroupDayChange({ group, align = 'flex-end' }: { group: GroupFigu
           {`${String(group.dayChangeExcluded)} excluded`}
         </Typography>
       )}
+    </Stack>
+  );
+}
+
+/**
+ * The dividends entered for a group (or the scope): the amount over, in a few words, since when they are known, so a total never
+ * reads as all there were. "—" when none is entered (a group with only charges has no dividends to show).
+ */
+export function GroupDividends({ group, align = 'flex-end' }: { group: GroupFigures; align?: Align }) {
+  const income = group.income;
+  if (!income?.dividendsFrom) return <>—</>;
+  return (
+    <Stack sx={{ alignItems: align, lineHeight: 1.25 }}>
+      <span>{formatInr(income.dividends)}</span>
+      <Typography component="span" variant="caption" color="text.secondary" sx={{ whiteSpace: 'normal' }}>
+        {dividendsHint(income)}
+      </Typography>
     </Stack>
   );
 }

@@ -218,4 +218,16 @@ public sealed class ReturnsCalculatorTests
         group.Pnl.ShouldBe(parts.Sum(p => p.Pnl));
         group.RealisedPnl.ShouldBe(parts.Sum(p => p.RealisedPnl));
     }
+
+    [Fact]
+    public void Without_the_xirr_every_other_figure_of_a_holding_is_the_same_and_the_rate_is_left_unworked()
+    {
+        var holding = Holding(180m, lots: [Open(100, 50m, TwoYearsAgo), Open(10, 200m, new DateOnly(2026, 4, 11)), Closed(5, 40m, new DateOnly(2025, 1, 1), new DateOnly(2025, 6, 1), 70m)]);
+
+        var full = ReturnsCalculator.ForHolding(holding, Valuation);
+        var money = ReturnsCalculator.ForHolding(holding, Valuation, withXirr: false);
+
+        money.ShouldBe(full with { Xirr = XirrResult.NoData });
+        full.Xirr.State.ShouldBe(XirrState.Ok);
+    }
 }

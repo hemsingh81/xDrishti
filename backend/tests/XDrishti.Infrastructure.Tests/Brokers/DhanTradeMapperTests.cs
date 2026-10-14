@@ -23,9 +23,9 @@ public sealed class DhanTradeMapperTests
         page.Skipped.ShouldBe(new Dictionary<string, int> { [BrokerSkipReasons.Bse] = 1, [BrokerSkipReasons.Derivatives] = 1, [BrokerSkipReasons.Intraday] = 1 });
         page.Trades.ShouldBe(
         [
-            new BrokerTrade("2611250001", "112111182045", TradeSide.Buy, "EXMPL", "1001", 10, 90.5m, new DateOnly(2026, 9, 2), new TimeOnly(10, 15, 2)),
-            new BrokerTrade("2611250002", "112111182046", TradeSide.Sell, "SAMPL-EQ", "1002", 3, 130m, new DateOnly(2026, 9, 20), new TimeOnly(14, 2, 12)),
-            new BrokerTrade("2611250006", "112111182051", TradeSide.Buy, "CASEY", "1004", 12, 1250.75m, new DateOnly(2026, 9, 23), new TimeOnly(11, 45, 30)),
+            new BrokerTrade("2611250001", "112111182045", TradeSide.Buy, "EXMPL", null, "1001", 10, 90.5m, 0m, new DateOnly(2026, 9, 2), new TimeOnly(10, 15, 2)),
+            new BrokerTrade("2611250002", "112111182046", TradeSide.Sell, "SAMPL-EQ", null, "1002", 3, 130m, 0m, new DateOnly(2026, 9, 20), new TimeOnly(14, 2, 12)),
+            new BrokerTrade("2611250006", "112111182051", TradeSide.Buy, "CASEY", null, "1004", 12, 1250.75m, 0m, new DateOnly(2026, 9, 23), new TimeOnly(11, 45, 30)),
         ]);
     }
 
@@ -62,7 +62,6 @@ public sealed class DhanTradeMapperTests
 
     [Theory]
     [InlineData("""[{"transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}]""")] // no trade id
-    [InlineData("""[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}]""")] // no ticker
     [InlineData("""[{"exchangeTradeId":"T1","transactionType":"HOLD","exchangeSegment":"NSE_EQ","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}]""")] // no side
     [InlineData("""[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"X","tradedQuantity":0,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}]""")] // no quantity
     [InlineData("""[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"X","tradedQuantity":1.5,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}]""")] // not whole
@@ -80,6 +79,91 @@ public sealed class DhanTradeMapperTests
         page.Trades.ShouldBeEmpty();
         page.Dropped.ShouldBe(page.Rows);
         page.Skipped.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Dhans_published_row_with_a_null_ticker_is_kept_with_its_isin_and_security_id_and_its_charges_summed()
+    {
+        var page = DhanTradeMapper.Map(DhanSamples.Json("dhan-published-trade.json"));
+
+        (page.Rows, page.Dropped).ShouldBe((1, 0));
+        page.Skipped.ShouldBeEmpty();
+        page.Trades.ShouldBe(
+        [
+            // customSymbol "Tata Motors" is a company name and is not the ticker; createTime and updateTime are "NA", the exchange time is India time.
+            new BrokerTrade("407958", "212212307731", TradeSide.Buy, null, "INE155A01022", "3456", 1, 390.9m, 0.0164m, new DateOnly(2022, 12, 30), new TimeOnly(10, 0, 46)),
+        ]);
+    }
+
+    [Fact]
+    public void A_company_name_is_never_taken_as_the_ticker()
+    {
+        var trade = Map(Row(extra: ",\"customSymbol\":\"Tata Motors\"").Replace("\"tradingSymbol\":\"EXMPL\",", "\"tradingSymbol\":null,", StringComparison.Ordinal)).Trades.ShouldHaveSingleItem();
+
+        trade.Symbol.ShouldBeNull();
+        trade.SecurityId.ShouldBe("1001");
+    }
+
+    [Theory]
+    [InlineData("""{"sebiTax":0.0004,"stt":0,"brokerageCharges":0,"serviceTax":0.0025,"exchangeTransactionCharges":0.0135,"stampDuty":0}""", "0.0164")]
+    [InlineData("""{"sebiTax":"0.5","stt":"1.25","brokerageCharges":"20","serviceTax":"3.6","exchangeTransactionCharges":"0.1","stampDuty":"1,000.00"}""", "1025.45")]
+    [InlineData("""{"stt":"NA","brokerageCharges":null,"stampDuty":"x","serviceTax":2}""", "2")] // missing, null, "NA" and text that is not a number count as 0
+    [InlineData("""{"stt":-5,"brokerageCharges":3}""", "3")] // a negative field does not reduce the total
+    [InlineData("""{"stt":0.000049,"brokerageCharges":0.00004}""", "0.0001")] // rounded to 4 decimals
+    [InlineData("""{"stt":2000000000}""", "0")] // beyond what a trade's charges can be
+    [InlineData("""{}""", "0")]
+    public void The_six_charge_fields_are_summed_into_one_total_that_is_never_negative(string charges, string expected)
+    {
+        var extra = "," + charges.Trim('{', '}');
+
+        var trade = Map(Row(extra: extra.Length > 1 ? extra : string.Empty)).Trades.ShouldHaveSingleItem();
+
+        trade.Charges.ShouldBe(decimal.Parse(expected, System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    [Theory]
+    [InlineData("""{"isin":"INE155A01022","securityId":"3456"}""", "INE155A01022", "3456")]
+    [InlineData("""{"isin":"ine155a01022","securityId":"3456"}""", "INE155A01022", "3456")] // the ISIN is upper case
+    [InlineData("""{"isin":"NA","securityId":"3456"}""", null, "3456")]
+    [InlineData("""{"isin":"not-an-isin","securityId":"3456"}""", null, "3456")]
+    [InlineData("""{"isin":"INE155A01022"}""", "INE155A01022", null)]
+    public void A_row_without_a_ticker_is_kept_when_it_has_an_isin_or_a_security_id(string identity, string? isin, string? securityId)
+    {
+        var json = """[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":null,"tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00",""" + identity.Trim('{', '}') + "}]";
+
+        var trade = Map(json).Trades.ShouldHaveSingleItem();
+
+        (trade.Symbol, trade.Isin, trade.SecurityId).ShouldBe((null, isin, securityId));
+    }
+
+    [Theory]
+    [InlineData("""[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":null,"customSymbol":"Tata Motors","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}]""")]
+    [InlineData("""[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","productType":"CNC","tradingSymbol":"NA","isin":"NA","securityId":"NA","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}]""")]
+    public void A_row_with_no_ticker_no_isin_and_no_security_id_is_skipped_and_counted_never_dropped_silently(string json)
+    {
+        var page = Map(json);
+
+        page.Trades.ShouldBeEmpty();
+        page.Dropped.ShouldBe(0);
+        page.Skipped.ShouldBe(new Dictionary<string, int> { [BrokerSkipReasons.NoSymbol] = 1 });
+    }
+
+    [Fact]
+    public void Times_that_are_NA_are_ignored_and_the_next_one_that_reads_is_used()
+    {
+        var json = """[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"NA","createTime":"NA","updateTime":"2026-09-04 09:20:00"}]""";
+
+        var trade = Map(json).Trades.ShouldHaveSingleItem();
+
+        (trade.Date, trade.Time).ShouldBe((new DateOnly(2026, 9, 4), new TimeOnly(9, 20, 0)));
+    }
+
+    [Fact]
+    public void A_row_whose_times_are_all_NA_is_dropped()
+    {
+        var json = """[{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"NA","createTime":"NA","updateTime":"NA"}]""";
+
+        Map(json).Dropped.ShouldBe(1);
     }
 
     [Fact]

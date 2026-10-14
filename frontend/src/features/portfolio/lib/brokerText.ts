@@ -27,7 +27,7 @@ function progress(status: BrokerKindStatus): string {
   return `${formatNumber(done)} of ${formatNumber(total)} windows done`;
 }
 
-/** One kind (trades or ledger) as a line: how far it is read, what the latest run found, and why it failed. */
+/** One kind (trades or ledger) as a line: how far it is read, what the latest run found (new, completed), and why it failed. */
 export function summariseKind(kind: BrokerKind, status: BrokerKindStatus): KindSummary {
   const name = names[kind];
   const run = status.lastRun;
@@ -61,10 +61,13 @@ export function summariseKind(kind: BrokerKind, status: BrokerKindStatus): KindS
     noData > (run.counts.windowsDone ?? 0)
       ? ` · Dhan answered "no data" for ${count(noData, 'date range', 'date ranges')}`
       : '';
+  // Trades stored by an earlier read that this read completed (ISIN, charges, ticker): not new, but not "nothing" either.
+  const enriched = run.counts.enriched ?? 0;
+  const enrichedNote = enriched > 0 ? ` · ${count(enriched, 'trade', 'trades')} completed` : '';
   return {
     tone: 'success',
     title: `${name} read up to ${readTo ?? formatDate(run.to)}`,
-    detail: `${stored > 0 ? `${formatNumber(stored)} new` : 'nothing new'}${noDataNote}`,
+    detail: `${stored > 0 ? `${formatNumber(stored)} new` : 'nothing new'}${enrichedNote}${noDataNote}`,
     at,
   };
 }
