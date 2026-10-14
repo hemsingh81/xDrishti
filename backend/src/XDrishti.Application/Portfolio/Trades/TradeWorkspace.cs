@@ -30,16 +30,7 @@ internal sealed class TradeWorkspace(
     IAccountEventLog events)
 {
     /// <summary>The active account with the Portfolio role on (read only).</summary>
-    public async ValueTask<Result<BrokerAccount>> AccountAsync(Guid accountId, CancellationToken cancellationToken)
-    {
-        var account = await accounts.FindReadOnlyAsync(accountId, cancellationToken);
-        if (account is null)
-        {
-            return Result.Failure<BrokerAccount>(PortfolioErrors.AccountNotFound);
-        }
-
-        return account.Portfolio.Enabled ? Result.Success(account) : Result.Failure<BrokerAccount>(PortfolioErrors.RoleOff);
-    }
+    public ValueTask<Result<BrokerAccount>> AccountAsync(Guid accountId, CancellationToken cancellationToken) => PortfolioAccess.AccountWithRoleAsync(accounts, accountId, cancellationToken);
 
     /// <summary>
     /// Plans the import of the identified trades of a file: the new ones become transactions (batch <paramref name="batchId"/>) and are rebuilt into the holdings together with the stored trades; trades whose identity is stored already

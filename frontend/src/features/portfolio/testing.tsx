@@ -8,6 +8,7 @@ import { scrollToEnd } from '@/test/intersection';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
 import { createDividendFake, type DividendFakeOptions } from '@/test/dividendFake';
+import { createDividendImportFake, type DividendImportFakeOptions } from '@/test/dividendImportFake';
 import { createTradeFake, type TradeFakeOptions } from '@/test/tradeFake';
 import { PortfolioPage } from './components/PortfolioPage';
 
@@ -123,10 +124,19 @@ export function serveDividends(options: DividendFakeOptions = {}) {
   return fake;
 }
 
+/** Serves the dividend import API (preview, import, history, undo) from one stateful fake. Bring `serveDividends` for the lists. */
+export function serveDividendImport(options: DividendImportFakeOptions = {}) {
+  const fake = createDividendImportFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
 /** Loads the code of the lazy dividend section, dialogs and panel before the first test (see `warmTrades`). */
 export const warmDividends = () =>
   Promise.all([
     import('./components/income/HoldingDividends'),
     import('./components/income/AddDividendDialog'),
     import('./components/broker/CashDrawer'),
+    import('./components/dividends/DividendImportDialog'),
+    import('./components/trades/TradesDrawer'),
   ]);

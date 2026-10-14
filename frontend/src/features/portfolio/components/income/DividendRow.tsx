@@ -1,6 +1,6 @@
 import { Button, Chip, TableCell, TableRow, Typography } from '@mui/material';
 import type { DividendView } from '@/shared/api';
-import { formatDate, formatInrPrecise, formatIstDate } from '@/shared/lib/format';
+import { formatDate, formatInrPrecise, formatIstDate, formatNumber } from '@/shared/lib/format';
 import { numeric } from '@/theme';
 import { dividendName } from '../../lib/income';
 
@@ -34,16 +34,25 @@ export function DividendRow({ dividend, showHolding, onVoid }: DividendRowProps)
       {showHolding && (
         <TableCell sx={{ verticalAlign: 'top', overflowWrap: 'anywhere' }}>
           {dividend.symbol ?? <Chip size="small" variant="outlined" label="Unallocated" />}
+          {dividend.holdingId === null && dividend.scripName && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+              {dividend.scripName}
+            </Typography>
+          )}
         </TableCell>
       )}
       <TableCell sx={{ ...number, ...struck, verticalAlign: 'top' }}>{formatInrPrecise(dividend.amount)}</TableCell>
       <TableCell sx={{ ...number, ...struck, verticalAlign: 'top' }}>
         {dividend.perShare === null ? '—' : formatInrPrecise(dividend.perShare)}
       </TableCell>
+      <TableCell sx={{ ...number, ...struck, verticalAlign: 'top' }}>
+        {dividend.quantity === null || dividend.quantity === undefined ? '—' : formatNumber(dividend.quantity)}
+      </TableCell>
       <TableCell sx={{ minWidth: 140, overflowWrap: 'anywhere', verticalAlign: 'top' }}>
         {dividend.note ?? '—'}
+        {dividend.source === 'csv' && <Chip size="small" variant="outlined" label="CSV" sx={{ ml: 0.75 }} />}
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-          {`Entered by ${dividend.createdBy} on ${formatIstDate(dividend.createdAt)}`}
+          {`${dividend.source === 'csv' ? 'Imported' : 'Entered'} by ${dividend.createdBy} on ${formatIstDate(dividend.createdAt)}`}
         </Typography>
       </TableCell>
       <TableCell sx={{ textAlign: 'right', verticalAlign: 'top' }}>

@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event';
 import type { BasketsFake } from '@/test/basketsFake';
 import { buildInstrument, sampleInstruments, trackedInfo } from '@/test/fixtures';
 import { basketIds, membersGrid, renderBaskets, symbolsShown } from './testing';
+import { findToast } from '@/test/toast';
 
 const rowBox = (symbol: string) => screen.getByRole('checkbox', { name: `Select ${symbol}` });
-const toast = () => screen.findByRole('alert');
+const toast = findToast;
 
 describe('Baskets page: removing members', () => {
   it('removes a row and Undo puts it back in its place', async () => {
@@ -139,7 +140,7 @@ describe('Baskets page: history', () => {
     renderBaskets();
     await membersGrid();
     await userEvent.click(screen.getByRole('button', { name: 'Remove NSE:TCS from MyChoice' }));
-    await screen.findByRole('alert');
+    await toast();
 
     await userEvent.click(screen.getByRole('button', { name: 'History' }));
 

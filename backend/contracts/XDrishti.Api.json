@@ -6133,7 +6133,7 @@
         "tags": [
           "Trades"
         ],
-        "summary": "Read a tradebook against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows). Returns the file (rows, parsed, skipped by reason, bad rows with line and reason - at most 200 listed, badTotal counts all -, duplicates, alreadyImported, newTrades), the securities - every held or master-listed one and at most 200 unmatched ones; securitiesTotal counts all, unmatchedListed the unmatched listed - (symbol, isin, matched, holdingId, trades, buys, sells, first and last trade date and the rebuild: status ok | unchanged | quantity_mismatch | no_holding | ambiguous, reason, lotsBefore, lotsAfter, handDatedLotsReplaced, syncLotsReplaced, realisedPnl, adjustedFor, q, net, openingQty {before, after}, openCostAfter, brokerCost, costDelta, costNote, digest), notHeld and unmatched {securities, trades} and the overall digest. 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off",
+        "summary": "Read a tradebook against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows). Returns the file (rows, parsed, skipped by reason, bad rows with line and reason - at most 200 listed, badTotal counts all -, duplicates, alreadyImported, newTrades), the securities - every held or master-listed one and at most 200 unmatched ones; securitiesTotal counts all, unmatchedListed the unmatched listed - (symbol, isin, matched, holdingId, trades, buys, sells, first and last trade date and the rebuild: status ok | unchanged | quantity_mismatch | no_holding | ambiguous, reason, lotsBefore, lotsAfter, handDatedLotsReplaced, syncLotsReplaced, realisedPnl, adjustedFor, q, net, openingQty {before, after}, openCostAfter, brokerCost, costDelta, costNote, digest), notHeld and unmatched {securities, trades} and the overall digest. 400 portfolio.wrong_file_kind (extension detected: dividends for a dividend payout list - import it as dividends -, tradebook_without_sides for a tradebook with no buy/sell column); 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off",
         "operationId": "PreviewTradeImport",
         "requestBody": {
           "content": {
@@ -6194,7 +6194,7 @@
         "tags": [
           "Trades"
         ],
-        "summary": "Import a tradebook: body multipart/form-data with accountId, file, rebuild (true | false, default true) and digest (required with rebuild: the digest of the preview). Stores the trades the account does not have yet as one batch (a trade id of the file together with the trade date - exchanges number trades per day -, else a hash of the line, is the identity: the same file again stores nothing and makes no batch) and, with rebuild, replaces the lots of every holding whose result is ok by lots built from the real buy and sell dates. Trades of securities not held, of mismatching or ambiguous holdings are stored and not applied. 409 portfolio.preview_stale when holdings, lots, corporate actions or trades changed since the preview (extension report: the fresh preview; nothing applied); 409 portfolio.sync_running while the account's holdings sync runs; 400 portfolio.invalid; 404 portfolio.not_found. Audited with counts only",
+        "summary": "Import a tradebook: body multipart/form-data with accountId, file, rebuild (true | false, default true) and digest (required with rebuild: the digest of the preview). Stores the trades the account does not have yet as one batch (a trade id of the file together with the trade date - exchanges number trades per day -, else a hash of the line, is the identity: the same file again stores nothing and makes no batch) and, with rebuild, replaces the lots of every holding whose result is ok by lots built from the real buy and sell dates. Trades of securities not held, of mismatching or ambiguous holdings are stored and not applied. 409 portfolio.preview_stale when holdings, lots, corporate actions or trades changed since the preview (extension report: the fresh preview; nothing applied); 409 portfolio.sync_running while the account's holdings sync runs; 400 portfolio.wrong_file_kind (extension detected: dividends | tradebook_without_sides, as for the preview); 400 portfolio.invalid; 404 portfolio.not_found. Audited with counts only",
         "operationId": "ImportTrades",
         "requestBody": {
           "content": {
@@ -7263,6 +7263,227 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/dividends/preview": {
+      "post": {
+        "tags": [
+          "Dividends"
+        ],
+        "summary": "Read a dividend payout file against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows; header: a date, a scrip name or symbol or ISIN, and the amount paid (Dividend Paid, Dividend Amount, Payout; a plain Amount or Net Amount only beside a Dividend Per Share or DPS column) - for example Date, Scrip Name, Dividend Per Share, Quantity, Dividend Paid - names accepted in any case with punctuation ignored; dates like 13 Jun 2024, 23 Sept 2024, 2024-06-13, 13-06-2024; amounts like 1,134.00). Returns format dividends, the file (rows, parsed, parsedAmount, repeated and identicalRepeats - rows identical to an earlier row are counted once -, distinct, bad rows with line and reason - at most 200 listed, badTotal counts all -, alreadyImported, possibleDuplicates, toAdd, needsMatch, ambiguous), the items (line, payDate, name, nameKey - the name as the server compares names: two spellings of one company have one nameKey, so group rows and key choices by it -, perShare, quantity, amount, status new | imported | possible_duplicate | needs_match | ambiguous, match {kind alias | isin | symbol | name | contains | master | choice | none, holdingId, instrumentId, symbol, isin, name, candidates}, warnings amount_mismatch | before_first_lot | partial_name_match), totals {count, amount, byYear} of what would be added, beforeFirstLot {count, amount, firstLotDate} and the digest. 400 portfolio.wrong_file_kind (extension detected: trades | tradebook_without_sides for a tradebook, statement for a file of a date, a name and a plain Amount with nothing in the header that says dividend - the kind is judged from the header before any column is read); 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off",
+        "operationId": "PreviewDividendImport",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/DividendUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DividendPreviewReport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/dividends/import": {
+      "post": {
+        "tags": [
+          "Dividends"
+        ],
+        "summary": "Import a dividend payout file: body multipart/form-data with accountId, file, digest (required: the digest of the preview), choices (optional JSON array of {name, holdingId | instrumentId | none, remember}: what a scrip name of the file means - name is the name as written or the item's nameKey; choices for spellings with one nameKey that agree are one choice, ones that disagree are a 400; remember saves it as an alias for later files) and includeDuplicates (optional JSON array of the lines of possible duplicates to import anyway). Stores the rows that are to be added as one batch of dividends with source csv, each with an identity (account, date, normalised name, per share, quantity, amount - the same file again stores nothing and makes no batch; rows identical within a file count once), the file's quantity and, when no holding is matched, the file's scrip name (unallocated; nothing is guessed). Answers imported, amount, allocated, instrumentOnly, unallocated, alreadyImported, possibleDuplicatesSkipped, aliasesSaved and the batch (preview again for the report). 409 portfolio.preview_stale when holdings, remembered names or dividends changed since the preview (extension report: the fresh preview; nothing stored); 400 portfolio.invalid (digest; choices naming no row of the file or no holding of the account, or contradicting each other for one nameKey; form fields too long or too many); 400 portfolio.wrong_file_kind (as for the preview); 404 portfolio.not_found. Audited with counts and ids only",
+        "operationId": "ImportDividends",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/DividendUploadForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DividendImportResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/dividend-batches": {
+      "get": {
+        "tags": [
+          "Dividends"
+        ],
+        "summary": "The imports of dividend files, newest first: accountId (optional), page, pageSize (max 100, default 50). Each has id, accountId, accountName, fileName, sha256, parsed, imported, duplicates, bad, amount, status imported | undone, activeDividends, createdBy, createdAt, undoneAt",
+        "operationId": "ListDividendBatches",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DividendBatchPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/dividend-batches/{id}/undo": {
+      "post": {
+        "tags": [
+          "Dividends"
+        ],
+        "summary": "Undo an import: voids its dividends (nothing is deleted; they stop counting in every figure) and marks the batch undone; the same file can be imported again afterwards. Remembered names stay. Undoing twice is a no-op (alreadyUndone, voided 0). 404 portfolio.not_found. Audited with counts and the batch id only",
+        "operationId": "UndoDividendBatch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DividendUndoResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -11245,6 +11466,355 @@
         },
         "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
       },
+      "DividendBadRow": {
+        "required": [
+          "line",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "A row that cannot be imported: the line of the file it starts on and why."
+      },
+      "DividendBatchPage": {
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DividendBatchView"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One page of import batches, newest first."
+      },
+      "DividendBatchView": {
+        "required": [
+          "id",
+          "accountId",
+          "accountName",
+          "fileName",
+          "sha256",
+          "parsed",
+          "imported",
+          "duplicates",
+          "bad",
+          "amount",
+          "status",
+          "activeDividends",
+          "createdBy",
+          "createdAt",
+          "undoneAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "parsed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "duplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "bad": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "type": "string"
+          },
+          "activeDividends": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "undoneAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        },
+        "description": "One import of a dividend file. `Status` is `imported` or `undone`; `ActiveDividends` counts its dividends that are not voided; `Amount` is the rupees it stored."
+      },
+      "DividendBeforeFirstLot": {
+        "required": [
+          "count",
+          "amount",
+          "firstLotDate"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "firstLotDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          }
+        },
+        "description": "The dividends to be added that are dated before the account's first lot (`FirstLotDate`; null: the account has no lot): the net XIRR cannot count an inflow before the first outflow — read the earlier trade history."
+      },
+      "DividendCandidate": {
+        "required": [
+          "holdingId",
+          "symbol",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "holdingId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "description": "A holding that fits an ambiguous scrip name."
+      },
+      "DividendChoice": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "none": {
+            "type": "boolean",
+            "default": false
+          },
+          "remember": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "description": "What the owner decided for a scrip name of the file: exactly one of `HoldingId` (one of the account's holdings), `InstrumentId` (an NSE share or ETF of the instrument list) and `None` (keep the dividends unallocated). It applies to every\nrow with that name. `Name` is the scrip name as the file wrote it or the item's `NameKey` (best: send the `NameKey`); either way it is reduced to the key names are compared by (case, punctuation and company suffixes\nignored), so two spellings of one company are one scrip. Several choices for one scrip are fine when they agree (one is made of them) and a 400 when they disagree. With `Remember` the choice is saved as an alias, so later files with that name need no question."
+      },
+      "DividendFileSummary": {
+        "required": [
+          "fileName",
+          "rows",
+          "parsed",
+          "parsedAmount",
+          "repeated",
+          "distinct",
+          "identicalRepeats",
+          "bad",
+          "badTotal",
+          "alreadyImported",
+          "possibleDuplicates",
+          "toAdd",
+          "needsMatch",
+          "ambiguous"
+        ],
+        "type": "object",
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parsed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "parsedAmount": {
+            "type": "number",
+            "format": "double"
+          },
+          "repeated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "distinct": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "identicalRepeats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DividendRepeat"
+            }
+          },
+          "bad": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DividendBadRow"
+            }
+          },
+          "badTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "possibleDuplicates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "toAdd": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "needsMatch": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ambiguous": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What was in the file. `Rows` are the data rows (empty lines do not count), `Parsed` the valid rows (`ParsedAmount` their rupees), `Repeated` the valid rows that repeat an earlier row of the file identically (counted once; listed in\n`IdenticalRepeats`, at most 200), `Distinct` the rows left (`Parsed - Repeated`). Of the distinct rows: `AlreadyImported` are stored already, `PossibleDuplicates` equal a dividend you typed in, and `ToAdd` would be stored,\namong them `NeedsMatch` (no holding or instrument found: stored unallocated with the file's name) and `Ambiguous` (more than one holding fits: stored unallocated unless you choose). `Bad` lists the first 200 bad rows (line, reason);\n`BadTotal` counts all of them."
+      },
+      "DividendImportResult": {
+        "required": [
+          "batch",
+          "imported",
+          "amount",
+          "allocated",
+          "instrumentOnly",
+          "unallocated",
+          "alreadyImported",
+          "possibleDuplicatesSkipped",
+          "aliasesSaved"
+        ],
+        "type": "object",
+        "properties": {
+          "batch": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DividendBatchView"
+              }
+            ]
+          },
+          "imported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "allocated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instrumentOnly": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unallocated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "alreadyImported": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "possibleDuplicatesSkipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "aliasesSaved": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What an import did. `Batch` is null when nothing new was stored. `Imported` dividends (`Amount` rupees) were stored: `Allocated` to a holding, `InstrumentOnly` with an instrument but no holding, `Unallocated` with the\nfile's name only. `AlreadyImported` rows were stored before, `PossibleDuplicatesSkipped` equal a dividend you typed in and were not ticked, `AliasesSaved` names were remembered."
+      },
       "DividendInput": {
         "required": [
           "accountId",
@@ -11307,6 +11877,62 @@
         },
         "description": "A dividend typed in by the owner: for a holding (`HoldingId`; the account is then the holding's) or, left unallocated, for an account (`AccountId` alone). `PayDate` is the day the money was credited (not in the future),\n`Amount` the rupees received (above 0, to the paisa), `PerShare` optional (above 0), `Note` optional plain text (at most 200 characters). The same account, holding, date and amount twice is allowed (two genuine payments) but the second asks\nfor a confirmation: `409 portfolio.possible_duplicate`, repeat with `Confirm` true."
       },
+      "DividendMatchView": {
+        "required": [
+          "kind",
+          "holdingId",
+          "instrumentId",
+          "symbol",
+          "isin",
+          "name",
+          "candidates"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "holdingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "instrumentId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isin": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DividendCandidate"
+            }
+          }
+        },
+        "description": "What a row's scrip name means. `Kind` is the rule that decided: `alias` (remembered), `isin`, `symbol` (the file's columns), `name` (equal names), `contains` (part of a name), `master` (a share of the instrument list that\nis not held), `choice` (your pick in an import) or `none`. With a `HoldingId` the dividend belongs to that holding; with only an `InstrumentId` it keeps the instrument, ISIN and symbol but no holding; with neither it is\nunallocated. `Candidates` (two or more) are the holdings an ambiguous name fits: nothing is guessed. `Symbol`, `Isin` and `Name` are those of the holding or instrument (plain text)."
+      },
       "DividendPage": {
         "required": [
           "items",
@@ -11337,6 +11963,143 @@
         },
         "description": "One page of dividends, newest first (pay date), voided ones included and flagged."
       },
+      "DividendPreviewItem": {
+        "required": [
+          "line",
+          "payDate",
+          "name",
+          "nameKey",
+          "perShare",
+          "quantity",
+          "amount",
+          "status",
+          "match",
+          "warnings"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "payDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "name": {
+            "type": "string"
+          },
+          "nameKey": {
+            "type": "string"
+          },
+          "perShare": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "quantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "status": {
+            "type": "string"
+          },
+          "match": {
+            "$ref": "#/components/schemas/DividendMatchView"
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "A distinct row of the file. `Name` is the scrip name as the file wrote it (plain text, untrusted); `NameKey` is the name reduced to what the server compares names by (case, punctuation and company suffixes ignored,\nthe ampersand read as and): two spellings of one company have one `NameKey`, so group the rows that need a choice by it and key the choices by it. `Status`: `new`, `imported` (stored already), `possible_duplicate`, `needs_match`, `ambiguous`.\n`Warnings`: `amount_mismatch` (per share × quantity differs from the amount paid by more than ₹0.01; the amount paid is used), `before_first_lot` (the date is before the account's first lot, so the net XIRR cannot count it),\n`partial_name_match` (matched by part of the name: check it)."
+      },
+      "DividendPreviewReport": {
+        "required": [
+          "format",
+          "file",
+          "items",
+          "totals",
+          "beforeFirstLot",
+          "digest"
+        ],
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string"
+          },
+          "file": {
+            "$ref": "#/components/schemas/DividendFileSummary"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DividendPreviewItem"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DividendTotals"
+          },
+          "beforeFirstLot": {
+            "$ref": "#/components/schemas/DividendBeforeFirstLot"
+          },
+          "digest": {
+            "type": "string"
+          }
+        },
+        "description": "The preview of a dividend file import — nothing is stored. `Format` is `dividends`. `Items` are the distinct rows in file order. `Digest` fingerprints what is shown; an import must send it back, and answers\n`409 portfolio.preview_stale` when holdings, aliases or dividends changed since."
+      },
+      "DividendRepeat": {
+        "required": [
+          "name",
+          "payDate",
+          "amount",
+          "occurrences",
+          "firstLine",
+          "lines"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "payDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "occurrences": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "firstLine": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "description": "A payment that appears more than once, identically, in the file: counted once. `Lines` are the lines of its occurrences (at most 10 listed)."
+      },
       "DividendSuggestionPage": {
         "required": [
           "items",
@@ -11366,6 +12129,97 @@
           }
         },
         "description": "The suggested dividends of an account: its ledger entries of class `dividend` the owner has not accepted or dismissed, newest first. Dhan's documented ledger has no entry for an ordinary dividend, so the list is usually empty. The entries'\n`Description` and `Narration` are Dhan's free text: untrusted, show as plain text."
+      },
+      "DividendTotals": {
+        "required": [
+          "count",
+          "amount",
+          "byYear"
+        ],
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          },
+          "byYear": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DividendYearTotal"
+            }
+          }
+        },
+        "description": "What an import would add: the number of dividends and rupees (the rows that are to be added — not stored yet, not possible duplicates) and the same by pay year."
+      },
+      "DividendUndoResult": {
+        "required": [
+          "batch",
+          "alreadyUndone",
+          "voided"
+        ],
+        "type": "object",
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/DividendBatchView"
+          },
+          "alreadyUndone": {
+            "type": "boolean"
+          },
+          "voided": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "What undoing a batch did: its dividends are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0)."
+      },
+      "DividendUploadForm": {
+        "required": [
+          "accountId",
+          "file",
+          "digest",
+          "choices",
+          "includeDuplicates"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file": {
+            "$ref": "#/components/schemas/IFormFile"
+          },
+          "digest": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "choices": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/DividendChoice"
+            }
+          },
+          "includeDuplicates": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        },
+        "description": "The multipart form of the dividend preview and import, for the API contract only (the request is read by DividendUploads). `AccountId` is the account, `File` the dividend list (CSV). For the import also `Digest` (required: the\ndigest of the preview), `Choices` and `IncludeDuplicates`. A form field is text: <b>send `Choices` and `IncludeDuplicates` as JSON text</b> (`JSON.stringify` of a `DividendChoice[]` and of a list of line numbers of possible\nduplicates to import anyway); the types here say what the JSON holds."
       },
       "DividendView": {
         "required": [
@@ -11460,9 +12314,52 @@
               "null",
               "string"
             ]
+          },
+          "quantity": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
+          "scripName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "batchId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         },
-        "description": "A dividend. `HoldingId` is null for an unallocated one; `Symbol` and `Isin` are the holding's at the time. `Source` is `manual`. A voided dividend does not count."
+        "description": "A dividend. `HoldingId` is null for an unallocated one; `Symbol` and `Isin` are the holding's (or the matched instrument's) at the time. `Source` is `manual` or `csv` (read from a dividend file, ADR 0028). A dividend from a file\nhas its import's `BatchId`, the file's `Quantity` (shares) when it had one and, when it belongs to no holding, the file's `ScripName` (plain text, untrusted). A voided dividend does not count."
+      },
+      "DividendYearTotal": {
+        "required": [
+          "year",
+          "count",
+          "amount"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Rows and rupees of one year."
       },
       "Drawdown": {
         "required": [

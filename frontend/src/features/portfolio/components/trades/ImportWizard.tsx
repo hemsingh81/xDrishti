@@ -15,13 +15,15 @@ interface ImportWizardProps {
   /** The account of the page's scope, chosen at the start; the only account when there is just one. */
   initialAccountId: string;
   onHistory: () => void;
+  /** A dividend file was dropped here: opens the dividend import. */
+  onImportDividends: () => void;
 }
 
 /**
  * Import CSV: choose the account and the file, Preview (nothing is stored), read the report, then Import and rebuild lots or
  * Import only. A report that the server finds stale at import time is swapped for the fresh one with a message.
  */
-export function ImportWizard({ accounts, initialAccountId, onHistory }: ImportWizardProps) {
+export function ImportWizard({ accounts, initialAccountId, onHistory, onImportDividends }: ImportWizardProps) {
   const wizard = useImportWizard(initialAccountId);
   const { report, done, stale, importing, previewing } = wizard;
   const reportHeading = useRef<HTMLHeadingElement>(null);
@@ -55,6 +57,7 @@ export function ImportWizard({ accounts, initialAccountId, onHistory }: ImportWi
         onPreview={() => {
           void wizard.preview();
         }}
+        onImportDividends={onImportDividends}
       />
       {done && <ImportDone result={done} headingRef={doneHeading} onHistory={onHistory} onAnother={wizard.startOver} />}
       {report && (

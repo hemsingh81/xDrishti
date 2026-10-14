@@ -22,6 +22,7 @@ public static class PortfolioErrors
     public const string TokenExpiredCode = "portfolio.token_expired";
     public const string HistoryTooLargeCode = "portfolio.history_too_large";
     public const string PossibleDuplicateCode = "portfolio.possible_duplicate";
+    public const string WrongFileKindCode = "portfolio.wrong_file_kind";
 
     /// <summary>The most active price alerts there can be (ADR 0022).</summary>
     public const int MaxActiveAlerts = 200;
@@ -54,6 +55,18 @@ public static class PortfolioErrors
     public static readonly Error SuggestionDecided = Error.Conflict(ConflictCode, "That suggested dividend was accepted or dismissed meanwhile. Reload the list.");
 
     public static readonly Error TradeBatchNotFound = Error.NotFound(NotFoundCode, "The import does not exist.");
+
+    public static readonly Error DividendBatchNotFound = Error.NotFound(NotFoundCode, "The dividend import does not exist.");
+
+    /// <summary>
+    /// The file is a different kind of file than the screen expects (ADR 0028): <c>detected</c> (an extension member of the problem) says which kind the header looks like — <c>dividends</c>, <c>trades</c>, or <c>tradebook_without_sides</c>
+    /// (a tradebook that cannot be read because it has no buy/sell column). A 400, so the screen can send the owner to the right import.
+    /// </summary>
+    public static Error WrongFileKind(string detected, string message) => new(
+        WrongFileKindCode,
+        message,
+        ErrorKind.Validation,
+        Payload: new Dictionary<string, object> { ["detected"] = detected });
 
     public static readonly Error LotFromTrade = Error.Conflict(
         LotFromTradeCode, "This lot was rebuilt from your trades, so its date is the trade's. Void or add a trade, then rebuild the lots, to change it.");

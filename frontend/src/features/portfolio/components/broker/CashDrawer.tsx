@@ -15,6 +15,10 @@ interface CashDrawerProps {
   scopeAccountId: string | null;
   /** Open the Add dividend form at once (the invitation under the tiles leads here). */
   startAdding?: boolean;
+  /** Open the dividend import at once (a link, or a dividend file dropped on the trade import). */
+  startImporting?: boolean;
+  /** A tradebook was dropped on the dividend import: the trade import opens instead. */
+  onImportTrades: () => void;
 }
 
 /**
@@ -22,7 +26,14 @@ interface CashDrawerProps {
  * what Dhan's ledger says about its money (funds in and out, dividends, charges), by class and period. The ledger's costs are
  * part of the net returns from the day the ledger was first read; its other entries are shown only.
  */
-export function CashDrawer({ onClose, accounts, scopeAccountId, startAdding = false }: CashDrawerProps) {
+export function CashDrawer({
+  onClose,
+  accounts,
+  scopeAccountId,
+  startAdding = false,
+  startImporting = false,
+  onImportTrades,
+}: CashDrawerProps) {
   const titleId = useId();
   const [accountId, setAccountId] = useState(() => initialTradesAccount(accounts, scopeAccountId));
   const [filter, setFilter] = useState<LedgerFilter>(noLedgerFilter);
@@ -76,7 +87,15 @@ export function CashDrawer({ onClose, accounts, scopeAccountId, startAdding = fa
             ))}
           </TextField>
         )}
-        {account && <DividendsPanel key={`dividends-${account.id}`} account={account} startAdding={startAdding} />}
+        {account && (
+          <DividendsPanel
+            key={`dividends-${account.id}`}
+            account={account}
+            startAdding={startAdding}
+            startImporting={startImporting}
+            onImportTrades={onImportTrades}
+          />
+        )}
         {accountId ? (
           <CashView key={accountId} accountId={accountId} filter={filter} onFilter={setFilter} />
         ) : (

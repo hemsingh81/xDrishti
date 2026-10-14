@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using XDrishti.Domain.Common;
 
 namespace XDrishti.Domain.Portfolio;
@@ -18,6 +20,12 @@ public static class DividendRules
     public const int PerShareDecimals = 4;
 
     public const int MaxNoteLength = 200;
+
+    /// <summary>The longest identity of a dividend of a file.</summary>
+    public const int MaxExternalIdLength = 64;
+
+    /// <summary>The longest scrip name kept from a file.</summary>
+    public const int MaxScripNameLength = 200;
 
     /// <summary>True when an amount (a ledger credit, say) can be entered as a dividend as it is: above 0 and at most <see cref="MaxAmount"/> once rounded to paise.</summary>
     public static bool CanEnter(decimal amount) => AmountProblem(RoundAmount(amount)) is null;
@@ -47,6 +55,25 @@ public static class DividendRules
     public static string? CleanNote(string? note)
     {
         var clean = LedgerEntry.Clean(note, int.MaxValue);
+        return clean.Length == 0 ? null : clean;
+    }
+
+    /// <summary>
+    /// A scrip name as a file wrote it, made safe to keep: Unicode format characters (category Cf: bidirectional overrides and isolates, zero-width spaces and joiners, byte order marks) removed - they are invisible and can make a name read differently
+    /// from what it is -, control characters turned into spaces, trimmed, cut at <see cref="MaxScripNameLength"/>; null when nothing is left.
+    /// </summary>
+    public static string? CleanScripName(string? name)
+    {
+        var visible = new StringBuilder(name?.Length ?? 0);
+        foreach (var rune in (name ?? string.Empty).EnumerateRunes())
+        {
+            if (Rune.GetUnicodeCategory(rune) != UnicodeCategory.Format)
+            {
+                visible.Append(rune.ToString());
+            }
+        }
+
+        var clean = LedgerEntry.Clean(visible.ToString(), MaxScripNameLength);
         return clean.Length == 0 ? null : clean;
     }
 }

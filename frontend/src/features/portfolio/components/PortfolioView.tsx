@@ -19,8 +19,7 @@ import { useSyncBarFocus } from '../hooks/useSyncBarFocus';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { usePortfolioOverlays } from '../hooks/usePortfolioOverlays';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
-import type { AlertTarget } from '../lib/alertTarget';
-import { alertTargetOfHolding } from '../lib/alertTarget';
+import { alertTargetOfHolding, type AlertTarget } from '../lib/alertTarget';
 import { activeFilterCount } from '../lib/filters';
 import { ActionCenter } from './actions/ActionCenter';
 import { HistoryCard } from './HistoryCard';
@@ -238,6 +237,8 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
           cash={{
             open: overlays.cashOpen,
             adding: overlays.cashAdding,
+            importing: overlays.cashImporting,
+            onImportTrades: overlays.importTradesInstead,
             onClose: overlays.closeCash,
             accounts: portfolio,
             scopeAccountId: account,
@@ -246,6 +247,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
             tab: overlays.tradesTab,
             onTab: overlays.changeTradesTab,
             onClose: overlays.closeTrades,
+            onImportDividends: overlays.importDividendsInstead,
             accounts: portfolio,
             scopeAccountId: account,
             adding: addingTrade,

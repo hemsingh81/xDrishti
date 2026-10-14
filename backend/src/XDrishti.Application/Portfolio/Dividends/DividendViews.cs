@@ -20,7 +20,10 @@ internal static class DividendViews
         dividend.CreatedAt,
         dividend.IsVoided,
         dividend.VoidedAt,
-        dividend.VoidedBy);
+        dividend.VoidedBy,
+        dividend.Quantity,
+        dividend.ScripName,
+        dividend.BatchId);
 
     public static SuggestionDecisionView Decision(DividendSuggestion decision, Guid ledgerEntryId) => new(ledgerEntryId, decision.State.ToString().ToLowerInvariant(), decision.DividendId);
 }

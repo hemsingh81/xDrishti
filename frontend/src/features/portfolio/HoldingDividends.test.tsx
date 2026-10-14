@@ -123,6 +123,7 @@ describe('Holding drawer: Dividends section', () => {
       'Pay date',
       'Amount',
       'Per share',
+      'Shares',
       'Note',
       'Action',
     ]);

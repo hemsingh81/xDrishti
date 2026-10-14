@@ -1,8 +1,9 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { stubLayout } from './dndTestkit';
 import { basketIds, membersGrid, renderBaskets, symbolsShown } from './testing';
+import { findToast } from '@/test/toast';
 
-const toast = () => screen.findByRole('alert');
+const toast = findToast;
 const grip = (symbol: string) => screen.getByRole('button', { name: `Drag ${symbol}` });
 // Rows are stacked from y = 200 (40 high) at x 300-900; the cards are a row at y 100-180, 250 px apart, 240 wide.
 const overRow = (index: number) => ({ clientX: 500, clientY: 200 + index * 40 + 20 });

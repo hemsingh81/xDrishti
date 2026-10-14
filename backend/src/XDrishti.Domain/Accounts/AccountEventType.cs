@@ -69,4 +69,7 @@ public enum AccountEventType
     DividendVoided,
     DividendSuggestionAccepted,
     DividendSuggestionDismissed,
+    DividendsImported,
+    DividendsUndone,
+    DividendAliasSaved,
 }

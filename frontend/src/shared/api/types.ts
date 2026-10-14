@@ -272,3 +272,17 @@ export type DividendPage = Schemas['DividendPage'];
 export type DividendSuggestionPage = Schemas['DividendSuggestionPage'];
 export type AcceptSuggestionInput = Schemas['AcceptSuggestionInput'];
 export type SuggestionDecision = Schemas['SuggestionDecisionView'];
+
+/** Dividend file import (P2-15, ADR 0028): preview, import with a digest, batches and Undo. */
+export type DividendPreviewReport = Schemas['DividendPreviewReport'];
+export type DividendPreviewItem = Schemas['DividendPreviewItem'];
+export type DividendFileSummary = Schemas['DividendFileSummary'];
+export type DividendMatch = Schemas['DividendMatchView'];
+export type DividendCandidate = Schemas['DividendCandidate'];
+export type DividendRepeat = Schemas['DividendRepeat'];
+export type DividendBadRow = Schemas['DividendBadRow'];
+export type DividendChoice = Schemas['DividendChoice'];
+export type DividendImportResult = Schemas['DividendImportResult'];
+export type DividendBatch = Schemas['DividendBatchView'];
+export type DividendBatchPage = Schemas['DividendBatchPage'];
+export type DividendUndoResult = Schemas['DividendUndoResult'];

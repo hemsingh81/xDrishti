@@ -26,6 +26,8 @@ export interface PortfolioOverlaysProps {
     tab: TradesTab | null;
     onTab: (tab: TradesTab) => void;
     onClose: () => void;
+    /** A dividend file was dropped on the trade import: the dividend import opens instead. */
+    onImportDividends: () => void;
     accounts: readonly AccountSummary[];
     scopeAccountId: string | null;
     /** The Add trade dialog is open. */
@@ -38,6 +40,10 @@ export interface PortfolioOverlaysProps {
     open: boolean;
     /** Opened to add a dividend straight away. */
     adding: boolean;
+    /** Opened on the dividend import. */
+    importing: boolean;
+    /** A tradebook was dropped on the dividend import: the trade import opens instead. */
+    onImportTrades: () => void;
     onClose: () => void;
     accounts: readonly AccountSummary[];
     scopeAccountId: string | null;
@@ -67,6 +73,7 @@ export function PortfolioOverlays({
           onTabChange={trades.onTab}
           onClose={trades.onClose}
           onAddTrade={trades.onAdd}
+          onImportDividends={trades.onImportDividends}
           accounts={trades.accounts}
           scopeAccountId={trades.scopeAccountId}
         />
@@ -77,6 +84,8 @@ export function PortfolioOverlays({
           accounts={cash.accounts}
           scopeAccountId={cash.scopeAccountId}
           startAdding={cash.adding}
+          startImporting={cash.importing}
+          onImportTrades={cash.onImportTrades}
         />
       )}
       {trades.adding && (

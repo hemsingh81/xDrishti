@@ -21,6 +21,39 @@ internal sealed class InMemoryDividendData(InMemoryBrokerData broker) : IDividen
         _collected.Add(dividend);
     }
 
+    public void AddRange(IEnumerable<Dividend> dividends)
+    {
+        foreach (var dividend in dividends)
+        {
+            if (dividend.ExternalId is not null && Dividends.Any(d => d.AccountId == dividend.AccountId && d.ExternalId == dividend.ExternalId && !d.IsVoided))
+            {
+                throw new InvalidOperationException("The partial unique index would refuse this dividend.");
+            }
+
+            Dividends.Add(dividend);
+            _collected.Add(dividend);
+        }
+    }
+
+    /// <summary>How many times the stored identities were read.</summary>
+    public int IdentityReads { get; private set; }
+
+    public ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken)
+    {
+        IdentityReads++;
+        return ValueTask.FromResult<IReadOnlySet<string>>(
+            Dividends.Where(d => d.AccountId == accountId && !d.IsVoided && d.ExternalId is not null && externalIds.Contains(d.ExternalId)).Select(d => d.ExternalId!).ToHashSet(StringComparer.Ordinal));
+    }
+
+    public ValueTask<IReadOnlyList<StoredDividendKey>> ListManualActiveAsync(Guid accountId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<StoredDividendKey>>(
+        [
+            .. Dividends.Where(d => d.AccountId == accountId && !d.IsVoided && d.Source == DividendSource.Manual && d.PayDate >= from && d.PayDate <= to).Select(d => new StoredDividendKey(d.HoldingId, d.PayDate, d.Amount, d.InstrumentId, d.Isin, d.TradingSymbol)),
+        ]);
+
+    public ValueTask<int> VoidBatchAsync(Guid batchId, string by, DateTimeOffset at, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Dividends.Where(d => d.BatchId == batchId).Count(d => d.Void(by, at)));
+
     public ValueTask<bool> ExistsSameAsync(Guid accountId, Guid? holdingId, DateOnly payDate, decimal amount, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Dividends.Any(d => d.AccountId == accountId && d.HoldingId == holdingId && d.PayDate == payDate && d.Amount == amount && !d.IsVoided));
 

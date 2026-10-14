@@ -15,6 +15,8 @@ interface TradesDrawerProps {
   onClose: () => void;
   /** Add one trade by hand. */
   onAddTrade: () => void;
+  /** A dividend file was dropped on the trade import: open the dividend import instead. */
+  onImportDividends: () => void;
   /** The accounts with the Portfolio role. */
   accounts: readonly AccountSummary[];
   /** The account of the page's scope (null = all accounts). */
@@ -32,7 +34,15 @@ const tabs: readonly ButtonTab<TradesTab>[] = tradesTabs.map((tab) => ({
  * The trades in a side panel: Import CSV (the wizard: file, preview, import) and History (the imported files with Undo),
  * and Add trade for one trade typed in. The wizard stays mounted while History is shown, so a half-done import is not lost.
  */
-export function TradesDrawer({ tab, onTabChange, onClose, onAddTrade, accounts, scopeAccountId }: TradesDrawerProps) {
+export function TradesDrawer({
+  tab,
+  onTabChange,
+  onClose,
+  onAddTrade,
+  onImportDividends,
+  accounts,
+  scopeAccountId,
+}: TradesDrawerProps) {
   const titleId = useId();
   return (
     <Drawer
@@ -77,6 +87,7 @@ export function TradesDrawer({ tab, onTabChange, onClose, onAddTrade, accounts, 
             onHistory={() => {
               onTabChange('history');
             }}
+            onImportDividends={onImportDividends}
           />
         </Box>
         {tab === 'history' && (

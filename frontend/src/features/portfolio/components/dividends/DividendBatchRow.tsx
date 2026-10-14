@@ -1,0 +1,61 @@
+import { Button, Stack, Typography } from '@mui/material';
+import type { DividendBatch } from '@/shared/api';
+import { formatInrPrecise, formatIstDateTime } from '@/shared/lib/format';
+import { countOf } from '../../lib/tradeText';
+import { BatchStatusChip } from '../trades/BatchStatusChip';
+
+interface DividendBatchRowProps {
+  batch: DividendBatch;
+  onUndo: (batch: DividendBatch) => void;
+}
+
+/** One imported dividend file: its name, account and time, what was in it, how many of its dividends still count, and Undo. */
+export function DividendBatchRow({ batch, onUndo }: DividendBatchRowProps) {
+  const undone = batch.status === 'undone';
+  const counts = [
+    countOf(batch.parsed, 'valid row'),
+    `${countOf(batch.imported, 'dividend')} stored (${formatInrPrecise(batch.amount)})`,
+    batch.duplicates > 0 ? countOf(batch.duplicates, 'duplicate') : null,
+    batch.bad > 0 ? countOf(batch.bad, 'bad row') : null,
+  ].filter((part): part is string => part !== null);
+  return (
+    <Stack
+      component="li"
+      direction="row"
+      sx={{ gap: 1.5, py: 1.5, alignItems: 'flex-start', justifyContent: 'space-between' }}
+    >
+      <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
+        <Stack direction="row" sx={{ alignItems: 'center', columnGap: 1, rowGap: 0.5, flexWrap: 'wrap' }}>
+          <Typography component="span" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
+            {batch.fileName}
+          </Typography>
+          <BatchStatusChip undone={undone} />
+        </Stack>
+        <Typography variant="body2" color="text.secondary">
+          {`${batch.accountName} · ${formatIstDateTime(batch.createdAt)} · by ${batch.createdBy}`}
+        </Typography>
+        <Typography variant="body2" className="numeric">
+          {counts.join(' · ')}
+        </Typography>
+        <Typography variant="body2" className="numeric" color="text.secondary">
+          {undone && batch.undoneAt
+            ? `Undone ${formatIstDateTime(batch.undoneAt)}; none of its dividends count now.`
+            : `${countOf(batch.activeDividends, 'dividend')} still ${batch.activeDividends === 1 ? 'counts' : 'count'}.`}
+        </Typography>
+      </Stack>
+      {!undone && (
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          aria-label={`Undo the import of ${batch.fileName}`}
+          onClick={() => {
+            onUndo(batch);
+          }}
+        >
+          Undo
+        </Button>
+      )}
+    </Stack>
+  );
+}

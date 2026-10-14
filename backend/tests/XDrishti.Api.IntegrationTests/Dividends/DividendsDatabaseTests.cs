@@ -82,6 +82,7 @@ public sealed class DividendsDatabaseTests(ApiFactory factory)
         (await ColumnsAsync(connection, "dividends")).ShouldBe(
         [
             "id", "account_id", "holding_id", "instrument_id", "isin", "trading_symbol", "pay_date", "amount", "per_share", "note", "source", "created_by", "created_at", "voided_at", "voided_by",
+            "batch_id", "external_id", "quantity", "scrip_name",
         ]);
         (await ColumnsAsync(connection, "dividend_suggestions")).ShouldBe(["id", "account_id", "state", "dividend_id", "decided_by", "decided_at"]);
     }

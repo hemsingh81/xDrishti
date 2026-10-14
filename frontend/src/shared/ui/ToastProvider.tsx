@@ -1,150 +1,205 @@
-import { Alert, Button, Snackbar, Stack, Typography } from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircleOutlined';
-import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined';
-import InfoIcon from '@mui/icons-material/InfoOutlined';
-import WarningIcon from '@mui/icons-material/WarningAmberOutlined';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { IconHueName } from '@/theme';
-import { IconChip } from './IconChip';
-import { ToastContext, type ToastAction, type ToastApi, type ToastSeverity } from './toastContext';
+import { Box } from '@mui/material';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent as ReactFocusEvent,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
+import { Toast } from './Toast';
+import { ToastContext, type ToastAction, type ToastApi, type ToastOptions } from './toastContext';
+import { buildToast, closeToast, openToasts, pushToast, type ToastItem } from './toastQueue';
+import { useAudibleAboveModals } from './useAudibleAboveModals';
 import { useInputModality } from './useInputModality';
 
-interface Toast {
-  id: number;
-  message: string;
-  severity: ToastSeverity;
-  action?: ToastAction;
-  /** The action was started with the keyboard, so focus moves to the button: it would take many Tabs to reach. */
-  focusAction: boolean;
-}
-
-const plainDuration = 5000;
-// A toast with a button gives time to read it and decide.
-const actionDuration = 10_000;
-
-const statusChip = {
-  success: { icon: CheckCircleIcon, hue: 'green' },
-  info: { icon: InfoIcon, hue: 'indigo' },
-  warning: { icon: WarningIcon, hue: 'amber' },
-  error: { icon: ErrorIcon, hue: 'rose' },
-} as const satisfies Record<ToastSeverity, { icon: typeof InfoIcon; hue: IconHueName }>;
+const isAction = (value: ToastAction | ToastOptions): value is ToastAction => 'label' in value;
 
 /** Typing in these keeps its own Ctrl/Cmd+Z (undo of the text). */
 const keepsOwnUndo = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement &&
   (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
+/** Listens to key presses on the document while `active`. */
+function useDocumentKeyDown(active: boolean, onKey: (event: KeyboardEvent) => void) {
+  useEffect(() => {
+    if (!active) return undefined;
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [active, onKey]);
+}
+
 /**
- * Owns one snackbar; descendants call `useToast().notify(...)`. Announced to screen readers (role "alert").
+ * Owns the stack of toasts; descendants call `useToast().notify(...)`. Up to three show at once, bottom right on wide
+ * screens and the full width above the bottom edge on phones; the newest is at the bottom. A fourth makes the oldest
+ * leave (a timed toast before a persistent one). Each toast is announced once, by its own role (see `Toast`).
  *
- * A toast with a button (Undo) is reachable without a mouse in two ways: when the action behind it was started with the
+ * A toast with an undo button is reachable without a mouse in two ways: when the action behind it was started with the
  * keyboard, focus moves to the button and returns to where it was when the toast closes; and Ctrl/Cmd+Z runs it for as
- * long as the toast is open (not while typing in a field, which keeps its own undo). The toast stays while it has focus
- * or the pointer is over it (the snackbar pauses its timer), and Escape closes it (the snackbar does that).
+ * long as the toast is open (the newest one that has an undo; not while typing in a field, which keeps its own undo).
+ * Hovering (a mouse pointer; a touch does not count) or focusing any toast pauses every countdown, and Escape closes the
+ * newest toast unless something else handled that Escape. The stack is in its own portal on the body and stays announced
+ * above an open dialog (see `useAudibleAboveModals`).
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const modality = useInputModality();
   const returnTo = useRef<HTMLElement | null>(null);
-  const alertRef = useRef<HTMLDivElement | null>(null);
-  const actionRef = useRef<HTMLButtonElement | null>(null);
+  const stackRef = useRef<HTMLDivElement | null>(null);
+  const cards = useRef(new Map<string, HTMLElement>());
+  const counter = useRef(0);
+  useAudibleAboveModals(stackRef);
 
-  /** Gives focus back to where it was before the toast took it, if it is still in the toast. */
-  const leaveToast = useCallback(() => {
+  // A stack that is empty has nothing under the pointer or focus any more (no leave/blur event comes from a removed node).
+  if (toasts.length === 0 && (hovered || focused)) {
+    setHovered(false);
+    setFocused(false);
+  }
+
+  /** Gives focus back to where it was before a toast took it, if focus is still in that toast. */
+  const leaveToast = useCallback((id: string) => {
     const target = returnTo.current;
-    returnTo.current = null;
-    if (target?.isConnected && alertRef.current?.contains(document.activeElement)) target.focus();
+    if (target !== null && cards.current.get(id)?.contains(document.activeElement)) {
+      returnTo.current = null;
+      if (target.isConnected) target.focus();
+    }
   }, []);
 
-  const close = useCallback(() => {
-    leaveToast();
-    setToast(null);
-  }, [leaveToast]);
+  const close = useCallback(
+    (id: string) => {
+      leaveToast(id);
+      setToasts((current) => closeToast(current, id));
+    },
+    [leaveToast],
+  );
+
+  const exited = useCallback((id: string) => {
+    setToasts((current) => current.filter((toast) => !(toast.id === id && toast.closing)));
+    cards.current.delete(id);
+    // Focus can have been in the card that went away.
+    setFocused(stackRef.current?.contains(document.activeElement) ?? false);
+  }, []);
 
   const api = useMemo<ToastApi>(
     () => ({
-      notify: (message, severity = 'success', action) => {
-        const focusAction = action !== undefined && modality.current === 'keyboard';
+      notify: (message, severity = 'success', actionOrOptions) => {
+        const options: ToastOptions =
+          actionOrOptions === undefined
+            ? {}
+            : isAction(actionOrOptions)
+              ? { action: actionOrOptions }
+              : actionOrOptions;
+        const focusAction = options.action !== undefined && modality.current === 'keyboard';
         if (focusAction) {
           // A second toast keeps the first place to return to: the one before any toast took focus.
           const active = document.activeElement;
           returnTo.current ??= active instanceof HTMLElement && active !== document.body ? active : null;
-        } else {
-          leaveToast();
         }
-        setToast((previous) => ({ id: (previous?.id ?? 0) + 1, message, severity, action, focusAction }));
+        counter.current += 1;
+        const next = buildToast(
+          options.id ?? `toast-${counter.current}`,
+          counter.current,
+          message,
+          severity,
+          options,
+          focusAction,
+        );
+        setToasts((current) => pushToast(current, next));
       },
+      dismiss: close,
     }),
-    [modality, leaveToast],
+    [modality, close],
   );
 
-  useEffect(() => {
-    if (toast?.focusAction) actionRef.current?.focus();
-  }, [toast?.id, toast?.focusAction]);
+  const open = openToasts(toasts);
+  const newestId = open.at(-1)?.id;
+  const undoable = open.findLast((toast) => toast.undo !== undefined);
+  const undo = undoable?.undo;
+  const undoId = undoable?.id;
 
-  const action = toast?.action;
-  useEffect(() => {
-    if (!action) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      const undo =
+  const onUndoKey = useCallback(
+    (event: KeyboardEvent) => {
+      const pressed =
         (event.ctrlKey || event.metaKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === 'z';
-      if (!undo || event.defaultPrevented || keepsOwnUndo(event.target)) return;
+      if (!pressed || event.defaultPrevented || keepsOwnUndo(event.target) || !undo || !undoId) return;
       event.preventDefault();
-      action.onClick();
-      close();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [action, close]);
+      undo.onClick();
+      close(undoId);
+    },
+    [undo, undoId, close],
+  );
+  useDocumentKeyDown(undo !== undefined, onUndoKey);
 
-  const chip = statusChip[toast?.severity ?? 'success'];
+  const onEscape = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented && newestId) close(newestId);
+    },
+    [newestId, close],
+  );
+  useDocumentKeyDown(newestId !== undefined, onEscape);
+
+  const onBlur = (event: ReactFocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+  };
+
+  const paused = hovered || focused;
   return (
     <ToastContext value={api}>
       {children}
-      <Snackbar
-        key={toast?.id}
-        open={toast !== null}
-        autoHideDuration={toast?.action ? actionDuration : plainDuration}
-        onClose={(_event, reason) => {
-          if (reason !== 'clickaway') close();
-        }}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          ref={alertRef}
-          severity={toast?.severity ?? 'success'}
-          variant="outlined"
-          icon={<IconChip icon={chip.icon} hue={chip.hue} />}
-          sx={{ bgcolor: 'background.paper', color: 'text.primary', alignItems: 'center', boxShadow: 3 }}
-          action={
-            toast?.action && (
-              <Stack direction="row" sx={{ gap: 1, alignItems: 'center' }}>
-                <Button
-                  ref={actionRef}
-                  color="inherit"
-                  size="small"
-                  aria-keyshortcuts="Control+Z Meta+Z"
-                  onClick={() => {
-                    toast.action?.onClick();
-                    close();
-                  }}
-                >
-                  {toast.action.label}
-                </Button>
-                {/* The button's aria-keyshortcuts tells assistive technology; this tells everyone else. */}
-                <Typography aria-hidden component="span" variant="caption" color="text.secondary">
-                  Ctrl/⌘+Z
-                </Typography>
-              </Stack>
-            )
-          }
-          onClose={toast?.action ? undefined : close}
+      {/* In its own portal on the body, so a dialog's own portal and the app root are not its parents (and it floats above both). */}
+      {createPortal(
+        <Box
+          ref={stackRef}
+          component="section"
+          // A labelled region while there is something in it (to find the notifications by); nothing to announce otherwise.
+          aria-label={toasts.length > 0 ? 'Notifications' : undefined}
+          // A mouse hovers; a finger does not (a touch fires enter and no leave until the next touch, which would pause it for good).
+          onPointerEnter={(event) => {
+            if (event.pointerType === 'mouse') setHovered(true);
+          }}
+          onPointerLeave={(event) => {
+            if (event.pointerType === 'mouse') setHovered(false);
+          }}
+          onFocus={() => {
+            setFocused(true);
+          }}
+          onBlur={onBlur}
+          sx={(theme) => ({
+            position: 'fixed',
+            zIndex: theme.zIndex.snackbar,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+            // Phones: the full width above the bottom edge (and the home indicator); wide screens: a column at the corner.
+            left: 12,
+            right: 12,
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+            pointerEvents: 'none',
+            '& > *': { pointerEvents: 'auto' },
+            [theme.breakpoints.up('md')]: { left: 'auto', right: 24, bottom: 24, width: 400 },
+          })}
         >
-          {toast?.message}
-        </Alert>
-      </Snackbar>
+          {toasts.map((toast) => (
+            <Toast
+              key={toast.id}
+              ref={(element: HTMLDivElement | null) => {
+                if (element) cards.current.set(toast.id, element);
+              }}
+              toast={toast}
+              paused={paused}
+              onClose={close}
+              onExited={exited}
+            />
+          ))}
+        </Box>,
+        document.body,
+      )}
     </ToastContext>
   );
 }

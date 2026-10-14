@@ -1743,6 +1743,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("amount");
 
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -1752,6 +1756,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("created_by");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("external_id");
 
                     b.Property<Guid?>("HoldingId")
                         .HasColumnType("uuid")
@@ -1780,6 +1789,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("per_share");
 
+                    b.Property<long?>("Quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("ScripName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("scrip_name");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(6)
@@ -1803,6 +1821,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_dividends");
 
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_dividends_batch")
+                        .HasFilter("batch_id IS NOT NULL");
+
+                    b.HasIndex("AccountId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dividends_account_external_active")
+                        .HasFilter("voided_at IS NULL AND external_id IS NOT NULL");
+
                     b.HasIndex("AccountId", "PayDate")
                         .HasDatabaseName("ix_dividends_account_pay_date");
 
@@ -1814,11 +1841,161 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_dividends_amount", "amount > 0");
 
+                            t.HasCheckConstraint("ck_dividends_file", "(source = 'csv') = (external_id IS NOT NULL AND batch_id IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_dividends_per_share", "per_share IS NULL OR per_share > 0");
 
-                            t.HasCheckConstraint("ck_dividends_source", "source IN ('manual')");
+                            t.HasCheckConstraint("ck_dividends_quantity", "quantity IS NULL OR quantity > 0");
+
+                            t.HasCheckConstraint("ck_dividends_source", "source IN ('manual', 'csv')");
 
                             t.HasCheckConstraint("ck_dividends_voided", "(voided_at IS NULL) = (voided_by IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("HoldingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holding_id");
+
+                    b.Property<Guid?>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_key");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividend_aliases");
+
+                    b.HasIndex("HoldingId")
+                        .HasDatabaseName("ix_dividend_aliases_holding")
+                        .HasFilter("holding_id IS NOT NULL");
+
+                    b.HasIndex("AccountId", "NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dividend_aliases_account_name");
+
+                    b.ToTable("dividend_aliases", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividend_aliases_target", "holding_id IS NULL OR instrument_id IS NULL");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<int>("Bad")
+                        .HasColumnType("integer")
+                        .HasColumnName("bad");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("Duplicates")
+                        .HasColumnType("integer")
+                        .HasColumnName("duplicates");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Imported")
+                        .HasColumnType("integer")
+                        .HasColumnName("imported");
+
+                    b.Property<int>("Parsed")
+                        .HasColumnType("integer")
+                        .HasColumnName("parsed");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("UndoneAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("undone_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividend_batches");
+
+                    b.HasIndex("AccountId", "CreatedAt")
+                        .HasDatabaseName("ix_dividend_batches_account_created");
+
+                    b.ToTable("dividend_batches", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividend_batches_counts", "parsed >= 0 AND imported >= 0 AND duplicates >= 0 AND bad >= 0 AND amount >= 0");
+
+                            t.HasCheckConstraint("ck_dividend_batches_status", "status IN ('imported', 'undone')");
+
+                            t.HasCheckConstraint("ck_dividend_batches_undone", "(status = 'undone') = (undone_at IS NOT NULL)");
                         });
                 });
 
@@ -3324,11 +3501,43 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_dividends_broker_accounts_account_id");
 
+                    b.HasOne("XDrishti.Domain.Portfolio.DividendBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividends_dividend_batches_batch_id");
+
                     b.HasOne("XDrishti.Domain.Portfolio.Holding", null)
                         .WithMany()
                         .HasForeignKey("HoldingId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_dividends_holdings_holding_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendAlias", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_aliases_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.Holding", null)
+                        .WithMany()
+                        .HasForeignKey("HoldingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividend_aliases_holdings_holding_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendBatch", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_batches_broker_accounts_account_id");
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendSuggestion", b =>

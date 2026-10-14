@@ -10,11 +10,11 @@ export function formatBytes(bytes: number): string {
   return `${String(Number((bytes / (1024 * 1024)).toFixed(1)))} MB`;
 }
 
-/** Why a chosen file cannot be previewed (a CSV of at most 10 MB that is not empty); undefined when it can. */
-export function validateTradeFile(file: { name: string; size: number }): string | undefined {
+/** Why a chosen file cannot be previewed (a CSV of at most 10 MB that is not empty; `what` names it, e.g. "dividend list"); undefined when it can. */
+export function validateTradeFile(file: { name: string; size: number }, what = 'tradebook'): string | undefined {
   const name = file.name.toLowerCase();
   if (!extensions.some((extension) => name.endsWith(extension))) {
-    return `“${file.name}” is not a CSV file. Export the tradebook as CSV (.csv) and choose that.`;
+    return `“${file.name}” is not a CSV file. Export the ${what} as CSV (.csv) and choose that.`;
   }
   if (file.size === 0) return `“${file.name}” is empty.`;
   if (file.size > maxTradeFileBytes) {

@@ -1,6 +1,7 @@
 import UploadIcon from '@mui/icons-material/UploadFileOutlined';
 import { Box, Button, Stack, Typography } from '@mui/material';
 import { useId, useState, type ChangeEvent, type DragEvent } from 'react';
+import { capitalise } from '@/shared/lib/format';
 import { formatBytes } from '../../lib/tradeFile';
 
 interface FileDropZoneProps {
@@ -11,13 +12,22 @@ interface FileDropZoneProps {
   disabled?: boolean;
   /** Why the file cannot be used, or what the API said about it. */
   error?: string;
+  /** What the file is, for the input's name and the prompt: "tradebook" (default) or "dividend list". */
+  what?: string;
 }
 
 /**
  * Where the tradebook goes: a bordered area that is a label of the file input, so a click opens the file chooser, a file can
  * be dropped on it and the keyboard reaches the (visually hidden) input itself. The chosen file is named with its size.
  */
-export function FileDropZone({ file, onFile, onClear, disabled = false, error }: FileDropZoneProps) {
+export function FileDropZone({
+  file,
+  onFile,
+  onClear,
+  disabled = false,
+  error,
+  what = 'tradebook',
+}: FileDropZoneProps) {
   const [over, setOver] = useState(false);
   const hintId = useId();
 
@@ -58,7 +68,7 @@ export function FileDropZone({ file, onFile, onClear, disabled = false, error }:
         <UploadIcon color="action" aria-hidden />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography sx={{ fontWeight: 600 }}>
-            {over ? 'Drop the file to choose it' : 'Drop the tradebook here, or click to choose a file'}
+            {over ? 'Drop the file to choose it' : `Drop the ${what} here, or click to choose a file`}
           </Typography>
           <Typography variant="body2" color="text.secondary" id={hintId}>
             CSV, up to 10 MB and 20,000 rows. The file is read, never kept: only its name and a fingerprint are.
@@ -68,7 +78,7 @@ export function FileDropZone({ file, onFile, onClear, disabled = false, error }:
           component="input"
           type="file"
           accept=".csv,.txt,text/csv,text/plain"
-          aria-label="Tradebook file (CSV)"
+          aria-label={`${capitalise(what)} file (CSV)`}
           aria-describedby={hintId}
           disabled={disabled}
           onChange={(event: ChangeEvent<HTMLInputElement>) => {

@@ -35,6 +35,7 @@ export function DividendList({ list, owner, showHolding, emptyText, onVoid }: Di
     ...(showHolding ? [{ label: 'Holding', align: 'left' } as const] : []),
     { label: 'Amount', align: 'right' },
     { label: 'Per share', align: 'right' },
+    { label: 'Shares', align: 'right' },
     { label: 'Note', align: 'left' },
     { label: 'Action', align: 'right' },
   ] as const;
@@ -57,7 +58,7 @@ export function DividendList({ list, owner, showHolding, emptyText, onVoid }: Di
   return (
     <>
       <TableContainer role="region" aria-label={`Dividends of ${owner}, scrolls sideways`} tabIndex={0}>
-        <Table size="small" aria-label={`Dividends of ${owner}`} sx={{ minWidth: showHolding ? 640 : 520 }}>
+        <Table size="small" aria-label={`Dividends of ${owner}`} sx={{ minWidth: showHolding ? 700 : 580 }}>
           <TableHead>
             <TableRow>
               {headings.map((heading) => (

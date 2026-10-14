@@ -1,0 +1,43 @@
+# 0028 — Dividend files are recognised by their headers and matched to holdings by name, with remembered corrections
+
+- **Status:** Accepted (owner, 2026-10-15: asked for the feature with a Dhan dividend payout export as the sample, [P2-15](../specs/P2-15-dividend-csv-import.md)) — amends [ADR 0026](0026-dividends-entered-by-the-owner-and-charges-in-net-returns.md) (dividends entered by the owner; "a dividend CSV import is a follow-up")
+- **Date:** 2026-10-15
+
+## Context
+Dhan's dividend list has no API, but the owner keeps it as a file: `Date, Scrip Name, Dividend Per Share, Quantity, Dividend Paid` (a few hundred rows; local analysis in `data/dhan/dividends/`, not committed). It has company names only, `Sept` for September, thousands separators, a repeated identical row, and many rows for stocks no longer held.
+
+## Decisions
+1. **Detection by headers**, shared with the trade import: a date, a scrip name (or symbol/ISIN) and a paid amount make a dividend file; a trade file with no side column is explained rather than rejected; a dividend file dropped on the trade import is redirected.
+2. **Preview, import with a digest, Undo** exactly as for trades (ADR 0023); dividends get `source = csv`, a batch, an identity and the file's quantity.
+3. **Name matching** in this order: remembered alias, ISIN/symbol columns, normalised-name equality with an open holding, a unique containment match (open holdings only, and only when the shorter name has at least two significant words), the instrument master (by equality; see Amendments b), else an unallocated dividend carrying the file's name. Ambiguity is never guessed. The owner's corrections can be remembered per account (`portfolio.dividend_aliases`) so the next file is handled without questions.
+4. **Identity:** a hash of account, date, normalised name, per share, quantity and amount (no occurrence index; see Amendments a); identical rows inside one file count once (listed in the preview); a row equal to a stored manual dividend is a possible duplicate, skipped unless ticked.
+5. **Dividends before the account's first lot** are imported but flagged: net XIRR cannot start with an inflow, and the notice offers the earlier-history read.
+
+## Consequences
+- A whole history of dividends needs one upload; re-uploading is harmless.
+- Name matching can be wrong only where the owner confirmed it; unmatched dividends are still counted at account level.
+- Dividends of stocks no longer held stay unallocated (no holding row exists), so they count in account and total figures but not in holding or sector groups.
+
+## Consequences from the build (2026-10-15)
+- **Re-uploading is harmless, and so is voiding one dividend by hand.** The identity is unique among the dividends that are not voided (a partial unique index), so the same file stores nothing and an undone or voided dividend can be imported again; voiding a single dividend of a batch and importing the same file again adds just that one back.
+- **A corrected value is a new payment.** The identity includes per share, quantity and amount, so a file in which an amount was corrected adds the corrected row as new and leaves the old one stored; the owner undoes the old batch or voids the old dividend. Two different payments on one day (for example 5 and 4.5 per share of one company) stay two dividends.
+- **Rows that need a match are still imported.** `needs_match` and `ambiguous` rows are in the set that is stored by default, unallocated with the file's name; the owner's choice per name only improves them (and, with Remember, the next file). Nothing is guessed and nothing is dropped, so the total of a file always equals the total stored; the price is that dividends of stocks no longer held count in the account and total figures but not in a holding, bucket or sector group.
+- **Matching is deliberately narrow.** A name that fits two holdings is ambiguous, not guessed; the instrument master is searched by equality only, so a stock that is no longer held but is the only NSE share with that name is recognised (instrument, ISIN and symbol kept), while a partial name that would need containment stays unallocated. The two-significant-words rule means `Bank of India` never joins `Union Bank of India`, and a remembered alias beats every other rule, including a wrong one the owner once confirmed.
+- **The digest guards what the world did, not what the owner chose.** It covers the bad and repeated counts, the account's first-lot date and, per row, its line, date, amount, status and the rule and holding or instrument its name matched. The owner's choices and ticked duplicates are part of the import request itself and are validated against the account's holdings and the master; a stale digest answers `409 portfolio.preview_stale` with the fresh preview and stores nothing.
+- **A large file is a large answer.** The preview lists every distinct row (up to 20,000, a few megabytes) and the import answers with the confirmed preview again; the screen therefore pages its tables. Reading is bounded: a few queries for the whole file (holdings, master names, aliases, stored identities, typed-in dividends) and an in-memory index; an integration test holds a 20,000-row preview under 5 seconds.
+- **Dividends before the first lot are imported but flagged**, as decided; they sit in the net XIRR as money in before the first lot, which is why the notice offers the read of earlier trade history.
+- **A sideless tradebook is explained, not read**, on both imports; reading it is outside this story.
+
+## Amendments (2026-10-15)
+Made while building [P2-15](../specs/P2-15-dividend-csv-import.md); the spec marks them too.
+- **a. No occurrence index in the identity.** The first reading hashed the "occurrence among distinct rows". Because identical rows collapse in the reader (they are counted once and listed), the occurrence of a row is always the first, so the index carries nothing and was left out; the identity is `d:` + 32 hex characters of the hash of account, pay date, normalised name, per share, quantity and amount.
+- **b. The instrument master is matched by equality only** (ISIN or symbol when the file has them, else the name's key), not "by the same name rules": containment against some thousands of master names would pick wrong shares. Containment (with at least two significant words) applies to the account's **open holdings** only.
+- **c. `needs_match` and `ambiguous` rows are imported unallocated by default** (they are in the "to add" counts and totals), instead of waiting for the owner's choice; the choice, with Remember, makes the next file clean.
+- **d. The digest's scope** is the one in the Consequences; it deliberately leaves the owner's choices out, because they are the request.
+- **e. A choice has three forms** (`holdingId`, `instrumentId`, or `none` for "keep unallocated"), exactly one per name, and a remembered `none` is an alias too; a choice that makes a row equal to a typed-in dividend turns it into a possible duplicate.
+- **f. Response size.** The preview and the import's `report` carry every distinct row (no paging); the screen pages its tables, 50 rows at a time (`usePaged`, `PageNav`).
+- **g. The identity depends on the name-normalisation rules.** The hash uses the normalised name, so a change to the rules (a new corporate word dropped, a different punctuation rule) would give old rows another identity and make an old file look new. A golden test pins a set of identities, so such a change fails the build and must be decided deliberately (with a migration of the stored identities if wanted).
+- **h. Remembered matches can be changed on screen.** An alias saved with Remember is not final: choosing another holding, instrument or *none* for the same name in a later preview retargets it (one alias per account and name key); nothing already imported changes.
+- **i. A plain `Amount` column alone does not make a dividend file.** A file whose only amount header is plain (`Amount`, `Net amount`) needs a per-share or dividend hint (a per-share column or a header that says dividend, payout or paid); otherwise it is a *statement* (not read) rather than a guess.
+- **j. Choices are keyed by a normalised key (`nameKey`).** Two spellings of one company in one file (case, punctuation, `Ltd`/`Limited`) are one choice and one alias, applying to every row with that key.
+- **k. The Down migration deletes csv dividends, including voided history.** Reverting `AddDividendImport` removes every dividend with `source = csv`, voided ones too, together with the batches and aliases; typed-in dividends are untouched. Undo, by contrast, only voids.

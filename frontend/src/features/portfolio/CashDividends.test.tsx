@@ -85,6 +85,7 @@ describe('Cash & dividends panel: the dividends of the account', () => {
       'Holding',
       'Amount',
       'Per share',
+      'Shares',
       'Note',
       'Action',
     ]);

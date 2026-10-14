@@ -93,6 +93,10 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<DividendSuggestion> DividendSuggestions => Set<DividendSuggestion>();
 
+    public DbSet<DividendBatch> DividendBatches => Set<DividendBatch>();
+
+    public DbSet<DividendAlias> DividendAliases => Set<DividendAlias>();
+
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
 

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, unwrap, type AcceptSuggestionInput, type DividendInput } from '@/shared/api';
+import { importDividends, previewDividends, type DividendUpload } from './dividendUpload';
 import { dividendKeys } from './dividendQueries';
 import { invalidateIncome } from './portfolioMutations';
 
@@ -58,5 +59,30 @@ export function useDismissSuggestion(accountId: string) {
         }),
       ),
     onSettled: () => queryClient.invalidateQueries({ queryKey: dividendKeys.all }),
+  });
+}
+
+/** Reads a dividend list: what importing it would do. Nothing is stored, so nothing is reloaded. */
+export function usePreviewDividends() {
+  return useMutation({ mutationFn: (upload: DividendUpload) => previewDividends(upload) });
+}
+
+/** Imports a dividend list as one batch: the dividend lists, the import history and the income figures are read again. */
+export function useImportDividends() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (upload: DividendUpload) => importDividends(upload),
+    onSuccess: () => invalidateDividends(queryClient),
+  });
+}
+
+/** Undoes an import: its dividends are voided (kept in the lists, flagged). Doing it twice changes nothing. */
+export function useUndoDividendBatch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.POST('/api/portfolio/dividend-batches/{id}/undo', { params: { path: { id } } })),
+    // Also after a refusal: an import that is undone already changes what the history shows.
+    onSettled: () => invalidateDividends(queryClient),
   });
 }

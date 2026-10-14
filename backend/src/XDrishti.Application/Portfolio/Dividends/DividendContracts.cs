@@ -11,7 +11,10 @@ namespace XDrishti.Application.Portfolio.Dividends;
 /// </summary>
 public sealed record DividendInput(Guid? AccountId, Guid? HoldingId, DateOnly? PayDate, decimal? Amount, decimal? PerShare, string? Note, bool? Confirm);
 
-/// <summary>A dividend. <c>HoldingId</c> is null for an unallocated one; <c>Symbol</c> and <c>Isin</c> are the holding's at the time. <c>Source</c> is <c>manual</c>. A voided dividend does not count.</summary>
+/// <summary>
+/// A dividend. <c>HoldingId</c> is null for an unallocated one; <c>Symbol</c> and <c>Isin</c> are the holding's (or the matched instrument's) at the time. <c>Source</c> is <c>manual</c> or <c>csv</c> (read from a dividend file, ADR 0028). A dividend from a file
+/// has its import's <c>BatchId</c>, the file's <c>Quantity</c> (shares) when it had one and, when it belongs to no holding, the file's <c>ScripName</c> (plain text, untrusted). A voided dividend does not count.
+/// </summary>
 public sealed record DividendView(
     Guid Id,
     Guid AccountId,
@@ -27,7 +30,10 @@ public sealed record DividendView(
     DateTimeOffset CreatedAt,
     bool Voided,
     DateTimeOffset? VoidedAt,
-    string? VoidedBy);
+    string? VoidedBy,
+    long? Quantity = null,
+    string? ScripName = null,
+    Guid? BatchId = null);
 
 /// <summary>One page of dividends, newest first (pay date), voided ones included and flagged.</summary>
 public sealed record DividendPage(IReadOnlyList<DividendView> Items, int Page, int PageSize, int Total);

@@ -3,6 +3,8 @@ import { Alert, Button, Link, Stack, TextField, Typography } from '@mui/material
 import type { AccountSummary } from '@/shared/api';
 import { problemKind } from '../../lib/errors';
 import { uploadErrorText, uploadFieldText } from '../../lib/tradeErrors';
+import { detectedKind, tradeImportKinds } from '../../lib/wrongFile';
+import { WrongFileNotice } from '../WrongFileNotice';
 import { FileDropZone } from './FileDropZone';
 
 interface ImportFormProps {
@@ -20,6 +22,8 @@ interface ImportFormProps {
   onFile: (file: File) => void;
   onClear: () => void;
   onPreview: () => void;
+  /** A dividend file was dropped here: opens the dividend import. */
+  onImportDividends: () => void;
 }
 
 /** Step one: which account, which file (with the template to start from), then Preview. Nothing is stored by it. */
@@ -35,10 +39,13 @@ export function ImportForm({
   onFile,
   onClear,
   onPreview,
+  onImportDividends,
 }: ImportFormProps) {
   const fields = error ? uploadFieldText(error) : {};
   const invalid = problemKind(error) === 'invalid';
-  const general = error && !(invalid && (fields.file || fields.accountId || fields.other)) ? error : null;
+  const detected = error ? detectedKind(error, tradeImportKinds) : null;
+  const general =
+    error && detected === null && !(invalid && (fields.file || fields.accountId || fields.other)) ? error : null;
   return (
     <Stack component="section" aria-label="Choose the file" spacing={2}>
       <Typography variant="body2" color="text.secondary">
@@ -79,6 +86,9 @@ export function ImportForm({
         disabled={busy}
         error={fileProblem ?? fields.file ?? (invalid ? fields.other : undefined)}
       />
+      {detected !== null && (
+        <WrongFileNotice detected={detected} onSwitch={detected === 'dividends' ? onImportDividends : undefined} />
+      )}
       {general ? (
         <Alert
           severity="error"

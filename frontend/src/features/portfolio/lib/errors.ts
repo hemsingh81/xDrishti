@@ -14,6 +14,7 @@ export type ProblemKind =
   | 'not_found'
   | 'alert_limit'
   | 'preview_stale'
+  | 'wrong_file_kind'
   | 'lot_from_trade'
   | 'broker_error'
   | 'network'
@@ -33,6 +34,7 @@ const byCode: Record<string, ProblemKind> = {
   'portfolio.not_found': 'not_found',
   'portfolio.alert_limit': 'alert_limit',
   'portfolio.preview_stale': 'preview_stale',
+  'portfolio.wrong_file_kind': 'wrong_file_kind',
   'portfolio.lot_from_trade': 'lot_from_trade',
   'accounts.broker_error': 'broker_error',
 };

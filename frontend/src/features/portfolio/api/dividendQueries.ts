@@ -2,6 +2,8 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import {
   api,
   unwrap,
+  type DividendBatch,
+  type DividendBatchPage,
   type DividendPage,
   type DividendSuggestionPage,
   type DividendView,
@@ -17,6 +19,7 @@ export const dividendKeys = {
   ofHolding: (holdingId: string) => [...portfolioKeys.all, 'dividends', 'holding', holdingId] as const,
   ofAccount: (accountId: string) => [...portfolioKeys.all, 'dividends', 'account', accountId] as const,
   suggestions: (accountId: string) => [...portfolioKeys.all, 'dividends', 'suggestions', accountId] as const,
+  batches: (accountId: string) => [...portfolioKeys.all, 'dividends', 'batches', accountId] as const,
 };
 
 /** Dividends are listed 50 at a time (the API default; "Show more" asks for the next page). */
@@ -82,3 +85,14 @@ export const dividendHoldingsQuery = (accountId: string, text: string) =>
       ).items,
     placeholderData: keepPreviousData,
   });
+
+/** The imports of dividend files, newest first, below the dividends root (an import or an undo reloads them with the lists). */
+export const dividendBatchesList = (accountId: string): InfiniteRowsOptions<DividendBatch, DividendBatchPage> => ({
+  queryKey: dividendKeys.batches(accountId),
+  pageSize: dividendPageSize,
+  getRowId: (batch) => batch.id,
+  fetchPage: async (page, { pageSize, signal }) =>
+    unwrap(
+      await api.GET('/api/portfolio/dividend-batches', { params: { query: { accountId, page, pageSize } }, signal }),
+    ),
+});

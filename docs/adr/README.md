@@ -31,3 +31,6 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0024](0024-live-feed-xd-feed-and-live-prices.md) | Live feed in its own container (`xd-feed`), live prices in the holding price columns, SignalR hub for the Portfolio screen | Accepted |
 | [0025](0025-dhan-trade-history-and-ledger-sync.md) | Dhan trade history and ledger are read nightly; lots are rebuilt automatically where it is safe | Accepted |
 | [0026](0026-dividends-entered-by-the-owner-and-charges-in-net-returns.md) | Dividends are entered by the owner; charges and dividends form a net return next to the gross one | Accepted |
+| [0027](0027-self-healing-sync-and-actionable-notifications.md) | Syncs heal themselves; what only the owner can do arrives as one actionable notification | Accepted |
+| [0028](0028-dividend-csv-import-with-name-matching.md) | Dividend files are recognised by their headers and matched to holdings by name, with remembered corrections | Accepted |
+| [0029](0029-dhan-report-imports-and-source-precedence.md) | Dhan's downloaded reports are imported by kind, and API trades take precedence over bill-level report rows | Accepted |

@@ -29,6 +29,7 @@ using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.BrokerHistory;
+using XDrishti.Application.Portfolio.DividendImport;
 using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Live;
@@ -343,6 +344,13 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListDividendSuggestionsQuery, Result<DividendSuggestionPage>>, ListDividendSuggestionsHandler>();
         services.AddScoped<ICommandHandler<AcceptDividendSuggestionCommand, DividendView>, AcceptDividendSuggestionHandler>();
         services.AddScoped<ICommandHandler<DismissDividendSuggestionCommand, SuggestionDecisionView>, DismissDividendSuggestionHandler>();
+
+        // Dividends from a payout file: preview, import with choices and remembered names, history, undo (ADR 0028). The workspace is shared by the use cases.
+        services.AddScoped<DividendWorkspace>();
+        services.AddScoped<IQueryHandler<PreviewDividendsQuery, Result<DividendPreviewReport>>, PreviewDividendsHandler>();
+        services.AddScoped<ICommandHandler<ImportDividendsCommand, DividendImportResult>, ImportDividendsHandler>();
+        services.AddScoped<IQueryHandler<ListDividendBatchesQuery, Result<DividendBatchPage>>, ListDividendBatchesHandler>();
+        services.AddScoped<ICommandHandler<UndoDividendBatchCommand, DividendUndoResult>, UndoDividendBatchHandler>();
 
         // The live price sink (ADR 0024): a singleton for the lifetime of the feed process; it resolves the scoped ports per flush.
         services.AddSingleton<LiveFlush>();

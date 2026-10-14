@@ -131,4 +131,5 @@ export const dividendHandlers = [
   http.get('/api/holdings/:id/dividends', () => HttpResponse.json(buildDividendPage([]))),
   http.get('/api/accounts/:id/dividends/suggestions', () => HttpResponse.json(buildSuggestionPage([]))),
   http.get('/api/accounts/:id/dividends', () => HttpResponse.json(buildDividendPage([]))),
+  http.get('/api/portfolio/dividend-batches', () => HttpResponse.json({ items: [], page: 1, pageSize: 50, total: 0 })),
 ];

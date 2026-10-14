@@ -182,6 +182,9 @@ public static class DependencyInjection
         services.AddScoped<ITradeStore, TradeStore>();
         services.AddScoped<IDividendStore, DividendStore>();
         services.AddScoped<IDividendSuggestionStore, DividendSuggestionStore>();
+        services.AddScoped<IDividendBatches, DividendBatches>();
+        services.AddScoped<IDividendAliases, DividendAliases>();
+        services.AddScoped<IInstrumentNames, InstrumentNames>();
         services.AddScoped<IIncomeQueries, IncomeQueries>();
         services.AddScoped<ITradeBatches, TradeBatches>();
         services.AddScoped<ITradeReferenceData, TradeReferenceData>();

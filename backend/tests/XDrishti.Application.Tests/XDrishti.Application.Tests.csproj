@@ -11,6 +11,8 @@
     <EmbeddedResource Include="Fixtures\*.csv" LogicalName="Fixtures/%(Filename)%(Extension)" />
     <!-- Made-up tradebook files for the trade CSV reader (docs/specs/P2-03). -->
     <EmbeddedResource Include="Portfolio\Trades\Samples\*.csv" LogicalName="Trades/%(Filename)%(Extension)" />
+    <!-- A made-up dividend payout file in the shape of Dhan's (docs/specs/P2-15): Sept months, thousands separators, repeated and same-day rows. -->
+    <EmbeddedResource Include="Portfolio\DividendImport\Samples\*.csv" LogicalName="Dividends/%(Filename)%(Extension)" />
   </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>

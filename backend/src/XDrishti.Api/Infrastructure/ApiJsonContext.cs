@@ -26,6 +26,7 @@ using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
 using XDrishti.Application.Portfolio.BrokerHistory;
+using XDrishti.Application.Portfolio.DividendImport;
 using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Income;
@@ -189,6 +190,23 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DividendSuggestionPage))]
 [JsonSerializable(typeof(AcceptSuggestionInput))]
 [JsonSerializable(typeof(SuggestionDecisionView))]
+[JsonSerializable(typeof(DividendPreviewReport))]
+[JsonSerializable(typeof(DividendFileSummary))]
+[JsonSerializable(typeof(DividendRepeat))]
+[JsonSerializable(typeof(DividendBadRow))]
+[JsonSerializable(typeof(DividendPreviewItem))]
+[JsonSerializable(typeof(DividendMatchView))]
+[JsonSerializable(typeof(DividendCandidate))]
+[JsonSerializable(typeof(DividendTotals))]
+[JsonSerializable(typeof(DividendYearTotal))]
+[JsonSerializable(typeof(DividendBeforeFirstLot))]
+[JsonSerializable(typeof(DividendChoice))]
+[JsonSerializable(typeof(DividendChoice[]))]
+[JsonSerializable(typeof(int[]))]
+[JsonSerializable(typeof(DividendImportResult))]
+[JsonSerializable(typeof(DividendBatchView))]
+[JsonSerializable(typeof(DividendBatchPage))]
+[JsonSerializable(typeof(DividendUndoResult))]
 [JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(ServiceView))]
 [JsonSerializable(typeof(ServiceRunView))]
