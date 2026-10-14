@@ -76,7 +76,7 @@
 </thead>
 <tbody><tr>
 <td><strong>Login / lock screen</strong></td>
-<td>One centred panel: about + non-sensitive service status (no balances before sign-in) on the left, form on the right. Show/hide password, Caps Lock warning, attempts left, live lockout countdown. Idle or manual <strong>lock</strong> keeps the user and asks only for the password (&quot;Welcome back · Unlock&quot;), and survives a page reload; password re-entry for sensitive actions</td>
+<td>One centred panel over a dotted background: the hero (brand, headline, what the app does) on the left, form on the right; below 860 px the form card comes first and the hero shrinks to its brand row. <strong>P2-12:</strong> the React page shows no live status before sign-in (no fabricated or leaked service data); the prototype&#39;s status line stays a prototype-only demo. Show/hide password, Caps Lock warning, attempts left, live lockout countdown. Idle or manual <strong>lock</strong> keeps the user and asks only for the password (&quot;Welcome back · Unlock&quot;), and survives a page reload; password re-entry for sensitive actions</td>
 <td>Form, status strip</td>
 </tr>
 <tr>
@@ -168,6 +168,11 @@
 <td><strong>Audit</strong></td>
 <td>Logins, configuration changes, approvals, service actions</td>
 <td>Filterable log</td>
+</tr>
+<tr>
+<td><strong>My account</strong> (<code>/account</code>, P2-11; not in the sidebar — user menu → <em>My account</em>)</td>
+<td>Three cards. <strong>Profile</strong>: display name and e-mail, Save asks for the password (step-up) and refreshes the avatar and menu; saving nothing says <em>No changes to save</em>. <strong>Change password</strong>: current, new and confirm with show/hide, &quot;At least 10 characters&quot;, inline mismatch and server messages, wrong current password cleared and refocused, locked state with the live countdown; success says other devices were signed out; help text on the Keychain items. <strong>Recent sign-in activity</strong>: the last 10 events (label, time, IP) with loading, empty and error-with-retry states. <a href="../specs/P2-11-account-profile-and-change-password.html">Spec</a></td>
+<td>Forms, cards, list</td>
 </tr>
 </tbody></table>
 <p>Every analytic screen has a <strong>lens selector</strong> — <em>All trades · By basket · By instrument · By individual trade ·
@@ -273,13 +278,19 @@ and the prototype&#39;s <code>proto.css</code>; the MUI theme and the prototype 
 <td>surfaceAlt</td>
 <td><code>#f1f4f9</code></td>
 <td><code>#182238</code></td>
-<td>dialog footer, table header, hover rows</td>
+<td>table header, alternate rows, hovered links, segmented tray</td>
 </tr>
 <tr>
-<td>border</td>
-<td><code>#dfe3ea</code></td>
-<td><code>#26324a</code></td>
-<td>hairlines (cards, table rows, dividers)</td>
+<td>surfaceStrong</td>
+<td><code>#e8edf4</code></td>
+<td><code>#202c46</code></td>
+<td>neutral chips, progress tracks, hovered controls</td>
+</tr>
+<tr>
+<td>border / borderStrong</td>
+<td><code>#dfe3ea</code> / <code>#c9d0dc</code></td>
+<td><code>#26324a</code> / <code>#34415c</code></td>
+<td>hairlines (cards, table rows, dividers) / scrollbars, hovered buttons</td>
 </tr>
 <tr>
 <td>inputBorder</td>
@@ -300,6 +311,12 @@ and the prototype&#39;s <code>proto.css</code>; the MUI theme and the prototype 
 <td>captions, helper text</td>
 </tr>
 <tr>
+<td>textTertiary</td>
+<td><code>#5b6b82</code></td>
+<td><code>#7d8aa3</code></td>
+<td>hints, sidebar section labels, search button</td>
+</tr>
+<tr>
 <td>accent</td>
 <td><code>#4338ca</code></td>
 <td><code>#9aa5ff</code></td>
@@ -315,13 +332,19 @@ and the prototype&#39;s <code>proto.css</code>; the MUI theme and the prototype 
 <td>accentSoft</td>
 <td><code>#eceefe</code></td>
 <td><code>#222a52</code></td>
-<td>dialog header band, selected nav/rows</td>
+<td>selected nav/rows, info banners, primary chips</td>
 </tr>
 <tr>
 <td>good / bad / warn / info</td>
 <td><code>#146c36</code> / <code>#b91c1c</code> / <code>#a35200</code> / <code>#0e7490</code></td>
 <td><code>#4ade80</code> / <code>#f87171</code> / <code>#fbbf24</code> / <code>#67e8f9</code></td>
 <td>gains / losses / warnings / information</td>
+</tr>
+<tr>
+<td>goodSoft / badSoft / warnSoft / infoSoft</td>
+<td><code>#e9f8ef</code> / <code>#fdecec</code> / <code>#fff5e6</code> / <code>#e6f6f9</code></td>
+<td><code>#10281d</code> / <code>#2f1a1d</code> / <code>#2d2513</code> / <code>#15303a</code></td>
+<td>tonal chips and banners (the colour as text on its tint is 4.5:1, tested)</td>
 </tr>
 </tbody></table>
 <table>
@@ -334,22 +357,22 @@ and the prototype&#39;s <code>proto.css</code>; the MUI theme and the prototype 
 </thead>
 <tbody><tr>
 <td>h1 / h2 / h3</td>
-<td>24/700, 18/650, 15/650 (tracking -0.02 to -0.01em)</td>
-<td>page, section, card titles</td>
+<td>24/750, 16.5/700, 14.5/650 (tracking -0.02 to -0.005em)</td>
+<td>page, dialog / section, card titles</td>
 </tr>
 <tr>
 <td>body1 / body2</td>
-<td>14/1.5, 13/1.45</td>
+<td>14/1.5, 13/1.5</td>
 <td>text, dense data</td>
 </tr>
 <tr>
 <td>caption / overline</td>
-<td>12/1.4, 11/600 uppercase +0.06em</td>
+<td>12/1.5, 11/700 uppercase +0.06em</td>
 <td>helper text, section labels</td>
 </tr>
 <tr>
 <td>button</td>
-<td>14/600</td>
+<td>14/550 (12.5 small, 15 large)</td>
 <td>actions</td>
 </tr>
 <tr>
@@ -363,15 +386,17 @@ and the prototype&#39;s <code>proto.css</code>; the MUI theme and the prototype 
 <td>ids, URLs, code</td>
 </tr>
 </tbody></table>
-<p>Fonts: Inter Variable and JetBrains Mono Variable, self-hosted (latin + latin-ext), <code>font-display: swap</code>, metric-matched fallbacks.</p>
+<p>Fonts: Inter Variable and JetBrains Mono Variable, self-hosted (latin + latin-ext), <code>font-display: swap</code>, metric-matched fallbacks. The root font size is <strong>14 px</strong> (<code>html</code> at 87.5 %, <code>htmlFontSize: 14</code>): every <code>rem</code> in the theme is px / 14 (<code>rem(px)</code> in <code>tokens.ts</code>).</p>
 <p>Rules:</p>
 <ul>
 <li><strong>60-30-10</strong>: 60 % neutral backgrounds, 30 % surfaces and text, at most 10 % accent. The accent is for primary actions, links, selection and focus - <strong>never for gain/loss</strong> (use good/bad plus a sign or arrow; status is never colour alone).</li>
 <li><strong>Tabular figures</strong> for every number column; right-align numbers.</li>
 <li><strong>Focus ring</strong>: 2 px accent outline, 2 px offset, on every interactive element.</li>
 <li><strong>Elevation</strong>: soft cool shadows in light, border-led in dark; <strong>motion</strong>: 120 ms (hover/press) and 200 ms (panels), honouring <code>prefers-reduced-motion</code>.</li>
-<li>Table rows 36 px, header on <code>surfaceAlt</code>; selected nav item on <code>accentSoft</code> with a 3 px accent marker.</li>
+<li>Table rows 36 px, header on <code>surfaceAlt</code> (small uppercase caps), alternate rows tinted, cell padding 9 / 12; selected nav item on <code>accentSoft</code> with a 3 px accent marker flush to the sidebar edge.</li>
 </ul>
+<h3 id="prototype-parity-p2-12">Prototype parity (P2-12)<a class="hash" href="#prototype-parity-p2-12" aria-label="Link to this section">#</a></h3>
+<p>The prototype&#39;s spacing, type and colour were audited against the app (<a href="../specs/P2-12-match-prototype-spacing-fonts-colours.html">spec P2-12</a>, <em>Audit result</em>) and brought into the theme (<code>tokens.ts</code>, <code>componentsControls.ts</code>, <code>componentsSurfaces.ts</code>, <code>globalStyles.ts</code>) and the shell (<code>AppShell</code>, <code>TopBar</code>, <code>Sidebar</code>, <code>NavRow</code>, <code>PageHeader</code>, <code>StatTile</code>), never per screen. The two large causes of the heavier look were the 16 px root (the scale is written for 14) and MUI 9 ignoring <code>color=&quot;text.secondary&quot;</code> on <code>Typography</code> (now mapped in the theme). Values: page padding 14 / 24 / 28·36 / 32·48 by width; top bar 60 px; controls 36 px (small 30, large 44) with radius 10 (8); icon buttons 36 square; cards 12 px radius with the soft shadow, body 14 / 16, header 13 / 16; tonal pill chips (22 px); banners tinted with a 22–25 % hairline; segmented control tray; dialog bands on the surface with hairlines. Deliberately not copied: the prototype&#39;s 1560 px page cap (screens are full width), the 861–1200 px icon rail, hover lifts and native checkbox / switch sizes. The sign-in page is the prototype&#39;s two-panel layout without the status line.</p>
 <h3 id="icons-p1-20">Icons (P1-20)<a class="hash" href="#icons-p1-20" aria-label="Link to this section">#</a></h3>
 <p>Every icon sits in a <strong>chip</strong>: a rounded square tinted from its own colour pair, so colour carries meaning at a glance while the page stays calm (the accent still means &quot;action&quot;). Tokens: <code>iconHues</code>, <code>iconChip</code>, <code>navHue</code> in <code>tokens.ts</code>; the prototype reads the same pairs from <code>ui.js</code> (<code>NAVSTYLE</code>, <code>C</code>).</p>
 <table>
@@ -794,13 +819,14 @@ nightly; responses are chart-ready series.</li>
     <a class="prev" href="12-portfolio-monitoring.html"><small>← Previous  [</small>12 · Portfolio monitoring</a>
     <a class="next" href="14-ai-assistant.html"><small>Next  ] →</small>14 · AI assistant</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-14 07:37</footer>
+  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-14 09:13</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-screens" class="d2">1. Screens</a>
 <a href="#1b-clickable-prototype" class="d2">1b. Clickable prototype</a>
 <a href="#1c-reports-experience" class="d2">1c. Reports experience</a>
 <a href="#1d-responsive-design-all-monitors" class="d2">1d. Responsive design (all monitors)</a>
 <a href="#1e-visual-system-p1-19" class="d2">1e. Visual system (P1-19)</a>
+<a href="#prototype-parity-p2-12" class="d3">Prototype parity (P2-12)</a>
 <a href="#icons-p1-20" class="d3">Icons (P1-20)</a>
 <a href="#layout-and-shared-list-controls-p1-03a" class="d3">Layout and shared list controls (P1-03a)</a>
 <a href="#portfolio-screen-p2-01-p2-05" class="d3">Portfolio screen (P2-01 / P2-05)</a>

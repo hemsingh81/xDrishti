@@ -2,8 +2,8 @@ import { Box, Drawer } from '@mui/material';
 import { Suspense, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { LoadingState } from '@/shared/ui';
-import { layout } from '@/theme';
-import { allNavItems } from '../navigation';
+import { layout, pagePadding } from '@/theme';
+import { allNavItems, routeTitles } from '../navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
@@ -11,7 +11,7 @@ import { TopBar } from './TopBar';
 export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { pathname } = useLocation();
-  const title = allNavItems.find((i) => i.path === pathname)?.label ?? 'xDrishti';
+  const title = allNavItems.find((i) => i.path === pathname)?.label ?? routeTitles[pathname] ?? 'xDrishti';
   const paper = { width: layout.sidebarWidth, boxSizing: 'border-box' as const };
 
   return (
@@ -46,7 +46,21 @@ export function AppShell() {
             a screen can fill it (`height: 100%`) and scroll a region of its own; below `md` the document scrolls. */}
         <Box
           component="main"
-          sx={{ p: { xs: 2, md: 3 }, width: '100%', flex: 1, minHeight: 0, overflowY: { md: 'auto' } }}
+          sx={(theme) => ({
+            // The prototype's `.page` padding: 14 px on phones, 24 from the sidebar breakpoint, more room on wide monitors.
+            padding: `${pagePadding.compact}px`,
+            [theme.breakpoints.up('md')]: { padding: `${pagePadding.base}px` },
+            [`@media (min-width:${pagePadding.wide.minWidth}px)`]: {
+              padding: `${pagePadding.wide.y}px ${pagePadding.wide.x}px`,
+            },
+            [`@media (min-width:${pagePadding.ultra.minWidth}px)`]: {
+              padding: `${pagePadding.ultra.y}px ${pagePadding.ultra.x}px`,
+            },
+            width: '100%',
+            flex: 1,
+            minHeight: 0,
+            overflowY: { md: 'auto' },
+          })}
         >
           <Suspense fallback={<LoadingState />}>
             <Outlet />

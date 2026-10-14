@@ -76,3 +76,6 @@ export const navigation: NavSection[] = [
 
 export const allNavItems: NavItem[] = navigation.flatMap((s) => s.items);
 export const plannedNavItems: NavItem[] = allNavItems.filter((i) => i.phase);
+
+/** Titles of routes that are not sidebar entries (reached from the user menu), so the top bar can still name the page. */
+export const routeTitles: Readonly<Record<string, string>> = { '/account': 'My account' };

@@ -2,12 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
   categorical,
   categoricalSeries,
+  controlHeight,
   elevation,
   iconChip,
   iconHues,
+  pagePadding,
   palettes,
+  rem,
+  rootFontSize,
+  shape,
   stateAlpha,
   table,
+  typeScale,
   type ColorMode,
 } from './tokens';
 
@@ -127,6 +133,37 @@ describe.each<ColorMode>(['light', 'dark'])('%s palette contrast', (mode) => {
     },
   );
 
+  it.each(surfaces)('tertiary text (hints, section labels) is at least 4.5:1 on %s', (surface) => {
+    expect(contrast(p.textTertiary, p[surface])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('tertiary text is quieter than secondary text', () => {
+    expect(contrast(p.textTertiary, p.surface)).toBeLessThan(contrast(p.textSecondary, p.surface));
+  });
+
+  // Tonal chips and banners: the colour as text on its own soft tint (prototype `.chip.green` and the like), and the normal
+  // text colour on every tint (banner bodies).
+  it.each([
+    ['good', 'goodSoft'],
+    ['bad', 'badSoft'],
+    ['warn', 'warnSoft'],
+    ['info', 'infoSoft'],
+    ['accent', 'accentSoft'],
+  ] as const)('%s text is at least 4.5:1 on its tint %s', (colour, tint) => {
+    expect(contrast(p[colour], p[tint])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.text, p[tint])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('secondary text on the neutral chip fill (surfaceStrong) is at least 4.5:1', () => {
+    expect(contrast(p.textSecondary, p.surfaceStrong)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('text is at least 4.5:1 on an alternate table row (surfaceAlt at the zebra strength over the surface)', () => {
+    const row = blend(p.surfaceAlt, p.surface, table.zebraAlpha);
+    expect(contrast(p.text, row)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.textSecondary, row)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('hairline borders stay quiet (below the input border)', () => {
     expect(contrast(p.border, p.surface)).toBeLessThan(contrast(p.inputBorder, p.surface));
   });
@@ -213,9 +250,44 @@ describe('token values from the spec', () => {
     });
   });
 
+  it('has the prototype neutrals and soft tints', () => {
+    expect(palettes.light).toMatchObject({
+      surfaceStrong: '#e8edf4',
+      borderStrong: '#c9d0dc',
+      textTertiary: '#5b6b82',
+      goodSoft: '#e9f8ef',
+      badSoft: '#fdecec',
+      warnSoft: '#fff5e6',
+      infoSoft: '#e6f6f9',
+    });
+    expect(palettes.dark).toMatchObject({
+      surfaceStrong: '#202c46',
+      borderStrong: '#34415c',
+      textTertiary: '#7d8aa3',
+      goodSoft: '#10281d',
+      badSoft: '#2f1a1d',
+      warnSoft: '#2d2513',
+      infoSoft: '#15303a',
+    });
+  });
+
   it('defines elevation steps for both modes', () => {
     for (const mode of ['light', 'dark'] as const) {
       expect(Object.keys(elevation[mode])).toEqual(['sm', 'md', 'lg']);
     }
+  });
+
+  it('follows the prototype for sizes: 36 px controls (small 30, large 44), 14 px body, 24 px page title', () => {
+    expect(controlHeight).toEqual({ small: 30, medium: 36, large: 44 });
+    expect(rootFontSize).toBe(14);
+    expect(typeScale.body1.size * rootFontSize).toBe(14);
+    expect(typeScale.body2.size * rootFontSize).toBe(13);
+    expect(typeScale.caption.size * rootFontSize).toBe(12);
+    expect(typeScale.h1.size * rootFontSize).toBeCloseTo(24);
+    expect(typeScale.h3.size * rootFontSize).toBeCloseTo(14.5);
+    expect(table).toMatchObject({ cellPaddingY: 9, cellPaddingX: 12, hoverAlpha: 0.05 });
+    expect(pagePadding).toMatchObject({ compact: 14, base: 24 });
+    expect(shape).toMatchObject({ radius: 12, radiusControl: 10, radiusSmall: 8, radiusLarge: 18 });
+    expect(rem(12)).toBe(`${12 / 14}rem`);
   });
 });

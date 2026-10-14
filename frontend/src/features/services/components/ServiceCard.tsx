@@ -61,7 +61,7 @@ export function ServiceCard({ service, names, busy, ...handlers }: ServiceCardPr
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-            minHeight: '2.9em',
+            minHeight: '3em',
           }}
         >
           {service.description}

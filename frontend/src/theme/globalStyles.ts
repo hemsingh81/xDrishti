@@ -1,5 +1,5 @@
-import type { Theme } from '@mui/material/styles';
-import { focusRing, monoFontFamily, numeric } from './tokens';
+import { alpha, type Theme } from '@mui/material/styles';
+import { focusRing, monoFontFamily, numeric, palettes, rootFontSize } from './tokens';
 
 /** Elements that take keyboard focus; they all get the same ring. */
 const interactive = [
@@ -19,7 +19,8 @@ const packed = '[role="menuitem"], [role="option"], [role="tab"], .MuiListItemBu
 export function createGlobalStyles(theme: Theme) {
   const ring = `${focusRing.width}px solid ${theme.palette.primary.main}`;
   return {
-    html: { WebkitTextSizeAdjust: '100%' },
+    // The prototype's body text is 14 px; every rem in the theme is relative to it. A percentage keeps the browser's text-size setting.
+    html: { WebkitTextSizeAdjust: '100%', fontSize: `${(rootFontSize / 16) * 100}%` },
     body: {
       WebkitFontSmoothing: 'antialiased',
       MozOsxFontSmoothing: 'grayscale',
@@ -36,6 +37,9 @@ export function createGlobalStyles(theme: Theme) {
     '.MuiInputBase-root .MuiInputBase-input:focus-visible, .MuiInputBase-root .MuiSelect-select:focus-visible': {
       outline: 'none',
     },
+    // The prototype's thin scrollbars and soft text selection.
+    '*': { scrollbarWidth: 'thin', scrollbarColor: `${palettes[theme.palette.mode].borderStrong} transparent` },
+    '::selection': { backgroundColor: alpha(theme.palette.primary.main, 0.25) },
     // Numeric roles: aligned digits, slashed zero.
     '.numeric': { ...numeric },
     '.mono': { fontFamily: monoFontFamily },

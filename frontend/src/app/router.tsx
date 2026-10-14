@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { createBrowserRouter, type RouteObject } from 'react-router';
-import { LoginPage, RequireAuth } from '@/features/auth';
+import { AccountPage, LoginPage, RequireAuth } from '@/features/auth';
 import { LoadingState } from '@/shared/ui';
 import { plannedNavItems } from './navigation';
 import { ComingSoonPage } from './pages/ComingSoonPage';
@@ -62,6 +62,12 @@ export const routes: RouteObject[] = [
           {
             path: 'settings',
             lazy: async () => ({ Component: (await import('@/features/settings')).SettingsPage }),
+          },
+          {
+            // Not in the sidebar: opened from the user menu and the command palette. The page is a lazy component
+            // (auth is already in the initial bundle, so a second dynamic import of it would not split anything).
+            path: 'account',
+            Component: AccountPage,
           },
           {
             path: 'system',

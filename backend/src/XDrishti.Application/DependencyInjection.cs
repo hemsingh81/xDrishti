@@ -51,6 +51,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutHandler>();
         services.AddScoped<ICommandHandler<StepUpCommand, StepUpResult>, StepUpHandler>();
         services.AddScoped<IQueryHandler<VerifySessionQuery, Result<VerifiedSession>>, VerifySessionHandler>();
+        services.AddScoped<IQueryHandler<GetOwnerAccountQuery, Result<AccountResponse>>, GetOwnerAccountHandler>();
+        services.AddScoped<ICommandHandler<ChangePasswordCommand>, ChangePasswordHandler>();
+        services.AddScoped<ICommandHandler<UpdateProfileCommand, AccountResponse>, UpdateProfileHandler>();
         services.AddScoped<IQueryHandler<GetAuditQuery, IReadOnlyList<AuditEventResponse>>, GetAuditHandler>();
         services.AddScoped<ICommandHandler<ProvisionOwnerCommand, ProvisionOutcome>, ProvisionOwnerHandler>();
         services.AddScoped<ICommandHandler<ResetOwnerPasswordCommand>, ResetOwnerPasswordHandler>();

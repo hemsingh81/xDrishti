@@ -84,7 +84,8 @@ internal sealed class StepUpHandler(
             return null;
         }
 
-        AuthLog.StepUpSucceeded(logger, found.Owner.Email, (int)AuthSession.ElevationDuration.TotalMinutes);
+        var logEmail = LogSanitizer.Email(found.Owner.Email);
+        AuthLog.StepUpSucceeded(logger, logEmail, (int)AuthSession.ElevationDuration.TotalMinutes);
         return Result.Success(new StepUpResult(until));
     }
 
@@ -103,10 +104,10 @@ internal sealed class StepUpHandler(
             return null;
         }
 
-        AuthLog.StepUpFailed(logger, owner.Email);
+        AuthLog.StepUpFailed(logger, LogSanitizer.Email(owner.Email));
         if (lockedNow)
         {
-            AuthLog.AccountLocked(logger, owner.Email, (int)OwnerAccount.LockoutDuration.TotalMinutes);
+            AuthLog.AccountLocked(logger, LogSanitizer.Email(owner.Email), (int)OwnerAccount.LockoutDuration.TotalMinutes);
         }
 
         return Result.Failure<StepUpResult>(lockedNow ? AuthErrors.Locked(owner.RemainingLock(now)) : AuthErrors.InvalidCredentials);
@@ -116,7 +117,7 @@ internal sealed class StepUpHandler(
     {
         audit.Record(AuditEvent.Record(AuditEventType.StepUpFailed, now, owner.Email, client.Ip, client.UserAgent, "account locked"));
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        AuthLog.StepUpRefusedLocked(logger, owner.Email);
+        AuthLog.StepUpRefusedLocked(logger, LogSanitizer.Email(owner.Email));
         return Result.Failure<StepUpResult>(AuthErrors.Locked(owner.RemainingLock(now)));
     }
 }

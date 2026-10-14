@@ -107,12 +107,13 @@ internal sealed class LoginHandler(
             return null;
         }
 
+        var logEmail = LogSanitizer.Email(owner.Email);
         if (upgradedHash is not null)
         {
-            AuthLog.PasswordHashUpgraded(logger, owner.Email);
+            AuthLog.PasswordHashUpgraded(logger, logEmail);
         }
 
-        AuthLog.LoginSucceeded(logger, owner.Email);
+        AuthLog.LoginSucceeded(logger, logEmail);
         var info = new SessionInfo(new UserInfo(owner.Email, owner.DisplayName), csrf, (int)AuthSession.IdleTimeout.TotalSeconds, session.ExpiresAt);
         return Result.Success(new LoginResult(info, token));
     }
@@ -132,10 +133,10 @@ internal sealed class LoginHandler(
             return null;
         }
 
-        AuthLog.LoginFailed(logger, owner.Email);
+        AuthLog.LoginFailed(logger, LogSanitizer.Email(owner.Email));
         if (lockedNow)
         {
-            AuthLog.AccountLocked(logger, owner.Email, (int)OwnerAccount.LockoutDuration.TotalMinutes);
+            AuthLog.AccountLocked(logger, LogSanitizer.Email(owner.Email), (int)OwnerAccount.LockoutDuration.TotalMinutes);
         }
 
         return Result.Failure<LoginResult>(lockedNow ? AuthErrors.Locked(owner.RemainingLock(now)) : AuthErrors.InvalidCredentials);
@@ -144,7 +145,7 @@ internal sealed class LoginHandler(
     private async ValueTask<Result<LoginResult>> RefuseLockedAsync(OwnerAccount owner, DateTimeOffset now, ClientInfo client, CancellationToken cancellationToken)
     {
         await RecordAsync(AuditEventType.LoginRefusedLocked, now, owner.Email, client, cancellationToken);
-        AuthLog.LoginRefusedLocked(logger, owner.Email);
+        AuthLog.LoginRefusedLocked(logger, LogSanitizer.Email(owner.Email));
         return Result.Failure<LoginResult>(AuthErrors.Locked(owner.RemainingLock(now)));
     }
 

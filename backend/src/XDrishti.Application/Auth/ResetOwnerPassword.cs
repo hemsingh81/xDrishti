@@ -43,7 +43,7 @@ internal sealed class ResetOwnerPasswordHandler(
         audit.Record(AuditEvent.Record(AuditEventType.OwnerPasswordReset, now, owner.Email, ClientInfo.Deployment.Ip, null));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        AuthLog.OwnerPasswordReset(logger, owner.Email, active.Count);
+        AuthLog.OwnerPasswordReset(logger, LogSanitizer.Email(owner.Email), active.Count);
         return Result.Success();
     }
 }

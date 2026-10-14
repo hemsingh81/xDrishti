@@ -33,7 +33,8 @@ export function configureApiAuth(hooks: ApiAuthHooks | undefined): void {
 
 const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS']);
 const anonymousPaths = new Set<string>(['/api/auth/login', '/api/auth/session']);
-const stepUpPath = '/api/auth/step-up';
+// Calls that ask for the password again: a wrong one is an answer to the user, not an ended session.
+const passwordCheckPaths = new Set<string>(['/api/auth/step-up', '/api/auth/change-password']);
 
 api.use({
   onRequest({ request, schemaPath }) {
@@ -54,8 +55,8 @@ api.use({
       .clone()
       .json()
       .catch(() => undefined)) as Problem | undefined;
-    // A wrong password in the step-up dialog is an answer to the user, not an ended session.
-    if (schemaPath === stepUpPath && problem?.code === 'auth.invalid_credentials') {
+    // A wrong password in the step-up dialog or the change-password form: show it, do not sign the owner out.
+    if (passwordCheckPaths.has(schemaPath) && problem?.code === 'auth.invalid_credentials') {
       return undefined;
     }
     authHooks.onUnauthorized(problem);

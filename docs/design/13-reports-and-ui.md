@@ -4,7 +4,7 @@
 
 | Screen | Purpose | Key components |
 |--------|---------|----------------|
-| **Login / lock screen** | One centred panel: about + non-sensitive service status (no balances before sign-in) on the left, form on the right. Show/hide password, Caps Lock warning, attempts left, live lockout countdown. Idle or manual **lock** keeps the user and asks only for the password ("Welcome back · Unlock"), and survives a page reload; password re-entry for sensitive actions | Form, status strip |
+| **Login / lock screen** | One centred panel over a dotted background: the hero (brand, headline, what the app does) on the left, form on the right; below 860 px the form card comes first and the hero shrinks to its brand row. **P2-12:** the React page shows no live status before sign-in (no fabricated or leaked service data); the prototype's status line stays a prototype-only demo. Show/hide password, Caps Lock warning, attempts left, live lockout countdown. Idle or manual **lock** keeps the user and asks only for the password ("Welcome back · Unlock"), and survives a page reload; password re-entry for sensitive actions | Form, status strip |
 | **Today** | Plan status, live open positions & P&L, armed tickets, alerts, briefing, services health | KPI tiles, ticket cards, live price panel (SignalR) |
 | **Plan review** | Approve / modify / reject proposed tickets before cutoff; reserve list; limits check | Ticket cards with chart, bulk approve, countdown to cutoff |
 | **Suggestions** | AI / engine suggestions inbox (track instrument, basket changes, promotions) | Cards with reason & evidence, accept / reject |
@@ -23,6 +23,7 @@
 | **Assistant** | Chat over your data; answers show numbers, query and chart | Streaming chat panel |
 | **Services** | Every background service: editable schedule (type, time, days, window, interval, run-after), retries, timeout, catch-up, parameters; dependency checks; trading-day timeline; run now, pause, history | Status table, configure dialog, timeline |
 | **Audit** | Logins, configuration changes, approvals, service actions | Filterable log |
+| **My account** (`/account`, P2-11; not in the sidebar — user menu → *My account*) | Three cards. **Profile**: display name and e-mail, Save asks for the password (step-up) and refreshes the avatar and menu; saving nothing says *No changes to save*. **Change password**: current, new and confirm with show/hide, "At least 10 characters", inline mismatch and server messages, wrong current password cleared and refocused, locked state with the live countdown; success says other devices were signed out; help text on the Keychain items. **Recent sign-in activity**: the last 10 events (label, time, IP) with loading, empty and error-with-retry states. [Spec](../specs/P2-11-account-profile-and-change-password.md) | Forms, cards, list |
 
 Every analytic screen has a **lens selector** — *All trades · By basket · By instrument · By individual trade ·
 By strategy · By account* ([doc 06](06-instruments-and-baskets.md) §4) — plus a common filter bar: **date range** ·
@@ -92,33 +93,40 @@ and the prototype's `proto.css`; the MUI theme and the prototype read the same v
 |-------|-------|------|------|
 | background | `#f4f6fa` | `#0b1220` | app canvas (60 %) |
 | surface | `#ffffff` | `#131c2e` | cards, dialogs, tables |
-| surfaceAlt | `#f1f4f9` | `#182238` | dialog footer, table header, hover rows |
-| border | `#dfe3ea` | `#26324a` | hairlines (cards, table rows, dividers) |
+| surfaceAlt | `#f1f4f9` | `#182238` | table header, alternate rows, hovered links, segmented tray |
+| surfaceStrong | `#e8edf4` | `#202c46` | neutral chips, progress tracks, hovered controls |
+| border / borderStrong | `#dfe3ea` / `#c9d0dc` | `#26324a` / `#34415c` | hairlines (cards, table rows, dividers) / scrollbars, hovered buttons |
 | inputBorder | `#7b8798` | `#5f6f8a` | input outlines, unchecked checkbox/radio, switch track (3:1+ on surface, surfaceAlt and background) |
 | text | `#0f172a` | `#e6eaf2` | primary text |
 | textSecondary | `#475569` | `#9aa7bd` | captions, helper text |
+| textTertiary | `#5b6b82` | `#7d8aa3` | hints, sidebar section labels, search button |
 | accent | `#4338ca` | `#9aa5ff` | primary actions, links, selection, focus |
 | accentContrast | `#ffffff` | `#0b1220` | text on accent fills |
-| accentSoft | `#eceefe` | `#222a52` | dialog header band, selected nav/rows |
+| accentSoft | `#eceefe` | `#222a52` | selected nav/rows, info banners, primary chips |
 | good / bad / warn / info | `#146c36` / `#b91c1c` / `#a35200` / `#0e7490` | `#4ade80` / `#f87171` / `#fbbf24` / `#67e8f9` | gains / losses / warnings / information |
+| goodSoft / badSoft / warnSoft / infoSoft | `#e9f8ef` / `#fdecec` / `#fff5e6` / `#e6f6f9` | `#10281d` / `#2f1a1d` / `#2d2513` / `#15303a` | tonal chips and banners (the colour as text on its tint is 4.5:1, tested) |
 
 | Type role | Size / weight | Use |
 |-----------|---------------|-----|
-| h1 / h2 / h3 | 24/700, 18/650, 15/650 (tracking -0.02 to -0.01em) | page, section, card titles |
-| body1 / body2 | 14/1.5, 13/1.45 | text, dense data |
-| caption / overline | 12/1.4, 11/600 uppercase +0.06em | helper text, section labels |
-| button | 14/600 | actions |
+| h1 / h2 / h3 | 24/750, 16.5/700, 14.5/650 (tracking -0.02 to -0.005em) | page, dialog / section, card titles |
+| body1 / body2 | 14/1.5, 13/1.5 | text, dense data |
+| caption / overline | 12/1.5, 11/700 uppercase +0.06em | helper text, section labels |
+| button | 14/550 (12.5 small, 15 large) | actions |
 | numeric | tabular-nums + `cv11`, `zero` | tables, stat tiles, countdowns, header counts |
 | mono | JetBrains Mono Variable | ids, URLs, code |
 
-Fonts: Inter Variable and JetBrains Mono Variable, self-hosted (latin + latin-ext), `font-display: swap`, metric-matched fallbacks.
+Fonts: Inter Variable and JetBrains Mono Variable, self-hosted (latin + latin-ext), `font-display: swap`, metric-matched fallbacks. The root font size is **14 px** (`html` at 87.5 %, `htmlFontSize: 14`): every `rem` in the theme is px / 14 (`rem(px)` in `tokens.ts`).
 
 Rules:
 - **60-30-10**: 60 % neutral backgrounds, 30 % surfaces and text, at most 10 % accent. The accent is for primary actions, links, selection and focus - **never for gain/loss** (use good/bad plus a sign or arrow; status is never colour alone).
 - **Tabular figures** for every number column; right-align numbers.
 - **Focus ring**: 2 px accent outline, 2 px offset, on every interactive element.
 - **Elevation**: soft cool shadows in light, border-led in dark; **motion**: 120 ms (hover/press) and 200 ms (panels), honouring `prefers-reduced-motion`.
-- Table rows 36 px, header on `surfaceAlt`; selected nav item on `accentSoft` with a 3 px accent marker.
+- Table rows 36 px, header on `surfaceAlt` (small uppercase caps), alternate rows tinted, cell padding 9 / 12; selected nav item on `accentSoft` with a 3 px accent marker flush to the sidebar edge.
+
+### Prototype parity (P2-12)
+
+The prototype's spacing, type and colour were audited against the app ([spec P2-12](../specs/P2-12-match-prototype-spacing-fonts-colours.md), *Audit result*) and brought into the theme (`tokens.ts`, `componentsControls.ts`, `componentsSurfaces.ts`, `globalStyles.ts`) and the shell (`AppShell`, `TopBar`, `Sidebar`, `NavRow`, `PageHeader`, `StatTile`), never per screen. The two large causes of the heavier look were the 16 px root (the scale is written for 14) and MUI 9 ignoring `color="text.secondary"` on `Typography` (now mapped in the theme). Values: page padding 14 / 24 / 28·36 / 32·48 by width; top bar 60 px; controls 36 px (small 30, large 44) with radius 10 (8); icon buttons 36 square; cards 12 px radius with the soft shadow, body 14 / 16, header 13 / 16; tonal pill chips (22 px); banners tinted with a 22–25 % hairline; segmented control tray; dialog bands on the surface with hairlines. Deliberately not copied: the prototype's 1560 px page cap (screens are full width), the 861–1200 px icon rail, hover lifts and native checkbox / switch sizes. The sign-in page is the prototype's two-panel layout without the status line.
 
 ### Icons (P1-20)
 

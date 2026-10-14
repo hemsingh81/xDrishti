@@ -1,6 +1,7 @@
 import { Box, Tab, Tabs } from '@mui/material';
 import type { DataOverview } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
+import { rem } from '@/theme';
 import { dataTabLabels, dataTabs, panelId, tabId, type DataTab } from '../lib/tabs';
 
 interface DataTabsProps {
@@ -56,7 +57,7 @@ export function DataTabs({ value, overview, onChange }: DataTabsProps) {
                         borderRadius: 1,
                         bgcolor: 'warning.main',
                         color: 'warning.contrastText',
-                        fontSize: '0.75rem',
+                        fontSize: rem(12),
                         fontWeight: 700,
                         lineHeight: '20px',
                         textAlign: 'center',

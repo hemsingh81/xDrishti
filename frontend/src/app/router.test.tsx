@@ -1,6 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
+import { createAccountFake } from '@/test/accountFake';
 import { createDataFake } from '@/test/dataFake';
 import { createQualityFake } from '@/test/qualityFake';
 import { createServicesFake } from '@/test/servicesFake';
@@ -114,6 +115,32 @@ describe('app routes', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
     expect(await screen.findByRole('tab', { name: 'Risk profiles', selected: true })).toBeInTheDocument();
     expect(screen.queryByText(/planned for roadmap phase/)).not.toBeInTheDocument();
+  });
+
+  it('opens My account from the user menu (no sidebar entry) with its three cards', async () => {
+    server.use(...createAccountFake().handlers);
+    const { router } = renderRoutes(routes);
+
+    await userEvent.click(await screen.findByRole('button', { name: /^Account menu/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'My account' }));
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'My account' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/account');
+    expect(await screen.findByLabelText('Display name')).toHaveValue('Test Owner');
+    // The top bar names the page too, although it is not a navigation item.
+    expect(screen.getByRole('heading', { level: 2, name: 'My account' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Change password' })).toBeInTheDocument();
+    expect(await screen.findByRole('list', { name: 'Recent sign-in activity' })).toBeInTheDocument();
+    const nav = screen.getAllByRole('navigation', { name: 'Main' })[0]!;
+    expect(within(nav).queryByRole('link', { name: 'My account' })).not.toBeInTheDocument();
+  });
+
+  it('keeps /account behind the sign-in guard', async () => {
+    server.use(http.get('/api/auth/session', () => problemResponse(buildProblem('auth.unauthenticated', 401), 401)));
+    const { router } = renderRoutes(routes, { initialPath: '/account' });
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument();
+    expect(router.state.location.search).toBe('?next=%2Faccount');
   });
 
   it('shows not-found for unknown paths', async () => {

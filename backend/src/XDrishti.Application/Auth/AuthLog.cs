@@ -46,4 +46,16 @@ internal static partial class AuthLog
 
     [LoggerMessage(EventId = 1014, Level = LogLevel.Warning, Message = "Step-up refused for {Email}: account is locked")]
     public static partial void StepUpRefusedLocked(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1015, Level = LogLevel.Information, Message = "Password changed for {Email}; {Count} other session(s) signed out")]
+    public static partial void PasswordChanged(ILogger logger, string email, int count);
+
+    [LoggerMessage(EventId = 1016, Level = LogLevel.Warning, Message = "Password change failed for {Email}: wrong current password")]
+    public static partial void PasswordChangeFailed(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1017, Level = LogLevel.Warning, Message = "Password change refused for {Email}: account is locked")]
+    public static partial void PasswordChangeRefusedLocked(ILogger logger, string email);
+
+    [LoggerMessage(EventId = 1018, Level = LogLevel.Information, Message = "Profile of {Email} updated ({Fields})")]
+    public static partial void ProfileUpdated(ILogger logger, string email, string fields);
 }

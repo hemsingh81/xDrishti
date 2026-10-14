@@ -144,4 +144,77 @@ public sealed class OwnerAccountTests
         owner.PasswordHash.ShouldBe("hash-upgraded");
         owner.PasswordChangedAt.ShouldBe(T0);
     }
+
+    [Fact]
+    public void ChangePassword_stores_the_hash_records_the_time_and_clears_the_lock()
+    {
+        var owner = NewOwner();
+        for (var i = 0; i < 5; i++)
+        {
+            owner.RegisterFailure(T0);
+        }
+
+        owner.ChangePassword("hash-2", T0.AddHours(1));
+
+        owner.PasswordHash.ShouldBe("hash-2");
+        owner.PasswordChangedAt.ShouldBe(T0.AddHours(1));
+        owner.FailedAttempts.ShouldBe(0);
+        owner.IsLocked(T0.AddHours(1)).ShouldBeFalse();
+        owner.Email.ShouldBe("owner@example.invalid");
+        owner.DisplayName.ShouldBe("The Owner");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void ChangePassword_rejects_a_missing_hash(string hash) =>
+        Should.Throw<ArgumentException>(() => NewOwner().ChangePassword(hash, T0));
+
+    [Fact]
+    public void UpdateProfile_replaces_name_and_email_and_reports_what_changed()
+    {
+        var owner = NewOwner();
+
+        var changed = owner.UpdateProfile(" New@Example.Invalid ", " New Name ");
+
+        owner.Email.ShouldBe("new@example.invalid");
+        owner.DisplayName.ShouldBe("New Name");
+        changed.ShouldBe([OwnerAccount.ProfileFieldEmail, OwnerAccount.ProfileFieldDisplayName], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void UpdateProfile_reports_only_the_field_that_changed()
+    {
+        var owner = NewOwner();
+
+        owner.UpdateProfile("OWNER@example.invalid", "Someone Else").ShouldBe([OwnerAccount.ProfileFieldDisplayName]);
+        owner.UpdateProfile("renamed@example.invalid", "Someone Else").ShouldBe([OwnerAccount.ProfileFieldEmail]);
+    }
+
+    [Fact]
+    public void UpdateProfile_with_the_same_values_changes_nothing()
+    {
+        var owner = NewOwner();
+
+        owner.UpdateProfile("owner@example.invalid", "The Owner").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void UpdateProfile_leaves_password_and_lockout_state_alone()
+    {
+        var owner = NewOwner();
+        owner.RegisterFailure(T0);
+
+        owner.UpdateProfile("new@example.invalid", "New Name");
+
+        owner.PasswordHash.ShouldBe("hash-1");
+        owner.PasswordChangedAt.ShouldBe(T0);
+        owner.FailedAttempts.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData("", "name")]
+    [InlineData("a@b.c", " ")]
+    public void UpdateProfile_rejects_missing_values(string email, string name) =>
+        Should.Throw<ArgumentException>(() => NewOwner().UpdateProfile(email, name));
 }

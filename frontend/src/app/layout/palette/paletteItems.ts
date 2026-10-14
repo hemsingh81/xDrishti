@@ -1,6 +1,7 @@
 import type { SvgIconComponent } from '@mui/icons-material';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccountsOutlined';
 import PersonIcon from '@mui/icons-material/PersonOutlined';
 import type { AccountSummary } from '@/shared/api';
 import { navHue, type IconHueName } from '@/theme';
@@ -66,6 +67,18 @@ export function buildPaletteItems({ accounts, go, toggleMode }: Targets): Palett
       icon: DarkModeIcon,
       hue: 'indigo',
       run: toggleMode,
+    },
+    {
+      id: 'action:my-account',
+      group: 'Actions',
+      label: 'My account',
+      hint: '/account',
+      keywords: 'profile password change name email sign-in activity',
+      icon: ManageAccountsIcon,
+      hue: 'accounts',
+      run: () => {
+        go('/account');
+      },
     },
     ...[
       { path: '/accounts', label: 'Go to Accounts' },

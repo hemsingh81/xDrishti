@@ -1,10 +1,12 @@
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ErrorIcon from '@mui/icons-material/ReportProblemOutlined';
 import VisibilityIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOffOutlined';
-import { Box, Button, IconButton, InputAdornment, Stack, TextField, Typography } from '@mui/material';
+import { Box, Button, IconButton, InputAdornment, Stack, Typography } from '@mui/material';
 import { useRef, useState, type KeyboardEvent, type SyntheticEvent } from 'react';
 import { useLogin } from '../api/authMutations';
 import { describeSignInProblem } from '../lib/signInProblem';
+import { LoginField } from './LoginField';
 import { SignInProblemAlert } from './SignInProblemAlert';
 
 /** Email + password form. On success the session cache changes and the page redirects — nothing to do here. */
@@ -25,9 +27,6 @@ export function LoginForm() {
   const disabled = blocked || login.isPending;
   // Fields are read-only + aria-disabled rather than `disabled`, so a keyboard user keeps their focus.
   const fieldAttributes = disabled ? { readOnly: true, 'aria-disabled': true } : {};
-  const fieldSx = {
-    '& .MuiInputBase-input[aria-disabled="true"]': { cursor: 'not-allowed', color: 'text.disabled' },
-  };
 
   /** Puts focus on a field unless the user has deliberately moved it elsewhere on the page. */
   function focusIfUnclaimed(field: HTMLInputElement | null) {
@@ -72,7 +71,7 @@ export function LoginForm() {
 
   return (
     <Box component="form" noValidate onSubmit={submit} aria-label="Sign in" ref={formRef}>
-      <Stack spacing={2}>
+      <Stack spacing={1.75}>
         {problem && (
           <SignInProblemAlert
             // A new attempt restarts the countdown.
@@ -84,31 +83,24 @@ export function LoginForm() {
             }}
           />
         )}
-        <TextField
+        <LoginField
           label="Email"
           name="email"
           type="email"
           autoComplete="username"
-          fullWidth
-          sx={fieldSx}
           value={email}
           onChange={(event) => {
             setEmail(event.target.value);
           }}
-          error={Boolean(missing.email)}
-          helperText={missing.email}
+          error={missing.email}
           inputRef={emailRef}
-          slotProps={{
-            htmlInput: { autoCapitalize: 'none', spellCheck: false, 'aria-required': true, ...fieldAttributes },
-          }}
+          inputProps={{ autoCapitalize: 'none', spellCheck: false, 'aria-required': true, ...fieldAttributes }}
         />
-        <TextField
+        <LoginField
           label="Password"
           name="password"
           type={showPassword ? 'text' : 'password'}
           autoComplete="current-password"
-          fullWidth
-          sx={fieldSx}
           value={password}
           onChange={(event) => {
             setPassword(event.target.value);
@@ -118,27 +110,23 @@ export function LoginForm() {
           onBlur={() => {
             setCapsLock(false);
           }}
-          error={Boolean(missing.password)}
-          helperText={missing.password}
+          error={missing.password}
           inputRef={passwordRef}
-          slotProps={{
-            htmlInput: { 'aria-required': true, ...fieldAttributes },
-            input: {
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    edge="end"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => {
-                      setShowPassword((value) => !value);
-                    }}
-                  >
-                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            },
-          }}
+          inputProps={{ 'aria-required': true, ...fieldAttributes }}
+          endAdornment={
+            <InputAdornment position="end">
+              <IconButton
+                edge="end"
+                size="small"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onClick={() => {
+                  setShowPassword((value) => !value);
+                }}
+              >
+                {showPassword ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+              </IconButton>
+            </InputAdornment>
+          }
         />
         {capsLock && (
           <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', color: 'warning.main' }} role="status">
@@ -146,7 +134,15 @@ export function LoginForm() {
             <Typography variant="body2">Caps Lock is on</Typography>
           </Stack>
         )}
-        <Button type="submit" variant="contained" size="large" fullWidth loading={login.isPending} disabled={blocked}>
+        <Button
+          type="submit"
+          variant="contained"
+          size="large"
+          fullWidth
+          loading={login.isPending}
+          disabled={blocked}
+          endIcon={<ChevronRightIcon />}
+        >
           Sign in
         </Button>
       </Stack>

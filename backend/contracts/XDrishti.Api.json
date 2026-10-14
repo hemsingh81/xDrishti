@@ -183,6 +183,152 @@
         }
       }
     },
+    "/api/auth/account": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "The signed-in owner's e-mail, display name and password change time",
+        "operationId": "GetOwnerAccount",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Change the password (current password required); signs out every other session",
+        "operationId": "ChangePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "423": {
+            "description": "Locked",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/profile": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Change the display name and sign-in e-mail (needs a recent step-up)",
+        "operationId": "UpdateProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/verify": {
       "get": {
         "tags": [
@@ -6614,6 +6760,32 @@
         },
         "description": "Per-account replacements for values of the risk profile; null means \"use the profile's value\"."
       },
+      "AccountResponse": {
+        "required": [
+          "email",
+          "displayName",
+          "createdAt",
+          "passwordChangedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "passwordChangedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "What the owner may see about their own account (never the hash or the lockout state)."
+      },
       "AccountSummary": {
         "required": [
           "id",
@@ -8343,6 +8515,22 @@
           }
         },
         "description": "The trading calendar. `days`: the confirmed holidays and special sessions from `from` to `to` (India dates, both included; default today and a\nyear on), by date. `proposals`: every proposed day, whatever its date, waiting for Confirm or Dismiss (including proposals that lie next to a confirmed day, marked `replaces`). `nextHoliday`: the first confirmed holiday\ntoday or later (null when none is known)."
+      },
+      "ChangePasswordRequest": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string"
+          }
+        },
+        "description": "Body of `POST /api/auth/change-password`."
       },
       "CompletenessCheck": {
         "required": [
@@ -16788,6 +16976,22 @@
           }
         },
         "description": "Changes an action and makes it applied (confirming a suggestion, bringing back an ignored one). Every field is optional and keeps its current value when left out (an empty body confirms as it is);\n`note` left out keeps the note, an empty text clears it. `acknowledgeCsvAdjusted` as when adding: needed when the result is applied with an ex-date on or before `csvAdjustedThrough`."
+      },
+      "UpdateProfileRequest": {
+        "required": [
+          "displayName",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          }
+        },
+        "description": "Body of `PUT /api/auth/profile`."
       },
       "UpdateSecretsInput": {
         "required": [

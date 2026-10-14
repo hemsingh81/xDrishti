@@ -1,7 +1,20 @@
 import { alpha, createTheme, type Theme, type ThemeOptions } from '@mui/material/styles';
 import { createComponents } from './components';
 import { createGlobalStyles } from './globalStyles';
-import { elevation, fontFamily, palettes, shape, stateAlpha, typeScale, type ColorMode } from './tokens';
+import { elevation, fontFamily, palettes, rootFontSize, shape, stateAlpha, typeScale, type ColorMode } from './tokens';
+
+declare module '@mui/material/styles' {
+  interface TypeText {
+    /** The prototype's `--text-3`: hints, section labels, counters. */
+    tertiary: string;
+  }
+  interface TypeBackground {
+    /** `surfaceAlt` (the prototype's `--surface-2`): table header, hovered links, footers. */
+    alt: string;
+    /** `surfaceStrong` (`--surface-3`): neutral chips, tracks, hovered controls. */
+    strong: string;
+  }
+}
 
 type Variant = keyof typeof typeScale;
 
@@ -28,8 +41,8 @@ export function createAppTheme(mode: ColorMode): Theme {
       error: { main: p.bad },
       warning: { main: p.warn },
       info: { main: p.info },
-      background: { default: p.background, paper: p.surface },
-      text: { primary: p.text, secondary: p.textSecondary },
+      background: { default: p.background, paper: p.surface, alt: p.surfaceAlt, strong: p.surfaceStrong },
+      text: { primary: p.text, secondary: p.textSecondary, tertiary: p.textTertiary },
       divider: p.border,
       action: {
         hover: alpha(p.accent, 0.06),
@@ -43,7 +56,8 @@ export function createAppTheme(mode: ColorMode): Theme {
     shadows: buildShadows(mode),
     typography: {
       fontFamily,
-      fontSize: 14,
+      fontSize: rootFontSize,
+      htmlFontSize: rootFontSize,
       h1: variant('h1'),
       h2: variant('h2'),
       h3: variant('h3'),

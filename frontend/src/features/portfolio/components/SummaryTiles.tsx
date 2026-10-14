@@ -61,7 +61,7 @@ function Tiles({ data, history }: { data: HoldingsSummary; history: HistoryTiles
         // A label such as "Max drawdown (All)" wraps at this width: every tile reserves two lines, so the values line up.
         [theme.breakpoints.up(1350)]: {
           gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-          '--stat-tile-label-min': '2.9em',
+          '--stat-tile-label-min': '3em',
         },
       })}
     >

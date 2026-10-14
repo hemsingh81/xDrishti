@@ -7,7 +7,7 @@ import { NotificationBell } from '@/features/notifications';
 import { HeaderAccounts } from '@/features/accounts';
 import { UserMenu } from '@/features/auth';
 import { IstClock } from '@/shared/ui/IstClock';
-import { useColorMode } from '@/theme';
+import { layout, rem, useColorMode } from '@/theme';
 import { SearchButton } from './palette/SearchButton';
 
 export function TopBar({ title, onMenu }: { title: string; onMenu: () => void }) {
@@ -16,7 +16,13 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
     <AppBar position="sticky">
       <Toolbar
         sx={(theme) => ({
-          gap: 1,
+          // The prototype's `.top`: 60 px high, 10 px gaps, 24 px side padding (12 px on phones).
+          // MUI's toolbar sets `min-height` in media queries, which sort after plain rules: the doubled class wins.
+          // The 1 px border of the bar is part of the 60 px.
+          '&.MuiToolbar-root': { minHeight: layout.topBarHeight - 1, height: layout.topBarHeight - 1 },
+          gap: '10px',
+          paddingInline: '24px',
+          [theme.breakpoints.down('md')]: { paddingInline: '12px', gap: '8px' },
           [theme.breakpoints.down('sm')]: { gap: 0.5 },
           // The narrowest phones (320 px): tighter padding and gaps, so the avatar is not squeezed out of the bar.
           [theme.breakpoints.down(360)]: { px: 1, gap: 0.25 },
@@ -29,7 +35,14 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
         <Typography
           component="h2"
           noWrap
-          sx={{ fontWeight: 650, minWidth: 0, flexShrink: 1, display: { xs: 'none', sm: 'block' } }}
+          sx={{
+            fontSize: rem(16),
+            fontWeight: 650,
+            letterSpacing: '-0.01em',
+            minWidth: 0,
+            flexShrink: 1,
+            display: { xs: 'none', sm: 'block' },
+          }}
         >
           {title}
         </Typography>
@@ -42,7 +55,7 @@ export function TopBar({ title, onMenu }: { title: string; onMenu: () => void })
           <HeaderAccounts />
         </Suspense>
         {/* Same size as the bell, so it loading in does not move the other controls. */}
-        <Suspense fallback={<Skeleton variant="circular" width={40} height={40} />}>
+        <Suspense fallback={<Skeleton variant="rounded" width={36} height={36} />}>
           <NotificationBell />
         </Suspense>
         <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>

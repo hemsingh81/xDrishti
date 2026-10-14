@@ -69,10 +69,18 @@ function GridRowView<Row>({
       sx={[
         (theme) => ({
           cursor: clickable ? 'pointer' : 'default',
+          // One source for the row's tint: `--grid-row-tint` (zebra, hover, selected). The row paints it and so do the
+          // opaque sticky cells, so the theme's own row backgrounds are replaced by it (same selectors, later rule).
           '--grid-row-tint': 'transparent',
-          '&:hover': {
-            '--grid-row-tint': clickable ? alpha(theme.palette.primary.main, table.hoverAlpha) : 'transparent',
+          '&, &:nth-of-type(even), &.MuiTableRow-hover:hover, &.Mui-selected, &.Mui-selected:hover': {
+            backgroundColor: 'var(--grid-row-tint)',
           },
+          // Alternate rows carry a faint tint (as the theme's table rows do), also under a sticky first column.
+          '&:nth-of-type(even)': { '--grid-row-tint': alpha(theme.palette.background.alt, table.zebraAlpha) },
+          // Only a clickable row reacts to the pointer; otherwise the zebra tint stays.
+          ...(clickable
+            ? { '&:hover': { '--grid-row-tint': alpha(theme.palette.primary.main, table.hoverAlpha) } }
+            : {}),
           '&.Mui-selected, &.Mui-selected:hover': {
             '--grid-row-tint': alpha(theme.palette.primary.main, table.selectedAlpha),
           },

@@ -26,8 +26,11 @@ describe('App shell layout', () => {
       const main = appliedCss(screen.getByRole('main'));
       expect(declares(main.base, 'width: 100%')).toBe(true);
       expect(main.base).not.toMatch(/max-width/);
-      expect(declares(from(screen.getByRole('main'), 0), 'padding: 16px')).toBe(true);
+      // The prototype's page padding: 14 px on phones, 24 px from md, 28 / 36 px and 32 / 48 px on wide monitors.
+      expect(declares(main.base, 'padding: 14px')).toBe(true);
       expect(declares(atMd(screen.getByRole('main')), 'padding: 24px')).toBe(true);
+      expect(declares(from(screen.getByRole('main'), 1680), 'padding: 28px 36px')).toBe(true);
+      expect(declares(from(screen.getByRole('main'), 2560), 'padding: 32px 48px')).toBe(true);
       unmount();
     }
   });

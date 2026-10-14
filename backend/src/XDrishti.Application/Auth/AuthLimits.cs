@@ -8,4 +8,7 @@ internal static class AuthLimits
     public const int MaxDisplayNameLength = 128;
 
     public const int MaxPasswordLength = 1024;
+
+    /// <summary>Shortest password the owner may choose when changing it (no composition rules).</summary>
+    public const int MinNewPasswordLength = 10;
 }

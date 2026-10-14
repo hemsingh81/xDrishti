@@ -1,7 +1,7 @@
 import type { SvgIconComponent } from '@mui/icons-material';
 import { Box, Typography } from '@mui/material';
 import { formatNumber } from '@/shared/lib/format';
-import { numeric } from '@/theme';
+import { numeric, rem } from '@/theme';
 
 interface SummaryCountProps {
   icon: SvgIconComponent;
@@ -17,7 +17,7 @@ export function SummaryCount({ icon: Icon, label, value, tone }: SummaryCountPro
   return (
     <Box component="li" sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
       <Icon aria-hidden sx={{ fontSize: 20, color }} />
-      <Typography component="span" sx={{ fontSize: '1.25rem', fontWeight: 700, lineHeight: 1, color, ...numeric }}>
+      <Typography component="span" sx={{ fontSize: rem(20), fontWeight: 700, lineHeight: 1, color, ...numeric }}>
         {formatNumber(value)}
       </Typography>
       <Typography component="span" variant="body2" color="text.secondary">

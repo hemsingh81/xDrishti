@@ -1,7 +1,7 @@
 import { Box, Card, CardContent, Typography } from '@mui/material';
 import type { SvgIconComponent } from '@mui/icons-material';
 import type { ReactNode } from 'react';
-import { numeric, type IconHueName } from '@/theme';
+import { numeric, rem, type IconHueName } from '@/theme';
 import { IconChip } from './IconChip';
 
 interface StatTileProps {
@@ -25,19 +25,22 @@ export function StatTile({ label, value, hint, tone = 'default', icon, hue }: St
           <IconChip icon={icon} hue={hue} size="md" />
         </Box>
       )}
-      <CardContent sx={icon && hue ? { pr: 6.5 } : undefined}>
+      <CardContent>
+        {/* The prototype's `.tile`: 12 px label (room for the icon chip), 22 px value, 12 px hint. */}
         <Typography
-          variant="body2"
+          variant="caption"
+          component="p"
           color="text.secondary"
-          sx={{ fontWeight: 600, minHeight: 'var(--stat-tile-label-min, 0)' }}
+          sx={{ m: 0, fontWeight: 600, pr: icon && hue ? '40px' : 0, minHeight: 'var(--stat-tile-label-min, 0)' }}
         >
           {label}
         </Typography>
         <Typography
           component="div"
           sx={{
-            fontSize: '1.4rem',
-            fontWeight: 700,
+            fontSize: rem(22),
+            fontWeight: 750,
+            letterSpacing: '-0.02em',
             mt: 0.5,
             color: toneColor[tone],
             ...numeric,
@@ -46,7 +49,7 @@ export function StatTile({ label, value, hint, tone = 'default', icon, hue }: St
           {value}
         </Typography>
         {hint && (
-          <Typography component="div" variant="body2" color="text.secondary">
+          <Typography component="div" variant="caption" color="text.secondary">
             {hint}
           </Typography>
         )}

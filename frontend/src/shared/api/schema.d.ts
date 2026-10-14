@@ -89,6 +89,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auth/account': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The signed-in owner's e-mail, display name and password change time */
+    get: operations['GetOwnerAccount'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/change-password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Change the password (current password required); signs out every other session */
+    post: operations['ChangePassword'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/profile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Change the display name and sign-in e-mail (needs a recent step-up) */
+    put: operations['UpdateProfile'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/verify': {
     parameters: {
       query?: never;
@@ -1924,6 +1975,15 @@ export interface components {
       /** Format: double */
       dailyLossPct: null | number;
     };
+    /** @description What the owner may see about their own account (never the hash or the lockout state). */
+    AccountResponse: {
+      email: string;
+      displayName: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      passwordChangedAt: string;
+    };
     /**
      * @description One row of the accounts list. Broker is "dhan"; MaskedClientId shows the first four and last two characters; Secrets lists the
      *     secret fields with set / not set; ApiKeyExpiresOn is the first day the Dhan API key is no longer valid; TokenStatus repeats
@@ -2481,6 +2541,11 @@ export interface components {
       days: components['schemas']['CalendarDayView'][];
       proposals: components['schemas']['CalendarDayView'][];
       nextHoliday: null | components['schemas']['CalendarDayView'];
+    };
+    /** @description Body of `POST /api/auth/change-password`. */
+    ChangePasswordRequest: {
+      currentPassword: string;
+      newPassword: string;
     };
     /**
      * @description Completeness: the 1-minute bars the trading calendar expects in the window against the ones stored. `missingPercent` is of the expected minutes; `unfillableMinutes` are missing
@@ -5227,6 +5292,11 @@ export interface components {
       note: null | string;
       acknowledgeCsvAdjusted?: null | boolean;
     };
+    /** @description Body of `PUT /api/auth/profile`. */
+    UpdateProfileRequest: {
+      displayName: string;
+      email: string;
+    };
     /**
      * @description Replaces the account's API key and/or secret (write-only). A value that is left out stays as it is; an empty one is invalid.
      *     ApiKeyIssuedOn is the day the key was generated: it defaults to today when a new API key is given and can also be corrected on its own.
@@ -5407,6 +5477,135 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  GetOwnerAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountResponse'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ChangePassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangePasswordRequest'];
+      };
+    };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateProfile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProfileRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountResponse'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
       };
     };
   };

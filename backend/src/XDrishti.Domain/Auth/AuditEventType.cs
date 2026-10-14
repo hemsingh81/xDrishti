@@ -14,4 +14,6 @@ public enum AuditEventType
     OwnerPasswordReset,
     StepUpSucceeded,
     StepUpFailed,
+    PasswordChanged,
+    ProfileUpdated,
 }
