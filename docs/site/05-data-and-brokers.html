@@ -289,6 +289,7 @@ and a test recomputes every bucket with an independent implementation over fixtu
 <td>every day with bars is complete</td>
 </tr>
 </tbody></table>
+<p>The streaming <code>TimeframeBuilder</code> of <code>XDrishti.Indicators</code> (P3-01, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>) reproduces these rules for 5m, 10m, 15m, 30m, 1h and 1D (not 1W or 1M) on a live stream of 1-minute bars and is tested against an independent grouping of the same fixtures; it emits a bucket when its last minute has arrived, or — flagged <code>complete = false</code> — when a later bucket or session proves the minute will not come. <strong>Where it can differ from the stored aggregates:</strong> (a) a regular date&#39;s 1D bar is closed by the 15:29 bar and any later bar of the same date (an evening bar) is ignored and counted, while the stored 1D merges every bar of the date; (b) a calendar entry that disagrees with the data (a session shorter than the bars) closes the day at the calendar&#39;s end; (c) the last bucket of a stream whose final minute never arrives is not emitted (there is no flush), and a special session without a calendar closes its last bucket and its day only at the next date. To compare with stored data, pass the same <code>TradingCalendar</code>.</p>
 <h3 id="41-trading-calendar-adr-0017-1-p1-11a">4.1 Trading calendar (ADR 0017 §1, P1-11a)<a class="hash" href="#41-trading-calendar-adr-0017-1-p1-11a" aria-label="Link to this section">#</a></h3>
 <p>What a session is comes from one place, <code>market.trading_days</code> (one row per date that is <strong>not</strong> an ordinary weekday session; nothing is seeded), read through the pure domain type <code>TradingCalendar</code> and, for any slice, the application port <code>ITradingCalendar</code> (the confirmed days are read once per request or job and kept as an in-memory snapshot; changing the calendar invalidates it).</p>
 <table>
@@ -984,14 +985,15 @@ Monday and the 1st of the month of the window&#39;s first session (the week and 
 </blockquote>
 <h2 id="11-biases-avoided">11. Biases avoided<a class="hash" href="#11-biases-avoided" aria-label="Link to this section">#</a></h2>
 <p>Survivorship (historical index membership incl. delisted stocks), look-ahead (closed bars only; higher-TF from
-last closed bar; point-in-time regime), selection (basket rules are dated; point-in-time membership available).</p>
+last closed bar; point-in-time regime), selection (basket rules are dated; point-in-time membership available).
+The closed-bar rule is built into <code>XDrishti.Indicators</code> (P3-01, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>) and checked from two sides: the frame never shows the bar still forming (a test builds a forming bar worth 200 against a closed bar worth 100 and asserts 100), and a <em>prefix property</em> (the outputs for the first <em>k</em> bars do not change when more bars are fed) guards against hidden state and any dependence on later input. The prefix property alone cannot detect a forming-bar leak in a push-only API, which is why the frame-semantics tests exist.</p>
 
   </article>
   <nav class="pager" aria-label="Previous and next document">
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-15 14:58</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-15 17:59</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>

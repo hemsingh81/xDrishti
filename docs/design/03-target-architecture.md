@@ -85,7 +85,7 @@ flowchart TB
 | Validation | FluentValidation; **JsonSchema.Net** for YAML config/strategy | One schema shared with the React editor |
 | YAML | YamlDotNet | Trading config & strategy rules |
 | Strategy DSL | Own parser (Superpower) → **compiled LINQ expression trees** | Safe (no eval), fast, look-ahead-checked |
-| Indicators | Own streaming implementations (cross-checked against Skender.Stock.Indicators) | Point-in-time control, speed |
+| Indicators | Own streaming implementations (`XDrishti.Indicators`, built in P3-01, [ADR 0031](../adr/0031-streaming-indicators-and-the-feature-frame.md)); cross-checked in the tests against **Skender.Stock.Indicators 2.7.3** (MIT, test-only, exact pin) | Point-in-time control, speed |
 | Numerics | MathNet.Numerics | Statistics, Monte Carlo, Bayesian updates; own XIRR solver (Newton–Raphson + bisection) |
 | CSV parsing | **Sep** or CsvHelper (streaming) + Npgsql binary COPY | Fast bulk import of 1-minute files |
 | Spreadsheet reading | **ExcelDataReader 3.7.0** (MIT), `Infrastructure/Portfolio/SpreadsheetReader` behind `ISpreadsheetReader` (P2-17, [ADR 0029](../adr/0029-dhan-report-imports-and-source-precedence.md)) | Dhan's downloaded reports come as legacy `.xls` (BIFF8) and `.xlsx`; read natively, no conversion step; the Application layer never references the package |
@@ -210,7 +210,7 @@ xDrishti/
 │   │   ├── XDrishti.DataImport/     # CSV profiles, parsers, import jobs
 │   │   ├── XDrishti.Catalog/        # instruments, tracked list, baskets
 │   │   ├── XDrishti.Portfolio/      # lots, positions, valuations, XIRR
-│   │   ├── XDrishti.Indicators/
+│   │   ├── XDrishti.Indicators/     # streaming indicators, TimeframeBuilder, FeatureFrame (pure; references Domain only; P3-01)
 │   │   ├── XDrishti.Strategies/     # built-ins + DSL (parser, compiler, look-ahead lint) + plugin host
 │   │   ├── XDrishti.Simulation/
 │   │   ├── XDrishti.Learning/       # cells, meta-model, smart rules, experiments, lessons
@@ -244,6 +244,34 @@ start ([ADR 0002](../adr/0002-config-and-strategies-in-app.md)).
 Dependency rule: `Domain` ← `Application` ← (`Infrastructure`, `Brokers.*`, engine modules) ← hosts.
 Engine modules (Indicators, Strategies, Simulation, Learning, Planning) have **no I/O dependencies** —
 they're pure and fully unit-testable.
+
+### 4.1 `XDrishti.Indicators` as built (P3-01, [ADR 0031](../adr/0031-streaming-indicators-and-the-feature-frame.md))
+
+The first engine module. A pure library that turns a stream of **closed 1-minute bars** into indicator values, closed higher-timeframe bars and session context; back-tests and live trading use the same code.
+
+| Part | What it is |
+|------|------------|
+| `IIndicator` | `Update(in Bar)`, `Value`, `IsReady`, `WarmUp`, `Reset()`; constant (or amortised constant) work per bar, 0 bytes allocated in steady state. A value that is not ready is `NaN` with `IsReady = false` (the two always agree) |
+| `IndicatorCatalog` | The 19 indicators with parameters (name, kind, min, max, default; at most 4), warm-up as a function of the spec (counted in bars of the spec's own timeframe), session behaviour (`Continuous` / `PerSession`), whether the source price is read, whether it is intraday-only, and a factory. The validator and lint of the DSL read it |
+| `TimeframeBuilder` | Builds *closed* 5m, 10m, 15m, 30m, 1h and 1D bars with the rules of the stored aggregates ([doc 05 §4](05-data-and-brokers.md)); `Push` returns 0, 1 or 2 closed bars per minute; optional `TradingCalendar`; late bars are ignored and counted (`Ignored`) |
+| `FeatureFrame` | Created once from a list of `FeatureSpec` (name, timeframe, price source, up to four parameters); validates them before any bar is fed, shares one instance between equal specs, builds only the needed builders, and exposes the value *as of the last closed bar of each timeframe* by a numeric handle. Counts the incomplete higher-timeframe bars it consumed (`IncompleteBarsConsumed`) |
+
+**References and rules.** The project references `XDrishti.Domain` only (for `Bar`, `Timeframe`, `SessionClock`, `TradingCalendar`). Architecture tests keep it that way: no Application, Infrastructure, Hosting, EF Core, ASP.NET Core, Npgsql,
+Serilog, `System.IO`, `System.Net`, `System.Data`, `System.Diagnostics`, `Environment`, `Random` or `TimeProvider`; no `DateTime.Now/UtcNow/Today` (scanned in the compiled code); no mutable static field; every public class
+sealed or static. The only package outside the base class library that is involved is Skender.Stock.Indicators, and only in `XDrishti.Indicators.Tests`.
+
+**Guarantees pinned by tests.** Each indicator equals an independent batch reference over seeded random series; `sma`, `ema`, `rsi` and `atr` also agree with Skender (differences: the ATR seed, and an RSI over a series that never
+moves is 50 here and 100 in Skender); the *prefix property* (the output for the first *k* bars is the same when more bars are fed) over 220 seeds; the frame never shows the forming bar; two runs are bit-identical; `Reset()`
+returns every indicator to its first state.
+
+**Throughput.** The benchmarks are explicit tests, not part of `scripts/check.sh` (a solution run lists them as skipped). From `backend/`, in Release:
+
+```
+dotnet test --project tests/XDrishti.Indicators.Tests -c Release -- --explicit only --filter-class "*ThroughputBenchmarks*" --report-trx --results-directory <dir>
+```
+
+On an Apple-silicon Mac (best of 5 passes of 1,000,000 steps, through `IIndicator`): `sma(20)` 104 M steps/s, `ema(20)` 359, `rsi(14)` 109, `atr(14)` 209, `highest(20)` 64, `lowest(20)` 55, `vwap` 172, `rel_volume(20)` 199,
+`or_high(15)` 208, `gap_pct` 182; `TimeframeBuilder` 109 M bars/s (5m) to 251 M (1D); a 12-feature frame 22 M steps/s, that is 0.045 µs per 1-minute step (targets: 10 M and 1 µs).
 
 ## 5. Data model (PostgreSQL schemas)
 

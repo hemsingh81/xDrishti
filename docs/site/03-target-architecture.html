@@ -235,7 +235,7 @@ backtest / Strategy Lab / nightly scan / grading. Modules can be split into serv
 </tr>
 <tr>
 <td>Indicators</td>
-<td>Own streaming implementations (cross-checked against Skender.Stock.Indicators)</td>
+<td>Own streaming implementations (<code>XDrishti.Indicators</code>, built in P3-01, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>); cross-checked in the tests against <strong>Skender.Stock.Indicators 2.7.3</strong> (MIT, test-only, exact pin)</td>
 <td>Point-in-time control, speed</td>
 </tr>
 <tr>
@@ -550,7 +550,7 @@ walk-forward learning, the nightly scanner and the outcome grader.</p>
 │   │   ├── XDrishti.DataImport/     # CSV profiles, parsers, import jobs
 │   │   ├── XDrishti.Catalog/        # instruments, tracked list, baskets
 │   │   ├── XDrishti.Portfolio/      # lots, positions, valuations, XIRR
-│   │   ├── XDrishti.Indicators/
+│   │   ├── XDrishti.Indicators/     # streaming indicators, TimeframeBuilder, FeatureFrame (pure; references Domain only; P3-01)
 │   │   ├── XDrishti.Strategies/     # built-ins + DSL (parser, compiler, look-ahead lint) + plugin host
 │   │   ├── XDrishti.Simulation/
 │   │   ├── XDrishti.Learning/       # cells, meta-model, smart rules, experiments, lessons
@@ -581,6 +581,42 @@ start (<a href="../adr/0002-config-and-strategies-in-app.html">ADR 0002</a>).</p
 <p>Dependency rule: <code>Domain</code> ← <code>Application</code> ← (<code>Infrastructure</code>, <code>Brokers.*</code>, engine modules) ← hosts.
 Engine modules (Indicators, Strategies, Simulation, Learning, Planning) have <strong>no I/O dependencies</strong> —
 they&#39;re pure and fully unit-testable.</p>
+<h3 id="41-xdrishtiindicators-as-built-p3-01-adr-0031">4.1 <code>XDrishti.Indicators</code> as built (P3-01, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>)<a class="hash" href="#41-xdrishtiindicators-as-built-p3-01-adr-0031" aria-label="Link to this section">#</a></h3>
+<p>The first engine module. A pure library that turns a stream of <strong>closed 1-minute bars</strong> into indicator values, closed higher-timeframe bars and session context; back-tests and live trading use the same code.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>IIndicator</code></td>
+<td><code>Update(in Bar)</code>, <code>Value</code>, <code>IsReady</code>, <code>WarmUp</code>, <code>Reset()</code>; constant (or amortised constant) work per bar, 0 bytes allocated in steady state. A value that is not ready is <code>NaN</code> with <code>IsReady = false</code> (the two always agree)</td>
+</tr>
+<tr>
+<td><code>IndicatorCatalog</code></td>
+<td>The 19 indicators with parameters (name, kind, min, max, default; at most 4), warm-up as a function of the spec (counted in bars of the spec&#39;s own timeframe), session behaviour (<code>Continuous</code> / <code>PerSession</code>), whether the source price is read, whether it is intraday-only, and a factory. The validator and lint of the DSL read it</td>
+</tr>
+<tr>
+<td><code>TimeframeBuilder</code></td>
+<td>Builds <em>closed</em> 5m, 10m, 15m, 30m, 1h and 1D bars with the rules of the stored aggregates (<a href="05-data-and-brokers.html">doc 05 §4</a>); <code>Push</code> returns 0, 1 or 2 closed bars per minute; optional <code>TradingCalendar</code>; late bars are ignored and counted (<code>Ignored</code>)</td>
+</tr>
+<tr>
+<td><code>FeatureFrame</code></td>
+<td>Created once from a list of <code>FeatureSpec</code> (name, timeframe, price source, up to four parameters); validates them before any bar is fed, shares one instance between equal specs, builds only the needed builders, and exposes the value <em>as of the last closed bar of each timeframe</em> by a numeric handle. Counts the incomplete higher-timeframe bars it consumed (<code>IncompleteBarsConsumed</code>)</td>
+</tr>
+</tbody></table>
+<p><strong>References and rules.</strong> The project references <code>XDrishti.Domain</code> only (for <code>Bar</code>, <code>Timeframe</code>, <code>SessionClock</code>, <code>TradingCalendar</code>). Architecture tests keep it that way: no Application, Infrastructure, Hosting, EF Core, ASP.NET Core, Npgsql,
+Serilog, <code>System.IO</code>, <code>System.Net</code>, <code>System.Data</code>, <code>System.Diagnostics</code>, <code>Environment</code>, <code>Random</code> or <code>TimeProvider</code>; no <code>DateTime.Now/UtcNow/Today</code> (scanned in the compiled code); no mutable static field; every public class
+sealed or static. The only package outside the base class library that is involved is Skender.Stock.Indicators, and only in <code>XDrishti.Indicators.Tests</code>.</p>
+<p><strong>Guarantees pinned by tests.</strong> Each indicator equals an independent batch reference over seeded random series; <code>sma</code>, <code>ema</code>, <code>rsi</code> and <code>atr</code> also agree with Skender (differences: the ATR seed, and an RSI over a series that never
+moves is 50 here and 100 in Skender); the <em>prefix property</em> (the output for the first <em>k</em> bars is the same when more bars are fed) over 220 seeds; the frame never shows the forming bar; two runs are bit-identical; <code>Reset()</code>
+returns every indicator to its first state.</p>
+<p><strong>Throughput.</strong> The benchmarks are explicit tests, not part of <code>scripts/check.sh</code> (a solution run lists them as skipped). From <code>backend/</code>, in Release:</p>
+<div class="code"><pre><code class="nohighlight">dotnet test --project tests/XDrishti.Indicators.Tests -c Release -- --explicit only --filter-class &quot;*ThroughputBenchmarks*&quot; --report-trx --results-directory &lt;dir&gt;</code></pre></div>
+<p>On an Apple-silicon Mac (best of 5 passes of 1,000,000 steps, through <code>IIndicator</code>): <code>sma(20)</code> 104 M steps/s, <code>ema(20)</code> 359, <code>rsi(14)</code> 109, <code>atr(14)</code> 209, <code>highest(20)</code> 64, <code>lowest(20)</code> 55, <code>vwap</code> 172, <code>rel_volume(20)</code> 199,
+<code>or_high(15)</code> 208, <code>gap_pct</code> 182; <code>TimeframeBuilder</code> 109 M bars/s (5m) to 251 M (1D); a 12-feature frame 22 M steps/s, that is 0.045 µs per 1-minute step (targets: 10 M and 1 µs).</p>
 <h2 id="5-data-model-postgresql-schemas">5. Data model (PostgreSQL schemas)<a class="hash" href="#5-data-model-postgresql-schemas" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -819,7 +855,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-15 14:58</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-15 17:59</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>
@@ -831,6 +867,7 @@ records the configuring actor for audit.</li>
 <a href="#26-infrastructure" class="d3">2.6 Infrastructure</a>
 <a href="#3-modules-inside-the-net-solution" class="d2">3. Modules (inside the .NET solution)</a>
 <a href="#4-repository-solution-structure" class="d2">4. Repository &amp;amp; solution structure</a>
+<a href="#41-xdrishtiindicators-as-built-p3-01-adr-0031" class="d3">4.1 XDrishti.Indicators as built (P3-01, ADR 0031)</a>
 <a href="#5-data-model-postgresql-schemas" class="d2">5. Data model (PostgreSQL schemas)</a>
 <a href="#6-api-surface-rest-signalr" class="d2">6. API surface (REST + SignalR)</a>
 <a href="#7-key-flows" class="d2">7. Key flows</a>

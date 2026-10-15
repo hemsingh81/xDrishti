@@ -3,6 +3,7 @@
     <ProjectReference Include="..\..\src\XDrishti.Api\XDrishti.Api.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Worker\XDrishti.Worker.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Feed\XDrishti.Feed.csproj" />
+    <ProjectReference Include="..\..\src\XDrishti.Indicators\XDrishti.Indicators.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />

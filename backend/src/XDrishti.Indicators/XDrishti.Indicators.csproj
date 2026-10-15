@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Engine module (P3-01, ADR 0031): streaming indicators, the timeframe builder and the feature frame. Pure calculation, no I/O:
+       depends only on Domain (enforced by architecture tests). -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Indicators.Tests" />
+  </ItemGroup>
+</Project>

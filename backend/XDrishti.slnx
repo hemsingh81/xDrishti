@@ -8,6 +8,7 @@
   <Folder Name="/src/">
     <Project Path="src/XDrishti.Domain/XDrishti.Domain.csproj" />
     <Project Path="src/XDrishti.Application/XDrishti.Application.csproj" />
+    <Project Path="src/XDrishti.Indicators/XDrishti.Indicators.csproj" />
     <Project Path="src/XDrishti.Infrastructure/XDrishti.Infrastructure.csproj" />
     <Project Path="src/XDrishti.Hosting/XDrishti.Hosting.csproj" />
     <Project Path="src/XDrishti.Api/XDrishti.Api.csproj" />
@@ -17,6 +18,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/XDrishti.Domain.Tests/XDrishti.Domain.Tests.csproj" />
     <Project Path="tests/XDrishti.Application.Tests/XDrishti.Application.Tests.csproj" />
+    <Project Path="tests/XDrishti.Indicators.Tests/XDrishti.Indicators.Tests.csproj" />
     <Project Path="tests/XDrishti.Infrastructure.Tests/XDrishti.Infrastructure.Tests.csproj" />
     <Project Path="tests/XDrishti.Feed.Tests/XDrishti.Feed.Tests.csproj" />
     <Project Path="tests/XDrishti.Architecture.Tests/XDrishti.Architecture.Tests.csproj" />

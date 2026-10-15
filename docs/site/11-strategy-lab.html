@@ -147,7 +147,7 @@ test:
 </tr>
 <tr>
 <td>Indicators</td>
-<td><code>sma ema rsi atr adx macd bbands vwap supertrend highest lowest rel_volume</code></td>
+<td><code>sma ema rsi atr adx macd bbands vwap supertrend highest lowest rel_volume</code> — which exist now: see <em>What exists now</em> below</td>
 </tr>
 <tr>
 <td>Multi-timeframe</td>
@@ -159,7 +159,7 @@ test:
 </tr>
 <tr>
 <td>Patterns</td>
-<td><code>inside_bar</code>, <code>nr(7)</code>, <code>gap_pct</code>, <code>engulfing</code>, <code>pivot_high/low(n)</code></td>
+<td><code>inside_bar</code>, <code>nr(7)</code>, <code>gap_pct</code>, <code>engulfing</code>, <code>pivot_high/low(n)</code> (<code>gap_pct</code> exists now; the others follow in P3-01b)</td>
 </tr>
 <tr>
 <td>Context</td>
@@ -174,6 +174,38 @@ test:
 <td>Any policy from <a href="08-exits-and-risk.html">doc 08</a></td>
 </tr>
 </tbody></table>
+<h3 id="what-exists-now-p3-01-adr-0031">What exists now (P3-01, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>)<a class="hash" href="#what-exists-now-p3-01-adr-0031" aria-label="Link to this section">#</a></h3>
+<p>The building blocks are implemented in <code>XDrishti.Indicators</code> as streaming code over closed bars; the DSL parser (P3-02) will read them through the <code>IndicatorCatalog</code> and the <code>FeatureFrame</code>. The <strong>19 names</strong> that exist:</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th>Names</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rolling (continuous across sessions)</td>
+<td><code>sma(n)</code>, <code>ema(n)</code>, <code>rsi(n)</code>, <code>atr(n)</code>, <code>highest(n)</code>, <code>lowest(n)</code>, <code>rel_volume(n)</code></td>
+<td><code>sma ema rsi highest lowest</code> take a price source (close, open, high, low); <code>rsi</code> and <code>atr</code> are Wilder; <code>rel_volume</code> divides by the mean of the <em>previous</em> n bars</td>
+</tr>
+<tr>
+<td>Session-anchored (reset per India trading date)</td>
+<td><code>vwap</code>, <code>or_high(m)</code>, <code>or_low(m)</code></td>
+<td>intraday only (refused on 1D); <code>vwap</code> on the typical price (H+L+C)/3; the opening range is the first <em>m</em> minutes and must be a whole number of bars of the timeframe</td>
+</tr>
+<tr>
+<td>Session context</td>
+<td><code>prev_day_open</code>, <code>prev_day_high</code>, <code>prev_day_low</code>, <code>prev_day_close</code>, <code>prev_day_volume</code>, <code>today_open</code>, <code>today_high</code>, <code>today_low</code>, <code>gap_pct</code></td>
+<td>the previous <em>session that had bars</em> (weekends and holidays skipped by the data); the DSL spellings <code>prev_day.high</code>, <code>today.open</code> map to these flat catalog names</td>
+</tr>
+</tbody></table>
+<p><strong>Not yet built — follow in P3-01b:</strong> <code>adx</code>, <code>macd</code>, <code>bbands</code>, <code>supertrend</code>; the patterns <code>inside_bar</code>, <code>nr(n)</code>, <code>engulfing</code> and <code>pivot_high/low(n)</code>; and the regime / market-context features (<code>regime()</code>, <code>index.trend</code>, <code>vix_pct</code>,
+<code>sector_rs(n)</code>). Weekly and monthly timeframes are not built either: a feature reads 1m, 5m, 10m, 15m, 30m, 1h or 1D.</p>
+<p><strong>How the closed-bar rule is kept.</strong> A feature on a higher timeframe (<code>tf(&quot;1h&quot;).ema(50)</code>) is computed over bars that a <code>TimeframeBuilder</code> emits only once their last minute has arrived, so at 10:30 it reflects the 09:15 hour
+(closed at 10:14) and never the 10:15 hour that is still forming. A bar with a missing minute is emitted late and flagged incomplete, and still used; the frame counts those so the simulator can report them. An indicator that is not
+ready is <code>NaN</code>, and a condition on it is false. The warm-up is counted in bars of the feature&#39;s own timeframe (<code>ema(20)</code> on 15m needs 20 fifteen-minute bars; <code>prev_day.*</code> and <code>gap_pct</code> need 376 one-minute bars, 26 fifteen-minute
+bars or 2 daily bars).</p>
 <h2 id="3-pipeline">3. Pipeline<a class="hash" href="#3-pipeline" aria-label="Link to this section">#</a></h2>
 <figure class="diagram"><pre class="mermaid">flowchart LR
     IN[Submit] --&gt; V[&quot;1 · Validate&lt;br/&gt;schema · names · look-ahead lint · ≤4 params&quot;]
@@ -252,10 +284,11 @@ folder); any version can be downloaded as a file and re-imported (<a href="../ad
     <a class="prev" href="10-trade-selection.html"><small>← Previous  [</small>10 · Trade selection</a>
     <a class="next" href="12-portfolio-monitoring.html"><small>Next  ] →</small>12 · Portfolio monitoring</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-15 14:58</footer>
+  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-15 17:59</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-ways-to-submit" class="d2">1. Ways to submit</a>
 <a href="#2-rules-language-dsl" class="d2">2. Rules language (DSL)</a>
+<a href="#what-exists-now-p3-01-adr-0031" class="d3">What exists now (P3-01, ADR 0031)</a>
 <a href="#3-pipeline" class="d2">3. Pipeline</a>
 <a href="#4-report" class="d2">4. Report</a>
 <a href="#5-guarding-against-test-until-it-passes" class="d2">5. Guarding against &amp;quot;test until it passes&amp;quot;</a>

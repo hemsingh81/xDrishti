@@ -35,3 +35,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0028](0028-dividend-csv-import-with-name-matching.md) | Dividend files are recognised by their headers and matched to holdings by name, with remembered corrections | Accepted |
 | [0029](0029-dhan-report-imports-and-source-precedence.md) | Dhan's downloaded reports are imported by kind, and API trades take precedence over bill-level report rows | Accepted |
 | [0030](0030-read-only-notices-retention-and-structured-failures.md) | Notices are read-only, attention rows are kept for 30 days, and failures carry a kind | Accepted |
+| [0031](0031-streaming-indicators-and-the-feature-frame.md) | Streaming indicators and the feature frame: closed bars only, one code path | Accepted |

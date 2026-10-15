@@ -151,6 +151,8 @@ and a test recomputes every bucket with an independent implementation over fixtu
 | 1W | India midnight of the **Monday** of the week | sum of its days | every day with bars is complete |
 | 1M | India midnight of the first of the month | sum of its days | every day with bars is complete |
 
+The streaming `TimeframeBuilder` of `XDrishti.Indicators` (P3-01, [ADR 0031](../adr/0031-streaming-indicators-and-the-feature-frame.md)) reproduces these rules for 5m, 10m, 15m, 30m, 1h and 1D (not 1W or 1M) on a live stream of 1-minute bars and is tested against an independent grouping of the same fixtures; it emits a bucket when its last minute has arrived, or — flagged `complete = false` — when a later bucket or session proves the minute will not come. **Where it can differ from the stored aggregates:** (a) a regular date's 1D bar is closed by the 15:29 bar and any later bar of the same date (an evening bar) is ignored and counted, while the stored 1D merges every bar of the date; (b) a calendar entry that disagrees with the data (a session shorter than the bars) closes the day at the calendar's end; (c) the last bucket of a stream whose final minute never arrives is not emitted (there is no flush), and a special session without a calendar closes its last bucket and its day only at the next date. To compare with stored data, pass the same `TradingCalendar`.
+
 ### 4.1 Trading calendar (ADR 0017 §1, P1-11a)
 
 What a session is comes from one place, `market.trading_days` (one row per date that is **not** an ordinary weekday session; nothing is seeded), read through the pure domain type `TradingCalendar` and, for any slice, the application port `ITradingCalendar` (the confirmed days are read once per request or job and kept as an in-memory snapshot; changing the calendar invalidates it).
@@ -501,3 +503,4 @@ aggregates** repair an instrument and re-validate it automatically; every run is
 
 Survivorship (historical index membership incl. delisted stocks), look-ahead (closed bars only; higher-TF from
 last closed bar; point-in-time regime), selection (basket rules are dated; point-in-time membership available).
+The closed-bar rule is built into `XDrishti.Indicators` (P3-01, [ADR 0031](../adr/0031-streaming-indicators-and-the-feature-frame.md)) and checked from two sides: the frame never shows the bar still forming (a test builds a forming bar worth 200 against a closed bar worth 100 and asserts 100), and a *prefix property* (the outputs for the first *k* bars do not change when more bars are fed) guards against hidden state and any dependence on later input. The prefix property alone cannot detect a forming-bar leak in a push-only API, which is why the frame-semantics tests exist.

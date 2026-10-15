@@ -59,13 +59,31 @@ test:
 | Building blocks | Examples |
 |-----------------|----------|
 | Price & bars | `open high low close volume`, `close[1]`, `prev_day.high`, `today.open`, `or_high(15)` |
-| Indicators | `sma ema rsi atr adx macd bbands vwap supertrend highest lowest rel_volume` |
+| Indicators | `sma ema rsi atr adx macd bbands vwap supertrend highest lowest rel_volume` — which exist now: see *What exists now* below |
 | Multi-timeframe | `tf("1h").ema(50)`, `tf("1D").close` |
 | Conditions | `crosses_above/below`, comparisons, `between`, `rising/falling(x,n)`, `all/any/not` |
-| Patterns | `inside_bar`, `nr(7)`, `gap_pct`, `engulfing`, `pivot_high/low(n)` |
+| Patterns | `inside_bar`, `nr(7)`, `gap_pct`, `engulfing`, `pivot_high/low(n)` (`gap_pct` exists now; the others follow in P3-01b) |
 | Context | `regime()`, `index.trend`, `vix_pct`, `sector_rs(n)`, `day_of_week`, `is_expiry_day` |
 | Stops | `fixed_pct`, `atr_mult`, `swing_low/high`, `bar_low/high`, `or_opposite`, `level` |
 | Exits | Any policy from [doc 08](08-exits-and-risk.md) |
+
+### What exists now (P3-01, [ADR 0031](../adr/0031-streaming-indicators-and-the-feature-frame.md))
+
+The building blocks are implemented in `XDrishti.Indicators` as streaming code over closed bars; the DSL parser (P3-02) will read them through the `IndicatorCatalog` and the `FeatureFrame`. The **19 names** that exist:
+
+| Group | Names | Notes |
+|-------|-------|-------|
+| Rolling (continuous across sessions) | `sma(n)`, `ema(n)`, `rsi(n)`, `atr(n)`, `highest(n)`, `lowest(n)`, `rel_volume(n)` | `sma ema rsi highest lowest` take a price source (close, open, high, low); `rsi` and `atr` are Wilder; `rel_volume` divides by the mean of the *previous* n bars |
+| Session-anchored (reset per India trading date) | `vwap`, `or_high(m)`, `or_low(m)` | intraday only (refused on 1D); `vwap` on the typical price (H+L+C)/3; the opening range is the first *m* minutes and must be a whole number of bars of the timeframe |
+| Session context | `prev_day_open`, `prev_day_high`, `prev_day_low`, `prev_day_close`, `prev_day_volume`, `today_open`, `today_high`, `today_low`, `gap_pct` | the previous *session that had bars* (weekends and holidays skipped by the data); the DSL spellings `prev_day.high`, `today.open` map to these flat catalog names |
+
+**Not yet built — follow in P3-01b:** `adx`, `macd`, `bbands`, `supertrend`; the patterns `inside_bar`, `nr(n)`, `engulfing` and `pivot_high/low(n)`; and the regime / market-context features (`regime()`, `index.trend`, `vix_pct`,
+`sector_rs(n)`). Weekly and monthly timeframes are not built either: a feature reads 1m, 5m, 10m, 15m, 30m, 1h or 1D.
+
+**How the closed-bar rule is kept.** A feature on a higher timeframe (`tf("1h").ema(50)`) is computed over bars that a `TimeframeBuilder` emits only once their last minute has arrived, so at 10:30 it reflects the 09:15 hour
+(closed at 10:14) and never the 10:15 hour that is still forming. A bar with a missing minute is emitted late and flagged incomplete, and still used; the frame counts those so the simulator can report them. An indicator that is not
+ready is `NaN`, and a condition on it is false. The warm-up is counted in bars of the feature's own timeframe (`ema(20)` on 15m needs 20 fifteen-minute bars; `prev_day.*` and `gap_pct` need 376 one-minute bars, 26 fifteen-minute
+bars or 2 daily bars).
 
 ## 3. Pipeline
 
