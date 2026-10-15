@@ -118,9 +118,9 @@ public sealed class TradeUndoAndVoidTests
     }
 
     [Theory]
-    [InlineData(BrokerSyncKind.Trades)]
-    [InlineData(BrokerSyncKind.Ledger)]
-    public async Task Undoing_while_a_broker_history_run_of_the_account_runs_is_refused(BrokerSyncKind kind)
+    [InlineData(BrokerSyncKind.Trades, true)]
+    [InlineData(BrokerSyncKind.Ledger, false)] // a ledger run changes no trade and no lot
+    public async Task Undoing_while_a_trades_run_of_the_account_runs_is_refused_and_a_ledger_run_does_not_stop_it(BrokerSyncKind kind, bool refused)
     {
         var s = await StartAsync();
         var batch = (await s.ImportOkAsync(Csv(BaseRows))).Batch!;
@@ -129,8 +129,16 @@ public sealed class TradeUndoAndVoidTests
 
         var running = await s.UndoAsync(batch.Id);
 
-        running.Error.Code.ShouldBe("portfolio.sync_running");
-        s.Data.Trades.ShouldAllBe(t => !t.IsVoided);
+        if (refused)
+        {
+            running.Error.ShouldBe(PortfolioErrors.SyncRunningWait);
+            s.Data.Trades.ShouldAllBe(t => !t.IsVoided);
+        }
+        else
+        {
+            running.IsSuccess.ShouldBeTrue();
+            s.Data.Trades.ShouldAllBe(t => t.IsVoided);
+        }
     }
 
     [Fact]

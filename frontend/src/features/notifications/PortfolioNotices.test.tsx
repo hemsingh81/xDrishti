@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildAlertNotice, buildPortfolioNotice } from '@/test/actionCenterFixtures';
-import { backendCommandTargets, buildReconnectNotice } from '@/test/attentionFixtures';
+import { buildReconnectNotice, buildRowsDroppedNotice, generatedCommandTargets } from '@/test/attentionFixtures';
 import { buildAccountDetail, buildConnected, buildDataNotice, ids, summaryOf } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
@@ -75,6 +75,36 @@ describe('Notification bell: Portfolio notices', () => {
     });
   });
 
+  it('lists rows dropped by a read as a warning or information, with Open leading to the sync line', async () => {
+    serve([
+      buildRowsDroppedNotice(),
+      buildRowsDroppedNotice({
+        id: `attention:dropped:${ids.main}:ledger:5e6f7a8b`,
+        severity: 'info',
+        title: 'Rows with no amount were left out',
+        text: 'The latest ledger read of Test Dhan Main dropped 2 rows: 2 with no amount. Open the sync line to see where they were.',
+        at: '2026-10-14T12:00:00Z',
+      }),
+    ]);
+    const { router } = renderBell();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Notifications, 2 unread' }));
+    const drawer = await screen.findByRole('dialog', { name: 'Notifications' });
+    const items = within(within(drawer).getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
+
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveTextContent('Warning: unread,');
+    expect(items[0]).toHaveTextContent('Some trades could not be read');
+    expect(items[1]).toHaveTextContent('Information: unread,');
+    expect(items[1]).toHaveTextContent('Rows with no amount were left out');
+
+    await userEvent.click(within(items[0]!).getByRole('button', { name: 'Open' }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/portfolio');
+    });
+    expect(router.state.location.search).toBe('?focus=sync');
+  });
+
   it('keeps the bell usable when the Portfolio notices cannot be read', async () => {
     server.use(
       http.get('/api/accounts', () =>
@@ -130,7 +160,7 @@ describe('derivePortfolioNotifications', () => {
   });
 
   it('keeps every command the API can name: no action is silently dropped', () => {
-    const targets = backendCommandTargets(ids.main);
+    const targets = generatedCommandTargets(ids.main);
     const [notice] = derivePortfolioNotifications([
       buildReconnectNotice({
         actions: targets.map((target, n) => ({ label: `Run ${n}`, kind: 'command', target })),
@@ -146,6 +176,19 @@ describe('derivePortfolioNotifications', () => {
 
     expect(kept).toEqual(targets);
     expect(notice?.actions).toHaveLength(2);
+  });
+
+  it('keeps `since` of rows dropped, as of every attention item, and routes Open to the sync line', () => {
+    const since = '2026-10-15T09:00:00Z';
+    const [dropped] = derivePortfolioNotifications([buildRowsDroppedNotice({ since })]);
+
+    expect(dropped).toMatchObject({
+      kind: 'rows_dropped',
+      severity: 'warn',
+      since,
+      href: '/portfolio?focus=sync',
+      actions: [{ label: 'Open', kind: 'route', target: '/portfolio?focus=sync' }],
+    });
   });
 
   it('drops a kind this version does not know and keeps a notice without a time', () => {

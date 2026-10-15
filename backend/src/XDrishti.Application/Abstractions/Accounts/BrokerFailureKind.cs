@@ -9,6 +9,9 @@ public enum BrokerFailureKind
     /// <summary>The broker refused the saved access token (401 or 403): it expired or was revoked. Only reported by calls that send a token.</summary>
     Unauthorized,
 
+    /// <summary>Dhan's rate limit: a 429, or a 4xx that carries DH-904. It passes by itself, so the syncs try again quietly (ADR 0027).</summary>
+    RateLimited,
+
     /// <summary>No usable answer: timeout, network failure, 5xx or a response that could not be read.</summary>
     Unavailable,
 }

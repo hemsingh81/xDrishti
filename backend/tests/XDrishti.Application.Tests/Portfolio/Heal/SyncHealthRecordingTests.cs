@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Application.Tests.Portfolio.BrokerHistory;
 using XDrishti.Domain.Portfolio;
 using static XDrishti.Application.Tests.Portfolio.BrokerHistory.BrokerScenario;
@@ -122,7 +123,7 @@ public sealed class SyncHealthRecordingTests
     }
 
     [Theory]
-    [InlineData(BrokerFailureKind.Rejected, "DH-904", "rate_limited")]
+    [InlineData(BrokerFailureKind.RateLimited, "DH-904", "rate_limited")]
     [InlineData(BrokerFailureKind.Rejected, "DH-910", "rejected")]
     [InlineData(BrokerFailureKind.Unavailable, null, "unavailable")]
     public async Task The_reason_of_a_dhan_failure_is_told_apart(BrokerFailureKind kind, string? code, string reason)
@@ -219,5 +220,77 @@ public sealed class SyncHealthRecordingTests
         var status = Ok(await s.Fx.SyncStatus().HandleAsync(new XDrishti.Application.Portfolio.GetSyncStatusQuery(s.Account.Id), CancellationToken.None));
 
         (status.ConsecutiveFailedDays, status.LastFailureReason, status.Attempts, status.RetryAt).ShouldBe((1, "unavailable", 1, s.Fx.Clock.GetUtcNow().AddMinutes(1)));
+    }
+    // ---- the bell is reconciled when an attempt ends (ADR 0030) ----
+
+    [Theory]
+    [InlineData(SyncHealthKind.Holdings, true)]
+    [InlineData(SyncHealthKind.Trades, true)]
+    [InlineData(SyncHealthKind.Ledger, true)]
+    [InlineData(SyncHealthKind.Quotes, false)]
+    public async Task The_end_of_an_attempt_of_a_synced_kind_reconciles_the_items_and_the_price_poll_does_not(SyncHealthKind kind, bool reconciles)
+    {
+        var s = await BrokerScenario.StartAsync();
+        var attention = s.Fx.Connections.Accounts.Attention;
+        var recorder = s.Fx.Connections.Accounts.HealthRecorder;
+        var before = attention.Reconciles; // the connect of the scenario reconciled once already
+
+        await recorder.FailedAsync(s.Account.Id, kind, "unavailable", TestContext.Current.CancellationToken);
+        await recorder.SucceededAsync(s.Account.Id, kind, TestContext.Current.CancellationToken);
+
+        (attention.Reconciles - before).ShouldBe(reconciles ? 2 : 0);
+    }
+
+    [Fact]
+    public async Task An_interrupted_attempt_is_noted_but_does_not_reconcile()
+    {
+        var s = await BrokerScenario.StartAsync();
+        var attention = s.Fx.Connections.Accounts.Attention;
+        var before = attention.Reconciles;
+
+        await s.Fx.Connections.Accounts.HealthRecorder.FailedAsync(s.Account.Id, SyncHealthKind.Trades, SyncFailures.Interrupted, CancellationToken.None);
+
+        Health(s).LastFailureReason.ShouldBe("interrupted");
+        attention.Reconciles.ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task A_reconcile_that_does_not_end_cannot_hold_up_a_failure_noted_with_a_token_that_cannot_cancel()
+    {
+        var s = await BrokerScenario.StartAsync();
+        var attention = s.Fx.Connections.Accounts.Attention;
+        var entered = new TaskCompletionSource();
+        attention.Wait = async token =>
+        {
+            entered.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+        };
+
+        var noting = s.Fx.Connections.Accounts.HealthRecorder.FailedAsync(s.Account.Id, SyncHealthKind.Trades, "unavailable", CancellationToken.None).AsTask();
+        await entered.Task;
+        noting.IsCompleted.ShouldBeFalse();
+        s.Fx.Clock.Advance(SyncHealthRecorder.UncancellableReconcileLimit + TimeSpan.FromSeconds(1));
+        await noting;
+
+        Health(s).LastFailureReason.ShouldBe("unavailable");
+    }
+
+    [Fact]
+    public async Task A_cancellation_of_the_callers_own_token_still_stops_the_reconcile_and_propagates()
+    {
+        var s = await BrokerScenario.StartAsync();
+        using var cancel = new CancellationTokenSource();
+        var entered = new TaskCompletionSource();
+        s.Fx.Connections.Accounts.Attention.Wait = async token =>
+        {
+            entered.SetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, token);
+        };
+
+        var noting = s.Fx.Connections.Accounts.HealthRecorder.FailedAsync(s.Account.Id, SyncHealthKind.Trades, "unavailable", cancel.Token).AsTask();
+        await entered.Task;
+        await cancel.CancelAsync();
+
+        await Should.ThrowAsync<OperationCanceledException>(() => noting);
     }
 }

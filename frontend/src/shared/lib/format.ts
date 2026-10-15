@@ -14,6 +14,13 @@ const rupeesPrecise = new Intl.NumberFormat('en-IN', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
+// A dividend per share is stored with 4 decimals (0.0125): up to 4 are shown, trailing zeros trimmed, never fewer than 2.
+const rupeesPerShare = new Intl.NumberFormat('en-IN', {
+  style: 'currency',
+  currency: 'INR',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
 const price = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const percent = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const share = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -129,6 +136,11 @@ export function formatInr(value: number): string {
 /** Indian rupees with paise, for prices and unit costs: 2456.3 -> "₹2,456.30". */
 export function formatInrPrecise(value: number): string {
   return rupeesPrecise.format(value);
+}
+
+/** An amount per share in rupees, up to 4 decimals and at least 2: 0.0125 -> "₹0.0125", 31.25 -> "₹31.25", 2.5 -> "₹2.50". */
+export function formatInrPerShare(value: number): string {
+  return rupeesPerShare.format(value);
 }
 
 /** A price with two decimals and no currency sign, for tables of bars: 2456.3 -> "2,456.30". */

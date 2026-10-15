@@ -336,6 +336,7 @@ public static class DependencyInjection
         services.AddScoped<SyncHealthRecorder>();
         services.AddScoped<PortfolioHealer>();
         services.AddScoped<IAttentionFactsSource, AttentionFactsLoader>();
+        services.AddScoped<IAttentionReconciler, AttentionReconciler>();
         services.AddScoped<ICommandHandler<StartBrokerHistoryCommand, BrokerHistoryRunView>, StartBrokerHistoryHandler>();
         services.AddScoped<ICommandHandler<ExecuteBrokerHistoryCommand>, ExecuteBrokerHistoryHandler>();
         services.AddScoped<ICommandHandler<SyncBrokerHistoryCommand, BrokerHistoryRunView>, SyncBrokerHistoryHandler>();

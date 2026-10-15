@@ -14,7 +14,7 @@ internal sealed record DpPrepared(DpFile File, DpPlan Plan, IReadOnlyList<Taught
 
 /// <summary>
 /// The depository-charges sheet as account costs (ADR 0029): previews it and imports it as one batch of ledger entries of class charges (description "DP charges", source import) that the net figures count once; teaches the names of its securities. Everything is decided by
-/// <see cref="DpPlanner"/> from the sheet, the identities stored and Dhan's own charges of the same days; the sheet's lines of ₹0 and on the buy side are listed and not stored. Failures of the file are the preview's <c>Error</c>, never exceptions. The import is refused (<c>409 portfolio.sync_running</c>) while a holdings sync or a broker history run of the account runs.
+/// <see cref="DpPlanner"/> from the sheet, the identities stored and Dhan's own charges of the same days; the sheet's lines of ₹0 and on the buy side are listed and not stored. Failures of the file are the preview's <c>Error</c>, never exceptions. The import is refused (<c>409 portfolio.sync_running</c>) while a holdings sync or a ledger run of the account runs; a trades run does not stop it (ADR 0030).
 /// </summary>
 internal sealed class DpService(
     ReportWorkspace reports,
@@ -91,9 +91,9 @@ internal sealed class DpService(
             async token =>
             {
                 // The costs are read against the ledger below inside this transaction; a broker history run (ledger or trades) or a holdings sync that is running changes them under us, and the sheet's lines would be stored again beside the ledger's own.
-                if (await guard.RunningAsync(account.Id, token))
+                if (await guard.RunningAsync(account.Id, SyncWaits.CostWrite, token))
                 {
-                    return Result.Failure(PortfolioErrors.SyncRunning);
+                    return Result.Failure(PortfolioErrors.SyncRunningWait);
                 }
 
                 var at = clock.GetUtcNow();

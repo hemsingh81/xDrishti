@@ -81,9 +81,10 @@ internal sealed class LedgerStore(XDrishtiDbContext db) : ILedgerStore
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.VoidedAt, time).SetProperty(x => x.VoidedBy, actor), cancellationToken);
     }
 
-    public async ValueTask<int> SupersedeImportedChargesAsync(Guid accountId, IReadOnlyCollection<LedgerChargeOnDay> brokerCharges, DateTimeOffset at, CancellationToken cancellationToken)
+    public async ValueTask<int> SupersedeImportedChargesAsync(Guid accountId, IReadOnlyCollection<LedgerChargeOnDay> brokerCharges, IReadOnlyCollection<LedgerChargeOnDay> storedBefore, DateTimeOffset at, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(brokerCharges);
+        ArgumentNullException.ThrowIfNull(storedBefore);
         if (brokerCharges.Count == 0)
         {
             return 0;
@@ -101,7 +102,7 @@ internal sealed class LedgerStore(XDrishtiDbContext db) : ILedgerStore
             return 0;
         }
 
-        var ids = LedgerSupersession.Covered(candidates.Select(c => (c.Id, c.EntryDate, -c.Amount)), brokerCharges);
+        var ids = LedgerSupersession.Covered(candidates.Select(c => (c.Id, c.EntryDate, -c.Amount)), brokerCharges, storedBefore);
         if (ids.Count == 0)
         {
             return 0;

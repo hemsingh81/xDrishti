@@ -14,6 +14,7 @@ describe('failureReasonText', () => {
       'token_expired',
       'token_refused',
       'not_connected',
+      'data_changed',
       'unexpected',
     ];
     const words = codes.map(failureReasonText);
@@ -27,6 +28,7 @@ describe('failureReasonText', () => {
       'the Dhan login has expired',
       'Dhan refused the login',
       'the account is not connected to Dhan',
+      'the data changed while it was being saved; it will be tried again',
       'something unexpected went wrong',
     ]);
   });

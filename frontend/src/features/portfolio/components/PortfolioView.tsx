@@ -16,6 +16,7 @@ import { useRefreshOnQuoteRun } from '../hooks/useRefreshOnQuoteRun';
 import { useCachedHolding } from '../hooks/useCachedHolding';
 import { useRefreshPrices } from '../hooks/useRefreshPrices';
 import { useSyncBarFocus } from '../hooks/useSyncBarFocus';
+import { useSyncFocusRequest } from '../hooks/useSyncFocusRequest';
 import { useUnmatchedParam, useUnmatchedView } from '../hooks/useUnmatchedView';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { usePortfolioOverlays } from '../hooks/usePortfolioOverlays';
@@ -85,6 +86,8 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const overlays = usePortfolioOverlays();
   const holdingsStart = useRef<HTMLDivElement>(null);
   const [syncBarRef, accountInputRef, focusSyncBar] = useSyncBarFocus();
+  // Arriving from the bell on a "rows dropped" item (`?focus=sync`): scroll to the sync bar's trades and ledger and focus it.
+  useSyncFocusRequest(overlays.focusSync, focusSyncBar, overlays.focusHandled);
   const [alertDialog, setAlertDialog] = useState<AlertTarget | 'pick' | null>(null);
   const scope = { account: filters.account, bucket: filters.bucket };
   const history = usePortfolioHistory(scope, market.pollMs);

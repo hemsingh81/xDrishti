@@ -1,6 +1,6 @@
 import { Button, Chip, TableCell, TableRow, Typography } from '@mui/material';
 import type { DividendView } from '@/shared/api';
-import { formatDate, formatInrPrecise, formatIstDate, formatNumber } from '@/shared/lib/format';
+import { formatDate, formatInrPerShare, formatInrPrecise, formatIstDate, formatNumber } from '@/shared/lib/format';
 import { numeric } from '@/theme';
 import { dividendName } from '../../lib/income';
 
@@ -43,7 +43,7 @@ export function DividendRow({ dividend, showHolding, onVoid }: DividendRowProps)
       )}
       <TableCell sx={{ ...number, ...struck, verticalAlign: 'top' }}>{formatInrPrecise(dividend.amount)}</TableCell>
       <TableCell sx={{ ...number, ...struck, verticalAlign: 'top' }}>
-        {dividend.perShare === null ? '—' : formatInrPrecise(dividend.perShare)}
+        {dividend.perShare === null ? '—' : formatInrPerShare(dividend.perShare)}
       </TableCell>
       <TableCell sx={{ ...number, ...struck, verticalAlign: 'top' }}>
         {dividend.quantity === null || dividend.quantity === undefined ? '—' : formatNumber(dividend.quantity)}

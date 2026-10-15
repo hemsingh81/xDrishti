@@ -28,17 +28,26 @@ public sealed class DematImportTests
     private static List<string> Shapes(ReportScenario s) =>
         [.. s.Fx.Data.Holdings.Select(h => $"{h.TradingSymbol}|{h.Qty}|{h.AvgCost}|{string.Join(',', h.Lots.Select(l => $"{l.Qty}@{l.UnitCost}"))}")];
 
-    [Fact]
-    public async Task While_a_broker_history_run_of_the_account_runs_the_import_is_rejected_and_no_name_is_remembered()
+    [Theory]
+    [InlineData("trades")]
+    [InlineData("ledger")]
+    [InlineData("holdings")]
+    public async Task No_run_of_the_account_holds_the_import_back_because_it_only_learns_names(string running)
     {
         var s = await StartAsync();
         var today = new DateOnly(2026, 10, 10);
-        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, BrokerSyncKind.Ledger, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+        if (running == "holdings")
+        {
+            s.Fx.Data.Syncs.Add(HoldingSync.Start(s.Account.Id, SyncTrigger.Manual, PortfolioFixture.Actor, s.Fx.Clock.GetUtcNow()));
+        }
+        else
+        {
+            s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, running == "trades" ? BrokerSyncKind.Trades : BrokerSyncKind.Ledger, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+        }
 
         var result = Ok(await s.ImportAsync(Demat(Statement)));
 
-        (result.Status, result.Error!.Code).ShouldBe(("rejected", "portfolio.sync_running"));
-        s.Learned.Aliases.ShouldBeEmpty();
+        result.Status.ShouldBe("imported");
     }
 
     [Fact]

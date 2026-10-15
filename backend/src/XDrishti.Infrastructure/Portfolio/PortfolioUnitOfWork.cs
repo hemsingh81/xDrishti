@@ -85,14 +85,14 @@ internal sealed partial class PortfolioUnitOfWork(XDrishtiDbContext db, IPortfol
             {
                 // A holding the work changed was changed by someone else meanwhile (a quote written between the work's read and its save, ADR 0019): the transaction is rolled back,
                 // and the work runs once more from scratch, reading the rows as they are now (the work reads its own state). A second conflict is a failure of the run: a result
-                // (PortfolioErrors.HoldingChanged, a 409 for the caller to reload and try again), never an exception that surfaces as a 500.
+                // (PortfolioErrors.DataChanged, a 409 for the caller to try again), never an exception that surfaces as a 500.
                 try
                 {
                     return await AttemptAsync(work, token);
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    return Result.Failure(PortfolioErrors.HoldingChanged);
+                    return Result.Failure(PortfolioErrors.DataChanged);
                 }
             }
         }, cancellationToken);

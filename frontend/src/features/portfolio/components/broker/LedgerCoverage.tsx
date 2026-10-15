@@ -2,8 +2,8 @@ import { Typography } from '@mui/material';
 import { formatDate } from '@/shared/lib/format';
 
 /**
- * From which day the ledger is stored for the account (whatever the filters say): the ledger's costs count in the net returns
- * from this day on, and "Read from an earlier date" on the Portfolio screen can move it back as far as Dhan's history goes.
+ * From which day the ledger is stored for the account (whatever the filters say): the ledger's account-level costs count in the net
+ * returns from this day on, and "Read from an earlier date" on the Portfolio screen can move it back as far as Dhan's history goes.
  */
 export function LedgerCoverage({ coverageFrom }: { coverageFrom: string | null | undefined }) {
   return (

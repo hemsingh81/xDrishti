@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Portfolio;
@@ -15,13 +16,14 @@ namespace XDrishti.Application.Portfolio.Heal;
 /// <item><b>Quiet retries.</b> A holdings, trade or ledger sync that failed for a reason that may pass (<see cref="SyncFailures.IsTransient"/>) is run again when the next wait of <see cref="IHealSettings.RetryBackoff"/> is over (<see cref="RetrySchedule"/>), inside the day of the failure. Nothing is shown while retries remain.</item>
 /// </list>
 /// The runs are the ordinary use cases (the same ones as "Sync now" and the schedules), so the usual rules hold: one run per account at a time (a retry that finds one running changes nothing and is tried at the next look), the same audit and the same rebuild. Failures of a run
-/// are noted by the run itself; this class only decides when to start one. Accounts are handled one after the other.
+/// are noted by the run itself; this class only decides when to start one. Accounts are handled one after the other. The attention items are reconciled before the runs of a look (so a long run does not delay them) and again at its end when runs were started, where the resolved ones past their retention are also deleted (ADR 0030): the notices only read.
 /// </summary>
 internal sealed class PortfolioHealer(
     IAccountStore accounts,
     IBrokerConnectionStore connections,
     ISyncHealthStore health,
     SyncHealthRecorder recorder,
+    IAttentionReconciler attention,
     IHealSettings settings,
     ICommandHandler<SyncHoldingsCommand, SyncRunView> holdings,
     ICommandHandler<SyncBrokerHistoryCommand, BrokerHistoryRunView> history,
@@ -33,6 +35,20 @@ internal sealed class PortfolioHealer(
 
     /// <summary>One look at the accounts. Returns how many runs were started.</summary>
     public async ValueTask<int> TickAsync(CancellationToken cancellationToken)
+    {
+        // Before the runs: a long sync inside this look must not hold back the items about the login, the failures and the expiry (cheap and set-based). After them: the runs changed the facts.
+        await attention.ReconcileAsync(cancellationToken);
+        var started = await HealAccountsAsync(cancellationToken);
+        if (started > 0)
+        {
+            await attention.ReconcileAsync(cancellationToken);
+        }
+
+        await attention.ApplyRetentionAsync(cancellationToken);
+        return started;
+    }
+
+    private async ValueTask<int> HealAccountsAsync(CancellationToken cancellationToken)
     {
         var portfolio = (await accounts.ListActiveAsync(cancellationToken)).Where(a => a.Portfolio.Enabled).ToList();
         if (portfolio.Count == 0)

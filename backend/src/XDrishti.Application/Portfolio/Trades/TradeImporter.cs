@@ -31,7 +31,7 @@ internal static class TradeDigests
 /// <summary>
 /// Stores the trades of a file in one unit of work (ADR 0023): the part of an import that every kind of trade file shares — the tradebook CSV and the global transaction report. The caller prepares the trades <b>inside the unit of work</b> (what it decides may depend on what is
 /// stored by then) and this plans them against the holdings, checks the digest of the preview when lots are to be rebuilt, stores the new trades as one batch and rebuilds the holdings whose result is <c>ok</c>. <c>409 portfolio.sync_running</c> while a holdings sync of the
-/// account runs, and while a broker history run (trades or ledger) of the account runs: it stores trades and rebuilds the same holdings. Audited with counts only.
+/// account runs, and while a trades run of the account runs: it stores trades and rebuilds the same holdings (a ledger run does not stop it, ADR 0030). The bill import of a Dhan report goes through here too. Audited with counts only.
 /// </summary>
 internal sealed class TradeImporter(
     TradeWorkspace workspace,
@@ -60,9 +60,9 @@ internal sealed class TradeImporter(
             async token =>
             {
                 // Holdings are read below inside this transaction; a sync that is running changes them under us, and a broker history run stores the same trades and rebuilds the same lots, so the owner waits for it (a sync that starts later is caught by the holdings' concurrency token).
-                if (await guard.RunningAsync(account.Id, token))
+                if (await guard.RunningAsync(account.Id, SyncWaits.TradeWrite, token))
                 {
-                    return Result.Failure(PortfolioErrors.SyncRunning);
+                    return Result.Failure(PortfolioErrors.SyncRunningWait);
                 }
 
                 var at = clock.GetUtcNow();

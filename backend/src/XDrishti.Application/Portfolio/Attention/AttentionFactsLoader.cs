@@ -13,7 +13,7 @@ internal interface IAttentionFactsSource
 }
 
 /// <summary>
-/// Reads the facts the attention items are derived from (ADR 0027), set-based: one read per kind of fact for all accounts together, never one per account - the accounts, their Dhan logins, the health figures, the latest succeeded trades run of each
+/// Reads the facts the attention items are derived from (ADR 0027), set-based: one read per kind of fact for all accounts together, never one per account - the accounts, their Dhan logins, the health figures, the latest succeeded trades and ledger run of each
 /// Portfolio account, the flags of the holdings those runs name, the pending ledger dividends and the unmatched securities. A fixed number of reads however many accounts there are.
 /// </summary>
 internal sealed class AttentionFactsLoader(
@@ -40,6 +40,7 @@ internal sealed class AttentionFactsLoader(
         var portfolio = active.Where(a => a.Portfolio.Enabled).Select(a => a.Id).ToList();
         IReadOnlyDictionary<Guid, BrokerSyncRun> latest = portfolio.Count == 0 ? new Dictionary<Guid, BrokerSyncRun>() : await runs.ListLastSucceededAsync(portfolio, BrokerSyncKind.Trades, cancellationToken);
         var counts = latest.ToDictionary(r => r.Key, r => r.Value.Counts);
+        IReadOnlyDictionary<Guid, BrokerSyncRun> latestLedger = portfolio.Count == 0 ? new Dictionary<Guid, BrokerSyncRun>() : await runs.ListLastSucceededAsync(portfolio, BrokerSyncKind.Ledger, cancellationToken);
         var named = counts.Values.SelectMany(c => c.NotRebuilt).Where(n => n.HoldingId is not null).Select(n => n.HoldingId!.Value).Distinct().ToList();
 
         IReadOnlyDictionary<Guid, HoldingFlags> flags = named.Count == 0 ? new Dictionary<Guid, HoldingFlags>() : await queries.HoldingFlagsAsync(named, cancellationToken);
@@ -50,6 +51,7 @@ internal sealed class AttentionFactsLoader(
             [.. active.Select(a => Account(a, logins.GetValueOrDefault(a.Id), now))],
             rows.ToDictionary(h => (h.AccountId, h.Kind)),
             counts,
+            latestLedger.ToDictionary(r => r.Key, r => r.Value.Counts),
             flags,
             dividends,
             unmatched,

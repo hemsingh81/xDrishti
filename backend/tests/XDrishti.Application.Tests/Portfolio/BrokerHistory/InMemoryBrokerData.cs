@@ -144,6 +144,8 @@ internal sealed class InMemoryBrokerData(InMemoryPortfolioData portfolio) : IBro
 
     public ValueTask<bool> IsRunningAsync(Guid accountId, CancellationToken cancellationToken) => ValueTask.FromResult(Runs.Any(r => r.AccountId == accountId && r.IsRunning));
 
+    public ValueTask<bool> IsRunningAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) => ValueTask.FromResult(Runs.Any(r => r.AccountId == accountId && r.Kind == kind && r.IsRunning));
+
     public ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var interrupted = Runs.Where(r => r.IsRunning && r.StartedAt < processStartedAt).ToList();
@@ -190,13 +192,13 @@ internal sealed class InMemoryBrokerData(InMemoryPortfolioData portfolio) : IBro
                 .Select(e => new LedgerChargeOnDay(e.EntryDate, -e.Amount, DepositoryCharges.Is(e.Description, e.Narration))),
         ]);
 
-    public ValueTask<int> SupersedeImportedChargesAsync(Guid accountId, IReadOnlyCollection<LedgerChargeOnDay> brokerCharges, DateTimeOffset at, CancellationToken cancellationToken)
+    public ValueTask<int> SupersedeImportedChargesAsync(Guid accountId, IReadOnlyCollection<LedgerChargeOnDay> brokerCharges, IReadOnlyCollection<LedgerChargeOnDay> storedBefore, DateTimeOffset at, CancellationToken cancellationToken)
     {
         var imported = Entries
             .Where(e => e.AccountId == accountId && e.Source == LedgerSource.Import && !e.IsVoided && e.EntryClass == LedgerClass.Charges && e.Amount < 0m)
             .OrderBy(e => e.CreatedAt).ThenBy(e => e.Id)
             .ToList();
-        var ids = LedgerSupersession.Covered(imported.Select(e => (e.Id, e.EntryDate, -e.Amount)), brokerCharges).ToHashSet();
+        var ids = LedgerSupersession.Covered(imported.Select(e => (e.Id, e.EntryDate, -e.Amount)), brokerCharges, storedBefore).ToHashSet();
         return ValueTask.FromResult(imported.Where(e => ids.Contains(e.Id)).Count(e => e.Void(LedgerEntry.SupersededReason, at)));
     }
 

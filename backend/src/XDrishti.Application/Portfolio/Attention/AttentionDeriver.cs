@@ -19,6 +19,7 @@ namespace XDrishti.Application.Portfolio.Attention;
 /// <item><b>Trades do not explain a holding</b> - a quantity mismatch that earlier history could not fix (the deepening is over) or never could.</item>
 /// <item><b>Possible dividends in the ledger</b> - ledger credits that look like dividends and wait for a decision.</item>
 /// <item><b>Unmatched securities</b> - holdings or traded securities with no instrument-master match.</item>
+/// <item><b>Rows dropped</b> - the latest succeeded trades or ledger read dropped rows (ADR 0030): info when only lines where no money moved, a warning otherwise; counts and plain reason words only.</item>
 /// </list>
 /// </summary>
 internal static class AttentionDeriver
@@ -63,6 +64,16 @@ internal static class AttentionDeriver
             if (facts.Unmatched.TryGetValue(account.Id, out var unmatched) && unmatched.Total > 0)
             {
                 items.Add(Unmatched(account, unmatched));
+            }
+
+            if (facts.TradeCounts.TryGetValue(account.Id, out var tradeCounts) && Dropped(account, "trades", tradeCounts) is { } droppedTrades)
+            {
+                items.Add(droppedTrades);
+            }
+
+            if (facts.LedgerCounts.TryGetValue(account.Id, out var ledgerCounts) && Dropped(account, "ledger", ledgerCounts) is { } droppedLedger)
+            {
+                items.Add(droppedLedger);
             }
         }
 
@@ -131,10 +142,10 @@ internal static class AttentionDeriver
 
         var (noun, retry, open) = kind switch
         {
-            SyncHealthKind.Holdings => ("holdings", new AttentionAction("Retry now", AttentionActionKinds.Command, $"POST /api/accounts/{accountId}/holdings/sync"), PortfolioPath(accountId)),
-            SyncHealthKind.Trades => ("trades", new AttentionAction("Retry now", AttentionActionKinds.Command, $"POST /api/accounts/{accountId}/sync/broker-history"), PortfolioPath(accountId)),
-            SyncHealthKind.Ledger => ("ledger", new AttentionAction("Retry now", AttentionActionKinds.Command, $"POST /api/accounts/{accountId}/sync/broker-history"), PortfolioPath(accountId)),
-            _ => ("prices", new AttentionAction("Retry now", AttentionActionKinds.Command, "POST /api/services/holdings-quotes/run"), "/services"),
+            SyncHealthKind.Holdings => ("holdings", new AttentionAction("Retry now", AttentionActionKinds.Command, AttentionCommands.HoldingsSyncOf(accountId)), PortfolioPath(accountId)),
+            SyncHealthKind.Trades => ("trades", new AttentionAction("Retry now", AttentionActionKinds.Command, AttentionCommands.BrokerHistorySyncOf(accountId)), PortfolioPath(accountId)),
+            SyncHealthKind.Ledger => ("ledger", new AttentionAction("Retry now", AttentionActionKinds.Command, AttentionCommands.BrokerHistorySyncOf(accountId)), PortfolioPath(accountId)),
+            _ => ("prices", new AttentionAction("Retry now", AttentionActionKinds.Command, AttentionCommands.ServiceRunOf("holdings-quotes")), "/services"),
         };
         var days = Math.Max(1, health.ConsecutiveFailedDays);
         var title = kind switch
@@ -263,6 +274,43 @@ internal static class AttentionDeriver
             [new AttentionAction("Open", AttentionActionKinds.Route, $"/portfolio?unmatched=1&account={account.Id}")],
             account.Id);
     }
+
+    /// <summary>
+    /// The rows the latest succeeded read of a kind dropped, as one item per account and kind (ADR 0030): none when it dropped nothing (which is also how an item resolves). The id holds a hash of the set of reasons, so a changed set is a new item. The text has counts and the
+    /// plain words of the reasons only.
+    /// </summary>
+    private static AttentionItem? Dropped(AttentionAccount account, string kind, BrokerSyncCounts counts)
+    {
+        if (counts.Dropped <= 0)
+        {
+            return null;
+        }
+
+        // A run recorded before the reasons were kept has a count and no reasons: they are "other".
+        IReadOnlyDictionary<string, int> reasons = counts.DroppedByReason.Count > 0 ? counts.DroppedByReason : new Dictionary<string, int> { [BrokerDropReasons.Other] = counts.Dropped };
+        var harmless = reasons.Keys.All(r => r == DropReasonWords.Harmless);
+        var ordered = reasons.Where(p => p.Value > 0).OrderByDescending(p => p.Value).ThenBy(p => p.Key, StringComparer.Ordinal).ToList();
+        var listed = ordered.Take(MaxReasons).Select(p => string.Create(CultureInfo.InvariantCulture, $"{p.Value} {DropReasonWords.Of(p.Key)}")).ToList();
+        if (ordered.Count > MaxReasons)
+        {
+            listed.Add(string.Create(CultureInfo.InvariantCulture, $"+{ordered.Count - MaxReasons} more"));
+        }
+
+        var rows = counts.Dropped == 1 ? "1 row" : string.Create(CultureInfo.InvariantCulture, $"{counts.Dropped} rows");
+        var set = string.Join('|', reasons.Where(p => p.Value > 0).Select(p => p.Key).Order(StringComparer.Ordinal));
+        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(set)))[..8];
+        return new AttentionItem(
+            $"attention:dropped:{account.Id:N}:{kind}:{hash}",
+            AttentionKinds.RowsDropped,
+            harmless ? AttentionSeverities.Info : AttentionSeverities.Warning,
+            harmless ? "Rows with no amount were left out" : kind == "trades" ? "Some trades could not be read" : "Some ledger lines could not be read",
+            $"The latest {kind} read of {account.Name} dropped {rows}: {string.Join(", ", listed)}. Open the sync line to see where they were.",
+            [new AttentionAction("Open", AttentionActionKinds.Route, "/portfolio?focus=sync")],
+            account.Id);
+    }
+
+    /// <summary>The most reasons a <c>rows_dropped</c> text lists.</summary>
+    public const int MaxReasons = 3;
 
     /// <summary>A mismatch an earlier read of the history could fix (the trades explain more than is held, or a sale is larger than what was open).</summary>
     internal static bool Deepenable(BrokerNotRebuilt held) =>

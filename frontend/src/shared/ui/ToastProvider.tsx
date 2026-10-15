@@ -62,14 +62,30 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setFocused(false);
   }
 
-  /** Gives focus back to where it was before a toast took it, if focus is still in that toast. */
-  const leaveToast = useCallback((id: string) => {
-    const target = returnTo.current;
-    if (target !== null && cards.current.get(id)?.contains(document.activeElement)) {
-      returnTo.current = null;
-      if (target.isConnected) target.focus();
+  /** Whether focus is inside an open toast other than `except` (the one that is leaving). */
+  const toastHoldsFocus = useCallback((except?: string) => {
+    for (const [id, card] of cards.current) {
+      if (id !== except && card.contains(document.activeElement)) return true;
     }
+    return false;
   }, []);
+
+  /**
+   * Gives focus back to where it was before a toast took it, if focus is still in that toast. The remembered place is
+   * dropped as soon as no other toast holds focus: it was only meaningful while a toast had it (a toast that timed out with
+   * focus elsewhere must not send the next one's focus to a stale place).
+   */
+  const leaveToast = useCallback(
+    (id: string) => {
+      const target = returnTo.current;
+      if (target !== null && cards.current.get(id)?.contains(document.activeElement)) {
+        returnTo.current = null;
+        if (target.isConnected) target.focus();
+      }
+      if (!toastHoldsFocus(id)) returnTo.current = null;
+    },
+    [toastHoldsFocus],
+  );
 
   const close = useCallback(
     (id: string) => {
@@ -79,12 +95,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [leaveToast],
   );
 
-  const exited = useCallback((id: string) => {
-    setToasts((current) => current.filter((toast) => !(toast.id === id && toast.closing)));
-    cards.current.delete(id);
-    // Focus can have been in the card that went away.
-    setFocused(stackRef.current?.contains(document.activeElement) ?? false);
-  }, []);
+  const exited = useCallback(
+    (id: string) => {
+      setToasts((current) => current.filter((toast) => !(toast.id === id && toast.closing)));
+      cards.current.delete(id);
+      if (!toastHoldsFocus()) returnTo.current = null;
+      // Focus can have been in the card that went away.
+      setFocused(stackRef.current?.contains(document.activeElement) ?? false);
+    },
+    [toastHoldsFocus],
+  );
 
   const api = useMemo<ToastApi>(
     () => ({
@@ -97,9 +117,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               : actionOrOptions;
         const focusAction = options.action !== undefined && modality.current === 'keyboard';
         if (focusAction) {
-          // A second toast keeps the first place to return to: the one before any toast took focus.
-          const active = document.activeElement;
-          returnTo.current ??= active instanceof HTMLElement && active !== document.body ? active : null;
+          // A second toast keeps the first place to return to while a toast holds focus (the place before any toast took
+          // it); with no toast holding focus, the place to return to is where focus is now.
+          if (!toastHoldsFocus()) {
+            const active = document.activeElement;
+            returnTo.current = active instanceof HTMLElement && active !== document.body ? active : null;
+          }
         }
         counter.current += 1;
         const next = buildToast(
@@ -114,7 +137,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       },
       dismiss: close,
     }),
-    [modality, close],
+    [modality, close, toastHoldsFocus],
   );
 
   const open = openToasts(toasts);

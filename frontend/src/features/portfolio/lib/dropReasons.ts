@@ -23,6 +23,8 @@ const reasonTexts: Record<string, string> = {
 };
 
 const order = Object.keys(reasonTexts);
+/** Every reason code the app has words for, in tie order. */
+export const dropReasonCodes: readonly string[] = order;
 const maxReasons = 3;
 /** A ledger line where no money moved (an opening balance, or debit equal to credit): harmless, so a read that dropped only these is mentioned quietly. */
 const harmless = 'zero_amount';

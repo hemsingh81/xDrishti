@@ -174,6 +174,9 @@ internal sealed class BrokerSyncStore(XDrishtiDbContext db, NpgsqlDataSource dat
     public async ValueTask<bool> IsRunningAsync(Guid accountId, CancellationToken cancellationToken) =>
         await db.BrokerSyncRuns.AsNoTracking().AnyAsync(x => x.AccountId == accountId && x.Status == SyncStatus.Running, cancellationToken);
 
+    public async ValueTask<bool> IsRunningAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
+        await db.BrokerSyncRuns.AsNoTracking().AnyAsync(x => x.AccountId == accountId && x.Kind == kind && x.Status == SyncStatus.Running, cancellationToken);
+
     public async ValueTask<IReadOnlyDictionary<Guid, BrokerSyncRun>> ListLastSucceededAsync(IReadOnlyCollection<Guid> accountIds, BrokerSyncKind kind, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(accountIds);

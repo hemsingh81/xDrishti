@@ -71,20 +71,59 @@ internal static class DividendUploads
         return [];
     }
 
-    private static List<int> Lines(string?[] values, FieldErrors errors)
+    /// <summary>The most characters one <c>includeDuplicates</c> value may have: <see cref="DividendCsvLimits.MaxRows"/> line numbers of up to seven digits and a comma each.</summary>
+    internal const int MaxLinesValueLength = DividendCsvLimits.MaxRows * 8;
+
+    /// <summary>
+    /// The line numbers of the <c>includeDuplicates</c> values. Each value is cut at <see cref="MaxLinesValueLength"/> characters and the reading stops at the first number over <see cref="DividendCsvLimits.MaxRows"/>, before the rest is parsed: the field is
+    /// untrusted and is not cut by the form options.
+    /// </summary>
+    internal static List<int> Lines(string?[] values, FieldErrors errors)
     {
+        ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(errors);
         var lines = new List<int>();
         foreach (var value in values.Select(v => v?.Trim()).Where(v => !string.IsNullOrEmpty(v)))
         {
+            if (value!.Length > MaxLinesValueLength)
+            {
+                errors.Add("includeDuplicates", $"A value is longer than {MaxLinesValueLength:N0} characters: send at most {DividendCsvLimits.MaxRows:N0} line numbers.");
+                return [];
+            }
+
             try
             {
-                var numbers = value![0] == '[' ? JsonSerializer.Deserialize(value, ApiJsonContext.Default.Int32Array) : [.. value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(int.Parse)];
-                lines.AddRange(numbers ?? []);
+                if (value[0] == '[')
+                {
+                    lines.AddRange(JsonSerializer.Deserialize(value, ApiJsonContext.Default.Int32Array) ?? []);
+                }
+                else
+                {
+                    foreach (var range in value.AsSpan().Split(','))
+                    {
+                        var text = value.AsSpan(range).Trim();
+                        if (text.IsEmpty)
+                        {
+                            continue;
+                        }
+
+                        lines.Add(int.Parse(text, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture));
+                        if (lines.Count > DividendCsvLimits.MaxRows)
+                        {
+                            break; // over the limit: reported below, the rest is not parsed
+                        }
+                    }
+                }
             }
             catch (Exception ex) when (ex is JsonException or FormatException or OverflowException)
             {
                 errors.Add("includeDuplicates", "Send a JSON array of line numbers, or numbers separated by commas.");
                 return [];
+            }
+
+            if (lines.Count > DividendCsvLimits.MaxRows)
+            {
+                break;
             }
         }
 

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Tests.Platform.Services;
@@ -35,6 +36,7 @@ public sealed class HoldingQuotesServiceTests : IDisposable
                 .Singleton(_actions.Reconciler())
                 .Singleton<ISyncHealthStore>(_health)
                 .Singleton<IHealSettings>(_heal)
+                .Singleton<IAttentionReconciler>(new XDrishti.Application.Tests.Portfolio.Heal.RecordingAttentionReconciler())
                 .Singleton<SyncHealthRecorder, SyncHealthRecorder>());
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;

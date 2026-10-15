@@ -24,6 +24,7 @@ const reasons: Readonly<Record<string, string>> = {
   token_expired: 'the Dhan login has expired',
   token_refused: 'Dhan refused the login',
   not_connected: 'the account is not connected to Dhan',
+  data_changed: 'the data changed while it was being saved; it will be tried again',
   unexpected: 'something unexpected went wrong',
 };
 

@@ -24,4 +24,8 @@ internal sealed class HealOptions
     /// <summary>How many years back from today the nightly deepening of the trade history reads at most, one year a night (default 8); 0 switches it off.</summary>
     [Range(0, 30)]
     public int DeepenMaxYears { get; set; } = 8;
+
+    /// <summary>How many days a resolved item of the bell is kept before the healer tick deletes it (default 30, ADR 0030). Unresolved items are never deleted.</summary>
+    [Range(1, 3650)]
+    public int AttentionRetentionDays { get; set; } = 30;
 }

@@ -23,7 +23,6 @@ internal sealed class DematService(
     ISecurityAliases securityAliases,
     IAccountEventLog events,
     ReportClientCodes clientCodes,
-    SyncGuard guard,
     IPortfolioUnitOfWork unitOfWork,
     TimeProvider clock)
 {
@@ -75,7 +74,7 @@ internal sealed class DematService(
         return new ImportFilePreview(fileName, Kind, true, null, null, null, summary, warnings, null, null, null, demat, prepared.Digest);
     }
 
-    /// <summary>Remembers the names of the statement. <paramref name="digest"/> is the preview's. No holding is touched. Refused (<c>409 portfolio.sync_running</c>) while a holdings sync or a broker history run of the account runs.</summary>
+    /// <summary>Remembers the names of the statement. <paramref name="digest"/> is the preview's. No holding is touched, so a run of the account in progress does not stop it (ADR 0030).</summary>
     public async ValueTask<Result<DematImportResult>> ImportAsync(BrokerAccount account, Sheet sheet, string digest, string actor, CancellationToken cancellationToken)
     {
         var read = DematHoldingReader.Read(sheet);
@@ -89,12 +88,7 @@ internal sealed class DematService(
         var outcome = await unitOfWork.RunAsync(
             async token =>
             {
-                // The names are compared with what is stored below inside this transaction; a broker history run or a holdings sync that is running teaches names of its own.
-                if (await guard.RunningAsync(account.Id, token))
-                {
-                    return Result.Failure(PortfolioErrors.SyncRunning);
-                }
-
+                // The names are compared with what is stored below inside this transaction. A run that is running teaches names of its own, which the save then refuses as already stored (ReportErrors.NamesChanged) - so this import waits for no run (ADR 0030).
                 var at = clock.GetUtcNow();
                 var prepared = await PrepareAsync(account, file, token);
                 if (!string.Equals(digest.Trim(), prepared.Digest, StringComparison.OrdinalIgnoreCase))

@@ -28,7 +28,7 @@ internal sealed class ExecuteBrokerHistoryHandler(BrokerHistoryAccess access, Br
             var token = account.IsSuccess ? await access.TokenAsync(account.Value, cancellationToken) : Result.Failure<Domain.Accounts.SecretValue>(account.Error);
             if (account.IsFailure || token.IsFailure)
             {
-                await pipeline.EndAsync(run.Id, (account.IsFailure ? account.Error : token.Error).Message);
+                await pipeline.EndAsync(run.Id, account.IsFailure ? account.Error : token.Error);
                 return Result.Success();
             }
 

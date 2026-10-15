@@ -1,5 +1,7 @@
 using XDrishti.Api.IntegrationTests.Infrastructure;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Api.IntegrationTests.BrokerHistory;
@@ -71,6 +73,49 @@ public sealed class BrokerDropReasonsApiTests(ApiFactory factory) : BrokerHistor
         after.Trades.LastRun!.Counts.Dropped.ShouldBe(0);
         after.Trades.DroppedByReason.ShouldBeEmpty();
         after.Trades.DroppedRows.ShouldBeEmpty();
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions Web = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    private async Task<List<PortfolioNotice>> DroppedItemsAsync()
+    {
+        using var response = await Client.GetAsync("/api/portfolio/notices", Ct); // a plain read: the items were reconciled when the run ended
+        response.StatusCode.ShouldBe(System.Net.HttpStatusCode.OK);
+        var text = await response.Content.ReadAsStringAsync(Ct);
+        foreach (var sentinel in new[] { "ZZ", "777777", "987654" })
+        {
+            text.ShouldNotContain(sentinel);
+        }
+
+        return [.. System.Text.Json.JsonSerializer.Deserialize<PortfolioNotices>(text, Web)!.Items.Where(i => i.Kind == "rows_dropped")];
+    }
+
+    [Fact]
+    public async Task A_run_that_dropped_rows_raises_an_item_when_it_ends_and_a_clean_later_run_resolves_it()
+    {
+        var held = await HeldOnTheNseAsync();
+        DhanHasTheBaseTrades();
+        DhanHasALedger();
+        Dhan.RawTrades.Add((D(7), "~1", """{"transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"ZZSYMBOL77","tradedQuantity":5,"tradedPrice":100,"exchangeTime":"2026-10-07 10:00:00"}"""));
+        Dhan.RawLedger.Add((D(9), """{"narration":"ZZNARRATION 987654.32","voucherdate":"Oct 9, 2026","voucherdesc":"JOURNAL","vouchernumber":"ZZV9","debit":"0.00","credit":"0.00"}"""));
+
+        await SyncAndWaitAsync(held.Account.Id);
+
+        var items = await DroppedItemsAsync();
+        items.Count.ShouldBe(2);
+        var trades = items.Single(i => i.Id.Contains(":trades:", StringComparison.Ordinal));
+        var ledger = items.Single(i => i.Id.Contains(":ledger:", StringComparison.Ordinal));
+        (trades.Severity, trades.Resolved, trades.AccountId).ShouldBe(("warning", false, held.Account.Id));
+        trades.Text.ShouldBe("The latest trades read of Example One dropped 1 row: 1 no trade id. Open the sync line to see where they were.");
+        (ledger.Severity, ledger.Resolved).ShouldBe(("info", false));
+        ledger.Text.ShouldBe("The latest ledger read of Example One dropped 1 row: 1 zero amount (no money moved, e.g. an opening balance). Open the sync line to see where they were.");
+        trades.Actions.ShouldBe([new AttentionAction("Open", "route", "/portfolio?focus=sync")]);
+
+        Dhan.RawTrades.Clear();
+        Dhan.RawLedger.Clear();
+        await SyncAndWaitAsync(held.Account.Id); // a clean later run of both kinds
+
+        (await DroppedItemsAsync()).ShouldAllBe(i => i.Resolved);
     }
 
     private async Task<List<string>> DetailsAsync() =>

@@ -1,5 +1,4 @@
 using XDrishti.Application.Abstractions.Portfolio;
-using XDrishti.Application.Accounts.Connections;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Portfolio;
 
@@ -41,50 +40,35 @@ internal static class SyncFailures
     /// <summary>The Portfolio role of the account is off. Only the owner can fix it.</summary>
     public const string RoleOff = "role_off";
 
-    private static readonly string[] Transient = [Unavailable, RateLimited, Interrupted];
+    /// <summary>Our own database refused a save because the same data was changed meanwhile (a sync or a quote saved the holding): nothing was applied and the next run does the work again. Transient; not a problem with Dhan.</summary>
+    public const string DataChanged = "data_changed";
+
+    private static readonly string[] Transient = [Unavailable, RateLimited, Interrupted, DataChanged];
 
     private static readonly string[] Token = [TokenExpired, TokenRefused, NotConnected];
 
     private static readonly string[] Owner = [TokenExpired, TokenRefused, NotConnected, RoleOff];
 
-    /// <summary>The code of a failure result.</summary>
+    /// <summary>The code of a failure result: its structured <see cref="Error.Cause"/> (ADR 0030), never its message. An error without a cause is unexpected, except the one whose code says the Portfolio role is off.</summary>
     public static string Of(Error error)
     {
         ArgumentNullException.ThrowIfNull(error);
-        return error.Code switch
-        {
-            PortfolioErrors.TokenExpiredCode => TokenExpired,
-            PortfolioErrors.NotConnectedCode => error.Message == PortfolioErrors.TokenRefused.Message ? TokenRefused : NotConnected,
-            PortfolioErrors.HistoryTooLargeCode => HistoryTooLarge,
-            PortfolioErrors.RoleOffCode => RoleOff,
-            ConnectionErrors.BrokerErrorCode => ConnectionErrors.IsUnavailable(error) ? Unavailable : ConnectionErrors.IsRateLimited(error) ? RateLimited : Rejected,
-            _ => Unexpected,
-        };
+        return error.Cause is { } cause ? Of(cause) : error.Code == PortfolioErrors.RoleOffCode ? RoleOff : Unexpected;
     }
 
-    /// <summary>The code of a failure that was recorded as a plain sentence (a run ended from outside the pipeline).</summary>
-    public static string OfMessage(string? message)
+    /// <summary>The code of a failure kind.</summary>
+    public static string Of(FailureKind kind) => kind switch
     {
-        if (string.IsNullOrEmpty(message))
-        {
-            return Unexpected;
-        }
-
-        if (message.Contains("interrupted", StringComparison.OrdinalIgnoreCase) || message.Contains("did not finish", StringComparison.OrdinalIgnoreCase))
-        {
-            return Interrupted;
-        }
-
-        foreach (var known in new[] { PortfolioErrors.TokenExpired, PortfolioErrors.TokenRefused, PortfolioErrors.NotConnected, PortfolioErrors.HistoryTooLarge, PortfolioErrors.RoleOff })
-        {
-            if (message == known.Message)
-            {
-                return Of(known);
-            }
-        }
-
-        return Unexpected;
-    }
+        FailureKind.Transient => Unavailable,
+        FailureKind.RateLimited => RateLimited,
+        FailureKind.Rejected => Rejected,
+        FailureKind.TokenExpired => TokenExpired,
+        FailureKind.TokenRefused => TokenRefused,
+        FailureKind.NotConnected => NotConnected,
+        FailureKind.HistoryTooLarge => HistoryTooLarge,
+        FailureKind.DataChanged => DataChanged,
+        _ => Unexpected,
+    };
 
     /// <summary>The code of a failed quote request: <c>Failed</c> and <c>RateLimited</c> pass by themselves, a refused token needs the owner.</summary>
     public static string OfQuote(QuoteFailureKind kind) => kind switch
@@ -115,6 +99,7 @@ internal static class SyncFailures
         TokenRefused => "Dhan refused the saved login",
         NotConnected => "the account is not connected to Dhan",
         RoleOff => "the Portfolio role of the account is off",
+        DataChanged => "the data changed while it was being saved; the next run does it again",
         _ => "the sync failed unexpectedly (see the application log)",
     };
 

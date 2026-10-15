@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Tests.Platform.Services;
@@ -37,6 +38,7 @@ public sealed class HoldingQuotesAlertsTests : IDisposable
                 .Singleton(_actions.Reconciler())
                 .Singleton<ISyncHealthStore>(_health)
                 .Singleton<IHealSettings>(_heal)
+                .Singleton<IAttentionReconciler>(new XDrishti.Application.Tests.Portfolio.Heal.RecordingAttentionReconciler())
                 .Singleton<SyncHealthRecorder, SyncHealthRecorder>());
 
     public void Dispose() => _world.Dispose();
@@ -222,6 +224,7 @@ public sealed class HoldingQuotesAlertsTests : IDisposable
                 .Singleton(harness.Reconciler())
                 .Singleton<ISyncHealthStore>(_health)
                 .Singleton<IHealSettings>(_heal)
+                .Singleton<IAttentionReconciler>(new XDrishti.Application.Tests.Portfolio.Heal.RecordingAttentionReconciler())
                 .Singleton<SyncHealthRecorder, SyncHealthRecorder>());
         _holdings.Targets = FakeHoldingQuotes.Held(open: 1, nse: 1);
 

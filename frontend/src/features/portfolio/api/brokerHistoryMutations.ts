@@ -1,12 +1,18 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, unwrap } from '@/shared/api';
 import { brokerHistoryKeys } from './brokerHistoryQueries';
+import { dividendKeys } from './dividendQueries';
 import { invalidateHoldings } from './portfolioMutations';
 
-/** A run finished: the status, the ledger and (the trades and the rebuilt lots changed what they show) the holdings. */
+/**
+ * A run finished: the status, the ledger, the dividend suggestions read from the ledger (a new ledger entry can be one; only
+ * lists on screen are read again, so this costs nothing without the Cash panel) and (the trades and the rebuilt lots changed
+ * what they show) the holdings.
+ */
 export function invalidateBrokerHistory(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: brokerHistoryKeys.all }),
+    queryClient.invalidateQueries({ queryKey: dividendKeys.all }),
     invalidateHoldings(queryClient),
   ]);
 }

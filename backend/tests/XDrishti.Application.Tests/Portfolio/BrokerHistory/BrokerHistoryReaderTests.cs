@@ -148,8 +148,8 @@ public sealed class BrokerHistoryReaderTests
     }
 
     [Theory]
-    [InlineData(BrokerFailureKind.Rejected, null)] // 429 without a code
-    [InlineData(BrokerFailureKind.Rejected, "DH-904")] // rate limit
+    [InlineData(BrokerFailureKind.RateLimited, null)] // 429 without a code
+    [InlineData(BrokerFailureKind.RateLimited, "DH-904")] // rate limit
     [InlineData(BrokerFailureKind.Unavailable, null)] // 5xx, timeout
     public async Task A_rate_limit_or_an_outage_fails_the_read_with_the_broker_error_and_does_not_halve(BrokerFailureKind kind, string? code)
     {

@@ -3,7 +3,7 @@ namespace XDrishti.Domain.Portfolio;
 /// <summary>
 /// An item that needs the owner's attention, as it was last seen (P2-16, ADR 0027; <c>portfolio.attention_items</c>). The items are derived on read from the state of the accounts and syncs; this row only remembers each one so that
 /// <see cref="Since"/> stays when it was first seen and a resolved item can be shown for a day (<see cref="ResolvedAt"/>) with the title, text and actions it had. The id includes the situation, so a changed situation is a new item. The
-/// store writes it with set-based statements (insert-or-update, resolve); the entity is for reading. Never deleted: the runtime role has no DELETE.
+/// store writes it with set-based statements (insert-or-update, resolve); the entity is for reading. Resolved rows are deleted after the retention (ADR 0030); the runtime role has DELETE on this table only.
 /// </summary>
 public sealed class AttentionRecord
 {

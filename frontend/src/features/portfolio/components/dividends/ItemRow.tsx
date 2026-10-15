@@ -1,6 +1,6 @@
 import { Box, Button, Checkbox, TableCell, TableRow, Typography } from '@mui/material';
 import type { DividendPreviewItem } from '@/shared/api';
-import { formatDate, formatInrPrecise, formatNumber } from '@/shared/lib/format';
+import { formatDate, formatInrPerShare, formatInrPrecise, formatNumber } from '@/shared/lib/format';
 import { numeric } from '@/theme';
 import { warningText, type MatchDraft } from '../../lib/dividendImport';
 import { MatchedTo } from './MatchedTo';
@@ -60,7 +60,7 @@ export function ItemRow({ item, variant, draft, included, onInclude, onChange }:
           </Button>
         )}
       </TableCell>
-      <TableCell sx={number}>{item.perShare === null ? '—' : formatInrPrecise(item.perShare)}</TableCell>
+      <TableCell sx={number}>{item.perShare === null ? '—' : formatInrPerShare(item.perShare)}</TableCell>
       <TableCell sx={number}>{item.quantity === null ? '—' : formatNumber(item.quantity)}</TableCell>
       <TableCell sx={number}>{formatInrPrecise(item.amount)}</TableCell>
       <TableCell sx={{ minWidth: 160, verticalAlign: 'top' }}>

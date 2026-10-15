@@ -166,6 +166,34 @@ public sealed class IncomeCalculatorTests
     }
 
     [Fact]
+    public void In_a_scope_that_mixes_priced_and_unpriced_holdings_the_income_of_the_unpriced_is_in_the_percentages_but_not_in_the_net_xirr()
+    {
+        // The rule stated on IncomeCalculator (ADR 0030): the unpriced holding's dividend and charge count in the totals and in the percentages (the gross figures are of the priced holding alone: no price, no value), but its flows are not put against the priced holding's lots.
+        var priced = OneLot();
+        var unpriced = Holding(0m, "BBB", lots: Open(10, 100m, TwoYearsAgo)).With("INE222B01011");
+        var pricedIncome = new[] { Dividend(priced, D(2025, 9, 15), 100m) };
+        var pricedCharges = new[] { Charge(priced, TwoYearsAgo, 12.5m) };
+        var unpricedIncome = new[] { Dividend(unpriced, D(2026, 1, 1), 50m) };
+        var unpricedCharges = new[] { Charge(unpriced, D(2025, 1, 1), 5m) };
+
+        var mixed = Figures([priced, unpriced], Book([priced, unpriced], [.. pricedIncome, .. unpricedIncome], [.. pricedCharges, .. unpricedCharges]));
+        var pricedAlone = Figures([priced], Book([priced], pricedIncome, pricedCharges));
+
+        // in the totals ...
+        (mixed.Dividends, mixed.Charges).ShouldBe((150m, 17.5m));
+
+        // ... and in the percentages: (unrealised 1,000 + dividends 150 - charges 17.5) / invested 5,000
+        var gross = ReturnsCalculator.ForGroup([priced, unpriced], Valuation);
+        gross.Invested.ShouldBe(5_000m);
+        mixed.TotalReturnPct.ShouldBe(Math.Round((gross.RealisedPnl + gross.Pnl!.Value + 150m) / 5_000m * 100m, 4, MidpointRounding.AwayFromZero));
+        mixed.NetTotalReturnPct.ShouldBe(Math.Round((gross.RealisedPnl + gross.Pnl.Value + 150m - 17.5m) / 5_000m * 100m, 4, MidpointRounding.AwayFromZero));
+
+        // ... but not in the net XIRR, which is the priced holding's own
+        mixed.NetXirr.State.ShouldBe(XirrState.Ok);
+        mixed.NetXirr.Rate.ShouldBe(pricedAlone.NetXirr.Rate);
+    }
+
+    [Fact]
     public void Nothing_invested_gives_no_percentages_and_no_lots_give_no_rate()
     {
         var closed = Holding(100m, "AAA", "closed", lots: Closed(100, 50m, D(2025, 1, 1), D(2026, 6, 1), 90m)).With("INE000A01011");

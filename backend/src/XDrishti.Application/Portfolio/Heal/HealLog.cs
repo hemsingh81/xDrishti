@@ -37,4 +37,10 @@ internal static partial class HealLog
 
     [LoggerMessage(EventId = 4311, Level = LogLevel.Warning, Message = "The attention items could not be worked out; the notices go without them")]
     public static partial void AttentionFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 4312, Level = LogLevel.Warning, Message = "The attention items could not be brought up to date at startup; the healing tick tries again")]
+    public static partial void StartupHousekeepingFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 4313, Level = LogLevel.Warning, Message = "The attention items were not reconciled at the end of a sync within {Seconds} seconds; the next healing tick does it")]
+    public static partial void ReconcileTimedOut(ILogger logger, int seconds);
 }

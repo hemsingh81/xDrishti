@@ -11,4 +11,7 @@ public interface IHealSettings
 
     /// <summary>How many years back from today the nightly deepening reads at most (default 8); 0 switches it off.</summary>
     int DeepenMaxYears { get; }
+
+    /// <summary>How many days a resolved attention item is kept before the healer tick deletes it (default 30, ADR 0030).</summary>
+    int AttentionRetentionDays { get; }
 }

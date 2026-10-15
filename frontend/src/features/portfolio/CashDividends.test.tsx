@@ -4,7 +4,18 @@ import { http, HttpResponse } from 'msw';
 import { answerLedger, buildLedgerEntry, ledgerIds, sampleLedger } from '@/test/brokerHistoryFixtures';
 import { buildDividend, dividendIds } from '@/test/dividendFixtures';
 import { holdingIds, ids, sampleHoldings } from '@/test/fixtures';
+import { captureIntervals } from '@/test/clock';
+import {
+  brokerRunIds,
+  buildBrokerCounts,
+  buildBrokerKind,
+  buildBrokerRun,
+  buildBrokerStatus,
+  buildRunningStatus,
+} from '@/test/brokerHistoryFixtures';
+import { buildSuggestionPage } from '@/test/dividendFixtures';
 import { server } from '@/test/server';
+import { brokerHistoryPollMs } from './api/brokerHistoryQueries';
 import { pinClock } from '@/test/pinClock';
 import { renderPortfolio, serveDividends, warmDividends } from './testing';
 
@@ -59,6 +70,18 @@ describe('Cash & dividends panel: what it says about dividends and the ledger', 
       panel.getByText(/Dhan credits dividends to your bank account, so they rarely appear here/),
     ).toBeInTheDocument();
     expect(panel.getByText(/enter them yourself/)).toBeInTheDocument();
+  });
+
+  it('says that only the account-level ledger costs count in the net return, the other entries being shown only', async () => {
+    const { panel } = await openPanel();
+
+    const note = panel.getByText(/Dhan credits dividends to your bank account/);
+    expect(note).toHaveTextContent(
+      /the ledger’s account-level costs \(DP charges, annual maintenance, delayed-payment interest\)/,
+    );
+    expect(note).toHaveTextContent(/Its other entries \(brokerage, STT, GST, stamp duty, settlements\) are shown only/);
+    expect(note).toHaveTextContent(/trade charges are already counted from the trades/);
+    expect(note).not.toHaveTextContent(/the ledger’s charges count/);
   });
 
   it('says from which day the ledger is stored and that costs before it are not counted', async () => {
@@ -361,5 +384,47 @@ describe('Cash & dividends panel: suggestions from the ledger', () => {
     await userEvent.click(panel.getByRole('button', { name: 'Retry' }));
 
     expect(await panel.findByRole('region', { name: 'Suggested dividends' })).toBeInTheDocument();
+  });
+});
+
+describe('Cash & dividends panel: a sync run that ends while it is open', () => {
+  it('reads the suggested dividends again, so an entry the run brought in is offered', async () => {
+    const timers = captureIntervals(brokerHistoryPollMs);
+    let running = true;
+    let reads = 0;
+    server.use(
+      http.get('/api/accounts/:id/sync/broker-history/status', () =>
+        HttpResponse.json(
+          running
+            ? buildRunningStatus()
+            : buildBrokerStatus({
+                ledger: buildBrokerKind({
+                  lastRun: buildBrokerRun({ id: brokerRunIds.ledger2, counts: buildBrokerCounts({ stored: 1 }) }),
+                }),
+              }),
+        ),
+      ),
+    );
+    const { panel } = await openPanel();
+    server.use(
+      http.get('/api/accounts/:id/dividends/suggestions', () => {
+        reads += 1;
+        return HttpResponse.json(
+          buildSuggestionPage(running ? [] : [suggested], { pageSize: 50, total: running ? 0 : 1 }),
+        );
+      }),
+    );
+    await panel.findByText('No dividends entered for this account yet.');
+    await waitFor(() => {
+      expect(timers.count(brokerHistoryPollMs)).toBeGreaterThan(0);
+    });
+    expect(panel.queryByRole('region', { name: 'Suggested dividends' })).not.toBeInTheDocument();
+    const before = reads;
+
+    running = false;
+    timers.fire(brokerHistoryPollMs);
+
+    expect(await panel.findByRole('region', { name: 'Suggested dividends' })).toBeInTheDocument();
+    expect(reads).toBeGreaterThan(before);
   });
 });

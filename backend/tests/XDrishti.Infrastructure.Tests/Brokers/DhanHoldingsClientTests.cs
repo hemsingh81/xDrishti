@@ -146,7 +146,7 @@ public sealed class DhanHoldingsClientTests : IDisposable
     [InlineData(HttpStatusCode.NotFound, """{"errorCode":"DH-901"}""", BrokerFailureKind.Unauthorized, "DH-901")]
     [InlineData(HttpStatusCode.InternalServerError, """{"errorCode":"DH-901"}""", BrokerFailureKind.Unavailable, "DH-901")]
     [InlineData(HttpStatusCode.BadRequest, """{"errorCode":"DH-905"}""", BrokerFailureKind.Rejected, "DH-905")]
-    [InlineData(HttpStatusCode.TooManyRequests, """{"errorCode":"DH-904"}""", BrokerFailureKind.Rejected, "DH-904")]
+    [InlineData(HttpStatusCode.TooManyRequests, """{"errorCode":"DH-904"}""", BrokerFailureKind.RateLimited, "DH-904")]
     [InlineData(HttpStatusCode.InternalServerError, """{"errorCode":"DH-908"}""", BrokerFailureKind.Unavailable, "DH-908")]
     [InlineData(HttpStatusCode.BadGateway, "<html>bad gateway</html>", BrokerFailureKind.Unavailable, null)]
     [InlineData(HttpStatusCode.Found, "", BrokerFailureKind.Unavailable, null)] // redirects are not followed

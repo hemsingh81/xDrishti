@@ -36,6 +36,42 @@ public sealed class CompleteConnectHandlerTests
     }
 
     [Fact]
+    public async Task A_successful_connect_reconciles_the_attention_items_once()
+    {
+        var account = await _fx.DhanAccountAsync();
+        await _fx.StartAsync(account.Id);
+
+        await _fx.CompleteAsync(Code);
+
+        _fx.Accounts.Attention.Reconciles.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_renewing_sign_in_reconciles_the_attention_items_once()
+    {
+        var account = await _fx.DhanAccountAsync();
+        await _fx.ConnectByLoginAsync(account);
+        var before = _fx.Accounts.Attention.Reconciles;
+        await _fx.StartAsync(account.Id);
+
+        await _fx.CompleteAsync(Code);
+
+        (_fx.Accounts.Attention.Reconciles - before).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_failed_connect_does_not_reconcile()
+    {
+        var account = await _fx.DhanAccountAsync();
+        _fx.Dhan.HolderId = "1000000099";
+        await _fx.StartAsync(account.Id);
+
+        await _fx.CompleteAsync(Code);
+
+        _fx.Accounts.Attention.Reconciles.ShouldBe(0);
+    }
+
+    [Fact]
     public async Task The_expiry_Dhan_states_is_used()
     {
         var account = await _fx.DhanAccountAsync();

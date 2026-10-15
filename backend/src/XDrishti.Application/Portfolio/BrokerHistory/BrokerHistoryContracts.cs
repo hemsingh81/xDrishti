@@ -31,7 +31,7 @@ public sealed record BrokerHistoryRunView(BrokerSyncRunView Trades, BrokerSyncRu
 /// <summary>
 /// How far one kind is read: the <c>Watermark</c> (last date read; null when nothing was read yet), the latest run and its windows done of total. The health (ADR 0027): <c>Attempts</c> is the number of the latest run within the day's occurrence (1 for the first, up to 4 with
 /// the three quiet retries; 0 while there is no run), <c>ConsecutiveFailedDays</c> the days in a row whose last attempt failed (0 when the latest attempt succeeded), <c>LastFailureReason</c> a code (<c>unavailable</c>, <c>rate_limited</c>, <c>interrupted</c>, <c>rejected</c>,
-/// <c>history_too_large</c>, <c>token_expired</c>, <c>token_refused</c>, <c>not_connected</c>, <c>unexpected</c>; null while healthy) and <c>RetryAt</c> when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing. <c>DroppedByReason</c> and <c>DroppedRows</c> say why the latest run dropped rows (see below).
+/// <c>history_too_large</c>, <c>token_expired</c>, <c>token_refused</c>, <c>not_connected</c>, <c>data_changed</c>, <c>unexpected</c>; null while healthy) and <c>RetryAt</c> when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing. <c>DroppedByReason</c> and <c>DroppedRows</c> say why the latest run dropped rows (see below).
 /// </summary>
 public sealed record BrokerKindStatus(
     DateOnly? Watermark,

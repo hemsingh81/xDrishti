@@ -27,8 +27,10 @@ interface CashDrawerProps {
 
 /**
  * Cash & dividends in a side panel: the dividends you entered for the account (add, void, the suggestions of the ledger) and
- * what Dhan's ledger says about its money (funds in and out, dividends, charges), by class and period. The ledger's costs are
- * part of the net returns from the day the ledger was first read; its other entries are shown only.
+ * what Dhan's ledger says about its money (funds in and out, dividends, charges), by class and period. Only the ledger's
+ * account-level costs (DP charges, annual maintenance, delayed-payment interest) are part of the net returns, from the day the
+ * ledger was first read; its other entries (brokerage, STT, GST, stamp duty, settlements) are shown only, because the trade
+ * charges are already counted from the trades.
  */
 export function CashDrawer({
   onClose,
@@ -69,8 +71,9 @@ export function CashDrawer({
       <Stack spacing={2} sx={{ px: 2.5, pt: 1.5, overflowY: 'auto', flex: 1, pb: 3 }}>
         <Alert severity="info">
           Dhan credits dividends to your bank account, so they rarely appear here &mdash; enter them yourself. Dividends
-          you enter and the ledger&rsquo;s charges count in the net return and net XIRR; the other entries are shown
-          only.
+          you enter count in the net return and net XIRR, and so do the ledger&rsquo;s account-level costs (DP charges,
+          annual maintenance, delayed-payment interest). Its other entries (brokerage, STT, GST, stamp duty,
+          settlements) are shown only: trade charges are already counted from the trades.
         </Alert>
         {accounts.length > 1 && (
           <TextField

@@ -25,9 +25,10 @@ public interface ILedgerStore
 
     /// <summary>
     /// Voids, as superseded (ADR 0029), the imported charges that Dhan's own ledger now has: for each day and amount of <paramref name="brokerCharges"/> (charges the broker run has just collected, rupees paid) as many non-voided imported charge entries of the account with that day
-    /// and amount, oldest first - one broker charge covers one imported line, and a day's amount of which the ledger has fewer charges than the sheet had lines leaves the rest counting. Executes at once, inside the current transaction; returns how many entries were voided.
+    /// and amount, oldest first - one broker charge covers one imported line, and a day's amount of which the ledger has fewer charges than the sheet had lines leaves the rest counting. <paramref name="storedBefore"/> are the charges of the same days that earlier saves stored: they are
+    /// not matched again, but they decide, with the new ones, which charges of a day count (a day with a depository charge anywhere in the stored day counts only those, <see cref="LedgerSupersession"/>). Executes at once, inside the current transaction; returns how many entries were voided.
     /// </summary>
-    ValueTask<int> SupersedeImportedChargesAsync(Guid accountId, IReadOnlyCollection<LedgerChargeOnDay> brokerCharges, DateTimeOffset at, CancellationToken cancellationToken);
+    ValueTask<int> SupersedeImportedChargesAsync(Guid accountId, IReadOnlyCollection<LedgerChargeOnDay> brokerCharges, IReadOnlyCollection<LedgerChargeOnDay> storedBefore, DateTimeOffset at, CancellationToken cancellationToken);
 
     /// <summary>The earliest date of any ledger entry Dhan's ledger gave for the account (whatever its class); null when there is none: the date the ledger is known from. Entries imported from reports do not count: they say nothing about how far Dhan's ledger was read.</summary>
     ValueTask<DateOnly?> FirstDateAsync(Guid accountId, CancellationToken cancellationToken);

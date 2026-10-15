@@ -123,7 +123,7 @@ public sealed class DhanLedgerClientTests : IDisposable
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, """{"errorCode":"DH-907"}""", BrokerFailureKind.Unauthorized, "DH-907")]
     [InlineData(HttpStatusCode.Unauthorized, """{"errorCode":"DH-901"}""", BrokerFailureKind.Unauthorized, "DH-901")]
-    [InlineData(HttpStatusCode.TooManyRequests, """{"errorCode":"DH-904"}""", BrokerFailureKind.Rejected, "DH-904")]
+    [InlineData(HttpStatusCode.TooManyRequests, """{"errorCode":"DH-904"}""", BrokerFailureKind.RateLimited, "DH-904")]
     [InlineData(HttpStatusCode.BadRequest, """{"errorCode":"DH-905"}""", BrokerFailureKind.Rejected, "DH-905")]
     [InlineData(HttpStatusCode.InternalServerError, "", BrokerFailureKind.Unavailable, null)]
     [InlineData(HttpStatusCode.OK, "not json", BrokerFailureKind.Unavailable, null)]

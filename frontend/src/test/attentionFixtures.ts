@@ -1,4 +1,4 @@
-import type { PortfolioNotice } from '@/shared/api';
+import { attentionCommands, type PortfolioNotice } from '@/shared/api';
 import { buildPortfolioNotice } from './actionCenterFixtures';
 import { holdingIds, ids } from './fixtures';
 
@@ -67,6 +67,19 @@ export const buildDividendsNotice = (overrides: Partial<PortfolioNotice> = {}): 
     ...overrides,
   });
 
+export const buildRowsDroppedNotice = (overrides: Partial<PortfolioNotice> = {}): PortfolioNotice =>
+  base({
+    id: `attention:dropped:${ids.main}:trades:1a2b3c4d`,
+    kind: 'rows_dropped',
+    severity: 'warning',
+    title: 'Some trades could not be read',
+    text: 'The latest trades read of Test Dhan Main dropped 3 rows: 2 with an unknown type, 1 with no date. Open the sync line to see where they were.',
+    at: '2026-10-14T13:00:00Z',
+    since: '2026-10-14T13:00:00Z',
+    actions: [{ label: 'Open', kind: 'route', target: '/portfolio?focus=sync' }],
+    ...overrides,
+  });
+
 export const buildUnmatchedNotice = (overrides: Partial<PortfolioNotice> = {}): PortfolioNotice =>
   base({
     id: `attention:unmatched:${ids.main}:1-0`,
@@ -84,12 +97,12 @@ export const buildUnmatchedNotice = (overrides: Partial<PortfolioNotice> = {}): 
 export const resolved = (notice: PortfolioNotice): PortfolioNotice => ({ ...notice, resolved: true });
 
 /**
- * Every command target the API can name in a notice (`AttentionDeriver`, ADR 0027), one per place it is built. A target missing
- * from the allow-list of `shared/api/commands.ts` would be dropped silently, so a new one on the backend is added here too.
+ * Every command target the API can name in a notice, made from the generated list (`attentionCommands`, ADR 0030): each
+ * template's placeholders are filled (`{account}` with a guid, anything else with a slug), so a new command on the server is
+ * covered the moment the list is regenerated. Nothing here is copied by hand.
  */
-export const backendCommandTargets = (accountId: string): string[] => [
-  `POST /api/accounts/${accountId}/holdings/sync`, // holdings: Retry now
-  `POST /api/accounts/${accountId}/sync/broker-history`, // trades: Retry now
-  `POST /api/accounts/${accountId}/sync/broker-history`, // ledger: Retry now
-  'POST /api/services/holdings-quotes/run', // prices: Retry now
-];
+export const generatedCommandTargets = (accountId: string): string[] =>
+  attentionCommands.map(
+    (command) =>
+      `${command.method} ${command.template.replace(/\{(\w+)\}/g, (_, name: string) => (name === 'account' ? accountId : `${name}-1`))}`,
+  );

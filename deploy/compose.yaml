@@ -109,10 +109,11 @@ services:
       # changed on the Services screen. "Sync now" per account always works.
       Portfolio__BrokerHistory__Enabled: ${XD_PORTFOLIO_BROKER_HISTORY:-true}
       # Self-healing syncs (ADR 0027): the waits before the quiet retries of a sync that failed for a reason that may pass (minutes, comma-separated, inside the day; set but empty - XD_PORTFOLIO_HEAL_BACKOFF_MINUTES= - switches the retries off, unset keeps 1,5,15; the other two keep their default when empty), the failed days in a row after
-      # which the bell hears of a failing sync (what only the owner can fix is told at once), and how many years back the nightly deepening of the trade history reads at most (0 switches it off).
+      # which the bell hears of a failing sync (what only the owner can fix is told at once), and how many years back the nightly deepening of the trade history reads at most (0 switches it off), and how many days a resolved bell item is kept before it is deleted (ADR 0030).
       Portfolio__Heal__RetryBackoffMinutes: ${XD_PORTFOLIO_HEAL_BACKOFF_MINUTES-1,5,15}
       Portfolio__Heal__PersistDays: ${XD_PORTFOLIO_HEAL_PERSIST_DAYS:-2}
       Portfolio__Heal__DeepenMaxYears: ${XD_PORTFOLIO_HEAL_DEEPEN_YEARS:-8}
+      Portfolio__Heal__AttentionRetentionDays: ${XD_PORTFOLIO_HEAL_ATTENTION_DAYS:-30}
       # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv

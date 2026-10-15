@@ -18,7 +18,7 @@ public interface IPortfolioUnitOfWork
     /// Runs <paramref name="work"/> inside one database transaction. The work saves what it collects with <see cref="SaveAsync"/>; everything is
     /// committed only when the returned result is a success, otherwise (or when the work throws) rolled back and the collected changes discarded.
     /// The work may run again from scratch after a transient database failure, and once more after a concurrency conflict (a holding it changed was changed
-    /// by someone else since it read it, for example by a quote), so it must read its own state. A second conflict is not thrown: the result is <see cref="Domain.Portfolio.PortfolioErrors.HoldingChanged"/> (everything rolled back).
+    /// by someone else since it read it, for example by a quote), so it must read its own state. A second conflict is not thrown: the result is <see cref="Domain.Portfolio.PortfolioErrors.DataChanged"/> (everything rolled back). <b>Callers must check the result</b>: a failed run applied nothing.
     /// </summary>
     ValueTask<Result> RunAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken);
 

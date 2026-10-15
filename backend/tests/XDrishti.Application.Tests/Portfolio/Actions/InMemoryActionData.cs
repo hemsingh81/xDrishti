@@ -241,6 +241,9 @@ internal sealed class InMemoryActionData : IActionStates, IActionSettings, IPric
 
     public ValueTask<Result> RunOnceAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken) => RunAsync(work, cancellationToken);
 
+    /// <summary>Number of upcoming <see cref="RunAsync"/> calls that end with a second concurrency conflict (as the real unit of work does): the work ran, everything is rolled back and the result is <see cref="PortfolioErrors.DataChanged"/>.</summary>
+    public int ConflictingRuns { get; set; }
+
     public async ValueTask<Result> RunAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken)
     {
         var states = _states.Select(s => ActionState.Create(s.Rule, s.Key, s.State, s.SnoozedUntil, s.UpdatedBy, s.UpdatedAt)).ToList();
@@ -255,6 +258,12 @@ internal sealed class InMemoryActionData : IActionStates, IActionSettings, IPric
         {
             Restore(states, alerts, events);
             throw;
+        }
+
+        if (result.IsSuccess && ConflictingRuns > 0)
+        {
+            ConflictingRuns--;
+            result = Result.Failure(PortfolioErrors.DataChanged);
         }
 
         if (result.IsFailure)

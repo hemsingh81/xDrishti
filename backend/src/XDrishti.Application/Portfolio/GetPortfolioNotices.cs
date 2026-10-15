@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
@@ -13,7 +12,7 @@ namespace XDrishti.Application.Portfolio;
 
 /// <summary>
 /// One notice of the Portfolio module for the top-bar bell. <c>Kind</c> is <c>price_alert_triggered</c> (<c>Severity</c> warn; <c>AlertId</c> and <c>InstrumentId</c> set), <c>actions_need_decision</c> (info) or - since ADR 0027 - an <b>attention item</b>:
-/// <c>reconnect_dhan</c>, <c>sync_failing</c>, <c>holdings_need_review</c>, <c>trades_unexplained</c>, <c>dividends_pending</c> or <c>securities_unmatched</c> (<c>Severity</c> error, warning or info; <c>AccountId</c> set). <c>Id</c> is stable and, for an attention item,
+/// <c>reconnect_dhan</c>, <c>sync_failing</c>, <c>holdings_need_review</c>, <c>trades_unexplained</c>, <c>dividends_pending</c>, <c>securities_unmatched</c> or <c>rows_dropped</c> (<c>Severity</c> error, warning or info; <c>AccountId</c> set). <c>Id</c> is stable and, for an attention item,
 /// includes its situation, so a changed situation is a new item and the bell keeps what was read by id. Since ADR 0027 every notice also has a <c>Title</c>, at most two <c>Actions</c> (a route to open or an existing endpoint to call), <c>Since</c> (when it was first seen; null for a notice derived on read that is not remembered - <c>actions_need_decision</c> - whose id already changes with the India date, so a client that keys read state on id and since sees the same key on every poll)
 /// and <c>Resolved</c>: an attention item whose condition stopped holding is kept for 24 hours with <c>Resolved</c> true and then dropped; resolved items are not counted in the badge. <c>At</c> is kept as it was (the time of the event, or <c>Since</c> for an attention item).
 /// </summary>
@@ -34,7 +33,7 @@ public sealed record PortfolioNotice(
 public sealed record PortfolioNotices(IReadOnlyList<PortfolioNotice> Items);
 
 /// <summary>
-/// The Portfolio notices for the bell, derived on read like the data and service notices (ADR 0022 §4, spec 16): <c>price_alert_triggered</c> for each alert that triggered in the last 7 days (id <c>portfolio:alert:{alertId}</c>; the text names the symbol, the
+/// The Portfolio notices for the bell, read only (ADR 0030; the attention items are kept up to date by <see cref="IAttentionReconciler"/>), derived on read like the data and service notices (ADR 0022 §4, spec 16): <c>price_alert_triggered</c> for each alert that triggered in the last 7 days (id <c>portfolio:alert:{alertId}</c>; the text names the symbol, the
 /// condition, the level and the trigger price) and <c>actions_need_decision</c> when the Action center has open items for the accounts that count in totals (id <c>portfolio:actions:{India date}</c>, so it is raised again at most once a day).
 /// </summary>
 public sealed record GetPortfolioNoticesQuery : IQuery<PortfolioNotices>;
@@ -43,9 +42,7 @@ internal sealed class GetPortfolioNoticesHandler(
     IPriceAlertStore alerts,
     ActionEvaluator evaluator,
     IPortfolioHistoryCache cache,
-    IAttentionFactsSource attention,
     IAttentionStore attentionStore,
-    IHealSettings healSettings,
     TimeProvider clock,
     ILogger<GetPortfolioNoticesHandler> logger) : IQueryHandler<GetPortfolioNoticesQuery, PortfolioNotices>
 {
@@ -92,18 +89,14 @@ internal sealed class GetPortfolioNoticesHandler(
     }
 
     /// <summary>
-    /// The attention items (ADR 0027): derived from the facts of all accounts at once, remembered (so <c>Since</c> stays and a resolved item can be shown for a day) and returned in the order error, warning, info, newest first, unresolved before resolved. A failure to work them out
+    /// The attention items (ADR 0027, ADR 0030): read as the reconciler (the healer tick, the end of a sync run) remembered them - this query writes nothing - and returned in the order error, warning, info, newest first, unresolved before resolved. A failure to read them
     /// is logged and the notices go without them (cancellation is not swallowed).
     /// </summary>
     private async ValueTask<IEnumerable<PortfolioNotice>> AttentionNoticesAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         try
         {
-            var facts = await attention.LoadAsync(cancellationToken);
-            var drafts = AttentionDeriver.Derive(facts, healSettings)
-                .Select(i => new AttentionDraft(i.Id, i.Kind, i.Severity, i.Title, i.Text, JsonSerializer.Serialize(i.Actions, ActionsJson), i.AccountId))
-                .ToList();
-            var stored = await attentionStore.ReconcileAsync(drafts, now, KeepResolved, cancellationToken);
+            var stored = await attentionStore.ListAsync(now, KeepResolved, cancellationToken);
             return stored
                 .OrderBy(a => a.ResolvedAt is null ? 0 : 1)
                 .ThenBy(a => AttentionSeverities.Rank(a.Severity))
@@ -118,7 +111,7 @@ internal sealed class GetPortfolioNoticesHandler(
                     null,
                     null,
                     a.Title,
-                    JsonSerializer.Deserialize<List<AttentionAction>>(a.ActionsJson, ActionsJson) ?? [],
+                    AttentionActionsJson.Deserialize(a.ActionsJson),
                     a.Since,
                     a.ResolvedAt is not null,
                     a.AccountId))
@@ -136,8 +129,6 @@ internal sealed class GetPortfolioNoticesHandler(
             return [];
         }
     }
-
-    private static readonly JsonSerializerOptions ActionsJson = new(JsonSerializerDefaults.Web);
 
     /// <summary>
     /// The number of open Action-center items of the accounts that count in totals. The bell asks every minute and the count needs a whole evaluation (the same reads as the Action center and the XIRRs of the lagging rule), so it is kept in the

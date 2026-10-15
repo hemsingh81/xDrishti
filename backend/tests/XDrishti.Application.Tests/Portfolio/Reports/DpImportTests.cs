@@ -315,19 +315,31 @@ public sealed class DpImportTests
 
     public static TheoryData<BrokerSyncKind> BrokerRunKinds => new() { BrokerSyncKind.Trades, BrokerSyncKind.Ledger };
 
-    [Theory]
-    [MemberData(nameof(BrokerRunKinds))]
-    public async Task While_a_broker_history_run_of_the_account_runs_the_import_is_rejected_and_nothing_is_stored(BrokerSyncKind kind)
+    [Fact]
+    public async Task While_a_ledger_run_of_the_account_runs_the_import_is_rejected_with_the_wait_text_and_nothing_is_stored()
     {
         var s = await StartAsync();
         var today = new DateOnly(2026, 10, 10);
-        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, kind, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, BrokerSyncKind.Ledger, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
 
         var result = Ok(await s.ImportAsync(Dp([Sell])));
 
-        (result.Status, result.Error!.Code).ShouldBe(("rejected", "portfolio.sync_running"));
+        (result.Status, result.Error!.Code, result.Error.Message).ShouldBe(("rejected", "portfolio.sync_running", PortfolioErrors.SyncRunningWait.Message));
         s.ActiveCosts().ShouldBeEmpty();
         s.Costs.Batches.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task While_only_a_trades_run_of_the_account_runs_the_import_goes_ahead()
+    {
+        var s = await StartAsync();
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, BrokerSyncKind.Trades, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var result = Ok(await s.ImportAsync(Dp([Sell])));
+
+        result.Status.ShouldBe("imported");
+        s.ActiveCosts().ShouldNotBeEmpty();
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Reflection;
 using NetArchTest.Rules;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Attention;
 using ArchResult = NetArchTest.Rules.TestResult;
 
 namespace XDrishti.Architecture.Tests;
@@ -16,7 +17,7 @@ public sealed class HealArchitectureTests
 
     private static readonly string[] Namespaces = ["XDrishti.Application.Portfolio.Heal", "XDrishti.Application.Portfolio.Attention"];
 
-    private static readonly string[] Pure = ["RetrySchedule", "SyncFailures", "AttentionDeriver"];
+    private static readonly string[] Pure = ["RetrySchedule", "SyncFailures", "AttentionDeriver", "AttentionCommands", "DropReasonWords"];
 
     private static void ShouldHaveNone(ArchResult result) => result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
 
@@ -74,8 +75,23 @@ public sealed class HealArchitectureTests
     public void The_notices_derive_the_items_in_one_place_from_set_based_facts()
     {
         ShouldHaveNone(Types.InAssembly(Application).That().HaveName("AttentionFactsLoader").ShouldNot().HaveDependencyOnAny("XDrishti.Application.Portfolio.BrokerHistory.BrokerHistoryPipeline").GetResult());
-        ShouldHaveNone(Types.InAssembly(Application).That().HaveName("GetPortfolioNoticesHandler").Should().HaveDependencyOn("XDrishti.Application.Portfolio.Attention.AttentionDeriver").GetResult());
+        ShouldHaveNone(Types.InAssembly(Application).That().HaveName("AttentionReconciler").Should().HaveDependencyOn("XDrishti.Application.Portfolio.Attention.AttentionDeriver").GetResult());
+        ShouldHaveNone(Types.InAssembly(Application).That().HaveName("AttentionDeriver").Should().HaveDependencyOn("XDrishti.Application.Portfolio.Attention.AttentionCommands").GetResult());
         ShouldHaveNone(Types.InAssembly(Application).That().HaveName("AttentionDeriver").ShouldNot().HaveDependencyOn("XDrishti.Application.Portfolio.GetPortfolioNoticesHandler").GetResult());
+    }
+
+    [Fact]
+    public void The_notices_only_read_the_attention_items_and_the_reconciler_is_their_one_writer()
+    {
+        // ADR 0030: the query reads what was stored; deriving and writing belong to the reconciler (the healer tick, the end of a sync run).
+        ShouldHaveNone(Types.InAssembly(Application).That().HaveName("GetPortfolioNoticesHandler")
+            .ShouldNot().HaveDependencyOnAny(
+                "XDrishti.Application.Portfolio.Attention.AttentionDeriver", "XDrishti.Application.Portfolio.Attention.IAttentionFactsSource", "XDrishti.Application.Portfolio.Attention.IAttentionReconciler",
+                "XDrishti.Application.Portfolio.Attention.AttentionFactsLoader", "XDrishti.Application.Portfolio.Attention.AttentionReconciler").GetResult());
+        Application.GetTypes().Where(t => t.Namespace == "XDrishti.Application.Portfolio.Attention" && !t.IsInterface && typeof(IAttentionReconciler).IsAssignableFrom(t)).Select(t => t.Name).ShouldBe(["AttentionReconciler"]);
+        var reconciler = Application.GetType("XDrishti.Application.Portfolio.Attention.AttentionReconciler");
+        reconciler.ShouldNotBeNull();
+        (reconciler.IsSealed && !reconciler.IsPublic).ShouldBeTrue();
     }
 
     [Fact]

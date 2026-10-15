@@ -6,7 +6,8 @@ namespace XDrishti.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// <c>portfolio.attention_items</c> (ADR 0027): the attention items of the bell as they were last seen - id (which includes the situation), kind, severity, title, text, actions (JSON), when first seen, when the condition stopped holding and the account they are about.
-/// Written with set-based upserts by one read of the notices; never deleted (the runtime role has no DELETE), a resolved item is simply not returned after a day.
+/// Written with one set-based statement by the reconciler (the healer tick, the end of a sync run; the notices only read); a resolved item is not returned after a day and is deleted after the retention (<c>Portfolio:Heal:AttentionRetentionDays</c>,
+/// ADR 0030) - the one table of the portfolio schema whose DELETE the runtime role has, because it is working memory and not a record.
 /// </summary>
 internal sealed class AttentionRecordConfiguration : IEntityTypeConfiguration<AttentionRecord>
 {

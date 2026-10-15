@@ -11,7 +11,7 @@ namespace XDrishti.Application.Portfolio.Trades;
 /// <c>Rebuild</c>, the default — rebuilds the lots of every holding whose result is <c>ok</c>. Trades of securities that are not held, of mismatching or ambiguous holdings, are stored but not applied, and reported. <b>Rebuilding replaces lots, so
 /// it must be what the owner saw:</b> <c>Digest</c> is the one the preview returned; when holdings, lots, corporate actions or trades changed meanwhile the answer is <c>409 portfolio.preview_stale</c> with the fresh report and nothing is
 /// applied. All or nothing, in one unit of work (the lots of each holding are replaced together with the trades; a holding changed by a sync or a quote meanwhile makes the work run again once). <c>409 portfolio.sync_running</c> while a
-/// holdings sync, or a trades or ledger read of the account, runs. Audited with counts only.
+/// holdings sync, or a trades read of the account, runs. Audited with counts only.
 /// </summary>
 public sealed record ImportTradesCommand(Guid AccountId, string FileName, TradeFileContent Content, bool Rebuild, string? Digest, string Actor) : ICommand;
 

@@ -1,3 +1,4 @@
+export { attentionCommands, type AttentionCommandPattern } from './attentionCommands.generated';
 export { api, ApiError, configureApiAuth, ensureOk, unwrap, type ApiAuthHooks } from './client';
 export { parseCommand, runCommand, type Command } from './commands';
 export { dataIdlePollMs, dataJobQuery, dataOverviewQuery } from './dataJobs';

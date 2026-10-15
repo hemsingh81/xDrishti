@@ -35,6 +35,7 @@ public sealed class HealerTests : IAsyncLifetime
         _s.Fx.Connections.Connections,
         _s.Fx.Data.Health,
         _s.Fx.Connections.Accounts.HealthRecorder,
+        _s.Fx.Connections.Accounts.Attention,
         _s.Fx.HealSettings,
         _s.Fx.Sync(),
         _s.Sync(),
@@ -50,6 +51,66 @@ public sealed class HealerTests : IAsyncLifetime
     private async Task<int> TickAsync() => await Healer().TickAsync(Ct);
 
     private int TradeRuns => _s.RunsOf(BrokerSyncKind.Trades).Count;
+
+    // ---- the bell (ADR 0030) ----
+
+    [Fact]
+    public async Task Every_look_reconciles_the_attention_items_and_applies_their_retention_even_when_nothing_is_started()
+    {
+        var attention = _s.Fx.Connections.Accounts.Attention;
+        var before = attention.Reconciles; // the connect of the scenario reconciled once already
+
+        (await TickAsync()).ShouldBe(0);
+        (await TickAsync()).ShouldBe(0);
+
+        (attention.Reconciles - before, attention.Retentions).ShouldBe((2, 2));
+    }
+
+    [Fact]
+    public async Task The_look_reconciles_after_it_has_started_its_runs_and_a_run_that_ends_reconciles_too()
+    {
+        var attention = _s.Fx.Connections.Accounts.Attention;
+        _s.Dhan.TradeFailure = (_, _, _) => Unavailable;
+        await _s.SyncOkAsync(scheduled: true);
+        var afterTheFailedRun = attention.Reconciles;
+        afterTheFailedRun.ShouldBeGreaterThan(0); // the end of the run itself
+        _s.Dhan.TradeFailure = null;
+
+        Advance(TimeSpan.FromSeconds(61));
+        (await TickAsync()).ShouldBe(1);
+
+        attention.Reconciles.ShouldBeGreaterThan(afterTheFailedRun + 1); // the retry ended (trades, ledger) and the look itself reconciled
+        attention.Retentions.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task The_look_reconciles_before_it_starts_its_runs_so_a_long_run_does_not_delay_the_items()
+    {
+        var attention = _s.Fx.Connections.Accounts.Attention;
+        _s.Dhan.TradeFailure = (_, _, _) => Unavailable;
+        await _s.SyncOkAsync(scheduled: true);
+        _s.Dhan.TradeFailure = null;
+        Advance(TimeSpan.FromSeconds(61));
+        var runsBefore = TradeRuns;
+        List<int> runsSeenAtEachReconcile = [];
+        attention.OnReconcile = () => runsSeenAtEachReconcile.Add(TradeRuns);
+
+        (await TickAsync()).ShouldBe(1);
+
+        runsSeenAtEachReconcile.First().ShouldBe(runsBefore); // the first one came before the retry started
+        runsSeenAtEachReconcile.Last().ShouldBeGreaterThan(runsBefore); // and one after it
+    }
+
+    [Fact]
+    public async Task A_look_that_starts_nothing_reconciles_once()
+    {
+        var attention = _s.Fx.Connections.Accounts.Attention;
+        var before = attention.Reconciles;
+
+        (await TickAsync()).ShouldBe(0);
+
+        (attention.Reconciles - before).ShouldBe(1);
+    }
 
     // ---- quiet retries ----
 

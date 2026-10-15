@@ -44,7 +44,22 @@ public sealed class SelfHealingApiTests(ApiFactory factory) : BrokerHistoryTestB
 
     private static HttpResponseMessage ServiceUnavailable() => FakeBrokers.Json(HttpStatusCode.ServiceUnavailable, "{}");
 
+    /// <summary>What the healer tick and the end of a sync run do (ADR 0030): the items are worked out and remembered; the GET only reads them.</summary>
+    private async Task ReconcileAsync()
+    {
+        using var scope = Factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IAttentionReconciler>().ReconcileAsync(Ct);
+    }
+
+    /// <summary>The bell's read after a reconciliation (a healer tick has run since the cause).</summary>
     private async Task<PortfolioNotices> NoticesAsync()
+    {
+        await ReconcileAsync();
+        return await ReadNoticesAsync();
+    }
+
+    /// <summary>The bell's read alone: nothing reconciles.</summary>
+    private async Task<PortfolioNotices> ReadNoticesAsync()
     {
         using var response = await Client.GetAsync("/api/portfolio/notices", Ct);
         var text = await response.Content.ReadAsStringAsync(Ct);
@@ -96,6 +111,45 @@ public sealed class SelfHealingApiTests(ApiFactory factory) : BrokerHistoryTestB
         item.Id.ShouldStartWith($"attention:reconnect:{account.Id:N}:missing:");
         item.Actions.ShouldBe([new AttentionAction("Connect to Dhan", "route", $"/accounts?account={account.Id}&tab=connection")]);
         item.Text.ShouldBe("Example One is not connected to Dhan.");
+    }
+
+    [Fact]
+    public async Task The_read_of_the_notices_sends_no_insert_update_or_delete_and_parallel_reads_change_nothing()
+    {
+        await UnconnectedAccountAsync();
+        await ReconcileAsync();
+        var before = await ItemStateAsync();
+
+        PortfolioNotices[] reads = [];
+        var statements = await Client.StatementsDuringAsync(async () => reads = await Task.WhenAll(ReadNoticesAsync(), ReadNoticesAsync(), ReadNoticesAsync()), readsOnly: false);
+
+        statements.ShouldContain(s => s.Contains("attention_items", StringComparison.OrdinalIgnoreCase)); // the recorder saw the read of the items ...
+        statements.ShouldNotContain(s => WriteStatement.IsMatch(s)); // ... and no statement that writes
+        reads.ShouldAllBe(r => r.Items.Count(i => i.Kind == "reconnect_dhan") == 1);
+        (await ItemStateAsync()).ShouldBe(before); // not a row touched: same rows, same row versions
+    }
+
+    [Fact]
+    public async Task A_cause_is_shown_after_the_next_healer_tick_and_not_by_the_read_alone()
+    {
+        var account = await UnconnectedAccountAsync();
+
+        (await ReadNoticesAsync()).Items.ShouldBeEmpty(); // nobody has reconciled yet: the read writes nothing, so it finds nothing
+        await Runner.TickAsync(Ct);
+
+        var item = (await ReadNoticesAsync()).Items.ShouldHaveSingleItem();
+        (item.Kind, item.AccountId).ShouldBe(("reconnect_dhan", account.Id));
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex WriteStatement = new(@"\b(INSERT|UPDATE|DELETE)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+    /// <summary>The ids and row versions (xmin) of the remembered items: any write to a row changes its version.</summary>
+    private async Task<string> ItemStateAsync()
+    {
+        await using var connection = new Npgsql.NpgsqlConnection(Factory.AdminConnectionString);
+        await connection.OpenAsync(Ct);
+        await using var command = new Npgsql.NpgsqlCommand("SELECT coalesce(string_agg(id || ':' || xmin::text, ',' ORDER BY id), '') FROM portfolio.attention_items", connection);
+        return (string)(await command.ExecuteScalarAsync(Ct))!;
     }
 
     [Fact]

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace XDrishti.Application.Portfolio.Attention;
 
 /// <summary>
@@ -48,7 +50,20 @@ public static class AttentionKinds
     public const string DividendsPending = "dividends_pending";
 
     public const string SecuritiesUnmatched = "securities_unmatched";
+
+    /// <summary>The latest trades or ledger read of an account dropped rows (ADR 0030): counts and reason words only.</summary>
+    public const string RowsDropped = "rows_dropped";
 }
 
 /// <summary>An item as the derivation produces it, before it is remembered: the id includes the situation. <c>AccountId</c> is the account it is about.</summary>
 internal sealed record AttentionItem(string Id, string Kind, string Severity, string Title, string Text, IReadOnlyList<AttentionAction> Actions, Guid? AccountId);
+
+/// <summary>How the actions of an item are kept as JSON in its row: the writer (<see cref="AttentionReconciler"/>) and the read-only notices use the same options without knowing each other.</summary>
+internal static class AttentionActionsJson
+{
+    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
+
+    public static string Serialize(IReadOnlyList<AttentionAction> actions) => JsonSerializer.Serialize(actions, Options);
+
+    public static IReadOnlyList<AttentionAction> Deserialize(string json) => JsonSerializer.Deserialize<List<AttentionAction>>(json, Options) ?? [];
+}

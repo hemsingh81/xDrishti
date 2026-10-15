@@ -14,6 +14,8 @@ internal sealed class HealSettings(IOptions<HealOptions> options) : IHealSetting
 
     public int DeepenMaxYears => options.Value.DeepenMaxYears;
 
+    public int AttentionRetentionDays => options.Value.AttentionRetentionDays;
+
     /// <summary>"1,5,15" as three waits; blank gives none. The options validation has checked the shape.</summary>
     internal static IReadOnlyList<TimeSpan> Parse(string? text) =>
         string.IsNullOrWhiteSpace(text)

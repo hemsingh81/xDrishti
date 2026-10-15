@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useCallback, useRef } from 'react';
 
 const enabledButton = 'section[aria-label="Trades and ledger from Dhan"] button:not(:disabled)';
 
@@ -9,21 +9,23 @@ const enabledButton = 'section[aria-label="Trades and ledger from Dhan"] button:
  *   to the Account picker, where the owner chooses one (the bar says "Pick an account above to sync it");
  * - when the account is not connected, or a read runs, its buttons are disabled: the bar itself takes the focus, so the
  *   visible reason beside it is what is read out.
+ * `focus()` returns whether it found a target (false while the bar or the picker is not on the page yet).
  * Returns `[barRef, accountRef, focus]`: `barRef` goes on the element that wraps the sync bar (focusable, `tabIndex={-1}`),
  * `accountRef` on the input of the Account picker.
  */
 export function useSyncBarFocus() {
   const barRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLInputElement>(null);
-  const focus = () => {
+  const focus = useCallback((): boolean => {
     const bar = barRef.current;
-    if (!bar) return;
+    if (!bar) return false;
     const button = bar.querySelector<HTMLElement>(enabledButton);
     const hasSection = bar.querySelector('section[aria-label="Trades and ledger from Dhan"]') !== null;
     const target = button ?? (hasSection ? bar : accountRef.current);
-    if (!target) return;
+    if (!target) return false;
     if (typeof target.scrollIntoView === 'function') target.scrollIntoView({ block: 'center' });
     target.focus();
-  };
+    return true;
+  }, []);
   return [barRef, accountRef, focus] as const;
 }

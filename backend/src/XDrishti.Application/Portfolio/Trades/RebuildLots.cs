@@ -10,7 +10,7 @@ namespace XDrishti.Application.Portfolio.Trades;
 /// <summary>
 /// Rebuilds the lots of one holding from its stored trades (ADR 0023): with <c>DryRun</c> only says what it would do (the same <c>rebuild</c> block as the import preview, changing nothing); without, replaces the lots when the result is <c>ok</c>
 /// (in one unit of work; a sync or quote that changed the holding meanwhile makes it run again once) and leaves them when it is <c>unchanged</c>, a <c>quantity_mismatch</c> or <c>ambiguous</c>. A holding without trades is rebuilt into one lot of the
-/// broker's quantity and cost dated by the account's first import date, flagged as default. <c>409 portfolio.sync_running</c> while a holdings sync or a broker history run of the account runs (not for a dry run). Audited with counts only.
+/// broker's quantity and cost dated by the account's first import date, flagged as default. <c>409 portfolio.sync_running</c> while a holdings sync or a trades run of the account runs (not for a dry run; a ledger run does not stop it, ADR 0030). Audited with counts only.
 /// </summary>
 public sealed record RebuildLotsCommand(Guid HoldingId, bool DryRun, string Actor) : ICommand;
 
@@ -42,9 +42,9 @@ internal sealed class RebuildLotsHandler(
         var outcome = await unitOfWork.RunAsync(
             async token =>
             {
-                if (await guard.RunningAsync(holding.AccountId, token))
+                if (await guard.RunningAsync(holding.AccountId, SyncWaits.TradeWrite, token))
                 {
-                    return Result.Failure(PortfolioErrors.SyncRunning);
+                    return Result.Failure(PortfolioErrors.SyncRunningWait);
                 }
 
                 var rebuild = await ComputeAsync(holding.AccountId, holding.Id, account.Portfolio.ImportDate, token);

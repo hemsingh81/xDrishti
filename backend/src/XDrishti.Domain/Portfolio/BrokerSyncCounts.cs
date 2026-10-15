@@ -71,6 +71,15 @@ public sealed record BrokerSyncCounts
     /// <summary>Of the replaced rows' day-security-side groups, how many had a different total quantity than the broker's trades.</summary>
     public int SupersededDiffering { get; init; }
 
+    /// <summary>The version of the Dhan mapping the windows in <see cref="RereadDone"/> were read again with (0: none were read again). A failed run's list is only taken over by the run that follows it when the version is still the same (ADR 0030).</summary>
+    public int RereadVersion { get; init; }
+
+    /// <summary>
+    /// The windows read again since the mapping changed (ADR 0027) that are done: each is added in the unit of work that stores the window, so a run that fails later does not make the retry read them again (ADR 0030). The run that follows a failed
+    /// one starts with the failed run's list (same <see cref="RereadVersion"/>) and adds its own. Dates only.
+    /// </summary>
+    public IReadOnlyList<BrokerWindowSpan> RereadDone { get; init; } = [];
+
     /// <summary>Adds the figures of one window read; <paramref name="drops"/> explains the <paramref name="dropped"/> rows (those it does not account for are counted as <see cref="BrokerDrops.Other"/>).</summary>
     public BrokerSyncCounts AddWindow(int read, int stored, int duplicates, int dropped, IReadOnlyDictionary<string, int> skipped, bool halved, int emptyByNoData = 0, int enriched = 0, int superseded = 0, int supersededDiffering = 0, BrokerDrops? drops = null)
     {

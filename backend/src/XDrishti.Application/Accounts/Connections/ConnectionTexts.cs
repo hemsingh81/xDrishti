@@ -11,7 +11,7 @@ internal static class ConnectionTexts
     public static string Failure(BrokerFailure failure)
     {
         var code = failure.BrokerCode is { } c ? $" (error {c})" : string.Empty;
-        return failure.Kind is BrokerFailureKind.Rejected or BrokerFailureKind.Unauthorized
+        return failure.Kind is BrokerFailureKind.Rejected or BrokerFailureKind.Unauthorized or BrokerFailureKind.RateLimited
             ? $"Dhan refused the request{code}."
             : $"Dhan could not be reached or gave an unexpected answer{code}.";
     }

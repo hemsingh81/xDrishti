@@ -79,11 +79,11 @@ The independent review of the first implementation changed the criteria above in
 
 ## Follow-ups from the second review (minor, not blocking)
 - Ledger cost phrases are incomplete until a real ledger is read: MTF interest, `DP CHRG`/`DP CHGS`, a bare demat or maintenance charge and a bare GST line are not counted yet; a DP/AMC line whose narration also says "settlement"/"bill" is left out on purpose. Tune `LedgerCosts` / `LedgerClassifier` after the first real read.
-- `CashDrawer` still says the ledger's charges count in the net return; only account-level costs do — reword.
-- `invalidateBrokerHistory` does not refresh the dividend suggestions list when a run ends with the Cash panel open.
-- Total return % and net XIRR use different bases in a scope that mixes priced and unpriced holdings (dividends and charges of unpriced holdings are in the percentage, not in the XIRR); add a mixed-case test and state the rule.
+- `CashDrawer` still says the ledger's charges count in the net return; only account-level costs do — reword. (closed in P2-18, R1)
+- `invalidateBrokerHistory` does not refresh the dividend suggestions list when a run ends with the Cash panel open. (closed in P2-18, R2)
+- Total return % and net XIRR use different bases in a scope that mixes priced and unpriced holdings (dividends and charges of unpriced holdings are in the percentage, not in the XIRR); add a mixed-case test and state the rule. (closed in P2-18, R4)
 - Every row with income computes a net XIRR on the live-base read (it is shown only in the drawer); ADR 0024's "full XIRR for its rows" wording needs the same sentence. Add a statement-budget test for `GET /api/holdings` with dividends.
-- `perShare` is shown with 2 decimals though stored with 4; an ISIN added by the enrich step can stop a symbol-matched trade matching a holding whose ISIN differs (corporate-action ISIN change) — note in ADR 0025 amendment h.
+- `perShare` is shown with 2 decimals though stored with 4 (closed in P2-18, R3); and an ISIN added by the enrich step can stop a symbol-matched trade matching a holding whose ISIN differs (corporate-action ISIN change) — note in ADR 0025 amendment h.
 
 ## Done when
 - [ ] All acceptance criteria have evidence

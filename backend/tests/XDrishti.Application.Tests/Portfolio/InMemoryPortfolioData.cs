@@ -245,15 +245,29 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
         return RunAsync(work, cancellationToken);
     }
 
-    /// <summary>Number of upcoming <see cref="RunAsync"/> calls that fail with a second concurrency conflict (the real unit of work repeats the work once, then reports <see cref="PortfolioErrors.HoldingChanged"/>): nothing is applied.</summary>
+    /// <summary>Number of upcoming <see cref="RunAsync"/> calls that fail with a second concurrency conflict (the real unit of work repeats the work once, then reports <see cref="PortfolioErrors.DataChanged"/>): nothing is applied.</summary>
     public int ConflictingRuns { get; set; }
+
+    /// <summary>Number of upcoming <see cref="RunAsync"/> calls that run normally before the next one ends with a second concurrency conflict (the work is not run); -1: none.</summary>
+    public int RunsBeforeConflict { get; set; } = -1;
 
     public async ValueTask<Result> RunAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken)
     {
         if (ConflictingRuns > 0)
         {
             ConflictingRuns--;
-            return Result.Failure(PortfolioErrors.HoldingChanged);
+            return Result.Failure(PortfolioErrors.DataChanged);
+        }
+
+        if (RunsBeforeConflict == 0)
+        {
+            RunsBeforeConflict = -1;
+            return Result.Failure(PortfolioErrors.DataChanged);
+        }
+
+        if (RunsBeforeConflict > 0)
+        {
+            RunsBeforeConflict--;
         }
 
         _pending = [];

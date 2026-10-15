@@ -17,12 +17,12 @@ public sealed class HealSettingsTests
     }
 
     [Fact]
-    public void The_defaults_are_one_five_and_fifteen_minutes_two_failed_days_and_eight_years()
+    public void The_defaults_are_one_five_and_fifteen_minutes_two_failed_days_eight_years_and_thirty_days_of_resolved_items()
     {
         var settings = Settings(new HealOptions());
 
         settings.RetryBackoff.ShouldBe([TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(15)]);
-        (settings.PersistDays, settings.DeepenMaxYears).ShouldBe((2, 8));
+        (settings.PersistDays, settings.DeepenMaxYears, settings.AttentionRetentionDays).ShouldBe((2, 8, 30));
         Validate(new HealOptions()).ShouldBeEmpty();
     }
 
@@ -59,5 +59,18 @@ public sealed class HealSettingsTests
     public void The_days_and_the_years_have_bounds(int persistDays, int deepenYears, bool valid)
     {
         Validate(new HealOptions { PersistDays = persistDays, DeepenMaxYears = deepenYears }).Count.ShouldBe(valid ? 0 : 1);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(-5, false)]
+    [InlineData(3651, false)]
+    [InlineData(1, true)]
+    [InlineData(30, true)]
+    [InlineData(3650, true)]
+    public void The_retention_of_resolved_items_is_one_day_to_ten_years(int days, bool valid)
+    {
+        Validate(new HealOptions { AttentionRetentionDays = days }).Count.ShouldBe(valid ? 0 : 1);
+        Settings(new HealOptions { AttentionRetentionDays = days }).AttentionRetentionDays.ShouldBe(days);
     }
 }

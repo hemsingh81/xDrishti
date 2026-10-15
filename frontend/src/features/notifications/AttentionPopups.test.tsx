@@ -6,6 +6,7 @@ import {
   buildDividendsNotice,
   buildReconnectNotice,
   buildReviewNotice,
+  buildRowsDroppedNotice,
   buildSyncFailingNotice,
   resolved,
 } from '@/test/attentionFixtures';
@@ -150,6 +151,73 @@ describe('Attention pop-ups: what pops up', () => {
 
     await bell('Notifications');
     expect(stack()).toBeNull();
+  });
+});
+
+describe('Attention pop-ups: rows dropped by a read', () => {
+  const dropped = (overrides: Parameters<typeof buildRowsDroppedNotice>[0] = {}) => buildRowsDroppedNotice(overrides);
+
+  it('pops up once with its Open button, which leads to the sync line', async () => {
+    serve([dropped()]);
+    const { router } = renderApp();
+
+    const toast = await findToast();
+
+    expect(toast).toHaveTextContent('Some trades could not be read');
+    expect(toast).toHaveTextContent('dropped 3 rows');
+    expect(within(toast).getByRole('button', { name: 'Open' })).toBeInTheDocument();
+    await userEvent.click(within(toast).getByRole('button', { name: 'Open' }));
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/portfolio');
+    });
+    expect(router.state.location.search).toBe('?focus=sync');
+  });
+
+  it('is not shown a second time while the app stays open', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    serve([dropped()]);
+    renderApp();
+    await userEvent.click(within(await findToast()).getByRole('button', { name: 'Close notification' }));
+    await waitFor(() => {
+      expect(stack()).toBeNull();
+    });
+
+    await poll();
+    await poll();
+
+    expect(stack()).toBeNull();
+  });
+
+  it('is information or a warning, never kept on screen: it counts down and goes by itself', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    serve([dropped({ severity: 'info', title: 'Rows with no amount were left out' })]);
+    renderApp();
+
+    const toast = await findToast();
+
+    expect(toast).toHaveAttribute('role', 'status');
+    expect(toast).toHaveTextContent('Rows with no amount were left out');
+    expect(toast.querySelector('[data-countdown]')).not.toBeNull();
+    await poll(10_500);
+    await waitFor(() => {
+      expect(stack()).toBeNull();
+    });
+    expect(await bell('Notifications, 1 unread')).toBeInTheDocument();
+  });
+
+  it('closes its toast when the server sends it as resolved', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const notices = serve([dropped()]);
+    renderApp();
+    // Hovering holds the toast, which would otherwise count down and go before the next read of the notices.
+    await userEvent.hover(await findToast());
+
+    notices.items = [resolved(dropped())];
+    await poll();
+
+    await waitFor(() => {
+      expect(stack()).toBeNull();
+    });
   });
 });
 

@@ -81,17 +81,17 @@ Found by the independent review of P2-16/P2-17 (2026-10-15); none changes the ac
 - **Recurring attention items** are keyed on `id` plus `since` in the browser (the six server attention kinds only; other notices use the plain id) ([ADR 0027](../adr/0027-self-healing-sync-and-actionable-notifications.md) amendment j), and the **compose empty-value semantics** of `XD_PORTFOLIO_HEAL_BACKOFF_MINUTES` are fixed with the `-` form (an empty value means the default).
 
 **Still open** (see also [P2-16](P2-16-self-healing-sync-and-actionable-notifications.md), "Follow-ups from the review")
-- `GET /api/portfolio/notices` writes attention rows (CQS-impure; reconcile in the healer tick and make the GET read-only; two tabs can flicker an item).
-- `attention_items` has no retention (about two rows a day; needs a documented DELETE exception or a job).
-- Transient versus permanent failures are told apart by matching the error message text; carry a structured failure kind.
+- `GET /api/portfolio/notices` writes attention rows (CQS-impure; reconcile in the healer tick and make the GET read-only; two tabs can flicker an item). (closed in P2-18, N1)
+- `attention_items` has no retention (about two rows a day; needs a documented DELETE exception or a job). (closed in P2-18, N2)
+- Transient versus permanent failures are told apart by matching the error message text; carry a structured failure kind. (closed in P2-18, F1)
 - Quote items, the mapper-version fallback and the deepening notes (P2-16).
-- No decompression-bomb guard for `.xlsx` (amendment h).
-- The command-target list on the client (`shared/api/commands.ts`) is a hand-copied fixture; share one source of truth to avoid drift.
-- A ledger-only run blocks the trade Undo and Rebuild; make `SyncGuard` kind-aware or word the message 'can take a few minutes'.
-- `BillPlanner` identity is relative to the siblings in the import, not to those that are not pending (covered by Dhan or skipped).
-- The supersede 'pool' decision (depository-labelled entries only, else all of the day's charges) is made from the entries newly stored in the save, while `DpPlanner` uses the whole stored day; align them.
-- A run that fails late re-reads the outside windows on each retry when noted windows lie inside the run's own range.
-- The `DepositoryCharges`, `LedgerClassifier` and `LedgerCosts` phrase lists differ; align them or drop the dead phrases.
+- No decompression-bomb guard for `.xlsx` (amendment h). (closed in P2-18, I4)
+- The command-target list on the client (`shared/api/commands.ts`) is a hand-copied fixture; share one source of truth to avoid drift. (closed in P2-18, N4)
+- A ledger-only run blocks the trade Undo and Rebuild; make `SyncGuard` kind-aware or word the message 'can take a few minutes'. (closed in P2-18, F3)
+- `BillPlanner` identity is relative to the siblings in the import, not to those that are not pending (covered by Dhan or skipped). (closed in P2-18, I3)
+- The supersede 'pool' decision (depository-labelled entries only, else all of the day's charges) is made from the entries newly stored in the save, while `DpPlanner` uses the whole stored day; align them. (closed in P2-18, I2)
+- A run that fails late re-reads the outside windows on each retry when noted windows lie inside the run's own range. (closed in P2-18, F4)
+- The `DepositoryCharges`, `LedgerClassifier` and `LedgerCosts` phrase lists differ; align them or drop the dead phrases. (closed in P2-18, I1)
 - The DP date assumption (the charge is booked on the sheet's day) and Dhan's labelling are unverified against a real ledger.
 
 ## Done when

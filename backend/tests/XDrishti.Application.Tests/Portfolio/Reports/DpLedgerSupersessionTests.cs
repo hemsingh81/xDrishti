@@ -19,6 +19,8 @@ public sealed class DpLedgerSupersessionTests
 
     private static readonly string Sell = DpLine(1, "04-Jun-2026", Isin, "THE EXAMPLE POWER COMPANY LIMITED", "11.000", "Sell", "Other Fees", "12.5");
 
+    private static readonly string SellSeven = DpLine(2, "04-Jun-2026", Isin, "THE EXAMPLE POWER COMPANY LIMITED", "5.000", "Sell", "Other Fees", "7");
+
     private static BrokerLedgerRow Charge(DateOnly date, string voucher, decimal paid) =>
         new(date, voucher, "JOURNAL", "DP CHARGES " + date.ToString("dd-MM-yyyy", System.Globalization.CultureInfo.InvariantCulture) + " EXMPL", "NSE-CAPITAL", -paid, null);
 
@@ -74,6 +76,58 @@ public sealed class DpLedgerSupersessionTests
         (done.Costs!.Imported, done.Costs.AlreadyInLedger).ShouldBe((0, 1));
         view.Ledger!.Counts.Superseded.ShouldBe(0);
         ChargesTotal(s).ShouldBe(-12.5m);
+    }
+
+    [Fact]
+    public async Task A_day_whose_entries_arrive_in_two_saves_is_decided_as_the_whole_stored_day_as_the_sheet_plan_decides_it()
+    {
+        // Sheet first: Dhan's DP charge is stored by the first run; the AMC of the same amount as the second line arrives in a later save of the same day.
+        var before = await StartAsync();
+        await before.ImportOkAsync(Dp([Sell, SellSeven]));
+        before.History.Ledger.Add(Charge(Jun4, "V1", 12.5m));
+        await before.SyncHistoryAsync(From);
+        before.History.Ledger.Add(Other(Jun4, "V2", 7m));
+        var second = await before.SyncHistoryAsync(From);
+
+        // Ledger first (the same two saves), sheet afterwards.
+        var after = await StartAsync();
+        after.History.Ledger.Add(Charge(Jun4, "V1", 12.5m));
+        await after.SyncHistoryAsync(From);
+        after.History.Ledger.Add(Other(Jun4, "V2", 7m));
+        await after.SyncHistoryAsync(From);
+        var done = await after.ImportOkAsync(Dp([Sell, SellSeven]));
+
+        // The day has a depository charge, so only it counts: the line of 7 is not covered by the AMC, whichever came first.
+        second.Ledger!.Counts.Superseded.ShouldBe(0);
+        before.Fx.BrokerData.Entries.Where(e => e.Source == LedgerSource.Import && !e.IsVoided).Select(e => -e.Amount).ShouldBe([7m]);
+        (done.Costs!.Imported, done.Costs.AlreadyInLedger).ShouldBe((1, 1));
+        after.ActiveCosts().Select(c => c.Amount).ShouldBe([-7m]);
+    }
+
+    [Fact]
+    public async Task A_day_without_a_depository_charge_in_its_whole_stored_day_still_compares_with_all_of_its_charges_in_a_later_save()
+    {
+        var s = await StartAsync();
+        await s.ImportOkAsync(Dp([Sell, SellSeven]));
+        s.History.Ledger.Add(Other(Jun4, "V1", 7m));
+        await s.SyncHistoryAsync(From);
+        s.History.Ledger.Add(Other(Jun4, "V2", 12.5m)); // the second save: still no depository charge on the day
+
+        var view = await s.SyncHistoryAsync(From);
+
+        s.Fx.BrokerData.Entries.Where(e => e.Source == LedgerSource.Import && e.IsVoided).Count().ShouldBe(2); // both lines are covered by the day's other charges
+        view.Ledger!.Counts.Superseded.ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_depository_charge_stored_before_decides_the_day_for_the_charges_added_now()
+    {
+        var added = new[] { new LedgerChargeOnDay(Jun4, 7m, false), new LedgerChargeOnDay(Jun4.AddDays(1), 7m, false) };
+        var storedBefore = new[] { new LedgerChargeOnDay(Jun4, 12.5m, true) };
+
+        var open = LedgerSupersession.OpenCharges(added, storedBefore);
+
+        open.ShouldBe(new Dictionary<(DateOnly, decimal), int> { [(Jun4.AddDays(1), 7m)] = 1 }, ignoreOrder: true); // Jun 4 has a depository charge: the 7 is not one
     }
 
     [Fact]

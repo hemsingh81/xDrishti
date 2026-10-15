@@ -1,5 +1,6 @@
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Application.Tests.Portfolio.BrokerHistory;
 using XDrishti.Domain.Portfolio;
 using static XDrishti.Application.Tests.Portfolio.BrokerHistory.BrokerScenario;
@@ -220,6 +221,93 @@ public sealed class MapperVersionTests
 
         failed.Trades.Status.ShouldBe("failed");
         Trades(s).MapperVersion.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_retry_after_a_failure_while_reading_again_reads_only_the_windows_that_are_not_done_even_when_they_dropped_rows_again()
+    {
+        var s = await StartAsync();
+        s.Dhan.DroppedPerWindow = 1;
+        await s.SyncOkAsync();
+        s.Dhan.MapperVersion = 2; // the new mapping still drops a row of every window
+        s.Fx.Clock.Advance(TimeSpan.FromMinutes(1));
+        s.Dhan.TradeFailure = (from, _, _) => from == new DateOnly(2026, 10, 1) ? new BrokerFailure(BrokerFailureKind.Unavailable) : null; // the second of the two re-reads fails
+        var failed = await s.SyncOkAsync(defaultFrom: true);
+        failed.Trades.Status.ShouldBe("failed");
+        failed.Trades.Counts.RereadDone.ShouldBe([new BrokerWindowSpan(new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30))]);
+        s.Dhan.TradeFailure = null;
+        s.Fx.Clock.Advance(TimeSpan.FromMinutes(1)); // the retry
+        s.Dhan.TradeCalls.Clear();
+
+        var retried = await s.SyncOkAsync(defaultFrom: true);
+
+        s.Dhan.TradeCalls.Where(c => c.Page == 0).Select(c => (c.From, c.To)).ShouldBe([(new DateOnly(2026, 10, 1), Today), (Today, Today)]); // the first window is done
+        retried.Trades.Counts.WindowsTotal.ShouldBe(2);
+        retried.Trades.Counts.RereadDone.Count.ShouldBe(2); // the failed attempt's window and its own
+        Trades(s).MapperVersion.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_retry_does_not_take_over_the_done_windows_of_a_failed_attempt_with_an_older_mapping()
+    {
+        var s = await StartAsync();
+        s.Dhan.DroppedPerWindow = 1;
+        await s.SyncOkAsync();
+        s.Dhan.MapperVersion = 2;
+        s.Fx.Clock.Advance(TimeSpan.FromMinutes(1));
+        s.Dhan.TradeFailure = (from, _, _) => from == new DateOnly(2026, 10, 1) ? new BrokerFailure(BrokerFailureKind.Unavailable) : null;
+        await s.SyncOkAsync(defaultFrom: true); // version 2: the first window is done
+        s.Fx.Clock.Advance(TimeSpan.FromMinutes(1));
+        s.Dhan.MapperVersion = 3; // the mapping changed again before the retry
+        s.Dhan.TradeFailure = null;
+        s.Dhan.TradeCalls.Clear();
+
+        await s.SyncOkAsync(defaultFrom: true);
+
+        s.Dhan.TradeCalls.Where(c => c.Page == 0).Select(c => (c.From, c.To)).ShouldBe(
+        [
+            (new DateOnly(2026, 9, 1), new DateOnly(2026, 9, 30)),
+            (new DateOnly(2026, 10, 1), Today),
+            (Today, Today),
+        ]);
+    }
+
+    [Fact]
+    public async Task A_retry_for_an_account_the_first_version_has_not_seen_reads_only_the_dates_not_done()
+    {
+        var s = await StartAsync();
+        s.Dhan.DroppedPerWindow = 1;
+        await s.SyncOkAsync();
+        s.Fx.Data.Health.Windows.Clear();
+        s.Fx.Data.Health.Rows[(s.Account.Id, SyncHealthKind.Trades)] = Trades(s) with { MapperVersion = 0 };
+        s.Dhan.DroppedPerWindow = 0;
+        s.Fx.Clock.Advance(TimeSpan.FromMinutes(1));
+        s.Dhan.TradeFailure = (from, _, _) => from == new DateOnly(2026, 10, 1) ? new BrokerFailure(BrokerFailureKind.Unavailable) : null;
+        await s.SyncOkAsync(defaultFrom: true); // the dates of the earlier run are read again: the first window is done, the second fails
+        s.Dhan.TradeFailure = null;
+        s.Fx.Clock.Advance(TimeSpan.FromMinutes(1));
+        s.Dhan.TradeCalls.Clear();
+
+        await s.SyncOkAsync(defaultFrom: true);
+
+        s.Dhan.TradeCalls.Where(c => c.Page == 0).Select(c => (c.From, c.To)).ShouldBe([(new DateOnly(2026, 10, 1), Today), (Today, Today)]);
+        Trades(s).MapperVersion.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData("2026-09-01", "2026-09-30", "2026-09-01:2026-09-10", "2026-09-11:2026-09-30")] // a start covered
+    [InlineData("2026-09-01", "2026-09-30", "2026-09-10:2026-09-20", "2026-09-01:2026-09-09,2026-09-21:2026-09-30")] // the middle covered
+    [InlineData("2026-09-01", "2026-09-30", "2026-08-01:2026-10-31", "")] // all covered
+    [InlineData("2026-09-01", "2026-09-30", "2026-10-01:2026-10-31", "2026-09-01:2026-09-30")] // nothing covered
+    [InlineData("2026-09-01", "2026-09-30", "2026-09-01:2026-09-10,2026-09-11:2026-09-30", "")] // covered by several
+    public void Dates_that_are_done_are_taken_out_of_a_range(string from, string to, string done, string left)
+    {
+        static BrokerDateRange Range(string text) => new(DateOnly.Parse(text.Split(':')[0], System.Globalization.CultureInfo.InvariantCulture), DateOnly.Parse(text.Split(':')[1], System.Globalization.CultureInfo.InvariantCulture));
+        var spans = done.Split(',').Select(Range).Select(r => new BrokerWindowSpan(r.From, r.To)).ToList();
+
+        var result = BrokerHistoryPipeline.Without([Range($"{from}:{to}")], spans);
+
+        result.ShouldBe(left.Length == 0 ? [] : left.Split(',').Select(Range));
     }
 
     [Fact]

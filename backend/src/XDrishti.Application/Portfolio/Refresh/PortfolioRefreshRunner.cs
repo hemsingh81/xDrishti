@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Portfolio;
@@ -29,12 +30,15 @@ public sealed class PortfolioRefreshRunner(
     /// <summary>How often the accounts are looked at.</summary>
     public static readonly TimeSpan Tick = TimeSpan.FromMinutes(1);
 
-    /// <summary>Runs until cancelled, or returns at once (after the clean-up) when the automatic refresh is switched off in the configuration.</summary>
+    /// <summary>Runs until cancelled, or returns at once (after the clean-up and one reconcile of the attention items) when the automatic refresh is switched off in the configuration.</summary>
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         try
         {
             await RecoverAsync(cancellationToken);
+
+            // The attention items and their retention are looked after once now, before the first (possibly long) sync and also when the refresh is off, which otherwise reconciles nothing (ADR 0030).
+            await HousekeepAsync(cancellationToken);
             if (!settings.AutoRefreshEnabled)
             {
                 PortfolioLog.AutoRefreshOff(logger);
@@ -141,6 +145,27 @@ public sealed class PortfolioRefreshRunner(
 #pragma warning restore CA1031
         {
             PortfolioLog.AutoRefreshCrashed(logger, slug, ex);
+        }
+    }
+
+    private async Task HousekeepAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            var attention = scope.ServiceProvider.GetRequiredService<IAttentionReconciler>();
+            await attention.ReconcileAsync(cancellationToken);
+            await attention.ApplyRetentionAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // housekeeping: the refresh must still run; the healing tick does the same every minute
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            HealLog.StartupHousekeepingFailed(logger, ex);
         }
     }
 

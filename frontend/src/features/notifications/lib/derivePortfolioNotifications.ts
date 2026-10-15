@@ -17,6 +17,7 @@ type PortfolioKind = Extract<
   | 'trades_unexplained'
   | 'dividends_pending'
   | 'securities_unmatched'
+  | 'rows_dropped'
 >;
 
 /**
@@ -33,6 +34,7 @@ const hrefs: Readonly<Record<PortfolioKind, string>> = {
   trades_unexplained: '/portfolio',
   dividends_pending: '/portfolio',
   securities_unmatched: '/portfolio',
+  rows_dropped: '/portfolio?focus=sync',
 };
 
 const kindOf = (kind: string): PortfolioKind | null =>

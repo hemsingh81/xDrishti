@@ -362,7 +362,7 @@ public sealed class BrokerHistoryDatabaseTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task A_run_whose_holding_changes_again_after_the_repeat_ends_as_a_holding_changed_result_and_not_an_exception()
+    public async Task A_run_whose_holding_changes_again_after_the_repeat_ends_as_a_data_changed_result_and_not_an_exception()
     {
         await using var admin = await ConnectedAccountAsync();
         const string Bucket = "00000000-0000-7000-8000-00000000c101";
@@ -389,7 +389,8 @@ public sealed class BrokerHistoryDatabaseTests(ApiFactory factory)
             },
             Ct);
 
-        result.Error.ShouldBe(PortfolioErrors.HoldingChanged);
+        result.Error.ShouldBe(PortfolioErrors.DataChanged);
+        result.Error.Message.ShouldBe("The data changed while you were working; try again.");
         runs.ShouldBe(2);
     }
 

@@ -75,6 +75,14 @@ internal static class BillTrades
         return ReportCells.Norm(row.Exchange) == "nse";
     }
 
+    /// <summary>True for a row that names an exchange other than the NSE (the BSE): the only kind of row whose identity is also salted by an NSE sibling that was left out of the plan (ADR 0030). A blank exchange is not one.</summary>
+    public static bool IsOtherExchange(GtrRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        var exchange = ReportCells.Norm(row.Exchange);
+        return exchange.Length > 0 && exchange != "nse";
+    }
+
     /// <summary>What a row adds to its identity when another trade of the file shares it: its exchange, or a fixed token when the exchange is blank (so a blank exchange never meets an NSE row's identity).</summary>
     public static string CollisionSalt(GtrRow row)
     {

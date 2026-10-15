@@ -137,7 +137,7 @@ public sealed class PortfolioBrokerHistoryService(IServiceScopeFactory scopes, I
     /// </summary>
     private static async ValueTask<bool> IsQuietAsync(IServiceProvider services, Guid accountId, BrokerSyncRunView failed, CancellationToken cancellationToken)
     {
-        var reason = failed.Counts.FailureReason ?? SyncFailures.OfMessage(failed.Error);
+        var reason = failed.Counts.FailureReason;
         if (!SyncFailures.IsTransient(reason))
         {
             return false;

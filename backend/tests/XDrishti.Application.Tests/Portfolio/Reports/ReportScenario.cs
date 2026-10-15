@@ -64,7 +64,7 @@ internal sealed class ReportScenario
 
     public DpService CostService => new(Workspace, Fx.BrokerData, Costs, Learned, Fx.Accounts, CodeCheck, Fx.SyncGuard, Fx.Data, Fx.Clock);
 
-    public DematService DematService => new(Workspace, Learned, Fx.Accounts, CodeCheck, Fx.SyncGuard, Fx.Data, Fx.Clock);
+    public DematService DematService => new(Workspace, Learned, Fx.Accounts, CodeCheck, Fx.Data, Fx.Clock);
 
     public ReportPreviewer Previewer => new(Workspace, Bills, CostService, DematService, Fx.PreviewTrades());
 

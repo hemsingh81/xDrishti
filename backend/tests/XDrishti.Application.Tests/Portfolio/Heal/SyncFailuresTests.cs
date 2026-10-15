@@ -13,7 +13,7 @@ public sealed class SyncFailuresTests
     public static TheoryData<Error, string> Errors => new()
     {
         { ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Unavailable)), "unavailable" }, // a timeout, a network failure, a 5xx
-        { ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Rejected, "DH-904")), "rate_limited" }, // 429
+        { ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.RateLimited, "DH-904")), "rate_limited" }, // 429
         { ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Rejected, "DH-910")), "rejected" },
         { ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Rejected)), "rejected" },
         { PortfolioErrors.HistoryTooLarge, "history_too_large" },
@@ -22,6 +22,7 @@ public sealed class SyncFailuresTests
         { PortfolioErrors.NotConnected, "not_connected" },
         { PortfolioErrors.RoleOff, "role_off" },
         { PortfolioErrors.SyncFailed, "unexpected" },
+        { PortfolioErrors.HoldingChanged, "data_changed" }, // our own database collided: not "Dhan could not be reached"
     };
 
     [Theory]
@@ -31,21 +32,60 @@ public sealed class SyncFailuresTests
         SyncFailures.Of(error).ShouldBe(code);
     }
 
-    [Theory]
-    [InlineData("The sync was interrupted because the application is stopping.", "interrupted")]
-    [InlineData("The sync did not finish (the application stopped or crashed while it ran).", "interrupted")]
-    [InlineData("Something else", "unexpected")]
-    [InlineData(null, "unexpected")]
-    public void A_failure_recorded_as_a_sentence_is_given_its_code(string? message, string code)
+    [Fact]
+    public void An_error_of_the_role_off_code_is_role_off_and_any_other_without_a_cause_is_unexpected()
     {
-        SyncFailures.OfMessage(message).ShouldBe(code);
+        (SyncFailures.Of(PortfolioErrors.RoleOff), SyncFailures.Of(PortfolioErrors.SyncRunning), SyncFailures.Of(Error.Conflict("x.y", "z"))).ShouldBe(("role_off", "unexpected", "unexpected"));
+    }
+
+    [Theory]
+    [InlineData(FailureKind.Transient, "unavailable")]
+    [InlineData(FailureKind.RateLimited, "rate_limited")]
+    [InlineData(FailureKind.Rejected, "rejected")]
+    [InlineData(FailureKind.TokenExpired, "token_expired")]
+    [InlineData(FailureKind.TokenRefused, "token_refused")]
+    [InlineData(FailureKind.NotConnected, "not_connected")]
+    [InlineData(FailureKind.HistoryTooLarge, "history_too_large")]
+    [InlineData(FailureKind.Unexpected, "unexpected")]
+    [InlineData(FailureKind.DataChanged, "data_changed")]
+    public void Every_failure_kind_has_its_stored_code(FailureKind kind, string code)
+    {
+        SyncFailures.Of(kind).ShouldBe(code);
     }
 
     [Fact]
-    public void The_messages_of_the_known_errors_are_given_their_codes()
+    public void Rewording_every_message_changes_no_code_and_no_retry_decision()
     {
-        SyncFailures.OfMessage(PortfolioErrors.TokenExpired.Message).ShouldBe("token_expired");
-        SyncFailures.OfMessage(PortfolioErrors.TokenRefused.Message).ShouldBe("token_refused");
+        foreach (var error in new[]
+        {
+            ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Unavailable)),
+            ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.RateLimited, "DH-904")),
+            ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Rejected, "DH-910")),
+            PortfolioErrors.HistoryTooLarge,
+            PortfolioErrors.TokenExpired,
+            PortfolioErrors.TokenRefused,
+            PortfolioErrors.NotConnected,
+            PortfolioErrors.RoleOff,
+            PortfolioErrors.SyncFailed,
+            PortfolioErrors.HoldingChanged,
+        })
+        {
+            var reworded = error with { Message = "Completely different words, nothing like the original." };
+
+            var (code, was) = (SyncFailures.Of(reworded), SyncFailures.Of(error));
+
+            code.ShouldBe(was);
+            (SyncFailures.IsTransient(code), SyncFailures.IsOwnerOnly(code), SyncFailures.IsLogin(code))
+                .ShouldBe((SyncFailures.IsTransient(was), SyncFailures.IsOwnerOnly(was), SyncFailures.IsLogin(was)));
+        }
+    }
+
+    [Fact]
+    public void A_message_that_looks_like_another_failure_does_not_change_the_code()
+    {
+        var misleading = ConnectionErrors.Broker(new BrokerFailure(BrokerFailureKind.Rejected, "DH-904")) with { Message = "Dhan could not be reached. Try again in a moment. DH-904" };
+
+        SyncFailures.Of(misleading).ShouldBe("rejected");
     }
 
     [Theory]
@@ -61,6 +101,7 @@ public sealed class SyncFailuresTests
     [InlineData("unavailable", true, false)]
     [InlineData("rate_limited", true, false)]
     [InlineData("interrupted", true, false)]
+    [InlineData("data_changed", true, false)]
     [InlineData("rejected", false, false)]
     [InlineData("history_too_large", false, false)]
     [InlineData("unexpected", false, false)]
@@ -82,5 +123,15 @@ public sealed class SyncFailuresTests
     public void A_login_reason_is_one_a_renewed_login_fixes(string reason, bool login)
     {
         SyncFailures.IsLogin(reason).ShouldBe(login);
+    }
+
+    [Fact]
+    public void A_local_data_conflict_has_its_own_plain_text_and_never_blames_dhan()
+    {
+        var text = SyncFailures.Text(SyncFailures.Of(PortfolioErrors.HoldingChanged));
+
+        text.ShouldBe("the data changed while it was being saved; the next run does it again");
+        text.ShouldNotContain("Dhan");
+        text.ShouldNotBe(SyncFailures.Text(SyncFailures.Unavailable));
     }
 }

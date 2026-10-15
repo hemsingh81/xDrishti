@@ -30,28 +30,23 @@ public static class ConnectionErrors
     public static readonly Error AppNotConfigured = Error.Conflict(
         AppNotConfiguredCode, "Enter the Dhan API key and secret first (Connection tab, Replace).");
 
-    /// <summary>The sentence a broker failure that is worth trying again (no answer, a timeout, a 5xx) ends with.</summary>
+    /// <summary>The sentence a broker failure that is worth trying again (no answer, a timeout, a 5xx) ends with. Text for the owner only: nothing reads it back.</summary>
     public const string TryAgainText = " Try again in a moment.";
 
+    /// <summary>The error of a failed broker call. It carries the structured <see cref="Error.Cause"/> of the failure (ADR 0030): what is retried is decided by it, never by the text of the message.</summary>
     public static Error Broker(BrokerFailure failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
-        return Error.Upstream(BrokerErrorCode, ConnectionTexts.Failure(failure) + (failure.Kind == BrokerFailureKind.Unavailable ? TryAgainText : string.Empty));
+        return Error.Upstream(BrokerErrorCode, ConnectionTexts.Failure(failure) + (failure.Kind == BrokerFailureKind.Unavailable ? TryAgainText : string.Empty)) with { Cause = CauseOf(failure.Kind) };
     }
 
-    /// <summary>True for a broker error that comes from no usable answer (timeout, network failure, 5xx): it may well pass, so the syncs try again by themselves (ADR 0027).</summary>
-    public static bool IsUnavailable(Error error)
+    private static FailureKind CauseOf(BrokerFailureKind kind) => kind switch
     {
-        ArgumentNullException.ThrowIfNull(error);
-        return error.Code == BrokerErrorCode && error.Message.EndsWith(TryAgainText, StringComparison.Ordinal);
-    }
-
-    /// <summary>True for a broker error that is Dhan's rate limit (429 or its code DH-904): it passes, so the syncs try again by themselves (ADR 0027).</summary>
-    public static bool IsRateLimited(Error error)
-    {
-        ArgumentNullException.ThrowIfNull(error);
-        return error.Code == BrokerErrorCode && error.Message.Contains("DH-904", StringComparison.Ordinal);
-    }
+        BrokerFailureKind.Unavailable => FailureKind.Transient,
+        BrokerFailureKind.RateLimited => FailureKind.RateLimited,
+        BrokerFailureKind.Unauthorized => FailureKind.TokenRefused,
+        _ => FailureKind.Rejected,
+    };
 
     public static Error ConsentLimit(int limit, int retryAfterSeconds) => Error.RateLimited(
         ConsentLimitCode, $"Dhan allows {limit} sign-in consents a day for an account; they are used up. Try again tomorrow (India time).", retryAfterSeconds);

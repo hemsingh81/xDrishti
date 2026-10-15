@@ -16,7 +16,8 @@ const parseImportFiles = (value: string | null): 'open' | null => (value === 'op
  * `?cash=open` the Cash & dividends panel (`?cash=add` with its Add dividend form open, `?cash=import` with the
  * dividend import open, `?cash=suggestions` with the keyboard on the suggested dividends of the ledger),
  * `?import=open` opens the Import files dialog (Dhan's downloaded reports: transaction report, DP charges, demat holding),
- * `?focus=actions` takes the owner to the Action center once (the card removes it when it has done so). See `usePanelParam`
+ * `?focus=actions` takes the owner to the Action center once (the card removes it when it has done so), `?focus=sync` to the
+ * Sync bar's trades and ledger section (the page removes it when it has done so). See `usePanelParam`
  * for how opening, closing and Back agree.
  */
 export function usePortfolioOverlays() {
@@ -26,6 +27,7 @@ export function usePortfolioOverlays() {
   const cash = usePanelParam('cash', parseCash);
   const importFiles = usePanelParam('import', parseImportFiles);
   const focusActions = params.get('focus') === 'actions';
+  const focusSync = params.get('focus') === 'sync';
 
   const focusHandled = useCallback(() => {
     setParams(
@@ -101,6 +103,7 @@ export function usePortfolioOverlays() {
     },
     closeCash: cash.close,
     focusActions,
+    focusSync,
     focusHandled,
   };
 }

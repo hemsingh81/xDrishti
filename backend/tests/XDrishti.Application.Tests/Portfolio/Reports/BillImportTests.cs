@@ -102,8 +102,22 @@ public sealed class BillImportTests
 
         var result = Ok(await s.ImportAsync(Gtr([Buy1, Buy2, Sell]), digest: preview.Digest));
 
-        (result.Status, result.Error!.Code).ShouldBe(("rejected", "portfolio.sync_running"));
+        (result.Status, result.Error!.Code, result.Error.Message).ShouldBe(("rejected", "portfolio.sync_running", PortfolioErrors.SyncRunningWait.Message));
         s.Active().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task While_only_a_ledger_run_of_the_account_runs_the_bill_import_goes_ahead()
+    {
+        var s = await StartAsync();
+        var preview = await s.PreviewOkAsync(Gtr([Buy1, Buy2, Sell]));
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, BrokerSyncKind.Ledger, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var result = Ok(await s.ImportAsync(Gtr([Buy1, Buy2, Sell]), digest: preview.Digest));
+
+        result.Status.ShouldBe("imported");
+        s.Active().ShouldNotBeEmpty();
     }
 
     [Fact]

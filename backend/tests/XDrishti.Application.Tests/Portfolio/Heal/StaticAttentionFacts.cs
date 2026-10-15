@@ -14,6 +14,8 @@ internal sealed class StaticAttentionFacts(TimeProvider clock) : IAttentionFacts
 
     public Dictionary<Guid, BrokerSyncCounts> TradeCounts { get; } = [];
 
+    public Dictionary<Guid, BrokerSyncCounts> LedgerCounts { get; } = [];
+
     public Dictionary<Guid, HoldingFlags> Flags { get; } = [];
 
     public Dictionary<Guid, PendingDividends> Dividends { get; } = [];
@@ -29,7 +31,7 @@ internal sealed class StaticAttentionFacts(TimeProvider clock) : IAttentionFacts
     public ValueTask<AttentionFacts> LoadAsync(CancellationToken cancellationToken)
     {
         Loads++;
-        return ValueTask.FromResult(new AttentionFacts(clock.GetUtcNow(), [.. Accounts], Health, TradeCounts, Flags, Dividends, Unmatched, DataAccountId, DataAccountName));
+        return ValueTask.FromResult(new AttentionFacts(clock.GetUtcNow(), [.. Accounts], Health, TradeCounts, LedgerCounts, Flags, Dividends, Unmatched, DataAccountId, DataAccountName));
     }
 
     /// <summary>An account that is connected for a good while, with the Portfolio role on.</summary>

@@ -112,10 +112,10 @@ internal sealed class BrokerHistoryPipeline(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await EndAsync(tradesRun.Id, Interrupted);
+            await EndAsync(tradesRun.Id, Interrupted, SyncFailures.Interrupted);
             if (ledgerRun is not null)
             {
-                await EndAsync(ledgerRun.Id, Interrupted);
+                await EndAsync(ledgerRun.Id, Interrupted, SyncFailures.Interrupted);
             }
 
             throw;
@@ -125,10 +125,10 @@ internal sealed class BrokerHistoryPipeline(
 #pragma warning restore CA1031
         {
             BrokerHistoryLog.Crashed(logger, BrokerHistoryViews.Name(tradesRun.Kind), tradesRun.Id, ex);
-            await EndAsync(tradesRun.Id, PortfolioErrors.SyncFailed.Message);
+            await EndAsync(tradesRun.Id, PortfolioErrors.SyncFailed);
             if (ledgerRun is not null)
             {
-                await EndAsync(ledgerRun.Id, PortfolioErrors.SyncFailed.Message);
+                await EndAsync(ledgerRun.Id, PortfolioErrors.SyncFailed);
             }
         }
 
@@ -141,14 +141,21 @@ internal sealed class BrokerHistoryPipeline(
     {
         ArgumentNullException.ThrowIfNull(cause);
         BrokerHistoryLog.Crashed(logger, "run", runId, cause);
-        await EndAsync(runId, PortfolioErrors.SyncFailed.Message);
+        await EndAsync(runId, PortfolioErrors.SyncFailed);
     }
 
     /// <summary>Ends a run that is still running because the application is stopping: failed, "interrupted"; the next run reads from the watermark. Never throws.</summary>
-    public ValueTask InterruptedAsync(Guid runId) => EndAsync(runId, Interrupted);
+    public ValueTask InterruptedAsync(Guid runId) => EndAsync(runId, Interrupted, SyncFailures.Interrupted);
 
-    /// <summary>Ends a run that is still running with a plain reason (an account or token that cannot be used any more). Never throws.</summary>
-    public async ValueTask EndAsync(Guid runId, string reason)
+    /// <summary>Ends a run that is still running because of <paramref name="error"/> (an account or token that cannot be used any more); the reason code is the error's cause, not its text. Never throws.</summary>
+    public ValueTask EndAsync(Guid runId, Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return EndAsync(runId, error.Message, SyncFailures.Of(error));
+    }
+
+    /// <summary>Ends a run that is still running with a plain sentence and the reason code (one of <see cref="SyncFailures"/>) it is recorded under. Never throws.</summary>
+    private async ValueTask EndAsync(Guid runId, string reason, string code)
     {
         try
         {
@@ -156,7 +163,6 @@ internal sealed class BrokerHistoryPipeline(
             var current = await runs.GetAsync(runId, CancellationToken.None);
             if (current is { IsRunning: true })
             {
-                var code = SyncFailures.OfMessage(reason);
                 await runs.CompleteAsync(runId, SyncStatus.Failed, current.Counts with { FailureReason = code }, reason, clock.GetUtcNow(), CancellationToken.None);
                 await recorder.FailedAsync(current.AccountId, SyncFailures.KindOf(current.Kind), code, CancellationToken.None);
             }
@@ -194,17 +200,18 @@ internal sealed class BrokerHistoryPipeline(
             var healthKind = SyncFailures.KindOf(run.Kind);
             var stored = await health.GetAsync(account.Id, healthKind, cancellationToken);
 
-            // Windows that dropped rows for a data reason are read again once the Dhan mapping has changed since the account was last read (ADR 0027); they come first, the regular windows follow.
-            var reread = await RereadWindowsAsync(account, run, stored, cancellationToken);
+            // Windows that dropped rows for a data reason are read again once the Dhan mapping has changed since the account was last read (ADR 0027); they come first, the regular windows follow. The windows an earlier failed attempt
+            // finished are not read again (ADR 0030): each window is marked done in the unit of work that stores it.
+            var version = reader.MapperVersion(run.Kind);
+            var reread = await RereadWindowsAsync(account, run, stored, version, cancellationToken);
             var again = reread.Windows;
-            counts = counts with { WindowsTotal = again.Count + windows.Count };
+            counts = counts with { WindowsTotal = again.Count + windows.Count, RereadVersion = reread.Done.Count > 0 || again.Count > 0 ? version : 0, RereadDone = reread.Done };
             var trigger = BrokerHistoryViews.Name(run.Trigger);
             BrokerHistoryLog.Started(logger, kind, run.Id, account.Slug, trigger, counts.WindowsTotal);
             await runs.UpdateProgressAsync(run.Id, counts, cancellationToken);
 
             // The mapping version is stamped as soon as the windows to read again have been read - not at the end: a transient failure later in the run must not make every retry read the same windows again. When some of the windows to read again lie
             // inside the run's own dates (a manual run from an earlier date) they are left to the run, so the version waits for its last window: a failure part-way must not drop the windows it never reached.
-            var version = reader.MapperVersion(run.Kind);
             var unstamped = stored.MapperVersion < version;
             var stampAt = again.Count + (reread.InsideRun ? windows.Count : 0);
             if (unstamped && stampAt == 0)
@@ -216,13 +223,16 @@ internal sealed class BrokerHistoryPipeline(
             var done = 0;
             foreach (var window in again.Concat(windows))
             {
-                var next = await work(window, counts, cancellationToken);
+                // A window read again is added to the done list handed to its unit of work: it is stored together with the window, or not at all.
+                var given = done < again.Count ? counts with { RereadDone = [.. counts.RereadDone, new BrokerWindowSpan(window.From, window.To)] } : counts;
+                var next = await work(window, given, cancellationToken);
                 if (next.IsFailure)
                 {
                     return await FailAsync(account, run, counts, next.Error);
                 }
 
-                if (unstamped && ++done == stampAt)
+                done++;
+                if (unstamped && done == stampAt)
                 {
                     await recorder.MapperVersionAsync(account.Id, healthKind, version, cancellationToken);
                     unstamped = false;
@@ -247,7 +257,12 @@ internal sealed class BrokerHistoryPipeline(
                 }
             }
 
-            await FinishAsync(account, run, counts, scheduled, actor, cancellationToken);
+            var finished = await FinishAsync(account, run, counts, scheduled, actor, cancellationToken);
+            if (finished.IsFailure)
+            {
+                return await FailAsync(account, run, counts, finished.Error);
+            }
+
             await recorder.SucceededAsync(account.Id, healthKind, cancellationToken);
             return true;
         }
@@ -268,14 +283,15 @@ internal sealed class BrokerHistoryPipeline(
 
     /// <summary>
     /// The windows to read again before the run's own: when the stored mapper version of the account's kind is older than the reader's, the windows that dropped rows for a data reason and were not read since (<see cref="ISyncHealthStore.ListRereadAsync"/>); an
-    /// account the first version of this rule has not seen (version 0) also gets the dates of its earlier runs that dropped rows, because windows were not noted before. Windows inside the run's own dates are read anyway (<see cref="RereadWindows.InsideRun"/> tells, so that the version is stamped only when the run has read them). Nothing when the version is current.
+    /// account the first version of this rule has not seen (version 0) also gets the dates of its earlier runs that dropped rows, because windows were not noted before. Dates that a failed attempt before this run already read again (its <see cref="BrokerSyncCounts.RereadDone"/>,
+    /// same mapper version) are left out, so a retry after a late failure reads only what is not done (ADR 0030). Windows inside the run's own dates are read anyway (<see cref="RereadWindows.InsideRun"/> tells, so that the version is stamped only when the run has read them).
+    /// Nothing when the version is current.
     /// </summary>
-    private async ValueTask<RereadWindows> RereadWindowsAsync(BrokerAccount account, BrokerSyncRun run, SyncHealth stored, CancellationToken cancellationToken)
+    private async ValueTask<RereadWindows> RereadWindowsAsync(BrokerAccount account, BrokerSyncRun run, SyncHealth stored, int current, CancellationToken cancellationToken)
     {
-        var current = reader.MapperVersion(run.Kind);
         if (stored.MapperVersion >= current)
         {
-            return new RereadWindows([], false);
+            return new RereadWindows([], false, []);
         }
 
         var ranges = (await health.ListRereadAsync(account.Id, SyncFailures.KindOf(run.Kind), cancellationToken)).ToList();
@@ -284,7 +300,9 @@ internal sealed class BrokerHistoryPipeline(
             ranges.AddRange(await runs.ListDroppedRangesAsync(account.Id, run.Kind, cancellationToken));
         }
 
-        var noted = Merge(ranges).SelectMany(r => BrokerWindows.Split(r.From, r.To)).ToList();
+        var before = await runs.GetPreviousFinishedAsync(account.Id, run.Kind, run.Id, cancellationToken);
+        IReadOnlyList<BrokerWindowSpan> carried = before is { Status: SyncStatus.Failed } && before.Counts.RereadVersion == current ? before.Counts.RereadDone : [];
+        var noted = Merge(Without(ranges, carried)).SelectMany(r => BrokerWindows.Split(r.From, r.To)).ToList();
         bool Inside(DateWindow w) => w.From >= run.FromDate && w.To <= run.ToDate;
         var windows = noted.Where(w => !Inside(w)).ToList();
         if (windows.Count > 0)
@@ -292,11 +310,44 @@ internal sealed class BrokerHistoryPipeline(
             HealLog.Rereading(logger, account.Slug, windows.Count, current);
         }
 
-        return new RereadWindows(windows, noted.Any(Inside));
+        return new RereadWindows(windows, noted.Any(Inside), carried);
     }
 
-    /// <summary>The windows to read before the run's own, and whether other windows to read again lie inside the run's own dates.</summary>
-    private sealed record RereadWindows(IReadOnlyList<DateWindow> Windows, bool InsideRun);
+    /// <summary>The windows to read before the run's own, whether other windows to read again lie inside the run's own dates, and the windows an earlier failed attempt finished.</summary>
+    private sealed record RereadWindows(IReadOnlyList<DateWindow> Windows, bool InsideRun, IReadOnlyList<BrokerWindowSpan> Done);
+
+    /// <summary>The ranges without the dates of the windows that are done (what is left of a range that a done window covers in part stays).</summary>
+    internal static IEnumerable<BrokerDateRange> Without(IEnumerable<BrokerDateRange> ranges, IReadOnlyList<BrokerWindowSpan> done)
+    {
+        var ordered = done.OrderBy(d => d.From).ToList();
+        foreach (var range in ranges)
+        {
+            var from = range.From;
+            foreach (var span in ordered)
+            {
+                if (span.To < from || span.From > range.To)
+                {
+                    continue;
+                }
+
+                if (span.From > from)
+                {
+                    yield return new BrokerDateRange(from, span.From.AddDays(-1));
+                }
+
+                from = span.To.AddDays(1);
+                if (from > range.To)
+                {
+                    break;
+                }
+            }
+
+            if (from <= range.To)
+            {
+                yield return new BrokerDateRange(from, range.To);
+            }
+        }
+    }
 
     /// <summary>The ranges with overlapping or adjoining ones joined, oldest first.</summary>
     internal static IReadOnlyList<BrokerDateRange> Merge(IEnumerable<BrokerDateRange> ranges)
@@ -573,7 +624,14 @@ internal sealed class BrokerHistoryPipeline(
                     .Where(e => e.EntryClass == LedgerClass.Charges && e.Amount < 0m)
                     .Select(e => new LedgerChargeOnDay(e.EntryDate, -e.Amount, DepositoryCharges.Is(e.Description, e.Narration)))
                     .ToList();
-                return charges.Count == 0 ? SupersedeOutcome.None : new SupersedeOutcome(await ledger.SupersedeImportedChargesAsync(account.Id, charges, at, token), 0);
+                if (charges.Count == 0)
+                {
+                    return SupersedeOutcome.None;
+                }
+
+                // The day is decided from the whole stored day (ADR 0030): the charges earlier saves stored for these days (the entries just added are not saved yet) decide with the new ones which charges of a day count, as the sheet's plan does.
+                var storedBefore = await ledger.ListBrokerChargesAsync(account.Id, charges.Min(c => c.Date), charges.Max(c => c.Date), token);
+                return new SupersedeOutcome(await ledger.SupersedeImportedChargesAsync(account.Id, charges, storedBefore, at, token), 0);
             },
             placed => counts.AddWindow(read.Received, placed.Stored, placed.Existing, read.Dropped + placed.Refused, new Dictionary<string, int>(), read.Halved, read.EmptyByNoData, superseded: placed.Superseded.Rows, drops: read.Drops.Plus(BrokerDropReasons.StoreRefused, placed.Refused)),
             placed => read.Dropped + placed.Refused,
@@ -657,7 +715,7 @@ internal sealed class BrokerHistoryPipeline(
             return Result.Success(saved!);
         }
 
-        return refused ? await SaveRowByRowAsync(run, window, rows, storedIds, add, countsOf, droppedOf, enrich, supersedeStored, cancellationToken) : Result.Failure<BrokerSyncCounts>(whole.Error);
+        return refused ? await SaveRowByRowAsync(run, window, rows, storedIds, add, countsOf, droppedOf, enrich, supersedeStored, cancellationToken) : Result.Failure<BrokerSyncCounts>(Internal(whole.Error));
     }
 
     private async ValueTask<Result<BrokerSyncCounts>> SaveRowByRowAsync<T>(
@@ -678,7 +736,7 @@ internal sealed class BrokerHistoryPipeline(
         {
             var fate = Fate.Stored;
             var superseded = SupersedeOutcome.None;
-            _ = await unitOfWork.RunAsync(
+            var unit = await unitOfWork.RunAsync(
                 async token =>
                 {
                     if ((await storedIds([row.Id], token)).Count > 0)
@@ -704,6 +762,12 @@ internal sealed class BrokerHistoryPipeline(
                     return Result.Failure(PortfolioErrors.HistoryChanged);
                 },
                 cancellationToken);
+            if (unit.IsFailure && fate != Fate.Refused)
+            {
+                // Rolled back by a concurrency conflict (twice): the row is neither stored nor refused, so the window is not done; the next run reads it again.
+                return Result.Failure<BrokerSyncCounts>(Internal(unit.Error));
+            }
+
             if (fate == Fate.Refused && (await storedIds([row.Id], cancellationToken)).Count > 0)
             {
                 fate = Fate.Existing; // someone stored it between the check and the save
@@ -743,18 +807,18 @@ internal sealed class BrokerHistoryPipeline(
                 return Result.Success();
             },
             cancellationToken);
-        return done.IsSuccess ? Result.Success(saved!) : Result.Failure<BrokerSyncCounts>(done.Error);
+        return done.IsSuccess ? Result.Success(saved!) : Result.Failure<BrokerSyncCounts>(Internal(done.Error));
     }
 
     /// <summary>
     /// Ends the run as succeeded, with its audit event (counts only), in one unit of work. A scheduled run leaves an audit event only when it stored something, rebuilt a holding, or changed which holdings need the owner's review: the same hand-dated
     /// holding is not news every evening.
     /// </summary>
-    private async ValueTask FinishAsync(BrokerAccount account, BrokerSyncRun run, BrokerSyncCounts counts, bool scheduled, string actor, CancellationToken cancellationToken)
+    private async ValueTask<Result> FinishAsync(BrokerAccount account, BrokerSyncRun run, BrokerSyncCounts counts, bool scheduled, string actor, CancellationToken cancellationToken)
     {
         var kind = BrokerHistoryViews.Name(run.Kind);
         var audit = !scheduled || await IsNewsAsync(account.Id, run, counts, cancellationToken);
-        _ = await unitOfWork.RunAsync(
+        var finished = await unitOfWork.RunAsync(
             async token =>
             {
                 var now = clock.GetUtcNow();
@@ -768,9 +832,19 @@ internal sealed class BrokerHistoryPipeline(
                 return Result.Success();
             },
             cancellationToken);
+        if (finished.IsFailure)
+        {
+            // Nothing was saved (a concurrency conflict, twice): the run is not complete, so it is ended as failed by the caller and the next run reads from the watermark.
+            return Result.Failure(Internal(finished.Error));
+        }
+
         var droppedReasons = Reasons(counts);
         BrokerHistoryLog.Succeeded(logger, kind, run.Id, counts.Stored, counts.Duplicates, counts.Dropped, droppedReasons, counts.Skipped, counts.WindowsDone, counts.Halved);
+        return Result.Success();
     }
+
+    /// <summary>The error of a failed unit of work as the run reports it: the manual flows' "try again" (<see cref="PortfolioErrors.DataChanged"/>) means nothing to a run, whose next attempt reads the window again.</summary>
+    private static Error Internal(Error error) => error == PortfolioErrors.DataChanged ? PortfolioErrors.HoldingChanged : error;
 
     /// <summary>True when a run changed something: it stored rows or rebuilt holdings, or (trades) the holdings that need review are not the ones the last successful run reported.</summary>
     private async ValueTask<bool> IsNewsAsync(Guid accountId, BrokerSyncRun run, BrokerSyncCounts counts, CancellationToken cancellationToken)

@@ -85,10 +85,10 @@ The independent review of the first implementation (a–e) and the mapping again
   6. *Dividends.* Dhan credits dividends to the owner's bank account; they are not in the trading ledger (a `dividend`-class entry is rare — rented stocks). The Cash & dividends panel shows whatever the ledger holds; dividends are entered by the owner from P2-14 ([ADR 0026](../adr/0026-dividends-entered-by-the-owner-and-charges-in-net-returns.md)).
 
 ## Follow-ups from the third review (minor, not blocking)
-- `PortfolioUnitOfWork.RunAsync` returns `HoldingChanged` on a second concurrency conflict; three callers discard the result (`BrokerHistoryPipeline` row-by-row save and `FinishAsync`, `PriceAlertChecker`). Unreachable today (those units of work never save holdings) but they should check `IsFailure`.
-- The `HoldingChanged` message ("The next run tries again.") reaches the owner on manual flows; give those callers a neutral text.
+- `PortfolioUnitOfWork.RunAsync` returns `HoldingChanged` on a second concurrency conflict; three callers discard the result (`BrokerHistoryPipeline` row-by-row save and `FinishAsync`, `PriceAlertChecker`). Unreachable today (those units of work never save holdings) but they should check `IsFailure`. (closed in P2-18, F2)
+- The `HoldingChanged` message ("The next run tries again.") reaches the owner on manual flows; give those callers a neutral text. (closed in P2-18, F2: `DataChanged`; `HoldingChanged` is now only for runs)
 - `FirstSeenAt` is stamped before the Dhan fetch, so the 1-second margin in `AnyAppearedSinceAsync` can hide a holding created within a second of a trades run ending (rare).
-- A database test for the `true` branch of `AnyAppearedSinceAsync`; a dedicated message when `from` is refused because the other kind was never read.
+- A database test for the `true` branch of `AnyAppearedSinceAsync` (closed in P2-18, R6); a dedicated message when `from` is refused because the other kind was never read (still open).
 
 ## Done when
 - [ ] All acceptance criteria have evidence

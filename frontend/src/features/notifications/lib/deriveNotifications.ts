@@ -17,7 +17,8 @@ export type NotificationKind =
   | 'holdings_need_review'
   | 'trades_unexplained'
   | 'dividends_pending'
-  | 'securities_unmatched';
+  | 'securities_unmatched'
+  | 'rows_dropped';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 /**
@@ -31,6 +32,7 @@ export const attentionKinds: ReadonlySet<NotificationKind> = new Set<Notificatio
   'trades_unexplained',
   'dividends_pending',
   'securities_unmatched',
+  'rows_dropped',
   'key_expired',
   'key_expiring',
 ]);

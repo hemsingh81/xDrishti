@@ -40,6 +40,7 @@ internal static class ApiSetup
             });
             o.AddSchemaTransformer(ProblemDetailsSchema.AddExtensions);
             o.AddDocumentTransformer(HubContractDocument.AddAsync);
+            o.AddDocumentTransformer(AttentionCommandsContractDocument.AddAsync);
         });
         services.ConfigureHttpJsonOptions(o =>
         {

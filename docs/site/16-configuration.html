@@ -507,8 +507,14 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
 <td><code>8</code></td>
 <td>integer 0 to 30</td>
 </tr>
+<tr>
+<td><code>Portfolio:Heal:AttentionRetentionDays</code> (<code>Portfolio__Heal__AttentionRetentionDays</code>; compose: <code>XD_PORTFOLIO_HEAL_ATTENTION_DAYS</code>)</td>
+<td>How many days a <strong>resolved</strong> item of the bell (<code>portfolio.attention_items</code>) is kept before the healer tick deletes it (<a href="../adr/0030-read-only-notices-retention-and-structured-failures.html">ADR 0030</a>, P2-18). Unresolved items are never deleted; a resolved item is not shown after 24 hours anyway (that is fixed in the code). The runtime role has DELETE on that one table only (migration <code>AttentionRetentionGrant</code>)</td>
+<td><code>30</code></td>
+<td>integer 1 to 3650</td>
+</tr>
 </tbody></table>
-<p>These are ordinary deployment settings, read at start (not first-start settings): change them in the environment and restart <code>xd-api</code>. The quiet retries and the catch-up after a reconnect are done by the holdings refresh runner, so <strong><code>Portfolio:AutoRefresh:Enabled = false</code> also switches the healing off</strong> (the scheduled runs, &quot;Sync now&quot; and the &quot;Retry now&quot; button keep working). The 1-minute look of the healer, the 24 hours a resolved item is kept in the bell and the 2 hours before a login runs out at which it is called &quot;expiring&quot; are fixed in the code. Details: <a href="12-portfolio-monitoring.html">doc 12</a> §3 &quot;Self-healing and attention items (P2-16)&quot;.</p>
+<p>These are ordinary deployment settings, read at start (not first-start settings): change them in the environment and restart <code>xd-api</code>. The quiet retries and the catch-up after a reconnect are done by the holdings refresh runner, so <strong><code>Portfolio:AutoRefresh:Enabled = false</code> also switches the healing off</strong> (the scheduled runs, &quot;Sync now&quot; and the &quot;Retry now&quot; button keep working) - and with it the once-a-minute reconcile of the attention items and the retention above, because both are done by the same tick: the items are then refreshed only at the end of a holdings, trades or ledger attempt and after a Dhan sign-in, and no resolved item is deleted. The 1-minute look of the healer, the 24 hours a resolved item is kept in the bell and the 2 hours before a login runs out at which it is called &quot;expiring&quot; are fixed in the code. Details: <a href="12-portfolio-monitoring.html">doc 12</a> §3 &quot;Self-healing and attention items (P2-16)&quot;.</p>
 <h3 id="live-feed-live-adr-0024-p2-10">Live feed (<code>Live:*</code>, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>, P2-10)<a class="hash" href="#live-feed-live-adr-0024-p2-10" aria-label="Link to this section">#</a></h3>
 <p><code>appsettings.json</code> of <code>xd-feed</code> (and <code>Live:ManualRunMinutes</code> of <code>xd-api</code> too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service <code>live-feed</code> on the Services screen, not a setting here.</p>
 <div class="code"><pre><code class="language-yaml">Live:
@@ -595,7 +601,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-15 13:18</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-15 14:58</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

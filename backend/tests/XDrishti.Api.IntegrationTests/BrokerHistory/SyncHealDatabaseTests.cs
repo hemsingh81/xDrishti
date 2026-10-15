@@ -18,6 +18,10 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
 {
     private const string MigrationDatabase = "xd_sync_heal_migration_probe";
 
+    private const string GrantMigrationDatabase = "xd_attention_grant_migration_probe";
+
+    private const string BeforeGrantMigration = "20261015072206_AddReportClientCodeHash";
+
     private const string BeforeMigration = "20261014205551_AddDividendImportConcurrencyTokens";
 
     private const string AccountId = "00000000-0000-7000-8000-00000000a201";
@@ -29,6 +33,9 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
     private static readonly string[] StateKinds = ["holdings", "trades", "ledger", "quotes"];
 
     private static readonly string[] NewTables = ["broker_sync_state", "broker_sync_windows", "attention_items"];
+
+    /// <summary>The portfolio tables whose rows are kept for good: the runtime role never deletes from them (ADR 0030 gives it DELETE on <c>attention_items</c> only).</summary>
+    private static readonly string[] NeverDeleteTables = ["broker_sync_state", "broker_sync_windows", "broker_sync_runs", "ledger_entries", "dividend_batches", "dividend_aliases"];
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -83,7 +90,7 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
     }
 
     [Fact]
-    public async Task The_app_role_can_read_insert_and_update_the_health_windows_and_items_but_never_delete_them()
+    public async Task The_app_role_can_read_insert_and_update_the_health_windows_and_items_and_delete_only_the_items()
     {
         await AppRoleProbe.RunAsync(
             factory,
@@ -99,13 +106,24 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
 
                 foreach (var table in NewTables)
                 {
-                    var refused = await Should.ThrowAsync<PostgresException>(() => AppRoleProbe.ExecuteAsync(connection, $"DELETE FROM portfolio.{table}", Ct));
-                    refused.SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege, table);
                     foreach (var privilege in Privileges)
                     {
                         (await AppRoleProbe.ScalarAsync(connection, $"SELECT has_table_privilege('xd_app', 'portfolio.{table}', '{privilege}')", Ct)).ShouldBe(true, $"{table} {privilege}");
                     }
                 }
+
+                // ADR 0030: the attention items are working memory, so they are the one table here whose rows the runtime role may delete ...
+                (await AppRoleProbe.ScalarAsync(connection, "SELECT has_table_privilege('xd_app', 'portfolio.attention_items', 'DELETE')", Ct)).ShouldBe(true);
+                // ... and every table that is kept for good still refuses it.
+                foreach (var table in NeverDeleteTables)
+                {
+                    (await AppRoleProbe.ScalarAsync(connection, $"SELECT has_table_privilege('xd_app', 'portfolio.{table}', 'DELETE')", Ct)).ShouldBe(false, table);
+                    var refused = await Should.ThrowAsync<PostgresException>(() => AppRoleProbe.ExecuteAsync(connection, $"DELETE FROM portfolio.{table}", Ct));
+                    refused.SqlState.ShouldBe(PostgresErrorCodes.InsufficientPrivilege, table);
+                }
+
+                await AppRoleProbe.ExecuteAsync(connection, "DELETE FROM portfolio.attention_items", Ct);
+                (await AppRoleProbe.ScalarAsync(connection, "SELECT count(*) FROM portfolio.attention_items", Ct)).ShouldBe(0L);
             },
             Ct);
     }
@@ -320,6 +338,13 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
     private static AttentionDraft Draft(string id, string severity = "warning", string text = "text", Guid? account = null) =>
         new(id, "sync_failing", severity, "Title", text, """[{"label":"Open","kind":"route","target":"/x"}]""", account);
 
+    /// <summary>What the reconciler does (write) followed by what the notices do (read).</summary>
+    private static async Task<IReadOnlyList<StoredAttention>> ReconcileAsync(IAttentionStore store, IReadOnlyList<AttentionDraft> drafts, DateTimeOffset at, TimeSpan keepResolved)
+    {
+        await store.ReconcileAsync(drafts, at, Ct);
+        return await store.ListAsync(at, keepResolved, Ct);
+    }
+
     [Fact]
     public async Task The_memory_keeps_since_resolves_what_no_longer_holds_keeps_it_for_the_time_given_and_starts_a_recurrence_anew()
     {
@@ -329,11 +354,11 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
         var keep = TimeSpan.FromHours(24);
         var t0 = At(12, 10, 0);
 
-        var first = await store.ReconcileAsync([Draft("a", account: Account), Draft("b", "error")], t0, keep, Ct);
-        var again = await store.ReconcileAsync([Draft("a", account: Account, text: "changed"), Draft("b", "error")], t0.AddMinutes(5), keep, Ct);
-        var resolved = await store.ReconcileAsync([Draft("b", "error")], t0.AddMinutes(10), keep, Ct);
-        var dayLater = await store.ReconcileAsync([Draft("b", "error")], t0.AddHours(24).AddMinutes(11), keep, Ct);
-        var recurred = await store.ReconcileAsync([Draft("a", account: Account), Draft("b", "error")], t0.AddHours(25), keep, Ct);
+        var first = await ReconcileAsync(store, [Draft("a", account: Account), Draft("b", "error")], t0, keep);
+        var again = await ReconcileAsync(store, [Draft("a", account: Account, text: "changed"), Draft("b", "error")], t0.AddMinutes(5), keep);
+        var resolved = await ReconcileAsync(store, [Draft("b", "error")], t0.AddMinutes(10), keep);
+        var dayLater = await ReconcileAsync(store, [Draft("b", "error")], t0.AddHours(24).AddMinutes(11), keep);
+        var recurred = await ReconcileAsync(store, [Draft("a", account: Account), Draft("b", "error")], t0.AddHours(25), keep);
 
         first.Select(i => (i.Id, i.Since, i.ResolvedAt)).Order().ShouldBe([("a", t0, (DateTimeOffset?)null), ("b", t0, null)]);
         again.Single(i => i.Id == "a").Text.ShouldBe("changed");
@@ -344,7 +369,7 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
         dayLater.Select(i => i.Id).ShouldBe(["b"]); // a day and a minute after: dropped
         recurred.Single(i => i.Id == "a").ShouldSatisfyAllConditions(i => i.ResolvedAt.ShouldBeNull(), i => i.Since.ShouldBe(t0.AddHours(25)));
         recurred.Single(i => i.Id == "b").Since.ShouldBe(t0);
-        (await AppRoleProbe.ScalarAsync(admin, "SELECT count(*) FROM portfolio.attention_items", Ct)).ShouldBe(2L); // nothing was deleted
+        (await AppRoleProbe.ScalarAsync(admin, "SELECT count(*) FROM portfolio.attention_items", Ct)).ShouldBe(2L); // resolving deletes nothing
     }
 
     [Fact]
@@ -353,11 +378,11 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
         await using var admin = await ConnectedAccountAsync();
         using var scope = factory.Services.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<IAttentionStore>();
-        await store.ReconcileAsync([Draft("a")], At(12, 10, 0), TimeSpan.FromHours(24), Ct);
+        await ReconcileAsync(store, [Draft("a")], At(12, 10, 0), TimeSpan.FromHours(24));
         var written = await AppRoleProbe.ScalarAsync(admin, "SELECT xmin::text FROM portfolio.attention_items WHERE id = 'a'", Ct);
 
-        await store.ReconcileAsync([Draft("a")], At(12, 10, 5), TimeSpan.FromHours(24), Ct);
-        await store.ReconcileAsync([Draft("a")], At(12, 10, 6), TimeSpan.FromHours(24), Ct);
+        await ReconcileAsync(store, [Draft("a")], At(12, 10, 5), TimeSpan.FromHours(24));
+        await ReconcileAsync(store, [Draft("a")], At(12, 10, 6), TimeSpan.FromHours(24));
 
         (await AppRoleProbe.ScalarAsync(admin, "SELECT xmin::text FROM portfolio.attention_items WHERE id = 'a'", Ct)).ShouldBe(written);
     }
@@ -368,12 +393,67 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
         await using var admin = await ConnectedAccountAsync();
         using var scope = factory.Services.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<IAttentionStore>();
-        await store.ReconcileAsync([Draft("a"), Draft("b")], At(12, 10, 0), TimeSpan.FromHours(24), Ct);
+        await ReconcileAsync(store, [Draft("a"), Draft("b")], At(12, 10, 0), TimeSpan.FromHours(24));
 
-        var none = await store.ReconcileAsync([], At(12, 11, 0), TimeSpan.FromHours(24), Ct);
+        var none = await ReconcileAsync(store, [], At(12, 11, 0), TimeSpan.FromHours(24));
 
         none.ShouldAllBe(i => i.ResolvedAt == At(12, 11, 0));
         none.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Listing_reads_only_and_shows_the_unresolved_items_and_those_resolved_within_the_time_kept()
+    {
+        await using var admin = await ConnectedAccountAsync();
+        using var scope = factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IAttentionStore>();
+        var t0 = At(12, 10, 0);
+        await store.ReconcileAsync([Draft("a"), Draft("b")], t0, Ct);
+        await store.ReconcileAsync([Draft("b")], t0.AddHours(1), Ct); // a is resolved at 11:00
+        var written = await AppRoleProbe.ScalarAsync(admin, "SELECT string_agg(xmin::text, ',' ORDER BY id) FROM portfolio.attention_items", Ct);
+
+        var shortly = await store.ListAsync(t0.AddHours(2), TimeSpan.FromHours(24), Ct);
+        var later = await store.ListAsync(t0.AddHours(30), TimeSpan.FromHours(24), Ct);
+
+        shortly.Select(i => i.Id).Order().ShouldBe(["a", "b"]);
+        later.Select(i => i.Id).ShouldBe(["b"]);
+        (await AppRoleProbe.ScalarAsync(admin, "SELECT string_agg(xmin::text, ',' ORDER BY id) FROM portfolio.attention_items", Ct)).ShouldBe(written); // nothing was written
+    }
+
+    [Fact]
+    public async Task The_retention_deletes_resolved_items_older_than_the_cutoff_in_one_statement_and_never_an_unresolved_one()
+    {
+        await using var admin = await ConnectedAccountAsync();
+        using var scope = factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IAttentionStore>();
+        var t0 = At(1, 10, 0);
+        await store.ReconcileAsync([Draft("old-open"), Draft("old-gone"), Draft("recent-gone")], t0, Ct);
+        await store.ReconcileAsync([Draft("old-open"), Draft("recent-gone")], t0.AddMinutes(1), Ct); // old-gone resolved on the 1st
+        await store.ReconcileAsync([Draft("old-open")], t0.AddDays(20), Ct); // recent-gone resolved on the 21st
+
+        var deleted = await store.DeleteResolvedBeforeAsync(t0.AddDays(5), Ct); // only what was resolved before the 6th
+
+        deleted.ShouldBe(1);
+        (await AppRoleProbe.ScalarAsync(admin, "SELECT string_agg(id, ',' ORDER BY id) FROM portfolio.attention_items", Ct)).ShouldBe("old-open,recent-gone");
+
+        (await store.DeleteResolvedBeforeAsync(t0.AddYears(5), Ct)).ShouldBe(1); // however late the cutoff: only resolved rows go
+        (await AppRoleProbe.ScalarAsync(admin, "SELECT string_agg(id, ',' ORDER BY id) FROM portfolio.attention_items", Ct)).ShouldBe("old-open");
+    }
+
+    [Fact]
+    public async Task The_retention_is_one_set_based_delete_even_for_many_rows()
+    {
+        await using var admin = await ConnectedAccountAsync();
+        using var scope = factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IAttentionStore>();
+        var t0 = At(1, 10, 0);
+        await store.ReconcileAsync([.. Enumerable.Range(0, 200).Select(i => Draft($"item-{i}"))], t0, Ct);
+        await store.ReconcileAsync([], t0.AddMinutes(1), Ct);
+
+        var deleted = await store.DeleteResolvedBeforeAsync(t0.AddDays(1), Ct);
+
+        deleted.ShouldBe(200);
+        (await AppRoleProbe.ScalarAsync(admin, "SELECT count(*) FROM portfolio.attention_items", Ct)).ShouldBe(0L);
     }
 
     // ---- the migration ----
@@ -421,6 +501,53 @@ public sealed class SyncHealDatabaseTests(ApiFactory factory)
             await using var connection = new NpgsqlConnection(admin.ConnectionString);
             await connection.OpenAsync(Ct);
             await AppRoleProbe.ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {MigrationDatabase} WITH (FORCE)", Ct);
+        }
+    }
+
+    [Fact]
+    public async Task The_retention_grant_migration_gives_the_app_role_delete_on_the_items_only_and_rolling_back_takes_it_away_again()
+    {
+        var admin = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString);
+        var scratch = new NpgsqlConnectionStringBuilder(factory.AdminConnectionString) { Database = GrantMigrationDatabase, Pooling = false };
+        await using (var connection = new NpgsqlConnection(admin.ConnectionString))
+        {
+            await connection.OpenAsync(Ct);
+            await AppRoleProbe.ExecuteAsync(connection, "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'xd_app') THEN CREATE ROLE xd_app NOLOGIN; END IF; END $$", Ct); // the grants are a no-op without the role
+            await AppRoleProbe.ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {GrantMigrationDatabase} WITH (FORCE)", Ct);
+            await AppRoleProbe.ExecuteAsync(connection, $"CREATE DATABASE {GrantMigrationDatabase}", Ct);
+        }
+
+        try
+        {
+            await using var host = factory.WithWebHostBuilder(b => b.UseSetting("Database:ConnectionString", scratch.ConnectionString));
+            using var scope = host.Services.CreateScope();
+            var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+            await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+            await connection.OpenAsync(Ct);
+            async Task<object?> CanDeleteAsync(string table) => await AppRoleProbe.ScalarAsync(connection, $"SELECT has_table_privilege('xd_app', 'portfolio.{table}', 'DELETE')", Ct);
+
+            await migrator.MigrateAsync(BeforeGrantMigration, Ct);
+            (await CanDeleteAsync("attention_items")).ShouldBe(false);
+
+            await migrator.MigrateAsync(null, Ct);
+            (await CanDeleteAsync("attention_items")).ShouldBe(true);
+            foreach (var table in NeverDeleteTables)
+            {
+                (await CanDeleteAsync(table)).ShouldBe(false, table); // nothing else gained it
+            }
+
+            await migrator.MigrateAsync(BeforeGrantMigration, Ct);
+            (await CanDeleteAsync("attention_items")).ShouldBe(false);
+            (await AppRoleProbe.ScalarAsync(connection, "SELECT has_table_privilege('xd_app', 'portfolio.attention_items', 'UPDATE')", Ct)).ShouldBe(true); // the rest of the access stays
+
+            await migrator.MigrateAsync(null, Ct); // and forward again
+            (await CanDeleteAsync("attention_items")).ShouldBe(true);
+        }
+        finally
+        {
+            await using var connection = new NpgsqlConnection(admin.ConnectionString);
+            await connection.OpenAsync(Ct);
+            await AppRoleProbe.ExecuteAsync(connection, $"DROP DATABASE IF EXISTS {GrantMigrationDatabase} WITH (FORCE)", Ct);
         }
     }
 }

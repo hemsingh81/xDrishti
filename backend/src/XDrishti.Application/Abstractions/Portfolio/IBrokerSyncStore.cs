@@ -59,6 +59,9 @@ public interface IBrokerSyncStore
     /// <summary>True while a run of the account is running.</summary>
     ValueTask<bool> IsRunningAsync(Guid accountId, CancellationToken cancellationToken);
 
+    /// <summary>True while a run of the account of this <paramref name="kind"/> (trades or ledger) is running.</summary>
+    ValueTask<bool> IsRunningAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken);
+
     /// <summary>Marks every run still <c>running</c> that started before <paramref name="processStartedAt"/> as failed (interrupted); returns how many.</summary>
     ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, CancellationToken cancellationToken);
 }

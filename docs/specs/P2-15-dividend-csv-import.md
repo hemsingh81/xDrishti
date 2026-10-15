@@ -59,12 +59,12 @@ Unit: detector, reader (sample file, formats, bad rows), normaliser and matcher 
 2. Whether Dhan's own "dividend payout" page can export this file directly is unknown; the app reads whatever file has these columns.
 
 ## Follow-ups from the second review (minor, not blocking)
-- A second concurrency conflict in an import or undo answers the generic "holding was changed meanwhile" text; give dividend flows their own message (`PortfolioUnitOfWork.RunAsync` / `PortfolioErrors.HoldingChanged`).
-- `DividendUploads.Lines`: cap each `includeDuplicates` value and stop at `MaxRows` before parsing the rest.
+- A second concurrency conflict in an import or undo answers the generic "holding was changed meanwhile" text; give dividend flows their own message (`PortfolioUnitOfWork.RunAsync` / `PortfolioErrors.HoldingChanged`). (closed in P2-18, F2: `DataChanged`)
+- `DividendUploads.Lines`: cap each `includeDuplicates` value and stop at `MaxRows` before parsing the rest. (closed in P2-18, I5)
 - ADR 0028 and doc 12 still describe a success response `report` and omit the `statement` kind and the plain-Amount rule in two places; amendment i should say "dividend, per share, payout or DPS".
-- Toast `returnTo` can go stale after a toast times out with focus elsewhere (clear it when no open toast holds focus). The audible-above-modals hook exposes the toast to screen readers while a modal is open but a focus trap keeps it out of Tab reach (Ctrl/Cmd+Z remains); check with VoiceOver and consider a permanent live region.
+- Toast `returnTo` can go stale after a toast times out with focus elsewhere (clear it when no open toast holds focus) (closed in P2-18, R5). The audible-above-modals hook exposes the toast to screen readers while a modal is open but a focus trap keeps it out of Tab reach (Ctrl/Cmd+Z remains); check with VoiceOver and consider a permanent live region.
 - NFC/NFD forms of one name give different keys (accented names only). A DP-charges file dropped on the dividend import gets the "import it as trades" refusal; P2-17 replaces it.
-- Display precision of per-share amounts (4 stored, 2 shown) is unchanged from P2-14.
+- Display precision of per-share amounts (4 stored, 2 shown) is unchanged from P2-14. (closed in P2-18, R3)
 
 ## Done when
 - [ ] All acceptance criteria have evidence

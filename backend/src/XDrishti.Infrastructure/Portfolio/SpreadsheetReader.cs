@@ -12,7 +12,7 @@ namespace XDrishti.Infrastructure.Portfolio;
 /// <summary>
 /// Reads the first sheet of a downloaded spreadsheet - legacy <c>.xls</c> (BIFF8) or <c>.xlsx</c> - into rows of text cells with ExcelDataReader (MIT, ADR 0029). Dhan's old <c>.xls</c> files use Windows code pages, which the runtime's code-page provider supplies. Text
 /// is kept as it is, numbers are written with an invariant point, dates as <c>yyyy-MM-dd</c> (with the time when there is one), an empty cell as the empty text. A file that is not a readable spreadsheet (corrupt, password protected, not Excel at all) is
-/// <c>portfolio.invalid</c> on <c>file</c>, never an exception (a package with broken XML or parts is such a file too); a sheet wider than <see cref="MaxColumns"/> columns or with more than <see cref="MaxCells"/> cells is refused before it is held in memory; the content is never logged.
+/// <c>portfolio.invalid</c> on <c>file</c>, never an exception (a package with broken XML or parts is such a file too); a sheet wider than <see cref="MaxColumns"/> columns or with more than <see cref="MaxCells"/> cells is refused before it is held in memory, and an <c>.xlsx</c> package that declares too many parts or too much unpacked data is refused before it is parsed (<see cref="SpreadsheetPackageGuard"/>, a decompression bomb); the content is never logged. The stream must be seekable (the report loader hands over a buffered file): any other stream is refused as unreadable, so the guard can never be skipped.
 /// </summary>
 internal sealed class SpreadsheetReader : ISpreadsheetReader
 {
@@ -36,6 +36,17 @@ internal sealed class SpreadsheetReader : ISpreadsheetReader
         ArgumentNullException.ThrowIfNull(content);
         try
         {
+            if (!content.CanSeek)
+            {
+                // Fail closed: the guard needs to look at the package and come back, so a stream that cannot seek is not read at all rather than read without it.
+                return Done(Result.Failure<IReadOnlyList<IReadOnlyList<string>>>(PortfolioErrors.Invalid("file", "The spreadsheet cannot be read. Download the report again as XLS, XLSX or CSV; a password-protected file cannot be read.")));
+            }
+
+            if (SpreadsheetPackageGuard.IsPackage(content) && SpreadsheetPackageGuard.Problem(content) is { } problem)
+            {
+                return Done(Result.Failure<IReadOnlyList<IReadOnlyList<string>>>(PortfolioErrors.Invalid("file", $"The spreadsheet is too large to read ({problem}). Download the report again with a shorter date range.")));
+            }
+
             using var reader = ExcelReaderFactory.CreateReader(content, new ExcelReaderConfiguration { FallbackEncoding = Encoding.GetEncoding(1252), LeaveOpen = true });
             var rows = new List<IReadOnlyList<string>>();
             while (reader.Read())

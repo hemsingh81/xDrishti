@@ -34,3 +34,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0027](0027-self-healing-sync-and-actionable-notifications.md) | Syncs heal themselves; what only the owner can do arrives as one actionable notification | Accepted |
 | [0028](0028-dividend-csv-import-with-name-matching.md) | Dividend files are recognised by their headers and matched to holdings by name, with remembered corrections | Accepted |
 | [0029](0029-dhan-report-imports-and-source-precedence.md) | Dhan's downloaded reports are imported by kind, and API trades take precedence over bill-level report rows | Accepted |
+| [0030](0030-read-only-notices-retention-and-structured-failures.md) | Notices are read-only, attention rows are kept for 30 days, and failures carry a kind | Accepted |

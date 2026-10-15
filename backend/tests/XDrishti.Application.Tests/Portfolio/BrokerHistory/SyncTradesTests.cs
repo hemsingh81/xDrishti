@@ -469,6 +469,41 @@ public sealed class SyncTradesTests
     }
 
     [Fact]
+    public async Task A_row_whose_unit_of_work_conflicts_is_not_counted_as_stored_the_window_is_not_done_and_the_next_run_reads_it_again()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.AddRange(BaseTrades());
+        s.Fx.Data.CollidingSaves = 1; // the whole window is refused: its rows are saved one by one ...
+        s.Fx.Data.RunsBeforeConflict = 1; // ... and the unit of the first row is rolled back by a second concurrency conflict
+
+        var view = await s.SyncOkAsync();
+
+        (view.Trades.Status, view.Trades.Counts.Stored).ShouldBe(("failed", 0));
+        s.BrokerTrades().ShouldBeEmpty();
+        s.Data.Watermarks.ShouldBeEmpty();
+        view.Trades.Counts.FailureReason.ShouldBe("data_changed"); // may pass (our own collision, not Dhan): the quiet retries read the window again
+
+        var again = await s.SyncOkAsync();
+
+        (again.Trades.Status, again.Trades.Counts.Stored).ShouldBe(("succeeded", 3));
+        s.Data.Watermarks[(s.Account.Id, BrokerSyncKind.Trades)].ShouldBe(new DateOnly(2026, 10, 10));
+    }
+
+    [Fact]
+    public async Task A_run_whose_last_unit_of_work_conflicts_ends_as_failed_and_is_not_recorded_as_a_success()
+    {
+        var s = await BrokerScenario.StartAsync();
+        s.Dhan.Trades.AddRange(BaseTrades());
+        s.Fx.Data.RunsBeforeConflict = 3; // the two windows and the automatic rebuild go through; the unit that ends the run conflicts
+
+        var view = await s.SyncOkAsync();
+
+        view.Trades.Status.ShouldBe("failed");
+        view.Ledger.ShouldBeNull();
+        s.Fx.Data.Health.Of(s.Account.Id, SyncHealthKind.Trades).IsFailing.ShouldBeTrue();
+    }
+
+    [Fact]
     public async Task A_crash_while_storing_a_window_ends_the_run_as_failed_with_a_fixed_text()
     {
         var s = await BrokerScenario.StartAsync();

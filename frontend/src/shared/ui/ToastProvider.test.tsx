@@ -208,6 +208,60 @@ describe('ToastProvider: toast with an Undo button', () => {
       });
     });
 
+    it('gives focus back to where the second toast was started, not to where the first toast was started', async () => {
+      function Page() {
+        const { notify } = useToast();
+        return (
+          <>
+            {['First', 'Second'].map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => {
+                  notify(`${name} done`, 'success', { label: 'Undo', onClick: vi.fn() });
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </>
+        );
+      }
+      render(
+        <AppThemeProvider>
+          <ToastProvider>
+            <Page />
+          </ToastProvider>
+        </AppThemeProvider>,
+      );
+      screen.getByRole('button', { name: 'First' }).focus();
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Undo' })).toHaveFocus();
+      });
+      // Focus moves on (out of the toast), and the toast times out with focus elsewhere.
+      await userEvent.tab();
+      await userEvent.tab();
+      act(() => {
+        vi.advanceTimersByTime(11_000);
+      });
+      await waitFor(() => {
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      });
+
+      screen.getByRole('button', { name: 'Second' }).focus();
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Undo' })).toHaveFocus();
+      });
+      await userEvent.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole('button', { name: 'Second' })).toHaveFocus();
+    });
+
     it('stays open while the pointer is over it', async () => {
       const { go } = setup();
       await userEvent.click(go);

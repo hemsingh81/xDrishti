@@ -72,7 +72,7 @@ internal sealed class UpdateLotDateHandler(
         if (saved.IsFailure)
         {
             // A second concurrency conflict (the run repeated once already) is the same conflict to the owner as a refused save.
-            return Result.Failure<LotRow>(saved.Error == PortfolioErrors.HoldingChanged ? PortfolioErrors.LotChanged : saved.Error);
+            return Result.Failure<LotRow>(saved.Error == PortfolioErrors.DataChanged ? PortfolioErrors.LotChanged : saved.Error);
         }
 
         var today = IndiaTime.Today(clock.GetUtcNow());

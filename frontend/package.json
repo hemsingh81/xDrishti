@@ -19,7 +19,7 @@
     "test:clock": "node scripts/test-clock.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "gen:api": "openapi-typescript ../backend/contracts/XDrishti.Api.json -o src/shared/api/schema.d.ts && node scripts/gen-hub-contract.mjs && prettier --write src/shared/api/schema.d.ts src/shared/realtime/hubContract.generated.ts",
+    "gen:api": "openapi-typescript ../backend/contracts/XDrishti.Api.json -o src/shared/api/schema.d.ts && node scripts/gen-hub-contract.mjs && node scripts/gen-attention-commands.mjs && prettier --write src/shared/api/schema.d.ts src/shared/realtime/hubContract.generated.ts src/shared/api/attentionCommands.generated.ts",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm run test"
   },
   "dependencies": {

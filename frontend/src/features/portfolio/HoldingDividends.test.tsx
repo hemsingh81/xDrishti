@@ -145,6 +145,17 @@ describe('Holding drawer: Dividends section', () => {
     expect(section.getByText(/Dividends are entered by you/)).toBeInTheDocument();
   });
 
+  it('shows a per-share amount with up to four decimals and never fewer than two', async () => {
+    const { section } = await openReliance([
+      buildDividend({ perShare: 0.0125 }),
+      buildDividend({ id: dividendIds.second, payDate: '2025-06-10', perShare: 2.5 }),
+    ]);
+
+    const table = within(await section.findByRole('table', { name: 'Dividends of RELIANCE' }));
+    expect(table.getByText('₹0.0125')).toBeInTheDocument();
+    expect(table.getByText('₹2.50')).toBeInTheDocument();
+  });
+
   it('flags a voided dividend: struck through, by whom and when, and no Void button', async () => {
     const { section } = await openReliance();
 

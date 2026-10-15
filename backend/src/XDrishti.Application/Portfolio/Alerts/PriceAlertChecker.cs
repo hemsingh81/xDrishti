@@ -43,7 +43,7 @@ internal sealed class PriceAlertChecker(IPriceAlerts alerts, IAccountEventLog ev
         List<ActiveAlert> triggered = [];
         if (hits.Count > 0)
         {
-            await unitOfWork.RunAsync(
+            var saved = await unitOfWork.RunAsync(
                 async token =>
                 {
                     // The work may run again after a transient failure of the transaction: it starts from nothing each time.
@@ -69,6 +69,13 @@ internal sealed class PriceAlertChecker(IPriceAlerts alerts, IAccountEventLog ev
                     return Result.Success();
                 },
                 cancellationToken);
+            if (saved.IsFailure)
+            {
+                // Rolled back (a concurrency conflict, twice): no alert was triggered, nothing is recorded; they stay active and the next tick finds them again.
+                triggered.Clear();
+                AlertsLog.CheckNotSaved(logger, hits.Count, saved.Error.Code);
+            }
+
             foreach (var hit in triggered)
             {
                 AlertsLog.Triggered(logger, hit.Id, hit.Symbol);

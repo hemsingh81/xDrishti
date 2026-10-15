@@ -191,6 +191,15 @@ describe('Import dividends: the preview', () => {
     expect(region.getByText(/1 row has a per-share amount times shares that differs/)).toBeInTheDocument();
   });
 
+  it('shows the per-share amount of a row with up to four decimals', async () => {
+    const items = [buildImportItem({ line: 2, name: 'Fabrikam Ltd', perShare: 0.0125, quantity: 100, amount: 1.25 })];
+    const { dialog } = await openDividendImport({ report: reportOf(items) });
+    const region = within(await previewFile(dialog));
+
+    const row = within(region.getByRole('row', { name: /Fabrikam Ltd/ }));
+    expect(row.getByText('₹0.0125')).toBeInTheDocument();
+  });
+
   it('lists the bad rows (the first ones listed, all counted) and the payments that repeat', async () => {
     const report = buildImportReport({
       file: {

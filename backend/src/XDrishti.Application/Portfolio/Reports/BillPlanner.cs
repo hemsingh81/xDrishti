@@ -67,6 +67,21 @@ internal static class BillPlanner
         var billQty = new Dictionary<(DateOnly, string, TradeSide), long>();
         var negative = 0;
         var inexact = 0;
+
+        // The plain identities of the NSE legs of the file, whatever becomes of them below (left out as covered by Dhan): a BSE trade whose NSE sibling is left out must still be told apart from it (ADR 0030).
+        var nseLegs = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var row in file.Items)
+        {
+            var name = BillName.Parse(row.Name);
+            if (BillTrades.KeepsPlainIdentity(row) && BillTrades.NotEquity(row, name) is null)
+            {
+                foreach (var leg in BillTrades.Legs(row))
+                {
+                    nseLegs.Add(BillTrades.Identity(row, leg.Side, name));
+                }
+            }
+        }
+
         foreach (var row in file.Items)
         {
             var name = BillName.Parse(row.Name);
@@ -122,7 +137,7 @@ internal static class BillPlanner
             names[nameKey] = (name, match, seen.Rows + 1, seen.Trades + taken);
         }
 
-        var identified = Identify(pending);
+        var identified = Identify(pending, nseLegs);
         var differences = billQty
             .Where(q => dhan[(q.Key.Item1, q.Key.Item2, q.Key.Item3)] != q.Value)
             .OrderBy(q => q.Key.Item1).ThenBy(q => q.Key.Item2, StringComparer.Ordinal).ThenBy(q => q.Key.Item3)
@@ -145,10 +160,12 @@ internal static class BillPlanner
     }
 
     /// <summary>
-    /// The identity of each trade. A trade keeps the plain identity (which stored trades have) unless another trade of the file shares it - the same bill number, scrip, day and side on another exchange. Then the NSE trade keeps the plain identity and every other one adds its exchange
-    /// (a blank exchange adds a fixed token), so the identities do not depend on the order of the rows: the same pair exported the other way round is the same trades, not new ones.
+    /// The identity of each trade. A trade keeps the plain identity (which stored trades have) unless another pending trade shares it - the same bill number, scrip, day and side on another exchange. Then the NSE trade keeps the plain identity and every other one adds its
+    /// exchange (a blank exchange adds a fixed token), so the identities do not depend on the order of the rows: the same pair exported the other way round is the same trades, not new ones.
+    /// <b>One more case</b> (ADR 0030): a trade of another named exchange (the BSE) whose NSE sibling was left out - covered by the broker's own trades - also adds its exchange, so it has the identity it has when the NSE sibling is pending. Nothing else depends on trades that
+    /// are not pending: a blank exchange, two BSE legs of which one is skipped, or an NSE trade whose BSE sibling is skipped keep the identity they had before. <paramref name="nseLegs"/> holds the plain identities of the NSE legs of the whole file.
     /// </summary>
-    private static List<IdentifiedTrade> Identify(List<(ParsedTrade Trade, GtrRow Row, TradeSide Side, BillName Name)> pending)
+    private static List<IdentifiedTrade> Identify(List<(ParsedTrade Trade, GtrRow Row, TradeSide Side, BillName Name)> pending, HashSet<string> nseLegs)
     {
         var plain = pending.Select(p => BillTrades.Identity(p.Row, p.Side, p.Name)).ToList();
         var shared = plain.GroupBy(id => id, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
@@ -158,7 +175,10 @@ internal static class BillPlanner
         {
             var (trade, row, side, name) = pending[i];
             var id = plain[i];
-            if (shared.Contains(id) && (!BillTrades.KeepsPlainIdentity(row) || !plainTaken.Add(id)))
+            var salted = shared.Contains(id)
+                ? !BillTrades.KeepsPlainIdentity(row) || !plainTaken.Add(id)
+                : BillTrades.IsOtherExchange(row) && nseLegs.Contains(id);
+            if (salted)
             {
                 id = BillTrades.Identity(row, side, name, BillTrades.CollisionSalt(row));
             }

@@ -167,9 +167,9 @@ public sealed class TradeLotRulesTests
     }
 
     [Theory]
-    [InlineData(BrokerSyncKind.Trades)]
-    [InlineData(BrokerSyncKind.Ledger)]
-    public async Task A_rebuild_is_refused_while_a_broker_history_run_of_the_account_runs_but_a_dry_run_and_another_accounts_run_are_not(BrokerSyncKind kind)
+    [InlineData(BrokerSyncKind.Trades, true)]
+    [InlineData(BrokerSyncKind.Ledger, false)] // a ledger run changes no trade and no lot
+    public async Task A_rebuild_is_refused_while_a_trades_run_of_the_account_runs_but_a_ledger_run_a_dry_run_and_another_accounts_run_are_not(BrokerSyncKind kind, bool refused)
     {
         var s = await StartAsync();
         var today = new DateOnly(2026, 10, 10);
@@ -181,7 +181,7 @@ public sealed class TradeLotRulesTests
         var dry = await s.RebuildAsync(dryRun: true);
 
         elsewhere.IsSuccess.ShouldBeTrue();
-        real.Error.Code.ShouldBe("portfolio.sync_running");
+        (real.IsFailure ? real.Error.Code : null).ShouldBe(refused ? "portfolio.sync_running" : null);
         dry.IsSuccess.ShouldBeTrue();
     }
 
