@@ -11,7 +11,11 @@ import {
   ids,
 } from '@/test/fixtures';
 import { createDataFake } from '@/test/dataFake';
+import { pinClock } from '@/test/pinClock';
 import { ready, renderData } from './testing';
+
+// "3 days ago" is counted back from the clock, and the fixtures are of the 12 Oct 2026 session: the clock is pinned.
+pinClock('2026-10-15T06:30:00Z');
 
 const day = 86_400_000;
 const daysAgo = (n: number) => new Date(Date.now() - n * day).toISOString();

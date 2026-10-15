@@ -97,4 +97,73 @@ public sealed class DhanLedgerMapperTests
     {
         Map("""{"x":1}""").ShouldBe(BrokerLedgerRead.Empty);
     }
+
+    [Theory]
+    [InlineData("""{"voucherdate":"someday","debit":"10.00","credit":"0.00"}""", BrokerDropReasons.BadDate)]
+    [InlineData("""{"debit":"10.00","credit":"0.00"}""", BrokerDropReasons.BadDate)]
+    [InlineData("""{"voucherdate":"someday"}""", BrokerDropReasons.BadDate)] // the date is checked first
+    [InlineData("""{"voucherdate":"Sep 23, 2026","vouchernumber":"1"}""", BrokerDropReasons.MissingAmount)]
+    [InlineData("""{"voucherdate":"Sep 23, 2026","debit":"","credit":""}""", BrokerDropReasons.MissingAmount)]
+    [InlineData("""{"voucherdate":"Sep 22, 2026","debit":"n/a","credit":"0.00"}""", BrokerDropReasons.BadAmount)]
+    [InlineData("""{"voucherdate":"Sep 22, 2026","credit":"1e40"}""", BrokerDropReasons.BadAmount)]
+    [InlineData("""{"voucherdate":"Sep 22, 2026","debit":"5","credit":"abc"}""", BrokerDropReasons.BadAmount)]
+    [InlineData("""{"voucherdate":"Sep 1, 2026","narration":"OPENING BALANCE","debit":"0.00","credit":"0.00","runbal":"957.29"}""", BrokerDropReasons.ZeroAmount)]
+    [InlineData("""{"voucherdate":"Sep 1, 2026","debit":"5.00","credit":"5.00"}""", BrokerDropReasons.ZeroAmount)]
+    [InlineData("5", BrokerDropReasons.UnreadableRow)]
+    [InlineData("null", BrokerDropReasons.UnreadableRow)]
+    public void Every_dropped_line_has_the_reason_of_its_first_problem(string row, string reason)
+    {
+        var read = Map($"[{row}]");
+
+        read.Dropped.ShouldBe(1);
+        read.Drops.ByReason.ShouldBe(new Dictionary<string, int> { [reason] = 1 });
+        read.Drops.Rows.ShouldBe([new BrokerRowDrop(0, reason)]);
+    }
+
+    [Fact]
+    public void The_sample_gives_one_reason_per_dropped_line_with_its_index()
+    {
+        var read = DhanLedgerMapper.Map(DhanSamples.Json("dhan-ledger.json"));
+
+        read.Drops.ByReason.ShouldBe(new Dictionary<string, int>
+        {
+            [BrokerDropReasons.BadAmount] = 1,
+            [BrokerDropReasons.BadDate] = 1,
+            [BrokerDropReasons.MissingAmount] = 1,
+            [BrokerDropReasons.ZeroAmount] = 1,
+        });
+        read.Drops.Rows.ShouldBe(
+        [
+            new BrokerRowDrop(0, BrokerDropReasons.ZeroAmount),
+            new BrokerRowDrop(5, BrokerDropReasons.BadAmount),
+            new BrokerRowDrop(6, BrokerDropReasons.BadDate),
+            new BrokerRowDrop(7, BrokerDropReasons.MissingAmount),
+        ]);
+    }
+
+    [Fact]
+    public void A_single_object_that_does_not_read_is_one_drop_with_its_reason_at_index_0()
+    {
+        var read = Map("""{"narration":"X","voucherdate":"not a date","debit":"1.00","credit":"0.00"}""");
+
+        read.Drops.ByReason.ShouldBe(new Dictionary<string, int> { [BrokerDropReasons.BadDate] = 1 });
+        read.Drops.Rows.ShouldBe([new BrokerRowDrop(0, BrokerDropReasons.BadDate)]);
+    }
+
+    [Fact]
+    public void A_dropped_line_leaves_nothing_of_its_content_in_the_drops()
+    {
+        var read = Map("""[{"narration":"ZZNARRATION PAID TO ZZ BANK","voucherdate":"Sep 22, 2026","vouchernumber":"ZZVOUCHER9","voucherdesc":"ZZDESC","debit":"ZZ987654.32","credit":"0.00"}]""");
+
+        var drops = System.Text.Json.JsonSerializer.Serialize(new { read.Drops.ByReason, read.Drops.Rows });
+        drops.ShouldNotContain("ZZ");
+        drops.ShouldNotContain("987654");
+        read.Drops.ByReason.ShouldBe(new Dictionary<string, int> { [BrokerDropReasons.BadAmount] = 1 });
+    }
+
+    [Fact]
+    public void A_read_without_drops_has_none_of_the_reasons()
+    {
+        Map("""[{"voucherdate":"2026-09-01","credit":"7"}]""").Drops.ShouldBe(BrokerReadDrops.None);
+    }
 }

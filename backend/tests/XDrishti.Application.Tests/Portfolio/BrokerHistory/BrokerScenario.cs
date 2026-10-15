@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Portfolio.BrokerHistory;
@@ -41,8 +42,8 @@ internal sealed class BrokerScenario
 
     public BrokerLotRebuilder Rebuilder() => new(Fx.Workspace, Fx.Data, Fx.Trades, Fx.Data, Fx.Clock, NullLogger<BrokerLotRebuilder>.Instance);
 
-    public BrokerHistoryPipeline Pipeline() =>
-        new(Reader(), Rebuilder(), Data, Fx.Data, Fx.Trades, Fx.Trades, Data, Fx.Accounts, Fx.Data, Fx.Data.Health, Fx.Connections.Accounts.HealthRecorder, Fx.HealSettings, Fx.Clock, NullLogger<BrokerHistoryPipeline>.Instance);
+    public BrokerHistoryPipeline Pipeline(ILogger<BrokerHistoryPipeline>? logger = null) =>
+        new(Reader(), Rebuilder(), Data, Fx.Data, Fx.Trades, Fx.Trades, Data, Fx.Accounts, Fx.Data, Fx.Data.Health, Fx.Connections.Accounts.HealthRecorder, Fx.HealSettings, Fx.Clock, logger ?? NullLogger<BrokerHistoryPipeline>.Instance);
 
     public BrokerHistoryAccess Access() => new(Fx.Fetcher, Data, Fx.Clock);
 

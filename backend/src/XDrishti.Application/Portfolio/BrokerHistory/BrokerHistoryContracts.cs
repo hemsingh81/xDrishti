@@ -9,7 +9,7 @@ public sealed record BrokerHistoryInput(DateOnly? From);
 
 /// <summary>
 /// A run that reads an account's trades or its ledger. <c>Kind</c> <c>trades</c> or <c>ledger</c>; <c>Trigger</c> <c>manual</c>, <c>scheduled</c> or <c>first</c> (the scheduled backfill of an account never read); <c>Status</c> <c>running</c>,
-/// <c>succeeded</c>, <c>failed</c> or <c>skipped</c>; <c>From</c> and <c>To</c> the dates it reads. <c>Counts</c> says what it did (windows done of total, rows read, new, already stored, unusable, skipped by reason; after a trade run the holdings
+/// <c>succeeded</c>, <c>failed</c> or <c>skipped</c>; <c>From</c> and <c>To</c> the dates it reads. <c>Counts</c> says what it did (windows done of total, rows read, new, already stored, unusable (<c>Counts.Dropped</c>, and <c>Counts.DroppedByReason</c>: how many per reason code, with <c>Counts.DroppedRows</c>: the place of the first five - request dates, page, row index and reason, never the row's content), skipped by reason; after a trade run the holdings
 /// rebuilt, unchanged and needing review). <c>Error</c> is a short safe text.
 /// </summary>
 public sealed record BrokerSyncRunView(
@@ -31,7 +31,7 @@ public sealed record BrokerHistoryRunView(BrokerSyncRunView Trades, BrokerSyncRu
 /// <summary>
 /// How far one kind is read: the <c>Watermark</c> (last date read; null when nothing was read yet), the latest run and its windows done of total. The health (ADR 0027): <c>Attempts</c> is the number of the latest run within the day's occurrence (1 for the first, up to 4 with
 /// the three quiet retries; 0 while there is no run), <c>ConsecutiveFailedDays</c> the days in a row whose last attempt failed (0 when the latest attempt succeeded), <c>LastFailureReason</c> a code (<c>unavailable</c>, <c>rate_limited</c>, <c>interrupted</c>, <c>rejected</c>,
-/// <c>history_too_large</c>, <c>token_expired</c>, <c>token_refused</c>, <c>not_connected</c>, <c>unexpected</c>; null while healthy) and <c>RetryAt</c> when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing.
+/// <c>history_too_large</c>, <c>token_expired</c>, <c>token_refused</c>, <c>not_connected</c>, <c>unexpected</c>; null while healthy) and <c>RetryAt</c> when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing. <c>DroppedByReason</c> and <c>DroppedRows</c> say why the latest run dropped rows (see below).
 /// </summary>
 public sealed record BrokerKindStatus(
     DateOnly? Watermark,
@@ -41,7 +41,14 @@ public sealed record BrokerKindStatus(
     int Attempts = 0,
     int ConsecutiveFailedDays = 0,
     string? LastFailureReason = null,
-    DateTimeOffset? RetryAt = null);
+    DateTimeOffset? RetryAt = null)
+{
+    /// <summary>Why the latest run of this kind dropped rows (roadmap ISS-03): the number per reason code, the same figures as <c>LastRun.Counts.DroppedByReason</c>. Only the latest run counts: a later clean or skipped run shows none (empty when that run dropped none, or when there is no run, or it ran before the reasons were recorded). The codes are listed on <c>BrokerDropReasons</c>.</summary>
+    public IReadOnlyDictionary<string, int> DroppedByReason { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>The place of the first five rows the latest run of this kind dropped (dates of the request, page, row index, reason code) - never the rows' content; a later clean or skipped run shows none. The same as <c>LastRun.Counts.DroppedRows</c>.</summary>
+    public IReadOnlyList<BrokerDroppedRow> DroppedRows { get; init; } = [];
+}
 
 /// <summary>
 /// The status of the broker history sync of an account: whether a run is running, both kinds, the next scheduled run (null when the service is paused or there is none) and three figures that come from <b>the latest <i>succeeded</i> trades run</b> and

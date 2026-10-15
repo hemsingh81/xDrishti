@@ -6,6 +6,7 @@ import { pendingResponse, releasePending, releaseStep } from '@/test/gate';
 import { server } from '@/test/server';
 import { smallPage } from '@/test/smallPages';
 import { buildRebuild, buildTrade, tradeIds } from '@/test/tradeFixtures';
+import { pinClock } from '@/test/pinClock';
 import { renderPortfolio, serveTrades, warmTrades } from './testing';
 
 // The list shows 50 trades a page in the app; here it pages by a few (the 50 is the constant `tradePageSize`).
@@ -44,6 +45,9 @@ async function openInfy(trades = [buy, sell, voidedBuy]) {
   const section = within(await drawer.findByRole('region', { name: 'Trades' }));
   return { ...view, fake, drawer, section };
 }
+
+// The dates typed here are past days of October 2026 and a form refuses a future date, so the clock is pinned.
+pinClock('2026-10-14T06:00:00Z');
 
 describe('Holding drawer: Trades section', () => {
   it('lists the trades newest first with date, side, quantity, price, charges and source', async () => {

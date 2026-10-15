@@ -181,6 +181,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(BrokerSyncRunView))]
 [JsonSerializable(typeof(BrokerSyncCounts))]
 [JsonSerializable(typeof(BrokerNotRebuilt))]
+[JsonSerializable(typeof(BrokerDroppedRow))]
 [JsonSerializable(typeof(BrokerHistoryStatusView))]
 [JsonSerializable(typeof(BrokerKindStatus))]
 [JsonSerializable(typeof(LedgerPage))]

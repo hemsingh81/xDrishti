@@ -61,6 +61,10 @@ internal sealed class GetBrokerHistoryStatusHandler(IAccountStore accounts, IBro
             view is null ? 0 : Math.Max(1, view.Counts.Attempts),
             figures.ConsecutiveFailedDays,
             figures.LastFailureReason,
-            RetrySchedule.NextAttemptAt(figures, settings));
+            RetrySchedule.NextAttemptAt(figures, settings))
+        {
+            DroppedByReason = view?.Counts.DroppedByReason ?? new Dictionary<string, int>(),
+            DroppedRows = view?.Counts.DroppedRows ?? [],
+        };
     }
 }

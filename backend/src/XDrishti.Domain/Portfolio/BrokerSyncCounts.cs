@@ -30,6 +30,12 @@ public sealed record BrokerSyncCounts
 
     public int Dropped { get; init; }
 
+    /// <summary>Why rows were dropped: the number of <see cref="Dropped"/> rows per reason code (<c>missing_id</c>, <c>bad_quantity</c>, <c>zero_amount</c> ...; see <c>BrokerDropReasons</c>). Empty in a run recorded before ISS-03 and when nothing was dropped; the figures add up to <see cref="Dropped"/> for a run that has them.</summary>
+    public IReadOnlyDictionary<string, int> DroppedByReason { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>The location of the first <see cref="BrokerDrops.MaxLocations"/> dropped rows of the run (request dates, page, row index and reason code) - never their content.</summary>
+    public IReadOnlyList<BrokerDroppedRow> DroppedRows { get; init; } = [];
+
     /// <summary>Trades stored already (counted in <see cref="Duplicates"/> too) that got an ISIN, charges or ticker they lacked from this read.</summary>
     public int Enriched { get; init; }
 
@@ -65,8 +71,8 @@ public sealed record BrokerSyncCounts
     /// <summary>Of the replaced rows' day-security-side groups, how many had a different total quantity than the broker's trades.</summary>
     public int SupersededDiffering { get; init; }
 
-    /// <summary>Adds the figures of one window read.</summary>
-    public BrokerSyncCounts AddWindow(int read, int stored, int duplicates, int dropped, IReadOnlyDictionary<string, int> skipped, bool halved, int emptyByNoData = 0, int enriched = 0, int superseded = 0, int supersededDiffering = 0)
+    /// <summary>Adds the figures of one window read; <paramref name="drops"/> explains the <paramref name="dropped"/> rows (those it does not account for are counted as <see cref="BrokerDrops.Other"/>).</summary>
+    public BrokerSyncCounts AddWindow(int read, int stored, int duplicates, int dropped, IReadOnlyDictionary<string, int> skipped, bool halved, int emptyByNoData = 0, int enriched = 0, int superseded = 0, int supersededDiffering = 0, BrokerDrops? drops = null)
     {
         ArgumentNullException.ThrowIfNull(skipped);
         var merged = new SortedDictionary<string, int>(SkippedByReason.ToDictionary(p => p.Key, p => p.Value), StringComparer.Ordinal);
@@ -75,6 +81,7 @@ public sealed record BrokerSyncCounts
             merged[reason] = merged.GetValueOrDefault(reason) + count;
         }
 
+        var dropsOfWindow = (drops ?? BrokerDrops.None).Reconciled(dropped);
         return this with
         {
             WindowsDone = WindowsDone + 1,
@@ -83,6 +90,8 @@ public sealed record BrokerSyncCounts
             Stored = Stored + stored,
             Duplicates = Duplicates + duplicates,
             Dropped = Dropped + dropped,
+            DroppedByReason = BrokerDrops.Merge(DroppedByReason, dropsOfWindow.ByReason),
+            DroppedRows = [.. DroppedRows.Concat(dropsOfWindow.Rows).Take(BrokerDrops.MaxLocations)],
             Enriched = Enriched + enriched,
             EmptyByNoData = EmptyByNoData + emptyByNoData,
             Superseded = Superseded + superseded,

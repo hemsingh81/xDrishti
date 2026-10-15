@@ -240,8 +240,8 @@ public sealed class BrokerHistoryApiTests(ApiFactory factory) : BrokerHistoryTes
         (await EventsAsync("BrokerHistorySynced")).ShouldBe(2);
         var details = await Factory.WithDbAsync(db => Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
             db.AccountEvents.Where(e => e.Event.ToString() == "BrokerHistorySynced" || e.Event.ToString() == "LotsRebuilt").Select(e => e.Detail!), Ct));
-        details.ShouldContain("Broker trades read (manual): 1 windows, 3 new trades, 0 already stored, 0 skipped, 0 unusable; 1 holdings rebuilt, 0 need review");
-        details.ShouldContain("Broker ledger read (manual): 1 windows, 5 new entries, 0 already stored, 0 unusable");
+        details.ShouldContain("Broker trades read (manual): 1 windows, 3 new trades, 0 already stored, 0 skipped, 0 dropped; 1 holdings rebuilt, 0 need review");
+        details.ShouldContain("Broker ledger read (manual): 1 windows, 5 new entries, 0 already stored, 0 dropped");
         details.ShouldContain(d => d.EndsWith("trigger broker_sync", StringComparison.Ordinal));
         details.ShouldAllBe(d => !d.Contains("EXMPL", StringComparison.Ordinal) && !d.Contains("130", StringComparison.Ordinal) && !d.Contains("FUNDS", StringComparison.Ordinal) && !d.Contains(FakeBrokers.DhanAccessToken, StringComparison.Ordinal));
     }

@@ -255,6 +255,7 @@ export type BrokerSyncCounts = Schemas['BrokerSyncCounts'];
 /** The answer of "Sync now": the trades run as it begins and, once it has been carried on to it, the ledger run. */
 export type BrokerHistoryRuns = Schemas['BrokerHistoryRunView'];
 export type BrokerKindStatus = Schemas['BrokerKindStatus'];
+export type BrokerDroppedRow = Schemas['BrokerDroppedRow'];
 export type BrokerHistoryStatus = Schemas['BrokerHistoryStatusView'];
 /** A holding the automatic rebuild left alone, and why (needs_review, quantity_mismatch, ambiguous, no_holding, changed_meanwhile). */
 export type BrokerNotRebuilt = Schemas['BrokerNotRebuilt'];

@@ -12,6 +12,7 @@ import {
   buildSwingAccount,
   summaryOf,
 } from '@/test/fixtures';
+import { fakeTimers, pinClock } from '@/test/pinClock';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
 import { NotificationBell } from './components/NotificationBell';
@@ -56,15 +57,11 @@ const openDrawer = async (name: string | RegExp) => {
   return screen.findByRole('dialog', { name: 'Notifications' });
 };
 
-describe('Notification bell', () => {
-  // The expiry dates are whole days and the age is rounded, so "2 days ago" depended on the time of day the suite ran at.
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-15T06:30:00Z') });
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+// The expiry dates are whole days and the age is rounded ("2 days ago"): the clock is pinned, and the dates of the keys that
+// expire (keyExpiring) are built from the pinned instant.
+pinClock('2026-10-15T06:30:00Z');
 
+describe('Notification bell', () => {
   it('shows the unread count in its name and badge', async () => {
     serve(...twoProblems());
     renderBell();
@@ -297,7 +294,7 @@ describe('Notification bell: data notices', () => {
   });
 
   it('asks for the data notices again when the poll interval passes', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fakeTimers({ shouldAdvanceTime: true });
     try {
       let reads = 0;
       server.use(

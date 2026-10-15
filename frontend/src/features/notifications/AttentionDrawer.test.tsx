@@ -17,6 +17,7 @@ import {
   ids,
   summaryOf,
 } from '@/test/fixtures';
+import { pinClock } from '@/test/pinClock';
 import { renderRoutes } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
 import { findToast } from '@/test/toast';
@@ -64,12 +65,7 @@ const itemsOf = (drawer: BoundFunctions<typeof queries>) =>
   within(drawer.getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
 
 // The fixtures carry fixed timestamps from 14 Oct 2026, so the relative times ("… ago") depend on the clock: pin it.
-beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-14T13:00:00Z') });
-});
-afterEach(() => {
-  vi.useRealTimers();
-});
+pinClock('2026-10-14T13:00:00Z');
 
 describe('Notification drawer: items that need the owner', () => {
   it('lists the open items most urgent first with severity, title, text, time and buttons', async () => {

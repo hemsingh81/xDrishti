@@ -37,6 +37,12 @@ public sealed class FakeBrokers
 
     public int TradePageSize { get; set; } = 100;
 
+    /// <summary>Trade rows sent exactly as written (a row that does not read, to see how it is dropped), listed with the others by their date and the <c>exchangeTradeId</c> text in the row's key.</summary>
+    public List<(DateOnly Date, string Key, string Json)> RawTrades { get; } = [];
+
+    /// <summary>Ledger rows sent exactly as written, for the dates asked.</summary>
+    public List<(DateOnly Date, string Json)> RawLedger { get; } = [];
+
     /// <summary>What the fake Dhan reports at <c>GET /v2/ledger</c> (those whose date is in the asked dates).</summary>
     public List<FakeLedgerLine> Ledger { get; } = [];
 
@@ -69,6 +75,8 @@ public sealed class FakeBrokers
         Quotes.Clear();
         Trades.Clear();
         Ledger.Clear();
+        RawTrades.Clear();
+        RawLedger.Clear();
         TradePageSize = 100;
         EmptyPageIsNoDataError = false;
         HistoryOverride = null;
@@ -129,17 +137,17 @@ public sealed class FakeBrokers
             var query = System.Web.HttpUtility.ParseQueryString(request.Uri.Query);
             var from = DateOnly.ParseExact(query["from-date"]!, "yyyy-MM-dd", invariant);
             var to = DateOnly.ParseExact(query["to-date"]!, "yyyy-MM-dd", invariant);
-            return Json(HttpStatusCode.OK, "[" + string.Join(",", Ledger.ToArray().Where(l => l.Date >= from && l.Date <= to).Select(l => l.ToJson())) + "]");
+            return Json(HttpStatusCode.OK, "[" + string.Join(",", Ledger.ToArray().Where(l => l.Date >= from && l.Date <= to).Select(l => l.ToJson()).Concat(RawLedger.ToArray().Where(l => l.Date >= from && l.Date <= to).Select(l => l.Json))) + "]");
         }
 
         var parts = request.Uri.AbsolutePath["/v2/trades/".Length..].Split('/');
         var fromDate = DateOnly.ParseExact(parts[0], "yyyy-MM-dd", invariant);
         var toDate = DateOnly.ParseExact(parts[1], "yyyy-MM-dd", invariant);
         var page = int.Parse(parts[2], invariant);
-        var rows = Trades.ToArray().Where(t => t.Date >= fromDate && t.Date <= toDate).OrderBy(t => t.Date).ThenBy(t => t.TradeId, StringComparer.Ordinal).Skip(page * TradePageSize).Take(TradePageSize).ToList();
+        var rows = Trades.ToArray().Select(t => (t.Date, Key: t.TradeId, Json: t.ToJson())).Concat(RawTrades.ToArray()).Where(t => t.Date >= fromDate && t.Date <= toDate).OrderBy(t => t.Date).ThenBy(t => t.Key, StringComparer.Ordinal).Skip(page * TradePageSize).Take(TradePageSize).ToList();
         return rows.Count == 0 && EmptyPageIsNoDataError
             ? Json(HttpStatusCode.BadRequest, """{"errorType":"Data_API_Error","errorCode":"DH-907","errorMessage":"Incorrect parameters or no data present"}""")
-            : Json(HttpStatusCode.OK, "[" + string.Join(",", rows.Select(t => t.ToJson())) + "]");
+            : Json(HttpStatusCode.OK, "[" + string.Join(",", rows.Select(t => t.Json)) + "]");
     }
 
     /// <summary>Dhan's documented market-quote answer for the asked NSE_EQ ids that <see cref="Quotes"/> knows (made-up values).</summary>

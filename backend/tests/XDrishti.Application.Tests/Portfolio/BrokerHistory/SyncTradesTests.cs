@@ -568,7 +568,7 @@ public sealed class SyncTradesTests
         var events = s.Fx.Events(AccountEventType.BrokerHistorySynced);
         events.Count.ShouldBe(2); // the trades and the ledger of the manual run; the scheduled one found nothing new
         var trades = events.Single(e => e.Detail!.StartsWith("Broker trades", StringComparison.Ordinal));
-        trades.Detail.ShouldBe("Broker trades read (manual): 2 windows, 3 new trades, 0 already stored, 0 skipped, 0 unusable; 1 holdings rebuilt, 0 need review");
+        trades.Detail.ShouldBe("Broker trades read (manual): 2 windows, 3 new trades, 0 already stored, 0 skipped, 0 dropped; 1 holdings rebuilt, 0 need review");
         events.ShouldAllBe(e => e.AccountId == s.Account.Id && e.Actor == Actor && !e.Detail!.Contains("EXMPL") && !e.Detail.Contains("130") && !e.Detail.Contains("T1"));
     }
 

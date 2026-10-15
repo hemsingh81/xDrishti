@@ -2,8 +2,12 @@ import { screen, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { buildBrokerKind, buildBrokerRun, buildBrokerStatus } from '@/test/brokerHistoryFixtures';
 import { buildSyncStatus } from '@/test/fixtures';
+import { pinClock } from '@/test/pinClock';
 import { server } from '@/test/server';
 import { renderPortfolio } from './testing';
+
+// The retry times are counted from the clock ("retrying in 5 minutes"), and the fixtures are of Oct 2026: the clock is pinned.
+pinClock('2026-10-15T06:30:00Z');
 
 // What the sync lines say when a sync is being retried quietly, keeps failing, or has read earlier history (ADR 0027).
 const statusPath = '/api/accounts/:id/sync/broker-history/status';

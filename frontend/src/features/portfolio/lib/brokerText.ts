@@ -1,5 +1,6 @@
 import type { BrokerHistoryStatus, BrokerKindStatus } from '@/shared/api';
 import { formatDate, formatNumber } from '@/shared/lib/format';
+import { summariseDrops, type DropsSummary } from './dropReasons';
 import type { RunTone } from './syncText';
 
 export type BrokerKind = 'trades' | 'ledger';
@@ -15,6 +16,8 @@ export interface KindSummary {
   detail: string;
   /** When the run ended (or began, while it runs); null when none. */
   at: string | null;
+  /** Rows the latest run dropped and why (ISS-03); null when it dropped none, is still running or did not run. */
+  drops: DropsSummary | null;
 }
 
 const count = (n: number, one: string, many: string): string => `${formatNumber(n)} ${n === 1 ? one : many}`;
@@ -29,6 +32,12 @@ function progress(status: BrokerKindStatus): string {
 
 /** One kind (trades or ledger) as a line: how far it is read, what the latest run found (new, completed), and why it failed. */
 export function summariseKind(kind: BrokerKind, status: BrokerKindStatus): KindSummary {
+  const run = status.lastRun;
+  const drops = run && run.status !== 'running' && run.status !== 'skipped' ? summariseDrops(kind, status) : null;
+  return { ...summariseRun(kind, status), drops };
+}
+
+function summariseRun(kind: BrokerKind, status: BrokerKindStatus): Omit<KindSummary, 'drops'> {
   const name = names[kind];
   const run = status.lastRun;
   const readTo = status.watermark === null ? null : formatDate(status.watermark);

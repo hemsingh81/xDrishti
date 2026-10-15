@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import type {
+  BrokerDroppedRow,
   BrokerHistoryStatus,
   BrokerKindStatus,
   BrokerSyncCounts,
@@ -13,6 +14,33 @@ import { ids } from './fixtures';
 const uuid = (n: number) => `00000000-0000-4000-8000-0000000009${String(n).padStart(2, '0')}`;
 
 export const brokerRunIds = { trades: uuid(1), ledger: uuid(2), trades2: uuid(3), ledger2: uuid(4) } as const;
+
+/** The place of one dropped row (zero-based page and row, as the API sends them). */
+export const buildDroppedRow = (overrides: Partial<BrokerDroppedRow> = {}): BrokerDroppedRow => ({
+  windowFrom: '2026-08-01',
+  windowTo: '2026-08-31',
+  page: 0,
+  rowIndex: 2,
+  reason: 'bad_price',
+  ...overrides,
+});
+
+/** A kind whose latest run dropped rows: the reasons with their counts, and the places the API lists. */
+export function buildDroppingKind(
+  byReason: Record<string, number>,
+  rows: BrokerDroppedRow[] = [],
+  overrides: Partial<BrokerKindStatus> = {},
+): BrokerKindStatus {
+  const dropped = Object.values(byReason).reduce((sum, n) => sum + n, 0);
+  return buildBrokerKind({
+    droppedByReason: byReason,
+    droppedRows: rows,
+    lastRun: buildBrokerRun({
+      counts: buildBrokerCounts({ dropped, droppedByReason: byReason, droppedRows: rows }),
+    }),
+    ...overrides,
+  });
+}
 
 export const buildBrokerCounts = (overrides: Partial<BrokerSyncCounts> = {}): BrokerSyncCounts => ({
   windowsDone: 3,

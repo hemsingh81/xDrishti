@@ -8,8 +8,8 @@ internal static partial class BrokerHistoryLog
     [LoggerMessage(EventId = 4201, Level = LogLevel.Information, Message = "Broker history {Kind} run {RunId} of account {Slug} started ({Trigger}): {Windows} windows")]
     public static partial void Started(ILogger logger, string kind, Guid runId, string slug, string trigger, int windows);
 
-    [LoggerMessage(EventId = 4202, Level = LogLevel.Information, Message = "Broker history {Kind} run {RunId} done: {Stored} new, {Duplicates} already stored, {Dropped} unusable, {Skipped} skipped in {Windows} windows ({Halved} halved)")]
-    public static partial void Succeeded(ILogger logger, string kind, Guid runId, int stored, int duplicates, int dropped, int skipped, int windows, int halved);
+    [LoggerMessage(EventId = 4202, Level = LogLevel.Information, Message = "Broker history {Kind} run {RunId} done: {Stored} new, {Duplicates} already stored, {Dropped} dropped{DroppedReasons}, {Skipped} skipped in {Windows} windows ({Halved} halved)")]
+    public static partial void Succeeded(ILogger logger, string kind, Guid runId, int stored, int duplicates, int dropped, string droppedReasons, int skipped, int windows, int halved);
 
     [LoggerMessage(EventId = 4203, Level = LogLevel.Warning, Message = "Broker history {Kind} run {RunId} failed: {Reason}")]
     public static partial void Failed(ILogger logger, string kind, Guid runId, string reason);

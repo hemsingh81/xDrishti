@@ -10,7 +10,7 @@ namespace XDrishti.Infrastructure.Brokers;
 /// <c>exchangeTransactionCharges</c>, <c>stampDuty</c>: rupee amounts, summed into <see cref="BrokerTrade.Charges"/>) and the time <c>exchangeTime</c> (else <c>createTime</c>, else <c>updateTime</c>; <c>"NA"</c> counts as missing), India time; names match in any case and
 /// numbers may be text (<see cref="DhanJson"/>). <c>customSymbol</c> is a company name, never a ticker. A row without a ticker is kept when it has an ISIN or a security id (the use case finds the share in the instrument master); a row with none of the three is skipped as
 /// <see cref="BrokerSkipReasons.NoSymbol"/>. Only <c>NSE_EQ</c> rows that are not intraday products are kept (delivery, <c>MTF</c>, <c>MARGIN</c>): other segments are skipped and counted per reason (<see cref="BrokerSkipReasons"/>), so are intraday, cover and bracket orders, which net out
-/// within the day and never reach the holdings. A row without an id, a side, a whole positive quantity, a positive price or a readable date is dropped and counted. Pure.
+/// within the day and never reach the holdings. A row without an id, a side, a whole positive quantity, a positive price or a readable date is dropped and counted <b>with its reason</b> (<see cref="BrokerDropReasons"/>: the first problem in that order) and the index of the first few in the page; nothing of the row's content is kept. Pure.
 /// </summary>
 internal static class DhanTradeMapper
 {
@@ -40,53 +40,81 @@ internal static class DhanTradeMapper
     {
         var trades = new List<BrokerTrade>(rows.ValueKind == JsonValueKind.Array ? rows.GetArrayLength() : 0);
         var skipped = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var drops = new List<BrokerRowDrop>();
         var count = 0;
-        var dropped = 0;
         if (rows.ValueKind == JsonValueKind.Array)
         {
             foreach (var row in rows.EnumerateArray())
             {
-                count++;
-                switch (Read(row))
+                var result = Read(row);
+                if (result.Trade is { } trade)
                 {
-                    case { Trade: { } trade }:
-                        trades.Add(trade);
-                        break;
-                    case { Skip: { } reason }:
-                        skipped[reason] = skipped.GetValueOrDefault(reason) + 1;
-                        break;
-                    default:
-                        dropped++;
-                        break;
+                    trades.Add(trade);
                 }
+                else if (result.Skip is { } reason)
+                {
+                    skipped[reason] = skipped.GetValueOrDefault(reason) + 1;
+                }
+                else
+                {
+                    drops.Add(new BrokerRowDrop(count, result.Drop ?? BrokerDropReasons.Other));
+                }
+
+                count++;
             }
         }
 
-        return new BrokerTradePage(trades, count, dropped, skipped);
+        return new BrokerTradePage(trades, count, drops.Count, skipped) { Drops = BrokerReadDrops.From(drops) };
     }
 
-    private readonly record struct RowResult(BrokerTrade? Trade, string? Skip);
+    /// <summary>What a row is: a trade, a skipped row (with its <see cref="BrokerSkipReasons"/> reason) or a dropped one (with its <see cref="BrokerDropReasons"/> reason). Exactly one is set.</summary>
+    private readonly record struct RowResult(BrokerTrade? Trade, string? Skip, string? Drop)
+    {
+        public static RowResult Dropped(string reason) => new(null, null, reason);
+    }
 
     private static RowResult Read(JsonElement row)
     {
         if (row.ValueKind != JsonValueKind.Object)
         {
-            return default;
+            return RowResult.Dropped(BrokerDropReasons.UnreadableRow);
         }
 
         if (SkipReason(DhanJson.Text(row, "exchangeSegment", "segment"), DhanJson.Text(row, "productType", "product")) is { } skip)
         {
-            return new RowResult(null, skip);
+            return new RowResult(null, skip, null);
         }
 
+        // The first problem found is the reason; the order is the order of the checks.
         var id = DhanJson.Text(row, "exchangeTradeId", "tradeId");
-        var qty = DhanJson.Number(row, Limit, "tradedQuantity", "quantity");
-        var price = DhanJson.Number(row, Limit, "tradedPrice", "price");
-        var moment = Moment(row);
-        if (id is null || id.Length > MaxTradeIdLength || !TradeRules.TryParseSide(DhanJson.Text(row, "transactionType", "side"), out var side)
-            || qty is not { } quantity || quantity <= 0m || quantity != decimal.Truncate(quantity) || price is not { } traded || traded <= 0m || moment is not { } when)
+        if (id is null)
         {
-            return default;
+            return RowResult.Dropped(BrokerDropReasons.MissingId);
+        }
+
+        if (id.Length > MaxTradeIdLength)
+        {
+            return RowResult.Dropped(BrokerDropReasons.BadId);
+        }
+
+        if (!TradeRules.TryParseSide(DhanJson.Text(row, "transactionType", "side"), out var side))
+        {
+            return RowResult.Dropped(BrokerDropReasons.MissingSide);
+        }
+
+        if (DhanJson.Number(row, Limit, "tradedQuantity", "quantity") is not { } quantity || quantity <= 0m || quantity != decimal.Truncate(quantity))
+        {
+            return RowResult.Dropped(BrokerDropReasons.BadQuantity);
+        }
+
+        if (DhanJson.Number(row, Limit, "tradedPrice", "price") is not { } traded || traded <= 0m)
+        {
+            return RowResult.Dropped(BrokerDropReasons.BadPrice);
+        }
+
+        if (Moment(row) is not { } at)
+        {
+            return RowResult.Dropped(BrokerDropReasons.BadTime);
         }
 
         // The ticker can be null in Dhan's answers (the published sample has "tradingSymbol": null); "customSymbol" is a company name and is never used as one. The ISIN and the security id let the use case find the share.
@@ -95,11 +123,12 @@ internal static class DhanTradeMapper
         var securityId = DhanJson.Known(row, "securityId");
         if (symbol is null && isin is null && securityId is null)
         {
-            return new RowResult(null, BrokerSkipReasons.NoSymbol);
+            return new RowResult(null, BrokerSkipReasons.NoSymbol, null);
         }
 
         return new RowResult(
-            new BrokerTrade(id, DhanJson.Known(row, "orderId", "exchangeOrderId"), side, symbol, isin, securityId, (long)quantity, traded, Charges(row), when.Date, when.Time),
+            new BrokerTrade(id, DhanJson.Known(row, "orderId", "exchangeOrderId"), side, symbol, isin, securityId, (long)quantity, traded, Charges(row), at.Date, at.Time),
+            null,
             null);
     }
 

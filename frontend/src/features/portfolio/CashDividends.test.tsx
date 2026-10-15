@@ -5,6 +5,7 @@ import { answerLedger, buildLedgerEntry, ledgerIds, sampleLedger } from '@/test/
 import { buildDividend, dividendIds } from '@/test/dividendFixtures';
 import { holdingIds, ids, sampleHoldings } from '@/test/fixtures';
 import { server } from '@/test/server';
+import { pinClock } from '@/test/pinClock';
 import { renderPortfolio, serveDividends, warmDividends } from './testing';
 
 beforeAll(warmDividends, 60_000);
@@ -46,6 +47,9 @@ async function openPanel(options: Parameters<typeof serveDividends>[0] = {}, sea
   const panel = within(await screen.findByRole('dialog', { name: 'Cash & dividends' }));
   return { ...view, fake, panel };
 }
+
+// The dates typed here are past days of October 2026 and a form refuses a future date, so the clock is pinned.
+pinClock('2026-10-14T06:00:00Z');
 
 describe('Cash & dividends panel: what it says about dividends and the ledger', () => {
   it('says that Dhan credits dividends to the bank account, so they are entered by the owner', async () => {

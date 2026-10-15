@@ -1,19 +1,18 @@
 import { act } from '@testing-library/react';
-
-let clockNow = 0;
+import { pinNow } from './pinClock';
 
 /**
- * Sets the clock the screens read (`Date.now()`) to a moment, without faking timers: the page keeps its real timers
- * and requests, so the network mocks behave as in every other test. Undone by `vi.restoreAllMocks()`.
+ * Sets the clock the screens read (`Date.now()`, `new Date()`) to a moment, without faking timers: the page keeps its real
+ * timers and requests, so the network mocks behave as in every other test. Undone after the test (see setup.ts). For a whole
+ * file or `describe`, use `pinClock` instead; this one is for a test that moves between moments.
  */
 export function setNow(iso: string) {
-  clockNow = Date.parse(iso);
-  vi.spyOn(Date, 'now').mockImplementation(() => clockNow);
+  pinNow(iso);
 }
 
 /** Lets minutes pass on the clock set by `setNow`: the shared clock re-reads it as when a hidden tab is shown again. */
 export function passMinutes(minutes: number) {
-  clockNow += minutes * 60_000;
+  vi.setSystemTime(Date.now() + minutes * 60_000);
   act(() => {
     document.dispatchEvent(new Event('visibilitychange'));
   });

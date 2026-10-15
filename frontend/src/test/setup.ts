@@ -5,6 +5,7 @@ import { installFakeIntersectionObserver } from './intersection';
 import { categoryStub, chartStub } from './chartStub';
 import { releasePending } from './gate';
 import { server } from './server';
+import { pinNow, unpinClock } from './pinClock';
 
 // Flows such as "save → password dialog → retry → toast" pass through several MUI transitions; under the parallel
 // full suite they can take longer than the 1 s default, so async queries (findBy*, waitFor) wait up to 5 s.
@@ -51,6 +52,21 @@ beforeAll(() => {
     }
   };
 });
+// Diagnostic (npm run test:clock): XD_TEST_NOW shifts `Date` for every test; the default is the real clock. A test that fakes
+// timers itself keeps control of them, but starts them at that instant unless it gives its own `now`.
+const shiftedNow = (import.meta.env as Record<string, string | undefined>).XD_TEST_NOW;
+if (shiftedNow) {
+  if (Number.isNaN(Date.parse(shiftedNow))) throw new Error(`XD_TEST_NOW is not an ISO instant: ${shiftedNow}`);
+  const fakeTimersOf = vi.useFakeTimers.bind(vi);
+  vi.useFakeTimers = (config) => fakeTimersOf({ now: new Date(shiftedNow), ...config });
+}
+beforeEach(() => {
+  if (shiftedNow) pinNow(shiftedNow);
+});
+afterEach(() => {
+  unpinClock(); // whatever a test pinned (pinClock, setNow) or faked is not for the next one
+});
+
 // The live hub: unless a test installs its own (see hubFake.ts), a connection never completes, which for the screens is the
 // same as having no hub (they read once a minute, as before it existed).
 beforeEach(() => {

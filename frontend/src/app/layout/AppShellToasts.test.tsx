@@ -2,6 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildReconnectNotice } from '@/test/attentionFixtures';
+import { pinClock } from '@/test/pinClock';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
 import { findToast } from '@/test/toast';
@@ -9,6 +10,9 @@ import { routes } from '../router';
 
 // One ToastProvider serves every route (it lives in the shell), so a toast raised on a screen that never had a provider
 // (System status) shows, and one that has to stay is not lost when the owner moves to another screen.
+// The notice is dated 14 Oct 2026 and the shell shows the account's key and login against today: the clock is pinned.
+pinClock('2026-10-15T06:30:00Z');
+
 const serveReconnect = () => {
   server.use(http.get('/api/portfolio/notices', () => HttpResponse.json({ items: [buildReconnectNotice()] })));
 };

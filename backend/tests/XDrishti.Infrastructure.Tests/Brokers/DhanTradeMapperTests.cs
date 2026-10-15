@@ -212,4 +212,90 @@ public sealed class DhanTradeMapperTests
 
         (page.Rows, page.Trades.Count, page.Dropped).ShouldBe((0, 0, 0));
     }
+
+    private const string Good = """{"exchangeTradeId":"T1","transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""";
+
+    [Theory]
+    [InlineData("""{"transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.MissingId)]
+    [InlineData("""{"exchangeTradeId":"  ","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.MissingId)]
+    [InlineData("""{"exchangeTradeId":"0123456789012345678901234567890123456789012345678901234567890123456789","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadId)]
+    [InlineData("""{"exchangeTradeId":"T1","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.MissingSide)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"HOLD","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.MissingSide)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadQuantity)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":0,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadQuantity)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1.5,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadQuantity)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":"many","tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadQuantity)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1e40,"tradedPrice":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadQuantity)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadPrice)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":0,"exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadPrice)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":"abc","exchangeTime":"2026-09-02 10:00:00"}""", BrokerDropReasons.BadPrice)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1}""", BrokerDropReasons.BadTime)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"NA","createTime":"NA"}""", BrokerDropReasons.BadTime)]
+    [InlineData("""{"exchangeTradeId":"T1","transactionType":"BUY","tradingSymbol":"X","tradedQuantity":1,"tradedPrice":1,"exchangeTime":"yesterday"}""", BrokerDropReasons.BadTime)]
+    [InlineData("5", BrokerDropReasons.UnreadableRow)]
+    [InlineData("\"text\"", BrokerDropReasons.UnreadableRow)]
+    [InlineData("null", BrokerDropReasons.UnreadableRow)]
+    [InlineData("""{"exchangeTradeId":"","transactionType":"","tradedQuantity":0,"tradedPrice":0}""", BrokerDropReasons.MissingId)] // several problems: the first in the order of the checks is the reason
+    public void Every_dropped_row_has_the_reason_of_its_first_problem(string row, string reason)
+    {
+        var page = Map($"[{row}]");
+
+        page.Dropped.ShouldBe(1);
+        page.Drops.ByReason.ShouldBe(new Dictionary<string, int> { [reason] = 1 });
+        page.Drops.Rows.ShouldBe([new BrokerRowDrop(0, reason)]);
+    }
+
+    [Fact]
+    public void The_drops_of_a_page_are_counted_per_reason_with_the_index_of_the_first_five_and_the_kept_and_skipped_rows_have_none()
+    {
+        var page = Map($"[{Good}, 5, {Good}, null, {Good.Replace("\"tradedPrice\":1", "\"tradedPrice\":0", StringComparison.Ordinal)}, \"x\", 7, 8, 9, 10]");
+
+        page.Rows.ShouldBe(10);
+        page.Dropped.ShouldBe(8);
+        page.Drops.ByReason.ShouldBe(new Dictionary<string, int> { [BrokerDropReasons.BadPrice] = 1, [BrokerDropReasons.UnreadableRow] = 7 });
+        page.Drops.Rows.ShouldBe(
+        [
+            new BrokerRowDrop(1, BrokerDropReasons.UnreadableRow),
+            new BrokerRowDrop(3, BrokerDropReasons.UnreadableRow),
+            new BrokerRowDrop(4, BrokerDropReasons.BadPrice),
+            new BrokerRowDrop(5, BrokerDropReasons.UnreadableRow),
+            new BrokerRowDrop(6, BrokerDropReasons.UnreadableRow),
+        ]);
+    }
+
+    [Fact]
+    public void A_row_that_is_skipped_or_kept_is_not_a_drop_and_a_page_without_drops_has_no_reasons()
+    {
+        var page = Map(Row("BSE_EQ", "CNC"));
+
+        (page.Dropped, page.Drops.ByReason.Count, page.Drops.Rows.Count).ShouldBe((0, 0, 0));
+        Map(Row()).Drops.ShouldBe(BrokerReadDrops.None);
+    }
+
+    [Fact]
+    public void The_sample_pages_dropped_row_is_the_one_without_a_trade_id_at_its_place()
+    {
+        var page = DhanTradeMapper.Map(DhanSamples.Json("dhan-trades-page.json"));
+
+        page.Drops.ByReason.Values.Sum().ShouldBe(page.Dropped);
+        page.Drops.Rows.Count.ShouldBe(1);
+        page.Drops.Rows[0].RowIndex.ShouldBe(5); // the NOID row of the sample: no exchangeTradeId
+        page.Drops.Rows[0].Reason.ShouldBe(BrokerDropReasons.MissingId);
+        page.Drops.ByReason.ShouldBe(new Dictionary<string, int> { [BrokerDropReasons.MissingId] = 1 });
+    }
+
+    [Fact]
+    public void A_dropped_row_leaves_nothing_of_its_content_in_the_drops()
+    {
+        var row = """{"exchangeTradeId":"ZZTRADEID9","orderId":"ZZORDER9","transactionType":"BUY","exchangeSegment":"NSE_EQ","tradingSymbol":"ZZSYMBOL9","customSymbol":"Zz Industries Ltd","isin":"INE999Z01017","securityId":"ZZSEC9","tradedQuantity":777777,"tradedPrice":-8888.77,"exchangeTime":"2026-09-02 10:00:00"}""";
+
+        var page = Map($"[{row}]");
+
+        var drops = System.Text.Json.JsonSerializer.Serialize(new { page.Drops.ByReason, page.Drops.Rows });
+        drops.ShouldNotContain("ZZ");
+        drops.ShouldNotContain("777777");
+        drops.ShouldNotContain("8888");
+        drops.ShouldNotContain("INE999");
+        page.Drops.ByReason.ShouldBe(new Dictionary<string, int> { [BrokerDropReasons.BadPrice] = 1 });
+    }
 }

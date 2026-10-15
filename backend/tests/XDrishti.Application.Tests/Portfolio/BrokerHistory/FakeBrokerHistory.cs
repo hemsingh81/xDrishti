@@ -25,6 +25,26 @@ internal sealed class FakeBrokerHistory : IBrokerTrades, IBrokerLedger
 
     public int DroppedPerWindow { get; set; }
 
+    /// <summary>Dropped rows with a reason code reported with the first page of every window (in addition to <see cref="DroppedPerWindow"/>, which come without a reason).</summary>
+    public Dictionary<string, int> DropReasonsPerWindow { get; } = [];
+
+    /// <summary>The page of every window that carries <see cref="DropReasonsPerWindow"/> (0: the first).</summary>
+    public int DropPage { get; set; }
+
+    /// <summary>Dropped lines per reason code reported with every ledger answer.</summary>
+    public Dictionary<string, int> LedgerDropReasonsPerWindow { get; } = [];
+
+    private static BrokerReadDrops DropsOf(Dictionary<string, int> reasons)
+    {
+        var list = new List<BrokerRowDrop>();
+        foreach (var (reason, count) in reasons.OrderBy(r => r.Key, StringComparer.Ordinal))
+        {
+            list.AddRange(Enumerable.Range(0, count).Select(_ => new BrokerRowDrop(list.Count, reason)));
+        }
+
+        return BrokerReadDrops.From(list);
+    }
+
     /// <summary>Answers every trade whatever the asked dates (a Dhan that sends rows outside the window).</summary>
     public bool IgnoreDates { get; set; }
 
@@ -74,8 +94,10 @@ internal sealed class FakeBrokerHistory : IBrokerTrades, IBrokerLedger
         }
 
         var skipped = page == 0 ? new Dictionary<string, int>(SkippedPerWindow) : new Dictionary<string, int>();
-        var dropped = page == 0 ? DroppedPerWindow : 0;
-        return BrokerResponse.Ok(new BrokerTradePage(rows, rows.Count + (page == 0 ? dropped + skipped.Values.Sum() : 0), dropped, skipped));
+        var withReason = page == DropPage ? DropReasonsPerWindow.Values.Sum() : 0;
+        var dropped = (page == 0 ? DroppedPerWindow : 0) + withReason;
+        var total = rows.Count + dropped + (page == 0 ? skipped.Values.Sum() : 0);
+        return BrokerResponse.Ok(new BrokerTradePage(rows, total, dropped, skipped) { Drops = page == DropPage ? DropsOf(DropReasonsPerWindow) : BrokerReadDrops.None });
     }
 
     public ValueTask<BrokerResponse<BrokerLedgerRead>> FetchAsync(SecretValue accessToken, DateOnly from, DateOnly to, CancellationToken cancellationToken)
@@ -93,6 +115,7 @@ internal sealed class FakeBrokerHistory : IBrokerTrades, IBrokerLedger
         }
 
         var rows = Ledger.Where(l => l.Date >= from && l.Date <= to).ToList();
-        return ValueTask.FromResult(BrokerResponse.Ok(new BrokerLedgerRead(rows, rows.Count, 0)));
+        var dropped = LedgerDropReasonsPerWindow.Values.Sum();
+        return ValueTask.FromResult(BrokerResponse.Ok(new BrokerLedgerRead(rows, rows.Count + dropped, dropped) { Drops = DropsOf(LedgerDropReasonsPerWindow) }));
     }
 }

@@ -1947,7 +1947,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The status of the trades and ledger sync: running, for each kind the watermark (last date read), the latest run (status, dates, counts, error) and windowsDone / windowsTotal, the next scheduled run (null when the service is paused) and, from the latest SUCCEEDED trades run and no other (nothing is carried forward from older runs; a skipped, failed or running run neither changes nor erases them): holdingsRebuilt, holdingsNeedingReview (a hand-dated lot; use the holding's rebuild preview) and needsReviewSymbols (their trading symbols, at most 50; holdingsNeedingReview says how many in all). Health (ADR 0027): each kind also has attempts (the number of the latest run within the day's occurrence: 1 for the first, up to 4 with the three quiet retries), consecutiveFailedDays (days in a row whose last attempt failed; 0 when the latest succeeded), lastFailureReason (unavailable, rate_limited, interrupted, rejected, history_too_large, token_expired, token_refused, not_connected, unexpected; null while healthy) and retryAt (when the next quiet retry is due, null when none is pending); the run counts carry attempts, failureReason and deepenedTo. deepenedTo is the earliest date the nightly deepening of the trade history reached (one earlier year a night while the trades do not explain a holding in a way earlier history could fix; null: none read) and deepenExhausted that it reads no more (Dhan's history ends there or the furthest year back is reached) */
+    /** The status of the trades and ledger sync: running, for each kind the watermark (last date read), the latest run (status, dates, counts, error) and windowsDone / windowsTotal, the next scheduled run (null when the service is paused) and, from the latest SUCCEEDED trades run and no other (nothing is carried forward from older runs; a skipped, failed or running run neither changes nor erases them): holdingsRebuilt, holdingsNeedingReview (a hand-dated lot; use the holding's rebuild preview) and needsReviewSymbols (their trading symbols, at most 50; holdingsNeedingReview says how many in all). Health (ADR 0027): each kind also has attempts (the number of the latest run within the day's occurrence: 1 for the first, up to 4 with the three quiet retries), consecutiveFailedDays (days in a row whose last attempt failed; 0 when the latest succeeded), lastFailureReason (unavailable, rate_limited, interrupted, rejected, history_too_large, token_expired, token_refused, not_connected, unexpected; null while healthy) and retryAt (when the next quiet retry is due, null when none is pending); the run counts carry attempts, failureReason and deepenedTo. deepenedTo is the earliest date the nightly deepening of the trade history reached (one earlier year a night while the trades do not explain a holding in a way earlier history could fix; null: none read) and deepenExhausted that it reads no more (Dhan's history ends there or the furthest year back is reached). Dropped rows (roadmap ISS-03): each kind also has droppedByReason (how many rows the latest run of that kind dropped per reason code; a later clean or skipped run shows none: unreadable_row, missing_id, bad_id, missing_side, bad_quantity, bad_price, bad_time for trades; bad_date, missing_amount, bad_amount, zero_amount for the ledger; failed_checks, store_refused, other) and droppedRows (from the same latest run: the place of the first five: windowFrom, windowTo, page, rowIndex, reason - never a row's content); the same two fields are in the run counts (lastRun.counts), where droppedByReason adds up to dropped. Old runs have both empty */
     get: operations['GetAccountBrokerHistoryStatus'];
     put?: never;
     post?: never;
@@ -2877,6 +2877,21 @@ export interface components {
       trades: number;
       candidates: components['schemas']['BillCandidate'][];
     };
+    /**
+     * @description Where one dropped row of a broker read lies, and why it was dropped: the dates of the request that returned it (DateOnly BrokerDroppedRow.WindowFrom, DateOnly BrokerDroppedRow.WindowTo; after a split, the half that was asked), the int BrokerDroppedRow.Page of the answer (0 for the
+     *     ledger, which has one) and the zero-based int BrokerDroppedRow.RowIndex of the row in that answer, so the owner can look the row up in Dhan's own statement. <b>Location and reason code only</b>: never a name, symbol, amount, id or narration of the row (roadmap ISS-03).
+     */
+    BrokerDroppedRow: {
+      /** Format: date */
+      windowFrom: string;
+      /** Format: date */
+      windowTo: string;
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      rowIndex: number;
+      reason: string;
+    };
     /** @description Optional body of "Sync now" for the broker history: the first date to read, instead of the watermark (or, for an account never read, the first import date). */
     BrokerHistoryInput: {
       /** Format: date */
@@ -2919,7 +2934,7 @@ export interface components {
     /**
      * @description How far one kind is read: the `Watermark` (last date read; null when nothing was read yet), the latest run and its windows done of total. The health (ADR 0027): `Attempts` is the number of the latest run within the day's occurrence (1 for the first, up to 4 with
      *     the three quiet retries; 0 while there is no run), `ConsecutiveFailedDays` the days in a row whose last attempt failed (0 when the latest attempt succeeded), `LastFailureReason` a code (`unavailable`, `rate_limited`, `interrupted`, `rejected`,
-     *     `history_too_large`, `token_expired`, `token_refused`, `not_connected`, `unexpected`; null while healthy) and `RetryAt` when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing.
+     *     `history_too_large`, `token_expired`, `token_refused`, `not_connected`, `unexpected`; null while healthy) and `RetryAt` when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing. `DroppedByReason` and `DroppedRows` say why the latest run dropped rows (see below).
      */
     BrokerKindStatus: {
       /** Format: date */
@@ -2942,6 +2957,12 @@ export interface components {
       lastFailureReason?: null | string;
       /** Format: date-time */
       retryAt?: null | string;
+      /** @description Why the latest run of this kind dropped rows (roadmap ISS-03): the number per reason code, the same figures as `LastRun.Counts.DroppedByReason`. Only the latest run counts: a later clean or skipped run shows none (empty when that run dropped none, or when there is no run, or it ran before the reasons were recorded). The codes are listed on `BrokerDropReasons`. */
+      droppedByReason?: {
+        [key: string]: number;
+      };
+      /** @description The place of the first five rows the latest run of this kind dropped (dates of the request, page, row index, reason code) - never the rows' content; a later clean or skipped run shows none. The same as `LastRun.Counts.DroppedRows`. */
+      droppedRows?: components['schemas']['BrokerDroppedRow'][];
     };
     /**
      * @description A holding (or security) the automatic rebuild after a trade sync left alone, and why: `needs_review`, `quantity_mismatch`, `ambiguous`, `no_holding` or `changed_meanwhile`. The symbol is a ticker, never trade content.
@@ -2979,6 +3000,12 @@ export interface components {
       duplicates?: number;
       /** Format: int32 */
       dropped?: number;
+      /** @description Why rows were dropped: the number of int BrokerSyncCounts.Dropped rows per reason code (`missing_id`, `bad_quantity`, `zero_amount` ...; see `BrokerDropReasons`). Empty in a run recorded before ISS-03 and when nothing was dropped; the figures add up to int BrokerSyncCounts.Dropped for a run that has them. */
+      droppedByReason?: {
+        [key: string]: number;
+      };
+      /** @description The location of the first int BrokerDrops.MaxLocations dropped rows of the run (request dates, page, row index and reason code) - never their content. */
+      droppedRows?: components['schemas']['BrokerDroppedRow'][];
       /**
        * Format: int32
        * @description Trades stored already (counted in int BrokerSyncCounts.Duplicates too) that got an ISIN, charges or ticker they lacked from this read.
@@ -3028,7 +3055,7 @@ export interface components {
     };
     /**
      * @description A run that reads an account's trades or its ledger. `Kind``trades` or `ledger`; `Trigger``manual`, `scheduled` or `first` (the scheduled backfill of an account never read); `Status``running`,
-     *     `succeeded`, `failed` or `skipped`; `From` and `To` the dates it reads. `Counts` says what it did (windows done of total, rows read, new, already stored, unusable, skipped by reason; after a trade run the holdings
+     *     `succeeded`, `failed` or `skipped`; `From` and `To` the dates it reads. `Counts` says what it did (windows done of total, rows read, new, already stored, unusable (`Counts.Dropped`, and `Counts.DroppedByReason`: how many per reason code, with `Counts.DroppedRows`: the place of the first five - request dates, page, row index and reason, never the row's content), skipped by reason; after a trade run the holdings
      *     rebuilt, unchanged and needing review). `Error` is a short safe text.
      */
     BrokerSyncRunView: {

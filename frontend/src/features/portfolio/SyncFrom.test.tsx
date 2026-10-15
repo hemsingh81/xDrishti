@@ -11,6 +11,7 @@ import {
 } from '@/test/brokerHistoryFixtures';
 import { buildAccountDetail, buildConnection, summaryOf, withConnection } from '@/test/fixtures';
 import { problemResponse, server } from '@/test/server';
+import { pinClock } from '@/test/pinClock';
 import { renderPortfolio } from './testing';
 
 const statusPath = '/api/accounts/:id/sync/broker-history/status';
@@ -31,6 +32,9 @@ function captureSyncs(answer?: () => Response) {
   );
   return bodies;
 }
+
+// The dates typed here are past days of October 2026 and a form refuses a future date, so the clock is pinned.
+pinClock('2026-10-14T06:00:00Z');
 
 describe('Sync trades & ledger: read from an earlier date', () => {
   it('opens a small dialog with the date field focused and says that Dhan does not state how far back it goes', async () => {

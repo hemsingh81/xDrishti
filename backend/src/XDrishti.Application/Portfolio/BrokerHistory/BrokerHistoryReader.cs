@@ -16,6 +16,10 @@ namespace XDrishti.Application.Portfolio.BrokerHistory;
 /// window longer than one date it is <i>unclear</i>: the window is split in half once, like a too-large one, and what the halves return is used (a half that answers DH-907 to its first page is empty). On the first page of a single date, or of a half, it
 /// is taken as empty. Every (half-)window taken as empty only for this reason is counted in <see cref="BrokerSyncCounts.EmptyByNoData"/>, so the owner can see that an empty stretch rested on that code alone.
 /// </para>
+/// <para>
+/// <b>Dropped rows</b> (roadmap ISS-03): the mappers say why each row was dropped; the reader adds the place - the dates of the request that returned it (the half, after a split), the page and the row's index - for the first few, and sums the reasons
+/// over pages and halves. Rows a source dropped without a reason are counted as <c>other</c>, so the reasons always add up to the dropped rows. Counts and places only.
+/// </para>
 /// </summary>
 internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger ledger)
 {
@@ -65,7 +69,10 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
             one.Value.Dropped + two.Value.Dropped,
             Merge(one.Value.Skipped, two.Value.Skipped),
             Halved: true,
-            one.Value.EmptyByNoData + two.Value.EmptyByNoData));
+            one.Value.EmptyByNoData + two.Value.EmptyByNoData)
+        {
+            Drops = one.Value.Drops.Plus(two.Value.Drops),
+        });
     }
 
     public async ValueTask<Result<LedgerWindowRead>> ReadLedgerAsync(SecretValue token, DateWindow window, CancellationToken cancellationToken)
@@ -101,7 +108,10 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
             one.Value.Received + two.Value.Received,
             one.Value.Dropped + two.Value.Dropped,
             Halved: true,
-            one.Value.EmptyByNoData + two.Value.EmptyByNoData));
+            one.Value.EmptyByNoData + two.Value.EmptyByNoData)
+        {
+            Drops = one.Value.Drops.Plus(two.Value.Drops),
+        });
     }
 
     /// <summary>The marker for "this window is too wide"; replaced by a real error when it is not (or cannot be) halved.</summary>
@@ -119,6 +129,7 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
         var all = new List<BrokerTrade>();
         var rows = 0;
         var dropped = 0;
+        var drops = BrokerDrops.None;
         var skipped = new Dictionary<string, int>(StringComparer.Ordinal);
         for (var page = 0; page < MaxPages; page++)
         {
@@ -134,7 +145,7 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
                 if (page > 0)
                 {
                     // After a page of rows, "no data" is the end of the history.
-                    return Result.Success(new TradeWindowRead(all, rows, dropped, skipped, Halved: false));
+                    return Result.Success(new TradeWindowRead(all, rows, dropped, skipped, Halved: false) { Drops = drops });
                 }
 
                 return mayProbe && window.Days > 1
@@ -144,12 +155,13 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
 
             if (read.Rows == 0)
             {
-                return Result.Success(new TradeWindowRead(all, rows, dropped, skipped, Halved: false));
+                return Result.Success(new TradeWindowRead(all, rows, dropped, skipped, Halved: false) { Drops = drops });
             }
 
             all.AddRange(read.Trades);
             rows += read.Rows;
             dropped += read.Dropped;
+            drops = drops.Plus(Located(read.Drops, read.Dropped, window, page));
             skipped = Merge(skipped, read.Skipped);
         }
 
@@ -168,7 +180,7 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
         var read = response.Value;
         if (!read.NoData)
         {
-            return Result.Success(new LedgerWindowRead(read.Rows, read.Received, read.Dropped, Halved: false));
+            return Result.Success(new LedgerWindowRead(read.Rows, read.Received, read.Dropped, Halved: false) { Drops = Located(read.Drops, read.Dropped, window, 0) });
         }
 
         return mayProbe && window.Days > 1
@@ -182,6 +194,16 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
         { Kind: BrokerFailureKind.Rejected, BrokerCode: TooLargeCode } when window.Days > 1 => TooLarge,
         _ => ConnectionErrors.Broker(failure),
     };
+
+    /// <summary>
+    /// The drops of one answer with the request that returned them: each located row gets the dates of <paramref name="window"/> (the half that was asked, after a split) and the page. Rows the mapper dropped without saying why are counted
+    /// as <see cref="BrokerDropReasons.Other"/>, so the reasons always add up to <paramref name="dropped"/>.
+    /// </summary>
+    private static BrokerDrops Located(BrokerReadDrops drops, int dropped, DateWindow window, int page) => new BrokerDrops
+    {
+        ByReason = drops.ByReason,
+        Rows = [.. drops.Rows.Select(d => new BrokerDroppedRow(window.From, window.To, page, d.RowIndex, d.Reason))],
+    }.Reconciled(dropped);
 
     private static Dictionary<string, int> Merge(IReadOnlyDictionary<string, int> left, IReadOnlyDictionary<string, int> right)
     {

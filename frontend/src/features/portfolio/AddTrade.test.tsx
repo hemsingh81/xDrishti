@@ -5,6 +5,7 @@ import { holdingIds, ids, sampleHoldings, searchHoldings } from '@/test/fixtures
 import { releaseStep, holdStep } from '@/test/gate';
 import { server } from '@/test/server';
 import { buildRebuild } from '@/test/tradeFixtures';
+import { pinClock } from '@/test/pinClock';
 import { renderPortfolio, serveTrades, tradesPanel, twoPortfolioAccounts, warmTrades } from './testing';
 
 beforeAll(warmTrades, 60_000);
@@ -49,6 +50,9 @@ async function fillValid(dialog: Dialog) {
 }
 
 const submit = (dialog: Dialog) => userEvent.click(dialog.getByRole('button', { name: 'Add trade' }));
+
+// The dates typed here are past days of October 2026 and a form refuses a future date, so the clock is pinned.
+pinClock('2026-10-14T06:00:00Z');
 
 describe('Add trade: the form', () => {
   it('offers the account, the security, the side, the date, the time, the quantity, the price and the charges', async () => {

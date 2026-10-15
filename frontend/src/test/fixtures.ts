@@ -216,7 +216,7 @@ export function buildAccountDetail(overrides: Partial<AccountDetail> = {}): Acco
       { name: 'apiSecret', set: true, updatedAt: '2026-10-09T09:00:00Z' },
     ],
     apiKeyIssuedOn: '2026-10-09',
-    apiKeyExpiresOn: '2027-10-09',
+    apiKeyExpiresOn: '2099-12-31',
     tokenStatus: 'connected',
     connection: buildConnected(),
     createdAt: '2026-10-09T09:00:00Z',
@@ -266,7 +266,7 @@ export function buildSwingAccount(overrides: Partial<AccountDetail> = {}): Accou
       { name: 'apiSecret', set: false, updatedAt: null },
     ],
     apiKeyIssuedOn: '2026-10-09',
-    apiKeyExpiresOn: '2027-10-09',
+    apiKeyExpiresOn: '2099-12-31',
     tokenStatus: 'not_connected',
     connection: buildConnection(),
     roles: {

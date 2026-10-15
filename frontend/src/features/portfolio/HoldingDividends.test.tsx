@@ -6,6 +6,7 @@ import { buildHolding, holdingIds, searchHoldings, sampleHoldings } from '@/test
 import { pendingResponse, releasePending } from '@/test/gate';
 import { server } from '@/test/server';
 import { smallPage } from '@/test/smallPages';
+import { pinClock } from '@/test/pinClock';
 import { renderPortfolio, serveDividends, warmDividends } from './testing';
 
 // The list shows 50 dividends a page in the app; here it pages by a few.
@@ -39,6 +40,9 @@ async function openReliance(dividends = [paid, earlier, voided]) {
   const section = within(await drawer.findByRole('region', { name: 'Dividends' }));
   return { ...view, fake, drawer, section };
 }
+
+// The dates typed here are past days of October 2026 and a form refuses a future date, so the clock is pinned.
+pinClock('2026-10-14T06:00:00Z');
 
 describe('Holding drawer: the income figures', () => {
   it('shows the dividends, charges, total return, net total return and net XIRR of the holding, with the dates', async () => {

@@ -433,6 +433,7 @@ internal sealed class BrokerHistoryPipeline(
     {
         var today = IndiaTime.Today(clock.GetUtcNow());
         var dropped = read.Dropped;
+        var failedChecks = 0;
         var repeated = 0;
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var skipped = new Dictionary<string, int>(read.Skipped, StringComparer.Ordinal);
@@ -443,6 +444,7 @@ internal sealed class BrokerHistoryPipeline(
             if (!IsUsable(trade.Trade, today))
             {
                 dropped++;
+                failedChecks++;
                 continue;
             }
 
@@ -496,7 +498,7 @@ internal sealed class BrokerHistoryPipeline(
                 ]);
                 return ValueTask.FromResult(SupersedeOutcome.None);
             },
-            placed => counts.AddWindow(read.Rows, placed.Stored, repeated + placed.Existing, dropped + placed.Refused, skipped, read.Halved, read.EmptyByNoData, placed.Enriched, placed.Superseded.Rows, placed.Superseded.Differing),
+            placed => counts.AddWindow(read.Rows, placed.Stored, repeated + placed.Existing, dropped + placed.Refused, skipped, read.Halved, read.EmptyByNoData, placed.Enriched, placed.Superseded.Rows, placed.Superseded.Differing, read.Drops.Plus(BrokerDropReasons.FailedChecks, failedChecks).Plus(BrokerDropReasons.StoreRefused, placed.Refused)),
             placed => dropped + skipped.GetValueOrDefault(BrokerSkipReasons.NoSymbol) + placed.Refused,
             cancellationToken,
             EnrichAsync(account.Id),
@@ -573,7 +575,7 @@ internal sealed class BrokerHistoryPipeline(
                     .ToList();
                 return charges.Count == 0 ? SupersedeOutcome.None : new SupersedeOutcome(await ledger.SupersedeImportedChargesAsync(account.Id, charges, at, token), 0);
             },
-            placed => counts.AddWindow(read.Received, placed.Stored, placed.Existing, read.Dropped + placed.Refused, new Dictionary<string, int>(), read.Halved, read.EmptyByNoData, superseded: placed.Superseded.Rows),
+            placed => counts.AddWindow(read.Received, placed.Stored, placed.Existing, read.Dropped + placed.Refused, new Dictionary<string, int>(), read.Halved, read.EmptyByNoData, superseded: placed.Superseded.Rows, drops: read.Drops.Plus(BrokerDropReasons.StoreRefused, placed.Refused)),
             placed => read.Dropped + placed.Refused,
             cancellationToken);
     }
@@ -766,7 +768,8 @@ internal sealed class BrokerHistoryPipeline(
                 return Result.Success();
             },
             cancellationToken);
-        BrokerHistoryLog.Succeeded(logger, kind, run.Id, counts.Stored, counts.Duplicates, counts.Dropped, counts.Skipped, counts.WindowsDone, counts.Halved);
+        var droppedReasons = Reasons(counts);
+        BrokerHistoryLog.Succeeded(logger, kind, run.Id, counts.Stored, counts.Duplicates, counts.Dropped, droppedReasons, counts.Skipped, counts.WindowsDone, counts.Halved);
     }
 
     /// <summary>True when a run changed something: it stored rows or rebuilt holdings, or (trades) the holdings that need review are not the ones the last successful run reported.</summary>
@@ -789,7 +792,7 @@ internal sealed class BrokerHistoryPipeline(
     private static IEnumerable<string> ReviewSymbols(BrokerSyncCounts counts) =>
         counts.NotRebuilt.Where(n => n.Reason == BrokerLotRebuilder.NeedsReview).Select(n => n.Symbol).Order(StringComparer.Ordinal);
 
-    private static string Describe(BrokerSyncRun run, BrokerSyncCounts counts)
+    internal static string Describe(BrokerSyncRun run, BrokerSyncCounts counts)
     {
         var trigger = BrokerHistoryViews.Name(run.Trigger);
         var halved = counts.Halved > 0 ? $", {counts.Halved} halved" : string.Empty;
@@ -799,8 +802,31 @@ internal sealed class BrokerHistoryPipeline(
         var superseded = counts.Superseded > 0 ? $"; {counts.Superseded} bill-level rows of imported reports replaced ({counts.SupersededDiffering} groups with a different total)" : string.Empty;
         var replaced = counts.Superseded > 0 ? $"; {counts.Superseded} imported depository charges replaced" : string.Empty;
         return run.Kind == BrokerSyncKind.Trades
-            ? $"Broker trades read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new trades, {counts.Duplicates} already stored{completed}, {counts.Skipped} skipped, {counts.Dropped} unusable; {counts.Rebuilt} holdings rebuilt, {counts.NeedsReview} need review{deepened}{superseded}"
-            : $"Broker ledger read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new entries, {counts.Duplicates} already stored, {counts.Dropped} unusable{replaced}";
+            ? $"Broker trades read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new trades, {counts.Duplicates} already stored{completed}, {counts.Skipped} skipped, {counts.Dropped} dropped{Reasons(counts)}; {counts.Rebuilt} holdings rebuilt, {counts.NeedsReview} need review{deepened}{superseded}"
+            : $"Broker ledger read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new entries, {counts.Duplicates} already stored, {counts.Dropped} dropped{Reasons(counts)}{replaced}";
+    }
+
+    /// <summary>The most drop reasons spelled out in the audit and log text; the rest are summed up as <c>+N more</c> so that the figures after them are not cut at <see cref="AccountEvent.MaxDetailLength"/>. The run counts keep every reason.</summary>
+    internal const int MaxReasonsListed = 3;
+
+    /// <summary>
+    /// The reasons of the dropped rows as <c> (reason×count, ...)</c>, the biggest first and at most <see cref="MaxReasonsListed"/> of them, then <c>+N more</c> for the others; empty when none. Counts only: nothing of a row, not even its place in the answer.
+    /// </summary>
+    internal static string Reasons(BrokerSyncCounts counts)
+    {
+        if (counts.DroppedByReason.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        var ordered = counts.DroppedByReason.OrderByDescending(p => p.Value).ThenBy(p => p.Key, StringComparer.Ordinal).ToList();
+        var listed = ordered.Take(MaxReasonsListed).Select(p => $"{p.Key}×{p.Value}").ToList();
+        if (ordered.Count > MaxReasonsListed)
+        {
+            listed.Add($"+{ordered.Count - MaxReasonsListed} more");
+        }
+
+        return " (" + string.Join(", ", listed) + ")";
     }
 
     private async ValueTask<bool> FailAsync(BrokerAccount account, BrokerSyncRun run, BrokerSyncCounts counts, Error error)

@@ -135,6 +135,7 @@ export type {
   BrokerSyncRun,
   BrokerSyncCounts,
   BrokerHistoryRuns,
+  BrokerDroppedRow,
   BrokerKindStatus,
   BrokerHistoryStatus,
   BrokerNotRebuilt,

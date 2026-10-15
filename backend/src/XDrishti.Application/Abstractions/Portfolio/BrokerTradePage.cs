@@ -7,6 +7,9 @@ namespace XDrishti.Application.Abstractions.Portfolio;
 /// </summary>
 public sealed record BrokerTradePage(IReadOnlyList<BrokerTrade> Trades, int Rows, int Dropped, IReadOnlyDictionary<string, int> Skipped, bool NoData = false)
 {
+    /// <summary>Why the <see cref="Dropped"/> rows were dropped (roadmap ISS-03): per reason code and the index of the first few. A source that does not say leaves it empty (the reader then counts them as <c>other</c>).</summary>
+    public BrokerReadDrops Drops { get; init; } = BrokerReadDrops.None;
+
     public static BrokerTradePage Empty { get; } = new([], 0, 0, new Dictionary<string, int>());
 
     /// <summary>The page of an answer that was Dhan's "no data" code (DH-907).</summary>
