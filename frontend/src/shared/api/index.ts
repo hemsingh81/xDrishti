@@ -1,4 +1,5 @@
 export { api, ApiError, configureApiAuth, ensureOk, unwrap, type ApiAuthHooks } from './client';
+export { parseCommand, runCommand, type Command } from './commands';
 export { dataIdlePollMs, dataJobQuery, dataOverviewQuery } from './dataJobs';
 export { dataNoticesPollMs, dataNoticesQuery } from './dataNotices';
 export { portfolioNoticesPollMs, portfolioNoticesQuery } from './portfolioNotices';
@@ -221,4 +222,25 @@ export type {
   TradeRebuild,
   TradeSecurity,
   TradeUndoResult,
+  BillCandidate,
+  BillCharges,
+  BillCoverage,
+  BillDetails,
+  BillDifference,
+  BillNameView,
+  CostBatch,
+  CostBatchPage,
+  CostImportResult,
+  CostUndoResult,
+  DematDifference,
+  DematHeld,
+  DematPreview,
+  DematSynced,
+  DpLine,
+  DpPreview,
+  ImportFileError,
+  ImportFilePreview,
+  ImportFileResult,
+  ImportSummary,
+  ImportWarning,
 } from './types';

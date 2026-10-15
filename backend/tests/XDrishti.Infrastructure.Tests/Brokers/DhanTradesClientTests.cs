@@ -118,7 +118,7 @@ public sealed class DhanTradesClientTests : IDisposable
     [InlineData(HttpStatusCode.Unauthorized, """{"errorType":"Invalid_Authentication","errorCode":"DH-901","errorMessage":"expired"}""", BrokerFailureKind.Unauthorized, "DH-901")]
     [InlineData(HttpStatusCode.Forbidden, "", BrokerFailureKind.Unauthorized, null)]
     [InlineData(HttpStatusCode.TooManyRequests, """{"errorCode":"DH-904"}""", BrokerFailureKind.Rejected, "DH-904")]
-    [InlineData(HttpStatusCode.TooManyRequests, "", BrokerFailureKind.Rejected, null)]
+    [InlineData(HttpStatusCode.TooManyRequests, "", BrokerFailureKind.Rejected, "DH-904")] // a 429 without a code in its body is the rate limit all the same (ADR 0027)
     [InlineData(HttpStatusCode.BadRequest, """{"errorCode":"DH-905"}""", BrokerFailureKind.Rejected, "DH-905")]
     [InlineData(HttpStatusCode.InternalServerError, """{"errorCode":"DH-908"}""", BrokerFailureKind.Unavailable, "DH-908")]
     [InlineData(HttpStatusCode.BadGateway, "<html>bad gateway</html>", BrokerFailureKind.Unavailable, null)]

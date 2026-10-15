@@ -377,7 +377,7 @@ has no effect on scheduled work.</li>
 </tr>
 <tr>
 <td>Holdings quote refresh</td>
-<td>Every 5 min, 09:15–15:30 on trading days; <strong>built</strong> as the service <code>holdings-quotes</code> (P2-06, <a href="../adr/0019-holdings-quotes-day-change-and-the-first-interval-service.html">ADR 0019</a>; the first <code>interval</code> service: retries 0, timeout 2 min, no catch-up, overlapping ticks dropped)</td>
+<td>Every 5 min, 09:15–15:30 on trading days; <strong>built</strong> as the service <code>holdings-quotes</code> (P2-06, <a href="../adr/0019-holdings-quotes-day-change-and-the-first-interval-service.html">ADR 0019</a>; the first <code>interval</code> service: retries 0, timeout 2 min, no catch-up, overlapping ticks dropped); since P2-16 (<a href="../adr/0027-self-healing-sync-and-actionable-notifications.html">ADR 0027</a>) a poll that fails because Dhan did not answer or limited the rate is recorded as <em>skipped</em> (the next 5-minute poll is its own retry) and fails the run — which the bell&#39;s failed-service notice shows — only after failing on two days in a row; a refused token fails it at once</td>
 <td><code>xd-api</code> today (<code>xd-feed</code> later)</td>
 </tr>
 <tr>
@@ -402,12 +402,12 @@ has no effect on scheduled work.</li>
 </tr>
 <tr>
 <td>Account &amp; portfolio sync</td>
-<td>16:30 (designed); <strong>built</strong> per account, once a day at the time set under Accounts (<a href="../adr/0013-portfolio-import-with-settings-and-daily-refresh.html">ADR 0013</a>) and shown on the Services screen as a <strong>read-only row</strong> with a link</td>
+<td>16:30 (designed); <strong>built</strong> per account, once a day at the time set under Accounts (<a href="../adr/0013-portfolio-import-with-settings-and-daily-refresh.html">ADR 0013</a>) and shown on the Services screen as a <strong>read-only row</strong> with a link; since P2-16 a refresh that failed for a reason that may pass is retried quietly by the holdings refresh runner (1, 5 and 15 minutes, inside the day) and a renewed Dhan login makes the missed syncs run by themselves (<a href="12-portfolio-monitoring.html">doc 12</a> §3 &quot;Self-healing and attention items (P2-16)&quot;; this needs <code>Portfolio:AutoRefresh:Enabled</code>)</td>
 <td><code>xd-api</code> today</td>
 </tr>
 <tr>
 <td>Portfolio trades &amp; ledger</td>
-<td>16:30 on trading days, never before the session has ended; <strong>built</strong> as the service <code>portfolio-broker-history</code> (P2-13, <a href="../adr/0025-dhan-trade-history-and-ledger-sync.html">ADR 0025</a>): reads each connected Portfolio account&#39;s Dhan trades and ledger (a one-time backfill, then from a watermark) and rebuilds lots where that is safe (<a href="12-portfolio-monitoring.html">doc 12</a> §3); an expired token is reported as <code>token_expired</code>; &quot;Sync trades &amp; ledger&quot; on the Portfolio screen works at any time</td>
+<td>16:30 on trading days, never before the session has ended; <strong>built</strong> as the service <code>portfolio-broker-history</code> (P2-13, <a href="../adr/0025-dhan-trade-history-and-ledger-sync.html">ADR 0025</a>): reads each connected Portfolio account&#39;s Dhan trades and ledger (a one-time backfill, then from a watermark) and rebuilds lots where that is safe (<a href="12-portfolio-monitoring.html">doc 12</a> §3); an expired token is reported as <code>token_expired</code>; &quot;Sync trades &amp; ledger&quot; on the Portfolio screen works at any time; since P2-16 the same run is retried quietly after a failure that may pass, reads <strong>one earlier year of trades per day</strong> (up to 8) while the trades do not explain a holding, and reads again the windows that dropped rows once the Dhan mapping has changed (<a href="../adr/0027-self-healing-sync-and-actionable-notifications.html">ADR 0027</a>); since P2-17 a bill-level trade imported from a Dhan report is replaced when the run stores the broker&#39;s own trades for the same day, ISIN and side (<a href="../adr/0029-dhan-report-imports-and-source-precedence.html">ADR 0029</a>)</td>
 <td><code>xd-api</code> today</td>
 </tr>
 <tr>
@@ -617,7 +617,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-14 21:34</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-15 09:32</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

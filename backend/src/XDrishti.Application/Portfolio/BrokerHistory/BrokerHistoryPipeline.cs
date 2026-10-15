@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -32,6 +33,9 @@ internal sealed class BrokerHistoryPipeline(
     ILedgerStore ledger,
     IAccountEventLog events,
     IPortfolioUnitOfWork unitOfWork,
+    ISyncHealthStore health,
+    SyncHealthRecorder recorder,
+    IHealSettings healSettings,
     TimeProvider clock,
     ILogger<BrokerHistoryPipeline> logger)
 {
@@ -60,7 +64,11 @@ internal sealed class BrokerHistoryPipeline(
         var watermark = await runs.GetWatermarkAsync(account.Id, kind, cancellationToken);
         var from = requestedFrom ?? watermark ?? account.Portfolio.ImportDate;
         var trigger = !scheduled ? BrokerSyncTrigger.Manual : watermark is null ? BrokerSyncTrigger.First : BrokerSyncTrigger.Scheduled;
-        var run = BrokerSyncRun.Start(account.Id, kind, trigger, from, IndiaTime.Today(now), actor, now);
+
+        // The number of this attempt within the day's occurrence: after a failure earlier today it is the next one (a quiet retry, ADR 0027).
+        var failing = await health.GetAsync(account.Id, SyncFailures.KindOf(kind), cancellationToken);
+        var attempt = failing is { LastFailedAt: { } failedAt } && failing.IsFailing && IndiaTime.Today(failedAt) == IndiaTime.Today(now) ? failing.Attempts + 1 : 1;
+        var run = BrokerSyncRun.Start(account.Id, kind, trigger, from, IndiaTime.Today(now), actor, now, attempt);
         return await runs.TryStartAsync(run, StaleAfter, now, cancellationToken) ? Result.Success(run) : Result.Failure<BrokerSyncRun>(PortfolioErrors.SyncRunning);
     }
 
@@ -70,6 +78,10 @@ internal sealed class BrokerHistoryPipeline(
         ArgumentNullException.ThrowIfNull(account);
         var now = clock.GetUtcNow();
         await runs.RecordSkippedAsync(BrokerSyncRun.Skipped(account.Id, BrokerSyncKind.Trades, BrokerSyncTrigger.Scheduled, IndiaTime.Today(now), actor, reason, now), cancellationToken);
+
+        // Neither the trades nor the ledger were read: the owner has to sign in again, and the reads catch up by themselves afterwards (ADR 0027).
+        await recorder.FailedAsync(account.Id, SyncHealthKind.Trades, SyncFailures.TokenExpired, cancellationToken);
+        await recorder.FailedAsync(account.Id, SyncHealthKind.Ledger, SyncFailures.TokenExpired, cancellationToken);
     }
 
     /// <summary>
@@ -144,7 +156,9 @@ internal sealed class BrokerHistoryPipeline(
             var current = await runs.GetAsync(runId, CancellationToken.None);
             if (current is { IsRunning: true })
             {
-                await runs.CompleteAsync(runId, SyncStatus.Failed, current.Counts, reason, clock.GetUtcNow(), CancellationToken.None);
+                var code = SyncFailures.OfMessage(reason);
+                await runs.CompleteAsync(runId, SyncStatus.Failed, current.Counts with { FailureReason = code }, reason, clock.GetUtcNow(), CancellationToken.None);
+                await recorder.FailedAsync(current.AccountId, SyncFailures.KindOf(current.Kind), code, CancellationToken.None);
             }
         }
 #pragma warning disable CA1031 // nothing more can be done; the cleanup of interrupted syncs ends the run at the next start
@@ -173,20 +187,45 @@ internal sealed class BrokerHistoryPipeline(
     private async ValueTask<bool> ExecuteAsync(BrokerAccount account, BrokerSyncRun run, string actor, bool scheduled, bool rebuild, WindowWork work, CancellationToken cancellationToken)
     {
         var kind = BrokerHistoryViews.Name(run.Kind);
-        var counts = BrokerSyncCounts.None;
+        var counts = BrokerSyncCounts.None with { Attempts = Math.Max(1, run.Counts.Attempts) };
         try
         {
             var windows = BrokerWindows.Split(run.FromDate, run.ToDate);
-            counts = counts with { WindowsTotal = windows.Count };
+            var healthKind = SyncFailures.KindOf(run.Kind);
+            var stored = await health.GetAsync(account.Id, healthKind, cancellationToken);
+
+            // Windows that dropped rows for a data reason are read again once the Dhan mapping has changed since the account was last read (ADR 0027); they come first, the regular windows follow.
+            var reread = await RereadWindowsAsync(account, run, stored, cancellationToken);
+            var again = reread.Windows;
+            counts = counts with { WindowsTotal = again.Count + windows.Count };
             var trigger = BrokerHistoryViews.Name(run.Trigger);
-            BrokerHistoryLog.Started(logger, kind, run.Id, account.Slug, trigger, windows.Count);
+            BrokerHistoryLog.Started(logger, kind, run.Id, account.Slug, trigger, counts.WindowsTotal);
             await runs.UpdateProgressAsync(run.Id, counts, cancellationToken);
-            foreach (var window in windows)
+
+            // The mapping version is stamped as soon as the windows to read again have been read - not at the end: a transient failure later in the run must not make every retry read the same windows again. When some of the windows to read again lie
+            // inside the run's own dates (a manual run from an earlier date) they are left to the run, so the version waits for its last window: a failure part-way must not drop the windows it never reached.
+            var version = reader.MapperVersion(run.Kind);
+            var unstamped = stored.MapperVersion < version;
+            var stampAt = again.Count + (reread.InsideRun ? windows.Count : 0);
+            if (unstamped && stampAt == 0)
+            {
+                await recorder.MapperVersionAsync(account.Id, healthKind, version, cancellationToken);
+                unstamped = false;
+            }
+
+            var done = 0;
+            foreach (var window in again.Concat(windows))
             {
                 var next = await work(window, counts, cancellationToken);
                 if (next.IsFailure)
                 {
-                    return await FailAsync(run, counts, next.Error);
+                    return await FailAsync(account, run, counts, next.Error);
+                }
+
+                if (unstamped && ++done == stampAt)
+                {
+                    await recorder.MapperVersionAsync(account.Id, healthKind, version, cancellationToken);
+                    unstamped = false;
                 }
 
                 if (next.Value.Halved > counts.Halved)
@@ -200,15 +239,22 @@ internal sealed class BrokerHistoryPipeline(
 
             if (rebuild && await RebuildOwedAsync(account.Id, run, counts, cancellationToken))
             {
-                counts = (await rebuilder.RebuildAsync(account, SystemActor, cancellationToken)).AddTo(counts);
+                var summary = await rebuilder.RebuildAsync(account, SystemActor, cancellationToken);
+                counts = summary.AddTo(counts);
+                if (scheduled && run.Kind == BrokerSyncKind.Trades)
+                {
+                    counts = await DeepenAsync(account, counts, summary, work, cancellationToken);
+                }
             }
 
             await FinishAsync(account, run, counts, scheduled, actor, cancellationToken);
+            await recorder.SucceededAsync(account.Id, healthKind, cancellationToken);
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await runs.CompleteAsync(run.Id, SyncStatus.Failed, counts, Interrupted, clock.GetUtcNow(), CancellationToken.None);
+            await runs.CompleteAsync(run.Id, SyncStatus.Failed, counts with { FailureReason = SyncFailures.Interrupted }, Interrupted, clock.GetUtcNow(), CancellationToken.None);
+            await recorder.FailedAsync(account.Id, SyncFailures.KindOf(run.Kind), SyncFailures.Interrupted, CancellationToken.None);
             throw;
         }
 #pragma warning disable CA1031 // any failure must end the run record as failed, never leave it running
@@ -216,9 +262,136 @@ internal sealed class BrokerHistoryPipeline(
 #pragma warning restore CA1031
         {
             BrokerHistoryLog.Crashed(logger, kind, run.Id, ex);
-            return await FailAsync(run, counts, PortfolioErrors.SyncFailed);
+            return await FailAsync(account, run, counts, PortfolioErrors.SyncFailed);
         }
     }
+
+    /// <summary>
+    /// The windows to read again before the run's own: when the stored mapper version of the account's kind is older than the reader's, the windows that dropped rows for a data reason and were not read since (<see cref="ISyncHealthStore.ListRereadAsync"/>); an
+    /// account the first version of this rule has not seen (version 0) also gets the dates of its earlier runs that dropped rows, because windows were not noted before. Windows inside the run's own dates are read anyway (<see cref="RereadWindows.InsideRun"/> tells, so that the version is stamped only when the run has read them). Nothing when the version is current.
+    /// </summary>
+    private async ValueTask<RereadWindows> RereadWindowsAsync(BrokerAccount account, BrokerSyncRun run, SyncHealth stored, CancellationToken cancellationToken)
+    {
+        var current = reader.MapperVersion(run.Kind);
+        if (stored.MapperVersion >= current)
+        {
+            return new RereadWindows([], false);
+        }
+
+        var ranges = (await health.ListRereadAsync(account.Id, SyncFailures.KindOf(run.Kind), cancellationToken)).ToList();
+        if (stored.MapperVersion == 0)
+        {
+            ranges.AddRange(await runs.ListDroppedRangesAsync(account.Id, run.Kind, cancellationToken));
+        }
+
+        var noted = Merge(ranges).SelectMany(r => BrokerWindows.Split(r.From, r.To)).ToList();
+        bool Inside(DateWindow w) => w.From >= run.FromDate && w.To <= run.ToDate;
+        var windows = noted.Where(w => !Inside(w)).ToList();
+        if (windows.Count > 0)
+        {
+            HealLog.Rereading(logger, account.Slug, windows.Count, current);
+        }
+
+        return new RereadWindows(windows, noted.Any(Inside));
+    }
+
+    /// <summary>The windows to read before the run's own, and whether other windows to read again lie inside the run's own dates.</summary>
+    private sealed record RereadWindows(IReadOnlyList<DateWindow> Windows, bool InsideRun);
+
+    /// <summary>The ranges with overlapping or adjoining ones joined, oldest first.</summary>
+    internal static IReadOnlyList<BrokerDateRange> Merge(IEnumerable<BrokerDateRange> ranges)
+    {
+        var merged = new List<BrokerDateRange>();
+        foreach (var range in ranges.OrderBy(r => r.From).ThenBy(r => r.To))
+        {
+            if (merged.Count > 0 && range.From <= merged[^1].To.AddDays(1))
+            {
+                merged[^1] = new BrokerDateRange(merged[^1].From, range.To > merged[^1].To ? range.To : merged[^1].To);
+            }
+            else
+            {
+                merged.Add(range);
+            }
+        }
+
+        return merged;
+    }
+
+    /// <summary>
+    /// The nightly deepening of the trade history (ADR 0027): when the rebuild left holdings the trades do not explain in a way earlier history could fix (the trades explain more shares than are held, or a sale is larger than what was open), one earlier year of
+    /// trades is read - the year before the earliest date actually read so far (the start of the first successful run, or what an earlier deepening reached) - and the lots are worked out again. At most one year a night; it stops for good at the first year Dhan refuses with something that trying again cannot change, at the first year that holds no
+    /// trade at all, and at <see cref="IHealSettings.DeepenMaxYears"/> years back. A failure that may pass leaves the state alone and the year is tried again tomorrow. The earliest date reached is kept in the health figures and on the run. Never fails the run.
+    /// </summary>
+    private async ValueTask<BrokerSyncCounts> DeepenAsync(BrokerAccount account, BrokerSyncCounts counts, BrokerRebuildSummary summary, WindowWork work, CancellationToken cancellationToken)
+    {
+        if (healSettings.DeepenMaxYears <= 0 || !summary.NotRebuilt.Any(n => Deepenable(n)))
+        {
+            return counts;
+        }
+
+        var stored = await health.GetAsync(account.Id, SyncHealthKind.Trades, cancellationToken);
+        var now = clock.GetUtcNow();
+        var today = IndiaTime.Today(now);
+        if (stored.DeepenExhausted || stored.DeepenedOn == today)
+        {
+            return counts;
+        }
+
+        var limit = today.AddYears(-healSettings.DeepenMaxYears);
+
+        // The earliest date actually read: the start of the first run that succeeded or what an earlier deepening reached, whichever is earlier - not the account's import date, which may have been moved since the first read and would leave the dates between unread.
+        var firstRead = await runs.GetEarliestReadAsync(account.Id, BrokerSyncKind.Trades, cancellationToken);
+        var reached = new[] { stored.DeepenedTo, firstRead }.Where(d => d is not null).Min() ?? account.Portfolio.ImportDate;
+        if (reached <= limit)
+        {
+            await recorder.DeepenedAsync(account.Id, null, exhausted: true, today, cancellationToken);
+            HealLog.DeepenStopped(logger, account.Slug, "the furthest year back is reached");
+            return counts;
+        }
+
+        var from = reached.AddYears(-1);
+        from = from < limit ? limit : from;
+        var windows = BrokerWindows.Split(from, reached.AddDays(-1));
+        counts = counts with { WindowsTotal = counts.WindowsTotal + windows.Count };
+        var readBefore = counts.Read;
+        foreach (var window in windows)
+        {
+            var next = await work(window, counts, cancellationToken);
+            if (next.IsFailure)
+            {
+                var reason = SyncFailures.Of(next.Error);
+                HealLog.DeepenFailed(logger, account.Slug, reason);
+
+                // Dhan refusing the year for a reason trying again cannot change ends the deepening; anything that may pass is tried again tomorrow.
+                if (!SyncFailures.IsTransient(reason) && !SyncFailures.IsOwnerOnly(reason) && reason != SyncFailures.Unexpected)
+                {
+                    await recorder.DeepenedAsync(account.Id, null, exhausted: true, today, cancellationToken);
+                    HealLog.DeepenStopped(logger, account.Slug, "Dhan refused the year");
+                }
+
+                return counts;
+            }
+
+            counts = next.Value;
+        }
+
+        var empty = counts.Read == readBefore;
+        var exhausted = empty || from <= limit;
+        await recorder.DeepenedAsync(account.Id, from, exhausted, today, cancellationToken);
+        if (exhausted)
+        {
+            HealLog.DeepenStopped(logger, account.Slug, empty ? "Dhan has no trades for that year" : "the furthest year back is reached");
+        }
+
+        var again = await rebuilder.RebuildAsync(account, SystemActor, cancellationToken);
+        var holdings = summary.NotRebuilt.Count(n => Deepenable(n));
+        HealLog.Deepened(logger, account.Slug, from, holdings);
+        return again.AddTo(counts) with { Rebuilt = summary.Rebuilt + again.Rebuilt, DeepenedTo = from };
+    }
+
+    /// <summary>A holding whose trades explain more shares than are held, or sell more than was open: the part of the history that is missing could be before the dates read.</summary>
+    internal static bool Deepenable(BrokerNotRebuilt held) =>
+        held.Reason == RebuildStatuses.QuantityMismatch && held.Detail is MismatchReasons.NegativeOpening or MismatchReasons.SellExceedsOpen;
 
     /// <summary>
     /// Whether the lots are to be worked out again: when this run stored trades, when the run before did not end whole (it may have stored some that were never rebuilt), when it left holdings to retry (needs review, a quantity mismatch, a race, an
@@ -321,11 +494,33 @@ internal sealed class BrokerHistoryPipeline(
                         at,
                         run.Id)),
                 ]);
-                return ValueTask.CompletedTask;
+                return ValueTask.FromResult(SupersedeOutcome.None);
             },
-            placed => counts.AddWindow(read.Rows, placed.Stored, repeated + placed.Existing, dropped + placed.Refused, skipped, read.Halved, read.EmptyByNoData, placed.Enriched),
+            placed => counts.AddWindow(read.Rows, placed.Stored, repeated + placed.Existing, dropped + placed.Refused, skipped, read.Halved, read.EmptyByNoData, placed.Enriched, placed.Superseded.Rows, placed.Superseded.Differing),
+            placed => dropped + skipped.GetValueOrDefault(BrokerSkipReasons.NoSymbol) + placed.Refused,
             cancellationToken,
-            EnrichAsync(account.Id));
+            EnrichAsync(account.Id),
+            (stored, at, token) => SupersedeBillRowsAsync(account.Id, run.Id, stored.Select(f => f.Row).ToList(), at, token));
+    }
+
+    /// <summary>
+    /// The broker's own trades replace the bill-level rows of an imported Dhan report for the same day, ISIN and side (ADR 0029). Run <b>after</b> the window's trades are saved - the whole stored group is then known, and a group of several fills is compared by its
+    /// total, whichever way the window was saved (in one unit, or row by row after the database refused the whole). Inside the window's unit of work.
+    /// </summary>
+    private async ValueTask<SupersedeOutcome> SupersedeBillRowsAsync(Guid accountId, Guid runId, IReadOnlyList<ResolvedBrokerTrade> stored, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        var keys = stored
+            .Where(t => TradeRules.NormaliseIsin(t.Isin) is not null)
+            .Select(t => (t.Trade.Date, Isin: TradeRules.NormaliseIsin(t.Isin)!, t.Trade.Side))
+            .ToHashSet();
+        if (keys.Count == 0)
+        {
+            return SupersedeOutcome.None;
+        }
+
+        var whole = await trades.ListBrokerGroupsAsync(accountId, keys.Min(k => k.Date), keys.Max(k => k.Date), cancellationToken);
+        var groups = whole.Where(g => keys.Contains((g.Date, g.Isin, g.Side))).ToList();
+        return groups.Count == 0 ? SupersedeOutcome.None : await trades.SupersedeBillRowsAsync(accountId, groups, runId, at, cancellationToken);
     }
 
     /// <summary>
@@ -354,32 +549,40 @@ internal sealed class BrokerHistoryPipeline(
             window,
             identified,
             (ids, token) => ledger.StoredIdsAsync(account.Id, ids, token),
-            (batch, at, _) =>
+            async (batch, at, token) =>
             {
-                ledger.Add(
-                [
-                    .. batch.Select(f => LedgerEntry.Create(
-                        account.Id,
-                        f.Row.Date,
-                        f.Row.VoucherNo,
-                        f.Row.Description,
-                        f.Row.Narration,
-                        f.Row.Exchange,
-                        f.Row.Amount,
-                        LedgerClassifier.Classify(f.Row.Description, f.Row.Narration, f.Row.Amount),
-                        f.Row.RunningBalance,
-                        f.Id,
-                        run.Id,
-                        at)),
-                ]);
-                return ValueTask.CompletedTask;
+                var entries = batch.Select(f => LedgerEntry.Create(
+                    account.Id,
+                    f.Row.Date,
+                    f.Row.VoucherNo,
+                    f.Row.Description,
+                    f.Row.Narration,
+                    f.Row.Exchange,
+                    f.Row.Amount,
+                    LedgerClassifier.Classify(f.Row.Description, f.Row.Narration, f.Row.Amount),
+                    f.Row.RunningBalance,
+                    f.Id,
+                    run.Id,
+                    at)).ToList();
+                ledger.Add(entries);
+
+                // Dhan's own charges replace the depository charges of an imported sheet for the same day and amount, so that the net figures count each once (ADR 0029).
+                var charges = entries
+                    .Where(e => e.EntryClass == LedgerClass.Charges && e.Amount < 0m)
+                    .Select(e => new LedgerChargeOnDay(e.EntryDate, -e.Amount, DepositoryCharges.Is(e.Description, e.Narration)))
+                    .ToList();
+                return charges.Count == 0 ? SupersedeOutcome.None : new SupersedeOutcome(await ledger.SupersedeImportedChargesAsync(account.Id, charges, at, token), 0);
             },
-            placed => counts.AddWindow(read.Received, placed.Stored, placed.Existing, read.Dropped + placed.Refused, new Dictionary<string, int>(), read.Halved, read.EmptyByNoData),
+            placed => counts.AddWindow(read.Received, placed.Stored, placed.Existing, read.Dropped + placed.Refused, new Dictionary<string, int>(), read.Halved, read.EmptyByNoData, superseded: placed.Superseded.Rows),
+            placed => read.Dropped + placed.Refused,
             cancellationToken);
     }
 
     /// <summary>What became of the rows of a window: stored now, stored already, or refused by the database (and not stored by anyone else).</summary>
-    private sealed record Placed(int Stored, int Existing, int Refused, int Enriched = 0);
+    private sealed record Placed(int Stored, int Existing, int Refused, int Enriched = 0, SupersedeOutcome? SupersededRows = null)
+    {
+        public SupersedeOutcome Superseded => SupersededRows ?? SupersedeOutcome.None;
+    }
 
     private enum Fate
     {
@@ -398,10 +601,12 @@ internal sealed class BrokerHistoryPipeline(
         DateWindow window,
         IReadOnlyList<(T Row, string Id)> rows,
         Func<IReadOnlyCollection<string>, CancellationToken, ValueTask<IReadOnlySet<string>>> storedIds,
-        Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask> add,
+        Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask<SupersedeOutcome>> add,
         Func<Placed, BrokerSyncCounts> countsOf,
+        Func<Placed, int> droppedOf,
         CancellationToken cancellationToken,
-        Func<IReadOnlyList<(T Row, string Id)>, CancellationToken, ValueTask<int>>? enrich = null)
+        Func<IReadOnlyList<(T Row, string Id)>, CancellationToken, ValueTask<int>>? enrich = null,
+        Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask<SupersedeOutcome>>? supersedeStored = null)
     {
         BrokerSyncCounts? saved = null;
         var refused = false;
@@ -412,9 +617,10 @@ internal sealed class BrokerHistoryPipeline(
                 refused = false;
                 var existing = rows.Count == 0 ? new HashSet<string>() : await storedIds([.. rows.Select(r => r.Id)], token);
                 var fresh = rows.Where(r => !existing.Contains(r.Id)).ToList();
+                var superseded = SupersedeOutcome.None;
                 if (fresh.Count > 0)
                 {
-                    await add(fresh, at, token);
+                    superseded = await add(fresh, at, token);
                 }
 
                 var enriched = 0;
@@ -423,15 +629,23 @@ internal sealed class BrokerHistoryPipeline(
                     enriched = await enrich([.. rows.Where(r => existing.Contains(r.Id))], token);
                 }
 
-                var next = countsOf(new Placed(fresh.Count, rows.Count - fresh.Count, 0, enriched));
                 if (!await unitOfWork.TrySaveAsync(token))
                 {
                     refused = true;
                     return Result.Failure(PortfolioErrors.HistoryChanged);
                 }
 
+                if (supersedeStored is not null && fresh.Count > 0)
+                {
+                    superseded = superseded.Plus(await supersedeStored(fresh, at, token));
+                }
+
+                var placed = new Placed(fresh.Count, rows.Count - fresh.Count, 0, enriched, superseded);
+                var next = countsOf(placed);
+
                 await runs.UpdateProgressAsync(run.Id, next, token);
                 await runs.MoveWatermarkAsync(run.AccountId, run.Kind, window.From, window.To, at, token);
+                await health.NoteWindowAsync(run.AccountId, SyncFailures.KindOf(run.Kind), window.From, window.To, droppedOf(placed), at, token);
                 saved = next;
                 return Result.Success();
             },
@@ -441,7 +655,7 @@ internal sealed class BrokerHistoryPipeline(
             return Result.Success(saved!);
         }
 
-        return refused ? await SaveRowByRowAsync(run, window, rows, storedIds, add, countsOf, enrich, cancellationToken) : Result.Failure<BrokerSyncCounts>(whole.Error);
+        return refused ? await SaveRowByRowAsync(run, window, rows, storedIds, add, countsOf, droppedOf, enrich, supersedeStored, cancellationToken) : Result.Failure<BrokerSyncCounts>(whole.Error);
     }
 
     private async ValueTask<Result<BrokerSyncCounts>> SaveRowByRowAsync<T>(
@@ -449,15 +663,19 @@ internal sealed class BrokerHistoryPipeline(
         DateWindow window,
         IReadOnlyList<(T Row, string Id)> rows,
         Func<IReadOnlyCollection<string>, CancellationToken, ValueTask<IReadOnlySet<string>>> storedIds,
-        Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask> add,
+        Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask<SupersedeOutcome>> add,
         Func<Placed, BrokerSyncCounts> countsOf,
+        Func<Placed, int> droppedOf,
         Func<IReadOnlyList<(T Row, string Id)>, CancellationToken, ValueTask<int>>? enrich,
+        Func<IReadOnlyList<(T Row, string Id)>, DateTimeOffset, CancellationToken, ValueTask<SupersedeOutcome>>? supersedeStored,
         CancellationToken cancellationToken)
     {
-        int stored = 0, existing = 0, refused = 0, enriched = 0;
+        int stored = 0, existing = 0, refused = 0, enriched = 0, supersededRows = 0, supersededDiffering = 0;
+        var storedRows = new List<(T Row, string Id)>();
         foreach (var row in rows)
         {
             var fate = Fate.Stored;
+            var superseded = SupersedeOutcome.None;
             _ = await unitOfWork.RunAsync(
                 async token =>
                 {
@@ -473,7 +691,7 @@ internal sealed class BrokerHistoryPipeline(
                         return Result.Success();
                     }
 
-                    await add([row], clock.GetUtcNow(), token);
+                    superseded = await add([row], clock.GetUtcNow(), token);
                     if (await unitOfWork.TrySaveAsync(token))
                     {
                         fate = Fate.Stored;
@@ -489,6 +707,13 @@ internal sealed class BrokerHistoryPipeline(
                 fate = Fate.Existing; // someone stored it between the check and the save
             }
 
+            if (fate == Fate.Stored)
+            {
+                supersededRows += superseded.Rows;
+                supersededDiffering += superseded.Differing;
+                storedRows.Add(row);
+            }
+
             stored += fate == Fate.Stored ? 1 : 0;
             existing += fate == Fate.Existing ? 1 : 0;
             refused += fate == Fate.Refused ? 1 : 0;
@@ -499,9 +724,19 @@ internal sealed class BrokerHistoryPipeline(
             async token =>
             {
                 var at = clock.GetUtcNow();
-                var next = countsOf(new Placed(stored, existing, refused, enriched));
+
+                // Once for the window, after every row is saved: the whole group of a day is known now, so a group of several fills is replaced once and compared by its total.
+                var superseded = new SupersedeOutcome(supersededRows, supersededDiffering);
+                if (supersedeStored is not null && storedRows.Count > 0)
+                {
+                    superseded = superseded.Plus(await supersedeStored(storedRows, at, token));
+                }
+
+                var placed = new Placed(stored, existing, refused, enriched, superseded);
+                var next = countsOf(placed);
                 await runs.UpdateProgressAsync(run.Id, next, token);
                 await runs.MoveWatermarkAsync(run.AccountId, run.Kind, window.From, window.To, at, token);
+                await health.NoteWindowAsync(run.AccountId, SyncFailures.KindOf(run.Kind), window.From, window.To, droppedOf(placed), at, token);
                 saved = next;
                 return Result.Success();
             },
@@ -560,15 +795,20 @@ internal sealed class BrokerHistoryPipeline(
         var halved = counts.Halved > 0 ? $", {counts.Halved} halved" : string.Empty;
         var noData = counts.EmptyByNoData > 0 ? $", {counts.EmptyByNoData} taken as empty on Dhan's no-data code" : string.Empty;
         var completed = counts.Enriched > 0 ? $" ({counts.Enriched} completed with an ISIN, charges or ticker)" : string.Empty;
+        var deepened = counts.DeepenedTo is { } earliest ? $"; earlier history read back to {earliest:yyyy-MM-dd}" : string.Empty;
+        var superseded = counts.Superseded > 0 ? $"; {counts.Superseded} bill-level rows of imported reports replaced ({counts.SupersededDiffering} groups with a different total)" : string.Empty;
+        var replaced = counts.Superseded > 0 ? $"; {counts.Superseded} imported depository charges replaced" : string.Empty;
         return run.Kind == BrokerSyncKind.Trades
-            ? $"Broker trades read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new trades, {counts.Duplicates} already stored{completed}, {counts.Skipped} skipped, {counts.Dropped} unusable; {counts.Rebuilt} holdings rebuilt, {counts.NeedsReview} need review"
-            : $"Broker ledger read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new entries, {counts.Duplicates} already stored, {counts.Dropped} unusable";
+            ? $"Broker trades read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new trades, {counts.Duplicates} already stored{completed}, {counts.Skipped} skipped, {counts.Dropped} unusable; {counts.Rebuilt} holdings rebuilt, {counts.NeedsReview} need review{deepened}{superseded}"
+            : $"Broker ledger read ({trigger}): {counts.WindowsDone} windows{halved}{noData}, {counts.Stored} new entries, {counts.Duplicates} already stored, {counts.Dropped} unusable{replaced}";
     }
 
-    private async ValueTask<bool> FailAsync(BrokerSyncRun run, BrokerSyncCounts counts, Error error)
+    private async ValueTask<bool> FailAsync(BrokerAccount account, BrokerSyncRun run, BrokerSyncCounts counts, Error error)
     {
+        var reason = SyncFailures.Of(error);
         BrokerHistoryLog.Failed(logger, BrokerHistoryViews.Name(run.Kind), run.Id, error.Code);
-        await runs.CompleteAsync(run.Id, SyncStatus.Failed, counts, error.Message, clock.GetUtcNow(), CancellationToken.None);
+        await runs.CompleteAsync(run.Id, SyncStatus.Failed, counts with { FailureReason = reason }, error.Message, clock.GetUtcNow(), CancellationToken.None);
+        await recorder.FailedAsync(account.Id, SyncFailures.KindOf(run.Kind), reason, CancellationToken.None);
         return false;
     }
 

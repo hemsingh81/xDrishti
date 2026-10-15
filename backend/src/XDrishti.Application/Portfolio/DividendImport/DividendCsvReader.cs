@@ -128,7 +128,11 @@ internal static class DividendCsvReader
     /// The columns of a dividend file. The kind of file is judged first, from the header alone: a tradebook (with or without a buy/sell column) or a statement of amounts is refused as <c>portfolio.wrong_file_kind</c> whatever columns it has that look like a
     /// dividend's (an amount, a rate); only then are the columns looked for, and an unknown file is refused with the missing columns named.
     /// </summary>
-    private static Result<DividendColumns> Header(IReadOnlyList<string> header) => FileKindDetector.Detect(header) switch
+    private static Result<DividendColumns> Header(IReadOnlyList<string> header) => FileKindDetector.DetectTitle(header) is var titled && FileKindDetector.IsReport(titled)
+        ? Result.Failure<DividendColumns>(PortfolioErrors.WrongFileKind(FileKindDetector.Code(titled), FileKindDetector.ReportElsewhereText(titled)))
+        : Judge(header);
+
+    private static Result<DividendColumns> Judge(IReadOnlyList<string> header) => FileKindDetector.Detect(header) switch
     {
         FileKind.Trades => Result.Failure<DividendColumns>(PortfolioErrors.WrongFileKind(
             FileKindDetector.TradesCode, "This looks like a tradebook (it has a buy/sell column), not a dividend list. Import it as trades on the Portfolio screen.")),

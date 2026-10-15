@@ -22,6 +22,8 @@ internal sealed class DhanTradesClient(IHttpClientFactory httpClients, DhanHisto
 
     private const string Operation = "trade history";
 
+    public int MapperVersion => DhanTradeMapper.Version;
+
     public async ValueTask<BrokerResponse<BrokerTradePage>> FetchPageAsync(SecretValue accessToken, DateOnly from, DateOnly to, int page, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(accessToken);

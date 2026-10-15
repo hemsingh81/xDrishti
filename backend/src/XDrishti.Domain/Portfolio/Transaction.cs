@@ -11,6 +11,9 @@ public sealed class Transaction : Entity<Guid>
 {
     public const int MaxCreatedByLength = 256;
 
+    /// <summary>The <see cref="VoidedBy"/> of a bill-level row that the broker's own trades replaced.</summary>
+    public const string SupersededReason = "superseded";
+
     // Parameter names match property names so EF Core can bind this constructor when materialising.
     private Transaction(
         Guid id,
@@ -96,6 +99,9 @@ public sealed class Transaction : Entity<Guid>
     /// <summary>The broker history run (<c>portfolio.broker_sync_runs</c>) that read the trade; null for a trade from a file or typed in (ADR 0025).</summary>
     public Guid? RunId { get; private set; }
 
+    /// <summary>The broker history run whose trades replaced this bill-level row (ADR 0029); null for any other trade. A superseded row is voided with <see cref="SupersededReason"/>.</summary>
+    public Guid? SupersededBy { get; private set; }
+
     public DateTimeOffset? VoidedAt { get; private set; }
 
     public string? VoidedBy { get; private set; }
@@ -139,7 +145,7 @@ public sealed class Transaction : Entity<Guid>
             throw new ArgumentOutOfRangeException(nameof(qty), qtyProblem);
         }
 
-        var rounded = TradeRules.Round(price);
+        var rounded = TradeRules.RoundPrice(price);
         if (TradeRules.PriceProblem(rounded) is { } priceProblem)
         {
             throw new ArgumentOutOfRangeException(nameof(price), priceProblem);
@@ -215,6 +221,22 @@ public sealed class Transaction : Entity<Guid>
         }
 
         return changed;
+    }
+
+    /// <summary>
+    /// Voids a bill-level row of a downloaded report because the broker's own trades for the same day, security and side were stored by the run <paramref name="runId"/> (ADR 0029). False for any other trade and for one voided already.
+    /// </summary>
+    public bool Supersede(Guid runId, DateTimeOffset at)
+    {
+        if (Source != TradeSource.Bill || VoidedAt is not null)
+        {
+            return false;
+        }
+
+        VoidedBy = SupersededReason;
+        VoidedAt = at;
+        SupersededBy = runId;
+        return true;
     }
 
     /// <summary>Voids the trade (it stops counting, it is never deleted). False when it was voided already.</summary>

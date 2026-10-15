@@ -1,5 +1,5 @@
 import type { DataNotice } from '@/shared/api';
-import type { AppNotification, NotificationKind, NotificationSeverity } from './deriveNotifications';
+import { severityOf, type AppNotification, type NotificationKind } from './deriveNotifications';
 
 const kinds: Readonly<Record<string, NotificationKind | undefined>> = {
   data_run_failed: 'data_run_failed',
@@ -18,9 +18,6 @@ const hrefs: Readonly<Partial<Record<NotificationKind, string>>> = {
   data_corporate_actions_pending: '/data?section=actions&actions=suggested',
 };
 const hrefOf = (kind: NotificationKind): string => hrefs[kind] ?? '/data';
-
-const severityOf = (severity: string): NotificationSeverity =>
-  severity === 'error' ? 'error' : severity === 'warn' ? 'warn' : 'info';
 
 /**
  * The data notices of the API as bell notifications. The id comes from the API (a new failed run or a changed number
@@ -41,6 +38,9 @@ export function deriveDataNotifications(notices: readonly DataNotice[]): AppNoti
         text: notice.text,
         href: hrefOf(kind),
         at: notice.at === null ? null : Date.parse(notice.at),
+        title: null,
+        actions: [],
+        resolved: false,
       },
     ];
   });

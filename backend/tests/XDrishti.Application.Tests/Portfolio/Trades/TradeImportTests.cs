@@ -301,6 +301,33 @@ public sealed class TradeImportTests
         s.Data.Trades.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData(BrokerSyncKind.Trades)]
+    [InlineData(BrokerSyncKind.Ledger)]
+    public async Task While_a_broker_history_run_of_the_account_runs_the_import_is_refused(BrokerSyncKind kind)
+    {
+        var s = await StartAsync();
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, kind, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var result = await s.ImportAsync(Csv(BaseRows));
+
+        result.Error.Code.ShouldBe("portfolio.sync_running");
+        s.Data.Trades.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_broker_history_run_of_another_account_does_not_hold_the_import_back()
+    {
+        var s = await StartAsync();
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(Guid.NewGuid(), BrokerSyncKind.Trades, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var result = await s.ImportAsync(Csv(BaseRows));
+
+        result.IsSuccess.ShouldBeTrue();
+    }
+
     [Fact]
     public async Task A_holding_the_trades_do_not_fit_is_reported_stored_and_left_alone()
     {

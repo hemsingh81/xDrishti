@@ -2,13 +2,18 @@ import InfoIcon from '@mui/icons-material/InfoOutlined';
 import { Stack, Typography } from '@mui/material';
 import type { BrokerKindStatus } from '@/shared/api';
 import { formatAgo } from '@/shared/lib/format';
+import { healthText } from '@/shared/lib/syncHealth';
 import { numeric } from '@/theme';
 import { summariseKind, type BrokerKind } from '../../lib/brokerText';
 import { toneLook } from '../toneLook';
 
-/** "Trades read up to 11 Oct 2026 5 min ago — 4 new" / "Reading ledger… — 3 of 12 windows done" / the reason a read failed. */
+/**
+ * "Trades read up to 11 Oct 2026 5 min ago — 4 new" / "Reading ledger… — 3 of 12 windows done" / the reason a read failed,
+ * and, when the read is not healthy, "retrying in 5 minutes (attempt 2 of 3)" or "failed for 2 days: Dhan could not be reached".
+ */
 export function BrokerKindLine({ kind, status }: { kind: BrokerKind; status: BrokerKindStatus }) {
   const summary = summariseKind(kind, status);
+  const health = healthText(status);
   const look = summary.tone === 'idle' ? null : toneLook[summary.tone];
   return (
     <Stack
@@ -29,6 +34,7 @@ export function BrokerKindLine({ kind, status }: { kind: BrokerKind; status: Bro
           </>
         )}
         {summary.detail && <> — {summary.detail}</>}
+        {health && <> · {health}</>}
       </Typography>
     </Stack>
   );

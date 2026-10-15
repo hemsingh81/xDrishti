@@ -24,6 +24,8 @@ interface ImportFormProps {
   onPreview: () => void;
   /** A dividend file was dropped here: opens the dividend import. */
   onImportDividends: () => void;
+  /** A report of Dhan was dropped here: opens Import files. */
+  onImportFiles: () => void;
 }
 
 /** Step one: which account, which file (with the template to start from), then Preview. Nothing is stored by it. */
@@ -40,6 +42,7 @@ export function ImportForm({
   onClear,
   onPreview,
   onImportDividends,
+  onImportFiles,
 }: ImportFormProps) {
   const fields = error ? uploadFieldText(error) : {};
   const invalid = problemKind(error) === 'invalid';
@@ -87,7 +90,11 @@ export function ImportForm({
         error={fileProblem ?? fields.file ?? (invalid ? fields.other : undefined)}
       />
       {detected !== null && (
-        <WrongFileNotice detected={detected} onSwitch={detected === 'dividends' ? onImportDividends : undefined} />
+        <WrongFileNotice
+          detected={detected}
+          onSwitch={detected === 'dividends' ? onImportDividends : undefined}
+          onImportFiles={onImportFiles}
+        />
       )}
       {general ? (
         <Alert

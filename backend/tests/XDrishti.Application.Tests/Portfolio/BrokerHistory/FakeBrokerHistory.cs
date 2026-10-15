@@ -9,6 +9,9 @@ namespace XDrishti.Application.Tests.Portfolio.BrokerHistory;
 /// </summary>
 internal sealed class FakeBrokerHistory : IBrokerTrades, IBrokerLedger
 {
+    /// <summary>The version of the Dhan mapping (a test raises it to simulate an update of the mappers).</summary>
+    public int MapperVersion { get; set; } = 1;
+
     /// <summary>Every trade Dhan has (the fake filters them by the asked dates).</summary>
     public List<BrokerTrade> Trades { get; } = [];
 

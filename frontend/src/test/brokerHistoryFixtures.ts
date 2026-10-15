@@ -54,6 +54,10 @@ export const buildBrokerKind = (overrides: Partial<BrokerKindStatus> = {}): Brok
   lastRun: buildBrokerRun(),
   windowsDone: 3,
   windowsTotal: 3,
+  attempts: 1,
+  consecutiveFailedDays: 0,
+  lastFailureReason: null,
+  retryAt: null,
   ...overrides,
 });
 
@@ -68,6 +72,8 @@ export const buildBrokerStatus = (overrides: Partial<BrokerHistoryStatus> = {}):
   holdingsRebuilt: 0,
   holdingsNeedingReview: 0,
   needsReviewSymbols: [],
+  deepenedTo: null,
+  deepenExhausted: false,
   ...overrides,
 });
 
@@ -106,6 +112,7 @@ export const buildLedgerEntry = (overrides: Partial<LedgerEntry> = {}): LedgerEn
   amount: 840,
   class: 'dividend',
   runningBalance: 25_840,
+  source: 'broker',
   ...overrides,
 });
 

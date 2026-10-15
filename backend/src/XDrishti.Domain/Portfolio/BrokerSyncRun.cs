@@ -56,14 +56,17 @@ public sealed class BrokerSyncRun : Entity<Guid>
 
     public bool IsRunning => Status == SyncStatus.Running;
 
-    public static BrokerSyncRun Start(Guid accountId, BrokerSyncKind kind, BrokerSyncTrigger trigger, DateOnly fromDate, DateOnly toDate, string startedBy, DateTimeOffset now)
+    /// <summary>Starts a run. <paramref name="attempt"/> is its number within the day's occurrence: 1 for the first, 2 to 4 for the quiet retries (ADR 0027).</summary>
+    public static BrokerSyncRun Start(Guid accountId, BrokerSyncKind kind, BrokerSyncTrigger trigger, DateOnly fromDate, DateOnly toDate, string startedBy, DateTimeOffset now, int attempt = 1)
     {
         if (accountId == Guid.Empty)
         {
             throw new ArgumentException("A run belongs to an account.", nameof(accountId));
         }
 
-        return new BrokerSyncRun(Guid.CreateVersion7(now), accountId, kind, trigger, fromDate, toDate, Truncate(startedBy?.Trim(), MaxStartedByLength) is { Length: > 0 } actor ? actor : "unknown", now);
+        var run = new BrokerSyncRun(Guid.CreateVersion7(now), accountId, kind, trigger, fromDate, toDate, Truncate(startedBy?.Trim(), MaxStartedByLength) is { Length: > 0 } actor ? actor : "unknown", now);
+        run.Counts = BrokerSyncCounts.None with { Attempts = Math.Max(1, attempt) };
+        return run;
     }
 
     /// <summary>A run that was not attempted: recorded as skipped and finished at once.</summary>

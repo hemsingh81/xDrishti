@@ -166,6 +166,25 @@ public sealed class TradeLotRulesTests
         dry.IsSuccess.ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData(BrokerSyncKind.Trades)]
+    [InlineData(BrokerSyncKind.Ledger)]
+    public async Task A_rebuild_is_refused_while_a_broker_history_run_of_the_account_runs_but_a_dry_run_and_another_accounts_run_are_not(BrokerSyncKind kind)
+    {
+        var s = await StartAsync();
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(Guid.NewGuid(), kind, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+        var elsewhere = await s.RebuildAsync(dryRun: false);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, kind, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var real = await s.RebuildAsync(dryRun: false);
+        var dry = await s.RebuildAsync(dryRun: true);
+
+        elsewhere.IsSuccess.ShouldBeTrue();
+        real.Error.Code.ShouldBe("portfolio.sync_running");
+        dry.IsSuccess.ShouldBeTrue();
+    }
+
     [Fact]
     public async Task An_unknown_holding_is_not_found_and_a_closed_holding_has_nothing_to_rebuild()
     {

@@ -576,12 +576,13 @@ describe('Portfolio page: empty and blocked states', () => {
     );
   });
 
-  it('has no import or auto refresh control, only Sync now', async () => {
+  it('has no holdings import or auto refresh control, only Sync now and Import files (Dhan’s reports)', async () => {
     renderPortfolio();
 
     await screen.findByRole('gridcell', { name: 'RELIANCE' });
     expect(screen.getByRole('button', { name: 'Sync now' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /import/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import files' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /import (holdings|csv)/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Auto refresh' })).not.toBeInTheDocument();
   });
 

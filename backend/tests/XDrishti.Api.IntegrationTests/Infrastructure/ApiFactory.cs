@@ -214,7 +214,11 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM portfolio.dividend_batches;
                 DELETE FROM portfolio.dividend_aliases;
                 DELETE FROM portfolio.ledger_entries;
+                DELETE FROM portfolio.cost_batches;
+                DELETE FROM portfolio.security_aliases;
                 DELETE FROM portfolio.transactions;
+                DELETE FROM portfolio.broker_sync_windows;
+                DELETE FROM portfolio.attention_items;
                 DELETE FROM portfolio.broker_sync_state;
                 DELETE FROM portfolio.broker_sync_runs;
                 DELETE FROM portfolio.trade_batches;
@@ -222,6 +226,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM portfolio.holdings;
                 DELETE FROM portfolio.holding_syncs;
                 DELETE FROM accounts.account_events;
+                DELETE FROM accounts.report_client_codes;
                 UPDATE accounts.portfolio_settings SET default_bucket_id = NULL;
                 DELETE FROM accounts.portfolio_buckets;
                 DELETE FROM accounts.broker_accounts;

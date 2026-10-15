@@ -2,7 +2,6 @@ import { Box, Button } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { accountsQuery } from '@/features/accounts';
 import { ErrorState, LoadingState } from '@/shared/ui';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { PortfolioHeader } from './PortfolioHeader';
 import { PortfolioView } from './PortfolioView';
 
@@ -44,9 +43,5 @@ function PortfolioContent() {
  * the URL.
  */
 export function PortfolioPage() {
-  return (
-    <ToastProvider>
-      <PortfolioContent />
-    </ToastProvider>
-  );
+  return <PortfolioContent />;
 }

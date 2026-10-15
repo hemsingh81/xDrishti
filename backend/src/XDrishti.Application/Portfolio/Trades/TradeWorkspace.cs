@@ -36,7 +36,12 @@ internal sealed class TradeWorkspace(
     /// Plans the import of the identified trades of a file: the new ones become transactions (batch <paramref name="batchId"/>) and are rebuilt into the holdings together with the stored trades; trades whose identity is stored already
     /// count in the file's securities but are not added again.
     /// </summary>
-    public async ValueTask<FilePlan> PlanAsync(BrokerAccount account, IReadOnlyList<IdentifiedTrade> identified, Guid? batchId, string actor, DateTimeOffset now, CancellationToken cancellationToken)
+    public ValueTask<FilePlan> PlanAsync(BrokerAccount account, IReadOnlyList<IdentifiedTrade> identified, Guid? batchId, string actor, DateTimeOffset now, CancellationToken cancellationToken) =>
+        PlanAsync(account, identified, batchId, actor, now, TradeSource.Csv, cancellationToken);
+
+    /// <summary>The same for trades that came from <paramref name="source"/> (a tradebook CSV, or the bill-level rows of a Dhan report, ADR 0029).</summary>
+    public async ValueTask<FilePlan> PlanAsync(
+        BrokerAccount account, IReadOnlyList<IdentifiedTrade> identified, Guid? batchId, string actor, DateTimeOffset now, TradeSource source, CancellationToken cancellationToken)
     {
         var all = await holdings.ListForAccountAsync(account.Id, cancellationToken);
         var stored = await trades.ListActiveAsync(account.Id, cancellationToken);
@@ -61,7 +66,7 @@ internal sealed class TradeWorkspace(
                 row.Qty,
                 row.Price,
                 row.Charges,
-                TradeSource.Csv,
+                source,
                 batchId,
                 row.Line,
                 externalId,

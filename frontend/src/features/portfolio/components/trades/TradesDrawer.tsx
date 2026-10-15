@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import UploadIcon from '@mui/icons-material/UploadFileOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import { Box, Button, Divider, Drawer, IconButton, Stack, Typography } from '@mui/material';
 import { useId } from 'react';
@@ -17,6 +18,8 @@ interface TradesDrawerProps {
   onAddTrade: () => void;
   /** A dividend file was dropped on the trade import: open the dividend import instead. */
   onImportDividends: () => void;
+  /** Opens the Import files dialog: the header button, or a report was dropped on this import. */
+  onImportFiles: () => void;
   /** The accounts with the Portfolio role. */
   accounts: readonly AccountSummary[];
   /** The account of the page's scope (null = all accounts). */
@@ -40,6 +43,7 @@ export function TradesDrawer({
   onClose,
   onAddTrade,
   onImportDividends,
+  onImportFiles,
   accounts,
   scopeAccountId,
 }: TradesDrawerProps) {
@@ -61,6 +65,9 @@ export function TradesDrawer({
         <Typography id={titleId} component="h2" variant="h2" sx={{ flex: 1 }}>
           Trades
         </Typography>
+        <Button size="small" variant="outlined" startIcon={<UploadIcon />} onClick={onImportFiles}>
+          Import files
+        </Button>
         <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={onAddTrade}>
           Add trade
         </Button>
@@ -88,6 +95,7 @@ export function TradesDrawer({
               onTabChange('history');
             }}
             onImportDividends={onImportDividends}
+            onImportFiles={onImportFiles}
           />
         </Box>
         {tab === 'history' && (

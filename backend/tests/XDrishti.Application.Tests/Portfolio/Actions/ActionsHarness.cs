@@ -71,7 +71,17 @@ internal sealed class ActionsHarness
 
     public ListPriceAlertsHandler Alerts() => new(Data);
 
-    public GetPortfolioNoticesHandler Notices() => new(Data, Evaluator(), Cache, Clock, NullLogger<GetPortfolioNoticesHandler>.Instance);
+    public GetPortfolioNoticesHandler Notices() => new(Data, Evaluator(), Cache, AttentionFacts, AttentionStore, HealSettings, Clock, NullLogger<GetPortfolioNoticesHandler>.Instance);
+
+    /// <summary>The memory of the attention items; it lives as long as the harness, so a second read sees what the first remembered.</summary>
+    public XDrishti.Application.Tests.Portfolio.Heal.InMemoryAttentionStore AttentionStore { get; } = new();
+
+    public XDrishti.Application.Tests.Portfolio.Heal.FixedHealSettings HealSettings { get; } = new();
+
+    /// <summary>The facts the attention items are derived from: none, unless a test adds some.</summary>
+    public XDrishti.Application.Tests.Portfolio.Heal.StaticAttentionFacts AttentionFacts => _attentionFacts ??= new(Clock);
+
+    private XDrishti.Application.Tests.Portfolio.Heal.StaticAttentionFacts? _attentionFacts;
 
     public DateTimeOffset Now => Clock.GetUtcNow();
 

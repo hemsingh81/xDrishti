@@ -20,6 +20,8 @@ interface DividendImportFormProps {
   onPreview: () => void;
   /** A tradebook was dropped here: opens the trade import. */
   onImportTrades: () => void;
+  /** A report of Dhan was dropped here: opens Import files. */
+  onImportFiles: () => void;
 }
 
 /** Step one: the file (drop zone or picker), then Preview. Nothing is stored by it. */
@@ -34,6 +36,7 @@ export function DividendImportForm({
   onClear,
   onPreview,
   onImportTrades,
+  onImportFiles,
 }: DividendImportFormProps) {
   const detected = error ? detectedKind(error, dividendImportKinds) : null;
   const fields = error && problemKind(error) === 'invalid' ? uploadFieldText(error) : {};
@@ -53,7 +56,11 @@ export function DividendImportForm({
         error={fileProblem ?? fieldProblem}
       />
       {detected !== null && (
-        <WrongFileNotice detected={detected} onSwitch={detected === 'trades' ? onImportTrades : undefined} />
+        <WrongFileNotice
+          detected={detected}
+          onSwitch={detected === 'trades' ? onImportTrades : undefined}
+          onImportFiles={onImportFiles}
+        />
       )}
       {general ? (
         <Alert

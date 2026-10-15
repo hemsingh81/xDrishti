@@ -2,10 +2,13 @@ using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Platform.Services;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Tests.Platform.Services;
 using XDrishti.Application.Tests.Portfolio.Actions;
+using XDrishti.Application.Tests.Portfolio.Heal;
 using XDrishti.Domain.Platform.Services;
+using XDrishti.Domain.Portfolio;
 using static XDrishti.Application.Tests.Platform.Services.ServicesWorld;
 
 namespace XDrishti.Application.Tests.Portfolio.Quotes;
@@ -17,6 +20,8 @@ public sealed class HoldingQuotesServiceTests : IDisposable
     private readonly FakeQuoteSource _source = new();
     private readonly FakeDataAccount _account = FakeDataAccount.Connected();
     private readonly ActionsHarness _actions = new();
+    private readonly InMemorySyncHealth _health = new();
+    private readonly FixedHealSettings _heal = new();
     private readonly ServicesWorld _world;
 
     public HoldingQuotesServiceTests() =>
@@ -27,7 +32,10 @@ public sealed class HoldingQuotesServiceTests : IDisposable
                 .Singleton<IQuoteSource>(_source)
                 .Singleton<IDataAccountStatus>(_account)
                 .Singleton(_actions.Checker())
-                .Singleton(_actions.Reconciler()));
+                .Singleton(_actions.Reconciler())
+                .Singleton<ISyncHealthStore>(_health)
+                .Singleton<IHealSettings>(_heal)
+                .Singleton<SyncHealthRecorder, SyncHealthRecorder>());
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -166,21 +174,94 @@ public sealed class HoldingQuotesServiceTests : IDisposable
         _holdings.Applied.ShouldBeEmpty();
     }
 
-    [Theory]
-    [InlineData(QuoteFailureKind.Unauthorized, "The Data account's token was refused by Dhan.")]
-    [InlineData(QuoteFailureKind.RateLimited, "Dhan's rate limit was reached; the next tick tries again.")]
-    [InlineData(QuoteFailureKind.Failed, "Dhan's quote service answered HTTP 503.")]
-    public async Task A_failed_request_ends_the_run_failed_with_the_safe_message_and_changes_no_price(QuoteFailureKind kind, string message)
+    [Fact]
+    public async Task A_refused_token_fails_the_run_at_once_with_the_safe_message_and_changes_no_price()
     {
+        const string message = "The Data account's token was refused by Dhan.";
         _holdings.Targets = FakeHoldingQuotes.Held(open: 3, nse: 3);
-        _source.Respond = _ => QuoteResult.Failed(new QuoteFailure(kind, message), 1);
+        _source.Respond = _ => QuoteResult.Failed(new QuoteFailure(QuoteFailureKind.Unauthorized, message), 1);
 
         var run = await RunAsync();
 
         (run.Status, run.Message).ShouldBe((ServiceRunStatus.Failed, message));
         _holdings.Applied.ShouldBeEmpty();
         _world.Data.RunsOf(HoldingQuotesService.Id).Count().ShouldBe(1); // retries are 0
+        _health.Of(_account.State.AccountId!.Value, SyncHealthKind.Quotes).LastFailureReason.ShouldBe("token_refused");
     }
+
+    [Theory]
+    [InlineData(QuoteFailureKind.RateLimited, "Dhan's rate limit was reached; the next tick tries again.", "rate_limited")]
+    [InlineData(QuoteFailureKind.Failed, "Dhan's quote service answered HTTP 503.", "unavailable")]
+    public async Task A_poll_that_dhan_did_not_answer_is_skipped_quietly_with_the_reason_and_changes_no_price(QuoteFailureKind kind, string message, string reason)
+    {
+        _holdings.Targets = FakeHoldingQuotes.Held(open: 3, nse: 3);
+        _source.Respond = _ => QuoteResult.Failed(new QuoteFailure(kind, message), 1);
+
+        var run = await RunAsync();
+
+        (run.Status, run.Message).ShouldBe((ServiceRunStatus.Skipped, message));
+        _holdings.Applied.ShouldBeEmpty();
+        var figures = _health.Of(_account.State.AccountId!.Value, SyncHealthKind.Quotes);
+        (figures.ConsecutiveFailedDays, figures.LastFailureReason).ShouldBe((1, reason));
+        (await NoticesAsync()).Items.ShouldBeEmpty(); // nothing is shown while the next polls can still put it right
+    }
+
+    [Fact]
+    public async Task Failures_on_the_same_day_count_as_one_failed_day_and_a_success_clears_them()
+    {
+        _holdings.Targets = FakeHoldingQuotes.Held(open: 1, nse: 1);
+        _source.Respond = _ => QuoteResult.Failed(new QuoteFailure(QuoteFailureKind.Failed, "Dhan's quote service answered HTTP 503."), 1);
+        await RunAsync();
+        _world.SetClock(At(12, 10, 5));
+        await RunAsync();
+        var id = _account.State.AccountId!.Value;
+
+        var figures = _health.Of(id, SyncHealthKind.Quotes);
+
+        (figures.ConsecutiveFailedDays, figures.Attempts).ShouldBe((1, 2));
+
+        _source.Respond = ids => new QuoteResult([.. ids.Select(i => new SecurityQuote(i, 10m, 9m))], null, 1);
+        _world.SetClock(At(12, 10, 10));
+        (await RunAsync()).Status.ShouldBe(ServiceRunStatus.Succeeded);
+
+        _health.Of(id, SyncHealthKind.Quotes).ShouldBe(SyncHealth.None(id, SyncHealthKind.Quotes) with { MapperVersion = 0 });
+    }
+
+    [Fact]
+    public async Task The_second_failed_day_in_a_row_fails_the_run_and_raises_the_service_notice()
+    {
+        _holdings.Targets = FakeHoldingQuotes.Held(open: 1, nse: 1);
+        _source.Respond = _ => QuoteResult.Failed(new QuoteFailure(QuoteFailureKind.RateLimited, "Dhan's rate limit was reached; the next tick tries again."), 1);
+        (await RunAsync()).Status.ShouldBe(ServiceRunStatus.Skipped); // Monday: the first failed day
+
+        _world.SetClock(At(13, 10, 0));
+        var second = await RunAsync(); // Tuesday: the second
+
+        second.Status.ShouldBe(ServiceRunStatus.Failed);
+        (await NoticesAsync()).Items.ShouldHaveSingleItem().Id.ShouldBe("service:failed:holdings-quotes:2026-10-13");
+    }
+
+    [Fact]
+    public async Task A_success_after_one_failed_day_means_the_next_failure_is_a_first_failed_day_again()
+    {
+        _holdings.Targets = FakeHoldingQuotes.Held(open: 1, nse: 1);
+        _source.Respond = _ => QuoteResult.Failed(new QuoteFailure(QuoteFailureKind.Failed, "Dhan's quote service answered HTTP 503."), 1);
+        await RunAsync();
+        _source.Respond = ids => new QuoteResult([.. ids.Select(i => new SecurityQuote(i, 10m, 9m))], null, 1);
+        _world.SetClock(At(13, 10, 0));
+        await RunAsync();
+        _source.Respond = _ => QuoteResult.Failed(new QuoteFailure(QuoteFailureKind.Failed, "Dhan's quote service answered HTTP 503."), 1);
+        _world.SetClock(At(14, 10, 0));
+
+        var run = await RunAsync();
+
+        run.Status.ShouldBe(ServiceRunStatus.Skipped);
+        _health.Of(_account.State.AccountId!.Value, SyncHealthKind.Quotes).ConsecutiveFailedDays.ShouldBe(1);
+    }
+
+    private async Task<ServiceNotices> NoticesAsync() =>
+        await _world.WithScopeAsync(async sp => await Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+            .GetRequiredService<XDrishti.Application.Abstractions.Messaging.IQueryHandler<GetServiceNoticesQuery, ServiceNotices>>(sp).HandleAsync(new GetServiceNoticesQuery(), Ct));
 
     [Fact]
     public async Task An_answer_without_one_usable_price_fails_the_run()

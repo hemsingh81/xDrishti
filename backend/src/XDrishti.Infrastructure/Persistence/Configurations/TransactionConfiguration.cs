@@ -7,7 +7,7 @@ namespace XDrishti.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// <c>portfolio.transactions</c> (ADR 0023, 0025): the trades of the accounts (tradebook files, the owner's hand, the broker's trade history), immutable except for <c>voided_at</c>/<c>voided_by</c> and, for broker trades, the completion of a missing <c>isin</c>, empty <c>trading_symbol</c> or zero <c>charges</c> by a later read (<c>Transaction.EnrichFromBroker</c>). The runtime role may read, insert and update them, never delete. The identity of a trade (<c>external_id</c>) is unique
-/// per account among the trades that are not voided (a partial unique index), so a voided trade can be imported again.
+/// per account among the trades that are not voided (a partial unique index), so a voided trade can be imported again. A bill-level row of a downloaded Dhan report (source <c>bill</c>, ADR 0029) is voided as <c>superseded</c> when the broker's own trades for its day, ISIN and side are stored.
 /// </summary>
 internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
 {
@@ -16,11 +16,12 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.ToTable("transactions", Schemas.Portfolio, t =>
         {
             t.HasCheckConstraint("ck_transactions_side", "side IN ('buy', 'sell')");
-            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual', 'broker')");
+            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual', 'broker', 'bill')");
             t.HasCheckConstraint("ck_transactions_qty", "qty > 0");
             t.HasCheckConstraint("ck_transactions_price", "price > 0");
             t.HasCheckConstraint("ck_transactions_charges", "charges >= 0");
             t.HasCheckConstraint("ck_transactions_voided", "(voided_at IS NULL) = (voided_by IS NULL)");
+            t.HasCheckConstraint("ck_transactions_superseded", "superseded_by IS NULL OR (voided_at IS NOT NULL AND source = 'bill')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
@@ -36,7 +37,7 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.Property(x => x.TradeDate).IsRequired();
         builder.Property(x => x.TradeTime);
         builder.Property(x => x.Qty).IsRequired();
-        builder.Property(x => x.Price).HasPrecision(18, 4).IsRequired();
+        builder.Property(x => x.Price).HasPrecision(18, 6).IsRequired();
         builder.Property(x => x.Charges).HasPrecision(18, 4).IsRequired();
         builder.Property(x => x.Source).HasConversion(EnumConversions.Lowercase<TradeSource>()).HasMaxLength(6).IsRequired();
         builder.Property(x => x.BatchId);
@@ -45,6 +46,10 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.Property(x => x.RunId);
         builder.HasOne<BrokerSyncRun>().WithMany().HasForeignKey(x => x.RunId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<TradeBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
+
+        // The broker history run whose trades replaced a bill-level row of an imported Dhan report (ADR 0029); the row is voided with it.
+        builder.Property(x => x.SupersededBy);
+        builder.HasOne<BrokerSyncRun>().WithMany().HasForeignKey(x => x.SupersededBy).OnDelete(DeleteBehavior.Restrict);
         builder.Property(x => x.Seq).IsRequired();
         builder.Property(x => x.ExternalId).HasMaxLength(TradeRules.MaxExternalIdLength).IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(Transaction.MaxCreatedByLength).IsRequired();

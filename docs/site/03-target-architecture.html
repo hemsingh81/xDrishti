@@ -249,6 +249,11 @@ backtest / Strategy Lab / nightly scan / grading. Modules can be split into serv
 <td>Fast bulk import of 1-minute files</td>
 </tr>
 <tr>
+<td>Spreadsheet reading</td>
+<td><strong>ExcelDataReader 3.7.0</strong> (MIT), <code>Infrastructure/Portfolio/SpreadsheetReader</code> behind <code>ISpreadsheetReader</code> (P2-17, <a href="../adr/0029-dhan-report-imports-and-source-precedence.html">ADR 0029</a>)</td>
+<td>Dhan&#39;s downloaded reports come as legacy <code>.xls</code> (BIFF8) and <code>.xlsx</code>; read natively, no conversion step; the Application layer never references the package</td>
+</tr>
+<tr>
 <td>Live feed</td>
 <td><code>System.Net.WebSockets</code> client + binary packet parser (Dhan little-endian format)</td>
 <td>Active-set streaming in <code>xd-feed</code></td>
@@ -814,7 +819,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-14 21:34</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-15 09:32</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

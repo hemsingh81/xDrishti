@@ -51,7 +51,9 @@ internal sealed class PortfolioFixture
 
     public HoldingsImporter Importer => Connections.Accounts.Importer;
 
-    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Reconciler(), Clock, NullLogger<SyncHoldingsHandler>.Instance);
+    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Reconciler(), Connections.Accounts.HealthRecorder, Clock, NullLogger<SyncHoldingsHandler>.Instance);
+
+    public XDrishti.Application.Tests.Portfolio.Heal.FixedHealSettings HealSettings { get; } = new();
 
     /// <summary>The Action-center reconciliation a sync ends with; there are no decisions in these tests, so it reads them (none) and stops.</summary>
     public ActionReconciler Reconciler() => new(
@@ -85,11 +87,15 @@ internal sealed class PortfolioFixture
 
     public PreviewTradesHandler PreviewTrades() => new(Workspace, Clock, NullLogger<PreviewTradesHandler>.Instance);
 
-    public ImportTradesHandler ImportTrades() => new(Workspace, Trades, Trades, Data, Accounts, Data, Clock, NullLogger<ImportTradesHandler>.Instance);
+    public SyncGuard SyncGuard => new(Data, BrokerData);
+
+    public TradeImporter TradeImporter() => new(Workspace, Trades, Trades, SyncGuard, Accounts, Data, Clock);
+
+    public ImportTradesHandler ImportTrades() => new(Workspace, TradeImporter(), Clock, NullLogger<ImportTradesHandler>.Instance);
 
     public ListTradeBatchesHandler ListTradeBatches() => new(Trades, Accounts);
 
-    public UndoTradeBatchHandler UndoTradeBatch() => new(Workspace, Trades, Trades, Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UndoTradeBatchHandler>.Instance);
+    public UndoTradeBatchHandler UndoTradeBatch() => new(Workspace, Trades, Trades, Data, SyncGuard, Accounts, Accounts, Data, Clock, NullLogger<UndoTradeBatchHandler>.Instance);
 
     public ListHoldingTradesHandler ListHoldingTrades() => new(Data, Trades);
 
@@ -97,11 +103,11 @@ internal sealed class PortfolioFixture
 
     public VoidTradeHandler VoidTrade() => new(Trades, Accounts, Accounts, Data, Clock, NullLogger<VoidTradeHandler>.Instance);
 
-    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Accounts, Data, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
+    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Accounts, SyncGuard, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
 
     public UpdateLotDateHandler UpdateLotDate() => new(Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UpdateLotDateHandler>.Instance);
 
-    public GetSyncStatusHandler SyncStatus() => new(Accounts, Data, Data, Clock);
+    public GetSyncStatusHandler SyncStatus() => new(Accounts, Data, Data, Data.Health, HealSettings, Clock);
 
     public RecoverInterruptedSyncsHandler Recover() => new(Data, BrokerData, Clock, NullLogger<RecoverInterruptedSyncsHandler>.Instance);
 

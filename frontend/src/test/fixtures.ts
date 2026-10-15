@@ -888,6 +888,10 @@ export function buildSyncStatus(overrides: Partial<SyncStatus> = {}): SyncStatus
     nextRunAt: null,
     running: false,
     last: buildSyncRun(),
+    consecutiveFailedDays: 0,
+    lastFailureReason: null,
+    attempts: 0,
+    retryAt: null,
     ...overrides,
   };
 }

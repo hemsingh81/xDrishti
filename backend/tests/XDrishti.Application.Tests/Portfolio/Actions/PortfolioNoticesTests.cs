@@ -95,6 +95,19 @@ public sealed class PortfolioNoticesTests
     }
 
     [Fact]
+    public async Task The_decision_notice_has_the_same_key_on_every_poll_of_the_day()
+    {
+        var harness = Held(Pos("BAD", 70m));
+
+        var first = (await NoticesAsync(harness)).Items.Single();
+        harness.Clock.Advance(TimeSpan.FromMinutes(5));
+        var second = (await NoticesAsync(harness)).Items.Single();
+
+        (second.Id, second.Since).ShouldBe((first.Id, first.Since));
+        second.Since.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Snoozed_and_done_items_do_not_count_and_without_open_items_there_is_no_notice()
     {
         var bad = Pos("BAD", 70m);

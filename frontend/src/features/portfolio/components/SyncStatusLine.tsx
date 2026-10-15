@@ -2,6 +2,7 @@ import InfoIcon from '@mui/icons-material/InfoOutlined';
 import { Stack, Typography } from '@mui/material';
 import type { SyncRun, SyncStatus } from '@/shared/api';
 import { formatAgo, formatIstTimeAndDay } from '@/shared/lib/format';
+import { healthText } from '@/shared/lib/syncHealth';
 import { numeric } from '@/theme';
 import { describeSchedule, summariseRun } from '../lib/syncText';
 import { toneLook } from './toneLook';
@@ -48,6 +49,8 @@ interface SyncStatusLineProps {
 
 /** Last run, and for an account: the auto-refresh setting and when it runs next. */
 export function SyncStatusLine({ status, fallbackRun }: SyncStatusLineProps) {
+  // While the app retries by itself it says so; once it keeps failing it says for how long and why (ADR 0027).
+  const health = status ? healthText(status) : null;
   return (
     <Stack spacing={0.25}>
       <LastRun run={status ? status.last : fallbackRun} running={status?.running ?? false} />
@@ -55,6 +58,11 @@ export function SyncStatusLine({ status, fallbackRun }: SyncStatusLineProps) {
         <Typography variant="body2" color="text.secondary" sx={numeric}>
           {describeSchedule(status)}
           {status.nextRunAt && ` · next run ${formatIstTimeAndDay(status.nextRunAt)} IST`}
+        </Typography>
+      )}
+      {health && (
+        <Typography variant="body2" color="text.secondary" sx={numeric}>
+          Holdings sync: {health}
         </Typography>
       )}
     </Stack>

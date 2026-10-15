@@ -3,9 +3,10 @@ import { render, type RenderResult } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router';
 import { connectAuth, StepUpProvider } from '@/features/auth';
+import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { AppThemeProvider } from '@/theme';
 
-/** Renders UI with the real providers (query cache, theme, router) — tests behave like the app. */
+/** Renders UI with the real providers (query cache, theme, toasts, router) — tests behave like the app. */
 export function renderWithProviders(ui: ReactElement, { path = '/' }: { path?: string } = {}): RoutesRender {
   return renderRoutes([{ path, element: ui }], { initialPath: path });
 }
@@ -27,7 +28,9 @@ export function renderRoutes(
     <QueryClientProvider client={client}>
       <AppThemeProvider>
         <StepUpProvider>
-          <RouterProvider router={router} />
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
         </StepUpProvider>
       </AppThemeProvider>
     </QueryClientProvider>,

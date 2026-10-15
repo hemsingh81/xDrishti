@@ -22,15 +22,26 @@ interface DividendsPanelProps {
   startAdding: boolean;
   /** Open the dividend import at once. */
   startImporting?: boolean;
+  /** Put the keyboard on the suggested dividends once they are listed. */
+  focusSuggestions?: boolean;
   /** A tradebook was dropped on the dividend import: leave for the trade import. */
   onImportTrades: () => void;
+  /** Opens the Import files dialog (the button, or a report was dropped on the dividend import). */
+  onImportFiles: () => void;
 }
 
 /**
  * The dividends of one account on the Cash & dividends panel: the ones you entered (every holding's and the unallocated ones),
  * Add dividend, Import dividends (a payout file), and the ledger entries that look like a dividend, to accept or dismiss. Mount it per account (`key`).
  */
-export function DividendsPanel({ account, startAdding, startImporting = false, onImportTrades }: DividendsPanelProps) {
+export function DividendsPanel({
+  account,
+  startAdding,
+  startImporting = false,
+  focusSuggestions = false,
+  onImportTrades,
+  onImportFiles,
+}: DividendsPanelProps) {
   const list = useInfiniteRows(accountDividendsList(account.id));
   const [adding, setAdding] = useState(startAdding);
   const [importing, setImporting] = useState(startImporting);
@@ -38,7 +49,7 @@ export function DividendsPanel({ account, startAdding, startImporting = false, o
   const [headingRef, focusHeading] = useFocusRequest<HTMLHeadingElement>();
   return (
     <Stack spacing={2}>
-      <SuggestionsList accountId={account.id} />
+      <SuggestionsList accountId={account.id} focusOnShow={focusSuggestions} />
       <Box component="section" aria-label="Dividends entered">
         <Stack
           direction="row"
@@ -48,6 +59,9 @@ export function DividendsPanel({ account, startAdding, startImporting = false, o
             Dividends you entered
           </Typography>
           <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap' }}>
+            <Button size="small" variant="outlined" startIcon={<UploadIcon />} onClick={onImportFiles}>
+              Import files
+            </Button>
             <Button
               size="small"
               variant="outlined"
@@ -87,6 +101,7 @@ export function DividendsPanel({ account, startAdding, startImporting = false, o
           <DividendImportDialog
             account={account}
             onImportTrades={onImportTrades}
+            onImportFiles={onImportFiles}
             onClose={() => {
               setImporting(false);
             }}

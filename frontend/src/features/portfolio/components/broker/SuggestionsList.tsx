@@ -10,7 +10,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LedgerEntry } from '@/shared/api';
 import { formatDate, formatInrPrecise, formatNumber } from '@/shared/lib/format';
 import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
@@ -29,7 +29,7 @@ import { SuggestionRow } from './SuggestionRow';
  * dividend, so this is usually empty and then not shown at all). Nothing is added without the owner: Accept asks for the
  * holding, Dismiss asks to be sure - both decisions are final.
  */
-export function SuggestionsList({ accountId }: { accountId: string }) {
+export function SuggestionsList({ accountId, focusOnShow = false }: { accountId: string; focusOnShow?: boolean }) {
   const { notify } = useToast();
   const list = useInfiniteRows(suggestionsList(accountId));
   const dismiss = useDismissSuggestion(accountId);
@@ -38,6 +38,13 @@ export function SuggestionsList({ accountId }: { accountId: string }) {
   // Once a decision emptied the list the section stays, saying so: the keyboard has somewhere to be.
   const [decided, setDecided] = useState(false);
   const [headingRef, focusHeading] = useFocusRequest<HTMLHeadingElement>();
+  // A link to the suggestions (the bell) puts the keyboard on their title and shows it, once they are listed.
+  const listed = !list.isPending && !list.isError && list.rows.length > 0;
+  useEffect(() => {
+    if (!focusOnShow || !listed) return;
+    if (typeof headingRef.current?.scrollIntoView === 'function') headingRef.current.scrollIntoView({ block: 'start' });
+    headingRef.current?.focus({ preventScroll: true });
+  }, [focusOnShow, listed, headingRef]);
 
   if (list.isPending) return <LoadingState label="Loading suggested dividends" />;
   if (list.isError) {

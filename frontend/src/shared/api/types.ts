@@ -286,3 +286,35 @@ export type DividendImportResult = Schemas['DividendImportResult'];
 export type DividendBatch = Schemas['DividendBatchView'];
 export type DividendBatchPage = Schemas['DividendBatchPage'];
 export type DividendUndoResult = Schemas['DividendUndoResult'];
+
+/** Dhan report imports (P2-17, ADR 0029): downloaded files recognised by kind, previewed and imported together. */
+export type ImportFilePreview = Schemas['ImportFilePreview'];
+export type ImportFileResult = Schemas['ImportFileResult'];
+export type ImportFileError = Schemas['ImportFileError'];
+export type ImportSummary = Schemas['ImportSummary'];
+export type ImportWarning = Schemas['ImportWarning'];
+export type ImportPreviewResponse = Schemas['ImportPreviewResponse'];
+export type ImportRunResponse = Schemas['ImportRunResponse'];
+/** What is particular to a global transaction report: names, coverage by Dhan's own trades, the charges check. */
+export type BillDetails = Schemas['BillDetails'];
+export type BillNameView = Schemas['BillNameView'];
+export type BillCandidate = Schemas['BillCandidate'];
+export type BillCoverage = Schemas['BillCoverage'];
+export type BillDifference = Schemas['BillDifference'];
+export type BillCharges = Schemas['BillCharges'];
+/** A depository-charges sheet: its lines, counts and the rupees an import would add to the costs. */
+export type DpPreview = Schemas['DpPreview'];
+export type DpLine = Schemas['DpLineView'];
+export type DpCounts = Schemas['DpCounts'];
+export type NameLearning = Schemas['NameLearning'];
+/** A demat holding statement: a check against the synced holdings and a source of names; it changes no holding. */
+export type DematPreview = Schemas['DematPreview'];
+export type DematDifference = Schemas['DematDifference'];
+export type DematHeld = Schemas['DematHeld'];
+export type DematSynced = Schemas['DematSynced'];
+export type DematImportResult = Schemas['DematImportResult'];
+/** Imports of depository-charges sheets (cost batches) with Undo. */
+export type CostBatch = Schemas['CostBatchView'];
+export type CostBatchPage = Schemas['CostBatchPage'];
+export type CostImportResult = Schemas['CostImportResult'];
+export type CostUndoResult = Schemas['CostUndoResult'];

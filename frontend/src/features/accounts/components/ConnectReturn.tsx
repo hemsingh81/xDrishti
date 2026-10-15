@@ -23,7 +23,7 @@ async function announceConnected(queryClient: QueryClient, accountId: string, no
 /**
  * Handles the broker's return to /accounts?account={id}&connected=1 or …&connectError={code}: selects the account on
  * its Connection tab, says how it went, and removes the outcome from the URL (replace, so Back does not repeat it).
- * Renders nothing; must sit inside the page's ToastProvider.
+ * Renders nothing; needs the app's ToastProvider above it (the shell).
  */
 export function ConnectReturn() {
   const [params, setParams] = useSearchParams();

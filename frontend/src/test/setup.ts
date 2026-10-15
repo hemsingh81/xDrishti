@@ -60,6 +60,8 @@ afterEach(async () => {
   // Answer what a test left hanging while the screen is still there (see gate.ts), then take the screen down.
   await releasePending();
   cleanup();
+  // What a test left in the browser's storage (the bell's read state, the pop-ups that were shown) is not for the next one.
+  window.localStorage.clear();
   setHubTransport();
   if (escaped.length > 0) {
     throw new Error(`A request escaped the network mock and reached the real network: ${escaped.splice(0).join(', ')}`);

@@ -15,6 +15,7 @@ import { Facts, LoadingState, type Fact } from '@/shared/ui';
 import { useWallClock } from '@/shared/lib/useWallClock';
 import { monoFontFamily } from '@/theme';
 import { useLive, useLiveRow } from '../hooks/liveContext';
+import { useHoldingRequest } from '../hooks/useHoldingRequest';
 import { istSecondText } from '../lib/liveChip';
 import { notLiveReason } from '../lib/liveNotes';
 import { noDayChangeReasonOf } from '../lib/figures';
@@ -84,6 +85,7 @@ export function HoldingDrawer({ id, holding: read, onClose, onSetAlert, onShowAl
   const holding = useLiveRow(read);
   const { following } = useLive();
   const now = useWallClock(60_000);
+  const request = useHoldingRequest();
   const liveNote = following && holding ? notLiveReason(holding, now) : null;
   return (
     <Drawer
@@ -144,7 +146,7 @@ export function HoldingDrawer({ id, holding: read, onClose, onSetAlert, onShowAl
           )}
           {id !== null && (
             <Suspense fallback={<LoadingState label="Loading trades" />}>
-              <HoldingTrades holdingId={id} holding={holding} />
+              <HoldingTrades key={id} holdingId={id} holding={holding} request={request} />
             </Suspense>
           )}
         </Stack>

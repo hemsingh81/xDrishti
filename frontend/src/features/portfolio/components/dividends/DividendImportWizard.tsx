@@ -12,13 +12,14 @@ interface DividendImportWizardProps {
   account: { id: string; name: string };
   onHistory: () => void;
   onImportTrades: () => void;
+  onImportFiles: () => void;
 }
 
 /**
  * Import dividends: the file, Preview (nothing is stored), the report with the owner's choices, then Import. A report that the
  * server finds stale at import time is swapped for the fresh one with a message, and the owner confirms again.
  */
-export function DividendImportWizard({ account, onHistory, onImportTrades }: DividendImportWizardProps) {
+export function DividendImportWizard({ account, onHistory, onImportTrades, onImportFiles }: DividendImportWizardProps) {
   const wizard = useDividendImportWizard(account.id);
   const { report, done, stale, importing, previewing } = wizard;
   const reportHeading = useRef<HTMLHeadingElement>(null);
@@ -50,6 +51,7 @@ export function DividendImportWizard({ account, onHistory, onImportTrades }: Div
           void wizard.preview();
         }}
         onImportTrades={onImportTrades}
+        onImportFiles={onImportFiles}
       />
       {done && (
         <DividendImportDone result={done} headingRef={doneHeading} onHistory={onHistory} onAnother={wizard.startOver} />

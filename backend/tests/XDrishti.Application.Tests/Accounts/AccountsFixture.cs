@@ -54,7 +54,9 @@ internal sealed class AccountsFixture
 
     public HoldingsFetcher Fetcher => new(Data, Data, Connections, Data, HoldingsDhan, HoldingsInstruments, Clock);
 
-    public SyncRuns Runs => new(PortfolioData, PortfolioData, Clock, NullLogger<SyncRuns>.Instance);
+    public SyncRuns Runs => new(PortfolioData, PortfolioData, HealthRecorder, Clock, NullLogger<SyncRuns>.Instance);
+
+    public XDrishti.Application.Portfolio.Heal.SyncHealthRecorder HealthRecorder => new(PortfolioData.Health, Clock, NullLogger<XDrishti.Application.Portfolio.Heal.SyncHealthRecorder>.Instance);
 
     public HoldingsImporter Importer => new(Fetcher, Runs, PortfolioData, Data, Clock, NullLogger<HoldingsImporter>.Instance);
 

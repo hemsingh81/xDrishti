@@ -107,7 +107,7 @@ internal sealed class ImportDividendsHandler(
                         at));
                 }
 
-                var saved = await RememberAsync(account.Value.Id, selection.Aliases, command.Actor, at, token);
+                var saved = await DividendAliasSaver.SaveAsync(aliases, events, account.Value.Id, selection.Aliases, command.Actor, at, token);
                 if (!await unitOfWork.TrySaveAsync(token))
                 {
                     return Result.Failure(DividendImportErrors.DividendsChanged);
@@ -159,43 +159,5 @@ internal sealed class ImportDividendsHandler(
             selected.Planned.ExternalId,
             actor,
             at);
-    }
-
-    /// <summary>
-    /// Saves the aliases the owner asked to remember: a new one, or the existing one for the name pointed elsewhere; the number of aliases that changed. The existing ones are read in one query, and one audit event says how many were created and
-    /// pointed elsewhere (counts only).
-    /// </summary>
-    private async ValueTask<int> RememberAsync(Guid accountId, IReadOnlyList<AliasToSave> toSave, string actor, DateTimeOffset at, CancellationToken cancellationToken)
-    {
-        if (toSave.Count == 0)
-        {
-            return 0;
-        }
-
-        var existing = (await aliases.FindByKeysAsync(accountId, [.. toSave.Select(s => s.NameKey)], cancellationToken)).ToDictionary(a => a.NameKey, StringComparer.Ordinal);
-        var created = 0;
-        var pointedElsewhere = 0;
-        foreach (var save in toSave)
-        {
-            if (existing.TryGetValue(save.NameKey, out var current))
-            {
-                if (current.Retarget(save.HoldingId, save.InstrumentId, at))
-                {
-                    pointedElsewhere++;
-                }
-
-                continue;
-            }
-
-            aliases.Add(DividendAlias.Create(accountId, save.NameKey, save.HoldingId, save.InstrumentId, actor, at));
-            created++;
-        }
-
-        if (created + pointedElsewhere > 0)
-        {
-            events.Record(AccountEvent.Record(AccountEventType.DividendAliasSaved, accountId, $"Dividend aliases saved: {created} new, {pointedElsewhere} pointed elsewhere", actor, at));
-        }
-
-        return created + pointedElsewhere;
     }
 }

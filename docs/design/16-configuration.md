@@ -347,6 +347,16 @@ The Dhan holdings endpoint (`GET https://api.dhan.co/v2/holdings`) is fixed in t
 
 The window length (30 days), the page cap (200), the 30 s timeout and the 5 MB answer limit are fixed in the code, not configuration (tuned after the first real read). The two Dhan endpoints are on the allow-list ([doc 05](05-data-and-brokers.md) §8.3, [doc 17](17-deployment-and-operations.md) §3).
 
+### Self-healing syncs (`Portfolio:Heal:*`, [ADR 0027](../adr/0027-self-healing-sync-and-actionable-notifications.md), P2-16)
+
+| Option (`appsettings` / environment) | Meaning | Default | Check |
+|--------------------------------------|---------|---------|-------|
+| `Portfolio:Heal:RetryBackoffMinutes` (`Portfolio__Heal__RetryBackoffMinutes`; compose: `XD_PORTFOLIO_HEAL_BACKOFF_MINUTES`) | The waits before each quiet retry of a sync that failed for a reason that may pass (Dhan did not answer, its rate limit, an interrupted run), in minutes, comma-separated; their **number is the number of retries** of one failure, all inside the same India day. With the default the first retry is due 1 minute after the first failure, the second 5 minutes after the second, the third 15 minutes after the third. Empty switches the quiet retries off (the nightly and scheduled runs still happen) | `1,5,15` | up to ten waits of 1 to 999 minutes (`^\d{1,3}(,\d{1,3}){0,9}$`, blanks allowed) |
+| `Portfolio:Heal:PersistDays` (`Portfolio__Heal__PersistDays`; compose: `XD_PORTFOLIO_HEAL_PERSIST_DAYS`) | The consecutive India days whose last attempt failed after which a failing sync (holdings, trades, ledger or the price poll) becomes an item in the bell; a reason only the owner can fix (the Dhan login) is told at once. The same number makes a failing price poll a failed run of the service | `2` | integer 1 to 30 |
+| `Portfolio:Heal:DeepenMaxYears` (`Portfolio__Heal__DeepenMaxYears`; compose: `XD_PORTFOLIO_HEAL_DEEPEN_YEARS`) | How many years back from today the nightly deepening of the trade history reads at most, **one year per day**, while the trades do not explain a holding; `0` switches it off | `8` | integer 0 to 30 |
+
+These are ordinary deployment settings, read at start (not first-start settings): change them in the environment and restart `xd-api`. The quiet retries and the catch-up after a reconnect are done by the holdings refresh runner, so **`Portfolio:AutoRefresh:Enabled = false` also switches the healing off** (the scheduled runs, "Sync now" and the "Retry now" button keep working). The 1-minute look of the healer, the 24 hours a resolved item is kept in the bell and the 2 hours before a login runs out at which it is called "expiring" are fixed in the code. Details: [doc 12](12-portfolio-monitoring.md) §3 "Self-healing and attention items (P2-16)".
+
 ### Live feed (`Live:*`, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md), P2-10)
 
 `appsettings.json` of `xd-feed` (and `Live:ManualRunMinutes` of `xd-api` too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service `live-feed` on the Services screen, not a setting here.

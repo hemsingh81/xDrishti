@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildAlertNotice, buildPortfolioNotice } from '@/test/actionCenterFixtures';
-import { buildAccountDetail, buildConnected, buildDataNotice, summaryOf } from '@/test/fixtures';
+import { backendCommandTargets, buildReconnectNotice } from '@/test/attentionFixtures';
+import { buildAccountDetail, buildConnected, buildDataNotice, ids, summaryOf } from '@/test/fixtures';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
 import { NotificationBell } from './components/NotificationBell';
@@ -102,6 +103,10 @@ describe('derivePortfolioNotifications', () => {
       text: 'TCS reached ₹3,912.50, at or above your ₹3,900 alert',
       href: '/portfolio?alerts=triggered',
       at: Date.parse('2026-10-12T09:40:00Z'),
+      title: null,
+      actions: [],
+      since: null,
+      resolved: false,
     });
     expect(decide).toMatchObject({
       id: 'portfolio:actions:2026-10-13',
@@ -109,6 +114,38 @@ describe('derivePortfolioNotifications', () => {
       severity: 'info',
       href: '/portfolio?focus=actions',
     });
+  });
+
+  it('keeps `since` only on the attention items: any other notice is identified by its id alone', () => {
+    const since = '2026-10-15T09:00:00Z';
+    const [decide, alert, reconnect] = derivePortfolioNotifications([
+      buildPortfolioNotice({ since }),
+      buildAlertNotice({ since }),
+      buildReconnectNotice({ since }),
+    ]);
+
+    expect(decide?.since).toBeNull();
+    expect(alert?.since).toBeNull();
+    expect(reconnect?.since).toBe(since);
+  });
+
+  it('keeps every command the API can name: no action is silently dropped', () => {
+    const targets = backendCommandTargets(ids.main);
+    const [notice] = derivePortfolioNotifications([
+      buildReconnectNotice({
+        actions: targets.map((target, n) => ({ label: `Run ${n}`, kind: 'command', target })),
+      }),
+    ]);
+    // Only the first two buttons are shown, so each target is tried on its own.
+    const kept = targets.map(
+      (target) =>
+        derivePortfolioNotifications([
+          buildReconnectNotice({ actions: [{ label: 'Retry now', kind: 'command', target }] }),
+        ])[0]?.actions[0]?.target,
+    );
+
+    expect(kept).toEqual(targets);
+    expect(notice?.actions).toHaveLength(2);
   });
 
   it('drops a kind this version does not know and keeps a notice without a time', () => {

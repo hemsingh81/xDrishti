@@ -44,12 +44,12 @@ internal sealed class IncomeQueries(XDrishtiDbContext db) : IIncomeQueries
         }
 
         var ledgerCharges = await db.LedgerEntries.AsNoTracking()
-            .Where(e => ids.Contains(e.AccountId) && e.EntryClass == LedgerClass.Charges)
+            .Where(e => ids.Contains(e.AccountId) && e.VoidedAt == null && e.EntryClass == LedgerClass.Charges)
             .GroupBy(e => new { e.AccountId, e.EntryDate, e.Description, e.Narration })
             .Select(g => new IncomeLedgerCharge(g.Key.AccountId, g.Key.EntryDate, g.Key.Description, g.Key.Narration, -g.Sum(e => e.Amount)))
             .ToListAsync(cancellationToken);
         var starts = await db.LedgerEntries.AsNoTracking()
-            .Where(e => ids.Contains(e.AccountId))
+            .Where(e => ids.Contains(e.AccountId) && e.Source == LedgerSource.Broker)
             .GroupBy(e => e.AccountId)
             .Select(g => new IncomeLedgerStart(g.Key, g.Min(e => e.EntryDate)))
             .ToListAsync(cancellationToken);

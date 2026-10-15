@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Tests.Platform.Services;
 using XDrishti.Application.Tests.Portfolio.Actions;
+using XDrishti.Application.Tests.Portfolio.Heal;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Platform.Services;
 using XDrishti.Domain.Portfolio;
@@ -20,6 +22,8 @@ public sealed class HoldingQuotesAlertsTests : IDisposable
     private readonly FakeQuoteSource _source = new();
     private readonly FakeDataAccount _account = FakeDataAccount.Connected();
     private readonly ActionsHarness _actions = new();
+    private readonly InMemorySyncHealth _health = new();
+    private readonly FixedHealSettings _heal = new();
     private readonly ServicesWorld _world;
 
     public HoldingQuotesAlertsTests() =>
@@ -30,7 +34,10 @@ public sealed class HoldingQuotesAlertsTests : IDisposable
                 .Singleton<IQuoteSource>(_source)
                 .Singleton<IDataAccountStatus>(_account)
                 .Singleton(_actions.Checker())
-                .Singleton(_actions.Reconciler()));
+                .Singleton(_actions.Reconciler())
+                .Singleton<ISyncHealthStore>(_health)
+                .Singleton<IHealSettings>(_heal)
+                .Singleton<SyncHealthRecorder, SyncHealthRecorder>());
 
     public void Dispose() => _world.Dispose();
 
@@ -130,7 +137,7 @@ public sealed class HoldingQuotesAlertsTests : IDisposable
 
         var run = await RunAsync();
 
-        run.Status.ShouldBe(ServiceRunStatus.Failed);
+        run.Status.ShouldBe(ServiceRunStatus.Skipped); // Dhan not answering is tried again by the next poll and is not shown (ADR 0027)
         _actions.Data.AlertOf(alert.Id).Status.ShouldBe(AlertStatus.Active);
         _actions.Data.Events.ShouldBeEmpty();
     }
@@ -212,7 +219,10 @@ public sealed class HoldingQuotesAlertsTests : IDisposable
                 .Singleton<IQuoteSource>(_source)
                 .Singleton<IDataAccountStatus>(_account)
                 .Singleton(harness.Checker())
-                .Singleton(harness.Reconciler()));
+                .Singleton(harness.Reconciler())
+                .Singleton<ISyncHealthStore>(_health)
+                .Singleton<IHealSettings>(_heal)
+                .Singleton<SyncHealthRecorder, SyncHealthRecorder>());
         _holdings.Targets = FakeHoldingQuotes.Held(open: 1, nse: 1);
 
         await world.RunNowAsync(HoldingQuotesService.Id);

@@ -19,6 +19,9 @@ internal static partial class BrokerHttp
     /// <summary>Dhan's error code for an invalid or expired access token (documented authentication error).</summary>
     public const string TokenRefusedCode = "DH-901";
 
+    /// <summary>Dhan's code for "too many requests".</summary>
+    public const string RateLimitCode = "DH-904";
+
     /// <summary>Broker answers are small; anything bigger is refused.</summary>
     public const int MaxResponseBytes = 256 * 1024;
 
@@ -105,7 +108,8 @@ internal static partial class BrokerHttp
                 return BrokerResponse.Fail<JsonElement>(BrokerFailureKind.Unavailable);
             }
 
-            var code = body is { } error ? ErrorCode(error) : null;
+            // A 429 is Dhan's rate limit whether or not the body says so (DH-904): the quiet retries of ADR 0027 tell it from a refusal by the code.
+            var code = (body is { } error ? ErrorCode(error) : null) ?? (status == 429 ? RateLimitCode : null);
             var kind = status switch
             {
                 // Dhan also reports an invalid or expired token as DH-901 with other 4xx statuses (400 has been seen).

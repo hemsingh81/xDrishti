@@ -9,6 +9,7 @@ import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
 import { createDividendFake, type DividendFakeOptions } from '@/test/dividendFake';
 import { createDividendImportFake, type DividendImportFakeOptions } from '@/test/dividendImportFake';
+import { createReportImportFake, type ReportImportFakeOptions } from '@/test/reportImportFake';
 import { createTradeFake, type TradeFakeOptions } from '@/test/tradeFake';
 import { PortfolioPage } from './components/PortfolioPage';
 
@@ -139,4 +140,20 @@ export const warmDividends = () =>
     import('./components/broker/CashDrawer'),
     import('./components/dividends/DividendImportDialog'),
     import('./components/trades/TradesDrawer'),
+  ]);
+
+/** Serves the report import API (preview, import, cost batches and their undo) from one stateful fake. Bring `serveTrades` for trade undo. */
+export function serveReportImport(options: ReportImportFakeOptions = {}) {
+  const fake = createReportImportFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
+/** Loads the code of the lazy Import files dialog and the panels it opens from before the first test (see `warmTrades`). */
+export const warmReportImport = () =>
+  Promise.all([
+    import('./components/imports/ImportFilesDialog'),
+    import('./components/trades/TradesDrawer'),
+    import('./components/broker/CashDrawer'),
+    import('./components/dividends/DividendImportDialog'),
   ]);

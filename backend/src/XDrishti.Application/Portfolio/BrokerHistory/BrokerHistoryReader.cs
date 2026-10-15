@@ -28,6 +28,9 @@ internal sealed class BrokerHistoryReader(IBrokerTrades trades, IBrokerLedger le
     /// </summary>
     public const string TooLargeCode = "DH-905";
 
+    /// <summary>The version of the Dhan mapping the kind is read with (ADR 0027).</summary>
+    public int MapperVersion(BrokerSyncKind kind) => kind == BrokerSyncKind.Trades ? trades.MapperVersion : ledger.MapperVersion;
+
     public async ValueTask<Result<TradeWindowRead>> ReadTradesAsync(SecretValue token, DateWindow window, CancellationToken cancellationToken)
     {
         var whole = await PagesAsync(token, window, mayProbe: true, cancellationToken);

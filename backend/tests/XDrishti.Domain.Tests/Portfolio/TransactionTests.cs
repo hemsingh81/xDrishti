@@ -13,11 +13,11 @@ public sealed class TransactionTests
         Transaction.Create(Account, null, isin, symbol, null, TradeSide.Buy, new DateOnly(2024, 3, 5), new TimeOnly(9, 21), qty, price, charges, TradeSource.Csv, batch, 7, externalId, " owner@example.com ", HoldingData.T0);
 
     [Fact]
-    public void A_trade_normalises_its_symbol_isin_and_exchange_and_rounds_price_and_charges_to_four_decimals()
+    public void A_trade_normalises_its_symbol_isin_and_exchange_and_keeps_the_price_to_six_decimals_and_the_charges_to_four()
     {
         var trade = Trade();
 
-        (trade.TradingSymbol, trade.Isin, trade.Exchange, trade.Price, trade.Charges, trade.CreatedBy, trade.Seq, trade.IsVoided).ShouldBe(("EXMPL", "INE000A01011", "NSE", 1250.1235m, 12.3457m, "owner@example.com", 7, false));
+        (trade.TradingSymbol, trade.Isin, trade.Exchange, trade.Price, trade.Charges, trade.CreatedBy, trade.Seq, trade.IsVoided).ShouldBe(("EXMPL", "INE000A01011", "NSE", 1250.123456m, 12.3457m, "owner@example.com", 7, false));
     }
 
     [Theory]

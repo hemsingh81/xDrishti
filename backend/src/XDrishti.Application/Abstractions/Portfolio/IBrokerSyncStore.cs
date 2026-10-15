@@ -38,6 +38,18 @@ public interface IBrokerSyncStore
     /// <summary>The latest run of the account and kind that succeeded (so one that was skipped, failed or is still running does not count); null when there is none.</summary>
     ValueTask<BrokerSyncRun?> GetLastSucceededAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken);
 
+    /// <summary>The earliest start date of the account's runs of the kind that succeeded: how far back the kind was first read (an earlier-history read of a run is not in it); null when no run succeeded yet.</summary>
+    ValueTask<DateOnly?> GetEarliestReadAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken);
+
+    /// <summary>The latest run that succeeded, of each of the given accounts, for the kind; accounts without one are absent. One read for all the accounts (the notices ask for every account at once).</summary>
+    ValueTask<IReadOnlyDictionary<Guid, BrokerSyncRun>> ListLastSucceededAsync(IReadOnlyCollection<Guid> accountIds, BrokerSyncKind kind, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The dates of the account's succeeded runs of the kind that dropped rows for a data reason (rows that could not be used, or that no security could be found for) - what the first version of ADR 0027 has to read again, because windows were not noted
+    /// before it. Merged where they overlap, oldest first.
+    /// </summary>
+    ValueTask<IReadOnlyList<BrokerDateRange>> ListDroppedRangesAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken);
+
     /// <summary>The latest run of the account and kind that has ended, whether it succeeded or failed (a skipped one never read anything and does not count), other than <paramref name="excludedRunId"/>; null when there is none.</summary>
     ValueTask<BrokerSyncRun?> GetPreviousFinishedAsync(Guid accountId, BrokerSyncKind kind, Guid excludedRunId, CancellationToken cancellationToken);
 

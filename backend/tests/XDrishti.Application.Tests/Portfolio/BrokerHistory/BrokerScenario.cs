@@ -42,7 +42,7 @@ internal sealed class BrokerScenario
     public BrokerLotRebuilder Rebuilder() => new(Fx.Workspace, Fx.Data, Fx.Trades, Fx.Data, Fx.Clock, NullLogger<BrokerLotRebuilder>.Instance);
 
     public BrokerHistoryPipeline Pipeline() =>
-        new(Reader(), Rebuilder(), Data, Fx.Data, Fx.Trades, Fx.Trades, Data, Fx.Accounts, Fx.Data, Fx.Clock, NullLogger<BrokerHistoryPipeline>.Instance);
+        new(Reader(), Rebuilder(), Data, Fx.Data, Fx.Trades, Fx.Trades, Data, Fx.Accounts, Fx.Data, Fx.Data.Health, Fx.Connections.Accounts.HealthRecorder, Fx.HealSettings, Fx.Clock, NullLogger<BrokerHistoryPipeline>.Instance);
 
     public BrokerHistoryAccess Access() => new(Fx.Fetcher, Data, Fx.Clock);
 
@@ -52,7 +52,7 @@ internal sealed class BrokerScenario
 
     public ExecuteBrokerHistoryHandler Execute() => new(Access(), Pipeline(), Data);
 
-    public GetBrokerHistoryStatusHandler Status() => new(Fx.Accounts, Data, new FixedSchedules());
+    public GetBrokerHistoryStatusHandler Status() => new(Fx.Accounts, Data, Fx.Data.Health, Fx.HealSettings, new FixedSchedules());
 
     public ListLedgerHandler Ledger() => new(Fx.Accounts, Data);
 

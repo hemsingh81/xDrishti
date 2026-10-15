@@ -146,7 +146,7 @@ public sealed class BrokerHistoryRulesTests(ApiFactory factory) : BrokerHistoryT
 
         var (_, status) = await SyncAndWaitAsync(held.Account.Id);
 
-        status.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "needs_review")]);
+        status.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "needs_review", null, held.HoldingId)]);
         (status.HoldingsRebuilt, status.HoldingsNeedingReview).ShouldBe((0, 1));
         status.NeedsReviewSymbols.ShouldBe(["EXMPL"]);
         var lots = (await LotsOfAsync(held.HoldingId)).Lots.ShouldHaveSingleItem();
@@ -171,7 +171,7 @@ public sealed class BrokerHistoryRulesTests(ApiFactory factory) : BrokerHistoryT
 
         Factory.TradeHooks.Armed.ShouldBeFalse();
         raced.Trades.LastRun!.Status.ShouldBe("succeeded");
-        raced.Trades.LastRun.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "changed_meanwhile")]);
+        raced.Trades.LastRun.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "changed_meanwhile", null, held.HoldingId)]);
         (raced.HoldingsRebuilt, raced.Trades.LastRun.Counts.Rebuilt).ShouldBe((0, 0));
         var row = await RowAsync();
         (row.Qty, row.LastPrice, row.LotCount).ShouldBe((31L, 777m, 1)); // the other change stands, the lots are as they were
@@ -201,14 +201,14 @@ public sealed class BrokerHistoryRulesTests(ApiFactory factory) : BrokerHistoryT
         var (_, raced) = await SyncAndWaitAsync(held.Account.Id);
 
         Factory.TradeHooks.Armed.ShouldBeFalse();
-        raced.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "changed_meanwhile")]);
+        raced.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "changed_meanwhile", null, held.HoldingId)]);
         var kept = (await LotsOfAsync(held.HoldingId)).Lots.ShouldHaveSingleItem();
         (kept.Id, kept.AcquiredOn, kept.UsesDefaultDate).ShouldBe((lot.Id, new DateOnly(2026, 8, 17), false));
         (await EventsAsync("LotsRebuilt")).ShouldBe(0);
 
         var (_, next) = await SyncAndWaitAsync(held.Account.Id);
 
-        next.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "needs_review")]);
+        next.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "needs_review", null, held.HoldingId)]);
         (await LotsOfAsync(held.HoldingId)).Lots.ShouldHaveSingleItem().AcquiredOn.ShouldBe(new DateOnly(2026, 8, 17));
     }
 
@@ -220,7 +220,7 @@ public sealed class BrokerHistoryRulesTests(ApiFactory factory) : BrokerHistoryT
 
         var (_, status) = await SyncAndWaitAsync(held.Account.Id);
 
-        status.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "quantity_mismatch")]);
+        status.Trades.LastRun!.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "quantity_mismatch", "negative_opening", held.HoldingId)]);
         (await TransactionsAsync("source = 'broker'")).ShouldBe(1);
         (await LotsOfAsync(held.HoldingId)).Lots.ShouldHaveSingleItem().Source.ShouldBe("import");
     }

@@ -5,7 +5,9 @@ namespace XDrishti.Domain.Portfolio;
 /// <see cref="Read"/> rows came from Dhan, <see cref="Stored"/> are new, <see cref="Duplicates"/> were stored already, <see cref="Dropped"/> were unusable rows, <see cref="Enriched"/> of the <see cref="Duplicates"/> were completed (a trade stored by an earlier read without its ISIN or charges got them from this one; nothing else of it is touched) and <see cref="Skipped"/> were not NSE equity trades (by reason in
 /// <see cref="SkippedByReason"/>). After a trade run the automatic rebuild adds <see cref="Rebuilt"/> holdings rebuilt, <see cref="Unchanged"/> already right, <see cref="NeedsReview"/> holdings with a hand-dated lot that were left alone and the
 /// first <see cref="MaxNotRebuiltListed"/> of the holdings or securities that were left alone with their reason (<see cref="NotRebuiltTotal"/> counts all of them). <see cref="EmptyByNoData"/> counts the windows (or half-windows) that were taken as
-/// empty only because Dhan answered DH-907 ("incorrect parameters or no data present") to the first page: that code means both "nothing there" and "bad request", so the owner can see how often an empty stretch rested on it alone. Counts only: no trade or ledger content.
+/// empty only because Dhan answered DH-907 ("incorrect parameters or no data present") to the first page: that code means both "nothing there" and "bad request", so the owner can see how often an empty stretch rested on it alone.
+/// <c>Attempts</c> is the number of this attempt within the day's occurrence (1 for the scheduled or manual start, 2 to 4 for the quiet retries of ADR 0027), <c>FailureReason</c> the plain reason code of a failed run (<c>unavailable</c>, <c>rate_limited</c>,
+/// <c>token_expired</c> ...) and <c>DeepenedTo</c> the earliest date an earlier-history read of this run reached. Counts only: no trade or ledger content.
 /// </summary>
 public sealed record BrokerSyncCounts
 {
@@ -48,8 +50,23 @@ public sealed record BrokerSyncCounts
 
     public IReadOnlyList<BrokerNotRebuilt> NotRebuilt { get; init; } = [];
 
+    /// <summary>The number of this attempt within the occurrence: 1 for the first, up to 4 with the three retries. 0 for a run recorded before ADR 0027 (read as 1).</summary>
+    public int Attempts { get; init; }
+
+    /// <summary>The plain reason code of why the run failed; null while it runs and when it succeeded.</summary>
+    public string? FailureReason { get; init; }
+
+    /// <summary>The earliest date a read of earlier history reached in this run (null: none was made).</summary>
+    public DateOnly? DeepenedTo { get; init; }
+
+    /// <summary>Trades run: bill-level rows of an imported Dhan report that the trades of this run replaced. Ledger run: imported depository-charge entries that the charges of this run replaced. Voided as superseded, ADR 0029.</summary>
+    public int Superseded { get; init; }
+
+    /// <summary>Of the replaced rows' day-security-side groups, how many had a different total quantity than the broker's trades.</summary>
+    public int SupersededDiffering { get; init; }
+
     /// <summary>Adds the figures of one window read.</summary>
-    public BrokerSyncCounts AddWindow(int read, int stored, int duplicates, int dropped, IReadOnlyDictionary<string, int> skipped, bool halved, int emptyByNoData = 0, int enriched = 0)
+    public BrokerSyncCounts AddWindow(int read, int stored, int duplicates, int dropped, IReadOnlyDictionary<string, int> skipped, bool halved, int emptyByNoData = 0, int enriched = 0, int superseded = 0, int supersededDiffering = 0)
     {
         ArgumentNullException.ThrowIfNull(skipped);
         var merged = new SortedDictionary<string, int>(SkippedByReason.ToDictionary(p => p.Key, p => p.Value), StringComparer.Ordinal);
@@ -68,6 +85,8 @@ public sealed record BrokerSyncCounts
             Dropped = Dropped + dropped,
             Enriched = Enriched + enriched,
             EmptyByNoData = EmptyByNoData + emptyByNoData,
+            Superseded = Superseded + superseded,
+            SupersededDiffering = SupersededDiffering + supersededDiffering,
             Skipped = merged.Values.Sum(),
             SkippedByReason = merged,
         };

@@ -28,14 +28,27 @@ public sealed record BrokerSyncRunView(
 /// <summary>The answer of "Sync now": the trades run and, when it succeeded and has been carried on to it, the ledger run. Started over the API, the answer holds the trades run as it begins (<c>running</c>); the status says how far both are.</summary>
 public sealed record BrokerHistoryRunView(BrokerSyncRunView Trades, BrokerSyncRunView? Ledger);
 
-/// <summary>How far one kind is read: the <c>Watermark</c> (last date read; null when nothing was read yet), the latest run and its windows done of total.</summary>
-public sealed record BrokerKindStatus(DateOnly? Watermark, BrokerSyncRunView? LastRun, int WindowsDone, int WindowsTotal);
+/// <summary>
+/// How far one kind is read: the <c>Watermark</c> (last date read; null when nothing was read yet), the latest run and its windows done of total. The health (ADR 0027): <c>Attempts</c> is the number of the latest run within the day's occurrence (1 for the first, up to 4 with
+/// the three quiet retries; 0 while there is no run), <c>ConsecutiveFailedDays</c> the days in a row whose last attempt failed (0 when the latest attempt succeeded), <c>LastFailureReason</c> a code (<c>unavailable</c>, <c>rate_limited</c>, <c>interrupted</c>, <c>rejected</c>,
+/// <c>history_too_large</c>, <c>token_expired</c>, <c>token_refused</c>, <c>not_connected</c>, <c>unexpected</c>; null while healthy) and <c>RetryAt</c> when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing.
+/// </summary>
+public sealed record BrokerKindStatus(
+    DateOnly? Watermark,
+    BrokerSyncRunView? LastRun,
+    int WindowsDone,
+    int WindowsTotal,
+    int Attempts = 0,
+    int ConsecutiveFailedDays = 0,
+    string? LastFailureReason = null,
+    DateTimeOffset? RetryAt = null);
 
 /// <summary>
 /// The status of the broker history sync of an account: whether a run is running, both kinds, the next scheduled run (null when the service is paused or there is none) and three figures that come from <b>the latest <i>succeeded</i> trades run</b> and
 /// from no other (nothing is carried forward from older runs, and a run that was skipped, failed or is still running does not change them): <c>HoldingsRebuilt</c> (rebuilt automatically by that run), <c>HoldingsNeedingReview</c> (a hand-dated lot; the owner
 /// uses the holding's rebuild preview) and <c>NeedsReviewSymbols</c>, the trading symbols of those holdings (at most 50, in the order the run listed them: alphabetical; <c>HoldingsNeedingReview</c> says how many there are in all). A quiet run that skipped the rebuild
-/// because nothing changed reports 0 rebuilt (holdings that need review are never skipped: every run looks at them again).
+/// because nothing changed reports 0 rebuilt (holdings that need review are never skipped: every run looks at them again). <c>DeepenedTo</c> is the earliest date the nightly deepening of the trade history reached (null: it has not read an earlier year) and
+/// <c>DeepenExhausted</c> that it reads no more years (Dhan's history ends there, or the furthest year back is reached; ADR 0027).
 /// </summary>
 public sealed record BrokerHistoryStatusView(
     bool Running,
@@ -44,9 +57,14 @@ public sealed record BrokerHistoryStatusView(
     DateTimeOffset? NextRunAt,
     int HoldingsRebuilt,
     int HoldingsNeedingReview,
-    IReadOnlyList<string> NeedsReviewSymbols);
+    IReadOnlyList<string> NeedsReviewSymbols,
+    DateOnly? DeepenedTo = null,
+    bool DeepenExhausted = false);
 
-/// <summary>A ledger entry. <c>Class</c> is <c>funds_in</c>, <c>funds_out</c>, <c>dividend</c>, <c>charges</c> or <c>other</c>; <c>Amount</c> is signed (credit minus debit). <c>Description</c> and <c>Narration</c> are Dhan's free text (untrusted: show as plain text).</summary>
+/// <summary>
+/// A ledger entry. <c>Class</c> is <c>funds_in</c>, <c>funds_out</c>, <c>dividend</c>, <c>charges</c> or <c>other</c>; <c>Amount</c> is signed (credit minus debit). <c>Description</c> and <c>Narration</c> are Dhan's free text (untrusted: show as plain text).
+/// <c>Source</c> is <c>broker</c> (read from Dhan's ledger) or <c>import</c> (a cost imported from a downloaded report, such as the depository-charges sheet, which can be undone).
+/// </summary>
 public sealed record LedgerEntryView(
     Guid Id,
     DateOnly Date,
@@ -56,7 +74,8 @@ public sealed record LedgerEntryView(
     string? Exchange,
     decimal Amount,
     string Class,
-    decimal? RunningBalance);
+    decimal? RunningBalance,
+    string Source = "broker");
 
 /// <summary>The entries of one class in the period and their signed total.</summary>
 public sealed record LedgerClassTotal(string Class, int Count, decimal Amount);

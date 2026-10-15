@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Portfolio;
 
@@ -52,8 +53,36 @@ public sealed class PortfolioRefreshRunner(
         }
     }
 
-    /// <summary>One look at the accounts: runs the sync of every account that is due. Public so that tests (and nothing else) can drive the clock.</summary>
+    /// <summary>
+    /// One look at the accounts: runs the sync of every account that is due, then lets <see cref="PortfolioHealer"/> retry the syncs that failed for a reason that may pass and catch up what a renewed Dhan login makes possible again (ADR 0027). Public so that
+    /// tests (and nothing else) can drive the clock.
+    /// </summary>
     public async Task TickAsync(CancellationToken cancellationToken)
+    {
+        await RefreshDueAsync(cancellationToken);
+        await HealAsync(cancellationToken);
+    }
+
+    private async Task HealAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = scopes.CreateAsyncScope();
+            _ = await scope.ServiceProvider.GetRequiredService<PortfolioHealer>().TickAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031 // a failed look must not end the loop; the next minute looks again
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            HealLog.TickCrashed(logger, ex);
+        }
+    }
+
+    private async Task RefreshDueAsync(CancellationToken cancellationToken)
     {
         IReadOnlyList<(Guid Id, string Slug, PortfolioRefresh Refresh)> candidates;
         IReadOnlyDictionary<Guid, SyncActivity> activity;

@@ -39,48 +39,19 @@ internal static class CsvUploads
     /// <param name="cancellationToken">Cancels the read.</param>
     public static async Task<Result<CsvUpload>> ReadAsync(HttpContext http, string fileLabel, CancellationToken cancellationToken)
     {
-        if (!http.Request.HasFormContentType)
+        var form = await ReadFormAsync(http, MaxRequestBytes, "accountId and file", $"The file is larger than {MaxBytes / (1024 * 1024)} MB.", cancellationToken);
+        if (form.IsFailure)
         {
-            return Fail("file", "Send multipart/form-data with the fields accountId and file.");
-        }
-
-        if (http.Request.ContentLength > MaxRequestBytes)
-        {
-            return Fail("file", $"The file is larger than {MaxBytes / (1024 * 1024)} MB.");
-        }
-
-        var limit = http.Features.Get<IHttpMaxRequestBodySizeFeature>();
-        if (limit is { IsReadOnly: false })
-        {
-            limit.MaxRequestBodySize = MaxRequestBytes;
-        }
-
-        // The form limits are set for these requests only (not app-wide): a file of up to 10 MB stays in memory, never in the temporary folder, and there are at most a few fields beside it.
-        http.Features.Set<IFormFeature>(new FormFeature(http.Request, new FormOptions
-        {
-            MultipartBodyLengthLimit = MaxRequestBytes,
-            MemoryBufferThreshold = MaxRequestBytes,
-            ValueCountLimit = MaxFormEntries,
-            ValueLengthLimit = MaxFieldBytes,
-            MultipartHeadersCountLimit = 16,
-        }));
-        IFormCollection form;
-        try
-        {
-            form = await http.Request.ReadFormAsync(cancellationToken);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or BadHttpRequestException or IOException && !cancellationToken.IsCancellationRequested)
-        {
-            return Overflow(ex);
+            return Result.Failure<CsvUpload>(form.Error);
         }
 
         var errors = new FieldErrors();
-        if (!Guid.TryParse(form["accountId"].ToString(), out var accountId) || accountId == Guid.Empty)
+        if (!Guid.TryParse(form.Value["accountId"].ToString(), out var accountId) || accountId == Guid.Empty)
         {
             errors.Add("accountId", "Required: the id of an account with the Portfolio role.");
         }
 
-        var file = form.Files.GetFile("file");
+        var file = form.Value.Files.GetFile("file");
         byte[] bytes = [];
         if (file is null)
         {
@@ -101,7 +72,48 @@ internal static class CsvUploads
             await stream.ReadExactlyAsync(bytes, cancellationToken);
         }
 
-        return Result.Success(new CsvUpload(form, accountId, file?.FileName ?? string.Empty, bytes, errors));
+        return Result.Success(new CsvUpload(form.Value, accountId, file?.FileName ?? string.Empty, bytes, errors));
+    }
+
+    /// <summary>
+    /// Reads the multipart form of a file import with the form limits set for this request only (not app-wide): files stay in memory, never in the temporary folder, and there are at most a few fields beside them. The request as a whole is at most
+    /// <paramref name="maxRequestBytes"/> long. A request that is not multipart (<paramref name="fields"/> names what it should carry), is too large (<paramref name="tooLarge"/> says so) or cannot be read is <c>400 portfolio.invalid</c> on <c>file</c>.
+    /// </summary>
+    public static async Task<Result<IFormCollection>> ReadFormAsync(HttpContext http, int maxRequestBytes, string fields, string tooLarge, CancellationToken cancellationToken)
+    {
+        if (!http.Request.HasFormContentType)
+        {
+            return FailForm("file", $"Send multipart/form-data with the fields {fields}.");
+        }
+
+        if (http.Request.ContentLength > maxRequestBytes)
+        {
+            return FailForm("file", tooLarge);
+        }
+
+        var limit = http.Features.Get<IHttpMaxRequestBodySizeFeature>();
+        if (limit is { IsReadOnly: false })
+        {
+            limit.MaxRequestBodySize = maxRequestBytes;
+        }
+
+        http.Features.Set<IFormFeature>(new FormFeature(http.Request, new FormOptions
+        {
+            MultipartBodyLengthLimit = maxRequestBytes,
+            MemoryBufferThreshold = maxRequestBytes,
+            ValueCountLimit = MaxFormEntries,
+            ValueLengthLimit = MaxFieldBytes,
+            MultipartHeadersCountLimit = 16 + (4 * ReportUploads.MaxFiles),
+        }));
+        try
+        {
+            return Result.Success(await http.Request.ReadFormAsync(cancellationToken));
+        }
+        catch (Exception ex) when (ex is InvalidDataException or BadHttpRequestException or IOException && !cancellationToken.IsCancellationRequested)
+        {
+            var failed = Overflow(ex);
+            return Result.Failure<IFormCollection>(failed.Error);
+        }
     }
 
     /// <summary>What the form's limits refuse, with the field to blame: too many entries are <c>includeDuplicates</c> sent line by line, anything else the file. (A multipart text field is not cut by the form options, only the request as a whole is limited; the size of the choices is checked by <see cref="DividendUploads"/>.)</summary>
@@ -113,4 +125,6 @@ internal static class CsvUploads
     };
 
     private static Result<CsvUpload> Fail(string field, string message) => Result.Failure<CsvUpload>(PortfolioErrors.Invalid(field, message));
+
+    private static Result<IFormCollection> FailForm(string field, string message) => Result.Failure<IFormCollection>(PortfolioErrors.Invalid(field, message));
 }

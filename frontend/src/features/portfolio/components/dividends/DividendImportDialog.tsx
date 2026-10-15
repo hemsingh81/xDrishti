@@ -17,13 +17,15 @@ interface DividendImportDialogProps {
   onClose: () => void;
   /** A tradebook was dropped here: leave this dialog for the trade import. */
   onImportTrades: () => void;
+  /** A report of Dhan (transaction report, DP charges, demat holding) was dropped here: open Import files. */
+  onImportFiles: () => void;
 }
 
 /**
  * Import dividends for the account of the Cash & dividends panel: the wizard (file, preview, choices, import, result) and the
  * history of imported files with Undo. The wizard stays mounted while History is shown, so a half-done import is not lost.
  */
-export function DividendImportDialog({ account, onClose, onImportTrades }: DividendImportDialogProps) {
+export function DividendImportDialog({ account, onClose, onImportTrades, onImportFiles }: DividendImportDialogProps) {
   const [tab, setTab] = useState<ImportTab>('import');
   return (
     <AppDialog open onClose={onClose} maxWidth="lg" fullScreenOnMobile>
@@ -42,6 +44,7 @@ export function DividendImportDialog({ account, onClose, onImportTrades }: Divid
               setTab('history');
             }}
             onImportTrades={onImportTrades}
+            onImportFiles={onImportFiles}
           />
         </Box>
         {tab === 'history' && (

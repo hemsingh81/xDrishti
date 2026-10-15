@@ -30,10 +30,27 @@ public static class ConnectionErrors
     public static readonly Error AppNotConfigured = Error.Conflict(
         AppNotConfiguredCode, "Enter the Dhan API key and secret first (Connection tab, Replace).");
 
+    /// <summary>The sentence a broker failure that is worth trying again (no answer, a timeout, a 5xx) ends with.</summary>
+    public const string TryAgainText = " Try again in a moment.";
+
     public static Error Broker(BrokerFailure failure)
     {
         ArgumentNullException.ThrowIfNull(failure);
-        return Error.Upstream(BrokerErrorCode, ConnectionTexts.Failure(failure) + (failure.Kind == BrokerFailureKind.Unavailable ? " Try again in a moment." : string.Empty));
+        return Error.Upstream(BrokerErrorCode, ConnectionTexts.Failure(failure) + (failure.Kind == BrokerFailureKind.Unavailable ? TryAgainText : string.Empty));
+    }
+
+    /// <summary>True for a broker error that comes from no usable answer (timeout, network failure, 5xx): it may well pass, so the syncs try again by themselves (ADR 0027).</summary>
+    public static bool IsUnavailable(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return error.Code == BrokerErrorCode && error.Message.EndsWith(TryAgainText, StringComparison.Ordinal);
+    }
+
+    /// <summary>True for a broker error that is Dhan's rate limit (429 or its code DH-904): it passes, so the syncs try again by themselves (ADR 0027).</summary>
+    public static bool IsRateLimited(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return error.Code == BrokerErrorCode && error.Message.Contains("DH-904", StringComparison.Ordinal);
     }
 
     public static Error ConsentLimit(int limit, int retryAfterSeconds) => Error.RateLimited(

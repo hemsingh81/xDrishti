@@ -28,13 +28,16 @@ using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Application.Portfolio.DividendImport;
 using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Application.Portfolio.Live;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
+using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Domain.Common;
 
@@ -330,6 +333,9 @@ public static class DependencyInjection
         services.AddScoped<BrokerHistoryReader>();
         services.AddScoped<BrokerLotRebuilder>();
         services.AddScoped<BrokerHistoryPipeline>();
+        services.AddScoped<SyncHealthRecorder>();
+        services.AddScoped<PortfolioHealer>();
+        services.AddScoped<IAttentionFactsSource, AttentionFactsLoader>();
         services.AddScoped<ICommandHandler<StartBrokerHistoryCommand, BrokerHistoryRunView>, StartBrokerHistoryHandler>();
         services.AddScoped<ICommandHandler<ExecuteBrokerHistoryCommand>, ExecuteBrokerHistoryHandler>();
         services.AddScoped<ICommandHandler<SyncBrokerHistoryCommand, BrokerHistoryRunView>, SyncBrokerHistoryHandler>();
@@ -351,6 +357,20 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ImportDividendsCommand, DividendImportResult>, ImportDividendsHandler>();
         services.AddScoped<IQueryHandler<ListDividendBatchesQuery, Result<DividendBatchPage>>, ListDividendBatchesHandler>();
         services.AddScoped<ICommandHandler<UndoDividendBatchCommand, DividendUndoResult>, UndoDividendBatchHandler>();
+
+        // Dhan's downloaded reports - global transaction report, depository charges, demat holding - recognised by their title and header, previewed and imported with Undo (ADR 0029). The workspace and the services are shared by the use cases.
+        services.AddScoped<SyncGuard>();
+        services.AddScoped<TradeImporter>();
+        services.AddScoped<ReportWorkspace>();
+        services.AddScoped<ReportClientCodes>();
+        services.AddScoped<BillService>();
+        services.AddScoped<DpService>();
+        services.AddScoped<DematService>();
+        services.AddScoped<ReportPreviewer>();
+        services.AddScoped<IQueryHandler<PreviewImportFileQuery, Result<ImportFilePreview>>, PreviewImportFileHandler>();
+        services.AddScoped<ICommandHandler<ImportFileCommand, ImportFileResult>, ImportFileHandler>();
+        services.AddScoped<IQueryHandler<ListCostBatchesQuery, Result<CostBatchPage>>, ListCostBatchesHandler>();
+        services.AddScoped<ICommandHandler<UndoCostBatchCommand, CostUndoResult>, UndoCostBatchHandler>();
 
         // The live price sink (ADR 0024): a singleton for the lifetime of the feed process; it resolves the scoped ports per flush.
         services.AddSingleton<LiveFlush>();

@@ -6,7 +6,6 @@ import { useState } from 'react';
 import type { Basket } from '@/shared/api';
 import { LoadingState, PageHeader } from '@/shared/ui';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { useToast } from '@/shared/ui/toastContext';
 import { useArchiveBasket } from '../api/basketMutations';
 import { basketsQuery } from '../api/basketsQueries';
@@ -23,11 +22,7 @@ type Editor = { kind: 'create' } | { kind: 'edit'; basket: Basket } | null;
  * card. The selected basket and the look-back date live in the URL.
  */
 export function BasketsPage() {
-  return (
-    <ToastProvider>
-      <BasketsContent />
-    </ToastProvider>
-  );
+  return <BasketsContent />;
 }
 
 function BasketsContent() {

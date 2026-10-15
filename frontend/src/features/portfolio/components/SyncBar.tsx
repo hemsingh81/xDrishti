@@ -1,3 +1,4 @@
+import UploadIcon from '@mui/icons-material/UploadFileOutlined';
 import SyncIcon from '@mui/icons-material/Sync';
 import { Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
@@ -21,13 +22,15 @@ interface SyncBarProps {
   fallbackRun: SyncRun | null;
   /** Refresh prices: runs the quote service now. */
   refresh: { available: boolean; busy: boolean; onRefresh: () => void };
+  /** Opens the Import files dialog (Dhan's downloaded reports). */
+  onImportFiles: () => void;
 }
 
 /**
  * Last sync, the daily-refresh setting and next run, and the Sync now and Refresh prices buttons; for one account also the
  * read of its trades and ledger from Dhan, under them.
  */
-export function SyncBar({ account, connected, fallbackRun, refresh }: SyncBarProps) {
+export function SyncBar({ account, connected, fallbackRun, refresh, onImportFiles }: SyncBarProps) {
   const accountId = account?.id ?? null;
   const status = useQuery({ ...syncStatusQuery(accountId ?? ''), enabled: accountId !== null });
   const flow = useSyncFlow(accountId);
@@ -48,6 +51,9 @@ export function SyncBar({ account, connected, fallbackRun, refresh }: SyncBarPro
           >
             <SyncStatusLine status={status.data ?? null} fallbackRun={fallbackRun} />
             <Stack direction="row" sx={{ gap: 1, flexWrap: 'wrap', flexShrink: 0 }}>
+              <Button variant="outlined" startIcon={<UploadIcon />} onClick={onImportFiles}>
+                Import files
+              </Button>
               <RefreshPricesButton available={refresh.available} busy={refresh.busy} onRefresh={refresh.onRefresh} />
               <Button
                 variant="contained"

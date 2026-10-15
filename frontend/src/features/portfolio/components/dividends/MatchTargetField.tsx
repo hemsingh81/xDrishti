@@ -21,13 +21,22 @@ interface MatchTargetFieldProps {
   value: TypeaheadOption | null;
   onChange: (option: TypeaheadOption | null) => void;
   inputRef?: Ref<HTMLInputElement>;
+  /** Offer "Leave unallocated" (default). A transaction report's name cannot be left nowhere: it is matched or kept without an ISIN. */
+  allowNone?: boolean;
 }
 
 /**
  * Where the dividends of a name go: a type-ahead over the account's holdings (sold ones too) and the instrument list (NSE
  * shares and ETFs not held), or "Leave unallocated". The options are searched on the server as the owner types.
  */
-export function MatchTargetField({ accountId, candidates, value, onChange, inputRef }: MatchTargetFieldProps) {
+export function MatchTargetField({
+  accountId,
+  candidates,
+  value,
+  onChange,
+  inputRef,
+  allowNone = true,
+}: MatchTargetFieldProps) {
   const [text, setText] = useState('');
   const search = useDebouncedValue(text, 250);
   const holdings = useQuery(dividendHoldingsQuery(accountId, search));
@@ -47,11 +56,13 @@ export function MatchTargetField({ accountId, candidates, value, onChange, input
     .filter((row) => !heldSymbols.has(bareSymbol(row.symbol)))
     .map((row) => ({ value: `i:${row.id}`, label: bareSymbol(row.symbol), hint: `${row.name} · not held` }));
   const seen = new Set<string>();
-  const options = [...fromCandidates, ...fromHoldings, ...fromMaster, noneOption].filter((option) => {
-    if (seen.has(option.value)) return false;
-    seen.add(option.value);
-    return true;
-  });
+  const options = [...fromCandidates, ...fromHoldings, ...fromMaster, ...(allowNone ? [noneOption] : [])].filter(
+    (option) => {
+      if (seen.has(option.value)) return false;
+      seen.add(option.value);
+      return true;
+    },
+  );
   const failed = holdings.isError ? holdings : instruments.isError ? instruments : null;
   return (
     <Box>

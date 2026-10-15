@@ -79,8 +79,12 @@ public sealed class BrokerHistoryDatabaseTests(ApiFactory factory)
         await connection.OpenAsync(Ct);
 
         (await ColumnsAsync(connection, "broker_sync_runs")).ShouldBe(["id", "account_id", "kind", "trigger", "from_date", "to_date", "status", "counts", "started_by", "started_at", "finished_at", "error"]);
-        (await ColumnsAsync(connection, "broker_sync_state")).ShouldBe(["account_id", "kind", "watermark_date", "updated_at"]);
-        (await ColumnsAsync(connection, "ledger_entries")).ShouldBe(["id", "account_id", "entry_date", "voucher_no", "description", "narration", "exchange", "amount", "class", "running_balance", "external_id", "run_id", "created_at"]);
+        (await ColumnsAsync(connection, "broker_sync_state")).ShouldBe(
+        [
+            "account_id", "kind", "watermark_date", "updated_at",
+            "attempts", "consecutive_failed_days", "deepen_exhausted", "deepened_on", "deepened_to", "last_failed_at", "last_failure_reason", "mapper_version", // ADR 0027
+        ]);
+        (await ColumnsAsync(connection, "ledger_entries")).ShouldBe(["id", "account_id", "entry_date", "voucher_no", "description", "narration", "exchange", "amount", "class", "running_balance", "external_id", "run_id", "created_at", "batch_id", "isin", "quantity", "source", "voided_at", "voided_by"]);
         (await AppRoleProbe.ScalarAsync(connection, "SELECT data_type FROM information_schema.columns WHERE table_schema = 'portfolio' AND table_name = 'broker_sync_runs' AND column_name = 'counts'", Ct)).ShouldBe("jsonb");
         (await AppRoleProbe.ScalarAsync(connection, "SELECT indexdef FROM pg_indexes WHERE schemaname = 'portfolio' AND indexname = 'ux_broker_sync_runs_one_running'", Ct))!.ToString()!.ShouldContain("WHERE ((status)::text = 'running'::text)");
         (await AppRoleProbe.ScalarAsync(connection, "SELECT indexdef FROM pg_indexes WHERE schemaname = 'portfolio' AND indexname = 'ux_ledger_entries_account_external'", Ct))!.ToString()!.ShouldContain("UNIQUE");

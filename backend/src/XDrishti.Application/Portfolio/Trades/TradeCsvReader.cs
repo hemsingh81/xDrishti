@@ -142,14 +142,16 @@ internal static class TradeCsvReader
     }
 
     /// <summary>
-    /// The refusal for a file that is not a tradebook but is recognisably something else (ADR 0028): a dividend list is sent to the dividend import, a tradebook without a buy/sell column is explained. Null for any other header: the missing columns are then named.
+    /// The refusal for a file that is not a tradebook but is recognisably something else (ADR 0028, 0029): a dividend list is sent to the dividend import, a tradebook without a buy/sell column is explained, one of Dhan's downloaded reports (known by its title line) is sent to the report import. Null for any other header: the missing columns are then named.
     /// </summary>
-    private static Error? Redirect(IReadOnlyList<string> header) => FileKindDetector.Detect(header) switch
-    {
-        FileKind.Dividends => PortfolioErrors.WrongFileKind(FileKindDetector.DividendsCode, FileKindDetector.DividendsInTradesText),
-        FileKind.TradebookWithoutSides => PortfolioErrors.WrongFileKind(FileKindDetector.TradebookWithoutSidesCode, FileKindDetector.TradebookWithoutSidesText),
-        _ => null,
-    };
+    private static Error? Redirect(IReadOnlyList<string> header) => FileKindDetector.DetectTitle(header) is var titled && FileKindDetector.IsReport(titled)
+        ? PortfolioErrors.WrongFileKind(FileKindDetector.Code(titled), FileKindDetector.ReportElsewhereText(titled))
+        : FileKindDetector.Detect(header) switch
+        {
+            FileKind.Dividends => PortfolioErrors.WrongFileKind(FileKindDetector.DividendsCode, FileKindDetector.DividendsInTradesText),
+            FileKind.TradebookWithoutSides => PortfolioErrors.WrongFileKind(FileKindDetector.TradebookWithoutSidesCode, FileKindDetector.TradebookWithoutSidesText),
+            _ => null,
+        };
 
     /// <summary>Why the row is not an NSE equity trade; null when it is one (or at least not recognisably something else).</summary>
     private static string? SkipReason(TradeColumns columns, IReadOnlyList<string> cells)

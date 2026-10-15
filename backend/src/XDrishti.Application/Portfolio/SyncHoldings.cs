@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market;
@@ -33,6 +34,7 @@ internal sealed class SyncHoldingsHandler(
     IHoldingSyncStore syncs,
     IAccountEventLog events,
     ActionReconciler reconciler,
+    SyncHealthRecorder health,
     TimeProvider clock,
     ILogger<SyncHoldingsHandler> logger) : ICommandHandler<SyncHoldingsCommand, SyncRunView>
 {
@@ -75,6 +77,9 @@ internal sealed class SyncHoldingsHandler(
             if (command.Trigger == SyncTrigger.Auto)
             {
                 await SkipOncePerDayAsync(account.Value, command.Actor, "The account is not connected to Dhan.", cancellationToken);
+
+                // The owner has to sign in again; the sync catches up by itself afterwards (ADR 0027).
+                await health.FailedAsync(account.Value.Id, SyncHealthKind.Holdings, SyncFailures.Of(connected.Error), cancellationToken);
             }
 
             return Result.Failure<SyncRunView>(connected.Error);

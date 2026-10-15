@@ -89,6 +89,47 @@ internal sealed class TradeStore(XDrishtiDbContext db) : ITradeStore
         return (items, total);
     }
 
+    public async ValueTask<IReadOnlyList<TradeGroup>> ListBrokerGroupsAsync(Guid accountId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        var groups = await db.Transactions.AsNoTracking()
+            .Where(x => x.AccountId == accountId && x.VoidedAt == null && x.Source == TradeSource.Broker && x.Isin != null && x.TradeDate >= from && x.TradeDate <= to)
+            .GroupBy(x => new { x.TradeDate, x.Isin, x.Side })
+            .Select(g => new { g.Key.TradeDate, g.Key.Isin, g.Key.Side, Qty = g.Sum(x => x.Qty) })
+            .ToListAsync(cancellationToken);
+        return [.. groups.OrderBy(g => g.TradeDate).ThenBy(g => g.Isin, StringComparer.Ordinal).ThenBy(g => g.Side).Select(g => new TradeGroup(g.TradeDate, g.Isin!, g.Side, g.Qty))];
+    }
+
+    public async ValueTask<SupersedeOutcome> SupersedeBillRowsAsync(Guid accountId, IReadOnlyCollection<TradeGroup> brokerGroups, Guid runId, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(brokerGroups);
+        if (brokerGroups.Count == 0)
+        {
+            return SupersedeOutcome.None;
+        }
+
+        var from = brokerGroups.Min(g => g.Date);
+        var to = brokerGroups.Max(g => g.Date);
+        var isins = brokerGroups.Select(g => g.Isin).Distinct(StringComparer.Ordinal).ToArray();
+        var candidates = await db.Transactions.AsNoTracking()
+            .Where(x => x.AccountId == accountId && x.VoidedAt == null && x.Source == TradeSource.Bill && x.TradeDate >= from && x.TradeDate <= to && x.Isin != null && isins.Contains(x.Isin))
+            .Select(x => new { x.Id, x.TradeDate, x.Isin, x.Side, x.Qty })
+            .ToListAsync(cancellationToken);
+        var wanted = brokerGroups.GroupBy(g => (g.Date, g.Isin, g.Side)).ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+        var hits = candidates.Where(c => wanted.ContainsKey((c.TradeDate, c.Isin!, c.Side))).ToList();
+        if (hits.Count == 0)
+        {
+            return SupersedeOutcome.None;
+        }
+
+        var differing = hits.GroupBy(c => (c.TradeDate, c.Isin!, c.Side)).Count(g => g.Sum(c => c.Qty) != wanted[g.Key]);
+        var ids = hits.Select(c => c.Id).ToArray();
+        var time = at.ToUniversalTime();
+        var voided = await db.Transactions
+            .Where(x => ids.Contains(x.Id) && x.VoidedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.VoidedAt, time).SetProperty(x => x.VoidedBy, Transaction.SupersededReason).SetProperty(x => x.SupersededBy, runId), cancellationToken);
+        return new SupersedeOutcome(voided, differing);
+    }
+
     public void Add(IEnumerable<Transaction> trades)
     {
         ArgumentNullException.ThrowIfNull(trades);

@@ -173,7 +173,8 @@ public sealed record ImportRowInput(string? Key, DateOnly? AcquiredOn);
 /// <summary>
 /// The refresh settings of an account and its latest run. Mode "off" or "daily"; NextRunAt is null when the mode is off. FirstImportDate is the date holdings
 /// get when they are imported without a date of their own; HasHoldings is true once the account has any holding (the first import has happened). Running is
-/// true while a sync or import of the account is in progress.
+/// true while a sync or import of the account is in progress. The health (ADR 0027): <c>ConsecutiveFailedDays</c> are the days in a row whose last attempt failed (0 when the latest succeeded), <c>LastFailureReason</c> a code (<c>unavailable</c>, <c>rate_limited</c>,
+/// <c>interrupted</c>, <c>rejected</c>, <c>token_expired</c>, <c>token_refused</c>, <c>not_connected</c>, <c>unexpected</c>; null while healthy), <c>Attempts</c> the failed attempts of the day of the latest failure and <c>RetryAt</c> when the next quiet retry is due (null when none is pending).
 /// </summary>
 public sealed record SyncStatusView(
     string Mode,
@@ -182,4 +183,8 @@ public sealed record SyncStatusView(
     bool HasHoldings,
     DateTimeOffset? NextRunAt,
     bool Running,
-    SyncRunView? Last);
+    SyncRunView? Last,
+    int ConsecutiveFailedDays = 0,
+    string? LastFailureReason = null,
+    int Attempts = 0,
+    DateTimeOffset? RetryAt = null);

@@ -24,6 +24,8 @@ public sealed class PortfolioBrokerHistoryServiceTests : IDisposable
             (_, scopes) => [new PortfolioBrokerHistoryService(scopes, _settings, NullLogger<PortfolioBrokerHistoryService>.Instance)],
             provider => provider
                 .Singleton<XDrishti.Application.Abstractions.Accounts.IAccountStore>(_fx.Accounts)
+                .Singleton<ISyncHealthStore>(_fx.Data.Health)
+                .Singleton<IHealSettings>(new XDrishti.Application.Tests.Portfolio.Heal.FixedHealSettings())
                 .Singleton<ICommandHandler<SyncBrokerHistoryCommand, BrokerHistoryRunView>>(_sync));
     }
 
@@ -159,6 +161,69 @@ public sealed class PortfolioBrokerHistoryServiceTests : IDisposable
         var run = await RunAsync();
 
         (run.Status, run.Message).ShouldBe((ServiceRunStatus.Succeeded, "1 left for the next run (a sync was running)"));
+    }
+
+    // ---- quiet failures (ADR 0027) ----
+
+    private static BrokerHistoryRunView Failed(Guid account, string reason, string kind = "trades") =>
+        new(Run(account, kind, "failed", BrokerSyncCounts.None with { FailureReason = reason }, "x"), null);
+
+    [Theory]
+    [InlineData("unavailable")]
+    [InlineData("rate_limited")]
+    [InlineData("interrupted")]
+    public async Task A_read_that_failed_for_a_reason_that_may_pass_is_left_to_the_quiet_retries_and_does_not_fail_the_run(string reason)
+    {
+        var one = await AccountAsync("Example One", "1000000001");
+        var two = await AccountAsync("Example Two", "1000000002");
+        _sync.Answers[one.Id] = Result.Success(Failed(one.Id, reason));
+        _sync.Answers[two.Id] = Result.Success(Done(two.Id, 3, 1));
+        await _fx.Data.Health.RecordFailureAsync(one.Id, SyncHealthKind.Trades, reason, _fx.Clock.GetUtcNow(), CancellationToken.None);
+
+        var run = await RunAsync();
+
+        (run.Status, run.Message).ShouldBe((ServiceRunStatus.Succeeded, "1 account read: 3 new trades, 1 new ledger entries, 0 holdings rebuilt, 0 need review; retrying: Example One"));
+    }
+
+    [Fact]
+    public async Task A_read_that_has_failed_on_enough_days_in_a_row_fails_the_run_again()
+    {
+        var one = await AccountAsync("Example One", "1000000001");
+        _sync.Answers[one.Id] = Result.Success(Failed(one.Id, "unavailable"));
+        await _fx.Data.Health.RecordFailureAsync(one.Id, SyncHealthKind.Trades, "unavailable", _fx.Clock.GetUtcNow().AddDays(-1), CancellationToken.None);
+        await _fx.Data.Health.RecordFailureAsync(one.Id, SyncHealthKind.Trades, "unavailable", _fx.Clock.GetUtcNow(), CancellationToken.None);
+
+        var run = await RunAsync();
+
+        (run.Status, run.Message).ShouldBe((ServiceRunStatus.Failed, "failed: Example One"));
+    }
+
+    [Fact]
+    public async Task A_failed_ledger_is_judged_by_the_ledgers_own_days()
+    {
+        var one = await AccountAsync("Example One", "1000000001");
+        _sync.Answers[one.Id] = Result.Success(Failed(one.Id, "unavailable", kind: "ledger"));
+        await _fx.Data.Health.RecordFailureAsync(one.Id, SyncHealthKind.Trades, "unavailable", _fx.Clock.GetUtcNow().AddDays(-1), CancellationToken.None); // the trades' days do not count
+        await _fx.Data.Health.RecordFailureAsync(one.Id, SyncHealthKind.Trades, "unavailable", _fx.Clock.GetUtcNow(), CancellationToken.None);
+        await _fx.Data.Health.RecordFailureAsync(one.Id, SyncHealthKind.Ledger, "unavailable", _fx.Clock.GetUtcNow(), CancellationToken.None);
+
+        var run = await RunAsync();
+
+        (run.Status, run.Message).ShouldBe((ServiceRunStatus.Succeeded, "retrying: Example One"));
+    }
+
+    [Theory]
+    [InlineData("rejected")]
+    [InlineData("history_too_large")]
+    [InlineData("unexpected")]
+    public async Task A_failure_that_will_not_pass_by_itself_still_fails_the_run(string reason)
+    {
+        var one = await AccountAsync("Example One", "1000000001");
+        _sync.Answers[one.Id] = Result.Success(Failed(one.Id, reason));
+
+        var run = await RunAsync();
+
+        (run.Status, run.Message).ShouldBe((ServiceRunStatus.Failed, "failed: Example One"));
     }
 
     private sealed class FakeSettings : IBrokerHistorySettings

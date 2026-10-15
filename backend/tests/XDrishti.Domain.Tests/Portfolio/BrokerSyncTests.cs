@@ -17,7 +17,41 @@ public sealed class BrokerSyncTests
         var run = Run();
 
         (run.Status, run.IsRunning, run.StartedBy, run.FinishedAt, run.Error).ShouldBe((SyncStatus.Running, true, "owner@example.com", null, null));
-        run.Counts.ShouldBeSameAs(BrokerSyncCounts.None);
+        run.Counts.ShouldBe(BrokerSyncCounts.None with { Attempts = 1 });
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(3, 3)]
+    [InlineData(0, 1)]
+    [InlineData(-4, 1)]
+    public void A_run_knows_which_attempt_of_the_days_occurrence_it_is(int attempt, int recorded)
+    {
+        var run = BrokerSyncRun.Start(Account, BrokerSyncKind.Trades, BrokerSyncTrigger.Scheduled, new DateOnly(2026, 9, 1), new DateOnly(2026, 10, 10), "system", Now, attempt);
+
+        run.Counts.Attempts.ShouldBe(recorded);
+    }
+
+    [Fact]
+    public void The_health_fields_of_the_counts_are_stored_in_the_json_and_older_rows_without_them_read_as_none()
+    {
+        var counts = BrokerSyncCounts.None with
+        {
+            Attempts = 3,
+            FailureReason = "unavailable",
+            DeepenedTo = new DateOnly(2024, 1, 1),
+            NotRebuilt = [new BrokerNotRebuilt("EXMPL", "quantity_mismatch", "negative_opening", Guid.Parse("00000000-0000-7000-8000-000000000001"))],
+        };
+        var options = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(counts, options);
+        var again = System.Text.Json.JsonSerializer.Deserialize<BrokerSyncCounts>(json, options)!;
+        var older = System.Text.Json.JsonSerializer.Deserialize<BrokerSyncCounts>("""{"windowsDone":2,"windowsTotal":2,"notRebuilt":[{"symbol":"EXMPL","reason":"needs_review"}]}""", options)!;
+
+        (again.Attempts, again.FailureReason, again.DeepenedTo).ShouldBe((3, "unavailable", new DateOnly(2024, 1, 1)));
+        again.NotRebuilt.ShouldBe(counts.NotRebuilt);
+        (older.Attempts, older.FailureReason, older.DeepenedTo).ShouldBe((0, null, null));
+        older.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "needs_review")]);
     }
 
     [Fact]

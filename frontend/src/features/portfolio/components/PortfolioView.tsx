@@ -16,11 +16,13 @@ import { useRefreshOnQuoteRun } from '../hooks/useRefreshOnQuoteRun';
 import { useCachedHolding } from '../hooks/useCachedHolding';
 import { useRefreshPrices } from '../hooks/useRefreshPrices';
 import { useSyncBarFocus } from '../hooks/useSyncBarFocus';
+import { useUnmatchedParam, useUnmatchedView } from '../hooks/useUnmatchedView';
 import { usePortfolioFilters } from '../hooks/usePortfolioFilters';
 import { usePortfolioOverlays } from '../hooks/usePortfolioOverlays';
 import { actingAccount, isConnected, portfolioAccounts } from '../lib/accounts';
 import { alertTargetOfHolding, type AlertTarget } from '../lib/alertTarget';
 import { activeFilterCount } from '../lib/filters';
+import { scopeLabelOf, scrollToElement } from '../lib/scope';
 import { ActionCenter } from './actions/ActionCenter';
 import { HistoryCard } from './HistoryCard';
 import { LiveProvider } from './LiveProvider';
@@ -30,9 +32,10 @@ import { HoldingDrawer } from './HoldingDrawer';
 import { HoldingsGrid, NoMatches } from './HoldingsGrid';
 import { EmptyHoldings, NoGroups, NoPortfolioAccounts, NotConnectedNotice } from './NoticeCards';
 import { PortfolioHeader, PortfolioHeaderActions } from './PortfolioHeader';
-import { PortfolioOverlays } from './PortfolioOverlays';
+import { PortfolioPanels } from './PortfolioPanels';
 import { ScopeBar } from './ScopeBar';
 import { SyncBar } from './SyncBar';
+import { UnmatchedBanner } from './UnmatchedBanner';
 
 /** The page once the accounts are known: scope, totals, value history, sync bar, holdings and the holding drawer. */
 export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[] }) {
@@ -41,7 +44,9 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const portfolio = portfolioAccounts(accounts);
   // A link to an account that has no Portfolio role (any more) means "all accounts".
   const account = portfolio.some((a) => a.id === requested.account) ? requested.account : null;
-  const filters = { ...requested, account };
+  // The holdings with no match in the master list are a flat list: a grouping is set aside while they are shown.
+  const unmatchedOn = useUnmatchedParam();
+  const filters = { ...requested, account, groupBy: unmatchedOn ? ('none' as const) : requested.groupBy };
   const acting = actingAccount(portfolio, account);
   const now = useNow(acting !== null, acting?.connection.expiresAt ?? null);
   const connected = acting !== null && isConnected(acting, now);
@@ -63,6 +68,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   // The flat list is for Group by None; a grouping loads the groups and, per opened group, its holdings.
   const grouped = filters.groupBy !== 'none';
   const holdings = useInfiniteRows({ ...holdingsList(filters), enabled: !grouped, refetchInterval: listPollMs });
+  const unmatched = useUnmatchedView(unmatchedOn, holdings);
   const shownIds = useMemo(
     () => [...(grouped ? [] : holdings.rows.map((h) => h.id)), ...(openId === null ? [] : [openId])],
     [grouped, holdings.rows, openId],
@@ -80,7 +86,6 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
   const holdingsStart = useRef<HTMLDivElement>(null);
   const [syncBarRef, accountInputRef, focusSyncBar] = useSyncBarFocus();
   const [alertDialog, setAlertDialog] = useState<AlertTarget | 'pick' | null>(null);
-  const [addingTrade, setAddingTrade] = useState(false);
   const scope = { account: filters.account, bucket: filters.bucket };
   const history = usePortfolioHistory(scope, market.pollMs);
 
@@ -100,13 +105,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
     : (history.query.data?.coverage.holdings ?? 0) > 0;
   const actingTarget = acting ? { id: acting.id, name: acting.name } : null;
   const showAccount = account === null && portfolio.length > 1;
-  const scopeLabel =
-    [
-      acting && account !== null ? acting.name : null,
-      filters.bucket === null ? null : (buckets.data?.find((b) => b.id === filters.bucket)?.name ?? null),
-    ]
-      .filter((part): part is string => part !== null)
-      .join(' · ') || null;
+  const scopeLabel = scopeLabelOf(acting && account !== null ? acting.name : null, filters.bucket, buckets.data);
 
   return (
     <LiveProvider feed={live} scope={liveScope}>
@@ -148,12 +147,7 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
             }}
             onShowSector={(accountId) => {
               update({ groupBy: 'sector', account: accountId });
-              // The grouped holdings are below the cards: take the owner to them.
-              requestAnimationFrame(() => {
-                if (typeof holdingsStart.current?.scrollIntoView === 'function') {
-                  holdingsStart.current.scrollIntoView({ block: 'start' });
-                }
-              });
+              scrollToElement(holdingsStart.current); // the grouped holdings are below the cards
             }}
             onSetAlert={setAlertDialog}
             onOpenAlerts={() => {
@@ -176,12 +170,16 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
             connected={connected}
             fallbackRun={summary.data?.lastSync ?? null}
             refresh={{ available: quotes.service !== null, busy: refresh.busy, onRefresh: refresh.start }}
+            onImportFiles={overlays.openImportFiles}
           />
         </div>
         <div ref={holdingsStart} aria-hidden />
+        {unmatchedOn && (
+          <UnmatchedBanner count={unmatched.count} reading={unmatched.reading} onShowAll={unmatched.showAll} />
+        )}
         {filters.groupBy === 'none' ? (
           <HoldingsGrid
-            result={holdings}
+            result={unmatched.result}
             filters={filters}
             openId={openId}
             showAccount={showAccount}
@@ -223,41 +221,12 @@ export function PortfolioView({ accounts }: { accounts: readonly AccountSummary[
             overlays.openAlerts();
           }}
         />
-        <PortfolioOverlays
-          alertsTab={overlays.alertsTab}
-          onAlertsTab={overlays.changeAlertsTab}
-          onCloseAlerts={overlays.closeAlerts}
-          dialog={alertDialog}
-          onNewAlert={() => {
-            setAlertDialog('pick');
-          }}
-          onCloseDialog={() => {
-            setAlertDialog(null);
-          }}
-          cash={{
-            open: overlays.cashOpen,
-            adding: overlays.cashAdding,
-            importing: overlays.cashImporting,
-            onImportTrades: overlays.importTradesInstead,
-            onClose: overlays.closeCash,
-            accounts: portfolio,
-            scopeAccountId: account,
-          }}
-          trades={{
-            tab: overlays.tradesTab,
-            onTab: overlays.changeTradesTab,
-            onClose: overlays.closeTrades,
-            onImportDividends: overlays.importDividendsInstead,
-            accounts: portfolio,
-            scopeAccountId: account,
-            adding: addingTrade,
-            onAdd: () => {
-              setAddingTrade(true);
-            },
-            onCloseAdd: () => {
-              setAddingTrade(false);
-            },
-          }}
+        <PortfolioPanels
+          overlays={overlays}
+          accounts={portfolio}
+          scopeAccountId={account}
+          alertDialog={alertDialog}
+          onAlertDialog={setAlertDialog}
         />
       </Box>
     </LiveProvider>

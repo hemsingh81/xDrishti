@@ -14,6 +14,12 @@ namespace XDrishti.Infrastructure.Brokers;
 /// </summary>
 internal static class DhanTradeMapper
 {
+    /// <summary>
+    /// The version of this mapping (ADR 0027). <b>Raise it with every change that lets a row be read that was dropped or skipped before</b> (a field name, the symbol resolution, a product that was unmapped): the next read of each account then reads
+    /// the windows that dropped rows for a data reason again, which the identities make safe. 1: the mapping of ADR 0025 amendments a to h.
+    /// </summary>
+    public const int Version = 1;
+
     /// <summary>The longest trade id kept (the identity is the date and the id).</summary>
     public const int MaxTradeIdLength = 64;
 

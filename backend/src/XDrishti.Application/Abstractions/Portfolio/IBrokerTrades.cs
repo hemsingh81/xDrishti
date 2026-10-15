@@ -9,5 +9,11 @@ namespace XDrishti.Application.Abstractions.Portfolio;
 /// </summary>
 public interface IBrokerTrades
 {
+    /// <summary>
+    /// The version of the mapping that turns Dhan's rows into trades (ADR 0027). It goes up whenever the mapping changes so that rows an older version had to drop could be read now: a read finds that the account's stored version is older and reads
+    /// the windows that dropped rows again.
+    /// </summary>
+    int MapperVersion { get; }
+
     ValueTask<BrokerResponse<BrokerTradePage>> FetchPageAsync(SecretValue accessToken, DateOnly from, DateOnly to, int page, CancellationToken cancellationToken);
 }

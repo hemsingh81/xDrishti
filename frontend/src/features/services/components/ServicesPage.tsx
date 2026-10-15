@@ -5,7 +5,6 @@ import { PortfolioRefreshDialog } from '@/features/accounts';
 import { queryRoots, type ServiceView } from '@/shared/api';
 import { formatIstDayAndTime } from '@/shared/lib/format';
 import { LoadingState } from '@/shared/ui';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { servicesQuery } from '../api/servicesQueries';
 import { useServiceActions } from '../hooks/useServiceActions';
 import { useServicesWatch } from '../hooks/useServicesWatch';
@@ -28,11 +27,7 @@ import { TimelineCard } from './TimelineCard';
  * drawer); the account sync has Settings (a dialog) instead.
  */
 export function ServicesPage() {
-  return (
-    <ToastProvider>
-      <ServicesContent />
-    </ToastProvider>
-  );
+  return <ServicesContent />;
 }
 
 function ServicesContent() {

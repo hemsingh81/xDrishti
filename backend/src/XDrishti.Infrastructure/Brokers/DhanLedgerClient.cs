@@ -17,6 +17,8 @@ internal sealed class DhanLedgerClient(IHttpClientFactory httpClients, DhanHisto
 
     private const string Operation = "ledger";
 
+    public int MapperVersion => DhanLedgerMapper.Version;
+
     public async ValueTask<BrokerResponse<BrokerLedgerRead>> FetchAsync(SecretValue accessToken, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(accessToken);

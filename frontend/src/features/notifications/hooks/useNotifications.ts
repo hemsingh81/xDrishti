@@ -11,15 +11,17 @@ export interface NotificationsState {
   notifications: AppNotification[];
   isPending: boolean;
   isError: boolean;
+  /** The accounts (settled, well or not) and the Portfolio notices (where the items that need the owner come from) have been read. */
+  ready: boolean;
   refetch: () => void;
   /** The clock the list was derived at, for relative times. */
   now: number;
 }
 
 /**
- * All current notifications: the accounts' (derived here from their state), the data, service and Portfolio notices
- * (derived by the API), most urgent first. The notices are polled lightly; when they cannot be read the account
- * notifications still show.
+ * All current notifications: the accounts' (the API-key expiry, derived here from their state), the data, service and Portfolio
+ * notices (derived by the API, among them the items that need the owner), open ones first and most urgent first. The notices
+ * are polled lightly; when they cannot be read the account notifications still show.
  */
 export function useNotifications(): NotificationsState {
   const { data, isPending, isError, refetch } = useQuery(accountsQuery);
@@ -44,6 +46,7 @@ export function useNotifications(): NotificationsState {
     notifications,
     isPending,
     isError,
+    ready: !isPending && portfolioNotices.isSuccess,
     now,
     refetch: () => {
       void refetch();

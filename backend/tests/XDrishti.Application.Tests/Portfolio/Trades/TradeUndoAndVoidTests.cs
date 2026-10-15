@@ -117,6 +117,35 @@ public sealed class TradeUndoAndVoidTests
         s.Data.Trades.ShouldAllBe(t => !t.IsVoided);
     }
 
+    [Theory]
+    [InlineData(BrokerSyncKind.Trades)]
+    [InlineData(BrokerSyncKind.Ledger)]
+    public async Task Undoing_while_a_broker_history_run_of_the_account_runs_is_refused(BrokerSyncKind kind)
+    {
+        var s = await StartAsync();
+        var batch = (await s.ImportOkAsync(Csv(BaseRows))).Batch!;
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, kind, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var running = await s.UndoAsync(batch.Id);
+
+        running.Error.Code.ShouldBe("portfolio.sync_running");
+        s.Data.Trades.ShouldAllBe(t => !t.IsVoided);
+    }
+
+    [Fact]
+    public async Task A_broker_history_run_of_another_account_does_not_hold_the_undo_back()
+    {
+        var s = await StartAsync();
+        var batch = (await s.ImportOkAsync(Csv(BaseRows))).Batch!;
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(Guid.NewGuid(), BrokerSyncKind.Trades, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var undone = await s.UndoAsync(batch.Id);
+
+        undone.IsSuccess.ShouldBeTrue();
+    }
+
     [Fact]
     public async Task Voiding_a_trade_stops_it_counting_and_frees_its_identity_for_a_later_import()
     {

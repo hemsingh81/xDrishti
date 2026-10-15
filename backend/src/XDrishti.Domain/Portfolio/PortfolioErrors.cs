@@ -58,6 +58,8 @@ public static class PortfolioErrors
 
     public static readonly Error DividendBatchNotFound = Error.NotFound(NotFoundCode, "The dividend import does not exist.");
 
+    public static readonly Error CostBatchNotFound = Error.NotFound(NotFoundCode, "The cost import does not exist.");
+
     /// <summary>
     /// The file is a different kind of file than the screen expects (ADR 0028): <c>detected</c> (an extension member of the problem) says which kind the header looks like — <c>dividends</c>, <c>trades</c>, or <c>tradebook_without_sides</c>
     /// (a tradebook that cannot be read because it has no buy/sell column). A 400, so the screen can send the owner to the right import.

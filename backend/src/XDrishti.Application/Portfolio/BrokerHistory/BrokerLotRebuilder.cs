@@ -64,7 +64,7 @@ internal sealed class BrokerLotRebuilder(
         var review = 0;
         foreach (var (id, symbol) in candidates)
         {
-            var outcome = await RebuildOneAsync(account, id, matcher, actor, cancellationToken);
+            var (outcome, detail) = await RebuildOneAsync(account, id, matcher, actor, cancellationToken);
             switch (outcome)
             {
                 case RebuildStatuses.Ok:
@@ -75,7 +75,7 @@ internal sealed class BrokerLotRebuilder(
                     break;
                 default:
                     review += outcome == NeedsReview ? 1 : 0;
-                    left.Add(new BrokerNotRebuilt(symbol, outcome));
+                    left.Add(new BrokerNotRebuilt(symbol, outcome, detail, id));
                     break;
             }
         }
@@ -86,10 +86,11 @@ internal sealed class BrokerLotRebuilder(
         return new BrokerRebuildSummary(rebuilt, unchanged, review, ordered.Count, [.. ordered.Take(BrokerSyncCounts.MaxNotRebuiltListed)]);
     }
 
-    /// <summary>One holding in its own unit of work: the status it ended in (<c>ok</c> when rebuilt, <c>unchanged</c>, <c>needs_review</c>, <c>changed_meanwhile</c>, or the reason it cannot be rebuilt).</summary>
-    private async ValueTask<string> RebuildOneAsync(BrokerAccount account, Guid holdingId, HoldingMatcher matcher, string actor, CancellationToken cancellationToken)
+    /// <summary>One holding in its own unit of work: the status it ended in (<c>ok</c> when rebuilt, <c>unchanged</c>, <c>needs_review</c>, <c>changed_meanwhile</c>, or the reason it cannot be rebuilt) and, for a quantity mismatch, the kind of mismatch.</summary>
+    private async ValueTask<(string Outcome, string? Detail)> RebuildOneAsync(BrokerAccount account, Guid holdingId, HoldingMatcher matcher, string actor, CancellationToken cancellationToken)
     {
         var outcome = RebuildStatuses.Unchanged;
+        string? detail = null;
         var result = await unitOfWork.RunOnceAsync(
             async token =>
             {
@@ -104,6 +105,7 @@ internal sealed class BrokerLotRebuilder(
                 if (!rebuild.WillReplace)
                 {
                     outcome = rebuild.Status;
+                    detail = rebuild.Status == RebuildStatuses.QuantityMismatch ? rebuild.Reason : null;
                     return Result.Success();
                 }
 
@@ -124,9 +126,9 @@ internal sealed class BrokerLotRebuilder(
         if (result.IsFailure)
         {
             BrokerHistoryLog.RebuildRaced(logger, holdingId);
-            return ChangedMeanwhile;
+            return (ChangedMeanwhile, null);
         }
 
-        return outcome;
+        return (outcome, detail);
     }
 }

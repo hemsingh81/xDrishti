@@ -18,6 +18,9 @@ internal sealed class BrokerSyncStore(XDrishtiDbContext db, NpgsqlDataSource dat
 {
     private const string InterruptedMessage = "The sync did not finish (the application stopped or crashed while it ran).";
 
+    /// <summary>The reason code the health figures note for a run that was interrupted (see <c>SyncFailures.Interrupted</c>).</summary>
+    private const string InterruptedReason = "interrupted";
+
     public async ValueTask<bool> TryStartAsync(BrokerSyncRun run, TimeSpan staleAfter, DateTimeOffset now, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(run);
@@ -34,16 +37,13 @@ internal sealed class BrokerSyncStore(XDrishtiDbContext db, NpgsqlDataSource dat
             }
         }
 
-        await using (var stale = new NpgsqlCommand(
-            """
-            UPDATE portfolio.broker_sync_runs
-            SET status = 'failed', finished_at = @now, error = @error
-            WHERE account_id = @account AND status = 'running' AND started_at < @cutoff
-            """, connection, transaction))
+        // A run that ran past its limit was interrupted: it is failed and the interruption is noted in the health figures (ADR 0027), in one statement.
+        await using (var stale = new NpgsqlCommand(SyncHealthSql.FailRunning("portfolio.broker_sync_runs", "kind", "account_id = @account AND started_at < @cutoff"), connection, transaction))
         {
             stale.Parameters.AddWithValue("now", now.ToUniversalTime());
             stale.Parameters.AddWithValue("cutoff", (now - staleAfter).ToUniversalTime());
             stale.Parameters.AddWithValue("error", InterruptedMessage);
+            stale.Parameters.AddWithValue("reason", InterruptedReason);
             stale.Parameters.AddWithValue("account", run.AccountId);
             await stale.ExecuteNonQueryAsync(cancellationToken);
         }
@@ -117,22 +117,27 @@ internal sealed class BrokerSyncStore(XDrishtiDbContext db, NpgsqlDataSource dat
                 cancellationToken);
     }
 
-    public async ValueTask<DateOnly?> GetWatermarkAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
-        await db.BrokerSyncStates.AsNoTracking().Where(x => x.AccountId == accountId && x.Kind == kind).Select(x => (DateOnly?)x.WatermarkDate).FirstOrDefaultAsync(cancellationToken);
+    public async ValueTask<DateOnly?> GetWatermarkAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken)
+    {
+        var health = Health(kind);
+        return await db.BrokerSyncStates.AsNoTracking().Where(x => x.AccountId == accountId && x.Kind == health).Select(x => x.WatermarkDate).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private static SyncHealthKind Health(BrokerSyncKind kind) => kind == BrokerSyncKind.Trades ? SyncHealthKind.Trades : SyncHealthKind.Ledger;
 
     public async ValueTask MoveWatermarkAsync(Guid accountId, BrokerSyncKind kind, DateOnly from, DateOnly to, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var name = kind.ToString().ToLowerInvariant();
         var time = now.ToUniversalTime();
-        // "Every date up to the watermark was read": it moves only when the window starts at or before the day after it. A first row (no watermark yet) is a first read from a chosen date.
+        // "Every date up to the watermark was read": it moves only when the window starts at or before the day after it. A first row (no watermark yet, or one that only holds health figures) is a first read from a chosen date.
         await db.Database.ExecuteSqlAsync(
             $"""
-            INSERT INTO portfolio.broker_sync_state (account_id, kind, watermark_date, updated_at)
+            INSERT INTO portfolio.broker_sync_state AS s (account_id, kind, watermark_date, updated_at)
             VALUES ({accountId}, {name}, {to}, {time})
             ON CONFLICT (account_id, kind) DO UPDATE
-            SET updated_at = CASE WHEN EXCLUDED.watermark_date > portfolio.broker_sync_state.watermark_date THEN EXCLUDED.updated_at ELSE portfolio.broker_sync_state.updated_at END,
-                watermark_date = GREATEST(portfolio.broker_sync_state.watermark_date, EXCLUDED.watermark_date)
-            WHERE portfolio.broker_sync_state.watermark_date + 1 >= {from}
+            SET updated_at = CASE WHEN s.watermark_date IS NULL OR EXCLUDED.watermark_date > s.watermark_date THEN EXCLUDED.updated_at ELSE s.updated_at END,
+                watermark_date = GREATEST(s.watermark_date, EXCLUDED.watermark_date)
+            WHERE s.watermark_date IS NULL OR s.watermark_date + 1 >= {from}
             """,
             cancellationToken);
     }
@@ -143,6 +148,11 @@ internal sealed class BrokerSyncStore(XDrishtiDbContext db, NpgsqlDataSource dat
             .OrderByDescending(x => x.StartedAt)
             .ThenByDescending(x => x.Id)
             .FirstOrDefaultAsync(cancellationToken);
+
+    public async ValueTask<DateOnly?> GetEarliestReadAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
+        await db.BrokerSyncRuns.AsNoTracking()
+            .Where(x => x.AccountId == accountId && x.Kind == kind && x.Status == SyncStatus.Succeeded)
+            .MinAsync(x => (DateOnly?)x.FromDate, cancellationToken);
 
     public async ValueTask<BrokerSyncRun?> GetLastSucceededAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
         await db.BrokerSyncRuns.AsNoTracking()
@@ -164,15 +174,42 @@ internal sealed class BrokerSyncStore(XDrishtiDbContext db, NpgsqlDataSource dat
     public async ValueTask<bool> IsRunningAsync(Guid accountId, CancellationToken cancellationToken) =>
         await db.BrokerSyncRuns.AsNoTracking().AnyAsync(x => x.AccountId == accountId && x.Status == SyncStatus.Running, cancellationToken);
 
+    public async ValueTask<IReadOnlyDictionary<Guid, BrokerSyncRun>> ListLastSucceededAsync(IReadOnlyCollection<Guid> accountIds, BrokerSyncKind kind, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(accountIds);
+        if (accountIds.Count == 0)
+        {
+            return new Dictionary<Guid, BrokerSyncRun>();
+        }
+
+        // The latest succeeded run of each account in one read: a run is the latest when no later succeeded run of the same account and kind exists.
+        var latest = await db.BrokerSyncRuns.AsNoTracking()
+            .Where(x => accountIds.Contains(x.AccountId) && x.Kind == kind && x.Status == SyncStatus.Succeeded
+                && !db.BrokerSyncRuns.Any(y => y.AccountId == x.AccountId && y.Kind == kind && y.Status == SyncStatus.Succeeded && y.StartedAt > x.StartedAt))
+            .ToListAsync(cancellationToken);
+        return latest.GroupBy(x => x.AccountId).ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StartedAt).ThenByDescending(x => x.Id).First());
+    }
+
+    public async ValueTask<IReadOnlyList<BrokerDateRange>> ListDroppedRangesAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken)
+    {
+        // The counts are JSON, read whole: a few hundred runs at most, and this is asked once per account and kind (the first version of ADR 0027).
+        var runs = await db.BrokerSyncRuns.AsNoTracking()
+            .Where(x => x.AccountId == accountId && x.Kind == kind && x.Status == SyncStatus.Succeeded)
+            .Select(x => new { x.FromDate, x.ToDate, x.Counts })
+            .ToListAsync(cancellationToken);
+        return [.. runs
+            .Where(r => r.Counts.Dropped > 0 || r.Counts.SkippedByReason.GetValueOrDefault(BrokerSkipReasons.NoSymbol) > 0)
+            .Select(r => new BrokerDateRange(r.FromDate, r.ToDate))
+            .OrderBy(r => r.From).ThenBy(r => r.To)];
+    }
+
     public async ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var started = processStartedAt.ToUniversalTime();
-        var finished = now.ToUniversalTime();
-        return await db.BrokerSyncRuns.Where(x => x.Status == SyncStatus.Running && x.StartedAt < started)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(x => x.Status, SyncStatus.Failed)
-                    .SetProperty(x => x.FinishedAt, finished)
-                    .SetProperty(x => x.Error, InterruptedMessage),
-                cancellationToken);
+        await using var command = dataSource.CreateCommand(SyncHealthSql.FailRunning("portfolio.broker_sync_runs", "kind", "started_at < @started"));
+        command.Parameters.AddWithValue("started", processStartedAt.ToUniversalTime());
+        command.Parameters.AddWithValue("now", now.ToUniversalTime());
+        command.Parameters.AddWithValue("error", InterruptedMessage);
+        command.Parameters.AddWithValue("reason", InterruptedReason);
+        return (int)(long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
     }
 }

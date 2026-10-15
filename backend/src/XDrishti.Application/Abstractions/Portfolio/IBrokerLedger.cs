@@ -9,5 +9,8 @@ namespace XDrishti.Application.Abstractions.Portfolio;
 /// </summary>
 public interface IBrokerLedger
 {
+    /// <summary>The version of the mapping that turns Dhan's rows into ledger lines (ADR 0027); see <see cref="IBrokerTrades.MapperVersion"/>.</summary>
+    int MapperVersion { get; }
+
     ValueTask<BrokerResponse<BrokerLedgerRead>> FetchAsync(SecretValue accessToken, DateOnly from, DateOnly to, CancellationToken cancellationToken);
 }

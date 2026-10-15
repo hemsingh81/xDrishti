@@ -13,5 +13,9 @@
     <!-- Anonymised, made-up answers shaped like Dhan's trade history and ledger (docs/specs/P2-13), embedded so the mapper and client tests never touch the disk. Replace with real samples after the owner's first real read. -->
     <EmbeddedResource Include="Brokers\Samples\*.json" LogicalName="DhanHistory/%(Filename)%(Extension)" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Synthetic depository-charges sheets (docs/specs/P2-17): a legacy BIFF8 .xls and an .xlsx written by Portfolio/Samples/tools/make_dp_samples.py with invented rows - no personal data. -->
+    <EmbeddedResource Include="Portfolio\Samples\*.xls;Portfolio\Samples\*.xlsx" LogicalName="Spreadsheets/%(Filename)%(Extension)" />
+  </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>

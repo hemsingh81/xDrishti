@@ -17,8 +17,12 @@ interface CashDrawerProps {
   startAdding?: boolean;
   /** Open the dividend import at once (a link, or a dividend file dropped on the trade import). */
   startImporting?: boolean;
+  /** Put the keyboard on the suggested dividends at once (the bell's "Possible dividends in the ledger"). */
+  focusSuggestions?: boolean;
   /** A tradebook was dropped on the dividend import: the trade import opens instead. */
   onImportTrades: () => void;
+  /** Opens the Import files dialog (a report was dropped on the dividend import, or its button). */
+  onImportFiles: () => void;
 }
 
 /**
@@ -32,7 +36,9 @@ export function CashDrawer({
   scopeAccountId,
   startAdding = false,
   startImporting = false,
+  focusSuggestions = false,
   onImportTrades,
+  onImportFiles,
 }: CashDrawerProps) {
   const titleId = useId();
   const [accountId, setAccountId] = useState(() => initialTradesAccount(accounts, scopeAccountId));
@@ -93,7 +99,9 @@ export function CashDrawer({
             account={account}
             startAdding={startAdding}
             startImporting={startImporting}
+            focusSuggestions={focusSuggestions}
             onImportTrades={onImportTrades}
+            onImportFiles={onImportFiles}
           />
         )}
         {accountId ? (

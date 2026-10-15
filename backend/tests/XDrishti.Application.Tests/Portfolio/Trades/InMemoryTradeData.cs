@@ -73,6 +73,25 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
         return ValueTask.FromResult<(IReadOnlyList<Transaction>, int)>(([.. all.Skip((page - 1) * pageSize).Take(pageSize)], all.Count));
     }
 
+    public ValueTask<IReadOnlyList<TradeGroup>> ListBrokerGroupsAsync(Guid accountId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<TradeGroup>>(
+        [
+            .. Trades
+                .Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Broker && t.Isin is not null && t.TradeDate >= from && t.TradeDate <= to)
+                .GroupBy(t => (t.TradeDate, Isin: t.Isin!, t.Side))
+                .Select(g => new TradeGroup(g.Key.TradeDate, g.Key.Isin, g.Key.Side, g.Sum(t => t.Qty)))
+                .OrderBy(g => g.Date).ThenBy(g => g.Isin, StringComparer.Ordinal).ThenBy(g => g.Side),
+        ]);
+
+    public ValueTask<SupersedeOutcome> SupersedeBillRowsAsync(Guid accountId, IReadOnlyCollection<TradeGroup> brokerGroups, Guid runId, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        var wanted = brokerGroups.GroupBy(g => (g.Date, g.Isin, g.Side)).ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+        var hits = Trades.Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Bill && t.Isin is not null && wanted.ContainsKey((t.TradeDate, t.Isin, t.Side))).ToList();
+        var differing = hits.GroupBy(t => (t.TradeDate, t.Isin!, t.Side)).Count(g => g.Sum(t => t.Qty) != wanted[g.Key]);
+        var voided = hits.Count(t => t.Supersede(runId, at));
+        return ValueTask.FromResult(new SupersedeOutcome(voided, differing));
+    }
+
     public void Add(IEnumerable<Transaction> trades)
     {
         foreach (var trade in trades)

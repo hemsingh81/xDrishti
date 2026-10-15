@@ -12,6 +12,9 @@ namespace XDrishti.Infrastructure.Brokers;
 /// </summary>
 internal static class DhanLedgerMapper
 {
+    /// <summary>The version of this mapping (ADR 0027): raise it with every change that lets a row be read that was dropped before; see <see cref="DhanTradeMapper.Version"/>. 1: the mapping of ADR 0025 amendment g.</summary>
+    public const int Version = 1;
+
     private const decimal Limit = 1_000_000_000_000m;
 
     public static BrokerLedgerRead Map(JsonElement rows)

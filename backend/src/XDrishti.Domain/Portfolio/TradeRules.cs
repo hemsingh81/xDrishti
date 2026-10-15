@@ -20,6 +20,9 @@ public static class TradeRules
     /// <summary>Prices and charges are stored with this many decimals; more are rounded away from zero.</summary>
     public const int Decimals = 4;
 
+    /// <summary>Prices are kept with 6 decimals: a bill-level row (value ÷ quantity) must give the bill's value back to the paisa when multiplied by the quantity (ADR 0029).</summary>
+    public const int PriceDecimals = 6;
+
     public const int MaxExternalIdLength = 100;
 
     private const string ExchangePrefix = "NSE:";
@@ -62,6 +65,9 @@ public static class TradeRules
     };
 
     public static decimal Round(decimal value) => Math.Round(value, Decimals, MidpointRounding.AwayFromZero);
+
+    /// <summary>A price rounded to <see cref="PriceDecimals"/> decimals (away from zero).</summary>
+    public static decimal RoundPrice(decimal value) => Math.Round(value, PriceDecimals, MidpointRounding.AwayFromZero);
 
     /// <summary>buy · b · purchase · bought → buy; sell · s · sale · sold → sell (case-insensitive).</summary>
     public static bool TryParseSide(string? text, out TradeSide side)

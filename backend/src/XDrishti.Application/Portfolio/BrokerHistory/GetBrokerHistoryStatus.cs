@@ -2,6 +2,7 @@ using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Portfolio;
@@ -14,7 +15,7 @@ namespace XDrishti.Application.Portfolio.BrokerHistory;
 /// </summary>
 public sealed record GetBrokerHistoryStatusQuery(Guid AccountId) : IQuery<Result<BrokerHistoryStatusView>>;
 
-internal sealed class GetBrokerHistoryStatusHandler(IAccountStore accounts, IBrokerSyncStore runs, IServiceScheduleReader schedules)
+internal sealed class GetBrokerHistoryStatusHandler(IAccountStore accounts, IBrokerSyncStore runs, ISyncHealthStore health, IHealSettings settings, IServiceScheduleReader schedules)
     : IQueryHandler<GetBrokerHistoryStatusQuery, Result<BrokerHistoryStatusView>>
 {
     public async ValueTask<Result<BrokerHistoryStatusView>> HandleAsync(GetBrokerHistoryStatusQuery query, CancellationToken cancellationToken)
@@ -28,6 +29,7 @@ internal sealed class GetBrokerHistoryStatusHandler(IAccountStore accounts, IBro
         var trades = await KindAsync(account.Id, BrokerSyncKind.Trades, cancellationToken);
         var ledger = await KindAsync(account.Id, BrokerSyncKind.Ledger, cancellationToken);
         var schedule = await schedules.GetAsync(PortfolioBrokerHistoryService.Id, cancellationToken);
+        var deepen = await health.GetAsync(account.Id, SyncHealthKind.Trades, cancellationToken);
         var counts = (await runs.GetLastSucceededAsync(account.Id, BrokerSyncKind.Trades, cancellationToken))?.Counts;
         return Result.Success(new BrokerHistoryStatusView(
             await runs.IsRunningAsync(account.Id, cancellationToken),
@@ -36,7 +38,9 @@ internal sealed class GetBrokerHistoryStatusHandler(IAccountStore accounts, IBro
             account.Portfolio.Enabled ? schedule?.NextRunAt : null,
             counts?.Rebuilt ?? 0,
             counts?.NeedsReview ?? 0,
-            NeedsReviewSymbols(counts)));
+            NeedsReviewSymbols(counts),
+            deepen.DeepenedTo,
+            deepen.DeepenExhausted));
     }
 
     /// <summary>The symbols of the holdings that need review in the counts of the latest succeeded run, whatever status the latest run (of any status) is in; the counts list at most <see cref="BrokerSyncCounts.MaxNotRebuiltListed"/>.</summary>
@@ -48,6 +52,15 @@ internal sealed class GetBrokerHistoryStatusHandler(IAccountStore accounts, IBro
         var watermark = await runs.GetWatermarkAsync(accountId, kind, cancellationToken);
         var last = await runs.GetLastAsync(accountId, kind, cancellationToken);
         var view = last is null ? null : BrokerHistoryViews.Run(last);
-        return new BrokerKindStatus(watermark, view, view?.Counts.WindowsDone ?? 0, view?.Counts.WindowsTotal ?? 0);
+        var figures = await health.GetAsync(accountId, SyncFailures.KindOf(kind), cancellationToken);
+        return new BrokerKindStatus(
+            watermark,
+            view,
+            view?.Counts.WindowsDone ?? 0,
+            view?.Counts.WindowsTotal ?? 0,
+            view is null ? 0 : Math.Max(1, view.Counts.Attempts),
+            figures.ConsecutiveFailedDays,
+            figures.LastFailureReason,
+            RetrySchedule.NextAttemptAt(figures, settings));
     }
 }

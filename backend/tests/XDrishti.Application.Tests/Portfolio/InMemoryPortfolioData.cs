@@ -16,6 +16,9 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
 
     public List<HoldingSync> Syncs { get; } = [];
 
+    /// <summary>The health figures of the syncs (ADR 0027).</summary>
+    public InMemorySyncHealth Health { get; } = new();
+
     public int SaveCount { get; private set; }
 
     public int PruneCalls { get; private set; }
@@ -93,6 +96,7 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
         foreach (var stale in Syncs.Where(s => s.AccountId == run.AccountId && s.IsRunning && s.StartedAt < now - staleAfter))
         {
             stale.Fail(now, "The sync did not finish (the application stopped or crashed while it ran).");
+            Health.Interrupted(stale.AccountId, SyncHealthKind.Holdings, now);
         }
 
         if (OtherRunInProgress || Syncs.Any(s => s.AccountId == run.AccountId && s.IsRunning))
@@ -196,6 +200,7 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
         foreach (var run in interrupted)
         {
             run.Fail(now, "The sync did not finish (the application stopped or crashed while it ran).");
+            Health.Interrupted(run.AccountId, SyncHealthKind.Holdings, now);
         }
 
         return ValueTask.FromResult(interrupted.Count);

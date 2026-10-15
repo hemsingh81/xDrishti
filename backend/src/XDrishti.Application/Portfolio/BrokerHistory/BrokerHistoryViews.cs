@@ -32,7 +32,8 @@ internal static class BrokerHistoryViews
         entry.Exchange,
         entry.Amount,
         LedgerClasses.Code(entry.EntryClass),
-        entry.RunningBalance);
+        entry.RunningBalance,
+        entry.Source.ToString().ToLowerInvariant());
 
     /// <summary>Every class in the listed order, with zeros for the ones without entries.</summary>
     public static IReadOnlyList<LedgerClassTotal> Totals(IReadOnlyList<LedgerTotal> totals) =>

@@ -479,6 +479,36 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
 </tr>
 </tbody></table>
 <p>The window length (30 days), the page cap (200), the 30 s timeout and the 5 MB answer limit are fixed in the code, not configuration (tuned after the first real read). The two Dhan endpoints are on the allow-list (<a href="05-data-and-brokers.html">doc 05</a> §8.3, <a href="17-deployment-and-operations.html">doc 17</a> §3).</p>
+<h3 id="self-healing-syncs-portfolioheal-adr-0027-p2-16">Self-healing syncs (<code>Portfolio:Heal:*</code>, <a href="../adr/0027-self-healing-sync-and-actionable-notifications.html">ADR 0027</a>, P2-16)<a class="hash" href="#self-healing-syncs-portfolioheal-adr-0027-p2-16" aria-label="Link to this section">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Option (<code>appsettings</code> / environment)</th>
+<th>Meaning</th>
+<th>Default</th>
+<th>Check</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Portfolio:Heal:RetryBackoffMinutes</code> (<code>Portfolio__Heal__RetryBackoffMinutes</code>; compose: <code>XD_PORTFOLIO_HEAL_BACKOFF_MINUTES</code>)</td>
+<td>The waits before each quiet retry of a sync that failed for a reason that may pass (Dhan did not answer, its rate limit, an interrupted run), in minutes, comma-separated; their <strong>number is the number of retries</strong> of one failure, all inside the same India day. With the default the first retry is due 1 minute after the first failure, the second 5 minutes after the second, the third 15 minutes after the third. Empty switches the quiet retries off (the nightly and scheduled runs still happen)</td>
+<td><code>1,5,15</code></td>
+<td>up to ten waits of 1 to 999 minutes (<code>^\d{1,3}(,\d{1,3}){0,9}$</code>, blanks allowed)</td>
+</tr>
+<tr>
+<td><code>Portfolio:Heal:PersistDays</code> (<code>Portfolio__Heal__PersistDays</code>; compose: <code>XD_PORTFOLIO_HEAL_PERSIST_DAYS</code>)</td>
+<td>The consecutive India days whose last attempt failed after which a failing sync (holdings, trades, ledger or the price poll) becomes an item in the bell; a reason only the owner can fix (the Dhan login) is told at once. The same number makes a failing price poll a failed run of the service</td>
+<td><code>2</code></td>
+<td>integer 1 to 30</td>
+</tr>
+<tr>
+<td><code>Portfolio:Heal:DeepenMaxYears</code> (<code>Portfolio__Heal__DeepenMaxYears</code>; compose: <code>XD_PORTFOLIO_HEAL_DEEPEN_YEARS</code>)</td>
+<td>How many years back from today the nightly deepening of the trade history reads at most, <strong>one year per day</strong>, while the trades do not explain a holding; <code>0</code> switches it off</td>
+<td><code>8</code></td>
+<td>integer 0 to 30</td>
+</tr>
+</tbody></table>
+<p>These are ordinary deployment settings, read at start (not first-start settings): change them in the environment and restart <code>xd-api</code>. The quiet retries and the catch-up after a reconnect are done by the holdings refresh runner, so <strong><code>Portfolio:AutoRefresh:Enabled = false</code> also switches the healing off</strong> (the scheduled runs, &quot;Sync now&quot; and the &quot;Retry now&quot; button keep working). The 1-minute look of the healer, the 24 hours a resolved item is kept in the bell and the 2 hours before a login runs out at which it is called &quot;expiring&quot; are fixed in the code. Details: <a href="12-portfolio-monitoring.html">doc 12</a> §3 &quot;Self-healing and attention items (P2-16)&quot;.</p>
 <h3 id="live-feed-live-adr-0024-p2-10">Live feed (<code>Live:*</code>, <a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a>, P2-10)<a class="hash" href="#live-feed-live-adr-0024-p2-10" aria-label="Link to this section">#</a></h3>
 <p><code>appsettings.json</code> of <code>xd-feed</code> (and <code>Live:ManualRunMinutes</code> of <code>xd-api</code> too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service <code>live-feed</code> on the Services screen, not a setting here.</p>
 <div class="code"><pre><code class="language-yaml">Live:
@@ -565,7 +595,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-14 21:34</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-15 09:32</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>
@@ -574,6 +604,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
 <a href="#end-of-day-run-dataeod-adr-0017-2-adr-0018" class="d3">End-of-day run (Data:Eod:*, ADR 0017 §2, ADR 0018)</a>
 <a href="#holdings-refresh-portfolio-adr-0012-p2-01" class="d3">Holdings refresh (Portfolio:*, ADR 0012, P2-01)</a>
 <a href="#trades-and-ledger-from-dhan-portfoliobrokerhistory-adr-0025-p2-13" class="d3">Trades and ledger from Dhan (Portfolio:BrokerHistory:*, ADR 0025, P2-13)</a>
+<a href="#self-healing-syncs-portfolioheal-adr-0027-p2-16" class="d3">Self-healing syncs (Portfolio:Heal:*, ADR 0027, P2-16)</a>
 <a href="#live-feed-live-adr-0024-p2-10" class="d3">Live feed (Live:*, ADR 0024, P2-10)</a>
 <a href="#4-most-used-settings" class="d2">4. Most-used settings</a></aside>
 </div>

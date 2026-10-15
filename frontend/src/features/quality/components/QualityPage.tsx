@@ -2,7 +2,6 @@ import { Alert, Box } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { LoadingState } from '@/shared/ui';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { overviewQuery } from '../api/qualityQueries';
 import { useQualityFilters } from '../hooks/useQualityFilters';
 import { useQualityWatch } from '../hooks/useQualityWatch';
@@ -25,11 +24,7 @@ import { SummaryRibbon } from './SummaryRibbon';
  * a drawer too. Table state and the open instrument are in the URL.
  */
 export function QualityPage() {
-  return (
-    <ToastProvider>
-      <QualityContent />
-    </ToastProvider>
-  );
+  return <QualityContent />;
 }
 
 function QualityContent() {

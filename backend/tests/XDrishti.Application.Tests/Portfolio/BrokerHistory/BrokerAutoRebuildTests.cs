@@ -172,7 +172,7 @@ public sealed class BrokerAutoRebuildTests
         var counts = (await s.SyncOkAsync()).Trades.Counts;
 
         (counts.Rebuilt, counts.NotRebuiltTotal).ShouldBe((0, 1));
-        counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "quantity_mismatch")]);
+        counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "quantity_mismatch", "negative_opening", s.Holding.Id)]);
         Shape(s.Holding).ShouldBe(lots);
         s.Fx.Events(AccountEventType.LotsRebuilt).ShouldBeEmpty();
     }
@@ -203,7 +203,7 @@ public sealed class BrokerAutoRebuildTests
 
         var counts = view.Trades.Counts;
         (counts.Rebuilt, counts.NeedsReview, counts.NotRebuiltTotal).ShouldBe((0, 1, 1));
-        counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "needs_review")]);
+        counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "needs_review", null, s.Holding.Id)]);
         Shape(s.Holding).ShouldBe(lots);
         s.BrokerTrades().Count.ShouldBe(3); // the trades are stored all the same
         s.Fx.Events(AccountEventType.LotsRebuilt).ShouldBeEmpty();
@@ -236,7 +236,7 @@ public sealed class BrokerAutoRebuildTests
         var raced = await s.SyncOkAsync();
 
         (raced.Trades.Counts.Rebuilt, raced.Trades.Status).ShouldBe((0, "succeeded"));
-        raced.Trades.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "changed_meanwhile")]);
+        raced.Trades.Counts.NotRebuilt.ShouldBe([new BrokerNotRebuilt("EXMPL", "changed_meanwhile", null, s.Holding.Id)]);
         Shape(s.Holding).ShouldBe(lots);
         s.Fx.Data.OnceRuns.ShouldBe(1); // it was not retried
 

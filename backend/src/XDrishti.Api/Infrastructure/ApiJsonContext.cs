@@ -25,11 +25,13 @@ using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Portfolio.BrokerHistory;
 using XDrishti.Application.Portfolio.DividendImport;
 using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Income;
+using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Domain.Portfolio;
 
@@ -157,6 +159,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PriceAlertView))]
 [JsonSerializable(typeof(PriceAlertPage))]
 [JsonSerializable(typeof(PortfolioNotices))]
+[JsonSerializable(typeof(AttentionAction))]
 [JsonSerializable(typeof(TradePreviewReport))]
 [JsonSerializable(typeof(TradeFileSummary))]
 [JsonSerializable(typeof(TradeSkipped))]
@@ -207,6 +210,35 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DividendBatchView))]
 [JsonSerializable(typeof(DividendBatchPage))]
 [JsonSerializable(typeof(DividendUndoResult))]
+[JsonSerializable(typeof(string[]))]
+[JsonSerializable(typeof(ImportWarning))]
+[JsonSerializable(typeof(ImportFileError))]
+[JsonSerializable(typeof(ImportSummary))]
+[JsonSerializable(typeof(BillCandidate))]
+[JsonSerializable(typeof(BillNameView))]
+[JsonSerializable(typeof(BillDifference))]
+[JsonSerializable(typeof(BillCoverage))]
+[JsonSerializable(typeof(BillCharges))]
+[JsonSerializable(typeof(BillDetails))]
+[JsonSerializable(typeof(DpLineView))]
+[JsonSerializable(typeof(DpCounts))]
+[JsonSerializable(typeof(NameLearning))]
+[JsonSerializable(typeof(DpPreview))]
+[JsonSerializable(typeof(DematDifference))]
+[JsonSerializable(typeof(DematHeld))]
+[JsonSerializable(typeof(DematSynced))]
+[JsonSerializable(typeof(DematPreview))]
+[JsonSerializable(typeof(ImportFilePreview))]
+[JsonSerializable(typeof(ImportPreviewResponse))]
+[JsonSerializable(typeof(BillChoice))]
+[JsonSerializable(typeof(BillChoice[]))]
+[JsonSerializable(typeof(CostBatchView))]
+[JsonSerializable(typeof(CostBatchPage))]
+[JsonSerializable(typeof(CostImportResult))]
+[JsonSerializable(typeof(CostUndoResult))]
+[JsonSerializable(typeof(DematImportResult))]
+[JsonSerializable(typeof(ImportFileResult))]
+[JsonSerializable(typeof(ImportRunResponse))]
 [JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(ServiceView))]
 [JsonSerializable(typeof(ServiceRunView))]

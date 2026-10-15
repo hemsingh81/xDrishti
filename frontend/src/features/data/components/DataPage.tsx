@@ -1,7 +1,6 @@
 import { Alert, Box } from '@mui/material';
 import { useRef } from 'react';
 import { LoadingState } from '@/shared/ui';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { useActionsView } from '../hooks/useActionsView';
 import { useCoverageFilters } from '../hooks/useCoverageFilters';
 import { useDataTab } from '../hooks/useDataTab';
@@ -33,11 +32,7 @@ import { UpdateData } from './UpdateData';
  * scrolls inside. The tab, the lists' filters and the open instrument are in the URL.
  */
 export function DataPage() {
-  return (
-    <ToastProvider>
-      <DataContent />
-    </ToastProvider>
-  );
+  return <DataContent />;
 }
 
 function DataContent() {

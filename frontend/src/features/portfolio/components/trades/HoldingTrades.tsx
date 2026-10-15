@@ -1,7 +1,7 @@
 import AddIcon from '@mui/icons-material/Add';
 import { Alert, Box, Button, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { HoldingRow, Trade } from '@/shared/api';
 import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { useToast } from '@/shared/ui/toastContext';
@@ -9,6 +9,7 @@ import { brokerHistoryStatusQuery } from '../../api/brokerHistoryQueries';
 import { useVoidTrade } from '../../api/tradeMutations';
 import { holdingTradesList } from '../../api/tradeQueries';
 import { needsReview } from '../../lib/brokerText';
+import type { HoldingRequest } from '../../hooks/useHoldingRequest';
 import { problemText } from '../../lib/errors';
 import { tradeName } from '../../lib/tradeText';
 import { AddTradeDialog } from './AddTradeDialog';
@@ -19,19 +20,35 @@ interface HoldingTradesProps {
   holdingId: string;
   /** The holding's row; Add trade needs its account and symbol. */
   holding: HoldingRow | undefined;
+  /** A link asked for this section (and maybe for the rebuild preview): scroll here, open the preview, then say it is done. */
+  request?: HoldingRequest | null;
 }
 
 /** The trades of a holding's security, newest first, with Void, Add trade and Rebuild lots (which shows its dry run first). */
-export function HoldingTrades({ holdingId, holding }: HoldingTradesProps) {
+export function HoldingTrades({ holdingId, holding, request = null }: HoldingTradesProps) {
   const { notify } = useToast();
   const list = useInfiniteRows(holdingTradesList(holdingId));
   const voidTrade = useVoidTrade();
-  const [dialog, setDialog] = useState<'add' | 'rebuild' | null>(null);
+  const [dialog, setDialog] = useState<'add' | 'rebuild' | null>(request?.rebuild ? 'rebuild' : null);
+  // A link used while this holding is open asks again: the preview opens once per request.
+  const [asked, setAsked] = useState(request !== null);
+  if (request === null ? asked : !asked) {
+    setAsked(request !== null);
+    if (request?.rebuild) setDialog('rebuild');
+  }
   const symbol = holding?.symbol ?? 'this holding';
   const heading = useRef<HTMLHeadingElement>(null);
   // The last Dhan read left this holding's lots alone when one of them is dated by hand: say so (the status is optional here).
   const broker = useQuery({ ...brokerHistoryStatusQuery(holding?.accountId ?? ''), enabled: holding !== undefined });
   const review = holding !== undefined && broker.data !== undefined && needsReview(broker.data, holding.symbol);
+  const onHandled = request?.onHandled;
+  // The section is scrolled to and its title takes the keyboard (it says where the owner is); the request is then done.
+  useEffect(() => {
+    if (!onHandled) return;
+    if (typeof heading.current?.scrollIntoView === 'function') heading.current.scrollIntoView({ block: 'start' });
+    heading.current?.focus({ preventScroll: true });
+    onHandled();
+  }, [onHandled]);
   const hasBrokerTrades = list.rows.some((trade) => trade.source === 'broker');
 
   // `mutateAsync` (not the callbacks of `mutate`, which only the latest call keeps): each void tells its own outcome.

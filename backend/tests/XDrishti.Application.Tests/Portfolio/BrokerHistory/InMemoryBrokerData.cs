@@ -37,6 +37,7 @@ internal sealed class InMemoryBrokerData(InMemoryPortfolioData portfolio) : IBro
         foreach (var stale in Runs.Where(r => r.AccountId == run.AccountId && r.IsRunning && r.StartedAt < now - staleAfter))
         {
             End(stale, SyncStatus.Failed, now, "The sync did not finish (the application stopped or crashed while it ran).", null);
+            portfolio.Health.Interrupted(stale.AccountId, stale.Kind == BrokerSyncKind.Trades ? SyncHealthKind.Trades : SyncHealthKind.Ledger, now);
         }
 
         if (OtherRunInProgress || Runs.Any(r => r.AccountId == run.AccountId && r.IsRunning) || portfolio.Syncs.Any(s => s.AccountId == run.AccountId && s.IsRunning))
@@ -116,8 +117,22 @@ internal sealed class InMemoryBrokerData(InMemoryPortfolioData portfolio) : IBro
     public ValueTask<BrokerSyncRun?> GetLastAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Runs.Where(r => r.AccountId == accountId && r.Kind == kind).OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).FirstOrDefault());
 
+    public ValueTask<DateOnly?> GetEarliestReadAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Runs.Where(r => r.AccountId == accountId && r.Kind == kind && r.Status == SyncStatus.Succeeded).Select(r => (DateOnly?)r.FromDate).Min());
+
     public ValueTask<BrokerSyncRun?> GetLastSucceededAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Runs.Where(r => r.AccountId == accountId && r.Kind == kind && r.Status == SyncStatus.Succeeded).OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).FirstOrDefault());
+
+    public ValueTask<IReadOnlyDictionary<Guid, BrokerSyncRun>> ListLastSucceededAsync(IReadOnlyCollection<Guid> accountIds, BrokerSyncKind kind, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<Guid, BrokerSyncRun>>(Runs
+            .Where(r => accountIds.Contains(r.AccountId) && r.Kind == kind && r.Status == SyncStatus.Succeeded)
+            .GroupBy(r => r.AccountId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.StartedAt).ThenByDescending(r => r.Id).First()));
+
+    public ValueTask<IReadOnlyList<BrokerDateRange>> ListDroppedRangesAsync(Guid accountId, BrokerSyncKind kind, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<BrokerDateRange>>([.. Runs
+            .Where(r => r.AccountId == accountId && r.Kind == kind && r.Status == SyncStatus.Succeeded && (r.Counts.Dropped > 0 || r.Counts.SkippedByReason.GetValueOrDefault(BrokerSkipReasons.NoSymbol) > 0))
+            .OrderBy(r => r.FromDate).Select(r => new BrokerDateRange(r.FromDate, r.ToDate))]);
 
     public ValueTask<BrokerSyncRun?> GetPreviousFinishedAsync(Guid accountId, BrokerSyncKind kind, Guid excludedRunId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Runs
@@ -135,19 +150,20 @@ internal sealed class InMemoryBrokerData(InMemoryPortfolioData portfolio) : IBro
         foreach (var run in interrupted)
         {
             End(run, SyncStatus.Failed, now, "The sync did not finish (the application stopped or crashed while it ran).", null);
+            portfolio.Health.Interrupted(run.AccountId, run.Kind == BrokerSyncKind.Trades ? SyncHealthKind.Trades : SyncHealthKind.Ledger, now);
         }
 
         return ValueTask.FromResult(interrupted.Count);
     }
 
     public ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken) =>
-        ValueTask.FromResult<IReadOnlySet<string>>(Entries.Where(e => e.AccountId == accountId && externalIds.Contains(e.ExternalId)).Select(e => e.ExternalId).ToHashSet(StringComparer.Ordinal));
+        ValueTask.FromResult<IReadOnlySet<string>>(Entries.Where(e => e.AccountId == accountId && !e.IsVoided && externalIds.Contains(e.ExternalId)).Select(e => e.ExternalId).ToHashSet(StringComparer.Ordinal));
 
     public void Add(IEnumerable<LedgerEntry> entries)
     {
         foreach (var entry in entries)
         {
-            if (Entries.Any(e => e.AccountId == entry.AccountId && e.ExternalId == entry.ExternalId))
+            if (Entries.Any(e => e.AccountId == entry.AccountId && e.ExternalId == entry.ExternalId && !e.IsVoided))
             {
                 throw new InvalidOperationException("The unique index would refuse this entry.");
             }
@@ -163,13 +179,35 @@ internal sealed class InMemoryBrokerData(InMemoryPortfolioData portfolio) : IBro
     }
 
     public ValueTask<DateOnly?> FirstDateAsync(Guid accountId, CancellationToken cancellationToken) =>
-        ValueTask.FromResult(Entries.Where(e => e.AccountId == accountId).Select(e => (DateOnly?)e.EntryDate).Min());
+        ValueTask.FromResult(Entries.Where(e => e.AccountId == accountId && e.Source == LedgerSource.Broker && !e.IsVoided).Select(e => (DateOnly?)e.EntryDate).Min());
+
+    public ValueTask<IReadOnlyList<LedgerChargeOnDay>> ListBrokerChargesAsync(Guid accountId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<LedgerChargeOnDay>>(
+        [
+            .. Entries
+                .Where(e => e.AccountId == accountId && e.Source == LedgerSource.Broker && e.EntryClass == LedgerClass.Charges && e.Amount < 0m && e.EntryDate >= from && e.EntryDate <= to)
+                .OrderBy(e => e.EntryDate).ThenBy(e => e.Id)
+                .Select(e => new LedgerChargeOnDay(e.EntryDate, -e.Amount, DepositoryCharges.Is(e.Description, e.Narration))),
+        ]);
+
+    public ValueTask<int> SupersedeImportedChargesAsync(Guid accountId, IReadOnlyCollection<LedgerChargeOnDay> brokerCharges, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        var imported = Entries
+            .Where(e => e.AccountId == accountId && e.Source == LedgerSource.Import && !e.IsVoided && e.EntryClass == LedgerClass.Charges && e.Amount < 0m)
+            .OrderBy(e => e.CreatedAt).ThenBy(e => e.Id)
+            .ToList();
+        var ids = LedgerSupersession.Covered(imported.Select(e => (e.Id, e.EntryDate, -e.Amount)), brokerCharges).ToHashSet();
+        return ValueTask.FromResult(imported.Where(e => ids.Contains(e.Id)).Count(e => e.Void(LedgerEntry.SupersededReason, at)));
+    }
+
+    public ValueTask<int> VoidBatchAsync(Guid batchId, string by, DateTimeOffset at, CancellationToken cancellationToken) =>
+        ValueTask.FromResult(Entries.Where(e => e.BatchId == batchId).Count(e => e.Void(by, at)));
 
     public ValueTask<IReadOnlyList<LedgerTotal>> TotalsAsync(Guid accountId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<LedgerTotal>>([.. Filter(accountId, from, to).GroupBy(e => e.EntryClass).Select(g => new LedgerTotal(g.Key, g.Count(), g.Sum(e => e.Amount)))]);
 
     private IEnumerable<LedgerEntry> Filter(Guid accountId, DateOnly? from, DateOnly? to) =>
-        Entries.Where(e => e.AccountId == accountId && (from is null || e.EntryDate >= from) && (to is null || e.EntryDate <= to));
+        Entries.Where(e => e.AccountId == accountId && !e.IsVoided && (from is null || e.EntryDate >= from) && (to is null || e.EntryDate <= to));
 
     /// <summary>The real store ends a run with a guarded UPDATE; the entity has no methods for it, so the double sets the same columns.</summary>
     private static void End(BrokerSyncRun run, SyncStatus status, DateTimeOffset finishedAt, string? error, BrokerSyncCounts? counts)

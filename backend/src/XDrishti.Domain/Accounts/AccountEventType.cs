@@ -72,4 +72,8 @@ public enum AccountEventType
     DividendsImported,
     DividendsUndone,
     DividendAliasSaved,
+    CostsImported,
+    CostsUndone,
+    SecurityNamesLearned,
+    TradesSuperseded,
 }

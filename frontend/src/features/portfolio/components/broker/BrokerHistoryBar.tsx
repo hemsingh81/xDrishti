@@ -2,6 +2,7 @@ import DownloadIcon from '@mui/icons-material/CloudDownloadOutlined';
 import { Button, Divider, Stack, Typography } from '@mui/material';
 import { lazy, Suspense, useState } from 'react';
 import { formatIstTimeAndDay } from '@/shared/lib/format';
+import { deepenText } from '@/shared/lib/syncHealth';
 import { numeric } from '@/theme';
 import { useBrokerHistorySync } from '../../hooks/useBrokerHistorySync';
 import { needsReviewSymbols, rebuildText } from '../../lib/brokerText';
@@ -29,6 +30,7 @@ export function BrokerHistoryBar({ account, connected, holdingsRunning }: Broker
   const data = status.data;
   const review = data ? needsReviewSymbols(data) : [];
   const rebuilt = data ? rebuildText(data) : null;
+  const deepened = data ? deepenText(data.deepenedTo, data.deepenExhausted) : null;
   return (
     <Stack component="section" aria-label="Trades and ledger from Dhan" spacing={1.5}>
       <Divider />
@@ -45,6 +47,11 @@ export function BrokerHistoryBar({ account, connected, holdingsRunning }: Broker
                 <Typography variant="body2" color="text.secondary" sx={numeric}>
                   {rebuilt}
                   {review.length > 0 && ` (${review.join(', ')}) — open the holding and use Rebuild lots`}
+                </Typography>
+              )}
+              {deepened && (
+                <Typography variant="body2" color="text.secondary" sx={numeric}>
+                  {deepened}
                 </Typography>
               )}
               <Typography variant="body2" color="text.secondary" sx={numeric}>

@@ -173,6 +173,14 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddSingleton<IBrokerHistorySettings, BrokerHistorySettings>();
         services.AddSingleton<IBrokerHistoryChannel, BrokerHistoryChannel>();
+        services.AddOptions<HealOptions>()
+            .Bind(configuration.GetSection(HealOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IHealSettings, HealSettings>();
+        services.AddScoped<ISyncHealthStore, SyncHealthStore>();
+        services.AddScoped<IAttentionStore, AttentionStore>();
+        services.AddScoped<IAttentionQueries, AttentionQueries>();
         services.AddScoped<IBrokerSyncStore, BrokerSyncStore>();
         services.AddScoped<ILedgerStore, LedgerStore>();
         services.AddScoped<IHoldingStore, HoldingStore>();
@@ -184,6 +192,10 @@ public static class DependencyInjection
         services.AddScoped<IDividendSuggestionStore, DividendSuggestionStore>();
         services.AddScoped<IDividendBatches, DividendBatches>();
         services.AddScoped<IDividendAliases, DividendAliases>();
+        services.AddScoped<ISecurityAliases, SecurityAliases>();
+        services.AddScoped<IReportClientCodes, ReportClientCodes>();
+        services.AddScoped<ICostBatches, CostBatches>();
+        services.AddSingleton<ISpreadsheetReader, SpreadsheetReader>();
         services.AddScoped<IInstrumentNames, InstrumentNames>();
         services.AddScoped<IIncomeQueries, IncomeQueries>();
         services.AddScoped<ITradeBatches, TradeBatches>();

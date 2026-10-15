@@ -1,4 +1,4 @@
-import { Button, Stack, Typography } from '@mui/material';
+import { Button, Chip, Stack, Typography } from '@mui/material';
 import type { TradeBatch } from '@/shared/api';
 import { formatIstDateTime } from '@/shared/lib/format';
 import { countOf } from '../../lib/tradeText';
@@ -9,7 +9,7 @@ interface BatchRowProps {
   onUndo: (batch: TradeBatch) => void;
 }
 
-/** One imported file: its name, account and time, what was in it, how many of its trades still count, and Undo while it is imported. */
+/** One imported tradebook: its name, kind, account and time, what was in it, how many of its trades still count, and Undo while it is imported. */
 export function BatchRow({ batch, onUndo }: BatchRowProps) {
   const undone = batch.status === 'undone';
   const counts = [
@@ -30,6 +30,7 @@ export function BatchRow({ batch, onUndo }: BatchRowProps) {
           <Typography component="span" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
             {batch.fileName}
           </Typography>
+          <Chip size="small" variant="outlined" label="Trades" />
           <BatchStatusChip undone={undone} />
         </Stack>
         <Typography variant="body2" color="text.secondary">

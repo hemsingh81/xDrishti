@@ -59,7 +59,7 @@ internal sealed class HoldingsEndpoints : IEndpointModule
 
         account.MapGet("/sync-status", GetSyncStatusAsync)
             .WithName("GetAccountHoldingsSyncStatus")
-            .WithSummary("The account's refresh settings (mode, daily time, first import date, hasHoldings), the next scheduled run and the latest sync run")
+            .WithSummary("The account's refresh settings (mode, daily time, first import date, hasHoldings), the next scheduled run and the latest sync run, and its health (ADR 0027): consecutiveFailedDays (days in a row whose last attempt failed; 0 when the latest succeeded), lastFailureReason (unavailable, rate_limited, interrupted, rejected, token_expired, token_refused, not_connected, unexpected; null while healthy), attempts (failed attempts of the day of the latest failure) and retryAt (when the next quiet retry is due; null when none is pending - a failure that may pass is retried after 1, 5 and 15 minutes inside the day and nothing is shown while retries remain)")
             .ProducesProblem(StatusCodes.Status404NotFound);
     }
 

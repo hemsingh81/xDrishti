@@ -87,6 +87,10 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<BrokerSyncState> BrokerSyncStates => Set<BrokerSyncState>();
 
+    public DbSet<BrokerSyncWindow> BrokerSyncWindows => Set<BrokerSyncWindow>();
+
+    public DbSet<AttentionRecord> AttentionItems => Set<AttentionRecord>();
+
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
 
     public DbSet<Dividend> Dividends => Set<Dividend>();
@@ -96,6 +100,12 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     public DbSet<DividendBatch> DividendBatches => Set<DividendBatch>();
 
     public DbSet<DividendAlias> DividendAliases => Set<DividendAlias>();
+
+    public DbSet<CostBatch> CostBatches => Set<CostBatch>();
+
+    public DbSet<SecurityAlias> SecurityAliases => Set<SecurityAlias>();
+
+    public DbSet<ReportClientCode> ReportClientCodes => Set<ReportClientCode>();
 
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
