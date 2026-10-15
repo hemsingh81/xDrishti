@@ -13,7 +13,7 @@ Phase 3 needs indicators and multi-timeframe features that behave identically in
 4. **Rolling indicators run continuously across sessions** on the series they are fed (an intraday EMA(20) at 09:30 uses the previous day's bars), as charting tools and the doc 11 examples assume; `vwap`, the opening range and the session context reset per India trading date. A per-spec reset option is a later addition.
 5. **Incomplete higher-timeframe bars are emitted with `complete = false` and are consumed by indicators.** A missing minute must not silence a strategy for an hour; the simulator reports how many incomplete bars it used.
 6. **Cross-checks:** every indicator is compared with an independent batch reference written in the test project; `sma`, `ema`, `rsi`, `atr` are also compared with **Skender.Stock.Indicators** (MIT), a **test-only**, exactly pinned dependency. Convention differences (seeding) are documented, not hidden by loose tolerances.
-7. **Scope of this slice:** ADX, MACD, Bollinger bands, Supertrend, candle patterns, pivots, regime and market-context features follow in P3-01b and later; the DSL (P3-02) and the simulator (P3-03) read from the frame and the catalog.
+7. **Scope of this slice:** ADX, MACD, Bollinger bands, Supertrend, candle patterns, pivots, regime and market-context features follow in P3-01b and later (built in P3-01b, [ADR 0032](0032-frame-history-closed-flags-and-the-remaining-indicators.md), except the regime and market-context features: P3-01c); the DSL (P3-02) and the simulator (P3-03) read from the frame and the catalog.
 
 ## Consequences
 - One code path for back-tests and live; the look-ahead property is a test, not a convention.
@@ -103,4 +103,9 @@ Deviations of the build from the sketch in [P3-01](../specs/P3-01-streaming-indi
 - `vwap` on a higher timeframe is the VWAP of the closed bars' typical prices, not the 1-minute VWAP.
 - `IncompleteBarsConsumed` counts bars per lane, so one missing minute counts once per timeframe that consumes it; the simulator's report must say so.
 - Open for P3-01b (API needed by the DSL and the simulator, not built here): a per-timeframe "a bar closed at this step" flag (for `crosses_above` and on-close evaluation), raw `open/high/low/close/volume` features and history (`close[1]`, `tf("1D").close`), exposing the last `ClosedBar` per timeframe, an ordering guard in `FeatureFrame.Step` (a duplicate or out-of-order 1-minute bar is fed to the 1m lane but ignored by the builders), the default source of `FeatureSpec` for `highest`/`lowest` (the catalog's `DefaultSpec()` uses High/Low, a bare `FeatureSpec` uses Close), read-only copies of the catalog arrays, and a project-reference check in the architecture test that also reads the csproj.
+  **All of these are closed by [ADR 0032](0032-frame-history-closed-flags-and-the-remaining-indicators.md)** (P3-01b: `BarClosed`/`ClosedBarsAt`/`TryLastClosed`, `At`/`IsReadyAt` history, the raw bar features, the ordering guard and `IgnoredBars`, `PriceSource.Default`, read-only collections, the csproj check). Still open, now in P3-01c: the weekly and monthly timeframe builders and the regime and market-context features.
 
+## Amendment (2026-10-16, P3-01b)
+[ADR 0032](0032-frame-history-closed-flags-and-the-remaining-indicators.md) adds to this one: the catalog has 44 names (the 19 above plus 25); `PriceSource` gained `Default` (the zero value) and `Volume`; `FeatureFrame.Steps` counts accepted bars only
+(a bar the new ordering guard skips is in `IgnoredBars`); `Create` takes `FrameOptions` (calendar and history depth) next to the earlier calendar overload; and the 12-feature frame of the benchmark now takes 0.060 µs per step (0.045 µs
+before the value history). Nothing else here changes.

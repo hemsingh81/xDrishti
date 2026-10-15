@@ -118,7 +118,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td><strong>P3 Simulator, DSL &amp; first strategies</strong> (5w)</td>
-<td>Streaming indicators/features (<strong>built in P3-01</strong>, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>: 19 indicators and session fields, a <code>TimeframeBuilder</code> and a <code>FeatureFrame</code> over closed bars only, tested for look-ahead (the frame never shows the forming bar; a prefix property guards against hidden state) and cross-checked against Skender; ADX, MACD, Bollinger, Supertrend, candle patterns and regime features follow in P3-01b); DSL parser → expression trees + look-ahead lint; event-driven simulator (conditional entries, stops, square-off, max hold, gaps, costs, slippage, MAE/MFE); <code>ORB</code>, <code>VWAP_PULLBACK</code>, <code>BASE_BREAKOUT</code>; scans scoped by basket</td>
+<td>Streaming indicators/features (<strong>built in P3-01</strong>, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>: 19 indicators and session fields, a <code>TimeframeBuilder</code> and a <code>FeatureFrame</code> over closed bars only, tested for look-ahead (the frame never shows the forming bar; a prefix property guards against hidden state) and cross-checked against Skender; <strong>P3-01b built</strong>, <a href="../adr/0032-frame-history-closed-flags-and-the-remaining-indicators.html">ADR 0032</a>: the frame API the DSL needs (closed flags per timeframe, value history for <code>close[1]</code> / crossings / <code>rising</code>, raw <code>open high low close volume</code>, an ordering guard) and the other 25 features (ADX/DMI, MACD, Bollinger, Supertrend, ROC, <code>inside_bar</code>, <code>nr</code>, <code>engulfing</code>, <code>pivot_high/low</code> with ages), 44 in all; <strong>P3-01c</strong> (regime / market-context features and the weekly / monthly timeframe builders) is still to build, and the DSL parser (P3-02) is next); DSL parser → expression trees + look-ahead lint; event-driven simulator (conditional entries, stops, square-off, max hold, gaps, costs, slippage, MAE/MFE); <code>ORB</code>, <code>VWAP_PULLBACK</code>, <code>BASE_BREAKOUT</code>; scans scoped by basket</td>
 <td>20 random trades hand-verified against charts</td>
 </tr>
 <tr>
@@ -282,7 +282,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-15 17:59</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-15 20:05</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#open-issues-log" class="d2">Open issues log</a></aside>
 </div>

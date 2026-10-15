@@ -7,8 +7,8 @@ namespace XDrishti.Indicators.Tests.Benchmarks;
 /// <summary>
 /// A small benchmark harness without BenchmarkDotNet. The tests are <b>explicit</b>: <c>dotnet test</c> and <c>scripts/check.sh</c> skip them. Run them in Release:
 /// <c>dotnet test --project tests/XDrishti.Indicators.Tests -c Release -- --explicit only --filter-class "*ThroughputBenchmarks*"</c>.
-/// They print updates per second per indicator (direct call and through <see cref="IIndicator"/>) and the microseconds of one step of a 12-feature <see cref="FeatureFrame"/>, and assert only generous floors
-/// (the spec's targets are 10 million simple-indicator updates per second per core and 1 microsecond per 12-feature step).
+/// They print updates per second per indicator (through <see cref="IIndicator"/>, the P3-01 ones and the P3-01b ones) and the microseconds of one step of a 12-feature and of a 20-feature <see cref="FeatureFrame"/> with history depth 8, and assert only the
+/// floors of the specs (10 million updates per second per core for each indicator, 1 microsecond per 1-minute step of the frames).
 /// </summary>
 [Collection(ExclusiveRun.Name)]
 public sealed class ThroughputBenchmarks
@@ -52,6 +52,46 @@ public sealed class ThroughputBenchmarks
     }
 
     [Fact(Explicit = true)]
+    public void New_indicator_updates_per_second()
+    {
+        var report = new List<string>();
+        var rates = new List<(string Name, double Rate)>();
+        foreach (var (name, spec) in new[]
+        {
+            ("adx(14)", new FeatureSpec("adx", Timeframe.M1, PriceSource.Close, 14)),
+            ("plus_di(14)", new FeatureSpec("plus_di", Timeframe.M1, PriceSource.Close, 14)),
+            ("minus_di(14)", new FeatureSpec("minus_di", Timeframe.M1, PriceSource.Close, 14)),
+            ("macd_line(12,26,9)", new FeatureSpec("macd_line", Timeframe.M1, PriceSource.Close, 12, 26, 9)),
+            ("macd_signal(12,26,9)", new FeatureSpec("macd_signal", Timeframe.M1, PriceSource.Close, 12, 26, 9)),
+            ("macd_hist(12,26,9)", new FeatureSpec("macd_hist", Timeframe.M1, PriceSource.Close, 12, 26, 9)),
+            ("bb_upper(20,2)", new FeatureSpec("bb_upper", Timeframe.M1, PriceSource.Close, 20, 2)),
+            ("bb_middle(20,2)", new FeatureSpec("bb_middle", Timeframe.M1, PriceSource.Close, 20, 2)),
+            ("bb_lower(20,2)", new FeatureSpec("bb_lower", Timeframe.M1, PriceSource.Close, 20, 2)),
+            ("bb_width(20,2)", new FeatureSpec("bb_width", Timeframe.M1, PriceSource.Close, 20, 2)),
+            ("supertrend(10,3)", new FeatureSpec("supertrend", Timeframe.M1, PriceSource.Close, 10, 3)),
+            ("supertrend_dir(10,3)", new FeatureSpec("supertrend_dir", Timeframe.M1, PriceSource.Close, 10, 3)),
+            ("roc(10)", new FeatureSpec("roc", Timeframe.M1, PriceSource.Close, 10)),
+            ("inside_bar", new FeatureSpec("inside_bar")),
+            ("nr(7)", new FeatureSpec("nr", Timeframe.M1, PriceSource.Close, 7)),
+            ("engulfing", new FeatureSpec("engulfing")),
+            ("pivot_high(5)", new FeatureSpec("pivot_high", Timeframe.M1, PriceSource.Close, 5)),
+            ("pivot_low(5)", new FeatureSpec("pivot_low", Timeframe.M1, PriceSource.Close, 5)),
+            ("pivot_high_age(5)", new FeatureSpec("pivot_high_age", Timeframe.M1, PriceSource.Close, 5)),
+            ("pivot_low_age(5)", new FeatureSpec("pivot_low_age", Timeframe.M1, PriceSource.Close, 5)),
+            ("close", new FeatureSpec("close")),
+        })
+        {
+            IndicatorCatalog.TryGet(spec.Name, out var info).ShouldBeTrue();
+            var rate = BestRate(() => Run(info.Create(spec)));
+            report.Add($"{name,-22} {rate / 1e6,8:F1} M updates/s   {1e9 / rate,6:F1} ns/update");
+            rates.Add((name, rate));
+        }
+
+        Report("New indicator updates per second (through IIndicator, best of " + Repeats + ")", report);
+        rates.ShouldAllBe(x => x.Rate > 10_000_000, "target: 10 million updates per second per core for each new indicator");
+    }
+
+    [Fact(Explicit = true)]
     public void Timeframe_builders_bars_per_second()
     {
         var report = new List<string>();
@@ -92,6 +132,26 @@ public sealed class ThroughputBenchmarks
         var microseconds = 1e6 / rate;
         Report("FeatureFrame, 12 features on 1m/5m/15m/1h (best of " + Repeats + ")", [$"{rate / 1e6,8:F2} M steps/s   {microseconds,6:F3} µs per 1-minute step"]);
         microseconds.ShouldBeLessThan(1.0, "target: a frame of 12 features in at most 1 microsecond per step");
+    }
+
+    [Fact(Explicit = true)]
+    public void Twenty_feature_frame_with_history_step_in_microseconds()
+    {
+        var frame = AllocationTests.TwentyFeatureFrame();
+        var rate = BestRate(() =>
+        {
+            frame.Reset();
+            for (var i = 0; i < Steps; i++)
+            {
+                frame.Step(Bars[i]);
+            }
+
+            return frame.Count;
+        });
+
+        var microseconds = 1e6 / rate;
+        Report("FeatureFrame, 20 features on 1m/5m/15m/1h/1D, history depth 8 (best of " + Repeats + ")", [$"{rate / 1e6,8:F2} M steps/s   {microseconds,6:F3} µs per 1-minute step"]);
+        microseconds.ShouldBeLessThan(1.0, "target: a frame of 20 features in at most 1 microsecond per step");
     }
 
     private static int Run(IIndicator indicator)

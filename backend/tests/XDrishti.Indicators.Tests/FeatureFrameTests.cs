@@ -186,4 +186,166 @@ public sealed class FeatureFrameTests
             FeatureFrame.Create(specsWithMinutes).IsSuccess.ShouldBeTrue(timeframe.ToCode());
         }
     }
+
+    // ---- the Default source (ADR 0032) ----------------------------------------------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_default_source_resolves_to_the_catalogs_default_for_each_indicator()
+    {
+        var frame = Create(new FeatureSpec("highest", P1: 20), new FeatureSpec("lowest", P1: 20), new FeatureSpec("sma", P1: 20), new FeatureSpec("roc", P1: 5));
+
+        frame.SpecOf(0).Source.ShouldBe(PriceSource.High);
+        frame.SpecOf(1).Source.ShouldBe(PriceSource.Low);
+        frame.SpecOf(2).Source.ShouldBe(PriceSource.Close);
+        frame.SpecOf(3).Source.ShouldBe(PriceSource.Close);
+    }
+
+    [Fact]
+    public void A_spec_with_the_default_source_means_what_the_catalogs_default_spec_means()
+    {
+        IndicatorCatalog.TryGet("highest", out var highest).ShouldBeTrue();
+        IndicatorCatalog.TryGet("lowest", out var lowest).ShouldBeTrue();
+        var frame = Create(new FeatureSpec("highest", P1: 3), new FeatureSpec("lowest", P1: 3));
+
+        frame.HandleOf(highest.DefaultSpec() with { P1 = 3 }).ShouldBe(0);
+        frame.HandleOf(lowest.DefaultSpec() with { P1 = 3 }).ShouldBe(1);
+        highest.DefaultSpec().Source.ShouldBe(PriceSource.High);
+
+        var bars = new[]
+        {
+            Minutes.Bar(new DateOnly(2026, 3, 2), Minutes.Open, 10, 50, 1, 12),
+            Minutes.Bar(new DateOnly(2026, 3, 2), Minutes.Open + 1, 10, 40, 2, 11),
+            Minutes.Bar(new DateOnly(2026, 3, 2), Minutes.Open + 2, 10, 30, 3, 10),
+        };
+        foreach (var bar in bars)
+        {
+            frame.Step(bar);
+        }
+
+        frame[0].ShouldBe(50.0, "the highest of the highs, not of the closes");
+        frame[1].ShouldBe(1.0, "the lowest of the lows");
+    }
+
+    [Fact]
+    public void A_default_source_spec_and_the_explicit_default_source_share_one_instance_but_another_source_does_not()
+    {
+        var frame = Create(
+            new FeatureSpec("highest", P1: 20),
+            new FeatureSpec("highest", Timeframe.M1, PriceSource.High, 20),
+            new FeatureSpec("highest", Timeframe.M1, PriceSource.Close, 20),
+            new FeatureSpec("sma", P1: 5),
+            new FeatureSpec("sma", Timeframe.M1, PriceSource.Close, 5));
+
+        frame.Count.ShouldBe(5);
+        frame.InstanceCount.ShouldBe(3);
+        frame.HandleOf(new FeatureSpec("highest", P1: 20)).ShouldBe(0);
+        frame.HandleOf(new FeatureSpec("highest", Timeframe.M1, PriceSource.High, 20)).ShouldBe(0);
+        frame.HandleOf(new FeatureSpec("highest", Timeframe.M1, PriceSource.Close, 20)).ShouldBe(2);
+        frame.HandleOf(new FeatureSpec("sma", P1: 5)).ShouldBe(3);
+    }
+
+    [Fact]
+    public void The_catalog_creates_the_same_indicator_for_the_default_source_as_for_the_explicit_one()
+    {
+        IndicatorCatalog.TryGet("highest", out var info).ShouldBeTrue();
+        var viaDefault = info.Create(new FeatureSpec("highest", P1: 2));
+        var viaHigh = info.Create(new FeatureSpec("highest", Timeframe.M1, PriceSource.High, 2));
+        var bar = Minutes.Bar(new DateOnly(2026, 3, 2), Minutes.Open, 10, 50, 1, 12);
+
+        viaDefault.Update(bar);
+        viaHigh.Update(bar);
+        viaDefault.Update(bar);
+        viaHigh.Update(bar);
+
+        viaDefault.Value.ShouldBe(50.0);
+        viaHigh.Value.ShouldBe(50.0);
+    }
+
+    [Fact]
+    public void A_bare_spec_has_the_default_source_the_zero_value()
+    {
+        new FeatureSpec("sma").Source.ShouldBe(PriceSource.Default);
+        ((int)PriceSource.Default).ShouldBe(0);
+        default(PriceSource).ShouldBe(PriceSource.Default);
+    }
+
+    // ---- parameter combinations of the new indicators -----------------------------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void Macd_with_a_fast_period_not_below_the_slow_one_is_refused_on_the_fast_parameter()
+    {
+        var error = Refused(
+            new FeatureSpec("macd_line", Timeframe.M1, PriceSource.Close, 26, 26, 9),
+            new FeatureSpec("macd_signal", Timeframe.M1, PriceSource.Close, 30, 26, 9),
+            new FeatureSpec("macd_hist", Timeframe.M1, PriceSource.Close, 12, 26, 9));
+
+        error.Fields.ShouldNotBeNull().Select(f => f.Field).ShouldBe(["specs[0].p1", "specs[1].p1"]);
+        error.Fields![0].Message.ShouldContain("fast");
+    }
+
+    [Theory]
+    [InlineData("bb_upper", 0)]
+    [InlineData("bb_middle", -1)]
+    [InlineData("bb_lower", 0)]
+    [InlineData("bb_width", -2.5)]
+    public void Bollinger_bands_with_k_not_above_zero_are_refused_on_the_k_parameter(string name, double k)
+    {
+        var error = Refused(new FeatureSpec(name, Timeframe.M1, PriceSource.Close, 20, k));
+
+        error.Fields.ShouldNotBeNull().Single().Field.ShouldBe("specs[0].p2");
+    }
+
+    [Theory]
+    [InlineData("supertrend", 0)]
+    [InlineData("supertrend_dir", -3)]
+    public void Supertrend_with_a_multiplier_not_above_zero_is_refused_on_the_multiplier(string name, double multiplier)
+    {
+        var error = Refused(new FeatureSpec(name, Timeframe.M1, PriceSource.Close, 10, multiplier));
+
+        error.Fields.ShouldNotBeNull().Single().Field.ShouldBe("specs[0].p2");
+    }
+
+    [Theory]
+    [InlineData("nr", 1)]
+    [InlineData("nr", 0)]
+    [InlineData("pivot_high", 0)]
+    [InlineData("pivot_low", 0)]
+    [InlineData("pivot_high_age", 0)]
+    [InlineData("pivot_low_age", -1)]
+    public void Nr_below_two_and_a_pivot_period_below_one_are_refused(string name, double period)
+    {
+        var error = Refused(new FeatureSpec(name, Timeframe.M1, PriceSource.Close, period));
+
+        error.Fields.ShouldNotBeNull().Single().Field.ShouldBe("specs[0].p1");
+    }
+
+    [Fact]
+    public void Parameters_that_are_not_finite_or_not_whole_are_refused_for_the_new_indicators_and_extra_ones_must_be_zero()
+    {
+        var error = Refused(
+            new FeatureSpec("bb_upper", Timeframe.M1, PriceSource.Close, 20, double.NaN),
+            new FeatureSpec("supertrend", Timeframe.M1, PriceSource.Close, 10.5, 3),
+            new FeatureSpec("inside_bar", Timeframe.M1, PriceSource.Close, 3),
+            new FeatureSpec("macd_line", Timeframe.M1, PriceSource.Close, 12, 26, 9, 1),
+            new FeatureSpec("adx", Timeframe.M1, PriceSource.Close, 14, 2));
+
+        error.Fields.ShouldNotBeNull().Select(f => f.Field).ShouldBe(["specs[0].p2", "specs[1].p1", "specs[2].p1", "specs[3].p4", "specs[4].p2"]);
+    }
+
+    [Fact]
+    public void Every_valid_combination_of_the_new_indicators_makes_a_frame_and_the_old_create_overload_with_a_calendar_still_works()
+    {
+        var specs = new[]
+        {
+            new FeatureSpec("macd_hist", Timeframe.M15, PriceSource.Close, 12, 26, 9),
+            new FeatureSpec("bb_width", Timeframe.H1, PriceSource.Close, 20, 2),
+            new FeatureSpec("supertrend_dir", Timeframe.D1, PriceSource.Close, 10, 3),
+            new FeatureSpec("pivot_low_age", Timeframe.M5, PriceSource.Close, 3),
+        };
+
+        FeatureFrame.Create(specs).IsSuccess.ShouldBeTrue();
+        var withCalendar = FeatureFrame.Create(specs, new XDrishti.Domain.Market.Calendar.TradingCalendar());
+        withCalendar.IsSuccess.ShouldBeTrue();
+        withCalendar.Value.HistoryDepth.ShouldBe(8);
+    }
 }

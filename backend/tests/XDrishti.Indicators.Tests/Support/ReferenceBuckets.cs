@@ -11,6 +11,7 @@ internal sealed record ReferenceBucket(long Start, double Open, double High, dou
 /// <summary>
 /// The independent grouping reference for the timeframe builder: the plain <c>GroupBy</c> of the stored-aggregate tests (<c>ReferenceAggregator</c>), written again here on India-time <see cref="DateTime"/> values,
 /// plus the step at which a bucket closes: the bar of its last minute (09:15-anchored windows clipped at 15:30; for a day that starts in the regular session, the 15:29 bar), otherwise the next bar of the input.
+/// With <c>sessions</c> (the special sessions a trading calendar knows, as minute windows by date) a bucket whose first bar lies before the session end also ends at the session's last minute.
 /// </summary>
 internal static class ReferenceBuckets
 {
@@ -18,7 +19,7 @@ internal static class ReferenceBuckets
 
     private static readonly DateTime Epoch = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Unspecified);
 
-    public static List<ReferenceBucket> Build(IReadOnlyList<Bar> minuteBars, Timeframe timeframe)
+    public static List<ReferenceBucket> Build(IReadOnlyList<Bar> minuteBars, Timeframe timeframe, IReadOnlyDictionary<DateOnly, (int From, int To)>? sessions = null)
     {
         var indexed = minuteBars.Select((bar, index) => (Bar: bar, Index: index)).ToList();
         var length = timeframe.Minutes();
@@ -34,18 +35,20 @@ internal static class ReferenceBuckets
             var startMinute = (int)(group.Key - group.Key.Date).TotalMinutes;
             bool complete;
             int windowEnd;
+            var firstMinute = Minute(items[0].Bar);
+            var sessionEnd = sessions is not null && sessions.TryGetValue(DateOnly.FromDateTime(Local(items[0].Bar.EpochSeconds).Date), out var window) && window.To > firstMinute ? window.To : int.MaxValue;
             if (timeframe == Timeframe.D1)
             {
                 var regular = bars.Count(b => Minute(b) is >= 9 * 60 + 15 and < 15 * 60 + 30);
                 var span = (bars[^1].EpochSeconds - bars[0].EpochSeconds) / 60 + 1;
                 complete = regular == 375 || (regular == 0 && bars.Count == span);
-                windowEnd = Minute(bars[0]) < 15 * 60 + 30 ? 15 * 60 + 30 : int.MaxValue;
+                windowEnd = sessionEnd != int.MaxValue ? sessionEnd : Minute(bars[0]) < 15 * 60 + 30 ? 15 * 60 + 30 : int.MaxValue;
             }
             else
             {
                 var expected = startMinute < 15 * 60 + 30 ? Math.Min(length, 15 * 60 + 30 - startMinute) : length;
                 complete = bars.Count == expected;
-                windowEnd = startMinute + (startMinute < 15 * 60 + 30 ? expected : length);
+                windowEnd = Math.Min(startMinute + (startMinute < 15 * 60 + 30 ? expected : length), sessionEnd);
             }
 
             var last = items[^1];

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
@@ -14,7 +15,7 @@ public sealed class IndicatorInfo
 
     private readonly Func<FeatureSpec, IIndicator> _factory;
 
-    private readonly Func<FeatureSpec, string?>? _extraCheck;
+    private readonly Func<FeatureSpec, SpecProblem?>? _extraCheck;
 
     internal IndicatorInfo(
         string name,
@@ -26,11 +27,11 @@ public sealed class IndicatorInfo
         bool intradayOnly,
         Func<FeatureSpec, int> warmUp,
         Func<FeatureSpec, IIndicator> factory,
-        Func<FeatureSpec, string?>? extraCheck = null)
+        Func<FeatureSpec, SpecProblem?>? extraCheck = null)
     {
         Name = name;
         Summary = summary;
-        Parameters = parameters;
+        Parameters = new ReadOnlyCollection<IndicatorParameter>([.. parameters]);
         SessionBehaviour = sessionBehaviour;
         UsesSource = usesSource;
         DefaultSource = defaultSource;
@@ -58,11 +59,14 @@ public sealed class IndicatorInfo
     /// <summary>Whether the indicator only makes sense on intraday bars (it is refused on 1D).</summary>
     public bool IntradayOnly { get; }
 
-    /// <summary>The bars of the spec's own timeframe after which the indicator is first ready on an unbroken series (a session indicator: counted from the first bar of the first session).</summary>
+    /// <summary>
+    /// The bars of the spec's own timeframe after which the indicator is first ready on an unbroken series (a session indicator: counted from the first bar of the first session). For the pivots it is the
+    /// earliest bar at which a pivot can be confirmed (<c>2n + 1</c>): they are ready from the first pivot on, which depends on the data.
+    /// </summary>
     public int WarmUp(in FeatureSpec spec) => _warmUp(spec);
 
-    /// <summary>A fresh instance for the spec. The spec must have been validated.</summary>
-    public IIndicator Create(in FeatureSpec spec) => _factory(spec);
+    /// <summary>A fresh instance for the spec (a <see cref="PriceSource.Default"/> source is resolved first). The spec must have been validated.</summary>
+    public IIndicator Create(in FeatureSpec spec) => _factory(Canonical(spec));
 
     /// <summary>A spec of this indicator with the default parameters and source on the timeframe. The defaults are those of 1-minute bars: an opening range on a longer timeframe needs a whole number of bars, so its default may be refused there.</summary>
     public FeatureSpec DefaultSpec(Timeframe timeframe = Timeframe.M1) => new(
@@ -74,8 +78,12 @@ public sealed class IndicatorInfo
         Parameters.Count > 2 ? Parameters[2].Default : 0,
         Parameters.Count > 3 ? Parameters[3].Default : 0);
 
-    /// <summary>The same feature in its canonical form (a source that is ignored is <see cref="PriceSource.Close"/>), so that two specs for one number are equal.</summary>
-    internal FeatureSpec Canonical(in FeatureSpec spec) => UsesSource ? spec : spec with { Source = PriceSource.Close };
+    /// <summary>
+    /// The same feature in its canonical form, so that two specs for one number are equal: <see cref="PriceSource.Default"/> becomes the indicator's <see cref="DefaultSource"/>, and a source that is ignored is
+    /// <see cref="PriceSource.Close"/>.
+    /// </summary>
+    internal FeatureSpec Canonical(in FeatureSpec spec) =>
+        !UsesSource ? spec with { Source = PriceSource.Close } : spec.Source == PriceSource.Default ? spec with { Source = DefaultSource } : spec;
 
     internal void Validate(in FeatureSpec spec, string path, FieldErrors errors)
     {
@@ -89,9 +97,9 @@ public sealed class IndicatorInfo
             errors.Add(path + ".timeframe", Text($"'{Name}' needs intraday bars; it cannot be computed on 1D."));
         }
 
-        if (!Enum.IsDefined(spec.Source))
+        if (spec.Source is not (PriceSource.Default or PriceSource.Close or PriceSource.Open or PriceSource.High or PriceSource.Low))
         {
-            errors.Add(path + ".source", "The price source must be close, open, high or low.");
+            errors.Add(path + ".source", "The price source must be close, open, high or low (volume is the feature 'volume', not a source).");
         }
 
         for (var i = 0; i < 4; i++)
@@ -125,7 +133,7 @@ public sealed class IndicatorInfo
 
         if (errors.Items.Count == before && _extraCheck?.Invoke(spec) is { } problem)
         {
-            errors.Add(path + ".p1", problem);
+            errors.Add(path + ".p" + (problem.Parameter + 1).ToString(CultureInfo.InvariantCulture), problem.Message);
         }
     }
 

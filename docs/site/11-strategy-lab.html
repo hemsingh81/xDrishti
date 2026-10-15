@@ -147,7 +147,7 @@ test:
 </tr>
 <tr>
 <td>Indicators</td>
-<td><code>sma ema rsi atr adx macd bbands vwap supertrend highest lowest rel_volume</code> — which exist now: see <em>What exists now</em> below</td>
+<td><code>sma ema rsi atr adx macd bbands vwap supertrend roc highest lowest rel_volume</code> — all exist now (<code>macd</code> and <code>bbands</code> are several features each): see <em>What exists now</em> below</td>
 </tr>
 <tr>
 <td>Multi-timeframe</td>
@@ -159,7 +159,7 @@ test:
 </tr>
 <tr>
 <td>Patterns</td>
-<td><code>inside_bar</code>, <code>nr(7)</code>, <code>gap_pct</code>, <code>engulfing</code>, <code>pivot_high/low(n)</code> (<code>gap_pct</code> exists now; the others follow in P3-01b)</td>
+<td><code>inside_bar</code>, <code>nr(7)</code>, <code>gap_pct</code>, <code>engulfing</code>, <code>pivot_high/low(n)</code> (all exist now)</td>
 </tr>
 <tr>
 <td>Context</td>
@@ -174,8 +174,8 @@ test:
 <td>Any policy from <a href="08-exits-and-risk.html">doc 08</a></td>
 </tr>
 </tbody></table>
-<h3 id="what-exists-now-p3-01-adr-0031">What exists now (P3-01, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>)<a class="hash" href="#what-exists-now-p3-01-adr-0031" aria-label="Link to this section">#</a></h3>
-<p>The building blocks are implemented in <code>XDrishti.Indicators</code> as streaming code over closed bars; the DSL parser (P3-02) will read them through the <code>IndicatorCatalog</code> and the <code>FeatureFrame</code>. The <strong>19 names</strong> that exist:</p>
+<h3 id="what-exists-now-p3-01-and-p3-01b-adr-0031-adr-0032">What exists now (P3-01 and P3-01b, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>, <a href="../adr/0032-frame-history-closed-flags-and-the-remaining-indicators.html">ADR 0032</a>)<a class="hash" href="#what-exists-now-p3-01-and-p3-01b-adr-0031-adr-0032" aria-label="Link to this section">#</a></h3>
+<p>The building blocks are implemented in <code>XDrishti.Indicators</code> as streaming code over closed bars; the DSL parser (P3-02) will read them through the <code>IndicatorCatalog</code> and the <code>FeatureFrame</code>. The <strong>44 names</strong> that exist (every output is a feature of its own, so <code>macd</code> is three names and <code>bbands</code> four):</p>
 <table>
 <thead>
 <tr>
@@ -190,6 +190,21 @@ test:
 <td><code>sma ema rsi highest lowest</code> take a price source (close, open, high, low); <code>rsi</code> and <code>atr</code> are Wilder; <code>rel_volume</code> divides by the mean of the <em>previous</em> n bars</td>
 </tr>
 <tr>
+<td>Trend, momentum, volatility (continuous)</td>
+<td><code>adx(n)</code>, <code>plus_di(n)</code>, <code>minus_di(n)</code>; <code>macd_line(fast, slow, signal)</code>, <code>macd_signal(…)</code>, <code>macd_hist(…)</code>; <code>bb_upper(n, k)</code>, <code>bb_middle(n, k)</code>, <code>bb_lower(n, k)</code>, <code>bb_width(n, k)</code>; <code>supertrend(n, mult)</code>, <code>supertrend_dir(n, mult)</code>; <code>roc(n)</code></td>
+<td>defaults: DMI n = 14, MACD 12/26/9, Bollinger n = 20 k = 2, Supertrend n = 10 mult = 3, <code>roc</code> n = 10. <code>adx</code>/DMI are Wilder (the DIs are ready at bar n+1, <code>adx</code> at bar 2n); <code>macd</code> and <code>bb</code> and <code>roc</code> take a price source; the Bollinger deviation is the <em>population</em> σ (÷ n, as TradingView) and <code>bb_width</code> is (upper − lower)/middle; <code>supertrend</code> is the TradingView-style line (final bands that carry over, the direction flips when the close passes the <em>current</em> final band, starts up at bar n) and <code>supertrend_dir</code> is +1 / −1; <code>roc</code> is the percent change over n bars</td>
+</tr>
+<tr>
+<td>Patterns and structure (continuous, on the closed bars of the timeframe)</td>
+<td><code>inside_bar</code>, <code>nr(n)</code>, <code>engulfing</code>, <code>pivot_high(n)</code>, <code>pivot_low(n)</code>, <code>pivot_high_age(n)</code>, <code>pivot_low_age(n)</code></td>
+<td><code>inside_bar</code> and <code>nr</code> are 1 / 0 (<code>nr(7)</code>: the range is strictly the smallest of the last n bars); <code>engulfing</code> is +1 / −1 / 0 judged on the bodies; a pivot is the price of the most recent <em>confirmed</em> swing point (strictly above / below the n bars before <strong>and</strong> after), known only n bars after it formed, so it is look-ahead-safe by construction (not ready until the first pivot is confirmed); <code>*_age</code> is the number of bars since that pivot (for structure stops)</td>
+</tr>
+<tr>
+<td>Raw bar</td>
+<td><code>open</code>, <code>high</code>, <code>low</code>, <code>close</code>, <code>volume</code></td>
+<td>the value of the <strong>last closed bar</strong> of the timeframe (<code>tf(&quot;1D&quot;).close</code> is yesterday&#39;s close until today&#39;s daily bar closes); with the value history they make <code>close[1]</code></td>
+</tr>
+<tr>
 <td>Session-anchored (reset per India trading date)</td>
 <td><code>vwap</code>, <code>or_high(m)</code>, <code>or_low(m)</code></td>
 <td>intraday only (refused on 1D); <code>vwap</code> on the typical price (H+L+C)/3; the opening range is the first <em>m</em> minutes and must be a whole number of bars of the timeframe</td>
@@ -200,8 +215,11 @@ test:
 <td>the previous <em>session that had bars</em> (weekends and holidays skipped by the data); the DSL spellings <code>prev_day.high</code>, <code>today.open</code> map to these flat catalog names</td>
 </tr>
 </tbody></table>
-<p><strong>Not yet built — follow in P3-01b:</strong> <code>adx</code>, <code>macd</code>, <code>bbands</code>, <code>supertrend</code>; the patterns <code>inside_bar</code>, <code>nr(n)</code>, <code>engulfing</code> and <code>pivot_high/low(n)</code>; and the regime / market-context features (<code>regime()</code>, <code>index.trend</code>, <code>vix_pct</code>,
-<code>sector_rs(n)</code>). Weekly and monthly timeframes are not built either: a feature reads 1m, 5m, 10m, 15m, 30m, 1h or 1D.</p>
+<p><strong>What the frame gives the DSL.</strong> For every feature the value as of the last closed bar of its timeframe, plus <code>BarClosed(tf)</code> (did a bar of that timeframe close at this step? the moment to evaluate a condition),
+<code>At(handle, lag)</code> (the value <code>lag</code> closed bars of the feature&#39;s own timeframe ago: <code>close[1]</code>, the previous value for <code>crosses_above</code> and <code>rising(x, n)</code>; the history depth is 1 to 256, default 8, sized by the parser from the
+strategy) and the last closed bar of each timeframe. A repeated or out-of-order 1-minute bar is skipped by every timeframe and counted.</p>
+<p><strong>Not yet built — follow in P3-01c:</strong> the regime / market-context features (<code>regime()</code>, <code>index.trend</code>, <code>vix_pct</code>, <code>sector_rs(n)</code>, breadth), which need the index and VIX series fed alongside the instrument, and the weekly and
+monthly timeframes (1W / 1M builders): a feature reads 1m, 5m, 10m, 15m, 30m, 1h or 1D. The DSL parser and look-ahead lint are P3-02.</p>
 <p><strong>How the closed-bar rule is kept.</strong> A feature on a higher timeframe (<code>tf(&quot;1h&quot;).ema(50)</code>) is computed over bars that a <code>TimeframeBuilder</code> emits only once their last minute has arrived, so at 10:30 it reflects the 09:15 hour
 (closed at 10:14) and never the 10:15 hour that is still forming. A bar with a missing minute is emitted late and flagged incomplete, and still used; the frame counts those so the simulator can report them. An indicator that is not
 ready is <code>NaN</code>, and a condition on it is false. The warm-up is counted in bars of the feature&#39;s own timeframe (<code>ema(20)</code> on 15m needs 20 fifteen-minute bars; <code>prev_day.*</code> and <code>gap_pct</code> need 376 one-minute bars, 26 fifteen-minute
@@ -284,11 +302,11 @@ folder); any version can be downloaded as a file and re-imported (<a href="../ad
     <a class="prev" href="10-trade-selection.html"><small>← Previous  [</small>10 · Trade selection</a>
     <a class="next" href="12-portfolio-monitoring.html"><small>Next  ] →</small>12 · Portfolio monitoring</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-15 17:59</footer>
+  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-15 20:05</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-ways-to-submit" class="d2">1. Ways to submit</a>
 <a href="#2-rules-language-dsl" class="d2">2. Rules language (DSL)</a>
-<a href="#what-exists-now-p3-01-adr-0031" class="d3">What exists now (P3-01, ADR 0031)</a>
+<a href="#what-exists-now-p3-01-and-p3-01b-adr-0031-adr-0032" class="d3">What exists now (P3-01 and P3-01b, ADR 0031, ADR 0032)</a>
 <a href="#3-pipeline" class="d2">3. Pipeline</a>
 <a href="#4-report" class="d2">4. Report</a>
 <a href="#5-guarding-against-test-until-it-passes" class="d2">5. Guarding against &amp;quot;test until it passes&amp;quot;</a>

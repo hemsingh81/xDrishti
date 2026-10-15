@@ -16,6 +16,16 @@ public sealed class DeterminismAndResetTests
             for (var h = 0; h < specs.Count; h++)
             {
                 bits.Add(BitConverter.DoubleToInt64Bits(frame[h]));
+                bits.Add(BitConverter.DoubleToInt64Bits(frame.At(h, 1)));
+                bits.Add(BitConverter.DoubleToInt64Bits(frame.At(h, 7)));
+            }
+
+            foreach (var timeframe in IndicatorCatalog.SupportedTimeframes)
+            {
+                if (frame.HasTimeframe(timeframe))
+                {
+                    bits.Add(frame.ClosedBarsAt(timeframe));
+                }
             }
         }
 
@@ -110,25 +120,46 @@ public sealed class DeterminismAndResetTests
             for (var h = 0; h < specs.Count; h++)
             {
                 Tolerance.Identical(used[h], fresh[h]).ShouldBeTrue($"{TestSpecs.Describe(specs[h])} at {bar.Start:u}");
+                Tolerance.Identical(used.At(h, 1), fresh.At(h, 1)).ShouldBeTrue($"{TestSpecs.Describe(specs[h])} At(h, 1) at {bar.Start:u}");
+                Tolerance.Identical(used.At(h, 7), fresh.At(h, 7)).ShouldBeTrue($"{TestSpecs.Describe(specs[h])} At(h, 7) at {bar.Start:u}");
+            }
+
+            foreach (var timeframe in IndicatorCatalog.SupportedTimeframes.Where(used.HasTimeframe))
+            {
+                used.ClosedBarsAt(timeframe).ShouldBe(fresh.ClosedBarsAt(timeframe), timeframe.ToCode());
             }
         }
     }
 
     [Fact]
-    public void Indicators_do_not_depend_on_the_current_culture()
+    public void Indicators_and_messages_do_not_depend_on_the_current_culture_also_with_a_comma_decimal_one()
     {
         var bars = SeriesGenerator.Random(41, 600, 800);
         var specs = TestSpecs.Variants(Timeframe.M1);
         var expected = Bits(bars, specs);
+        var invalid = new[] { new FeatureSpec("bb_upper", Timeframe.M1, PriceSource.Close, 20, 0), new FeatureSpec("ema", Timeframe.M1, PriceSource.Close, 1.5), new FeatureSpec("macd_line", Timeframe.M1, PriceSource.Close, 26, 12, 9) };
+        var expectedMessages = FeatureFrame.Create(invalid).Error.Fields!.Select(f => f.Message).ToList();
+
+        // a culture with a comma as the decimal separator, a dot for groups and an unusual minus sign: any culture-sensitive formatting or parsing would show
+        var comma = (System.Globalization.CultureInfo)System.Globalization.CultureInfo.InvariantCulture.Clone();
+        comma.NumberFormat.NumberDecimalSeparator = ",";
+        comma.NumberFormat.NumberGroupSeparator = ".";
+        comma.NumberFormat.NegativeSign = "~";
         var original = Thread.CurrentThread.CurrentCulture;
+        var originalUi = Thread.CurrentThread.CurrentUICulture;
         try
         {
-            Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+            Thread.CurrentThread.CurrentCulture = comma;
+            Thread.CurrentThread.CurrentUICulture = comma;
+
             Bits(bars, specs).ShouldBe(expected);
+            FeatureFrame.Create(invalid).Error.Fields!.Select(f => f.Message).ShouldBe(expectedMessages);
+            TestSpecs.Describe(new FeatureSpec("bb_upper", Timeframe.M1, PriceSource.Close, 20, 2.5)).ShouldContain("2.5");
         }
         finally
         {
             Thread.CurrentThread.CurrentCulture = original;
+            Thread.CurrentThread.CurrentUICulture = originalUi;
         }
     }
 }

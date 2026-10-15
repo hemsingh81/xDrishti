@@ -26,10 +26,10 @@ public sealed class TimeframeBuilderTests
 
     public static TheoryData<int> Seeds { get; } = [.. Enumerable.Range(1, 40)];
 
-    private static void ShouldMatchReference(IReadOnlyList<Bar> bars, Timeframe timeframe, string label)
+    private static void ShouldMatchReference(IReadOnlyList<Bar> bars, Timeframe timeframe, string label, IReadOnlyDictionary<DateOnly, (int From, int To)>? sessions = null)
     {
-        var expected = ReferenceBuckets.Build(bars, timeframe).Where(b => b.CloseIndex != int.MaxValue).OrderBy(b => b.CloseIndex).ThenBy(b => b.Start).ToList();
-        var actual = BuilderRun.Run(bars, timeframe);
+        var expected = ReferenceBuckets.Build(bars, timeframe, sessions).Where(b => b.CloseIndex != int.MaxValue).OrderBy(b => b.CloseIndex).ThenBy(b => b.Start).ToList();
+        var actual = BuilderRun.Run(bars, timeframe, sessions is null ? null : new TimeframeBuilder(timeframe, CalendarFixtures.For(sessions)));
 
         actual.Count.ShouldBe(expected.Count, label);
         for (var i = 0; i < expected.Count; i++)
@@ -66,6 +66,64 @@ public sealed class TimeframeBuilderTests
         {
             ShouldMatchReference(bars, timeframe, $"seed {seed}");
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void With_a_calendar_buckets_equal_the_calendar_aware_grouping_reference_on_random_series_with_special_sessions(int seed)
+    {
+        var bars = SeriesGenerator.Random(seed, specialSessions: true);
+        var sessions = CalendarFixtures.Windows(bars);
+
+        foreach (var timeframe in TestSpecs.HigherTimeframes)
+        {
+            ShouldMatchReference(bars, timeframe, $"seed {seed}, with calendar", sessions);
+        }
+    }
+
+    [Fact]
+    public void The_random_series_do_contain_special_and_early_sessions_for_the_calendar_tests()
+    {
+        var windows = Enumerable.Range(1, 40).Select(seed => CalendarFixtures.Windows(SeriesGenerator.Random(seed, specialSessions: true))).ToList();
+
+        windows.Sum(w => w.Count).ShouldBeGreaterThan(100);
+        windows.SelectMany(w => w).Count(w => w.Key.DayOfWeek == DayOfWeek.Saturday).ShouldBeGreaterThan(5);
+        windows.SelectMany(w => w).Count(w => w.Value.From >= SessionClock.EveningSessionFromMinute).ShouldBeGreaterThan(5);
+    }
+
+    [Theory]
+    [MemberData(nameof(Fixtures))]
+    public void With_a_calendar_buckets_equal_the_calendar_aware_reference_on_every_fixture(string fixture, Timeframe timeframe)
+    {
+        var bars = BarFixtures.Get(fixture);
+
+        ShouldMatchReference(bars, timeframe, fixture + ", with calendar", CalendarFixtures.Windows(bars));
+    }
+
+    [Fact]
+    public void A_muhurat_evening_with_a_calendar_closes_the_hour_and_the_day_at_its_own_last_minute()
+    {
+        var evening = BarFixtures.Get("muhurat evening");
+        var calendar = CalendarFixtures.For(evening);
+
+        var hour = BuilderRun.Run(evening, Timeframe.H1, new TimeframeBuilder(Timeframe.H1, calendar)).Single();
+        var day = BuilderRun.Run(evening, Timeframe.D1, new TimeframeBuilder(Timeframe.D1, calendar)).Single();
+
+        (hour.Step, hour.Closed.Bars, hour.Closed.Complete).ShouldBe((59, 60, true));
+        (day.Step, day.Closed.Bars, day.Closed.Complete).ShouldBe((59, 60, true));
+        BuilderRun.Run(evening, Timeframe.D1).ShouldBeEmpty("without the calendar the evening day waits for a later date");
+    }
+
+    [Fact]
+    public void A_shorter_evening_session_with_a_calendar_closes_its_clipped_hour_at_once_and_flags_it_incomplete()
+    {
+        var evening = BarFixtures.Walk(BarFixtures.Sun, Minutes.At(18, 15), 50);
+        var calendar = CalendarFixtures.For(evening);
+
+        var withCalendar = BuilderRun.Run(evening, Timeframe.H1, new TimeframeBuilder(Timeframe.H1, calendar)).Single();
+
+        (withCalendar.Step, withCalendar.Closed.Bars, withCalendar.Closed.Complete).ShouldBe((49, 50, false));
+        BuilderRun.Run(evening, Timeframe.H1).ShouldBeEmpty("without the calendar only a later bucket closes it");
     }
 
     [Fact]

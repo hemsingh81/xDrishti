@@ -36,3 +36,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0029](0029-dhan-report-imports-and-source-precedence.md) | Dhan's downloaded reports are imported by kind, and API trades take precedence over bill-level report rows | Accepted |
 | [0030](0030-read-only-notices-retention-and-structured-failures.md) | Notices are read-only, attention rows are kept for 30 days, and failures carry a kind | Accepted |
 | [0031](0031-streaming-indicators-and-the-feature-frame.md) | Streaming indicators and the feature frame: closed bars only, one code path | Accepted |
+| [0032](0032-frame-history-closed-flags-and-the-remaining-indicators.md) | The frame exposes closed flags and value history; the remaining indicators and patterns | Accepted |

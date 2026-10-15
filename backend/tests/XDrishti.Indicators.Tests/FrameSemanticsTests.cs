@@ -30,7 +30,56 @@ public sealed class FrameSemanticsTests
             for (var t = 0; t < bars.Count; t++)
             {
                 frame.Step(bars[t]);
+                var before = closedSoFar;
                 while (closedSoFar < closed.Count && closed[closedSoFar].CloseIndex <= t)
+                {
+                    closedSoFar++;
+                }
+
+                if (frame.HasTimeframe(timeframe) && (frame.BarClosed(timeframe) != closedSoFar > before || frame.ClosedBarsAt(timeframe) != closedSoFar - before))
+                {
+                    Assert.Fail($"seed {seed}, {timeframe.ToCode()}, step {t}: the frame says {frame.ClosedBarsAt(timeframe)} bars closed, the reference {closedSoFar - before}");
+                }
+
+                for (var h = 0; h < specs.Count; h++)
+                {
+                    var want = closedSoFar == 0 ? double.NaN : expected[h][closedSoFar - 1];
+                    if (!Tolerance.Same(want, frame[h]) || frame.IsReady(h) == double.IsNaN(want))
+                    {
+                        Assert.Fail($"seed {seed}, {TestSpecs.Describe(specs[h])}, step {t}: expected {want:R}, frame has {frame[h]:R} (ready {frame.IsReady(h)})");
+                    }
+
+                    var wantPrevious = closedSoFar < 2 ? double.NaN : expected[h][closedSoFar - 2];
+                    if (!Tolerance.Same(wantPrevious, frame.At(h, 1)))
+                    {
+                        Assert.Fail($"seed {seed}, {TestSpecs.Describe(specs[h])}, step {t}: At(h, 1) expected {wantPrevious:R}, frame has {frame.At(h, 1):R}");
+                    }
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void With_a_calendar_the_value_equals_the_reference_over_the_buckets_the_calendar_aware_reference_closes(int seed)
+    {
+        var bars = SeriesGenerator.Random(seed, 600, 2_500, specialSessions: true);
+        var windows = CalendarFixtures.Windows(bars);
+        var calendar = CalendarFixtures.For(windows);
+
+        foreach (var timeframe in TestSpecs.HigherTimeframes)
+        {
+            var specs = TestSpecs.Variants(timeframe);
+            var frame = FeatureFrame.Create(specs, calendar).Value;
+            var closed = FrameReference.ClosedInOrder(bars, timeframe, windows);
+            var closedAt = closed.Select(b => b.CloseIndex).ToList();
+            var expected = specs.Select(s => ReferenceIndicators.Compute(s, [.. closed.Select(b => b.AsBar)])).ToList();
+
+            var closedSoFar = 0;
+            for (var t = 0; t < bars.Count; t++)
+            {
+                frame.Step(bars[t]);
+                while (closedSoFar < closed.Count && closedAt[closedSoFar] <= t)
                 {
                     closedSoFar++;
                 }
@@ -40,7 +89,7 @@ public sealed class FrameSemanticsTests
                     var want = closedSoFar == 0 ? double.NaN : expected[h][closedSoFar - 1];
                     if (!Tolerance.Same(want, frame[h]) || frame.IsReady(h) == double.IsNaN(want))
                     {
-                        Assert.Fail($"seed {seed}, {TestSpecs.Describe(specs[h])}, step {t}: expected {want:R}, frame has {frame[h]:R} (ready {frame.IsReady(h)})");
+                        Assert.Fail($"seed {seed}, with calendar, {TestSpecs.Describe(specs[h])}, step {t}: expected {want:R}, frame has {frame[h]:R}");
                     }
                 }
             }

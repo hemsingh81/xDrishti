@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 using NetArchTest.Rules;
 using ArchResult = NetArchTest.Rules.TestResult;
 
@@ -35,6 +36,43 @@ public sealed class IndicatorsArchitectureTests
         referenced.ShouldNotContain(n => n.StartsWith("Npgsql", StringComparison.Ordinal) || n.StartsWith("Serilog", StringComparison.Ordinal));
         referenced.ShouldNotContain("System.Net.Http");
         referenced.ShouldNotContain("System.Net.Primitives");
+    }
+
+    [Fact]
+    public void The_project_file_references_only_the_domain_project_and_no_package()
+    {
+        var project = XDocument.Load(ProjectFile("src", "XDrishti.Indicators", "XDrishti.Indicators.csproj"));
+
+        ProjectReferences(project).ShouldBe(["XDrishti.Domain"], "the compiled references can hide a reference the compiler never used; the project file cannot");
+        project.Descendants("PackageReference").ShouldBeEmpty("the library has no package dependency");
+        project.Descendants("Reference").ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_project_file_reader_does_see_project_and_package_references()
+    {
+        var tests = XDocument.Load(ProjectFile("tests", "XDrishti.Indicators.Tests", "XDrishti.Indicators.Tests.csproj"));
+
+        ProjectReferences(tests).ShouldBe(["XDrishti.Indicators"]);
+        tests.Descendants("PackageReference").Select(r => (string?)r.Attribute("Include")).ShouldContain("Skender.Stock.Indicators");
+    }
+
+    private static List<string> ProjectReferences(XDocument project) =>
+        [.. project.Descendants("ProjectReference").Select(r => Path.GetFileNameWithoutExtension(((string?)r.Attribute("Include") ?? string.Empty).Replace('\\', '/')))];
+
+    /// <summary>Finds a file of the backend source tree by walking up from the test binaries (the tests run from a checkout, never from a published image).</summary>
+    private static string ProjectFile(params string[] parts)
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine([directory.FullName, .. parts]);
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new FileNotFoundException("The project file " + string.Join('/', parts) + " was not found above " + AppContext.BaseDirectory);
     }
 
     [Fact]

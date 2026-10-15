@@ -50,12 +50,18 @@ public sealed class WilderTests
     }
 
     [Fact]
-    public void Rsi_returns_to_fifty_only_while_both_averages_are_zero()
+    public void Rsi_is_fifty_only_while_both_averages_are_zero_and_stays_at_one_hundred_after_a_gain_followed_by_a_flat_run()
     {
-        // up, then flat: the average gain stays above zero, so the level is 100 until a loss comes
+        // nothing ever moved: both averages are 0 -> 50
+        var flat = Run(new Rsi(2), Minutes.Closes(Day, 10, 10, 10, 10, 10));
+        flat[2].ShouldBe(50.0);
+        flat[4].ShouldBe(50.0);
+
+        // up, then flat: the average gain stays above zero, so the level is 100 until a loss comes (never 50)
         var values = Run(new Rsi(2), Minutes.Closes(Day, 10, 11, 12, 12, 12));
 
         values[2].ShouldBe(100.0);
+        values[3].ShouldBe(100.0);
         values[4].ShouldBe(100.0);
     }
 

@@ -245,23 +245,24 @@ Dependency rule: `Domain` ← `Application` ← (`Infrastructure`, `Brokers.*`, 
 Engine modules (Indicators, Strategies, Simulation, Learning, Planning) have **no I/O dependencies** —
 they're pure and fully unit-testable.
 
-### 4.1 `XDrishti.Indicators` as built (P3-01, [ADR 0031](../adr/0031-streaming-indicators-and-the-feature-frame.md))
+### 4.1 `XDrishti.Indicators` as built (P3-01 and P3-01b, [ADR 0031](../adr/0031-streaming-indicators-and-the-feature-frame.md), [ADR 0032](../adr/0032-frame-history-closed-flags-and-the-remaining-indicators.md))
 
 The first engine module. A pure library that turns a stream of **closed 1-minute bars** into indicator values, closed higher-timeframe bars and session context; back-tests and live trading use the same code.
 
 | Part | What it is |
 |------|------------|
 | `IIndicator` | `Update(in Bar)`, `Value`, `IsReady`, `WarmUp`, `Reset()`; constant (or amortised constant) work per bar, 0 bytes allocated in steady state. A value that is not ready is `NaN` with `IsReady = false` (the two always agree) |
-| `IndicatorCatalog` | The 19 indicators with parameters (name, kind, min, max, default; at most 4), warm-up as a function of the spec (counted in bars of the spec's own timeframe), session behaviour (`Continuous` / `PerSession`), whether the source price is read, whether it is intraday-only, and a factory. The validator and lint of the DSL read it |
+| `IndicatorCatalog` | The 44 features (19 of P3-01 and 25 of P3-01b: ADX/DMI, MACD, Bollinger, Supertrend, ROC, the candle patterns, pivots and the raw bar features) with parameters (name, kind, min, max, default; at most 4), warm-up as a function of the spec (counted in bars of the spec's own timeframe), session behaviour (`Continuous` / `PerSession`), whether the source price is read, whether it is intraday-only, and a factory. The validator and lint of the DSL read it |
 | `TimeframeBuilder` | Builds *closed* 5m, 10m, 15m, 30m, 1h and 1D bars with the rules of the stored aggregates ([doc 05 §4](05-data-and-brokers.md)); `Push` returns 0, 1 or 2 closed bars per minute; optional `TradingCalendar`; late bars are ignored and counted (`Ignored`) |
 | `FeatureFrame` | Created once from a list of `FeatureSpec` (name, timeframe, price source, up to four parameters); validates them before any bar is fed, shares one instance between equal specs, builds only the needed builders, and exposes the value *as of the last closed bar of each timeframe* by a numeric handle. Counts the incomplete higher-timeframe bars it consumed (`IncompleteBarsConsumed`) |
+| Frame API for the DSL (P3-01b) | `Create(specs, FrameOptions?)` with `FrameOptions(Calendar, HistoryDepth = 8, 1..256)`; `BarClosed(tf)`, `ClosedBarsAt(tf)`, `TryLastClosed(tf, out ClosedBar)` and `HasTimeframe(tf)` (what the **last** step closed; a timeframe not asked for throws); `At(handle, lag)` and `IsReadyAt(handle, lag)` read the value a feature had `lag` closed bars of **its own** timeframe ago (a lag outside `0..HistoryDepth−1` throws; the history is written only when that timeframe closes a bar, twice when one minute closes two); the raw bar features `open high low close volume`; an **ordering guard** (a 1-minute bar at or before the previous one is skipped by every lane and counted in `IgnoredBars`; `Steps` counts accepted bars); `PriceSource.Default` resolves to the catalog default (`High` for `highest`, `Low` for `lowest`); the catalog collections are read-only |
 
 **References and rules.** The project references `XDrishti.Domain` only (for `Bar`, `Timeframe`, `SessionClock`, `TradingCalendar`). Architecture tests keep it that way: no Application, Infrastructure, Hosting, EF Core, ASP.NET Core, Npgsql,
 Serilog, `System.IO`, `System.Net`, `System.Data`, `System.Diagnostics`, `Environment`, `Random` or `TimeProvider`; no `DateTime.Now/UtcNow/Today` (scanned in the compiled code); no mutable static field; every public class
-sealed or static. The only package outside the base class library that is involved is Skender.Stock.Indicators, and only in `XDrishti.Indicators.Tests`.
+sealed or static. The tests also read the project file: only the `ProjectReference` to `XDrishti.Domain` and no `PackageReference`. The only package outside the base class library that is involved is Skender.Stock.Indicators, and only in `XDrishti.Indicators.Tests`.
 
-**Guarantees pinned by tests.** Each indicator equals an independent batch reference over seeded random series; `sma`, `ema`, `rsi` and `atr` also agree with Skender (differences: the ATR seed, and an RSI over a series that never
-moves is 50 here and 100 in Skender); the *prefix property* (the output for the first *k* bars is the same when more bars are fed) over 220 seeds; the frame never shows the forming bar; two runs are bit-identical; `Reset()`
+**Guarantees pinned by tests.** Each indicator equals an independent batch reference over seeded random series; `sma`, `ema`, `rsi`, `atr`, `adx`/`plus_di`/`minus_di`, `macd_*`, `bb_*` (population σ) and `roc` also agree with Skender (differences: the ATR seed, an RSI over a series that never
+moves is 50 here and 100 in Skender, and `supertrend`, which starts a bar earlier here and always starts up); the history `At(handle, lag)` equals a record kept independently by the test, for depths 1, 2, 8 and 256; the *prefix property* (the output for the first *k* bars is the same when more bars are fed) over 220 seeds; the frame never shows the forming bar; two runs are bit-identical; `Reset()`
 returns every indicator to its first state.
 
 **Throughput.** The benchmarks are explicit tests, not part of `scripts/check.sh` (a solution run lists them as skipped). From `backend/`, in Release:
@@ -271,7 +272,10 @@ dotnet test --project tests/XDrishti.Indicators.Tests -c Release -- --explicit o
 ```
 
 On an Apple-silicon Mac (best of 5 passes of 1,000,000 steps, through `IIndicator`): `sma(20)` 104 M steps/s, `ema(20)` 359, `rsi(14)` 109, `atr(14)` 209, `highest(20)` 64, `lowest(20)` 55, `vwap` 172, `rel_volume(20)` 199,
-`or_high(15)` 208, `gap_pct` 182; `TimeframeBuilder` 109 M bars/s (5m) to 251 M (1D); a 12-feature frame 22 M steps/s, that is 0.045 µs per 1-minute step (targets: 10 M and 1 µs).
+`or_high(15)` 208, `gap_pct` 182; `TimeframeBuilder` 109 M bars/s (5m) to 251 M (1D) (targets: 10 M updates/s per indicator and 1 µs per frame step). The P3-01b features, same method: `adx(14)` 127, `plus_di` 101, `minus_di` 72,
+`macd_line` 155, `macd_signal` 113, `macd_hist` 157, `bb_upper(20,2)` 53, `bb_middle` 90, `bb_lower` 54, `bb_width` 74 (the Bollinger deviation is an exact O(n) second pass), `supertrend(10,3)` 87, `supertrend_dir` 77, `roc(10)` 194,
+`inside_bar` 114, `nr(7)` 83, `engulfing` 109, `pivot_high(5)` 86, `pivot_low` 67, `pivot_high_age` 72, `pivot_low_age` 66, `close` 201. A 20-feature frame (1m, 5m, 15m, 1h and 1D, history depth 8) runs at 10.7 M steps/s, that is
+0.094 µs per 1-minute step; the 12-feature frame of P3-01 went from 0.045 to 0.060 µs with the history. Every step allocates 0 bytes (tested on gap-free and gappy series, with and without a calendar).
 
 ## 5. Data model (PostgreSQL schemas)
 

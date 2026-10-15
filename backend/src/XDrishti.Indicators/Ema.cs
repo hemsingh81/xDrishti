@@ -11,53 +11,23 @@ public sealed class Ema : IIndicator
 
     private readonly PriceSource _source;
 
-    private readonly double _alpha;
-
-    private readonly double _keep;
-
-    private CompensatedSum _seed;
-
-    private int _count;
-
-    private double _value = double.NaN;
+    private EmaCore _core;
 
     public Ema(int period, PriceSource source = PriceSource.Close)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(period, 1);
         _period = period;
         _source = source;
-        _alpha = 2.0 / (period + 1.0);
-        _keep = 1.0 - _alpha;
+        _core = new EmaCore(period);
     }
 
-    public double Value => _value;
+    public double Value => _core.Value;
 
-    public bool IsReady => _count >= _period;
+    public bool IsReady => _core.IsReady;
 
     public int WarmUp => _period;
 
-    public void Update(in Bar bar)
-    {
-        var x = PriceSources.Pick(_source, bar);
-        if (_count < _period)
-        {
-            _seed.Add(x);
-            _count++;
-            if (_count == _period)
-            {
-                _value = _seed.Value / _period;
-            }
+    public void Update(in Bar bar) => _core.Add(PriceSources.Pick(_source, bar));
 
-            return;
-        }
-
-        _value = _alpha * x + _keep * _value;
-    }
-
-    public void Reset()
-    {
-        _seed.Clear();
-        _count = 0;
-        _value = double.NaN;
-    }
+    public void Reset() => _core.Clear();
 }
