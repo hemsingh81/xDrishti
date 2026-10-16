@@ -44,6 +44,168 @@ public sealed class RawBarFeatureTests
         }
     }
 
+    public static TheoryData<int, CalendarKnowledge> PeriodSeeds
+    {
+        get
+        {
+            var data = new TheoryData<int, CalendarKnowledge>();
+            foreach (var seed in Enumerable.Range(1, 16))
+            {
+                data.Add(seed, (CalendarKnowledge)(seed % 4));
+            }
+
+            return data;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(PeriodSeeds))]
+    public void Every_weekly_and_monthly_raw_feature_equals_that_value_of_the_last_closed_week_or_month_at_every_minute(int seed, CalendarKnowledge kind)
+    {
+        var series = SeriesGenerator.Thin(seed, 500);
+        var known = PeriodCalendars.For(series, kind);
+        var specs = TestSpecs.PeriodTimeframes.SelectMany(t => Names.Select(n => new FeatureSpec(n, t))).ToList();
+        var frame = FeatureFrame.Create(specs, known.Options()).Value;
+        var closedByStep = TestSpecs.PeriodTimeframes.ToDictionary(t => t, t => FrameReference.ClosedByStep(series.Bars, t, known.Sessions, known.Holidays));
+        var last = TestSpecs.PeriodTimeframes.ToDictionary(t => t, _ => (ReferenceBucket?)null);
+        var checkedReady = 0;
+
+        for (var t = 0; t < series.Bars.Count; t++)
+        {
+            frame.Step(series.Bars[t]);
+            foreach (var timeframe in TestSpecs.PeriodTimeframes)
+            {
+                if (closedByStep[timeframe][t].Count > 0)
+                {
+                    last[timeframe] = closedByStep[timeframe][t][^1];
+                }
+            }
+
+            for (var h = 0; h < specs.Count; h++)
+            {
+                var want = last[specs[h].Timeframe] is { } bucket ? ReferencePatterns.Raw([bucket.AsBar], specs[h].Name)[0] : double.NaN;
+                if (!Tolerance.Identical(want, frame[h]) || frame.IsReady(h) == double.IsNaN(want))
+                {
+                    Assert.Fail($"seed {seed}, calendar {kind}, {TestSpecs.Describe(specs[h])}, step {t}: expected {want:R}, frame has {frame[h]:R}");
+                }
+
+                checkedReady += frame.IsReady(h) ? 1 : 0;
+            }
+        }
+
+        checkedReady.ShouldBeGreaterThan(series.Bars.Count, "the weekly and monthly features were ready for most of the series");
+    }
+
+    [Theory]
+    [InlineData(Timeframe.W1)]
+    [InlineData(Timeframe.Mo1)]
+    public void Without_a_calendar_the_close_at_any_minute_of_a_week_or_month_is_the_close_of_the_period_before_it(Timeframe timeframe)
+    {
+        foreach (var seed in Enumerable.Range(1, 20))
+        {
+            var series = SeriesGenerator.Thin(seed, 400);
+            var frame = FeatureFrame.Create([new FeatureSpec("close", timeframe), new FeatureSpec("open", timeframe)]).Value;
+            var starts = series.Bars.Select(b => PeriodStart(b, timeframe)).ToList();
+
+            var firstOfPeriod = 0;
+            for (var t = 0; t < series.Bars.Count; t++)
+            {
+                frame.Step(series.Bars[t]);
+
+                // the last bar of the latest earlier period is the bar before the first one of this period: no builder, no calendar, no reference bucket
+                firstOfPeriod = t > 0 && starts[t] != starts[t - 1] ? t : firstOfPeriod;
+                var back = firstOfPeriod - 1;
+                var wantClose = back < 0 ? double.NaN : series.Bars[back].Close;
+                if (!Tolerance.Identical(wantClose, frame[0]))
+                {
+                    Assert.Fail($"seed {seed}, {timeframe.ToCode()}, minute {t} ({SessionClock.DateOf(series.Bars[t].EpochSeconds)}): the close is {frame[0]:R}, the previous period closed at {wantClose:R}");
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(Timeframe.W1)]
+    [InlineData(Timeframe.Mo1)]
+    public void With_a_calendar_that_knows_every_session_the_period_closes_at_its_last_bar_and_not_before(Timeframe timeframe)
+    {
+        foreach (var seed in Enumerable.Range(1, 20))
+        {
+            // every special session is in the calendar, so the last session of a period is the last date that has bars and the period closes with that date's last bar: Friday 15:29, a holiday-shortened Thursday, a Saturday
+            var series = SeriesGenerator.Thin(seed, 400);
+            var frame = FeatureFrame.Create([new FeatureSpec("close", timeframe)], PeriodCalendars.For(series, CalendarKnowledge.Full).Options()).Value;
+            var starts = series.Bars.Select(b => PeriodStart(b, timeframe)).ToList();
+
+            var firstOfPeriod = 0;
+            for (var t = 0; t < series.Bars.Count; t++)
+            {
+                frame.Step(series.Bars[t]);
+                firstOfPeriod = t > 0 && starts[t] != starts[t - 1] ? t : firstOfPeriod;
+
+                // the last period of the series is cut by its end, not by its last session: the calendar still expects sessions after the last bar
+                if (starts[t] == starts[^1])
+                {
+                    continue;
+                }
+
+                var lastOfPeriod = starts[t + 1] != starts[t];
+
+                // the period in progress is never the one shown, unless this very bar is its last: then it is shown at once
+                var back = firstOfPeriod - 1;
+                var want = lastOfPeriod ? series.Bars[t].Close : back < 0 ? double.NaN : series.Bars[back].Close;
+                if (!Tolerance.Identical(want, frame[0]) || frame.BarClosed(timeframe) != lastOfPeriod)
+                {
+                    Assert.Fail($"seed {seed}, {timeframe.ToCode()}, minute {t} ({SessionClock.DateOf(series.Bars[t].EpochSeconds)}): the close is {frame[0]:R} (a period closed: {frame.BarClosed(timeframe)}), expected {want:R} (closed: {lastOfPeriod})");
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void The_weekly_close_is_not_ready_before_the_first_week_closes_and_stays_last_weeks_until_this_week_closes()
+    {
+        var series = BarFixtures.GetPeriods("holiday friday");
+        var withCalendar = FeatureFrame.Create([new FeatureSpec("close", Timeframe.W1), new FeatureSpec("volume", Timeframe.W1)], PeriodCalendars.For(series, CalendarKnowledge.Full).Options()).Value;
+        var without = FeatureFrame.Create([new FeatureSpec("close", Timeframe.W1), new FeatureSpec("volume", Timeframe.W1)]).Value;
+        var firstWeek = series.Bars.Take(1500).ToList();
+        var thursdayClose = firstWeek[^1].Close;
+
+        for (var t = 0; t < 1499; t++)
+        {
+            withCalendar.Step(series.Bars[t]);
+            without.Step(series.Bars[t]);
+            withCalendar.IsReady(0).ShouldBeFalse($"minute {t}");
+            without.IsReady(0).ShouldBeFalse($"minute {t}");
+        }
+
+        withCalendar.Step(series.Bars[1499]);
+        without.Step(series.Bars[1499]);
+        withCalendar.IsReady(0).ShouldBeTrue("closed by the Thursday 15:29 bar: Friday is a holiday");
+        without.IsReady(0).ShouldBeFalse("nothing says Friday is not coming");
+        (withCalendar[0], withCalendar[1]).ShouldBe((thursdayClose, firstWeek.Sum(b => (double)b.Volume)));
+
+        for (var t = 1500; t < 3374; t++)
+        {
+            withCalendar.Step(series.Bars[t]);
+            without.Step(series.Bars[t]);
+            withCalendar[0].ShouldBe(thursdayClose, $"minute {t} of the second week");
+            without[0].ShouldBe(thursdayClose, $"minute {t} of the second week");
+        }
+
+        withCalendar.Step(series.Bars[3374]);
+        without.Step(series.Bars[3374]);
+        withCalendar[0].ShouldBe(series.Bars[3374].Close, "the second week closes with Friday 13 March 15:29");
+        withCalendar.At(0, 1).ShouldBe(thursdayClose);
+        without[0].ShouldBe(thursdayClose, "without a calendar the second week closes with the third");
+    }
+
+    /// <summary>The Monday of the week, or the 1st of the month, of the bar's India date (calendar arithmetic only).</summary>
+    private static DateOnly PeriodStart(Bar bar, Timeframe timeframe)
+    {
+        var date = SessionClock.DateOf(bar.EpochSeconds);
+        return timeframe == Timeframe.W1 ? date.AddDays(-(((int)date.DayOfWeek + 6) % 7)) : new DateOnly(date.Year, date.Month, 1);
+    }
+
     [Fact]
     public void The_daily_close_is_not_ready_before_the_first_daily_close_and_stays_yesterdays_until_today_closes()
     {

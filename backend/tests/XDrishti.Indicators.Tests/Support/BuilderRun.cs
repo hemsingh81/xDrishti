@@ -1,4 +1,5 @@
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Calendar;
 
 namespace XDrishti.Indicators.Tests.Support;
 
@@ -24,5 +25,12 @@ internal static class BuilderRun
         }
 
         return result;
+    }
+
+    /// <summary>Runs a fresh builder, with the calendar if there is one, and also returns how many bars it ignored.</summary>
+    public static (List<(int Step, ClosedBar Closed)> Closed, long Ignored) RunCounting(IReadOnlyList<Bar> bars, Timeframe timeframe, TradingCalendar? calendar)
+    {
+        var builder = new TimeframeBuilder(timeframe, calendar);
+        return (Run(bars, timeframe, builder), builder.Ignored);
     }
 }

@@ -62,6 +62,137 @@ public sealed class FrameHistoryTests
         }
     }
 
+    public static TheoryData<int, int> PeriodDepthsAndSeeds
+    {
+        get
+        {
+            var data = new TheoryData<int, int>();
+            foreach (var depth in new[] { 1, 2, 8, 256 })
+            {
+                foreach (var seed in Enumerable.Range(1, 3))
+                {
+                    data.Add(depth, seed);
+                }
+            }
+
+            return data;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(PeriodDepthsAndSeeds))]
+    public void At_equals_the_reference_value_k_closed_weeks_or_months_ago_for_every_weekly_and_monthly_feature_including_not_ready_lags(int depth, int seed)
+    {
+        // 1,400 calendar days: about 200 weeks and 46 months, so the long warm-ups are crossed; the calendar the frame is given varies with the seed
+        var series = SeriesGenerator.Thin(seed, 1_400);
+        var known = PeriodCalendars.For(series, (CalendarKnowledge)(seed % 4));
+        var specs = TestSpecs.PeriodTimeframes.SelectMany(TestSpecs.Variants).ToList();
+        var frame = FeatureFrame.Create(specs, known.Options(depth)).Value;
+        var closedByStep = TestSpecs.PeriodTimeframes.ToDictionary(t => t, t => FrameReference.ClosedByStep(series.Bars, t, known.Sessions, known.Holidays));
+        var closedOfHandle = specs.Select(s => closedByStep[s.Timeframe]).ToArray();
+        var expected = specs.Select((s, h) => ReferenceIndicators.Compute(s, [.. closedOfHandle[h].SelectMany(x => x).Select(b => b.AsBar)])).ToList();
+        var closedSoFar = new int[specs.Count];
+
+        for (var t = 0; t < series.Bars.Count; t++)
+        {
+            frame.Step(series.Bars[t]);
+            var anyClosed = frame.BarClosed(Timeframe.W1) || frame.BarClosed(Timeframe.Mo1);
+            var everyLag = anyClosed || t % 61 == 0 || t == series.Bars.Count - 1;
+            for (var h = 0; h < specs.Count; h++)
+            {
+                closedSoFar[h] += closedOfHandle[h][t].Count;
+                if (!everyLag && h != 0 && specs[h].Timeframe == specs[h - 1].Timeframe)
+                {
+                    continue;
+                }
+
+                for (var lag = 0; lag < depth; lag++)
+                {
+                    if (!everyLag && lag > 1 && lag < depth - 1)
+                    {
+                        continue;
+                    }
+
+                    var index = closedSoFar[h] - 1 - lag;
+                    var want = index < 0 ? double.NaN : expected[h][index];
+                    var got = frame.At(h, lag);
+                    if (!Tolerance.Same(want, got) || frame.IsReadyAt(h, lag) == double.IsNaN(want))
+                    {
+                        Assert.Fail($"depth {depth}, seed {seed}, {TestSpecs.Describe(specs[h])}, step {t}, lag {lag}: expected {want:R}, At is {got:R} (ready {frame.IsReadyAt(h, lag)})");
+                    }
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(PeriodDepthsAndSeeds))]
+    public void The_weekly_and_monthly_history_shifts_only_when_the_features_own_timeframe_closes_and_by_the_number_of_bars_it_closed(int depth, int seed)
+    {
+        var series = SeriesGenerator.Thin(seed + 100, 700);
+        var known = PeriodCalendars.For(series, (CalendarKnowledge)(seed % 2 + 1));
+        var timeframes = new[] { Timeframe.D1, Timeframe.W1, Timeframe.Mo1 };
+        var specs = timeframes.SelectMany(TestSpecs.Representatives).ToList();
+        var frame = FeatureFrame.Create(specs, known.Options(depth)).Value;
+        var before = new double[specs.Count][];
+        for (var h = 0; h < specs.Count; h++)
+        {
+            before[h] = new double[depth];
+            Array.Fill(before[h], double.NaN);
+        }
+
+        var closes = new int[timeframes.Length];
+        for (var t = 0; t < series.Bars.Count; t++)
+        {
+            frame.Step(series.Bars[t]);
+            for (var i = 0; i < timeframes.Length; i++)
+            {
+                closes[i] += frame.ClosedBarsAt(timeframes[i]);
+            }
+
+            // Every lag is checked at the steps where the feature's timeframe closed a bar and at every 37th step; at the others lags 0, 1 and the last (a bug that moved the history between closes shows at the next close)
+            var fullStep = t % 37 == 0 || t == series.Bars.Count - 1;
+            for (var h = 0; h < specs.Count; h++)
+            {
+                var closed = frame.ClosedBarsAt(specs[h].Timeframe);
+                var all = closed > 0 || fullStep;
+                for (var lag = 0; lag < depth; lag++)
+                {
+                    if (!all && lag > 1 && lag < depth - 1)
+                    {
+                        continue;
+                    }
+
+                    // after c closes, the value at lag k + c is the one that was at lag k before the step; with no close nothing moves
+                    if (closed == 0 || lag >= closed)
+                    {
+                        var want = lag - closed >= 0 ? before[h][lag - closed] : double.NaN;
+                        var got = frame.At(h, lag);
+                        if (!Tolerance.Identical(want, got))
+                        {
+                            Assert.Fail($"depth {depth}, seed {seed}, {TestSpecs.Describe(specs[h])}, step {t}, lag {lag}: was {want:R} before the step ({closed} bars closed), now {got:R}");
+                        }
+                    }
+                }
+            }
+
+            for (var h = 0; h < specs.Count; h++)
+            {
+                var all = frame.ClosedBarsAt(specs[h].Timeframe) > 0 || fullStep;
+                for (var lag = 0; lag < depth; lag++)
+                {
+                    if (all || lag <= 1 || lag == depth - 1)
+                    {
+                        before[h][lag] = frame.At(h, lag);
+                    }
+                }
+            }
+        }
+
+        closes[1].ShouldBeGreaterThan(70, "weeks closed");
+        closes[2].ShouldBeGreaterThan(15, "months closed");
+    }
+
     [Theory]
     [MemberData(nameof(DepthsAndSeeds))]
     public void The_history_shifts_only_when_the_features_own_timeframe_closes_and_by_the_number_of_bars_it_closed(int depth, int seed)
@@ -209,6 +340,41 @@ public sealed class FrameHistoryTests
         }
 
         frame.At(0, 2).ShouldBe(BarFixtures.Walk(BarFixtures.Mon, Minutes.Open, 375)[^1].Close);
+    }
+
+    [Fact]
+    public void A_monthly_feature_moves_its_history_on_the_close_of_the_last_session_of_the_month_and_at_no_other_step()
+    {
+        // Jan 31 and Feb 28 are Saturdays, Mar 31 a Tuesday and Apr 30 a Thursday: the last sessions are Jan 30, Feb 27, Mar 31 and Apr 30
+        (DateOnly Date, double Close)[] days =
+        [
+            (new DateOnly(2026, 1, 29), 100), (new DateOnly(2026, 1, 30), 110), (new DateOnly(2026, 2, 2), 120), (new DateOnly(2026, 2, 27), 130),
+            (new DateOnly(2026, 3, 2), 140), (new DateOnly(2026, 3, 31), 150), (new DateOnly(2026, 4, 1), 160), (new DateOnly(2026, 4, 30), 170),
+        ];
+        var frame = FeatureFrame.Create([new FeatureSpec("close", Timeframe.Mo1), new FeatureSpec("sma", Timeframe.Mo1, PriceSource.Close, 2)], new FrameOptions(new XDrishti.Domain.Market.Calendar.TradingCalendar())).Value;
+        var seen = new List<(DateOnly Date, int Minute, double Now, double Previous, double BeforeThat, double Mean)>();
+
+        foreach (var (date, close) in days)
+        {
+            foreach (var bar in BarFixtures.Brief(date, close, close + 5, close - 5, close, 1_000))
+            {
+                frame.Step(bar);
+                seen.Add((date, SessionClock.MinuteOfDay(bar.EpochSeconds), frame.At(0, 0), frame.At(0, 1), frame.At(0, 2), frame[1]));
+            }
+        }
+
+        double Nan() => double.NaN;
+        seen.Where(x => x.Date < new DateOnly(2026, 1, 30) || (x.Date == new DateOnly(2026, 1, 30) && x.Minute == Minutes.Open)).ShouldAllBe(x => double.IsNaN(x.Now), "January has not closed");
+        var january = seen.Single(x => x.Date == new DateOnly(2026, 1, 30) && x.Minute == Minutes.At(15, 29));
+        (january.Now, january.Previous, january.Mean).ShouldBe((110.0, Nan(), Nan()));
+        seen.Where(x => x.Date > new DateOnly(2026, 1, 30) && x.Date < new DateOnly(2026, 2, 27)).ShouldAllBe(x => x.Now == 110.0 && double.IsNaN(x.Previous), "February is the month in progress");
+        var february = seen.Single(x => x.Date == new DateOnly(2026, 2, 27) && x.Minute == Minutes.At(15, 29));
+        (february.Now, february.Previous, february.BeforeThat, february.Mean).ShouldBe((130.0, 110.0, Nan(), 120.0));
+        var march = seen.Single(x => x.Date == new DateOnly(2026, 3, 31) && x.Minute == Minutes.At(15, 29));
+        (march.Now, march.Previous, march.BeforeThat, march.Mean).ShouldBe((150.0, 130.0, 110.0, 140.0));
+        var april = seen.Last();
+        (april.Now, april.Previous, april.BeforeThat, april.Mean).ShouldBe((170.0, 150.0, 130.0, 160.0));
+        seen.Where(x => x.Date == new DateOnly(2026, 4, 1)).ShouldAllBe(x => x.Now == 150.0 && x.Previous == 130.0, "April has begun and moves nothing");
     }
 
     [Fact]

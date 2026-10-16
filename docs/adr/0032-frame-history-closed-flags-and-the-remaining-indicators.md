@@ -15,7 +15,7 @@ The parser (P3-02) must evaluate conditions such as `crosses_above(close, vwap)`
 6. **New indicators** (each output is its own feature): `adx plus_di minus_di` (Wilder), `macd_line macd_signal macd_hist`, `bb_upper bb_middle bb_lower bb_width` (population σ), `supertrend supertrend_dir` (TradingView-style: final bands that carry over, the flip decided against the *current* final band; Wilder ATR), `roc`.
 7. **New patterns and structure:** `inside_bar`, `nr(n)` (strictly the smallest range of the last n bars), `engulfing` (on bodies; +1/−1/0), `pivot_high(n)`/`pivot_low(n)` (the most recent *confirmed* swing point: strictly above/below the n bars before **and** after, confirmed when the n-th later bar has closed, so it is look-ahead-safe and arrives n bars late) with `pivot_high_age(n)`/`pivot_low_age(n)`.
 8. **Conventions vs Skender** are asserted exactly in tests (never absorbed by tolerance) and listed in "Consequences from the build": only `supertrend` differs.
-9. **Out of this slice (P3-01c):** regime and market-context features (index, VIX, breadth series) and the 1W/1M builders.
+9. **Out of this slice (P3-01c):** regime and market-context features (index, VIX, breadth series) and the 1W/1M builders. *Built in P3-01c, [ADR 0033](0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md).*
 
 ## Consequences
 - The parser can compile every building block of doc 11 §2 except regime/context and weekly timeframes.
@@ -108,3 +108,6 @@ Deviations of the build from the sketch in [P3-01b](../specs/P3-01b-frame-api-fo
    the earliest possible one, and a second test checks on a random series that a pivot is never ready before the declared bar and is a number from its first value on; every other entry is checked for equality on every timeframe.
 
 Documents updated: [doc 03 §4.1](../design/03-target-architecture.md), [doc 11 §2](../design/11-strategy-lab.md), the [roadmap](../design/18-roadmap.md), and "Amendment, final review" of [ADR 0031](0031-streaming-indicators-and-the-feature-frame.md).
+
+## Amendment (2026-10-16, P3-01c)
+[ADR 0033](0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md) builds what decision 9 left out: the 1W and 1M timeframes and the calendar and market-context features (12 new names, 56 in all); `FrameOptions` gains `Context` and `ExpiryDays` after `HistoryDepth`. `BarClosed(M1)` still throws for a frame that has no feature on 1m (follow-up 4 of the P3-01b spec), except that a frame with a date-driven feature always has a 1m lane.

@@ -99,6 +99,7 @@ Deviations of the build from the text above; the guarantees of the acceptance cr
 8. **Skender cross-check result.** `adx`, `plus_di`, `minus_di`, `macd_*` (3,6,4), (12,26,9), (5,35,5), `bb_*` (population σ; Skender's `Width` is (upper − lower)/middle) and `roc` agree with Skender 2.7.3 within 1e-9, with the same seeds and readiness, so there is no convention difference to document for them. Only `supertrend` differs (item 2).
 9. **Performance (met).** Each new indicator is far above 10 M updates/s (lowest: `bb_upper` 53, `pivot_low_age` 66); a 20-feature frame on 1m, 5m, 15m, 1h and 1D with history depth 8 runs at 10.7 M steps/s, 0.094 µs per 1-minute step (target 1 µs); the allocation test also covers a 35-feature frame and gap/zero-volume series.
 10. **Also closed** (gaps found in the P3-01 review): the allocation test over a gappy series, the timeframe-builder reference with a calendar, a culture test, and a clearer name for an RSI test.
+11. **Closed later:** the 1W / 1M builders and the regime / market-context features that this slice left to P3-01c are built ([P3-01c](P3-01c-weekly-monthly-timeframes-and-market-context.md), [ADR 0033](../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md)).
 
 ## Follow-ups from the final review (minors, none blocks)
 1. `bb_*` and `pivot_*` cost O(n) per update; the 10 M/s target holds for typical n but not for n near `MaxPeriod` (10,000). Consider a lower cap for these families or a monotone window for pivots.

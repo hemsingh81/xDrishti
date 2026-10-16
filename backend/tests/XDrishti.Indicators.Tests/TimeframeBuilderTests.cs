@@ -307,11 +307,11 @@ public sealed class TimeframeBuilderTests
         builder.Ignored.ShouldBe(0);
     }
 
+    // W1 and Mo1 were refused here until P3-01c: they are built now, see WeeklyMonthlyBuilderTests.
     [Theory]
     [InlineData(Timeframe.M1)]
-    [InlineData(Timeframe.W1)]
-    [InlineData(Timeframe.Mo1)]
-    public void Only_the_intraday_timeframes_and_the_day_can_be_built(Timeframe timeframe) =>
+    [InlineData((Timeframe)99)]
+    public void Only_the_intraday_timeframes_the_day_the_week_and_the_month_can_be_built(Timeframe timeframe) =>
         Should.Throw<ArgumentOutOfRangeException>(() => new TimeframeBuilder(timeframe));
 
     [Fact]

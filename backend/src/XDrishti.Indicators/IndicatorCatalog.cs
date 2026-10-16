@@ -5,11 +5,13 @@ namespace XDrishti.Indicators;
 
 /// <summary>
 /// The indicators this library offers, with the metadata the DSL validator and the feature frame need (ADR 0031): parameters with ranges and defaults, warm-up bars as a function of the parameters, session
-/// behaviour and a factory. A test fails if an indicator class is not listed here or if its measured first ready bar differs from the warm-up declared here.
+/// behaviour and a factory. A test fails if an indicator class is not listed here or if its measured first ready bar differs from the warm-up declared here. The twelve date-driven names (the calendar features and
+/// the market context, ADR 0033) are listed like the others; their warm-up is counted in days of the context and measured by a test of their own.
 /// </summary>
 public static class IndicatorCatalog
 {
-    private const int MaxPeriod = 10_000;
+    /// <summary>The largest period, window or slope distance an indicator parameter (and a <see cref="ContextOptions"/> period) accepts.</summary>
+    internal const int MaxPeriod = 10_000;
 
     private static readonly IndicatorInfo[] Entries = Build();
 
@@ -17,12 +19,21 @@ public static class IndicatorCatalog
 
     private static readonly ReadOnlyCollection<IndicatorInfo> AllView = new(Entries);
 
-    private static readonly ReadOnlyCollection<Timeframe> Supported = new([Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1, Timeframe.D1]);
+    private static readonly ReadOnlyCollection<Timeframe> Supported = new(Timeframes.ToArray());
+
+    /// <summary>
+    /// The timeframes a feature may be asked for on, shortest first. A property over a constant span, not a static field: <see cref="IndicatorInfo"/> reads it while the entries are being built (before the fields
+    /// that come after <c>Entries</c> are set), and a span of constants cannot be changed by anyone.
+    /// </summary>
+    internal static ReadOnlySpan<Timeframe> Timeframes => [Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1, Timeframe.D1, Timeframe.W1, Timeframe.Mo1];
 
     /// <summary>Every indicator, in a fixed order. A read-only view: it cannot be turned back into the array behind it.</summary>
     public static IReadOnlyList<IndicatorInfo> All => AllView;
 
-    /// <summary>The timeframes a feature may read: 1m and the derived 5m, 10m, 15m, 30m, 1h and 1D. A read-only view.</summary>
+    /// <summary>
+    /// The timeframes a feature may read: 1m and the derived 5m, 10m, 15m, 30m, 1h, 1D, 1W and 1M, shortest first. Not every indicator runs on every one of them: <see cref="IndicatorInfo.Supports"/> says which do (the
+    /// intraday ones are refused on 1D, 1W and 1M; the per-session ones on 1W and 1M; the date-driven ones run on 1m only). A read-only view.
+    /// </summary>
     public static IReadOnlyList<Timeframe> SupportedTimeframes => Supported;
 
     public static bool TryGet(string? name, out IndicatorInfo info)
@@ -37,7 +48,8 @@ public static class IndicatorCatalog
         return false;
     }
 
-    internal static bool IsSupported(Timeframe timeframe) => timeframe is Timeframe.M1 or Timeframe.M5 or Timeframe.M10 or Timeframe.M15 or Timeframe.M30 or Timeframe.H1 or Timeframe.D1;
+    internal static bool IsSupported(Timeframe timeframe) =>
+        timeframe is Timeframe.M1 or Timeframe.M5 or Timeframe.M10 or Timeframe.M15 or Timeframe.M30 or Timeframe.H1 or Timeframe.D1 or Timeframe.W1 or Timeframe.Mo1;
 
     private static IndicatorInfo[] Build()
     {
@@ -81,6 +93,7 @@ public static class IndicatorCatalog
         AddTrend(list, dmiPeriod, macdParameters, bandParameters, supertrendParameters);
         AddPatterns(list, period, pivotPeriod);
         AddRawBars(list);
+        AddDateFeatures(list);
 
         foreach (var (name, field) in new[]
         {
@@ -177,6 +190,38 @@ public static class IndicatorCatalog
         }
     }
 
+    /// <summary>
+    /// The calendar and market-context features (P3-01c, ADR 0033): twelve names without parameters, asked for on 1m only, that change at most once per India date. They do not read bars: the frame refreshes them at
+    /// the first accepted step of each date, from the date itself or from the latest <see cref="MarketContext"/> day strictly before it. All are <see cref="SessionBehaviour.Continuous"/>. The warm-up is counted in days of the
+    /// context, for the default <see cref="ContextOptions"/> (a frame's instance reports it for the options of its own context): 1 for the calendar features and the VIX and the breadth, 2 for the VIX change, 28 for the
+    /// ADX, 55 for the trend, 252 for the VIX percentile and 265 for the index volatility percentile, the volatility class and the regime.
+    /// </summary>
+    private static void AddDateFeatures(List<IndicatorInfo> list)
+    {
+        var defaults = new ContextOptions();
+        foreach (var (name, kind, text) in new[]
+        {
+            ("day_of_week", ContextFeatureKind.Weekday, "ISO weekday of the India date of the step: Monday 1 to Sunday 7."),
+            ("is_expiry_day", ContextFeatureKind.ExpiryDay, "1 when the India date of the step is one of the expiry dates given in the frame options, else 0."),
+            ("index_trend", ContextFeatureKind.IndexTrend, "Trend of the regime index as of the previous session: +1 up, 0 range, -1 down (by default: close against its 50-day average, the average's 5-day slope and an ADX(14) of at least 20)."),
+            ("index_adx", ContextFeatureKind.IndexAdx, "Wilder ADX(14) of the regime index's daily bars as of the previous session."),
+            ("index_vol_pct", ContextFeatureKind.IndexVolPct, "Percentile rank (0 to 100) of the regime index's ATR as a percent of its close over the last 252 sessions (by default), as of the previous session."),
+            ("vix", ContextFeatureKind.Vix, "VIX close of the previous session; not ready when that session has none."),
+            ("vix_pct", ContextFeatureKind.VixPct, "Percentile rank (0 to 100) of the VIX close of the previous session over the last 252 sessions (by default) that have one."),
+            ("vix_chg", ContextFeatureKind.VixChg, "Percent change of the VIX close of the previous session against the session before it; not ready when either has none."),
+            ("breadth", ContextFeatureKind.Breadth, "Breadth of the previous session in percent (tracked stocks above their 20-day average); not ready when that session has none."),
+            ("regime_trend", ContextFeatureKind.RegimeTrend, "Trend part of the market regime as of the previous session: +1 up, 0 range, -1 down (the same as index_trend)."),
+            ("regime_vol", ContextFeatureKind.RegimeVol, "Volatility part of the market regime as of the previous session: 0 low, 1 normal, 2 high (terciles of the mean of the VIX and index percentiles)."),
+            ("regime", ContextFeatureKind.Regime, "Market regime as of the previous session: 1 (UP_LOW_VOL) to 9 (DOWN_HIGH_VOL), (1 - regime_trend) * 3 + regime_vol + 1."),
+        })
+        {
+            var captured = kind;
+            list.Add(new IndicatorInfo(
+                name, text, [], SessionBehaviour.Continuous, false, PriceSource.Close, false,
+                _ => ContextFeature.WarmUpDays(captured, defaults), _ => new ContextFeature(captured), dateFeature: kind));
+        }
+    }
+
     private static SpecProblem? FastBelowSlow(FeatureSpec spec) =>
         spec.P1 < spec.P2 ? null : new SpecProblem(0, "'fast' must be below 'slow'.");
 
@@ -197,9 +242,9 @@ public static class IndicatorCatalog
     /// <summary>The length in minutes of one bar of the timeframe (1 for 1m); a day is treated as a single bar.</summary>
     private static int BarMinutes(FeatureSpec spec) => Math.Max(1, spec.Timeframe.Minutes());
 
-    /// <summary>How many bars of the timeframe a full regular session has (the last one clipped at the close).</summary>
+    /// <summary>How many bars of the timeframe a full regular session has (the last one clipped at the close); 1 for a calendar timeframe (a bar of a day, a week or a month holds the session).</summary>
     private static int BarsPerSession(Timeframe timeframe) =>
-        timeframe == Timeframe.D1 ? 1 : (SessionClock.RegularBars + timeframe.Minutes() - 1) / timeframe.Minutes();
+        timeframe.Minutes() == 0 ? 1 : (SessionClock.RegularBars + timeframe.Minutes() - 1) / timeframe.Minutes();
 
     private static SpecProblem? WholeBars(FeatureSpec spec) =>
         (int)spec.P1 % BarMinutes(spec) == 0 ? null : new SpecProblem(0, $"The opening range must be a whole number of {spec.Timeframe.ToCode()} bars.");

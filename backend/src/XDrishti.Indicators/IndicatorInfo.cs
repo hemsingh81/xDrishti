@@ -17,6 +17,8 @@ public sealed class IndicatorInfo
 
     private readonly Func<FeatureSpec, SpecProblem?>? _extraCheck;
 
+    private readonly ContextFeatureKind? _dateFeature;
+
     internal IndicatorInfo(
         string name,
         string summary,
@@ -27,7 +29,8 @@ public sealed class IndicatorInfo
         bool intradayOnly,
         Func<FeatureSpec, int> warmUp,
         Func<FeatureSpec, IIndicator> factory,
-        Func<FeatureSpec, SpecProblem?>? extraCheck = null)
+        Func<FeatureSpec, SpecProblem?>? extraCheck = null,
+        ContextFeatureKind? dateFeature = null)
     {
         Name = name;
         Summary = summary;
@@ -39,6 +42,19 @@ public sealed class IndicatorInfo
         _warmUp = warmUp;
         _factory = factory;
         _extraCheck = extraCheck;
+        _dateFeature = dateFeature;
+
+        // Built here, once, from the fixed order of the timeframes: the catalog is shared by the whole process, so nothing in it may be filled in lazily by whichever thread reads first.
+        var supported = new List<Timeframe>(IndicatorCatalog.Timeframes.Length);
+        foreach (var timeframe in IndicatorCatalog.Timeframes)
+        {
+            if (Supports(timeframe))
+            {
+                supported.Add(timeframe);
+            }
+        }
+
+        SupportedTimeframes = new ReadOnlyCollection<Timeframe>(supported);
     }
 
     /// <summary>The lower-case snake_case name used in specs and in the DSL.</summary>
@@ -49,6 +65,7 @@ public sealed class IndicatorInfo
     /// <summary>The parameters in the order of <see cref="FeatureSpec.P1"/> … <see cref="FeatureSpec.P4"/> (at most four).</summary>
     public IReadOnlyList<IndicatorParameter> Parameters { get; }
 
+    /// <summary>Whether the indicator runs on across sessions (a rolling window, a trend, a pattern, a raw bar) or restarts at each India trading date; the second kind is refused on 1W and 1M, whose bars span many dates.</summary>
     public SessionBehaviour SessionBehaviour { get; }
 
     /// <summary>Whether the indicator reads a chosen price (<see cref="FeatureSpec.Source"/>); the others read the whole bar and treat all sources as the same feature.</summary>
@@ -56,17 +73,54 @@ public sealed class IndicatorInfo
 
     public PriceSource DefaultSource { get; }
 
-    /// <summary>Whether the indicator only makes sense on intraday bars (it is refused on 1D).</summary>
+    /// <summary>Whether the indicator only makes sense on intraday bars (it is refused on 1D, 1W and 1M).</summary>
     public bool IntradayOnly { get; }
 
     /// <summary>
+    /// Whether the feature changes at most once per India date and is asked for on 1m only: the two calendar features (<c>day_of_week</c>, <c>is_expiry_day</c>) and the ten that read the daily
+    /// <see cref="MarketContext"/>. The frame keeps them in a lane of their own that is refreshed at the first accepted step of each date and writes their history once per date (ADR 0033); their warm-up is counted
+    /// in days of the context (see <see cref="ContextFeature"/>). The ones that read the context need <see cref="FrameOptions.Context"/>, <c>is_expiry_day</c> needs <see cref="FrameOptions.ExpiryDays"/>.
+    /// </summary>
+    public bool DateDriven => _dateFeature is not null;
+
+    /// <summary>Which date-driven feature this is, or null for an indicator that reads bars.</summary>
+    internal ContextFeatureKind? DateFeature => _dateFeature;
+
+    /// <summary>
+    /// The timeframes a feature of this indicator may be asked for on, shortest first: every one of <see cref="IndicatorCatalog.SupportedTimeframes"/> for which <see cref="Supports"/> is true (nine for the continuous
+    /// indicators; six for the intraday-only ones, seven for the other session-bound ones and only 1m for the date-driven ones). A read-only view, built once with the indicator (immutable, so any thread may read it).
+    /// </summary>
+    public IReadOnlyList<Timeframe> SupportedTimeframes { get; }
+
+    /// <summary>
+    /// Whether a feature of this indicator may be asked for on the timeframe: one of <see cref="IndicatorCatalog.SupportedTimeframes"/>, not an intraday-only indicator (<c>vwap</c>, <c>or_high</c>, <c>or_low</c>) on 1D,
+    /// 1W or 1M, and not a per-session indicator (those and <c>prev_day_*</c>, <c>today_*</c>, <c>gap_pct</c>) on 1W or 1M: a weekly or monthly bar has no session to restart at. A date-driven feature
+    /// (<see cref="DateDriven"/>) changes once per date whatever the bar, so it is asked for on 1m only. The frame refuses a spec the catalog does not support with an error on <c>specs[i].timeframe</c> that names the
+    /// feature and the timeframe.
+    /// </summary>
+    public bool Supports(Timeframe timeframe) =>
+        IndicatorCatalog.IsSupported(timeframe)
+        && !(IntradayOnly && timeframe is Timeframe.D1 or Timeframe.W1 or Timeframe.Mo1)
+        && !(SessionBehaviour == SessionBehaviour.PerSession && timeframe is Timeframe.W1 or Timeframe.Mo1)
+        && !(DateDriven && timeframe != Timeframe.M1);
+
+    /// <summary>
     /// The bars of the spec's own timeframe after which the indicator is first ready on an unbroken series (a session indicator: counted from the first bar of the first session). For the pivots it is the
-    /// earliest bar at which a pivot can be confirmed (<c>2n + 1</c>): they are ready from the first pivot on, which depends on the data.
+    /// earliest bar at which a pivot can be confirmed (<c>2n + 1</c>): they are ready from the first pivot on, which depends on the data. For a date-driven feature (<see cref="DateDriven"/>) it is counted in
+    /// <b>days of the market context</b> and declared for the default <see cref="ContextOptions"/> (the instance a frame runs reports the number for the options of its own context): 1 for <c>day_of_week</c>,
+    /// <c>is_expiry_day</c>, <c>vix</c> and <c>breadth</c>, 55 for <c>index_trend</c>, 265 for <c>regime</c> (see <see cref="ContextFeature"/>).
     /// </summary>
     public int WarmUp(in FeatureSpec spec) => _warmUp(spec);
 
-    /// <summary>A fresh instance for the spec (a <see cref="PriceSource.Default"/> source is resolved first). The spec must have been validated.</summary>
+    /// <summary>
+    /// A fresh instance for the spec (a <see cref="PriceSource.Default"/> source is resolved first). The spec must have been validated. A date-driven feature is created without a context or expiry dates, so only
+    /// <c>day_of_week</c> is ever ready on it; the frame builds the others with <see cref="FrameOptions.Context"/> and <see cref="FrameOptions.ExpiryDays"/>.
+    /// </summary>
     public IIndicator Create(in FeatureSpec spec) => _factory(Canonical(spec));
+
+    /// <summary>A fresh instance for the spec, given the context and the expiry dates of the frame: a date-driven feature reads them, any other indicator is created as by <see cref="Create(in FeatureSpec)"/>.</summary>
+    internal IIndicator CreateWith(in FeatureSpec spec, MarketContext? context, IReadOnlySet<DateOnly>? expiryDays) =>
+        _dateFeature is { } kind ? new ContextFeature(kind, context, expiryDays) : _factory(Canonical(spec));
 
     /// <summary>A spec of this indicator with the default parameters and source on the timeframe. The defaults are those of 1-minute bars: an opening range on a longer timeframe needs a whole number of bars, so its default may be refused there.</summary>
     public FeatureSpec DefaultSpec(Timeframe timeframe = Timeframe.M1) => new(
@@ -90,11 +144,15 @@ public sealed class IndicatorInfo
         var before = errors.Items.Count;
         if (!IndicatorCatalog.IsSupported(spec.Timeframe))
         {
-            errors.Add(path + ".timeframe", "The timeframe must be one of 1m, 5m, 10m, 15m, 30m, 1h, 1D.");
+            errors.Add(path + ".timeframe", "The timeframe must be one of 1m, 5m, 10m, 15m, 30m, 1h, 1D, 1W, 1M.");
         }
-        else if (IntradayOnly && spec.Timeframe == Timeframe.D1)
+        else if (!Supports(spec.Timeframe))
         {
-            errors.Add(path + ".timeframe", Text($"'{Name}' needs intraday bars; it cannot be computed on 1D."));
+            errors.Add(path + ".timeframe", DateDriven
+                ? Text($"'{Name}' changes once per date; it can only be asked for on 1m (the default), not on {spec.Timeframe.ToCode()}.")
+                : IntradayOnly
+                    ? Text($"'{Name}' needs intraday bars; it cannot be computed on {spec.Timeframe.ToCode()}.")
+                    : Text($"'{Name}' is a value of the trading session; it cannot be computed on {spec.Timeframe.ToCode()} (read it on 1m or 1D)."));
         }
 
         if (spec.Source is not (PriceSource.Default or PriceSource.Close or PriceSource.Open or PriceSource.High or PriceSource.Low))

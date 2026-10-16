@@ -70,6 +70,82 @@ internal static class SeriesGenerator
         return bars;
     }
 
+    /// <summary>
+    /// A long, cheap series for the weekly and monthly lanes: <paramref name="calendarDays"/> consecutive India dates from a seeded day between mid-2026 and late 2028 (so year ends and a leap February occur). A weekday is a
+    /// holiday (8%, returned with the bars) or a session of a few bars at random minutes — it ends at the 15:29 close three times in four, otherwise earlier, and the next date has to close it —, of a single bar, or, for
+    /// one day in twelve, of all 375 minutes. A Saturday has a short session one time in four and a Sunday a Muhurat evening one time in twenty. Prices are a random walk; some volumes are zero. The same seed always gives the
+    /// same series. The builder tests use <see cref="BarFixtures.RandomPeriods"/> instead (mostly whole sessions, so that periods are complete and their bar counts exact).
+    /// </summary>
+    public static PeriodSeries Thin(int seed, int calendarDays)
+    {
+        var random = new Random(seed);
+        var date = new DateOnly(2026, 6, 1).AddDays(random.Next(0, 900));
+        var bars = new List<Bar>();
+        var holidays = new HashSet<DateOnly>();
+        var price = 100 + random.NextDouble() * 4_900;
+        for (var i = 0; i < calendarDays; i++, date = date.AddDays(1))
+        {
+            IEnumerable<int> minutes;
+            if (date.DayOfWeek == DayOfWeek.Saturday)
+            {
+                minutes = random.NextDouble() < 0.25 ? Enumerable.Range(Minutes.Open, random.Next(1, 40)) : [];
+            }
+            else if (date.DayOfWeek == DayOfWeek.Sunday)
+            {
+                minutes = random.NextDouble() < 0.05 ? Enumerable.Range(Minutes.At(18, 15), random.Next(1, 60)) : [];
+            }
+            else if (random.NextDouble() < 0.08)
+            {
+                holidays.Add(date);
+                minutes = [];
+            }
+            else
+            {
+                minutes = WeekdayMinutes(random);
+            }
+
+            foreach (var minute in minutes)
+            {
+                var open = price;
+                var close = Math.Max(1, open + (random.NextDouble() - 0.5) * price * 0.006);
+                var high = Math.Max(open, close) + random.NextDouble() * price * 0.001;
+                var low = Math.Max(0.5, Math.Min(open, close) - random.NextDouble() * price * 0.001);
+                bars.Add(Minutes.Bar(date, minute, open, high, low, close, random.NextDouble() < 0.05 ? 0 : random.Next(1, 80_000)));
+                price = close;
+            }
+        }
+
+        return new PeriodSeries(bars, holidays);
+    }
+
+    private static List<int> WeekdayMinutes(Random random)
+    {
+        var roll = random.NextDouble();
+        if (roll < 1.0 / 12)
+        {
+            return [.. Enumerable.Range(Minutes.Open, SessionClock.RegularBars)];
+        }
+
+        if (roll < 0.2)
+        {
+            return [random.Next(Minutes.Open, SessionClock.CloseMinute)];
+        }
+
+        var minutes = new SortedSet<int>();
+        if (random.NextDouble() < 0.75)
+        {
+            minutes.Add(SessionClock.CloseMinute - 1);
+        }
+
+        var count = random.Next(2, 13);
+        while (minutes.Count < count)
+        {
+            minutes.Add(random.Next(Minutes.Open, SessionClock.CloseMinute));
+        }
+
+        return [.. minutes];
+    }
+
     private static double Session(Random random, List<Bar> bars, DateOnly date, int startMinute, int count, double price, double gapProbability, bool plain = false)
     {
         var open = price;

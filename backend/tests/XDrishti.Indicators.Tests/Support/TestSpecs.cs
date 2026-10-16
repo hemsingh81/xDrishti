@@ -5,14 +5,17 @@ namespace XDrishti.Indicators.Tests.Support;
 /// <summary>Feature specs that exercise every catalog entry with more than one parameter set (the edge ones included).</summary>
 internal static class TestSpecs
 {
-    /// <summary>Several specs per catalog indicator on the timeframe; indicators that cannot run there (vwap, opening range on 1D) are left out.</summary>
+    /// <summary>
+    /// Several specs per catalog indicator on the timeframe; indicators that cannot run there (vwap and the opening range on 1D, those and the session values on 1W and 1M) are left out, and so are the date-driven
+    /// features (<see cref="ContextNames"/>): they read a market context rather than bars and have tests of their own.
+    /// </summary>
     public static List<FeatureSpec> Variants(Timeframe timeframe)
     {
         var length = Math.Max(1, timeframe.Minutes());
         var specs = new List<FeatureSpec>();
         foreach (var info in IndicatorCatalog.All)
         {
-            if (info.IntradayOnly && timeframe == Timeframe.D1)
+            if (!info.Supports(timeframe) || info.DateDriven)
             {
                 continue;
             }
@@ -22,6 +25,18 @@ internal static class TestSpecs
 
         return specs;
     }
+
+    /// <summary>The two calendar features and the ten that read the market context, in the order of the catalog (independent of the catalog's own flags).</summary>
+    public static IReadOnlyList<string> ContextNames { get; } =
+    [
+        "day_of_week", "is_expiry_day", "index_trend", "index_adx", "index_vol_pct", "vix", "vix_pct", "vix_chg", "breadth", "regime_trend", "regime_vol", "regime",
+    ];
+
+    /// <summary>The ten names that read the market context (all of <see cref="ContextNames"/> but the two calendar ones).</summary>
+    public static IReadOnlyList<string> MarketContextNames { get; } = [.. ContextNames.Skip(2)];
+
+    /// <summary>One spec per catalog indicator that runs on the timeframe (the first variant of each): a small frame that still covers every kind of state, for the checks that run at every step of a long series.</summary>
+    public static List<FeatureSpec> Representatives(Timeframe timeframe) => [.. Variants(timeframe).DistinctBy(s => s.Name)];
 
     /// <summary>The (fast, slow, signal) sets, the (n, k) band sets and the (n, mult) Supertrend sets that the multi-parameter indicators are tested with: small and edge ones included.</summary>
     public static IReadOnlyList<(int Fast, int Slow, int Signal)> MacdSets { get; } = [(2, 3, 1), (3, 6, 4), (12, 26, 9), (5, 40, 3)];
@@ -82,5 +97,15 @@ internal static class TestSpecs
     public static string Describe(FeatureSpec spec) =>
         string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{spec.Name}({spec.P1}, {spec.P2}, {spec.P3}) {spec.Timeframe.ToCode()} {spec.Source}");
 
+    /// <summary>The derived timeframes up to the day: the ones whose buckets the intraday and day reference builds from a few sessions of bars.</summary>
     public static IEnumerable<Timeframe> HigherTimeframes { get; } = [Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1, Timeframe.D1];
+
+    /// <summary>The weekly and monthly timeframes, whose features need weeks and months of bars: the tests that read them use the long series of <see cref="SeriesGenerator.Thin"/>.</summary>
+    public static IReadOnlyList<Timeframe> PeriodTimeframes { get; } = [Timeframe.W1, Timeframe.Mo1];
+
+    /// <summary>Every derived timeframe, the weekly and monthly ones included.</summary>
+    public static IEnumerable<Timeframe> DerivedTimeframes { get; } = [.. HigherTimeframes, .. PeriodTimeframes];
+
+    /// <summary>The timeframes of the intraday and day families (1m up to 1D), for the tests whose short series cannot fill a week.</summary>
+    public static IReadOnlyList<Timeframe> UpToDay { get; } = [Timeframe.M1, .. HigherTimeframes];
 }

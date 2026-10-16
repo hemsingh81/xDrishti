@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using System.Globalization;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
@@ -18,12 +19,30 @@ namespace XDrishti.Indicators;
 /// <para>
 /// Incomplete higher-timeframe bars (a minute was missing) are consumed like any other and counted in <see cref="IncompleteBarsConsumed"/>. Thread-confined: one frame per instrument and worker.
 /// </para>
+/// <para>
+/// <b>1W and 1M.</b> A weekly or monthly feature reads the closed weeks or months only — never the one running —, so <c>close</c> on 1W is the close of the last week that has closed, at every minute of the week in
+/// progress before its closing step. With a <see cref="TradingCalendar"/> in <see cref="FrameOptions"/> a week or month closes at the step that closes the <i>last session of the period</i> (the same step at which the 1D lane closes that
+/// date); without one, at the first bar of the next period: later, never earlier (see <see cref="TimeframeBuilder"/>). Closed flags, <see cref="At"/> (in weekly or monthly bars) and the warm-up (in bars of the feature's
+/// own timeframe: <c>ema(10)</c> on 1W needs ten weeks) work as for every other timeframe. The session-bound features (<c>vwap</c>, <c>or_high</c>, <c>or_low</c>, <c>prev_day_*</c>, <c>today_*</c>, <c>gap_pct</c>) are
+/// refused on 1W and 1M (see <see cref="IndicatorInfo.Supports"/>).
+/// </para>
+/// <para>
+/// <b>The calendar and the market context (ADR 0033).</b> The twelve date-driven features (<c>day_of_week</c>, <c>is_expiry_day</c> and the ten that read <see cref="FrameOptions.Context"/>: <c>index_trend</c>,
+/// <c>index_adx</c>, <c>index_vol_pct</c>, <c>vix</c>, <c>vix_pct</c>, <c>vix_chg</c>, <c>breadth</c>, <c>regime_trend</c>, <c>regime_vol</c>, <c>regime</c>) are asked for on 1m and live in a <i>date lane</i> of their own.
+/// At the <b>first accepted step of each India date</b> <i>D</i> the lane refreshes them all: the weekday and the expiry flag from <i>D</i> itself, the context features from the latest context day <b>strictly before</b>
+/// <i>D</i> (a day record dated <i>D</i> is in the context but is never read on <i>D</i>, so the value at 09:15 and at 15:29 is the same and a strategy never sees today's close). Every other step of the date changes nothing.
+/// The history of these features is written once per date, so <see cref="At"/>(h, 1) is the value the previous date of the frame had; a bar the ordering guard skips does not refresh the lane. The lane adds no
+/// allocation, also at the step that changes the date, and a <see cref="FrameOptions.Context"/> shared by many frames is only read. A frame with such a feature has a 1m lane even if no other feature is on 1m, so
+/// <see cref="BarClosed"/>(M1) works for it.
+/// </para>
 /// </summary>
 public sealed class FeatureFrame
 {
     public const string InvalidCode = "indicators.invalid_features";
 
     private readonly Lane[] _lanes;
+
+    private readonly Lane? _dateLane;
 
     private readonly Lane?[] _laneByTimeframe;
 
@@ -43,9 +62,10 @@ public sealed class FeatureFrame
 
     private long _lastEpoch;
 
-    private FeatureFrame(Lane[] lanes, Lane?[] laneByTimeframe, IIndicator[] byHandle, Lane[] laneOfHandle, int[] historyBase, FeatureSpec[] specs, Dictionary<FeatureSpec, int> handles, int depth)
+    private FeatureFrame(Lane[] lanes, Lane? dateLane, Lane?[] laneByTimeframe, IIndicator[] byHandle, Lane[] laneOfHandle, int[] historyBase, FeatureSpec[] specs, Dictionary<FeatureSpec, int> handles, int depth)
     {
         _lanes = lanes;
+        _dateLane = dateLane;
         _laneByTimeframe = laneByTimeframe;
         _byHandle = byHandle;
         _laneOfHandle = laneOfHandle;
@@ -62,7 +82,7 @@ public sealed class FeatureFrame
     public int HistoryDepth => _depth;
 
     /// <summary>How many distinct indicator instances run (specs for the same feature share one).</summary>
-    internal int InstanceCount => _lanes.Sum(l => l.Indicators.Length);
+    internal int InstanceCount => _lanes.Sum(l => l.Indicators.Length) + (_dateLane?.Indicators.Length ?? 0);
 
     /// <summary>How many timeframe builders run (one per higher timeframe asked for).</summary>
     internal int BuilderCount => _lanes.Count(l => l.Builder is not null);
@@ -81,11 +101,13 @@ public sealed class FeatureFrame
 
     /// <summary>
     /// Validates the options and the specs before any bar is fed and builds the frame. An unknown indicator, a parameter outside its range or in a bad combination (<c>fast ≥ slow</c>), a timeframe other than
-    /// 1m, 5m, 10m, 15m, 30m, 1h or 1D, an indicator that cannot run on the timeframe, a history depth outside 1 to 256 — each is reported with its field (<c>specs[2].p1</c>, <c>options.historyDepth</c>) in a
-    /// validation error; nothing is thrown.
+    /// 1m, 5m, 10m, 15m, 30m, 1h, 1D, 1W or 1M, an indicator that cannot run on the timeframe (<see cref="IndicatorInfo.Supports"/>: its message names the feature and the timeframe), a history depth outside 1 to 256 — each is
+    /// reported with its field (<c>specs[2].p1</c>, <c>specs[2].timeframe</c>, <c>options.historyDepth</c>) in a validation error; nothing is thrown. A date-driven feature on another timeframe than 1m is refused on
+    /// <c>specs[i].timeframe</c>; a context feature without <see cref="FrameOptions.Context"/> on <c>options.context</c> and <c>is_expiry_day</c> without <see cref="FrameOptions.ExpiryDays"/> on <c>options.expiryDays</c>
+    /// (each reported once, naming the features).
     /// </summary>
     /// <param name="specs">The features to compute; the handle of a spec is its index.</param>
-    /// <param name="options">The trading calendar and the history depth; the defaults (no calendar, depth 8) when null.</param>
+    /// <param name="options">The trading calendar, the history depth, the market context and the expiry dates; the defaults (no calendar, depth 8, no context, no expiry dates) when null.</param>
     public static Result<FeatureFrame> Create(IReadOnlyList<FeatureSpec> specs, FrameOptions? options = null)
     {
         options ??= new FrameOptions();
@@ -101,6 +123,8 @@ public sealed class FeatureFrame
         }
 
         var infos = new IndicatorInfo?[specs.Count];
+        List<string>? needContext = null;
+        List<string>? needExpiryDays = null;
         for (var i = 0; i < specs.Count; i++)
         {
             var spec = specs[i];
@@ -113,6 +137,27 @@ public sealed class FeatureFrame
 
             infos[i] = info;
             info.Validate(spec, path, errors);
+            if (info.DateFeature is { } kind)
+            {
+                if (ContextFeature.ReadsContext(kind) && options.Context is null)
+                {
+                    Note(ref needContext, info.Name);
+                }
+                else if (kind == ContextFeatureKind.ExpiryDay && options.ExpiryDays is null)
+                {
+                    Note(ref needExpiryDays, info.Name);
+                }
+            }
+        }
+
+        if (needContext is not null)
+        {
+            errors.Add("options.context", "The market context is needed by " + NamesText(needContext) + "; give FrameOptions.Context.");
+        }
+
+        if (needExpiryDays is not null)
+        {
+            errors.Add("options.expiryDays", "The expiry dates are needed by " + NamesText(needExpiryDays) + "; give FrameOptions.ExpiryDays (an empty set is allowed).");
         }
 
         if (errors.HasErrors)
@@ -124,8 +169,11 @@ public sealed class FeatureFrame
         var handles = new Dictionary<FeatureSpec, int>(specs.Count);
         var shared = new Dictionary<FeatureSpec, (Timeframe Timeframe, int Index)>(specs.Count);
         var laneIndicators = new Dictionary<Timeframe, List<IIndicator>>();
+        var dateIndicators = new List<IIndicator>();
+        var expiryDays = options.ExpiryDays is null ? null : options.ExpiryDays as FrozenSet<DateOnly> ?? options.ExpiryDays.ToFrozenSet();
         var byHandle = new IIndicator[specs.Count];
         var timeframeOfHandle = new Timeframe[specs.Count];
+        var onDate = new bool[specs.Count];
         var indexOfHandle = new int[specs.Count];
         var canonicalSpecs = new FeatureSpec[specs.Count];
         for (var i = 0; i < specs.Count; i++)
@@ -133,19 +181,25 @@ public sealed class FeatureFrame
             var info = infos[i]!;
             var canonical = info.Canonical(specs[i]);
             canonicalSpecs[i] = canonical;
+            onDate[i] = info.DateDriven;
             if (!shared.TryGetValue(canonical, out var placed))
             {
-                if (!laneIndicators.TryGetValue(canonical.Timeframe, out var list))
+                List<IIndicator>? list;
+                if (info.DateDriven)
+                {
+                    list = dateIndicators;
+                }
+                else if (!laneIndicators.TryGetValue(canonical.Timeframe, out list))
                 {
                     laneIndicators.Add(canonical.Timeframe, list = []);
                 }
 
                 placed = (canonical.Timeframe, list.Count);
-                list.Add(info.Create(canonical));
+                list.Add(info.CreateWith(canonical, options.Context, expiryDays));
                 shared.Add(canonical, placed);
             }
 
-            byHandle[i] = laneIndicators[placed.Timeframe][placed.Index];
+            byHandle[i] = info.DateDriven ? dateIndicators[placed.Index] : laneIndicators[placed.Timeframe][placed.Index];
             timeframeOfHandle[i] = placed.Timeframe;
             indexOfHandle[i] = placed.Index;
             handles.TryAdd(canonical, i);
@@ -155,32 +209,38 @@ public sealed class FeatureFrame
         var laneByTimeframe = new Lane?[Enum.GetValues<Timeframe>().Length];
         foreach (var timeframe in IndicatorCatalog.SupportedTimeframes)
         {
-            if (laneIndicators.TryGetValue(timeframe, out var list))
+            // the date-driven features are asked for on 1m, so such a frame has a 1m lane even when no bar feature is on it
+            if (laneIndicators.TryGetValue(timeframe, out var list) || (timeframe == Timeframe.M1 && dateIndicators.Count > 0))
             {
-                var lane = new Lane(timeframe, timeframe == Timeframe.M1 ? null : new TimeframeBuilder(timeframe, options.Calendar), [.. list], depth);
+                var lane = new Lane(timeframe, timeframe == Timeframe.M1 ? null : new TimeframeBuilder(timeframe, options.Calendar), list is null ? [] : [.. list], depth);
                 lanes.Add(lane);
                 laneByTimeframe[(int)timeframe] = lane;
             }
         }
 
+        var dateLane = dateIndicators.Count > 0 ? new Lane(Timeframe.M1, null, [.. dateIndicators], depth) : null;
         var laneOfHandle = new Lane[specs.Count];
         var historyBase = new int[specs.Count];
         for (var i = 0; i < specs.Count; i++)
         {
-            laneOfHandle[i] = laneByTimeframe[(int)timeframeOfHandle[i]]!;
+            laneOfHandle[i] = onDate[i] ? dateLane! : laneByTimeframe[(int)timeframeOfHandle[i]]!;
             historyBase[i] = indexOfHandle[i] * depth;
         }
 
-        return Result.Success(new FeatureFrame([.. lanes], laneByTimeframe, byHandle, laneOfHandle, historyBase, canonicalSpecs, handles, depth));
+        return Result.Success(new FeatureFrame([.. lanes], dateLane, laneByTimeframe, byHandle, laneOfHandle, historyBase, canonicalSpecs, handles, depth));
     }
 
     /// <summary>Builds a frame with the default history depth and the trading calendar given to the timeframe builders (see <see cref="FrameOptions"/>).</summary>
     public static Result<FeatureFrame> Create(IReadOnlyList<FeatureSpec> specs, TradingCalendar? calendar) => Create(specs, new FrameOptions(calendar));
 
-    /// <summary>Whether the feature behind the handle has a value yet.</summary>
+    /// <summary>Whether the feature behind the handle has a value now. A date-driven feature can be not ready again on a date the context has a gap for (no VIX that day).</summary>
     public bool IsReady(int handle) => _byHandle[handle].IsReady;
 
-    /// <summary>The bars of the feature's own timeframe it needs before it is ready (see <see cref="IIndicator.WarmUp"/>).</summary>
+    /// <summary>
+    /// The bars of the feature's own timeframe it needs before it is ready (see <see cref="IIndicator.WarmUp"/>). <b>For a date-driven feature</b> (<see cref="IndicatorInfo.DateDriven"/>) the unit is <b>days of the
+    /// market context</b>, not bars, and the number is that of the context the frame was given (<c>regime</c> needs 265 daily records with the default options): a simulator sizes the preload of the context in days,
+    /// not in 1-minute bars of the feature's timeframe.
+    /// </summary>
     public int WarmUp(int handle) => _byHandle[handle].WarmUp;
 
     /// <summary>The spec behind a handle, in canonical form (a <see cref="PriceSource.Default"/> source resolved, an ignored source close).</summary>
@@ -304,6 +364,17 @@ public sealed class FeatureFrame
                 }
             }
         }
+
+        if (_dateLane is { } dateLane)
+        {
+            var day = IndiaDays.DayOf(minuteBar.EpochSeconds);
+            if (!dateLane.DayKnown || day != dateLane.Day)
+            {
+                dateLane.DayKnown = true;
+                dateLane.Day = day;
+                Consume(dateLane, minuteBar);
+            }
+        }
     }
 
     /// <summary>Returns the frame to the state after <see cref="Create(IReadOnlyList{FeatureSpec}, FrameOptions?)"/>.</summary>
@@ -314,12 +385,24 @@ public sealed class FeatureFrame
             lane.Reset();
         }
 
+        _dateLane?.Reset();
         Steps = 0;
         IgnoredBars = 0;
         IncompleteBarsConsumed = 0;
         _seenBar = false;
         _lastEpoch = 0;
     }
+
+    private static void Note(ref List<string>? names, string name)
+    {
+        names ??= [];
+        if (!names.Contains(name))
+        {
+            names.Add(name);
+        }
+    }
+
+    private static string NamesText(List<string> names) => string.Join(", ", names.Select(n => "'" + n + "'"));
 
     private Lane? LaneOrNull(Timeframe timeframe) => (uint)(int)timeframe < (uint)_laneByTimeframe.Length ? _laneByTimeframe[(int)timeframe] : null;
 
@@ -357,7 +440,7 @@ public sealed class FeatureFrame
         lane.Recorded++;
     }
 
-    /// <summary>The indicators of one timeframe, its builder (none for 1m) and the ring of their recent values.</summary>
+    /// <summary>The indicators of one timeframe, its builder (none for 1m) and the ring of their recent values. The date lane (the date-driven features) is one too, fed once per India date instead of per closed bar.</summary>
     private sealed class Lane
     {
         private readonly int _depth;
@@ -392,6 +475,12 @@ public sealed class FeatureFrame
         /// <summary>The last bar closed (meaningful once <see cref="Recorded"/> is above 0).</summary>
         public ClosedBar Last { get; set; }
 
+        /// <summary>The India date (day number) the date lane last refreshed for; used by the date lane only.</summary>
+        public long Day { get; set; }
+
+        /// <summary>Whether the date lane has refreshed at all (a day number of 0 is a date too).</summary>
+        public bool DayKnown { get; set; }
+
         public void Reset()
         {
             Builder?.Reset();
@@ -405,6 +494,8 @@ public sealed class FeatureFrame
             Recorded = 0;
             ClosedNow = 0;
             Last = default;
+            Day = 0;
+            DayKnown = false;
         }
     }
 }

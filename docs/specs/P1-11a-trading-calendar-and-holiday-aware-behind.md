@@ -1,6 +1,6 @@
 # P1-11a — Trading calendar and holiday-aware "behind" detection
 
-- **Status:** Approved (owner, 2026-10-12, quote in [ADR 0017](../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md)) · **Phase:** P1 — the calendar part of **P1-11** (context data series stay there) · depends on P1-17a
+- **Status:** Approved (owner, 2026-10-12, quote in [ADR 0017](../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md)) · **Phase:** P1 — the calendar part of **P1-11** (the daily context data series — index, VIX, breadth — moved to **P3-01d**, [ADR 0033](../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md)) · depends on P1-17a
 ## Goal
 The system knows which dates had a session; "behind", gaps, the schedule and quality all use it.
 ## Backend

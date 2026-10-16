@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Reflection;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Indicators.Tests.Support;
 
@@ -8,6 +9,17 @@ namespace XDrishti.Indicators.Tests;
 public sealed class IndicatorCatalogTests
 {
     private static readonly List<Bar> Sessions = SeriesGenerator.Sessions(7, 60);
+
+    /// <summary>1,100 gap-free sessions (about 220 weeks, 52 months): enough weekly and monthly bars for the longest warm-up of the test variants (42).</summary>
+    private static readonly Lazy<List<Bar>> LongSessions = new(() => SeriesGenerator.Sessions(7, 1_100));
+
+    private static readonly string[] IntradayOnlyNames = ["vwap", "or_high", "or_low"];
+
+    /// <summary>The names that are tied to the trading session of one India date and so are refused on weekly and monthly bars (independent of the catalog's own flags).</summary>
+    private static readonly string[] SessionBound =
+    [
+        "vwap", "or_high", "or_low", "prev_day_open", "prev_day_high", "prev_day_low", "prev_day_close", "prev_day_volume", "today_open", "today_high", "today_low", "gap_pct",
+    ];
 
     [Fact]
     public void Every_public_indicator_class_is_produced_by_a_catalog_entry_and_every_entry_by_an_indicator_class()
@@ -83,7 +95,13 @@ public sealed class IndicatorCatalogTests
     {
         foreach (var timeframe in IndicatorCatalog.SupportedTimeframes)
         {
+            // 1W and 1M: the first ready bar is measured in weeks and months, so the series is years long (cheap: the builders run at over 100 million minute bars per second)
             var sessionBars = timeframe == Timeframe.M1 ? Sessions : Closed(timeframe);
+            if (timeframe is Timeframe.W1 or Timeframe.Mo1)
+            {
+                sessionBars.Count.ShouldBeGreaterThan(timeframe == Timeframe.W1 ? 200 : 45, timeframe.ToCode() + ": enough closed bars for the longest warm-up (42)");
+            }
+
             foreach (var spec in TestSpecs.Variants(timeframe))
             {
                 IndicatorCatalog.TryGet(spec.Name, out var info).ShouldBeTrue();
@@ -134,7 +152,7 @@ public sealed class IndicatorCatalogTests
     }
 
     [Fact]
-    public void The_catalog_lists_the_forty_four_names_of_p3_01_and_p3_01b()
+    public void The_catalog_lists_the_forty_four_names_of_p3_01_and_p3_01b_and_the_twelve_date_driven_ones_of_p3_01c()
     {
         string[] added =
         [
@@ -142,8 +160,10 @@ public sealed class IndicatorCatalogTests
             "inside_bar", "nr", "engulfing", "pivot_high", "pivot_low", "pivot_high_age", "pivot_low_age", "open", "high", "low", "close", "volume",
         ];
 
-        IndicatorCatalog.All.Count.ShouldBe(19 + added.Length);
-        IndicatorCatalog.All.Count.ShouldBe(44);
+        IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(19 + added.Length);
+        IndicatorCatalog.All.Count(i => !i.DateDriven).ShouldBe(44);
+        IndicatorCatalog.All.Count.ShouldBe(44 + TestSpecs.ContextNames.Count);
+        IndicatorCatalog.All.Count.ShouldBe(56);
         foreach (var name in added)
         {
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue(name);
@@ -239,10 +259,231 @@ public sealed class IndicatorCatalogTests
     [Fact]
     public void Default_specs_of_the_catalog_are_valid_where_the_timeframe_allows()
     {
+        // the date-driven names need the context and the expiry dates in the options; an empty context and an empty set are enough for the frame to be valid
+        var options = new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>());
         foreach (var info in IndicatorCatalog.All.Where(i => !i.Name.StartsWith("or_", StringComparison.Ordinal)))
         {
-            FeatureFrame.Create([info.DefaultSpec()]).IsSuccess.ShouldBeTrue(info.Name);
+            FeatureFrame.Create([info.DefaultSpec()], options).IsSuccess.ShouldBeTrue(info.Name);
+            foreach (var timeframe in IndicatorCatalog.SupportedTimeframes)
+            {
+                FeatureFrame.Create([info.DefaultSpec(timeframe)], options).IsSuccess.ShouldBe(info.Supports(timeframe), $"{info.Name} on {timeframe.ToCode()}");
+            }
         }
+    }
+
+    [Fact]
+    public void The_supported_timeframes_are_the_nine_stored_ones_shortest_first()
+    {
+        IndicatorCatalog.SupportedTimeframes.ShouldBe([Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1, Timeframe.D1, Timeframe.W1, Timeframe.Mo1]);
+        IndicatorCatalog.SupportedTimeframes.ShouldBe(Timeframes.All);
+    }
+
+    [Fact]
+    public void Weekly_and_monthly_bars_take_every_continuous_indicator_and_refuse_the_session_bound_ones()
+    {
+        foreach (var timeframe in new[] { Timeframe.W1, Timeframe.Mo1 })
+        {
+            var refused = IndicatorCatalog.All.Where(i => !i.Supports(timeframe)).Select(i => i.Name).ToList();
+            var accepted = IndicatorCatalog.All.Where(i => i.Supports(timeframe)).ToList();
+
+            refused.Order().ShouldBe(SessionBound.Concat(TestSpecs.ContextNames).Order(), timeframe.ToCode() + ": the session-bound ones and the date-driven ones (1m only)");
+            accepted.Count.ShouldBe(44 - SessionBound.Length, timeframe.ToCode());
+            accepted.ShouldAllBe(i => i.SessionBehaviour == SessionBehaviour.Continuous && !i.IntradayOnly && !i.DateDriven);
+        }
+    }
+
+    [Fact]
+    public void Daily_bars_refuse_the_intraday_indicators_and_the_date_driven_ones_and_the_intraday_timeframes_refuse_only_the_date_driven_ones()
+    {
+        IndicatorCatalog.All.Where(i => !i.Supports(Timeframe.D1)).Select(i => i.Name).Order().ShouldBe(IntradayOnlyNames.Concat(TestSpecs.ContextNames).Order());
+        IndicatorCatalog.All.ShouldAllBe(i => i.Supports(Timeframe.M1), "1m takes everything");
+        foreach (var timeframe in new[] { Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1 })
+        {
+            IndicatorCatalog.All.Where(i => !i.Supports(timeframe)).Select(i => i.Name).Order().ShouldBe(TestSpecs.ContextNames.Order(), timeframe.ToCode());
+        }
+
+        IndicatorCatalog.All.ShouldAllBe(i => !i.Supports((Timeframe)99) && !i.Supports((Timeframe)(-1)));
+    }
+
+    [Fact]
+    public void Each_indicator_lists_the_supported_timeframes_it_can_run_on_shortest_first_in_a_read_only_view()
+    {
+        foreach (var info in IndicatorCatalog.All)
+        {
+            info.SupportedTimeframes.ShouldBe(IndicatorCatalog.SupportedTimeframes.Where(info.Supports), info.Name);
+            info.SupportedTimeframes.ShouldBeAssignableTo<ReadOnlyCollection<Timeframe>>();
+            info.SupportedTimeframes.ShouldBeSameAs(info.SupportedTimeframes, "built once");
+            info.SupportedTimeframes[0].ShouldBe(Timeframe.M1, info.Name);
+        }
+
+        IndicatorCatalog.TryGet("sma", out var sma).ShouldBeTrue();
+        IndicatorCatalog.TryGet("vwap", out var vwap).ShouldBeTrue();
+        IndicatorCatalog.TryGet("or_low", out var orLow).ShouldBeTrue();
+        IndicatorCatalog.TryGet("prev_day_close", out var previousClose).ShouldBeTrue();
+        IndicatorCatalog.TryGet("macd_hist", out var macd).ShouldBeTrue();
+        sma.SupportedTimeframes.ShouldBe(Timeframes.All);
+        macd.SupportedTimeframes.ShouldBe(Timeframes.All);
+        vwap.SupportedTimeframes.ShouldBe(Timeframes.Intraday.Prepend(Timeframe.M1), "1m and the intraday derived ones; not 1D, 1W or 1M");
+        orLow.SupportedTimeframes.ShouldBe(vwap.SupportedTimeframes);
+        previousClose.SupportedTimeframes.ShouldBe(Timeframes.Intraday.Prepend(Timeframe.M1).Append(Timeframe.D1), "the session values are read on 1m, the intraday timeframes and 1D");
+        Should.Throw<NotSupportedException>(() => ((IList<Timeframe>)sma.SupportedTimeframes)[0] = Timeframe.D1);
+    }
+
+    [Fact]
+    public void An_indicator_info_has_no_state_that_a_read_can_change_so_the_shared_catalog_is_immutable()
+    {
+        // The catalog is a process-wide static array: a field filled on first use (a lazily built list) would be shared mutable state raced by two threads (review of P3-01c, M20).
+        var writable = typeof(IndicatorInfo).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Where(f => !f.IsInitOnly).Select(f => f.Name);
+
+        writable.ShouldBeEmpty("every field of IndicatorInfo is readonly");
+        typeof(IndicatorInfo).GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Where(p => p.SetMethod is { IsPublic: true }).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Many_threads_reading_the_supported_timeframes_of_a_new_indicator_info_at_once_all_get_the_one_list()
+    {
+        const int Threads = 16;
+        var info = new IndicatorInfo("probe", "a probe", [], SessionBehaviour.Continuous, false, PriceSource.Close, false, _ => 1, _ => new Sma(1));
+        var lists = new IReadOnlyList<Timeframe>[Threads];
+        using var barrier = new Barrier(Threads);
+
+        Parallel.For(0, Threads, new ParallelOptions { MaxDegreeOfParallelism = Threads }, i =>
+        {
+            barrier.SignalAndWait();
+            lists[i] = info.SupportedTimeframes;
+        });
+
+        lists.ShouldAllBe(l => ReferenceEquals(l, lists[0]));
+        lists[0].ShouldBe(Timeframes.All);
+    }
+
+    [Theory]
+    [InlineData(Timeframe.W1, "1W")]
+    [InlineData(Timeframe.Mo1, "1M")]
+    public void A_session_bound_indicator_on_a_weekly_or_monthly_bar_is_refused_naming_the_feature_and_the_timeframe(Timeframe timeframe, string code)
+    {
+        foreach (var name in SessionBound)
+        {
+            var spec = new FeatureSpec(name, timeframe, PriceSource.Close, name.StartsWith("or_", StringComparison.Ordinal) ? 30 : 0);
+
+            var result = FeatureFrame.Create([new FeatureSpec("sma", Timeframe.M1, PriceSource.Close, 3), spec]);
+
+            result.IsFailure.ShouldBeTrue($"{name} on {code}");
+            var field = result.Error.Fields.ShouldNotBeNull().Single();
+            field.Field.ShouldBe("specs[1].timeframe", $"{name} on {code}");
+            field.Message.ShouldContain($"'{name}'");
+            field.Message.ShouldContain(code);
+        }
+    }
+
+    [Fact]
+    public void The_refusal_on_daily_bars_keeps_its_message_and_the_one_on_weekly_bars_says_where_to_read_the_value()
+    {
+        string Message(string name, Timeframe timeframe) => FeatureFrame.Create([new FeatureSpec(name, timeframe, PriceSource.Close, 0)]).Error.Fields.ShouldNotBeNull().Single().Message;
+
+        Message("vwap", Timeframe.D1).ShouldBe("'vwap' needs intraday bars; it cannot be computed on 1D.");
+        Message("vwap", Timeframe.W1).ShouldBe("'vwap' needs intraday bars; it cannot be computed on 1W.");
+        Message("prev_day_close", Timeframe.Mo1).ShouldBe("'prev_day_close' is a value of the trading session; it cannot be computed on 1M (read it on 1m or 1D).");
+        Message("gap_pct", Timeframe.W1).ShouldBe("'gap_pct' is a value of the trading session; it cannot be computed on 1W (read it on 1m or 1D).");
+        FeatureFrame.Create([new FeatureSpec("prev_day_close", Timeframe.D1)]).IsSuccess.ShouldBeTrue("the session values are still read on 1D");
+    }
+
+    [Fact]
+    public void The_warm_up_on_weekly_and_monthly_bars_is_counted_in_bars_of_that_timeframe()
+    {
+        int Warm(string name, Timeframe timeframe, double p1 = 0, double p2 = 0, double p3 = 0) =>
+            IndicatorCatalog.TryGet(name, out var info) ? info.WarmUp(new FeatureSpec(name, timeframe, PriceSource.Close, p1, p2, p3)) : -1;
+
+        Warm("ema", Timeframe.W1, 10).ShouldBe(10, "ema(10) on 1W needs ten weekly bars");
+        Warm("ema", Timeframe.Mo1, 10).ShouldBe(10);
+        Warm("sma", Timeframe.W1, 20).ShouldBe(20);
+        Warm("rsi", Timeframe.Mo1, 14).ShouldBe(15);
+        Warm("adx", Timeframe.W1, 14).ShouldBe(28);
+        Warm("macd_signal", Timeframe.Mo1, 12, 26, 9).ShouldBe(34);
+        Warm("pivot_high", Timeframe.W1, 5).ShouldBe(11);
+        Warm("close", Timeframe.W1).ShouldBe(1);
+        FeatureFrame.Create([new FeatureSpec("ema", Timeframe.W1, PriceSource.Close, 10)]).Value.WarmUp(0).ShouldBe(10);
+    }
+
+    [Fact]
+    public void The_declared_warm_up_of_the_date_driven_names_is_the_measured_number_of_context_days_for_the_default_options()
+    {
+        foreach (var name in TestSpecs.ContextNames)
+        {
+            IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue();
+
+            var (measured, instance) = MeasureDateFeature(name, new ContextOptions(), 330);
+
+            measured.ShouldBe(info.WarmUp(info.DefaultSpec()), $"{name}: the declared warm-up");
+            instance.ShouldBe(measured, $"{name}: the warm-up of the instance in a frame");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(OptionSets))]
+    public void The_warm_up_of_a_date_driven_instance_is_the_measured_number_of_context_days_for_the_options_of_its_context(string label, ContextOptions options, int days)
+    {
+        foreach (var name in TestSpecs.ContextNames)
+        {
+            var (measured, instance) = MeasureDateFeature(name, options, days);
+
+            instance.ShouldBe(measured, $"{label}: {name}");
+        }
+    }
+
+    public static TheoryData<string, ContextOptions, int> OptionSets() => new()
+    {
+        { "small", FrameContextFixtures.Small, 60 },
+        { "slow trend", FrameContextFixtures.SlowTrend, 80 },
+        { "long adx", new ContextOptions(TrendSmaPeriod: 5, TrendSlopeDays: 1, AdxPeriod: 20, AtrPeriod: 2, PercentileWindow: 3), 80 },
+        { "one-day slope and window", new ContextOptions(TrendSmaPeriod: 2, TrendSlopeDays: 1, AdxPeriod: 1, AtrPeriod: 1, PercentileWindow: 1), 30 },
+    };
+
+    [Fact]
+    public void The_declared_warm_ups_of_the_twelve_names_follow_the_definitions()
+    {
+        int Warm(string name) => IndicatorCatalog.TryGet(name, out var info) ? info.WarmUp(info.DefaultSpec()) : -1;
+
+        Warm("day_of_week").ShouldBe(1);
+        Warm("is_expiry_day").ShouldBe(1);
+        Warm("index_trend").ShouldBe(55, "the 50-day average, a 5-day slope of it");
+        Warm("index_adx").ShouldBe(28, "ADX(14) is ready at 2 * 14");
+        Warm("index_vol_pct").ShouldBe(265, "the ATR(14) and then a window of 252 of its values: 14 + 252 - 1");
+        Warm("vix").ShouldBe(1);
+        Warm("vix_pct").ShouldBe(252);
+        Warm("vix_chg").ShouldBe(2);
+        Warm("breadth").ShouldBe(1);
+        Warm("regime_trend").ShouldBe(55);
+        Warm("regime_vol").ShouldBe(265);
+        Warm("regime").ShouldBe(265);
+    }
+
+    /// <summary>
+    /// For a date-driven feature on a context with a VIX and a breadth on every day, stepped once on the date of each record (so that the date of record i sees record i - 1): how many context days preceded the first date
+    /// at which it was ready (the number of dates stepped, for the two calendar names, which read no context), after checking that it stays ready, and the warm-up the frame reports for it.
+    /// </summary>
+    private static (int Measured, int Instance) MeasureDateFeature(string name, ContextOptions options, int dayCount)
+    {
+        var records = FrameContextFixtures.Consecutive(40, dayCount);
+        var context = FrameContextFixtures.Build(records, options);
+        var frame = FeatureFrame.Create([new FeatureSpec(name)], new FrameOptions(Context: context, ExpiryDays: new HashSet<DateOnly>())).Value;
+        var first = -1;
+        for (var i = 0; i < records.Count; i++)
+        {
+            frame.Step(Minutes.Close(records[i].Date, Minutes.Open, 100));
+
+            if (frame.IsReady(0))
+            {
+                first = first < 0 ? i : first;
+            }
+            else
+            {
+                first.ShouldBe(-1, $"{name} stays ready once it is ready");
+            }
+        }
+
+        first.ShouldBeGreaterThanOrEqualTo(0, $"{name} was ready on a context of {dayCount} days");
+        return (name is "day_of_week" or "is_expiry_day" ? first + 1 : first, frame.WarmUp(0));
     }
 
     /// <summary>Bars whose highs rise to a peak at index n and fall again, and whose lows fall to a trough there: the first pivot (high and low) is confirmed at bar 2n + 1, the earliest possible.</summary>
@@ -259,12 +500,12 @@ public sealed class IndicatorCatalogTests
         return bars;
     }
 
-    /// <summary>The closed bars the builder emits for the long gap-free series.</summary>
+    /// <summary>The closed bars the builder emits for the gap-free series (the long one for the weekly and monthly timeframes).</summary>
     private static List<Bar> Closed(Timeframe timeframe)
     {
         var builder = new TimeframeBuilder(timeframe);
         var bars = new List<Bar>();
-        foreach (var bar in Sessions)
+        foreach (var bar in timeframe is Timeframe.W1 or Timeframe.Mo1 ? LongSessions.Value : Sessions)
         {
             var count = builder.Push(bar, out var first, out var second);
             if (count > 0)

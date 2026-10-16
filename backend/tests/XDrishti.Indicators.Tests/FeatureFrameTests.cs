@@ -51,6 +51,27 @@ public sealed class FeatureFrameTests
     }
 
     [Fact]
+    public void The_weekly_and_monthly_timeframes_get_a_builder_each_and_equal_specs_on_them_share_one_instance()
+    {
+        var frame = Create(
+            new FeatureSpec("sma", Timeframe.W1, PriceSource.Close, 10),
+            new FeatureSpec("sma", Timeframe.W1, PriceSource.Close, 10),
+            new FeatureSpec("close", Timeframe.W1),
+            new FeatureSpec("sma", Timeframe.Mo1, PriceSource.Close, 10),
+            new FeatureSpec("close", Timeframe.M1));
+
+        frame.Count.ShouldBe(5);
+        frame.BuilderCount.ShouldBe(2, "one for 1W and one for 1M; 1m needs none");
+        frame.InstanceCount.ShouldBe(4);
+        frame.HasTimeframe(Timeframe.W1).ShouldBeTrue();
+        frame.HasTimeframe(Timeframe.Mo1).ShouldBeTrue();
+        frame.HasTimeframe(Timeframe.D1).ShouldBeFalse("a weekly feature does not make a daily lane");
+        frame.HandleOf(new FeatureSpec("sma", Timeframe.W1, PriceSource.Close, 10)).ShouldBe(0);
+        frame.HandleOf(new FeatureSpec("sma", Timeframe.Mo1, PriceSource.Close, 10)).ShouldBe(3);
+        frame.WarmUp(0).ShouldBe(10);
+    }
+
+    [Fact]
     public void Handles_read_the_value_and_readiness_and_the_spec_finds_its_handle()
     {
         var sma = new FeatureSpec("sma", Timeframe.M1, PriceSource.Close, 2);
@@ -93,6 +114,24 @@ public sealed class FeatureFrameTests
 
         frame.IncompleteBarsConsumed.ShouldBe(1);
         frame[0].ShouldBe(564.0);    // the second bucket closed at 09:24 with its last close
+    }
+
+    [Fact]
+    public void A_week_with_a_half_missing_day_is_consumed_incomplete_and_counted_once_and_the_clean_week_is_not()
+    {
+        var series = BarFixtures.GetPeriods("half missing day");
+        var frame = Create(new FeatureSpec("close", Timeframe.W1), new FeatureSpec("close", Timeframe.Mo1));
+
+        foreach (var bar in series.Bars)
+        {
+            frame.Step(bar);
+        }
+
+        // the week of 2 March (a Wednesday with every second minute missing) closes with the first bar of 9 March, the clean week of the 9th with the first bar of the 16th; March is still open
+        frame.IncompleteBarsConsumed.ShouldBe(1);
+        frame.TryLastClosed(Timeframe.W1, out var lastWeek).ShouldBeTrue();
+        (lastWeek.Complete, SessionClock.DateOf(lastWeek.StartEpochSeconds)).ShouldBe((true, BarFixtures.Mon.AddDays(7)));
+        frame.IsReady(1).ShouldBeFalse("no month has closed");
     }
 
     [Fact]
@@ -145,14 +184,26 @@ public sealed class FeatureFrameTests
     }
 
     [Theory]
-    [InlineData(Timeframe.W1)]
-    [InlineData(Timeframe.Mo1)]
     [InlineData((Timeframe)99)]
+    [InlineData((Timeframe)(-1))]
     public void A_timeframe_outside_the_supported_set_is_refused(Timeframe timeframe)
     {
         var error = Refused(new FeatureSpec("sma", timeframe, PriceSource.Close, 5));
 
         error.Fields.ShouldNotBeNull().Single().Field.ShouldBe("specs[0].timeframe");
+        error.Fields![0].Message.ShouldBe("The timeframe must be one of 1m, 5m, 10m, 15m, 30m, 1h, 1D, 1W, 1M.");
+    }
+
+    [Theory]
+    [InlineData(Timeframe.W1)]
+    [InlineData(Timeframe.Mo1)]
+    public void The_weekly_and_monthly_timeframes_are_accepted_for_a_continuous_indicator(Timeframe timeframe)
+    {
+        var result = FeatureFrame.Create([new FeatureSpec("sma", timeframe, PriceSource.Close, 5), new FeatureSpec("rsi", timeframe, PriceSource.Close, 14), new FeatureSpec("close", timeframe)]);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.HasTimeframe(timeframe).ShouldBeTrue();
+        result.Value.SpecOf(0).Timeframe.ShouldBe(timeframe);
     }
 
     [Fact]
@@ -168,11 +219,30 @@ public sealed class FeatureFrameTests
     }
 
     [Fact]
+    public void Intraday_and_session_bound_indicators_are_refused_on_weekly_and_monthly_bars_and_each_problem_is_reported_at_its_spec()
+    {
+        var error = Refused(
+            new FeatureSpec("sma", Timeframe.W1, PriceSource.Close, 5),
+            new FeatureSpec("vwap", Timeframe.W1),
+            new FeatureSpec("or_low", Timeframe.Mo1, PriceSource.Close, 15),
+            new FeatureSpec("prev_day_high", Timeframe.Mo1),
+            new FeatureSpec("today_open", Timeframe.W1),
+            new FeatureSpec("gap_pct", Timeframe.D1));
+
+        error.Fields.ShouldNotBeNull().Select(f => f.Field).ShouldBe(["specs[1].timeframe", "specs[2].timeframe", "specs[3].timeframe", "specs[4].timeframe"]);
+        foreach (var (field, name, code) in new[] { (0, "vwap", "1W"), (1, "or_low", "1M"), (2, "prev_day_high", "1M"), (3, "today_open", "1W") })
+        {
+            error.Fields![field].Message.ShouldContain($"'{name}'");
+            error.Fields![field].Message.ShouldContain(code);
+        }
+    }
+
+    [Fact]
     public void An_unknown_price_source_and_an_empty_list_are_refused_and_every_problem_is_reported_at_once()
     {
         Refused(new FeatureSpec("sma", Timeframe.M1, (PriceSource)9, 5)).Fields.ShouldNotBeNull().Single().Field.ShouldBe("specs[0].source");
         FeatureFrame.Create([]).Error.Code.ShouldBe(FeatureFrame.InvalidCode);
-        Refused(new FeatureSpec("zzz"), new FeatureSpec("sma", Timeframe.W1, PriceSource.Close, 0)).Fields.ShouldNotBeNull().Count.ShouldBe(3);
+        Refused(new FeatureSpec("zzz"), new FeatureSpec("sma", (Timeframe)99, PriceSource.Close, 0)).Fields.ShouldNotBeNull().Count.ShouldBe(3);
     }
 
     [Fact]
@@ -180,10 +250,10 @@ public sealed class FeatureFrameTests
     {
         foreach (var timeframe in IndicatorCatalog.SupportedTimeframes)
         {
-            var specs = IndicatorCatalog.All.Where(i => !(i.IntradayOnly && timeframe == Timeframe.D1)).Select(i => i.DefaultSpec(timeframe)).ToList();
+            var specs = IndicatorCatalog.All.Where(i => i.Supports(timeframe)).Select(i => i.DefaultSpec(timeframe)).ToList();
             var specsWithMinutes = specs.Select(s => s.Name.StartsWith("or_", StringComparison.Ordinal) ? s with { P1 = Math.Max(30, timeframe.Minutes()) } : s).ToList();
 
-            FeatureFrame.Create(specsWithMinutes).IsSuccess.ShouldBeTrue(timeframe.ToCode());
+            FeatureFrame.Create(specsWithMinutes, new FrameOptions(Context: MarketContext.Create([]).Value, ExpiryDays: new HashSet<DateOnly>())).IsSuccess.ShouldBeTrue(timeframe.ToCode());
         }
     }
 
