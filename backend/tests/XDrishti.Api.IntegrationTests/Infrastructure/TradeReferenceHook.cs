@@ -30,6 +30,9 @@ internal sealed class HookedTradeReferenceData(ITradeReferenceData inner, TradeH
     public ValueTask<IReadOnlyList<TradeInstrument>> FindInstrumentsAsync(IReadOnlyCollection<string> isins, IReadOnlyCollection<string> symbols, CancellationToken cancellationToken) =>
         inner.FindInstrumentsAsync(isins, symbols, cancellationToken);
 
+    public ValueTask<IReadOnlyDictionary<string, TradeInstrument>> FindInstrumentsByDhanIdsAsync(IReadOnlyCollection<string> securityIds, CancellationToken cancellationToken) =>
+        inner.FindInstrumentsByDhanIdsAsync(securityIds, cancellationToken);
+
     public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<AppliedAction>>> ListAppliedActionsAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken)
     {
         await hooks.RunAsync();

@@ -30,22 +30,18 @@ internal sealed class TradeWorkspace(
     IAccountEventLog events)
 {
     /// <summary>The active account with the Portfolio role on (read only).</summary>
-    public async ValueTask<Result<BrokerAccount>> AccountAsync(Guid accountId, CancellationToken cancellationToken)
-    {
-        var account = await accounts.FindReadOnlyAsync(accountId, cancellationToken);
-        if (account is null)
-        {
-            return Result.Failure<BrokerAccount>(PortfolioErrors.AccountNotFound);
-        }
-
-        return account.Portfolio.Enabled ? Result.Success(account) : Result.Failure<BrokerAccount>(PortfolioErrors.RoleOff);
-    }
+    public ValueTask<Result<BrokerAccount>> AccountAsync(Guid accountId, CancellationToken cancellationToken) => PortfolioAccess.AccountWithRoleAsync(accounts, accountId, cancellationToken);
 
     /// <summary>
     /// Plans the import of the identified trades of a file: the new ones become transactions (batch <paramref name="batchId"/>) and are rebuilt into the holdings together with the stored trades; trades whose identity is stored already
     /// count in the file's securities but are not added again.
     /// </summary>
-    public async ValueTask<FilePlan> PlanAsync(BrokerAccount account, IReadOnlyList<IdentifiedTrade> identified, Guid? batchId, string actor, DateTimeOffset now, CancellationToken cancellationToken)
+    public ValueTask<FilePlan> PlanAsync(BrokerAccount account, IReadOnlyList<IdentifiedTrade> identified, Guid? batchId, string actor, DateTimeOffset now, CancellationToken cancellationToken) =>
+        PlanAsync(account, identified, batchId, actor, now, TradeSource.Csv, cancellationToken);
+
+    /// <summary>The same for trades that came from <paramref name="source"/> (a tradebook CSV, or the bill-level rows of a Dhan report, ADR 0029).</summary>
+    public async ValueTask<FilePlan> PlanAsync(
+        BrokerAccount account, IReadOnlyList<IdentifiedTrade> identified, Guid? batchId, string actor, DateTimeOffset now, TradeSource source, CancellationToken cancellationToken)
     {
         var all = await holdings.ListForAccountAsync(account.Id, cancellationToken);
         var stored = await trades.ListActiveAsync(account.Id, cancellationToken);
@@ -70,7 +66,7 @@ internal sealed class TradeWorkspace(
                 row.Qty,
                 row.Price,
                 row.Charges,
-                TradeSource.Csv,
+                source,
                 batchId,
                 row.Line,
                 externalId,
@@ -114,8 +110,43 @@ internal sealed class TradeWorkspace(
         return new RebuildApplied(changed, replaced, created, handDated, sync);
     }
 
-    /// <summary>Audits a rebuild (counts only): nothing per lot, nothing about the securities.</summary>
-    public void RecordRebuilt(Guid accountId, RebuildApplied applied, string actor, DateTimeOffset now)
+    /// <summary>
+    /// Works out the rebuild of one holding from its stored trades (ADR 0023): reads the account's holdings (tracked, so applying the result changes what is saved), the holding's security's trades and the applied corporate actions. Used by the owner's
+    /// rebuild and by the automatic rebuild after a broker trade sync (ADR 0025), so both decide the same way.
+    /// </summary>
+    public async ValueTask<HoldingRebuild> RebuildOfAsync(Guid accountId, Guid holdingId, DateOnly firstImportDate, CancellationToken cancellationToken)
+    {
+        var all = await holdings.ListForAccountAsync(accountId, cancellationToken);
+        return await RebuildOfAsync(accountId, all.Single(h => h.Id == holdingId), new HoldingMatcher(all), firstImportDate, cancellationToken);
+    }
+
+    /// <summary>
+    /// The same for a holding the caller has read already (tracked, with its lots) and the matcher over the account's holdings: the automatic rebuild reads the account's holdings once for all its candidates and then only the one holding
+    /// of each candidate inside that candidate's unit of work.
+    /// </summary>
+    public async ValueTask<HoldingRebuild> RebuildOfAsync(Guid accountId, Holding holding, HoldingMatcher matcher, DateOnly firstImportDate, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(holding);
+        ArgumentNullException.ThrowIfNull(matcher);
+        if (holding.Status != HoldingStatus.Open)
+        {
+            return HoldingRebuild.Without(RebuildStatuses.NoHolding, holding.Id.ToString("N"));
+        }
+
+        if (matcher.Find(holding.Isin, holding.TradingSymbol) is not { Kind: MatchKind.One })
+        {
+            return HoldingRebuild.Without(RebuildStatuses.Ambiguous, holding.Id.ToString("N"));
+        }
+
+        // Only this security's trades are read, not the account's whole history.
+        var candidates = await trades.ListActiveForSecurityAsync(accountId, TradeRules.NormaliseIsin(holding.Isin), TradeRules.NormaliseSymbol(holding.TradingSymbol), cancellationToken);
+        var mine = HoldingRebuilds.Of(matcher, holding, candidates);
+        var actions = await ActionsOfAsync([holding], cancellationToken);
+        return HoldingRebuilds.Compute(holding, mine, holding.InstrumentId is { } instrument ? actions.GetValueOrDefault(instrument) ?? [] : [], firstImportDate);
+    }
+
+    /// <summary>Audits a rebuild (counts only): nothing per lot, nothing about the securities. <paramref name="trigger"/> says what started it when it was not the owner's own request (<c>broker_sync</c>).</summary>
+    public void RecordRebuilt(Guid accountId, RebuildApplied applied, string actor, DateTimeOffset now, string? trigger = null)
     {
         ArgumentNullException.ThrowIfNull(applied);
         if (applied.Holdings == 0)
@@ -126,7 +157,7 @@ internal sealed class TradeWorkspace(
         events.Record(AccountEvent.Record(
             AccountEventType.LotsRebuilt,
             accountId,
-            $"Lots rebuilt from trades: {applied.Holdings} {(applied.Holdings == 1 ? "holding" : "holdings")}, {applied.LotsReplaced} lots replaced by {applied.LotsCreated} ({applied.HandDated} hand-dated, {applied.Sync} added by syncs)",
+            $"Lots rebuilt from trades: {applied.Holdings} {(applied.Holdings == 1 ? "holding" : "holdings")}, {applied.LotsReplaced} lots replaced by {applied.LotsCreated} ({applied.HandDated} hand-dated, {applied.Sync} added by syncs){(trigger is null ? string.Empty : $", trigger {trigger}")}",
             actor,
             now));
     }

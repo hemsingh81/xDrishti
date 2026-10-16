@@ -12,6 +12,7 @@ import {
   buildSwingAccount,
   summaryOf,
 } from '@/test/fixtures';
+import { fakeTimers, pinClock } from '@/test/pinClock';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
 import { NotificationBell } from './components/NotificationBell';
@@ -35,8 +36,11 @@ const serveNotices = (...items: ReturnType<typeof buildDataNotice>[]) => {
 const day = 86_400_000;
 const keyExpiring = (days: number) => new Date(Date.now() + days * day).toISOString().slice(0, 10);
 
-/** Main is fine; Swing is not connected and its key is about to expire: two notifications. */
-const twoProblems = () => [buildAccountDetail(), buildSwingAccount({ apiKeyExpiresOn: keyExpiring(10) })];
+/** Main's API key ran out two days ago and Swing's is about to expire: two notifications (the Dhan login is the server's). */
+const twoProblems = () => [
+  buildAccountDetail({ apiKeyExpiresOn: keyExpiring(-2) }),
+  buildSwingAccount({ apiKeyExpiresOn: keyExpiring(10) }),
+];
 
 function renderBell(storage: ReadStorage | null = new FakeStorage()) {
   return renderRoutes([
@@ -53,6 +57,10 @@ const openDrawer = async (name: string | RegExp) => {
   return screen.findByRole('dialog', { name: 'Notifications' });
 };
 
+// The expiry dates are whole days and the age is rounded ("2 days ago"): the clock is pinned, and the dates of the keys that
+// expire (keyExpiring) are built from the pinned instant.
+pinClock('2026-10-15T06:30:00Z');
+
 describe('Notification bell', () => {
   it('shows the unread count in its name and badge', async () => {
     serve(...twoProblems());
@@ -66,10 +74,11 @@ describe('Notification bell', () => {
     const drawer = await openDrawer('Notifications, 2 unread');
     const items = within(within(drawer).getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
     expect(items).toHaveLength(2);
-    expect(within(items[0]!).getByText('Test Dhan Swing is not connected')).toBeInTheDocument();
+    expect(within(items[0]!).getByText(/Test Dhan Main API key expired on/)).toBeInTheDocument();
+    expect(within(items[0]!).getByText(/^2 days ago$/)).toBeInTheDocument();
     expect(within(items[1]!).getByText(/API key expires on/)).toBeInTheDocument();
     expect(within(items[1]!).getByText(/^in \d+ days$/)).toBeInTheDocument();
-    expect(within(items[0]!).getByRole('link', { name: 'Open: Test Dhan Swing is not connected' })).toHaveAttribute(
+    expect(within(items[0]!).getByRole('link', { name: /^Open: Test Dhan Main API key expired on/ })).toHaveAttribute(
       'href',
       expect.stringMatching(/^\/accounts\?account=.+&tab=connection$/),
     );
@@ -93,7 +102,7 @@ describe('Notification bell', () => {
     const { router } = renderBell();
     const drawer = await openDrawer('Notifications, 2 unread');
 
-    await userEvent.click(within(drawer).getByRole('link', { name: 'Open: Test Dhan Swing is not connected' }));
+    await userEvent.click(within(drawer).getByRole('link', { name: /^Open: Test Dhan Main API key expired on/ }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/accounts');
@@ -132,7 +141,11 @@ describe('Notification bell', () => {
 
   it('caps the badge at 9+', async () => {
     const many = Array.from({ length: 11 }, (_, i) =>
-      buildSwingAccount({ id: `00000000-0000-4000-8000-00000000${String(100 + i)}`, name: `Account ${String(i)}` }),
+      buildSwingAccount({
+        id: `00000000-0000-4000-8000-00000000${String(100 + i)}`,
+        name: `Account ${String(i)}`,
+        apiKeyExpiresOn: keyExpiring(10),
+      }),
     );
     serve(...many);
     renderBell();
@@ -186,19 +199,20 @@ describe('Notification bell', () => {
 
 describe('Notification bell: data notices', () => {
   it('shows the data notices with the account ones, errors first, newest first within a level', async () => {
-    serve(...twoProblems());
+    serve(buildAccountDetail(), buildSwingAccount({ apiKeyExpiresOn: keyExpiring(10) }));
     serveNotices(buildDataNotice(), buildRunFailedNotice());
     renderBell();
 
-    const drawer = await openDrawer('Notifications, 4 unread');
+    const drawer = await openDrawer('Notifications, 3 unread');
     const items = within(within(drawer).getByRole('list', { name: 'Notifications' })).getAllByRole('listitem');
-    expect(items).toHaveLength(4);
-    // Error first (the failed run), then the warnings by time: the gaps (12 Oct) before the account (never connected).
+    expect(items).toHaveLength(3);
+    // Error first (the failed run), then the warning (the gaps), then the information (a key that expires in 10 days).
     expect(items[0]).toHaveTextContent('Error: unread,');
     expect(items[0]).toHaveTextContent('The automatic update of 12 Oct failed: Dhan refused the access token.');
     expect(items[1]).toHaveTextContent('Warning: unread,');
     expect(items[1]).toHaveTextContent('4 sessions have missing 1-minute bars');
-    expect(items[2]).toHaveTextContent('Test Dhan Swing is not connected');
+    expect(items[2]).toHaveTextContent('Information: unread,');
+    expect(items[2]).toHaveTextContent('Test Dhan Swing API key expires on');
   });
 
   it('links the failed run to the Data screen and the gaps to their list', async () => {
@@ -280,7 +294,7 @@ describe('Notification bell: data notices', () => {
   });
 
   it('asks for the data notices again when the poll interval passes', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    fakeTimers({ shouldAdvanceTime: true });
     try {
       let reads = 0;
       server.use(

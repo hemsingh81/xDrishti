@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useId, useRef, useState } from 'react';
 import { useInfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { PageHeader } from '@/shared/ui';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { facetsQuery, searchList } from '../api/instrumentsQueries';
 import { useInstrumentFilters } from '../hooks/useInstrumentFilters';
 import { useRefreshWatch } from '../hooks/useRefreshWatch';
@@ -22,11 +21,9 @@ import { TrackingActionsProvider } from './TrackingActionsProvider';
  */
 export function InstrumentsPage() {
   return (
-    <ToastProvider>
-      <TrackingActionsProvider>
-        <InstrumentsContent />
-      </TrackingActionsProvider>
-    </ToastProvider>
+    <TrackingActionsProvider>
+      <InstrumentsContent />
+    </TrackingActionsProvider>
   );
 }
 

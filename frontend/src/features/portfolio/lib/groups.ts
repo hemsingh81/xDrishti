@@ -11,8 +11,24 @@ export const groupingLabels: Record<Grouping, string> = {
 /** The reserved key of "Unclassified" (sector) and "No basket": it cannot be a real sector name or id. */
 export const noGroupKey = '~none';
 
+/**
+ * The reserved key of the extra last row "Unallocated" (ADR 0026): the dividends and costs that belong to no group. It is not
+ * a group of holdings: no holdings to open, no price to move, not a slice of a chart.
+ */
+export const unallocatedKey = '~unallocated';
+export const isUnallocatedKey = (key: string): boolean => key === unallocatedKey;
+
 /** The sort fields of the groups endpoint (a subset of the holdings' fields, with the same names). */
-export const groupSortFields = ['value', 'invested', 'pnl', 'pnlPct', 'xirr', 'dayChange', 'name'] as const;
+export const groupSortFields = [
+  'value',
+  'invested',
+  'pnl',
+  'pnlPct',
+  'xirr',
+  'dividends',
+  'dayChange',
+  'name',
+] as const;
 export type GroupSortField = (typeof groupSortFields)[number];
 
 /** Largest value first, as the endpoint's default: the screen sends it explicitly. */
@@ -61,6 +77,8 @@ export const groupSortOptions: readonly { field: GroupSortField; descending: boo
   { field: 'pnlPct', descending: false, label: 'P&L %, worst first' },
   { field: 'xirr', descending: true, label: 'XIRR, best first' },
   { field: 'xirr', descending: false, label: 'XIRR, worst first' },
+  { field: 'dividends', descending: true, label: 'Dividends, most first' },
+  { field: 'dividends', descending: false, label: 'Dividends, least first' },
   { field: 'dayChange', descending: true, label: 'Day change, best first' },
   { field: 'dayChange', descending: false, label: 'Day change, worst first' },
   { field: 'name', descending: false, label: 'Name, A to Z' },

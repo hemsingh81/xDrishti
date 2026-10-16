@@ -1,21 +1,11 @@
-import CheckCircleIcon from '@mui/icons-material/CheckCircleOutlined';
-import ErrorIcon from '@mui/icons-material/ErrorOutlineOutlined';
 import InfoIcon from '@mui/icons-material/InfoOutlined';
-import SyncIcon from '@mui/icons-material/Sync';
-import WarningIcon from '@mui/icons-material/WarningAmberOutlined';
 import { Stack, Typography } from '@mui/material';
-import type { ReactElement } from 'react';
 import type { SyncRun, SyncStatus } from '@/shared/api';
 import { formatAgo, formatIstTimeAndDay } from '@/shared/lib/format';
+import { healthText } from '@/shared/lib/syncHealth';
 import { numeric } from '@/theme';
-import { describeSchedule, summariseRun, type RunTone } from '../lib/syncText';
-
-const toneLook: Record<RunTone, { icon: ReactElement; color: string }> = {
-  success: { icon: <CheckCircleIcon fontSize="small" />, color: 'success.main' },
-  error: { icon: <ErrorIcon fontSize="small" />, color: 'error.main' },
-  warning: { icon: <WarningIcon fontSize="small" />, color: 'warning.main' },
-  info: { icon: <SyncIcon fontSize="small" />, color: 'info.main' },
-};
+import { describeSchedule, summariseRun } from '../lib/syncText';
+import { toneLook } from './toneLook';
 
 /** "Synced 5 min ago — 2 new, 1 closed" / "Skipped 2 h ago — The account is not connected to Dhan." */
 function LastRun({ run, running }: { run: SyncRun | null; running: boolean }) {
@@ -59,6 +49,8 @@ interface SyncStatusLineProps {
 
 /** Last run, and for an account: the auto-refresh setting and when it runs next. */
 export function SyncStatusLine({ status, fallbackRun }: SyncStatusLineProps) {
+  // While the app retries by itself it says so; once it keeps failing it says for how long and why (ADR 0027).
+  const health = status ? healthText(status) : null;
   return (
     <Stack spacing={0.25}>
       <LastRun run={status ? status.last : fallbackRun} running={status?.running ?? false} />
@@ -66,6 +58,11 @@ export function SyncStatusLine({ status, fallbackRun }: SyncStatusLineProps) {
         <Typography variant="body2" color="text.secondary" sx={numeric}>
           {describeSchedule(status)}
           {status.nextRunAt && ` · next run ${formatIstTimeAndDay(status.nextRunAt)} IST`}
+        </Typography>
+      )}
+      {health && (
+        <Typography variant="body2" color="text.secondary" sx={numeric}>
+          Holdings sync: {health}
         </Typography>
       )}
     </Stack>

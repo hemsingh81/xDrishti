@@ -1,0 +1,4 @@
+# UNVERIFIED - constructed from Dhan's documentation (made-up id and prices), not recorded from the real feed.
+# Previous close packet (response code 6), 16 bytes: NSE_EQ, security id 2885.
+# payload: previous close float32 2931 | previous open interest int32 0
+06 10 00 01 45 0b 00 00 00 30 37 45 00 00 00 00

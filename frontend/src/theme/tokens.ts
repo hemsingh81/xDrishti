@@ -9,33 +9,47 @@ export const palettes = {
     background: '#f4f6fa',
     surface: '#ffffff',
     surfaceAlt: '#f1f4f9',
+    surfaceStrong: '#e8edf4',
     border: '#dfe3ea',
+    borderStrong: '#c9d0dc',
     inputBorder: '#7b8798',
     text: '#0f172a',
     textSecondary: '#475569',
+    textTertiary: '#5b6b82',
     accent: '#4338ca',
     accentContrast: '#ffffff',
     accentSoft: '#eceefe',
     good: '#146c36',
+    goodSoft: '#e9f8ef',
     bad: '#b91c1c',
+    badSoft: '#fdecec',
     warn: '#a35200',
+    warnSoft: '#fff5e6',
     info: '#0e7490',
+    infoSoft: '#e6f6f9',
   },
   dark: {
     background: '#0b1220',
     surface: '#131c2e',
     surfaceAlt: '#182238',
+    surfaceStrong: '#202c46',
     border: '#26324a',
+    borderStrong: '#34415c',
     inputBorder: '#5f6f8a',
     text: '#e6eaf2',
     textSecondary: '#9aa7bd',
+    textTertiary: '#7d8aa3',
     accent: '#9aa5ff',
     accentContrast: '#0b1220',
     accentSoft: '#222a52',
     good: '#4ade80',
+    goodSoft: '#10281d',
     bad: '#f87171',
+    badSoft: '#2f1a1d',
     warn: '#fbbf24',
+    warnSoft: '#2d2513',
     info: '#67e8f9',
+    infoSoft: '#15303a',
   },
 } as const satisfies Record<ColorMode, Record<string, string>>;
 
@@ -53,7 +67,18 @@ export const categorical = {
 /** How many categories get their own colour; the next one (index `categoricalSeries`) is the neutral "Other". */
 export const categoricalSeries = 8;
 
-export const shape = { radius: 12, radiusSmall: 8, radiusLarge: 18 } as const;
+/**
+ * Corner radii (px), from the prototype: cards and tiles `radius` (12), buttons and inputs `radiusControl` (10; small
+ * buttons and chips-in-a-row `radiusSmall` 8), dialogs `radiusLarge` (18), sidebar links `radiusNav` (11), pills `radiusPill`.
+ */
+export const shape = {
+  radius: 12,
+  radiusControl: 10,
+  radiusSmall: 8,
+  radiusNav: 11,
+  radiusLarge: 18,
+  radiusPill: 999,
+} as const;
 
 /** Dialog band padding (px) — from the prototype's `.dlg-h`, `.dlg-b`, `.dlg-f`. */
 export const dialogSpacing = { header: '15px 20px', body: '18px 20px', footer: '13px 20px' } as const;
@@ -66,37 +91,49 @@ export const fontFamily =
 export const monoFontFamily =
   "'JetBrains Mono Variable', 'JetBrains Mono Fallback', ui-monospace, Menlo, Consolas, monospace";
 
-/** Type scale on a 14 px base. `size` is rem; `lineHeight` unitless; `tracking` em. */
+/** The root font size (px): the prototype's body text is 14 px. `html` is set to this (as a percentage of the browser default). */
+export const rootFontSize = 14;
+
+/** A size in px as rem on the 14 px root (`rem(12)` = `0.857rem` = 12 px), for `sx` values that are not a type-scale role. */
+export const rem = (px: number): string => `${px / rootFontSize}rem`;
+
+/**
+ * Type scale on the 14 px root (`rootFontSize`) — the prototype's sizes. `size` is rem (px / 14); `lineHeight` unitless;
+ * `tracking` em. Page title 24 px, top-bar / dialog title 16.5, card title 14.5, body 14, table / secondary 13, caption 12.
+ */
 export const typeScale = {
-  h1: { size: 1.5, weight: 700, lineHeight: 1.25, tracking: -0.02 },
-  h2: { size: 1.125, weight: 650, lineHeight: 1.3, tracking: -0.01 },
-  h3: { size: 0.95, weight: 650, lineHeight: 1.35, tracking: -0.01 },
-  h4: { size: 1, weight: 650, lineHeight: 1.4, tracking: 0 },
-  h5: { size: 13 / 14, weight: 650, lineHeight: 1.4, tracking: 0 },
-  h6: { size: 12 / 14, weight: 650, lineHeight: 1.4, tracking: 0 },
-  subtitle1: { size: 1, weight: 600, lineHeight: 1.45, tracking: 0 },
-  subtitle2: { size: 13 / 14, weight: 600, lineHeight: 1.45, tracking: 0 },
+  h1: { size: 24 / 14, weight: 750, lineHeight: 1.5, tracking: -0.02 },
+  h2: { size: 16.5 / 14, weight: 700, lineHeight: 1.4, tracking: -0.01 },
+  h3: { size: 14.5 / 14, weight: 650, lineHeight: 1.5, tracking: -0.005 },
+  h4: { size: 1, weight: 650, lineHeight: 1.5, tracking: 0 },
+  h5: { size: 13 / 14, weight: 650, lineHeight: 1.5, tracking: 0 },
+  h6: { size: 12 / 14, weight: 650, lineHeight: 1.5, tracking: 0 },
+  subtitle1: { size: 1, weight: 600, lineHeight: 1.5, tracking: 0 },
+  subtitle2: { size: 13 / 14, weight: 600, lineHeight: 1.5, tracking: 0 },
   body1: { size: 1, weight: 400, lineHeight: 1.5, tracking: 0 },
-  body2: { size: 13 / 14, weight: 400, lineHeight: 1.45, tracking: 0 },
-  caption: { size: 12 / 14, weight: 400, lineHeight: 1.4, tracking: 0 },
-  overline: { size: 11 / 14, weight: 600, lineHeight: 1.4, tracking: 0.06 },
-  button: { size: 1, weight: 600, lineHeight: 1.4, tracking: 0 },
+  body2: { size: 13 / 14, weight: 400, lineHeight: 1.5, tracking: 0 },
+  caption: { size: 12 / 14, weight: 400, lineHeight: 1.5, tracking: 0 },
+  overline: { size: 11 / 14, weight: 700, lineHeight: 1.5, tracking: 0.06 },
+  button: { size: 1, weight: 550, lineHeight: 1.4, tracking: 0 },
 } as const;
 
 /** Numeric roles (tables, stat tiles, countdowns): aligned digits and a slashed zero. */
 export const numeric = { fontVariantNumeric: 'tabular-nums', fontFeatureSettings: "'cv11', 'zero'" } as const;
 
-/** Elevation per mode: soft cool-tinted shadows in light, border-led (tighter, darker) in dark. */
+/**
+ * Elevation per mode (the prototype's `--shadow-sm`, `--shadow`, `--shadow-lg`): `sm` buttons, `md` cards and tiles, `lg`
+ * dialogs, menus and popovers. Soft cool-tinted in light, border-led (darker) in dark.
+ */
 export const elevation = {
   light: {
-    sm: '0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04)',
-    md: '0 4px 12px rgba(15, 23, 42, 0.08), 0 1px 3px rgba(15, 23, 42, 0.06)',
-    lg: '0 12px 32px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.08)',
+    sm: '0 1px 2px rgba(16, 24, 40, 0.04)',
+    md: '0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.03)',
+    lg: '0 20px 40px -12px rgba(16, 24, 40, 0.18)',
   },
   dark: {
-    sm: '0 1px 2px rgba(0, 0, 0, 0.5)',
-    md: '0 4px 12px rgba(0, 0, 0, 0.55)',
-    lg: '0 12px 32px rgba(0, 0, 0, 0.65)',
+    sm: '0 1px 2px rgba(0, 0, 0, 0.3)',
+    md: '0 1px 3px rgba(0, 0, 0, 0.3)',
+    lg: '0 20px 40px -10px rgba(0, 0, 0, 0.55)',
   },
 } as const satisfies Record<ColorMode, Record<'sm' | 'md' | 'lg', string>>;
 
@@ -118,15 +155,36 @@ export const motion = {
  * do not shift; use `spacingUnit` for fine-grained values inside theme overrides.
  */
 export const spacingUnit = 4;
-export const controlHeight = { small: 32, medium: 40 } as const;
+export const controlHeight = { small: 30, medium: 36, large: 44 } as const;
 
 /** Table density (px) and the strength of the accent tint on hovered / selected rows. */
-export const table = { rowHeight: 36, rowHeightComfortable: 48, hoverAlpha: 0.06, selectedAlpha: 0.12 } as const;
+export const table = {
+  rowHeight: 36,
+  rowHeightComfortable: 48,
+  hoverAlpha: 0.05,
+  selectedAlpha: 0.12,
+  /** Cell padding (px): 9 vertical, 12 horizontal. */
+  cellPaddingY: 9,
+  cellPaddingX: 12,
+  /** Opacity of the alternate-row tint (`surfaceAlt` over the surface). */
+  zebraAlpha: 0.55,
+} as const;
 
 /** Sidebar: selected item sits on `accentSoft` with an accent marker of this width (px). */
-export const sidebar = { markerWidth: 3 } as const;
+export const sidebar = { markerWidth: 3, paddingX: 12, linkPadding: '6px 8px', linkGap: 11 } as const;
 
 export const layout = { sidebarWidth: 248, topBarHeight: 60 } as const;
+
+/**
+ * Page content padding (px) from the prototype's `.page`: 14 on phones, 24 from the sidebar breakpoint, and more room on
+ * wide monitors (28 / 36 from 1680 px, 32 / 48 from 2560 px). Used by the app shell.
+ */
+export const pagePadding = {
+  compact: 14,
+  base: 24,
+  wide: { minWidth: 1680, y: 28, x: 36 },
+  ultra: { minWidth: 2560, y: 32, x: 48 },
+} as const;
 
 /** Starting colours offered for an account's colour bar; the chosen value is user data stored with the account. */
 export const accountColors = ['#5b8def', '#16a34a', '#b45309', '#a855f7', '#0891b2', '#dc2626'] as const;

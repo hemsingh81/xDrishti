@@ -196,7 +196,8 @@ learning:
   min_trades: 30
   recency_half_life_days: 180
   bayes_prior: { type: beta, shrink_to_parent: true, strength: 20 }
-  regime: { trend_inputs: [dma20_slope, adx14], vol_inputs: [vix_pct, atr_pct] }
+  regime: { trend: { sma_days: 50, slope_days: 5, adx_period: 14, adx_min: 20 },       # built in P3-01c (ADR 0033): the numbers of ContextOptions
+            volatility: { atr_period: 14, percentile_window: 252, low_below: 33.333333333333336, high_from: 66.66666666666667 } }  # exactly one third and two thirds (100/3, 200/3: the doubles of ContextOptions, never 33.33 / 66.67) of the mean of the VIX and index-ATR% percentiles; below low_below is LOW, from high_from is HIGH; pending owner confirmation, ADR 0033 Amendments 1, 2 and 13 (the owner's wording was 33.3 and 66.7)
   meta_model: { enabled: true, trainer: lightgbm, fallback_trainer: fasttree, split_by: [style, side],
                 calibration: pav, must_beat_baseline: true }
   qualification_gates: { min_oos_trades: 30, min_expectancy_R: 0.15, min_profit_factor: 1.2,
@@ -252,6 +253,7 @@ services:
   eod-fetch:        { schedule: { type: daily, time: "15:50", days: trading }, params: { throttle_per_sec: 5, gap_lookback_days: 5 } }
   validation:       { schedule: { type: after, after: eod-fetch }, params: { days_to_check: 5, tolerance_pct: 0.05, spike_multiple: 8 } }
   portfolio-sync:   { schedule: { type: daily, time: "16:30", days: trading } }
+  broker-history:   { schedule: { type: daily, time: "16:30", days: trading } }   # built in P2-13 (ADR 0025), service id portfolio-broker-history, "Portfolio trades & ledger": Dhan trades and ledger of the Portfolio accounts; first-start seed Portfolio:BrokerHistory:Enabled
   nightly:          { schedule: { type: daily, time: "18:30", days: trading } }
   suggestions:      { schedule: { type: after, after: nightly } }
   retrain:          { schedule: { type: weekly, weekday: Sat, time: "10:00" } }
@@ -336,6 +338,41 @@ The other `Data:*` options (CSV folder and limits, Dhan fetch, gap look-back, da
 Each account chooses its own schedule in the app (Accounts → Portfolio, and on the Portfolio screen): *Off* (default), *Every 5 / 15 / 30 / 60 minutes during market hours*
 (Monday–Friday 09:15–15:30 India time) or *Daily at HH:MM IST*; it is stored in `accounts.portfolio_settings`, not in this file ([doc 04](04-accounts-access-and-operations.md) §1, [doc 12](12-portfolio-monitoring.md) §3).
 The Dhan holdings endpoint (`GET https://api.dhan.co/v2/holdings`) is fixed in the code and on the allow-list ([doc 17](17-deployment-and-operations.md) §3).
+
+### Trades and ledger from Dhan (`Portfolio:BrokerHistory:*`, [ADR 0025](../adr/0025-dhan-trade-history-and-ledger-sync.md), P2-13)
+
+| Option (`appsettings` / environment) | Meaning | Default | Check |
+|--------------------------------------|---------|---------|-------|
+| `Portfolio:BrokerHistory:Enabled` (`Portfolio__BrokerHistory__Enabled`; compose: `XD_PORTFOLIO_BROKER_HISTORY`) | **First-start setting** (ADR 0018): whether the service `portfolio-broker-history` ("Portfolio trades & ledger", daily 16:30 IST on trading days) starts enabled; read once, when the service has no stored row, and ignored after it (then the Services screen decides). `false` starts it paused; "Sync trades & ledger" per account keeps working | `true` | boolean |
+| `Portfolio:BrokerHistory:CallSpacingMs` (`Portfolio__BrokerHistory__CallSpacingMs`; no compose variable) | The least time between two calls to Dhan's trade history and ledger, kept by one throttle for the whole process; `0` switches the spacing off (tests) | `250` | integer 0 to 60,000 |
+
+The window length (30 days), the page cap (200), the 30 s timeout and the 5 MB answer limit are fixed in the code, not configuration (tuned after the first real read). The two Dhan endpoints are on the allow-list ([doc 05](05-data-and-brokers.md) §8.3, [doc 17](17-deployment-and-operations.md) §3).
+
+### Self-healing syncs (`Portfolio:Heal:*`, [ADR 0027](../adr/0027-self-healing-sync-and-actionable-notifications.md), P2-16)
+
+| Option (`appsettings` / environment) | Meaning | Default | Check |
+|--------------------------------------|---------|---------|-------|
+| `Portfolio:Heal:RetryBackoffMinutes` (`Portfolio__Heal__RetryBackoffMinutes`; compose: `XD_PORTFOLIO_HEAL_BACKOFF_MINUTES`) | The waits before each quiet retry of a sync that failed for a reason that may pass (Dhan did not answer, its rate limit, an interrupted run), in minutes, comma-separated; their **number is the number of retries** of one failure, all inside the same India day. With the default the first retry is due 1 minute after the first failure, the second 5 minutes after the second, the third 15 minutes after the third. Empty switches the quiet retries off (the nightly and scheduled runs still happen) | `1,5,15` | up to ten waits of 1 to 999 minutes (`^\d{1,3}(,\d{1,3}){0,9}$`, blanks allowed) |
+| `Portfolio:Heal:PersistDays` (`Portfolio__Heal__PersistDays`; compose: `XD_PORTFOLIO_HEAL_PERSIST_DAYS`) | The consecutive India days whose last attempt failed after which a failing sync (holdings, trades, ledger or the price poll) becomes an item in the bell; a reason only the owner can fix (the Dhan login) is told at once. The same number makes a failing price poll a failed run of the service | `2` | integer 1 to 30 |
+| `Portfolio:Heal:DeepenMaxYears` (`Portfolio__Heal__DeepenMaxYears`; compose: `XD_PORTFOLIO_HEAL_DEEPEN_YEARS`) | How many years back from today the nightly deepening of the trade history reads at most, **one year per day**, while the trades do not explain a holding; `0` switches it off | `8` | integer 0 to 30 |
+| `Portfolio:Heal:AttentionRetentionDays` (`Portfolio__Heal__AttentionRetentionDays`; compose: `XD_PORTFOLIO_HEAL_ATTENTION_DAYS`) | How many days a **resolved** item of the bell (`portfolio.attention_items`) is kept before the healer tick deletes it ([ADR 0030](../adr/0030-read-only-notices-retention-and-structured-failures.md), P2-18). Unresolved items are never deleted; a resolved item is not shown after 24 hours anyway (that is fixed in the code). The runtime role has DELETE on that one table only (migration `AttentionRetentionGrant`) | `30` | integer 1 to 3650 |
+
+These are ordinary deployment settings, read at start (not first-start settings): change them in the environment and restart `xd-api`. The quiet retries and the catch-up after a reconnect are done by the holdings refresh runner, so **`Portfolio:AutoRefresh:Enabled = false` also switches the healing off** (the scheduled runs, "Sync now" and the "Retry now" button keep working) - and with it the once-a-minute reconcile of the attention items and the retention above, because both are done by the same tick: the items are then refreshed only at the end of a holdings, trades or ledger attempt and after a Dhan sign-in, and no resolved item is deleted. The 1-minute look of the healer, the 24 hours a resolved item is kept in the bell and the 2 hours before a login runs out at which it is called "expiring" are fixed in the code. Details: [doc 12](12-portfolio-monitoring.md) §3 "Self-healing and attention items (P2-16)".
+
+### Live feed (`Live:*`, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md), P2-10)
+
+`appsettings.json` of `xd-feed` (and `Live:ManualRunMinutes` of `xd-api` too); bounds are checked at start-up. The window itself (09:00–15:35, trading days) is the schedule of the service `live-feed` on the Services screen, not a setting here.
+
+```yaml
+Live:
+  MaxWsInstruments: 200          # 1–5000: the cap of the active set (alerts, then indices, then holdings by value)
+  FlushSeconds: 2                # 1–30: how often the latest ticks are written
+  SilenceSeconds: 30             # 5–300: no packet for this long in market hours = dead connection (when an index is subscribed)
+  BackoffInitialSeconds: 1       # 1–60: reconnect back-off 1, 2, 4 … BackoffMaxSeconds, jittered
+  BackoffMaxSeconds: 30          # 1–300
+  SubscribeSpacingMilliseconds: 250   # 0–5000: gap between subscription messages (≤ 100 instruments each)
+  ManualRunMinutes: 30           # 1–240: how long Run now keeps the connection open outside the window
+```
 
 ## 4. Most-used settings
 

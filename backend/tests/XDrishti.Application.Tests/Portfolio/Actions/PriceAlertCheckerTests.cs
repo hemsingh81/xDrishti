@@ -160,6 +160,23 @@ public sealed class PriceAlertCheckerTests
     }
 
     [Fact]
+    public async Task A_check_whose_unit_of_work_fails_triggers_nothing_reports_none_and_the_next_tick_finds_the_alerts_again()
+    {
+        var infy = Instrument("INFY");
+        var tcs = Instrument("TCS");
+        var a = _harness.Data.SeedAlert(infy, AlertDirection.AtOrBelow, 1200m, _harness.Now);
+        var b = _harness.Data.SeedAlert(tcs, AlertDirection.AtOrBelow, 4200m, _harness.Now);
+        _harness.Data.ConflictingRuns = 1; // the work ran, then the database refused it twice: rolled back
+
+        var triggered = await CheckAsync([(infy, 1000m), (tcs, 4000m)]);
+
+        triggered.ShouldBe(0);
+        (_harness.Data.AlertOf(a.Id).Status, _harness.Data.AlertOf(b.Id).Status).ShouldBe((AlertStatus.Active, AlertStatus.Active));
+        _harness.Data.Events.ShouldBeEmpty();
+        (await CheckAsync([(infy, 1000m), (tcs, 4000m)])).ShouldBe(2);
+    }
+
+    [Fact]
     public async Task Nothing_to_check_costs_nothing()
     {
         var checker = _harness.Checker();

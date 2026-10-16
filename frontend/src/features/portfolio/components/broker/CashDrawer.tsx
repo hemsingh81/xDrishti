@@ -1,0 +1,120 @@
+import CloseIcon from '@mui/icons-material/Close';
+import { Alert, Box, Divider, Drawer, IconButton, Stack, TextField, Typography } from '@mui/material';
+import { useId, useState } from 'react';
+import type { AccountSummary } from '@/shared/api';
+import { initialTradesAccount } from '../../lib/accounts';
+import { noLedgerFilter, type LedgerFilter } from '../../lib/ledger';
+import { CashView } from './CashView';
+import { DividendsPanel } from './DividendsPanel';
+
+interface CashDrawerProps {
+  onClose: () => void;
+  /** The accounts with the Portfolio role. */
+  accounts: readonly AccountSummary[];
+  /** The account of the page's scope (null = all accounts). */
+  scopeAccountId: string | null;
+  /** Open the Add dividend form at once (the invitation under the tiles leads here). */
+  startAdding?: boolean;
+  /** Open the dividend import at once (a link, or a dividend file dropped on the trade import). */
+  startImporting?: boolean;
+  /** Put the keyboard on the suggested dividends at once (the bell's "Possible dividends in the ledger"). */
+  focusSuggestions?: boolean;
+  /** A tradebook was dropped on the dividend import: the trade import opens instead. */
+  onImportTrades: () => void;
+  /** Opens the Import files dialog (a report was dropped on the dividend import, or its button). */
+  onImportFiles: () => void;
+}
+
+/**
+ * Cash & dividends in a side panel: the dividends you entered for the account (add, void, the suggestions of the ledger) and
+ * what Dhan's ledger says about its money (funds in and out, dividends, charges), by class and period. Only the ledger's
+ * account-level costs (DP charges, annual maintenance, delayed-payment interest) are part of the net returns, from the day the
+ * ledger was first read; its other entries (brokerage, STT, GST, stamp duty, settlements) are shown only, because the trade
+ * charges are already counted from the trades.
+ */
+export function CashDrawer({
+  onClose,
+  accounts,
+  scopeAccountId,
+  startAdding = false,
+  startImporting = false,
+  focusSuggestions = false,
+  onImportTrades,
+  onImportFiles,
+}: CashDrawerProps) {
+  const titleId = useId();
+  const [accountId, setAccountId] = useState(() => initialTradesAccount(accounts, scopeAccountId));
+  const [filter, setFilter] = useState<LedgerFilter>(noLedgerFilter);
+  const account = accounts.find((a) => a.id === accountId);
+  return (
+    <Drawer
+      anchor="right"
+      open
+      onClose={onClose}
+      slotProps={{
+        paper: {
+          role: 'dialog',
+          'aria-labelledby': titleId,
+          sx: { width: { xs: '100%', md: 920 }, maxWidth: '100vw' },
+        },
+      }}
+    >
+      <Stack direction="row" sx={{ alignItems: 'center', gap: 1, px: 2.5, py: 1.5 }}>
+        <Typography id={titleId} component="h2" variant="h2" sx={{ flex: 1 }}>
+          Cash &amp; dividends
+        </Typography>
+        <IconButton aria-label="Close cash and dividends" size="small" edge="end" onClick={onClose}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </Stack>
+      <Divider />
+      <Stack spacing={2} sx={{ px: 2.5, pt: 1.5, overflowY: 'auto', flex: 1, pb: 3 }}>
+        <Alert severity="info">
+          Dhan credits dividends to your bank account, so they rarely appear here &mdash; enter them yourself. Dividends
+          you enter count in the net return and net XIRR, and so do the ledger&rsquo;s account-level costs (DP charges,
+          annual maintenance, delayed-payment interest). Its other entries (brokerage, STT, GST, stamp duty,
+          settlements) are shown only: trade charges are already counted from the trades.
+        </Alert>
+        {accounts.length > 1 && (
+          <TextField
+            select
+            label="Account"
+            value={accountId}
+            onChange={(event) => {
+              setAccountId(event.target.value);
+            }}
+            slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+            sx={{ maxWidth: 360 }}
+          >
+            <option value="" disabled>
+              Choose an account
+            </option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </TextField>
+        )}
+        {account && (
+          <DividendsPanel
+            key={`dividends-${account.id}`}
+            account={account}
+            startAdding={startAdding}
+            startImporting={startImporting}
+            focusSuggestions={focusSuggestions}
+            onImportTrades={onImportTrades}
+            onImportFiles={onImportFiles}
+          />
+        )}
+        {accountId ? (
+          <CashView key={accountId} accountId={accountId} filter={filter} onFilter={setFilter} />
+        ) : (
+          <Box>
+            <Typography color="text.secondary">Choose an account to see its cash movements.</Typography>
+          </Box>
+        )}
+      </Stack>
+    </Drawer>
+  );
+}

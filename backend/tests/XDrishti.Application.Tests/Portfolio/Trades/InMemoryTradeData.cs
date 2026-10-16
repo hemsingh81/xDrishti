@@ -14,6 +14,9 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
     /// <summary>The NSE shares and ETFs of the master list.</summary>
     public List<TradeInstrument> Instruments { get; } = [];
 
+    /// <summary>The Dhan security ids (NSE equity segment) of the instruments, by security id.</summary>
+    public Dictionary<string, TradeInstrument> DhanIds { get; } = [];
+
     /// <summary>The applied actions by instrument.</summary>
     public Dictionary<Guid, List<AppliedAction>> Actions { get; } = [];
 
@@ -37,6 +40,25 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
                 .OrderBy(t => t.CreatedAt).ThenBy(t => t.Seq).ThenBy(t => t.Id),
         ]);
 
+    /// <summary>How many times the securities of the broker trades were read (once per automatic rebuild that was not skipped).</summary>
+    public int BrokerSecurityReads { get; private set; }
+
+    public ValueTask<IReadOnlyList<TradeSecurity>> ListBrokerSecuritiesAsync(Guid accountId, CancellationToken cancellationToken)
+    {
+        BrokerSecurityReads++;
+        return ValueTask.FromResult<IReadOnlyList<TradeSecurity>>(
+            [.. Trades.Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Broker).Select(t => new TradeSecurity(t.Isin, t.TradingSymbol)).Distinct().OrderBy(t => t.Isin, StringComparer.Ordinal).ThenBy(t => t.TradingSymbol, StringComparer.Ordinal)]);
+    }
+
+    public ValueTask<IReadOnlySet<string>> StoredIdsAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlySet<string>>(Trades.Where(t => t.AccountId == accountId && !t.IsVoided && externalIds.Contains(t.ExternalId)).Select(t => t.ExternalId).ToHashSet(StringComparer.Ordinal));
+
+    public ValueTask<IReadOnlyList<Transaction>> ListBrokerAwaitingEnrichmentAsync(Guid accountId, IReadOnlyCollection<string> externalIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<Transaction>>(
+        [
+            .. Trades.Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Broker && externalIds.Contains(t.ExternalId) && (t.Isin is null || t.TradingSymbol.Length == 0 || t.Charges == 0m)),
+        ]);
+
     public ValueTask<IReadOnlyList<Transaction>> ListActiveOfBatchAsync(Guid batchId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<Transaction>>([.. Trades.Where(t => t.BatchId == batchId && !t.IsVoided).OrderBy(t => t.Seq)]);
 
@@ -51,6 +73,25 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
         return ValueTask.FromResult<(IReadOnlyList<Transaction>, int)>(([.. all.Skip((page - 1) * pageSize).Take(pageSize)], all.Count));
     }
 
+    public ValueTask<IReadOnlyList<TradeGroup>> ListBrokerGroupsAsync(Guid accountId, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<TradeGroup>>(
+        [
+            .. Trades
+                .Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Broker && t.Isin is not null && t.TradeDate >= from && t.TradeDate <= to)
+                .GroupBy(t => (t.TradeDate, Isin: t.Isin!, t.Side))
+                .Select(g => new TradeGroup(g.Key.TradeDate, g.Key.Isin, g.Key.Side, g.Sum(t => t.Qty)))
+                .OrderBy(g => g.Date).ThenBy(g => g.Isin, StringComparer.Ordinal).ThenBy(g => g.Side),
+        ]);
+
+    public ValueTask<SupersedeOutcome> SupersedeBillRowsAsync(Guid accountId, IReadOnlyCollection<TradeGroup> brokerGroups, Guid runId, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        var wanted = brokerGroups.GroupBy(g => (g.Date, g.Isin, g.Side)).ToDictionary(g => g.Key, g => g.Sum(x => x.Qty));
+        var hits = Trades.Where(t => t.AccountId == accountId && !t.IsVoided && t.Source == TradeSource.Bill && t.Isin is not null && wanted.ContainsKey((t.TradeDate, t.Isin, t.Side))).ToList();
+        var differing = hits.GroupBy(t => (t.TradeDate, t.Isin!, t.Side)).Count(g => g.Sum(t => t.Qty) != wanted[g.Key]);
+        var voided = hits.Count(t => t.Supersede(runId, at));
+        return ValueTask.FromResult(new SupersedeOutcome(voided, differing));
+    }
+
     public void Add(IEnumerable<Transaction> trades)
     {
         foreach (var trade in trades)
@@ -61,7 +102,20 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
             }
 
             Trades.Add(trade);
+            _collected.Add(trade);
         }
+    }
+
+    private readonly List<Transaction> _collected = [];
+
+    /// <summary>A save went through: what was collected is committed.</summary>
+    public void ForgetCollected() => _collected.Clear();
+
+    /// <summary>A save was refused: the database rolls back what it had collected.</summary>
+    public void RollBackCollected()
+    {
+        Trades.RemoveAll(_collected.Contains);
+        _collected.Clear();
     }
 
     public ValueTask<int> VoidBatchAsync(Guid batchId, string by, DateTimeOffset at, CancellationToken cancellationToken)
@@ -89,6 +143,9 @@ internal sealed class InMemoryTradeData : ITradeStore, ITradeBatches, ITradeRefe
 
     public ValueTask<IReadOnlyList<TradeInstrument>> FindInstrumentsAsync(IReadOnlyCollection<string> isins, IReadOnlyCollection<string> symbols, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<TradeInstrument>>([.. Instruments.Where(i => (i.Isin is not null && isins.Contains(i.Isin)) || symbols.Contains(i.Symbol))]);
+
+    public ValueTask<IReadOnlyDictionary<string, TradeInstrument>> FindInstrumentsByDhanIdsAsync(IReadOnlyCollection<string> securityIds, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyDictionary<string, TradeInstrument>>(DhanIds.Where(d => securityIds.Contains(d.Key)).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal));
 
     public ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<AppliedAction>>> ListAppliedActionsAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken)
     {

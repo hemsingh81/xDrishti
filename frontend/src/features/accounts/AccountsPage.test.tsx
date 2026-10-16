@@ -2,9 +2,13 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildAccountDetail, buildProblem, ids, summaryOf } from '@/test/fixtures';
+import { pinClock } from '@/test/pinClock';
 import { renderRoutes } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
 import { AccountsPage } from './components/AccountsPage';
+
+// The overview reads the key expiry and the login against today: the clock is pinned.
+pinClock('2026-10-15T06:30:00Z');
 
 function renderPage(path = '/accounts') {
   return renderRoutes([{ path: '/accounts', element: <AccountsPage /> }], { initialPath: path });
@@ -79,7 +83,7 @@ describe('AccountsPage — list and detail', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('API key: set · updated 9 Oct 2026')).toBeInTheDocument();
     expect(screen.getByText('API secret: set · updated 9 Oct 2026')).toBeInTheDocument();
-    expect(screen.getByText('API key valid until 9 Oct 2027')).toBeInTheDocument();
+    expect(screen.getByText('API key valid until 31 Dec 2099')).toBeInTheDocument();
     expect(screen.getByText(/paper · Standard profile · capital ₹2,00,000 · swing/)).toBeInTheDocument();
     expect(screen.getByText('Included in portfolio totals')).toBeInTheDocument();
     expect(screen.queryByText(/history from/)).not.toBeInTheDocument();

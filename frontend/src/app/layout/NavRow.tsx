@@ -1,9 +1,11 @@
 import { Box, ListItemButton, ListItemIcon, ListItemText, Tooltip } from '@mui/material';
 import { NavLink } from 'react-router';
 import { IconChip } from '@/shared/ui';
-import { navHue, numeric } from '@/theme';
+import { iconChip, navHue, numeric, rem, shape, sidebar } from '@/theme';
 import type { NavItem } from '../navigation';
 import type { NavBadge } from './navBadges';
+
+const iconChipWidth = iconChip.sm.box;
 
 interface NavRowProps {
   item: NavItem;
@@ -21,12 +23,25 @@ export function NavRow({ item, badge = null, onNavigate }: NavRowProps) {
       end={path === '/'}
       onClick={onNavigate}
       aria-label={badge ? `${label}, ${badge.label}` : undefined}
-      sx={{ mb: 0.25 }}
+      sx={(theme) => ({
+        // The prototype's `.side a`: 6 / 8 px padding, 11 px gap, radius 11, a 1 px gap between links.
+        mb: '1px',
+        p: sidebar.linkPadding,
+        borderRadius: `${shape.radiusNav}px`,
+        '&:hover': { backgroundColor: theme.palette.background.alt },
+        // The marker sits on the sidebar's own edge, outside the link.
+        '&.active::before': { left: -sidebar.paddingX },
+        '&.active .MuiListItemText-primary': { fontWeight: 600 },
+      })}
     >
-      <ListItemIcon sx={{ minWidth: 40 }}>
+      <ListItemIcon sx={{ minWidth: iconChipWidth + sidebar.linkGap }}>
         <IconChip icon={icon} hue={navHue[path] ?? 'slate'} size="sm" />
       </ListItemIcon>
-      <ListItemText primary={label} slotProps={{ primary: { sx: { fontWeight: 550, opacity: phase ? 0.7 : 1 } } }} />
+      <ListItemText
+        primary={label}
+        sx={{ m: 0 }}
+        slotProps={{ primary: { sx: { fontWeight: 550, opacity: phase ? 0.7 : 1, whiteSpace: 'nowrap' } } }}
+      />
       {badge && (
         <Box
           component="span"
@@ -40,7 +55,7 @@ export function NavRow({ item, badge = null, onNavigate }: NavRowProps) {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 11,
+            fontSize: rem(11),
             fontWeight: 700,
             bgcolor: `${badge.severity}.main`,
             color: `${badge.severity}.contrastText`,

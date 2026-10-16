@@ -1,8 +1,5 @@
 import type { ServiceNotice } from '@/shared/api';
-import type { AppNotification, NotificationSeverity } from './deriveNotifications';
-
-const severityOf = (severity: string): NotificationSeverity =>
-  severity === 'error' ? 'error' : severity === 'warn' ? 'warn' : 'info';
+import { severityOf, type AppNotification } from './deriveNotifications';
 
 /**
  * The service notices of the API as bell notifications. The id comes from the API (`service:failed:{serviceId}:{day}`: one
@@ -22,6 +19,9 @@ export function deriveServiceNotifications(notices: readonly ServiceNotice[]): A
             text: notice.text,
             href: '/services',
             at: notice.at === null ? null : Date.parse(notice.at),
+            title: null,
+            actions: [],
+            resolved: false,
           },
         ]
       : [],

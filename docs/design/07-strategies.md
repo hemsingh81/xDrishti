@@ -74,14 +74,33 @@ Confluence (same symbol & side on several timeframes/strategies) is a feature an
 | Volume | Relative volume (same time-of-day), delivery %, OI change |
 | Levels | Distance to previous-day H/L/C, CPR width, VWAP distance, 52-week high/low, round numbers |
 | Relative strength | Stock vs index, stock vs sector, sector vs index (5/20/60 days) |
-| Market context | Index trend/ADX, VIX level/percentile/change, breadth |
-| Calendar | Weekday, time of day, expiry day/week, pre/post holiday, days to results |
+| Market context | Index trend/ADX, VIX level/percentile/change, breadth — **built in P3-01c** as the features `index_trend`, `index_adx`, `index_vol_pct`, `vix`, `vix_pct`, `vix_chg`, `breadth`, `regime_trend`, `regime_vol`, `regime`: daily, as of the previous session ([doc 11](11-strategy-lab.md) §2, [ADR 0033](../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md)); the computation of breadth and `sector_rs` follow in P3-01d |
+| Calendar | Weekday, time of day, expiry day/week, pre/post holiday, days to results — `day_of_week` and `is_expiry_day` (the dates are passed in by the caller) are built; the rest follow |
 | Plan geometry | Stop distance in ATR, room to next obstacle in R, achievable R:R |
 
 ## 6. Market regime
 
 Daily label from index data: **trend** (UP / DOWN / RANGE via DMA slope + ADX) × **volatility** (LOW /
 NORMAL / HIGH via VIX and ATR percentiles) → up to 9 regimes. Used to condition statistics and as a feature.
+
+**As built (P3-01c, [ADR 0033](../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md)).** The label of a day is computed from the regime index (Nifty 50 by default) and the VIX, from that day and
+earlier days only, and it is read **as of the previous session**: every minute of a date *D* sees the label of the latest day strictly before *D*, so the regime never contains the close of the day being traded and a
+back-test cannot look ahead through it. The numbers are `ContextOptions` (defaults below; later trading configuration in the database, [ADR 0002](../adr/0002-config-and-strategies-in-app.md)).
+
+| Part | Rule |
+|------|------|
+| Trend | **UP (+1)** when the index close is above its 50-day average, the average is higher than 5 days ago and ADX(14) ≥ 20; **DOWN (−1)** for the mirror image (close below the average, the average lower, ADX ≥ 20); otherwise **RANGE (0)**. Ready from day 55 |
+| Volatility | score = the mean of two percentile ranks over the last 252 days — the VIX close and the index's ATR(14) as a percent of its close (ties take the middle of their span: `100 × (#below + 0.5 × #equal) / 252`). **LOW (0)** below 100/3 (33.33…), **HIGH (2)** from 200/3 (66.67…), **NORMAL (1)** in between. When the VIX percentile is not ready (a day without a VIX, or fewer than 252 VIX days) the index percentile alone is the score. Ready from day 265. *Pending owner confirmation, ADR 0033 Amendments 1 and 2 (the VIX window and the fallback) and 13 (the exact thirds; the owner's wording was 33.3 and 66.7).* |
+| Code | `regime = (1 − trend) × 3 + volatility + 1` |
+
+| Trend ↓ / volatility → | LOW | NORMAL | HIGH |
+|------------------------|----:|-------:|-----:|
+| UP | 1 `UP_LOW_VOL` | 2 `UP_NORMAL_VOL` | 3 `UP_HIGH_VOL` |
+| RANGE | 4 `RANGE_LOW_VOL` | 5 `RANGE_NORMAL_VOL` | 6 `RANGE_HIGH_VOL` |
+| DOWN | 7 `DOWN_LOW_VOL` | 8 `DOWN_NORMAL_VOL` | 9 `DOWN_HIGH_VOL` |
+
+Breadth is carried next to the regime (feature `breadth`) but is not part of it; it feeds the market gate ([doc 09](09-learning-engine.md), P7). One regime index and the VIX only: Bank Nifty and the sector indices are not
+part of the regime. The configuration inputs are in [doc 16](16-configuration.md).
 
 ## 7. Side specifics
 

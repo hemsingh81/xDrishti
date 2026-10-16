@@ -96,7 +96,6 @@ public sealed class TradeCsvReaderTests
     [Theory]
     [InlineData("symbol,side,quantity,price", "date")]
     [InlineData("date,side,quantity,price", "symbol or ISIN")]
-    [InlineData("date,symbol,quantity,price", "side")]
     [InlineData("date,symbol,side,price", "quantity")]
     [InlineData("date,symbol,side,quantity", "price")]
     public async Task A_missing_required_column_refuses_the_file_and_names_it(string header, string missing)
@@ -108,6 +107,15 @@ public sealed class TradeCsvReaderTests
         result.Error.Fields!.Single().Field.ShouldBe("file");
         result.Error.Fields!.Single().Message.ShouldContain(missing);
         result.Error.Fields!.Single().Message.ShouldContain("Accepted header names");
+    }
+
+    [Fact]
+    public async Task A_file_with_a_date_symbol_quantity_and_price_but_no_side_is_explained_as_a_tradebook_without_sides_not_as_a_missing_column()
+    {
+        var result = await ReadRowsAsync("date,symbol,quantity,price", "2024-03-05,EXMPL,10,90");
+
+        result.Error.Code.ShouldBe("portfolio.wrong_file_kind");
+        result.Error.Payload!["detected"].ShouldBe("tradebook_without_sides");
     }
 
     [Fact]

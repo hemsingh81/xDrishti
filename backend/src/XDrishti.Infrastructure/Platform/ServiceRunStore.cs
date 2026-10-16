@@ -80,12 +80,13 @@ internal sealed class ServiceRunStore(XDrishtiDbContext db) : IServiceRunStore
     public async ValueTask<int> CountAsync(string serviceId, CancellationToken cancellationToken) =>
         await db.ServiceRuns.AsNoTracking().CountAsync(x => x.ServiceId == serviceId, cancellationToken);
 
-    public async ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, string message, CancellationToken cancellationToken)
+    public async ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, string message, IReadOnlyCollection<string> exceptServiceIds, CancellationToken cancellationToken)
     {
         var running = ServiceRunStatus.Running;
         var failed = ServiceRunStatus.Failed;
+        var except = exceptServiceIds.ToArray();
         return await db.ServiceRuns
-            .Where(x => x.Status == running && x.StartedAt < processStartedAt)
+            .Where(x => x.Status == running && x.StartedAt < processStartedAt && !except.Contains(x.ServiceId))
             .ExecuteUpdateAsync(s => s.SetProperty(x => x.Status, failed).SetProperty(x => x.FinishedAt, now).SetProperty(x => x.Message, message), cancellationToken);
     }
 }

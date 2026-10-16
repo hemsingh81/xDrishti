@@ -35,6 +35,19 @@ public sealed class TradeImportTests
         ]);
     }
 
+    [Fact]
+    public async Task An_import_whose_data_was_changed_twice_meanwhile_is_refused_with_the_neutral_try_again_text_and_stores_nothing()
+    {
+        var s = await StartAsync();
+        s.Fx.Data.ConflictingRuns = 1;
+
+        var result = await s.ImportAsync(Csv(BaseRows));
+
+        result.Error.ShouldBe(PortfolioErrors.DataChanged);
+        result.Error.Message.ShouldBe("The data changed while you were working; try again.");
+        s.Data.Trades.ShouldBeEmpty();
+    }
+
     private static DateOnly D(string date) => DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture);
 
     [Fact]
@@ -299,6 +312,44 @@ public sealed class TradeImportTests
 
         result.Error.Code.ShouldBe("portfolio.sync_running");
         s.Data.Trades.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task While_a_trades_run_of_the_account_runs_the_import_is_refused_with_the_wait_text()
+    {
+        var s = await StartAsync();
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, BrokerSyncKind.Trades, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var result = await s.ImportAsync(Csv(BaseRows));
+
+        result.Error.ShouldBe(PortfolioErrors.SyncRunningWait);
+        s.Data.Trades.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task While_only_a_ledger_run_of_the_account_runs_the_import_goes_ahead()
+    {
+        var s = await StartAsync();
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(s.Account.Id, BrokerSyncKind.Ledger, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var result = await s.ImportAsync(Csv(BaseRows));
+
+        result.IsSuccess.ShouldBeTrue();
+        s.Data.Trades.Count.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task A_broker_history_run_of_another_account_does_not_hold_the_import_back()
+    {
+        var s = await StartAsync();
+        var today = new DateOnly(2026, 10, 10);
+        s.Fx.BrokerData.Runs.Add(BrokerSyncRun.Start(Guid.NewGuid(), BrokerSyncKind.Trades, BrokerSyncTrigger.Scheduled, today.AddDays(-30), today, "system:broker-history", s.Fx.Clock.GetUtcNow()));
+
+        var result = await s.ImportAsync(Csv(BaseRows));
+
+        result.IsSuccess.ShouldBeTrue();
     }
 
     [Fact]

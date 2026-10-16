@@ -7,7 +7,7 @@ using XDrishti.Application.Abstractions.Accounts;
 namespace XDrishti.Infrastructure.Brokers;
 
 /// <summary>
-/// Sends one request to Dhan and turns the answer into JSON or a <see cref="BrokerFailure"/>: 2xx → the JSON body; 4xx → rejected;
+/// Sends one request to Dhan and turns the answer into JSON or a <see cref="BrokerFailure"/>: 2xx → the JSON body; 429 or a 4xx with DH-904 → rate limited; other 4xx → rejected;
 /// anything else (3xx — redirects are not followed —, 5xx, timeout, network failure, unreadable body) → unavailable. Never retries: codes are
 /// single-use. Only the operation, the HTTP status and Dhan's error code are logged — never URLs, headers or bodies.
 /// </summary>
@@ -18,6 +18,9 @@ internal static partial class BrokerHttp
 
     /// <summary>Dhan's error code for an invalid or expired access token (documented authentication error).</summary>
     public const string TokenRefusedCode = "DH-901";
+
+    /// <summary>Dhan's code for "too many requests".</summary>
+    public const string RateLimitCode = "DH-904";
 
     /// <summary>Broker answers are small; anything bigger is refused.</summary>
     public const int MaxResponseBytes = 256 * 1024;
@@ -105,12 +108,15 @@ internal static partial class BrokerHttp
                 return BrokerResponse.Fail<JsonElement>(BrokerFailureKind.Unavailable);
             }
 
-            var code = body is { } error ? ErrorCode(error) : null;
+            // A 429 is Dhan's rate limit whether or not the body says so (DH-904): the quiet retries of ADR 0027 tell it from a refusal by the code.
+            var code = (body is { } error ? ErrorCode(error) : null) ?? (status == 429 ? RateLimitCode : null);
             var kind = status switch
             {
                 // Dhan also reports an invalid or expired token as DH-901 with other 4xx statuses (400 has been seen).
                 401 or 403 when tokenCall => BrokerFailureKind.Unauthorized,
                 >= 400 and < 500 when tokenCall && code == TokenRefusedCode => BrokerFailureKind.Unauthorized,
+                429 => BrokerFailureKind.RateLimited,
+                >= 400 and < 500 when code == RateLimitCode => BrokerFailureKind.RateLimited,
                 >= 400 and < 500 => BrokerFailureKind.Rejected,
                 _ => BrokerFailureKind.Unavailable,
             };
@@ -176,7 +182,13 @@ internal static partial class BrokerHttp
     {
         var code = ErrorCode(body);
         LogFailed(logger, operation, null, "answer without the expected fields", code);
-        return BrokerResponse.Fail<T>(code is null ? BrokerFailureKind.Unavailable : BrokerFailureKind.Rejected, code);
+        var kind = code switch
+        {
+            null => BrokerFailureKind.Unavailable,
+            RateLimitCode => BrokerFailureKind.RateLimited,
+            _ => BrokerFailureKind.Rejected,
+        };
+        return BrokerResponse.Fail<T>(kind, code);
     }
 
     private static async ValueTask<JsonElement?> ReadJsonAsync(HttpResponseMessage response, CancellationToken cancellationToken)

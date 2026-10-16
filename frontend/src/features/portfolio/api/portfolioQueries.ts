@@ -7,6 +7,8 @@ import { formatSort, type PortfolioFilters } from '../lib/filters';
 export const portfolioKeys = {
   all: ['portfolio'] as const,
   holdings: ['portfolio', 'holdings'] as const,
+  /** The live feed's state, read over REST when the hub is not connected (P2-10a). */
+  live: ['portfolio', 'live'] as const,
   /** The groups of the Group by view and the holdings of each opened group (P2-08). */
   groups: ['portfolio', 'groups'] as const,
   summary: ['portfolio', 'summary'] as const,

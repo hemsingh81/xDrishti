@@ -32,7 +32,7 @@ internal static class GroupFixtures
 
     public static readonly Guid Core = Guid.Parse("00000000-0000-7000-8000-0000000000c1");
 
-    public static readonly Guid Dividend = Guid.Parse("00000000-0000-7000-8000-0000000000c2");
+    public static readonly Guid DividendBasket = Guid.Parse("00000000-0000-7000-8000-0000000000c2");
 
     public static readonly Guid InstrumentAaa = Guid.Parse("00000000-0000-7000-8000-000000000e01");
 
@@ -70,7 +70,7 @@ internal static class GroupFixtures
         new Dictionary<Guid, string> { [InstrumentAaa] = "Banks", [InstrumentBbb] = "Banks", [InstrumentCcc] = "IT", [InstrumentEee] = "Banks" },
         new Dictionary<Guid, IReadOnlyList<BasketRef>>
         {
-            [InstrumentAaa] = [new BasketRef(Core, "Core"), new BasketRef(Dividend, "Dividend")],
+            [InstrumentAaa] = [new BasketRef(Core, "Core"), new BasketRef(DividendBasket, "Dividend")],
             [InstrumentBbb] = [new BasketRef(Core, "Core")],
         });
 

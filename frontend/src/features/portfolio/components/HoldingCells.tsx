@@ -1,11 +1,12 @@
 import { Box, Chip, Stack, Tooltip, Typography } from '@mui/material';
 import type { HoldingRow } from '@/shared/api';
-import { formatDate, formatInrPrecise, formatIstDateTime, formatIstDayMonth } from '@/shared/lib/format';
+import { formatDate, formatInr, formatInrPrecise, formatIstDateTime, formatIstDayMonth } from '@/shared/lib/format';
 import { useWallClock } from '@/shared/lib/useWallClock';
 import { monoFontFamily, numeric } from '@/theme';
 import { noDayChangeReasonOf } from '../lib/figures';
 import { isEarlierDay } from '../lib/prices';
 import { DayChangeAmount, PnlPercent } from './Figures';
+import { PriceFlash } from './PriceFlash';
 
 const dash = '—';
 
@@ -29,12 +30,15 @@ export function Symbol({ holding }: { holding: HoldingRow }) {
 export function LastPrice({ holding }: { holding: HoldingRow }) {
   if (!holding.priced) return <>{dash}</>;
   const price = formatInrPrecise(holding.lastPrice);
-  if (holding.lastPriceAt === null) return <>{price}</>;
-  return (
-    <Tooltip describeChild title={`Price as of ${formatIstDateTime(holding.lastPriceAt)}`}>
-      <span>{price}</span>
-    </Tooltip>
-  );
+  const text =
+    holding.lastPriceAt === null ? (
+      <>{price}</>
+    ) : (
+      <Tooltip describeChild title={`Price as of ${formatIstDateTime(holding.lastPriceAt)}`}>
+        <span>{price}</span>
+      </Tooltip>
+    );
+  return <PriceFlash price={holding.lastPrice}>{text}</PriceFlash>;
 }
 
 export function Acquired({ holding }: { holding: HoldingRow }) {
@@ -47,6 +51,13 @@ export function Acquired({ holding }: { holding: HoldingRow }) {
       </Typography>
     </Stack>
   );
+}
+
+/** The dividends entered for the holding; "—" when none is entered (a holding with only trade charges has none to show). */
+export function Dividends({ holding }: { holding: HoldingRow }) {
+  const income = holding.income;
+  if (!income?.dividendsFrom) return <>{dash}</>;
+  return <>{formatInr(income.dividends)}</>;
 }
 
 /** Day change: rupees over percent; the date of the session under them when the price is from an earlier India day. */

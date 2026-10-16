@@ -1,0 +1,4 @@
+# UNVERIFIED - constructed from Dhan's documentation (made-up id and prices), not recorded from the real feed.
+# Ticker packet (response code 2) of an index: IDX_I (segment 0), security id 13.
+# payload: last price float32 24800.5 | last trade time int32 1791781200
+02 10 00 00 0d 00 00 00 00 c1 c1 46 50 69 cc 6a

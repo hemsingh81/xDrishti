@@ -1,4 +1,5 @@
 import AddIcon from '@mui/icons-material/Add';
+import UploadIcon from '@mui/icons-material/UploadFileOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import { Box, Button, Divider, Drawer, IconButton, Stack, Typography } from '@mui/material';
 import { useId } from 'react';
@@ -15,6 +16,10 @@ interface TradesDrawerProps {
   onClose: () => void;
   /** Add one trade by hand. */
   onAddTrade: () => void;
+  /** A dividend file was dropped on the trade import: open the dividend import instead. */
+  onImportDividends: () => void;
+  /** Opens the Import files dialog: the header button, or a report was dropped on this import. */
+  onImportFiles: () => void;
   /** The accounts with the Portfolio role. */
   accounts: readonly AccountSummary[];
   /** The account of the page's scope (null = all accounts). */
@@ -32,7 +37,16 @@ const tabs: readonly ButtonTab<TradesTab>[] = tradesTabs.map((tab) => ({
  * The trades in a side panel: Import CSV (the wizard: file, preview, import) and History (the imported files with Undo),
  * and Add trade for one trade typed in. The wizard stays mounted while History is shown, so a half-done import is not lost.
  */
-export function TradesDrawer({ tab, onTabChange, onClose, onAddTrade, accounts, scopeAccountId }: TradesDrawerProps) {
+export function TradesDrawer({
+  tab,
+  onTabChange,
+  onClose,
+  onAddTrade,
+  onImportDividends,
+  onImportFiles,
+  accounts,
+  scopeAccountId,
+}: TradesDrawerProps) {
   const titleId = useId();
   return (
     <Drawer
@@ -51,6 +65,9 @@ export function TradesDrawer({ tab, onTabChange, onClose, onAddTrade, accounts, 
         <Typography id={titleId} component="h2" variant="h2" sx={{ flex: 1 }}>
           Trades
         </Typography>
+        <Button size="small" variant="outlined" startIcon={<UploadIcon />} onClick={onImportFiles}>
+          Import files
+        </Button>
         <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={onAddTrade}>
           Add trade
         </Button>
@@ -77,6 +94,8 @@ export function TradesDrawer({ tab, onTabChange, onClose, onAddTrade, accounts, 
             onHistory={() => {
               onTabChange('history');
             }}
+            onImportDividends={onImportDividends}
+            onImportFiles={onImportFiles}
           />
         </Box>
         {tab === 'history' && (

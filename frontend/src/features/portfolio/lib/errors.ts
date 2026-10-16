@@ -2,16 +2,19 @@ import { ApiError } from '@/shared/api';
 
 export type ProblemKind =
   | 'not_connected'
+  | 'token_expired'
   | 'role_off'
   | 'no_bucket'
   | 'sync_running'
   | 'confirmation_required'
   | 'confirmation_stale'
   | 'conflict'
+  | 'possible_duplicate'
   | 'invalid'
   | 'not_found'
   | 'alert_limit'
   | 'preview_stale'
+  | 'wrong_file_kind'
   | 'lot_from_trade'
   | 'broker_error'
   | 'network'
@@ -19,16 +22,19 @@ export type ProblemKind =
 
 const byCode: Record<string, ProblemKind> = {
   'portfolio.not_connected': 'not_connected',
+  'portfolio.token_expired': 'token_expired',
   'portfolio.role_off': 'role_off',
   'portfolio.no_bucket': 'no_bucket',
   'portfolio.sync_running': 'sync_running',
   'portfolio.confirmation_required': 'confirmation_required',
   'portfolio.confirmation_stale': 'confirmation_stale',
   'portfolio.conflict': 'conflict',
+  'portfolio.possible_duplicate': 'possible_duplicate',
   'portfolio.invalid': 'invalid',
   'portfolio.not_found': 'not_found',
   'portfolio.alert_limit': 'alert_limit',
   'portfolio.preview_stale': 'preview_stale',
+  'portfolio.wrong_file_kind': 'wrong_file_kind',
   'portfolio.lot_from_trade': 'lot_from_trade',
   'accounts.broker_error': 'broker_error',
 };
@@ -41,6 +47,7 @@ export function problemKind(error: unknown): ProblemKind {
 
 const friendly: Partial<Record<ProblemKind, string>> = {
   not_connected: 'Connect the account first. Dhan is not signed in for it (or the sign-in has expired).',
+  token_expired: 'The Dhan sign-in of this account has expired. Connect the account again, then read once more.',
   role_off: 'Switch on the Portfolio role of this account first.',
   no_bucket:
     'This account has no portfolio bucket to put holdings in. Switch its Portfolio role off and on again in Accounts.',

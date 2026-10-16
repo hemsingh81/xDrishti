@@ -2,6 +2,7 @@ using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Portfolio.Returns;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -13,7 +14,8 @@ namespace XDrishti.Application.Portfolio;
 /// <summary>
 /// Totals of the holdings of one account, one bucket, or (without an account) every active account that has the Portfolio role and counts in totals:
 /// invested, current value, unrealised and realised P&amp;L, XIRR from the union of all cash flows, day change, counts, lots on the default date, the price times and the last sync, and the benchmark XIRR and alpha of the same cash flows (ADR 0020):
-/// the same holdings and lots as the XIRR, put into the benchmark index at its stored day closes (carried forward to the valuation date); one more read, of the index's bars only.
+/// the same holdings and lots as the XIRR, put into the benchmark index at its stored day closes (carried forward to the valuation date); one more read, of the index's bars only. The benchmark and the alpha stay price returns, before dividends and
+/// charges. The income of the scope (ADR 0026): dividends, charges, total and net returns and the net XIRR; for the portfolio or an account (no bucket) it includes the dividends of no holding and the ledger's costs, for a bucket only its holdings'.
 /// </summary>
 public sealed record GetHoldingsSummaryQuery(Guid? AccountId, Guid? BucketId) : IQuery<Result<HoldingsSummary>>;
 
@@ -23,6 +25,7 @@ internal sealed class GetHoldingsSummaryHandler(
     IAccountStore accounts,
     IPortfolioBenchmark benchmarks,
     IPortfolioPrices prices,
+    IIncomeQueries income,
     ITradingCalendar calendar,
     TimeProvider clock) : IQueryHandler<GetHoldingsSummaryQuery, Result<HoldingsSummary>>
 {
@@ -40,6 +43,7 @@ internal sealed class GetHoldingsSummaryHandler(
         var valuationDate = IndiaTime.Today(clock.GetUtcNow());
         var holdings = await queries.ListAsync(new HoldingFilter(query.AccountId, query.BucketId, null, null, TotalsOnly: query.AccountId is null), cancellationToken);
         var figures = ReturnsCalculator.ForGroup(holdings, valuationDate);
+        var book = await IncomeLoader.LoadAsync(income, IncomeLoader.ScopeOf(query.AccountId, query.AccountId is null, holdings, complete: query.BucketId is null), cancellationToken);
         var open = holdings.Where(h => h.IsOpen).ToList();
         var dayChange = DayChangeCalculator.ForGroup(holdings);
         var last = await syncs.GetLastAsync(query.AccountId, cancellationToken);
@@ -64,7 +68,8 @@ internal sealed class GetHoldingsSummaryHandler(
             alpha,
             BenchmarkStateCodes.Name(benchmark.State),
             benchmark.AsOf,
-            await AlphaBasisAsync(benchmark, alpha, newestPrice, cancellationToken)));
+            await AlphaBasisAsync(benchmark, alpha, newestPrice, cancellationToken),
+            IncomeViews.View(IncomeCalculator.Of(figures, holdings, book, query.BucketId is null ? book.AccountIds : [], valuationDate))));
     }
 
     /// <summary>The benchmark XIRR of the holdings the portfolio XIRR is made of (those with a usable price), from the benchmark index's stored closes.</summary>

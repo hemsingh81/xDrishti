@@ -16,12 +16,21 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
 
     public List<HoldingSync> Syncs { get; } = [];
 
+    /// <summary>The health figures of the syncs (ADR 0027).</summary>
+    public InMemorySyncHealth Health { get; } = new();
+
     public int SaveCount { get; private set; }
 
     public int PruneCalls { get; private set; }
 
     /// <summary>Number of upcoming <see cref="TrySaveAsync"/> calls that report a collision with a concurrent change.</summary>
     public int CollidingSaves { get; set; }
+
+    /// <summary>Runs after a save went through (collected changes are committed).</summary>
+    public Action? OnSaved { get; set; }
+
+    /// <summary>Runs when <see cref="TrySaveAsync"/> reports a collision: the database would have rolled back what the save collected.</summary>
+    public Action? OnRefusedSave { get; set; }
 
     /// <summary>Completions made inside a transaction wait here and are applied on commit, discarded on rollback (like the update they stand for).</summary>
     private List<Action>? _pending;
@@ -34,6 +43,14 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
 
     public ValueTask<bool> AnyForAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
         ValueTask.FromResult(Holdings.Any(h => h.AccountId == accountId));
+
+    public int AppearedReads { get; private set; }
+
+    public ValueTask<bool> AnyAppearedSinceAsync(Guid accountId, DateTimeOffset since, CancellationToken cancellationToken)
+    {
+        AppearedReads++;
+        return ValueTask.FromResult(Holdings.Any(h => h.AccountId == accountId && (h.FirstSeenAt > since || h.Lots.Any(l => l.CreatedAt > since))));
+    }
 
     public ValueTask<IReadOnlyList<Holding>> ListForAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
         ValueTask.FromResult<IReadOnlyList<Holding>>([.. Holdings.Where(h => h.AccountId == accountId).OrderBy(h => h.FirstSeenAt).ThenBy(h => h.Id)]);
@@ -79,6 +96,7 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
         foreach (var stale in Syncs.Where(s => s.AccountId == run.AccountId && s.IsRunning && s.StartedAt < now - staleAfter))
         {
             stale.Fail(now, "The sync did not finish (the application stopped or crashed while it ran).");
+            Health.Interrupted(stale.AccountId, SyncHealthKind.Holdings, now);
         }
 
         if (OtherRunInProgress || Syncs.Any(s => s.AccountId == run.AccountId && s.IsRunning))
@@ -182,6 +200,7 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
         foreach (var run in interrupted)
         {
             run.Fail(now, "The sync did not finish (the application stopped or crashed while it ran).");
+            Health.Interrupted(run.AccountId, SyncHealthKind.Holdings, now);
         }
 
         return ValueTask.FromResult(interrupted.Count);
@@ -190,6 +209,7 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
     public ValueTask SaveAsync(CancellationToken cancellationToken)
     {
         SaveCount++;
+        OnSaved?.Invoke();
         return ValueTask.CompletedTask;
     }
 
@@ -198,15 +218,58 @@ internal sealed class InMemoryPortfolioData(InMemoryAccountData accounts) : IHol
         if (CollidingSaves > 0)
         {
             CollidingSaves--;
+            OnRefusedSave?.Invoke();
             return ValueTask.FromResult(false);
         }
 
         SaveCount++;
+        OnSaved?.Invoke();
         return ValueTask.FromResult(true);
     }
 
+    /// <summary>Number of upcoming <see cref="RunOnceAsync"/> calls that report that the holding changed meanwhile (a sync or a quote saved it): the work is not run.</summary>
+    public int RacedRuns { get; set; }
+
+    /// <summary>The runs of <see cref="RunOnceAsync"/>, to tell that an automatic rebuild did not retry.</summary>
+    public int OnceRuns { get; private set; }
+
+    public ValueTask<Result> RunOnceAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken)
+    {
+        OnceRuns++;
+        if (RacedRuns > 0)
+        {
+            RacedRuns--;
+            return ValueTask.FromResult(Result.Failure(PortfolioErrors.HoldingChanged));
+        }
+
+        return RunAsync(work, cancellationToken);
+    }
+
+    /// <summary>Number of upcoming <see cref="RunAsync"/> calls that fail with a second concurrency conflict (the real unit of work repeats the work once, then reports <see cref="PortfolioErrors.DataChanged"/>): nothing is applied.</summary>
+    public int ConflictingRuns { get; set; }
+
+    /// <summary>Number of upcoming <see cref="RunAsync"/> calls that run normally before the next one ends with a second concurrency conflict (the work is not run); -1: none.</summary>
+    public int RunsBeforeConflict { get; set; } = -1;
+
     public async ValueTask<Result> RunAsync(Func<CancellationToken, ValueTask<Result>> work, CancellationToken cancellationToken)
     {
+        if (ConflictingRuns > 0)
+        {
+            ConflictingRuns--;
+            return Result.Failure(PortfolioErrors.DataChanged);
+        }
+
+        if (RunsBeforeConflict == 0)
+        {
+            RunsBeforeConflict = -1;
+            return Result.Failure(PortfolioErrors.DataChanged);
+        }
+
+        if (RunsBeforeConflict > 0)
+        {
+            RunsBeforeConflict--;
+        }
+
         _pending = [];
         try
         {

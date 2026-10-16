@@ -9,7 +9,10 @@ internal static class StatementRecorder
     /// The text of every SQL statement the driver ran for <paramref name="request"/> and only for it: the request runs under a fresh trace of its own (sent as a W3C `traceparent` header to the in-process server), and the driver's command
     /// activities of that trace are collected — statements of background services or of other tests have another trace and are ignored.
     /// </summary>
-    public static async Task<List<string>> StatementsDuringAsync(this HttpClient client, Func<Task> request)
+    /// <param name="client">The client the request is sent with.</param>
+    /// <param name="request">The request(s) to watch.</param>
+    /// <param name="readsOnly">True (the default): only statements that read (contain SELECT) are collected. False: every statement, so a test can prove that a request wrote nothing.</param>
+    public static async Task<List<string>> StatementsDuringAsync(this HttpClient client, Func<Task> request, bool readsOnly = true)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(request);
@@ -27,7 +30,9 @@ internal static class StatementRecorder
                     return;
                 }
 
-                var text = activity.Tags.Select(t => t.Value).FirstOrDefault(v => v is not null && v.Contains("SELECT", StringComparison.OrdinalIgnoreCase));
+                var text = readsOnly
+                    ? activity.Tags.Select(t => t.Value).FirstOrDefault(v => v is not null && v.Contains("SELECT", StringComparison.OrdinalIgnoreCase))
+                    : activity.Tags.Where(t => t.Key is "db.statement" or "db.query.text").Select(t => t.Value).FirstOrDefault();
                 if (text is not null)
                 {
                     lock (statements)

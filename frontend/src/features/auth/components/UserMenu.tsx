@@ -1,8 +1,10 @@
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LogoutIcon from '@mui/icons-material/LogoutOutlined';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccountsOutlined';
 import { Avatar, Box, Button, Divider, ListItemIcon, Menu, MenuItem, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { palettes } from '@/theme';
 import { useLogout } from '../api/authMutations';
 import { useSession } from '../api/sessionQuery';
@@ -15,10 +17,11 @@ function initialsOf(name: string): string {
     .join('');
 }
 
-/** Top-bar account control: the owner's name and a menu with the signed-in email and Sign out. */
+/** Top-bar account control: the owner's name and a menu with the signed-in email, My account and Sign out. */
 export function UserMenu() {
   const { data } = useSession();
   const logout = useLogout();
+  const navigate = useNavigate();
   const { mode } = useTheme().palette;
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
@@ -73,6 +76,17 @@ export function UserMenu() {
           </Typography>
         </Box>
         <Divider />
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
+            void navigate('/account');
+          }}
+        >
+          <ListItemIcon>
+            <ManageAccountsIcon fontSize="small" />
+          </ListItemIcon>
+          My account
+        </MenuItem>
         <MenuItem
           disabled={logout.isPending}
           onClick={() => {

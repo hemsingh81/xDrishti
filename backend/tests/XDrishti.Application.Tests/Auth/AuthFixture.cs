@@ -47,6 +47,14 @@ internal sealed class AuthFixture
     public ResetOwnerPasswordHandler Reset() =>
         new(Data, Data, Data, Data, Hasher, Clock, NullLogger<ResetOwnerPasswordHandler>.Instance);
 
+    public ChangePasswordHandler ChangePassword() =>
+        new(Data, Data, Data, Hasher, Clock, NullLogger<ChangePasswordHandler>.Instance);
+
+    public UpdateProfileHandler UpdateProfile() =>
+        new(Data, Data, Data, Clock, NullLogger<UpdateProfileHandler>.Instance);
+
+    public GetOwnerAccountHandler GetAccount() => new(Data, Clock);
+
     public GetAuditHandler Audit() => new(Data);
 
     public async Task<LoginResult> SignInAsync()

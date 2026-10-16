@@ -1,3 +1,4 @@
+using XDrishti.Application.Live;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Platform.Services;
 
@@ -13,10 +14,11 @@ internal static class ServiceMapper
         IEnumerable<ScheduleIssue> issues,
         TradingCalendar calendar,
         DateTimeOffset now,
-        Func<string, string> nameOf)
+        Func<string, string> nameOf,
+        LiveFeedReading? external = null)
     {
         var (definition, settings) = (service.Definition, service.Settings);
-        var status = running ? "running" : !settings.Enabled ? "paused" : lastRun is { Status: ServiceRunStatus.Failed } ? "failed" : "healthy";
+        var status = external?.Status ?? (running ? "running" : !settings.Enabled ? "paused" : lastRun is { Status: ServiceRunStatus.Failed } ? "failed" : "healthy");
         var nextRun = settings.Enabled ? ScheduleCalculator.NextAfter(settings.Schedule, now, calendar, service.NotBeforeSessionEnd) : null;
         var defaults = definition.Defaults;
         var isDefault = (settings with { Parameters = definition.WithDefaults(settings.Parameters) }).Same(defaults with { Parameters = definition.WithDefaults(defaults.Parameters) });
@@ -38,7 +40,8 @@ internal static class ServiceMapper
             nextRun,
             [.. issues.Where(i => i.ServiceId == definition.Id).Select(ServiceIssueView.From)],
             isDefault,
-            service.Revision);
+            service.Revision,
+            external?.Live);
     }
 
     public static IReadOnlyList<RuleSubject> Subjects(IEnumerable<EffectiveService> services) => [.. services.Select(s => new RuleSubject(s.Definition, s.Settings))];

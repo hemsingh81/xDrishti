@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Auth;
+using XDrishti.Domain.Common;
 
 namespace XDrishti.Api.Endpoints;
 
@@ -37,6 +38,25 @@ internal sealed class AuthEndpoints : IEndpointModule
         group.MapPost("/logout", LogoutAsync)
             .WithName("Logout")
             .WithSummary("End the current session and clear the cookie");
+
+        group.MapGet("/account", GetOwnerAccountAsync)
+            .WithName("GetOwnerAccount")
+            .WithSummary("The signed-in owner's e-mail, display name and password change time")
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
+
+        group.MapPost("/change-password", ChangePasswordAsync)
+            .WithName("ChangePassword")
+            .WithSummary("Change the password (current password required); signs out every other session")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status423Locked);
+
+        group.MapPut("/profile", UpdateProfileAsync)
+            .RequireStepUp()
+            .WithName("UpdateProfile")
+            .WithSummary("Change the display name and sign-in e-mail (needs a recent step-up)")
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .ProducesProblem(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/verify", Verify)
             .WithName("VerifySession")
@@ -109,6 +129,44 @@ internal sealed class AuthEndpoints : IEndpointModule
         await handler.HandleAsync(new LogoutCommand(session.SessionId, http.GetClientInfo()), cancellationToken);
         SessionCookie.Clear(http);
         return TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<AccountResponse>, ProblemHttpResult>> GetOwnerAccountAsync(
+        HttpContext http,
+        IQueryHandler<GetOwnerAccountQuery, Result<AccountResponse>> handler,
+        CancellationToken cancellationToken)
+    {
+        // Authorization guarantees a verified session here.
+        var session = http.GetVerifiedSession()!;
+        var result = await handler.HandleAsync(new GetOwnerAccountQuery(session.SessionId), cancellationToken);
+        http.Response.Headers.CacheControl = "no-store";
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<NoContent, ProblemHttpResult>> ChangePasswordAsync(
+        ChangePasswordRequest request,
+        HttpContext http,
+        ICommandHandler<ChangePasswordCommand> handler,
+        CancellationToken cancellationToken)
+    {
+        var session = http.GetVerifiedSession()!;
+        var result = await handler.HandleAsync(
+            new ChangePasswordCommand(session.SessionId, request.CurrentPassword, request.NewPassword, http.GetClientInfo()), cancellationToken);
+        http.Response.Headers.CacheControl = "no-store";
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.NoContent();
+    }
+
+    private static async Task<Results<Ok<AccountResponse>, ProblemHttpResult>> UpdateProfileAsync(
+        UpdateProfileRequest request,
+        HttpContext http,
+        ICommandHandler<UpdateProfileCommand, AccountResponse> handler,
+        CancellationToken cancellationToken)
+    {
+        var session = http.GetVerifiedSession()!;
+        var result = await handler.HandleAsync(
+            new UpdateProfileCommand(session.SessionId, request.DisplayName, request.Email, http.GetClientInfo()), cancellationToken);
+        http.Response.Headers.CacheControl = "no-store";
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static NoContent Verify(HttpContext http)

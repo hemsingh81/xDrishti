@@ -1,0 +1,5 @@
+# UNVERIFIED - constructed from Dhan's documentation (made-up id and prices), not recorded from the real feed.
+# Ticker packet (response code 2), little-endian, 16 bytes: NSE_EQ (segment 1), security id 1333.
+# header: code 02 | length 16 (0x0010, the whole message) | segment 01 | security id 1333
+# payload: last price float32 1650.25 | last trade time int32 1791781200 (2026-10-12 05:00:00 UTC = 10:30 IST, epoch seconds)
+02 10 00 01 35 05 00 00 00 48 ce 44 50 69 cc 6a

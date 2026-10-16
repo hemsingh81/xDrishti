@@ -248,3 +248,74 @@ export type Trade = Schemas['TradeView'];
 export type TradePage = Schemas['TradePage'];
 export type ManualTradeInput = Schemas['ManualTradeInput'];
 export type HoldingRebuildResult = Schemas['HoldingRebuildResult'];
+
+/** Dhan trade history and ledger (P2-13, ADR 0025): a run reads one kind (trades | ledger); the status says how far each is read. */
+export type BrokerSyncRun = Schemas['BrokerSyncRunView'];
+export type BrokerSyncCounts = Schemas['BrokerSyncCounts'];
+/** The answer of "Sync now": the trades run as it begins and, once it has been carried on to it, the ledger run. */
+export type BrokerHistoryRuns = Schemas['BrokerHistoryRunView'];
+export type BrokerKindStatus = Schemas['BrokerKindStatus'];
+export type BrokerDroppedRow = Schemas['BrokerDroppedRow'];
+export type BrokerHistoryStatus = Schemas['BrokerHistoryStatusView'];
+/** A holding the automatic rebuild left alone, and why (needs_review, quantity_mismatch, ambiguous, no_holding, changed_meanwhile). */
+export type BrokerNotRebuilt = Schemas['BrokerNotRebuilt'];
+/** A cash movement of the account read from Dhan's ledger; `amount` is signed, `narration` is untrusted free text. */
+export type LedgerEntry = Schemas['LedgerEntryView'];
+export type LedgerPage = Schemas['LedgerPage'];
+export type LedgerClassTotal = Schemas['LedgerClassTotal'];
+export type BrokerHistoryInput = Schemas['BrokerHistoryInput'];
+
+/** Dividends and charges in the returns (P2-14, ADR 0026). */
+export type IncomeView = Schemas['IncomeView'];
+export type DividendView = Schemas['DividendView'];
+export type DividendInput = Schemas['DividendInput'];
+export type DividendPage = Schemas['DividendPage'];
+export type DividendSuggestionPage = Schemas['DividendSuggestionPage'];
+export type AcceptSuggestionInput = Schemas['AcceptSuggestionInput'];
+export type SuggestionDecision = Schemas['SuggestionDecisionView'];
+
+/** Dividend file import (P2-15, ADR 0028): preview, import with a digest, batches and Undo. */
+export type DividendPreviewReport = Schemas['DividendPreviewReport'];
+export type DividendPreviewItem = Schemas['DividendPreviewItem'];
+export type DividendFileSummary = Schemas['DividendFileSummary'];
+export type DividendMatch = Schemas['DividendMatchView'];
+export type DividendCandidate = Schemas['DividendCandidate'];
+export type DividendRepeat = Schemas['DividendRepeat'];
+export type DividendBadRow = Schemas['DividendBadRow'];
+export type DividendChoice = Schemas['DividendChoice'];
+export type DividendImportResult = Schemas['DividendImportResult'];
+export type DividendBatch = Schemas['DividendBatchView'];
+export type DividendBatchPage = Schemas['DividendBatchPage'];
+export type DividendUndoResult = Schemas['DividendUndoResult'];
+
+/** Dhan report imports (P2-17, ADR 0029): downloaded files recognised by kind, previewed and imported together. */
+export type ImportFilePreview = Schemas['ImportFilePreview'];
+export type ImportFileResult = Schemas['ImportFileResult'];
+export type ImportFileError = Schemas['ImportFileError'];
+export type ImportSummary = Schemas['ImportSummary'];
+export type ImportWarning = Schemas['ImportWarning'];
+export type ImportPreviewResponse = Schemas['ImportPreviewResponse'];
+export type ImportRunResponse = Schemas['ImportRunResponse'];
+/** What is particular to a global transaction report: names, coverage by Dhan's own trades, the charges check. */
+export type BillDetails = Schemas['BillDetails'];
+export type BillNameView = Schemas['BillNameView'];
+export type BillCandidate = Schemas['BillCandidate'];
+export type BillCoverage = Schemas['BillCoverage'];
+export type BillDifference = Schemas['BillDifference'];
+export type BillCharges = Schemas['BillCharges'];
+/** A depository-charges sheet: its lines, counts and the rupees an import would add to the costs. */
+export type DpPreview = Schemas['DpPreview'];
+export type DpLine = Schemas['DpLineView'];
+export type DpCounts = Schemas['DpCounts'];
+export type NameLearning = Schemas['NameLearning'];
+/** A demat holding statement: a check against the synced holdings and a source of names; it changes no holding. */
+export type DematPreview = Schemas['DematPreview'];
+export type DematDifference = Schemas['DematDifference'];
+export type DematHeld = Schemas['DematHeld'];
+export type DematSynced = Schemas['DematSynced'];
+export type DematImportResult = Schemas['DematImportResult'];
+/** Imports of depository-charges sheets (cost batches) with Undo. */
+export type CostBatch = Schemas['CostBatchView'];
+export type CostBatchPage = Schemas['CostBatchPage'];
+export type CostImportResult = Schemas['CostImportResult'];
+export type CostUndoResult = Schemas['CostUndoResult'];

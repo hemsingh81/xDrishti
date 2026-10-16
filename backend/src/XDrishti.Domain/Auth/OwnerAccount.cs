@@ -10,6 +10,10 @@ public sealed class OwnerAccount : Entity<Guid>
 {
     public const int MaxFailedAttempts = 5;
 
+    public const string ProfileFieldEmail = "email";
+
+    public const string ProfileFieldDisplayName = "displayName";
+
     public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
     // Parameter names match property names so EF Core can bind this constructor when materialising.
@@ -90,6 +94,41 @@ public sealed class OwnerAccount : Entity<Guid>
         PasswordHash = passwordHash;
         PasswordChangedAt = now;
         ClearLockout();
+    }
+
+    /// <summary>The owner chose a new password (the current one was verified): new hash, change time recorded, failure counter and lock cleared.</summary>
+    public void ChangePassword(string passwordHash, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(passwordHash);
+        PasswordHash = passwordHash;
+        PasswordChangedAt = now;
+        ClearLockout();
+    }
+
+    /// <summary>
+    /// Replaces the display name and sign-in e-mail (the password is untouched). Returns the names of the fields whose stored value
+    /// actually changed (<see cref="ProfileFieldEmail"/>, <see cref="ProfileFieldDisplayName"/>), empty when nothing changed.
+    /// </summary>
+    public IReadOnlyList<string> UpdateProfile(string email, string displayName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(email);
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        var changed = new List<string>(2);
+        var newEmail = NormalizeEmail(email);
+        if (!string.Equals(Email, newEmail, StringComparison.Ordinal))
+        {
+            Email = newEmail;
+            changed.Add(ProfileFieldEmail);
+        }
+
+        var newName = displayName.Trim();
+        if (!string.Equals(DisplayName, newName, StringComparison.Ordinal))
+        {
+            DisplayName = newName;
+            changed.Add(ProfileFieldDisplayName);
+        }
+
+        return changed;
     }
 
     /// <summary>Stores the same password with stronger parameters (transparent upgrade at login).</summary>

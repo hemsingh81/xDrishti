@@ -32,38 +32,56 @@ internal sealed class UpdateLotDateHandler(
             return Result.Failure<LotRow>(PortfolioErrors.Invalid("acquiredOn", "Required."));
         }
 
-        var holding = await holdings.FindAsync(command.HoldingId, cancellationToken);
-        var account = holding is null ? null : await accounts.FindReadOnlyAsync(holding.AccountId, cancellationToken);
-        if (holding is null || account is null)
+        // The holding's row is marked as changed (Touch) although only a lot is: saving then checks its concurrency token, so an automatic rebuild after a broker sync (ADR 0025) that read the holding before this edit cannot save over the date the owner
+        // just set (it is skipped and tried again), and an edit made on a holding that a sync, a quote or a rebuild changed meanwhile is repeated once on what is stored now (RunAsync) instead of overwriting it.
+        string? slug = null;
+        var saved = await unitOfWork.RunAsync(
+            async token =>
+            {
+                var holding = await holdings.FindAsync(command.HoldingId, token);
+                var account = holding is null ? null : await accounts.FindReadOnlyAsync(holding.AccountId, token);
+                if (holding is null || account is null)
+                {
+                    return Result.Failure(PortfolioErrors.HoldingNotFound);
+                }
+
+                var now = clock.GetUtcNow();
+                var previous = holding.Lots.FirstOrDefault(l => l.Id == command.LotId)?.AcquiredOn;
+                var changed = holding.ChangeLotDate(command.LotId, date, IndiaTime.Today(now));
+                if (changed.IsFailure)
+                {
+                    return changed;
+                }
+
+                holdings.Touch(holding);
+                events.Record(AccountEvent.Record(
+                    AccountEventType.LotDateChanged,
+                    holding.AccountId,
+                    $"Lot date of {holding.TradingSymbol} changed from {previous:yyyy-MM-dd} to {date:yyyy-MM-dd}",
+                    command.Actor,
+                    now));
+                if (!await unitOfWork.TrySaveAsync(token))
+                {
+                    return Result.Failure(PortfolioErrors.LotChanged);
+                }
+
+                slug = account.Slug;
+                return Result.Success();
+            },
+            cancellationToken);
+        if (saved.IsFailure)
         {
-            return Result.Failure<LotRow>(PortfolioErrors.HoldingNotFound);
+            // A second concurrency conflict (the run repeated once already) is the same conflict to the owner as a refused save.
+            return Result.Failure<LotRow>(saved.Error == PortfolioErrors.DataChanged ? PortfolioErrors.LotChanged : saved.Error);
         }
 
-        var now = clock.GetUtcNow();
-        var previous = holding.Lots.FirstOrDefault(l => l.Id == command.LotId)?.AcquiredOn;
-        var changed = holding.ChangeLotDate(command.LotId, date, IndiaTime.Today(now));
-        if (changed.IsFailure)
-        {
-            return Result.Failure<LotRow>(changed.Error);
-        }
-
-        events.Record(AccountEvent.Record(
-            AccountEventType.LotDateChanged,
-            holding.AccountId,
-            $"Lot date of {holding.TradingSymbol} changed from {previous:yyyy-MM-dd} to {date:yyyy-MM-dd}",
-            command.Actor,
-            now));
-        if (!await unitOfWork.TrySaveAsync(cancellationToken))
-        {
-            return Result.Failure<LotRow>(PortfolioErrors.LotChanged);
-        }
-
-        PortfolioLog.LotDateChanged(logger, account.Slug);
+        var today = IndiaTime.Today(clock.GetUtcNow());
+        PortfolioLog.LotDateChanged(logger, slug!);
 
         var fresh = await queries.GetAsync(command.HoldingId, cancellationToken);
         var lot = fresh?.Lots.FirstOrDefault(l => l.Id == command.LotId);
         return fresh is null || lot is null
             ? Result.Failure<LotRow>(PortfolioErrors.LotNotFound)
-            : Result.Success(HoldingViews.Lot(fresh, lot, IndiaTime.Today(now)));
+            : Result.Success(HoldingViews.Lot(fresh, lot, today));
     }
 }

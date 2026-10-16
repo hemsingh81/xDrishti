@@ -14,6 +14,9 @@ internal sealed class HoldingSyncStore(XDrishtiDbContext db, NpgsqlDataSource da
 
     private const string InterruptedMessage = "The sync did not finish (the application stopped or crashed while it ran).";
 
+    /// <summary>The reason code the health figures note for a run that was interrupted (see <c>SyncFailures.Interrupted</c>).</summary>
+    private const string InterruptedReason = "interrupted";
+
     public async ValueTask<bool> TryStartAsync(HoldingSync run, TimeSpan staleAfter, DateTimeOffset now, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(run);
@@ -30,24 +33,26 @@ internal sealed class HoldingSyncStore(XDrishtiDbContext db, NpgsqlDataSource da
             }
         }
 
-        await using (var stale = new NpgsqlCommand(
-            """
-            UPDATE portfolio.holding_syncs
-            SET status = 'failed', finished_at = @now, error = @error
-            WHERE account_id = @account AND status = 'running' AND started_at < @cutoff
-            """, connection, transaction))
+        // A run that ran past its limit was interrupted: it is failed and the interruption is noted in the health figures (ADR 0027), in one statement.
+        await using (var stale = new NpgsqlCommand(SyncHealthSql.FailRunning("portfolio.holding_syncs", "'holdings'", "account_id = @account AND started_at < @cutoff"), connection, transaction))
         {
-            stale.Parameters.AddWithValue("now", now);
-            stale.Parameters.AddWithValue("cutoff", now - staleAfter);
+            stale.Parameters.AddWithValue("now", now.ToUniversalTime());
+            stale.Parameters.AddWithValue("cutoff", (now - staleAfter).ToUniversalTime());
             stale.Parameters.AddWithValue("error", InterruptedMessage);
+            stale.Parameters.AddWithValue("reason", InterruptedReason);
             stale.Parameters.AddWithValue("account", run.AccountId);
             await stale.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // A trade or ledger read of the account (ADR 0025) takes the same turn: it holds the advisory lock while it starts, and a holdings sync does not start while one runs (one that ran past its limit counts as dead).
         await using (var running = new NpgsqlCommand(
-            "SELECT EXISTS (SELECT 1 FROM portfolio.holding_syncs WHERE account_id = @account AND status = 'running')", connection, transaction))
+            """
+            SELECT EXISTS (SELECT 1 FROM portfolio.holding_syncs WHERE account_id = @account AND status = 'running')
+                OR EXISTS (SELECT 1 FROM portfolio.broker_sync_runs WHERE account_id = @account AND status = 'running' AND started_at > @brokerCutoff)
+            """, connection, transaction))
         {
             running.Parameters.AddWithValue("account", run.AccountId);
+            running.Parameters.AddWithValue("brokerCutoff", now - SyncLimits.BrokerHistoryStaleAfter);
             if (await running.ExecuteScalarAsync(cancellationToken) is true)
             {
                 return false;
@@ -157,11 +162,13 @@ internal sealed class HoldingSyncStore(XDrishtiDbContext db, NpgsqlDataSource da
         return rows.ToDictionary(r => r.AccountId, r => new SyncActivity(r.LastAuto));
     }
 
-    public async ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, CancellationToken cancellationToken) =>
-        await db.HoldingSyncs.Where(x => x.Status == SyncStatus.Running && x.StartedAt < processStartedAt)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(x => x.Status, SyncStatus.Failed)
-                    .SetProperty(x => x.FinishedAt, now)
-                    .SetProperty(x => x.Error, InterruptedMessage),
-                cancellationToken);
+    public async ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand(SyncHealthSql.FailRunning("portfolio.holding_syncs", "'holdings'", "started_at < @started"));
+        command.Parameters.AddWithValue("started", processStartedAt.ToUniversalTime());
+        command.Parameters.AddWithValue("now", now.ToUniversalTime());
+        command.Parameters.AddWithValue("error", InterruptedMessage);
+        command.Parameters.AddWithValue("reason", InterruptedReason);
+        return (int)(long)(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    }
 }

@@ -1,14 +1,18 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
+using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Tests.Accounts;
 using XDrishti.Application.Tests.Accounts.Connections;
+using XDrishti.Application.Tests.Portfolio.BrokerHistory;
 using XDrishti.Application.Tests.Portfolio.Groups;
 using XDrishti.Application.Tests.Portfolio.History;
+using XDrishti.Application.Tests.Portfolio.Income;
 using XDrishti.Application.Tests.Portfolio.Trades;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
@@ -47,7 +51,9 @@ internal sealed class PortfolioFixture
 
     public HoldingsImporter Importer => Connections.Accounts.Importer;
 
-    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Reconciler(), Clock, NullLogger<SyncHoldingsHandler>.Instance);
+    public SyncHoldingsHandler Sync() => new(Fetcher, Runs, Importer, Data, Data, Accounts, Reconciler(), Connections.Accounts.HealthRecorder, Clock, NullLogger<SyncHoldingsHandler>.Instance);
+
+    public XDrishti.Application.Tests.Portfolio.Heal.FixedHealSettings HealSettings { get; } = new();
 
     /// <summary>The Action-center reconciliation a sync ends with; there are no decisions in these tests, so it reads them (none) and stops.</summary>
     public ActionReconciler Reconciler() => new(
@@ -58,16 +64,19 @@ internal sealed class PortfolioFixture
     /// <summary>The master's sectors and the baskets' members of the holdings' instruments (empty: every holding is unclassified and in no basket).</summary>
     public FakeHoldingClassifications Classifications { get; } = new();
 
-    public ListHoldingsHandler List() => new(Data, Classifications, Clock);
+    public ListHoldingsHandler List() => new(Data, Classifications, Income, Clock);
 
-    public GetHoldingGroupsHandler Groups() => new(Data, Classifications, Clock, NullLogger<GetHoldingGroupsHandler>.Instance);
+    /// <summary>The dividends and costs recorded for the accounts (ADR 0026); the holdings are the fixture's own.</summary>
+    public FakeIncomeQueries Income { get; }
+
+    public GetHoldingGroupsHandler Groups() => new(Data, Classifications, Income, Clock, NullLogger<GetHoldingGroupsHandler>.Instance);
 
     /// <summary>The benchmark setting and the stored day closes the summary's benchmark XIRR reads (empty: no benchmark index).</summary>
     public FakePortfolioBenchmark Benchmarks { get; } = new();
 
     public FakePortfolioPrices Prices { get; } = new();
 
-    public GetHoldingsSummaryHandler Summary() => new(Data, Data, Accounts, Benchmarks, Prices, new FakeTradingCalendar(HistoryData.Weekdays), Clock);
+    public GetHoldingsSummaryHandler Summary() => new(Data, Data, Accounts, Benchmarks, Prices, Income, new FakeTradingCalendar(HistoryData.Weekdays), Clock);
 
     public GetHoldingLotsHandler Lots() => new(Data, Clock);
 
@@ -78,11 +87,15 @@ internal sealed class PortfolioFixture
 
     public PreviewTradesHandler PreviewTrades() => new(Workspace, Clock, NullLogger<PreviewTradesHandler>.Instance);
 
-    public ImportTradesHandler ImportTrades() => new(Workspace, Trades, Trades, Data, Accounts, Data, Clock, NullLogger<ImportTradesHandler>.Instance);
+    public SyncGuard SyncGuard => new(Data, BrokerData);
+
+    public TradeImporter TradeImporter() => new(Workspace, Trades, Trades, SyncGuard, Accounts, Data, Clock);
+
+    public ImportTradesHandler ImportTrades() => new(Workspace, TradeImporter(), Clock, NullLogger<ImportTradesHandler>.Instance);
 
     public ListTradeBatchesHandler ListTradeBatches() => new(Trades, Accounts);
 
-    public UndoTradeBatchHandler UndoTradeBatch() => new(Workspace, Trades, Trades, Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UndoTradeBatchHandler>.Instance);
+    public UndoTradeBatchHandler UndoTradeBatch() => new(Workspace, Trades, Trades, Data, SyncGuard, Accounts, Accounts, Data, Clock, NullLogger<UndoTradeBatchHandler>.Instance);
 
     public ListHoldingTradesHandler ListHoldingTrades() => new(Data, Trades);
 
@@ -90,13 +103,52 @@ internal sealed class PortfolioFixture
 
     public VoidTradeHandler VoidTrade() => new(Trades, Accounts, Accounts, Data, Clock, NullLogger<VoidTradeHandler>.Instance);
 
-    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Trades, Accounts, Data, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
+    public RebuildLotsHandler RebuildLots() => new(Workspace, Data, Accounts, SyncGuard, Data, Clock, NullLogger<RebuildLotsHandler>.Instance);
 
     public UpdateLotDateHandler UpdateLotDate() => new(Data, Data, Accounts, Accounts, Data, Clock, NullLogger<UpdateLotDateHandler>.Instance);
 
-    public GetSyncStatusHandler SyncStatus() => new(Accounts, Data, Data, Clock);
+    public GetSyncStatusHandler SyncStatus() => new(Accounts, Data, Data, Data.Health, HealSettings, Clock);
 
-    public RecoverInterruptedSyncsHandler Recover() => new(Data, Clock, NullLogger<RecoverInterruptedSyncsHandler>.Instance);
+    public RecoverInterruptedSyncsHandler Recover() => new(Data, BrokerData, Clock, NullLogger<RecoverInterruptedSyncsHandler>.Instance);
+
+    /// <summary>The broker history runs, watermarks and ledger entries (ADR 0025).</summary>
+    public InMemoryBrokerData BrokerData { get; }
+
+    /// <summary>The dividends the owner entered and the decisions about suggested ones (ADR 0026).</summary>
+    public InMemoryDividendData Dividends { get; }
+
+    public AddDividendHandler AddDividend() => new(Accounts, Data, Dividends, Accounts, Data, Clock, NullLogger<AddDividendHandler>.Instance);
+
+    public VoidDividendHandler VoidDividend() => new(Dividends, Accounts, Accounts, Data, Clock, NullLogger<VoidDividendHandler>.Instance);
+
+    public ListHoldingDividendsHandler ListHoldingDividends() => new(Data, Dividends);
+
+    public ListAccountDividendsHandler ListAccountDividends() => new(Accounts, Dividends);
+
+    public ListDividendSuggestionsHandler ListDividendSuggestions() => new(Accounts, Dividends);
+
+    public AcceptDividendSuggestionHandler AcceptDividendSuggestion() => new(Accounts, Data, Dividends, Dividends, Accounts, Data, Clock, NullLogger<AcceptDividendSuggestionHandler>.Instance);
+
+    public DismissDividendSuggestionHandler DismissDividendSuggestion() => new(Accounts, Dividends, Accounts, Data, Clock, NullLogger<DismissDividendSuggestionHandler>.Instance);
+
+    public PortfolioFixture()
+    {
+        BrokerData = new InMemoryBrokerData(Data);
+        Income = new FakeIncomeQueries(() => Data.Holdings.Select(h => new IncomeHolding(h.Id, h.AccountId, h.Isin, h.TradingSymbol, h.Status == HoldingStatus.Open)));
+
+        // The database rolls back what a refused save had collected; the in-memory trades must too.
+        Dividends = new InMemoryDividendData(BrokerData);
+        Data.OnSaved = () =>
+        {
+            Trades.ForgetCollected();
+            Dividends.ForgetCollected();
+        };
+        Data.OnRefusedSave = () =>
+        {
+            Trades.RollBackCollected();
+            Dividends.RollBackCollected();
+        };
+    }
 
     /// <summary>An account with the Portfolio role on (so it has its default bucket), connected to Dhan.</summary>
     public async Task<BrokerAccount> ConnectedAsync(string name = "Example One", string clientId = AccountsFixture.ClientId, bool connect = true, PortfolioInput? portfolio = null)

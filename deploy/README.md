@@ -15,6 +15,7 @@ deploy/xd-down.sh          # stop (data kept);  --purge deletes all data
 | `xd-proxy` extras | Serves `docs/prototype` at `/prototype/` (delivery plan at `/prototype/delivery/`) and `docs/site` at `/docs/`, read-only | via proxy |
 | `xd-api` | ASP.NET Core API (OpenAPI docs at `/api/docs`); the only service with the broker vault key | via proxy |
 | `xd-worker` | Background services (heartbeat for now) | — |
+| `xd-feed` | Live market-data feed (Dhan WebSocket) for the active set, 09:00–15:35 IST on trading days; writes live prices; gets the vault key and egress like `xd-api` (P2-10, ADR 0024) | — |
 | `xd-migrate` | One-shot: database migrations, then creates the owner account if none exists | — |
 | `xd-owner-reset` | On-demand one-shot (profile `tools`): password reset from the secrets | — |
 | `xd-db` | PostgreSQL 18 + TimescaleDB 2.30 | localhost:5433 (dev override) |

@@ -7,3 +7,8 @@ export type { AppNotification } from './lib/deriveNotifications';
 export const NotificationBell = lazy(async () => ({
   default: (await import('./components/NotificationBell')).NotificationBell,
 }));
+
+/** Pops up the items that need the owner, once each. Mount once in the shell, inside the ToastProvider and the router; render in <Suspense>. */
+export const AttentionPopups = lazy(async () => ({
+  default: (await import('./components/AttentionPopups')).AttentionPopups,
+}));

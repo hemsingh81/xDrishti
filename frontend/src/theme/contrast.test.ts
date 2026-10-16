@@ -1,42 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import { blend, contrast } from '@/test/colour';
 import {
   categorical,
   categoricalSeries,
+  controlHeight,
   elevation,
   iconChip,
   iconHues,
+  pagePadding,
   palettes,
+  rem,
+  rootFontSize,
+  shape,
   stateAlpha,
   table,
+  typeScale,
   type ColorMode,
 } from './tokens';
-
-function channel(v: number): number {
-  const c = v / 255;
-  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
-}
-
-function luminance(hex: string): number {
-  const n = Number.parseInt(hex.slice(1), 16);
-  return 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255);
-}
-
-/** `fg` at `alpha` painted over `bg`, as #rrggbb. */
-function blend(fg: string, bg: string, alpha: number): string {
-  const f = Number.parseInt(fg.slice(1), 16);
-  const b = Number.parseInt(bg.slice(1), 16);
-  const mix = (shift: number) =>
-    Math.round(((f >> shift) & 255) * alpha + ((b >> shift) & 255) * (1 - alpha))
-      .toString(16)
-      .padStart(2, '0');
-  return `#${mix(16)}${mix(8)}${mix(0)}`;
-}
-
-/** WCAG 2.x contrast ratio between two #rrggbb colours. */
-export function contrast(a: string, b: string): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
-  return (hi + 0.05) / (lo + 0.05);
-}
 
 type Key = keyof (typeof palettes)['light'];
 const surfaces: Key[] = ['surface', 'background', 'surfaceAlt'];
@@ -127,6 +107,37 @@ describe.each<ColorMode>(['light', 'dark'])('%s palette contrast', (mode) => {
     },
   );
 
+  it.each(surfaces)('tertiary text (hints, section labels) is at least 4.5:1 on %s', (surface) => {
+    expect(contrast(p.textTertiary, p[surface])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('tertiary text is quieter than secondary text', () => {
+    expect(contrast(p.textTertiary, p.surface)).toBeLessThan(contrast(p.textSecondary, p.surface));
+  });
+
+  // Tonal chips and banners: the colour as text on its own soft tint (prototype `.chip.green` and the like), and the normal
+  // text colour on every tint (banner bodies).
+  it.each([
+    ['good', 'goodSoft'],
+    ['bad', 'badSoft'],
+    ['warn', 'warnSoft'],
+    ['info', 'infoSoft'],
+    ['accent', 'accentSoft'],
+  ] as const)('%s text is at least 4.5:1 on its tint %s', (colour, tint) => {
+    expect(contrast(p[colour], p[tint])).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.text, p[tint])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('secondary text on the neutral chip fill (surfaceStrong) is at least 4.5:1', () => {
+    expect(contrast(p.textSecondary, p.surfaceStrong)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('text is at least 4.5:1 on an alternate table row (surfaceAlt at the zebra strength over the surface)', () => {
+    const row = blend(p.surfaceAlt, p.surface, table.zebraAlpha);
+    expect(contrast(p.text, row)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(p.textSecondary, row)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('hairline borders stay quiet (below the input border)', () => {
     expect(contrast(p.border, p.surface)).toBeLessThan(contrast(p.inputBorder, p.surface));
   });
@@ -213,9 +224,44 @@ describe('token values from the spec', () => {
     });
   });
 
+  it('has the prototype neutrals and soft tints', () => {
+    expect(palettes.light).toMatchObject({
+      surfaceStrong: '#e8edf4',
+      borderStrong: '#c9d0dc',
+      textTertiary: '#5b6b82',
+      goodSoft: '#e9f8ef',
+      badSoft: '#fdecec',
+      warnSoft: '#fff5e6',
+      infoSoft: '#e6f6f9',
+    });
+    expect(palettes.dark).toMatchObject({
+      surfaceStrong: '#202c46',
+      borderStrong: '#34415c',
+      textTertiary: '#7d8aa3',
+      goodSoft: '#10281d',
+      badSoft: '#2f1a1d',
+      warnSoft: '#2d2513',
+      infoSoft: '#15303a',
+    });
+  });
+
   it('defines elevation steps for both modes', () => {
     for (const mode of ['light', 'dark'] as const) {
       expect(Object.keys(elevation[mode])).toEqual(['sm', 'md', 'lg']);
     }
+  });
+
+  it('follows the prototype for sizes: 36 px controls (small 30, large 44), 14 px body, 24 px page title', () => {
+    expect(controlHeight).toEqual({ small: 30, medium: 36, large: 44 });
+    expect(rootFontSize).toBe(14);
+    expect(typeScale.body1.size * rootFontSize).toBe(14);
+    expect(typeScale.body2.size * rootFontSize).toBe(13);
+    expect(typeScale.caption.size * rootFontSize).toBe(12);
+    expect(typeScale.h1.size * rootFontSize).toBeCloseTo(24);
+    expect(typeScale.h3.size * rootFontSize).toBeCloseTo(14.5);
+    expect(table).toMatchObject({ cellPaddingY: 9, cellPaddingX: 12, hoverAlpha: 0.05 });
+    expect(pagePadding).toMatchObject({ compact: 14, base: 24 });
+    expect(shape).toMatchObject({ radius: 12, radiusControl: 10, radiusSmall: 8, radiusLarge: 18 });
+    expect(rem(12)).toBe(`${12 / 14}rem`);
   });
 });

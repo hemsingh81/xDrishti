@@ -74,12 +74,12 @@ public sealed class GetHoldingGroupsHandlerTests
         groups.Additive.ShouldBeFalse();
         groups.Groups.Select(g => g.Name).ShouldBe(["Core", "Dividend", "No basket"]);
         (By(groups, Core.ToString()).Holdings, By(groups, Core.ToString()).Value).ShouldBe((2, 7800m));
-        (By(groups, Dividend.ToString()).Holdings, By(groups, Dividend.ToString()).Value).ShouldBe((1, 6000m)); // AAA is in Core and in Dividend
+        (By(groups, DividendBasket.ToString()).Holdings, By(groups, DividendBasket.ToString()).Value).ShouldBe((1, 6000m)); // AAA is in Core and in Dividend
         (By(groups, "~none").Holdings, By(groups, "~none").Value).ShouldBe((3, 8500m));
         groups.Groups.Sum(g => g.Holdings).ShouldBeGreaterThan(groups.Total.Holdings);
         groups.Total.Holdings.ShouldBe(5);
         groups.Total.Value.ShouldBe(16300m); // each holding once
-        By(groups, Dividend.ToString()).WeightPct.ShouldNotBeNull().ShouldBe(36.8098m, 0.0001m);
+        By(groups, DividendBasket.ToString()).WeightPct.ShouldNotBeNull().ShouldBe(36.8098m, 0.0001m);
     }
 
     [Fact]
@@ -356,12 +356,12 @@ public sealed class GetHoldingGroupsHandlerTests
     public async Task Basket_membership_is_read_on_every_request_so_a_change_shows_at_once()
     {
         var before = await _fx.OkAsync(Req("basket"));
-        _fx.Classifications.Baskets[InstrumentCcc] = [new BasketRef(Dividend, "Dividend")];
+        _fx.Classifications.Baskets[InstrumentCcc] = [new BasketRef(DividendBasket, "Dividend")];
 
         var after = await _fx.OkAsync(Req("basket"));
 
-        By(before, Dividend.ToString()).Holdings.ShouldBe(1);
-        By(after, Dividend.ToString()).Holdings.ShouldBe(2);
+        By(before, DividendBasket.ToString()).Holdings.ShouldBe(1);
+        By(after, DividendBasket.ToString()).Holdings.ShouldBe(2);
         By(after, "~none").Holdings.ShouldBe(2);
     }
 

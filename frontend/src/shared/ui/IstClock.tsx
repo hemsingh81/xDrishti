@@ -1,7 +1,7 @@
 import { Box, Tooltip, useMediaQuery, useTheme } from '@mui/material';
 import { istClockParts, istDayLabel } from '@/shared/lib/istClock';
 import { useWallClock } from '@/shared/lib/useWallClock';
-import { numeric } from '@/theme';
+import { numeric, rem } from '@/theme';
 import { RollingDigit } from './RollingDigit';
 
 const reducedMotion = '(prefers-reduced-motion: reduce)';
@@ -50,7 +50,7 @@ export function IstClock() {
           py: 0.25,
           borderRadius: 1,
           fontWeight: 600,
-          fontSize: '0.95rem',
+          fontSize: rem(14),
           lineHeight: 1.25,
           whiteSpace: 'nowrap',
           cursor: 'default',
@@ -71,7 +71,7 @@ export function IstClock() {
         <Box
           component="span"
           aria-hidden
-          sx={{ fontSize: '0.65rem', lineHeight: 1, fontWeight: 700, letterSpacing: '0.06em', color: 'text.secondary' }}
+          sx={{ fontSize: rem(10.5), lineHeight: 1, fontWeight: 700, letterSpacing: '0.06em', color: 'text.secondary' }}
         >
           IST
         </Box>

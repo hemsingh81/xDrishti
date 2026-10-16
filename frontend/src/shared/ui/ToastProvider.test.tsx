@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AppThemeProvider } from '@/theme';
+import { findToast } from '@/test/toast';
 import { ToastProvider } from './ToastProvider';
 import { useToast, type ToastSeverity } from './toastContext';
 
@@ -33,8 +34,9 @@ describe('ToastProvider', () => {
       </AppThemeProvider>,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Go' }));
-    const toast = await screen.findByRole('alert');
+    const toast = await findToast();
     expect(toast).toHaveTextContent('Saved it');
+    expect(toast).toHaveAttribute('role', severity === 'warning' || severity === 'error' ? 'alert' : 'status');
     expect(toast.querySelector(`[data-hue="${hue}"]`)).toBeInTheDocument();
   });
 
@@ -61,13 +63,13 @@ describe('ToastProvider', () => {
       </AppThemeProvider>,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Go' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Moved 2 instruments');
+    expect(await findToast()).toHaveTextContent('Moved 2 instruments');
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
 
     expect(undo).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 });
@@ -115,7 +117,7 @@ describe('ToastProvider: toast with an Undo button', () => {
     await userEvent.keyboard('{Escape}');
 
     await waitFor(() => {
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
     expect(go).toHaveFocus();
   });
@@ -157,7 +159,7 @@ describe('ToastProvider: toast with an Undo button', () => {
 
     expect(undo).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 
@@ -192,35 +194,91 @@ describe('ToastProvider: toast with an Undo button', () => {
       act(() => {
         vi.advanceTimersByTime(60_000);
       });
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toBeInTheDocument();
 
-      // Moving on (Tab leaves the toast) starts the countdown again.
+      // Moving on (two Tabs: past the close button, out of the toast) starts the countdown again.
+      await userEvent.tab();
+      expect(screen.getByRole('button', { name: 'Close notification' })).toHaveFocus();
       await userEvent.tab();
       act(() => {
         vi.advanceTimersByTime(11_000);
       });
       await waitFor(() => {
-        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
       });
+    });
+
+    it('gives focus back to where the second toast was started, not to where the first toast was started', async () => {
+      function Page() {
+        const { notify } = useToast();
+        return (
+          <>
+            {['First', 'Second'].map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => {
+                  notify(`${name} done`, 'success', { label: 'Undo', onClick: vi.fn() });
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </>
+        );
+      }
+      render(
+        <AppThemeProvider>
+          <ToastProvider>
+            <Page />
+          </ToastProvider>
+        </AppThemeProvider>,
+      );
+      screen.getByRole('button', { name: 'First' }).focus();
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Undo' })).toHaveFocus();
+      });
+      // Focus moves on (out of the toast), and the toast times out with focus elsewhere.
+      await userEvent.tab();
+      await userEvent.tab();
+      act(() => {
+        vi.advanceTimersByTime(11_000);
+      });
+      await waitFor(() => {
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      });
+
+      screen.getByRole('button', { name: 'Second' }).focus();
+      await userEvent.keyboard('{Enter}');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Undo' })).toHaveFocus();
+      });
+      await userEvent.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole('button', { name: 'Second' })).toHaveFocus();
     });
 
     it('stays open while the pointer is over it', async () => {
       const { go } = setup();
       await userEvent.click(go);
-      const toast = await screen.findByRole('alert');
+      const toast = await screen.findByRole('status');
 
       await userEvent.hover(toast);
       act(() => {
         vi.advanceTimersByTime(60_000);
       });
-      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toBeInTheDocument();
 
       await userEvent.unhover(toast);
       act(() => {
         vi.advanceTimersByTime(11_000);
       });
       await waitFor(() => {
-        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
       });
     });
   });

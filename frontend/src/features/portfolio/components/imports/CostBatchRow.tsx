@@ -1,0 +1,62 @@
+import { Button, Chip, Stack, Typography } from '@mui/material';
+import type { CostBatch } from '@/shared/api';
+import { formatInrPrecise, formatIstDateTime } from '@/shared/lib/format';
+import { countOf } from '../../lib/tradeText';
+import { BatchStatusChip } from '../trades/BatchStatusChip';
+
+interface CostBatchRowProps {
+  batch: CostBatch;
+  onUndo: (batch: CostBatch) => void;
+}
+
+/** One imported depository-charges sheet: its name, kind, account and time, what was in it, how many charges still count, and Undo. */
+export function CostBatchRow({ batch, onUndo }: CostBatchRowProps) {
+  const undone = batch.status === 'undone';
+  const counts = [
+    countOf(batch.parsed, 'valid line'),
+    `${countOf(batch.imported, 'charge')} stored (${formatInrPrecise(batch.amount)})`,
+    batch.duplicates > 0 ? countOf(batch.duplicates, 'duplicate') : null,
+    batch.bad > 0 ? countOf(batch.bad, 'bad row') : null,
+  ].filter((part): part is string => part !== null);
+  return (
+    <Stack
+      component="li"
+      direction="row"
+      sx={{ gap: 1.5, py: 1.5, alignItems: 'flex-start', justifyContent: 'space-between' }}
+    >
+      <Stack spacing={0.5} sx={{ minWidth: 0, flex: 1 }}>
+        <Stack direction="row" sx={{ alignItems: 'center', columnGap: 1, rowGap: 0.5, flexWrap: 'wrap' }}>
+          <Typography component="span" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
+            {batch.fileName}
+          </Typography>
+          <Chip size="small" variant="outlined" label="DP charges" />
+          <BatchStatusChip undone={undone} />
+        </Stack>
+        <Typography variant="body2" color="text.secondary">
+          {`${batch.accountName} · ${formatIstDateTime(batch.createdAt)} · by ${batch.createdBy}`}
+        </Typography>
+        <Typography variant="body2" className="numeric">
+          {counts.join(' · ')}
+        </Typography>
+        <Typography variant="body2" className="numeric" color="text.secondary">
+          {undone && batch.undoneAt
+            ? `Undone ${formatIstDateTime(batch.undoneAt)}; none of its charges count now.`
+            : `${countOf(batch.activeEntries, 'charge')} still ${batch.activeEntries === 1 ? 'counts' : 'count'}.`}
+        </Typography>
+      </Stack>
+      {!undone && (
+        <Button
+          size="small"
+          variant="outlined"
+          color="error"
+          aria-label={`Undo the import of ${batch.fileName}`}
+          onClick={() => {
+            onUndo(batch);
+          }}
+        >
+          Undo
+        </Button>
+      )}
+    </Stack>
+  );
+}

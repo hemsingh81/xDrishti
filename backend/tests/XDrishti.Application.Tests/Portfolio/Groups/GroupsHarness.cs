@@ -3,6 +3,7 @@ using Microsoft.Extensions.Time.Testing;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Tests.Portfolio.Income;
 using XDrishti.Domain.Common;
 using static XDrishti.Application.Tests.Portfolio.Groups.GroupFixtures;
 
@@ -15,6 +16,7 @@ internal sealed class GroupsHarness
     {
         Queries = new StubHoldingQueries(holdings.Length == 0 ? AllHoldings() : holdings);
         Classifications = Fake();
+        Income = FakeIncomeQueries.For(Queries.Holdings);
         Clock.SetUtcNow(new DateTimeOffset(2026, 10, 12, 4, 30, 0, TimeSpan.Zero));
     }
 
@@ -22,11 +24,13 @@ internal sealed class GroupsHarness
 
     public FakeHoldingClassifications Classifications { get; }
 
+    public FakeIncomeQueries Income { get; }
+
     public FakeTimeProvider Clock { get; } = new();
 
-    public GetHoldingGroupsHandler Handler() => new(Queries, Classifications, Clock, NullLogger<GetHoldingGroupsHandler>.Instance);
+    public GetHoldingGroupsHandler Handler() => new(Queries, Classifications, Income, Clock, NullLogger<GetHoldingGroupsHandler>.Instance);
 
-    public ListHoldingsHandler Lister() => new(Queries, Classifications, Clock);
+    public ListHoldingsHandler Lister() => new(Queries, Classifications, Income, Clock);
 
     public static HoldingGroupsRequest Req(string? by, string? sort = null, string? stackBy = null, string? status = null, string? q = null, Guid? account = null, Guid? bucket = null) =>
         new(account, bucket, status, q, by, sort, stackBy);

@@ -12,6 +12,9 @@
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
   </ItemGroup>
+  <ItemGroup Label="Spreadsheets (P2-17)">
+    <PackageVersion Include="ExcelDataReader" Version="3.7.0" />
+  </ItemGroup>
   <ItemGroup Label="Hosting">
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
@@ -35,6 +38,12 @@
     <PackageVersion Include="Microsoft.ML" Version="5.0.0" />
     <PackageVersion Include="Microsoft.ML.LightGbm" Version="5.0.0" />
     <PackageVersion Include="Microsoft.ML.FastTree" Version="5.0.0" />
+  </ItemGroup>
+  <ItemGroup Label="Indicator cross-check (P3-01, test projects only)">
+    <PackageVersion Include="Skender.Stock.Indicators" Version="2.7.3" />
+  </ItemGroup>
+  <ItemGroup Label="Rules language (P3-02)">
+    <PackageVersion Include="Superpower" Version="3.2.1" />
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3" Version="4.0.1" />

@@ -7,6 +7,9 @@ import { buildHistory } from '@/test/historyFixtures';
 import { scrollToEnd } from '@/test/intersection';
 import { renderRoutes } from '@/test/render';
 import { server } from '@/test/server';
+import { createDividendFake, type DividendFakeOptions } from '@/test/dividendFake';
+import { createDividendImportFake, type DividendImportFakeOptions } from '@/test/dividendImportFake';
+import { createReportImportFake, type ReportImportFakeOptions } from '@/test/reportImportFake';
 import { createTradeFake, type TradeFakeOptions } from '@/test/tradeFake';
 import { PortfolioPage } from './components/PortfolioPage';
 
@@ -113,4 +116,44 @@ export const warmTrades = () =>
     import('./components/trades/TradesDrawer'),
     import('./components/trades/AddTradeDialog'),
     import('./components/trades/HoldingTrades'),
+  ]);
+
+/** Serves the dividends API (a holding's and an account's list, add, void, the suggestions and their decisions) from one stateful fake. */
+export function serveDividends(options: DividendFakeOptions = {}) {
+  const fake = createDividendFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
+/** Serves the dividend import API (preview, import, history, undo) from one stateful fake. Bring `serveDividends` for the lists. */
+export function serveDividendImport(options: DividendImportFakeOptions = {}) {
+  const fake = createDividendImportFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
+/** Loads the code of the lazy dividend section, dialogs and panel before the first test (see `warmTrades`). */
+export const warmDividends = () =>
+  Promise.all([
+    import('./components/income/HoldingDividends'),
+    import('./components/income/AddDividendDialog'),
+    import('./components/broker/CashDrawer'),
+    import('./components/dividends/DividendImportDialog'),
+    import('./components/trades/TradesDrawer'),
+  ]);
+
+/** Serves the report import API (preview, import, cost batches and their undo) from one stateful fake. Bring `serveTrades` for trade undo. */
+export function serveReportImport(options: ReportImportFakeOptions = {}) {
+  const fake = createReportImportFake(options);
+  server.use(...fake.handlers);
+  return fake;
+}
+
+/** Loads the code of the lazy Import files dialog and the panels it opens from before the first test (see `warmTrades`). */
+export const warmReportImport = () =>
+  Promise.all([
+    import('./components/imports/ImportFilesDialog'),
+    import('./components/trades/TradesDrawer'),
+    import('./components/broker/CashDrawer'),
+    import('./components/dividends/DividendImportDialog'),
   ]);

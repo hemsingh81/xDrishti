@@ -13,6 +13,10 @@ internal sealed class TradeReferenceData(XDrishtiDbContext db) : ITradeReference
 
     private const string ExchangePrefix = "NSE:";
 
+    private const string DhanBroker = "dhan";
+
+    private const string NseEquitySegment = "NSE_EQ";
+
     public async ValueTask<IReadOnlyList<TradeInstrument>> FindInstrumentsAsync(IReadOnlyCollection<string> isins, IReadOnlyCollection<string> symbols, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(isins);
@@ -30,6 +34,25 @@ internal sealed class TradeReferenceData(XDrishtiDbContext db) : ITradeReference
             .Select(i => new { i.Id, i.CanonicalSymbol, i.Isin, i.Type })
             .ToListAsync(cancellationToken);
         return [.. rows.Select(r => new TradeInstrument(r.Id, Ticker(r.CanonicalSymbol), r.Isin, r.Type))];
+    }
+
+    public async ValueTask<IReadOnlyDictionary<string, TradeInstrument>> FindInstrumentsByDhanIdsAsync(IReadOnlyCollection<string> securityIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(securityIds);
+        if (securityIds.Count == 0)
+        {
+            return new Dictionary<string, TradeInstrument>();
+        }
+
+        var ids = securityIds.ToArray();
+        var rows = await (
+            from b in db.InstrumentBrokerIds.AsNoTracking()
+            join i in db.Instruments.AsNoTracking() on b.InstrumentId equals i.Id
+            where b.Broker == DhanBroker && b.Segment == NseEquitySegment && ids.Contains(b.BrokerId)
+                && i.Exchange == Nse && (i.Type == InstrumentTypeCodes.Share || i.Type == InstrumentTypeCodes.Etf)
+            select new { b.BrokerId, i.Id, i.CanonicalSymbol, i.Isin, i.Type })
+            .ToListAsync(cancellationToken);
+        return rows.ToDictionary(r => r.BrokerId, r => new TradeInstrument(r.Id, Ticker(r.CanonicalSymbol), r.Isin, r.Type), StringComparer.Ordinal);
     }
 
     public async ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<AppliedAction>>> ListAppliedActionsAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken)

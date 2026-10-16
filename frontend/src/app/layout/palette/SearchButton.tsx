@@ -60,12 +60,18 @@ export function SearchButton() {
         startIcon={<SearchIcon />}
         sx={{
           minWidth: { xs: 40, lg: 240 },
-          height: 36,
-          px: { xs: 0, lg: 1.5 },
+          // The prototype's `.search-btn`: 34 px high, radius 8, on the alternate surface.
+          height: 34,
+          borderRadius: '8px',
+          fontSize: '13px',
+          fontWeight: 400,
+          px: { xs: 0, lg: '10px' },
           justifyContent: { xs: 'center', lg: 'flex-start' },
-          color: 'text.secondary',
+          color: 'text.tertiary',
           borderColor: 'divider',
-          bgcolor: 'background.default',
+          bgcolor: 'background.alt',
+          boxShadow: 'none',
+          '&:hover': { bgcolor: 'background.paper', color: 'text.secondary', borderColor: 'divider' },
           // Icon only below lg: the label and shortcut hint need the room.
           '& .MuiButton-startIcon': { mr: { xs: 0, lg: 1 }, ml: { xs: 0, lg: -0.5 } },
         }}

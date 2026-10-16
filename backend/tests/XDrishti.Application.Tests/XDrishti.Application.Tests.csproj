@@ -11,6 +11,10 @@
     <EmbeddedResource Include="Fixtures\*.csv" LogicalName="Fixtures/%(Filename)%(Extension)" />
     <!-- Made-up tradebook files for the trade CSV reader (docs/specs/P2-03). -->
     <EmbeddedResource Include="Portfolio\Trades\Samples\*.csv" LogicalName="Trades/%(Filename)%(Extension)" />
+    <!-- A made-up dividend payout file in the shape of Dhan's (docs/specs/P2-15): Sept months, thousands separators, repeated and same-day rows. -->
+    <EmbeddedResource Include="Portfolio\DividendImport\Samples\*.csv" LogicalName="Dividends/%(Filename)%(Extension)" />
+    <!-- A made-up Dhan global transaction report (docs/specs/P2-17): the shape of the real one - title, personal lines, header, bill rows, footer, note - with invented scrips and amounts. -->
+    <EmbeddedResource Include="Portfolio\Reports\Samples\*.csv" LogicalName="Reports/%(Filename)%(Extension)" />
   </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>

@@ -23,7 +23,9 @@ const accents: Readonly<Record<string, string>> = {
 /**
  * One service: its state, what it does, when it runs next and how the last run went, the schedule in words with its
  * retries, timeout and catch-up, then Run now and the overflow menu. A failed, running or paused service looks it (the
- * left bar and the header); a paused card has a dashed border. While the end-of-day run works, its progress is shown.
+ * left bar and the header); a paused card has a dashed border. While the end-of-day run works, its progress is shown;
+ * a service that another process runs (the live feed) adds the one line its heartbeat gives (connected, how many
+ * instruments, the last tick).
  */
 export function ServiceCard({ service, names, busy, ...handlers }: ServiceCardProps) {
   const jobId = service.status === 'running' ? service.lastRun?.dataJobId : null;
@@ -59,12 +61,21 @@ export function ServiceCard({ service, names, busy, ...handlers }: ServiceCardPr
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-            minHeight: '2.9em',
+            minHeight: '3em',
           }}
         >
           {service.description}
         </Typography>
         <RunFacts service={service} names={names} />
+        {service.live ? (
+          <Typography
+            variant="body2"
+            color={service.status === 'failed' ? 'error.main' : 'text.secondary'}
+            sx={{ overflowWrap: 'anywhere' }}
+          >
+            {service.live.summary}
+          </Typography>
+        ) : null}
         {jobId ? <RunProgress jobId={jobId} /> : null}
         <ScheduleBlock service={service} />
       </Box>

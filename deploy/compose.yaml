@@ -105,6 +105,15 @@ services:
       # Holdings (ADR 0012): whether the API looks once a minute at the accounts whose own automatic refresh (Off / Every N minutes / Daily, set in the app,
       # off by default) is due; false disables every schedule. "Sync now" always works.
       Portfolio__AutoRefresh__Enabled: ${XD_PORTFOLIO_AUTO_REFRESH:-true}
+      # Trades and ledger from Dhan (ADR 0025): first-start setting only (ADR 0018) of the "Portfolio trades & ledger" service (daily 16:30 IST on trading days); false starts it paused. After that it is
+      # changed on the Services screen. "Sync now" per account always works.
+      Portfolio__BrokerHistory__Enabled: ${XD_PORTFOLIO_BROKER_HISTORY:-true}
+      # Self-healing syncs (ADR 0027): the waits before the quiet retries of a sync that failed for a reason that may pass (minutes, comma-separated, inside the day; set but empty - XD_PORTFOLIO_HEAL_BACKOFF_MINUTES= - switches the retries off, unset keeps 1,5,15; the other two keep their default when empty), the failed days in a row after
+      # which the bell hears of a failing sync (what only the owner can fix is told at once), and how many years back the nightly deepening of the trade history reads at most (0 switches it off), and how many days a resolved bell item is kept before it is deleted (ADR 0030).
+      Portfolio__Heal__RetryBackoffMinutes: ${XD_PORTFOLIO_HEAL_BACKOFF_MINUTES-1,5,15}
+      Portfolio__Heal__PersistDays: ${XD_PORTFOLIO_HEAL_PERSIST_DAYS:-2}
+      Portfolio__Heal__DeepenMaxYears: ${XD_PORTFOLIO_HEAL_DEEPEN_YEARS:-8}
+      Portfolio__Heal__AttentionRetentionDays: ${XD_PORTFOLIO_HEAL_ATTENTION_DAYS:-30}
       # Market data (ADR 0016): the folder with the <SYMBOL>_1m.csv[.gz] files, mounted read-only below. Dhan Data API fetch: first fetch goes this many days
       # back, at most this many requests per second.
       Data__CsvFolder: /data/csv
@@ -116,7 +125,7 @@ services:
     secrets:
       - source: db_app_password
         target: Database__Password
-      # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API gets it: the API refuses to start without it.
+      # Key of the encrypted broker vault (accounts.broker_secrets, ADR 0008). Only the API and the live feed (ADR 0024) get it: the API refuses to start without it.
       - source: broker_vault_key
         target: BrokerVault__Key
     # egress: outbound only, to Dhan's consent endpoints (auth.dhan.co; ADR 0008, 0009), the read of the account's holdings (GET api.dhan.co/v2/holdings
@@ -149,6 +158,36 @@ services:
     mem_limit: 2g
     depends_on:
       xd-migrate: { condition: service_completed_successfully }
+    <<: *hardening
+
+  # The live feed (P2-10, ADR 0024): the Dhan WebSocket for the active set during market hours (09:00-15:35 IST on trading days; the window is the service
+  # `live-feed` on the Services screen). It reads the Data account's token through the broker vault, so it gets the vault key like xd-api, and it writes
+  # prices into the database only. Outbound to api-feed.dhan.co (wss) only: its client refuses every other endpoint. No published port.
+  xd-feed:
+    image: localhost/xdrishti/feed:${XD_VERSION:-0.1.0}
+    build:
+      context: ../backend
+      target: feed
+      args: { VERSION: "${XD_VERSION:-0.1.0}" }
+    restart: unless-stopped
+    environment: *dotnet-env
+    secrets:
+      - source: db_app_password
+        target: Database__Password
+      - source: broker_vault_key
+        target: BrokerVault__Key
+    networks: [back, egress]
+    mem_limit: 256m
+    # Shutdown ends the window run and sends a last heartbeat (up to ~30 s); the default 10 s would kill it and leave the run to be closed as interrupted.
+    stop_grace_period: 30s
+    depends_on:
+      xd-migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: [CMD, dotnet, XDrishti.Feed.dll, --healthcheck]
+      interval: 15s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
     <<: *hardening
 
   xd-proxy:
@@ -194,7 +233,7 @@ networks:
   front: {}
   back:
     internal: true
-  # Outbound internet for xd-api only (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010). Not internal, no published ports, no other member.
+  # Outbound internet for xd-api (Dhan sign-in, ADR 0008, 0009; instrument master files, ADR 0010) and xd-feed (the market-data WebSocket, ADR 0024). Not internal, no published ports, no other member.
   egress: {}
 
 volumes:

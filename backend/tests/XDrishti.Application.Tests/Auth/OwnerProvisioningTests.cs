@@ -50,6 +50,9 @@ public sealed class OwnerProvisioningTests
     [Theory]
     [InlineData(null, "name", "pw", "auth.owner_email_invalid")]
     [InlineData("not-an-email", "name", "pw", "auth.owner_email_invalid")]
+    [InlineData("a@b.com\nfake", "name", "pw", "auth.owner_email_invalid")]
+    [InlineData("a b@c.com", "name", "pw", "auth.owner_email_invalid")]
+    [InlineData("a@b.com\tx", "name", "pw", "auth.owner_email_invalid")]
     [InlineData("a@b.c", " ", "pw", "auth.owner_name_invalid")]
     [InlineData("a@b.c", "name", "", "auth.owner_password_invalid")]
     public async Task Missing_secrets_fail_when_no_owner_exists(string? email, string? name, string? password, string code)

@@ -5,6 +5,7 @@ import { buildLoadedCsvFile, sampleCsvFiles } from '@/test/csvFixtures';
 import { createDataFake, type DataFake } from '@/test/dataFake';
 import { buildCsvOverview, buildCsvPhase, buildDataJob, buildDataOverview, dataJobId } from '@/test/fixtures';
 import { problemResponse } from '@/test/server';
+import { findToast } from '@/test/toast';
 import { openCsvReview, openStep, openTab, renderData } from './testing';
 
 vi.mock('./lib/polling', () => ({ dataPollMs: 25 }));
@@ -97,7 +98,7 @@ describe('Undo the load of a CSV file', () => {
 
     await finish(fake);
     const message = `CSV load of ${reliance} undone, 1,234,567 bars removed`;
-    expect(await screen.findByText(message, { selector: '.MuiAlert-message' })).toBeInTheDocument();
+    expect(await findToast()).toHaveTextContent(message);
 
     const csv = await openStep('CSV files');
     expect(csv).toHaveTextContent(message);

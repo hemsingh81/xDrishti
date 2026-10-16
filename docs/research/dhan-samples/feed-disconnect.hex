@@ -1,0 +1,4 @@
+# UNVERIFIED - constructed from Dhan's documentation (made-up id and prices), not recorded from the real feed.
+# Disconnect packet (response code 50), 10 bytes.
+# payload: reason code int16 807 (access token expired, per the documentation)
+32 0a 00 00 00 00 00 00 27 03

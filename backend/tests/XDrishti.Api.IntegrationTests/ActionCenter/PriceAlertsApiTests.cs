@@ -255,7 +255,7 @@ public sealed class PriceAlertsApiTests(ApiFactory factory) : ActionCenterTestBa
 
         var run = await RunQuotesAsync();
 
-        run.Status.ShouldBe("failed");
+        run.Status.ShouldBe("skipped"); // Dhan not answering is tried again by the next poll and is not shown (ADR 0027)
         (await AlertsAsync("?status=active")).Items.Select(a => a.Id).ShouldBe([alert.Id]);
         (await EventsAsync("PriceAlertTriggered")).ShouldBe(0);
     }

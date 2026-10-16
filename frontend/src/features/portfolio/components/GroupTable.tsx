@@ -27,7 +27,10 @@ export function GroupTable({ data, by, sort, expanded, scope, onSort, onToggle }
       stickyHeader
       size="small"
       aria-label={`Holdings by ${by}`}
-      sx={{ tableLayout: 'fixed', minWidth: { xs: groupTableMinWidth.xs, lg: groupTableMinWidth.lg } }}
+      sx={{
+        tableLayout: 'fixed',
+        minWidth: { xs: groupTableMinWidth.xs, md: groupTableMinWidth.md, lg: groupTableMinWidth.lg },
+      }}
     >
       <GroupTableHead by={by} total={data.total} sort={sort} onSort={onSort} />
       <TableBody>

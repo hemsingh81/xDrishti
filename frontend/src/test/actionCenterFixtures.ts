@@ -260,6 +260,11 @@ export const buildPortfolioNotice = (overrides: Partial<PortfolioNotice> = {}): 
   at: '2026-10-13T04:30:00Z',
   alertId: null,
   instrumentId: null,
+  title: null,
+  actions: [],
+  since: null,
+  resolved: false,
+  accountId: null,
   ...overrides,
 });
 

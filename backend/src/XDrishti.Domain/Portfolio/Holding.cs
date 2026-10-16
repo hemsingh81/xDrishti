@@ -74,7 +74,13 @@ public sealed class Holding : Entity<Guid>
     /// <summary>The previous session's close as the last quote reported it (ADR 0019); null until a quote has given one. A sync never touches it.</summary>
     public decimal? PreviousClose { get; private set; }
 
-    /// <summary>Where <see cref="LastPrice"/> came from: the holdings list at the last sync, or a quote.</summary>
+    /// <summary>
+    /// When <see cref="PreviousClose"/> was taken: the fetch time of the quote that gave it; null until a quote has. Only a quote writes it (a sync and a live tick never do). A live price counts in the day change only when the previous
+    /// close was taken on the same India day as the tick - until then it is the close of the session before the last one.
+    /// </summary>
+    public DateTimeOffset? PreviousCloseAt { get; private set; }
+
+    /// <summary>Where <see cref="LastPrice"/> came from: the holdings list at the last sync, a quote, or a tick of the live feed.</summary>
     public PriceSource LastPriceSource { get; private set; } = PriceSource.Sync;
 
     public HoldingStatus Status { get; private set; }
@@ -121,6 +127,7 @@ public sealed class Holding : Entity<Guid>
 
         // The previous close belongs to the session of the quote that gave it: a holding that comes back must not show a day change against it.
         PreviousClose = null;
+        PreviousCloseAt = null;
         Describe(row, instrumentId, name);
         Begin(row, acquiredOn, usesDefaultDate, source, now);
     }
@@ -168,9 +175,9 @@ public sealed class Holding : Entity<Guid>
     }
 
     /// <summary>
-    /// A market quote for the holding (ADR 0019 §3): the price, the previous session's close and the time of the fetch, source <see cref="PriceSource.Quote"/>. A closed holding is not priced, and a last price that is
-    /// zero or negative is no quote at all (nothing changes, false). A previous close that is missing, zero or negative is ignored: the one held stays. The batch update of the store applies the same rules
-    /// to many holdings in one statement (<c>IHoldingQuotes.ApplyAsync</c>).
+    /// A market quote for the holding (ADR 0019 §3, ADR 0024): the price, the previous session's close and the time of the fetch, source <see cref="PriceSource.Quote"/>. A closed holding is not priced, and a last price that is
+    /// zero or negative is no quote at all (nothing changes, false). A previous close that is missing, zero or negative is ignored: the one held stays (with the time it was taken, <see cref="PreviousCloseAt"/>; a previous close taken is stamped with the fetch time). A live price newer than the fetch time stays (the quote's own price is older
+    /// than it), but the previous close of the quote is still taken - only quotes carry one. True when the holding changed. The batch update of the store applies the same rules to many holdings in one statement (<c>IHoldingQuotes.ApplyAsync</c>).
     /// </summary>
     public bool ApplyQuote(decimal last, decimal? previousClose, DateTimeOffset at)
     {
@@ -179,14 +186,45 @@ public sealed class Holding : Entity<Guid>
             return false;
         }
 
+        if (!LivePricePolicy.QuoteReplaces(LastPriceSource, LastPriceAt, at))
+        {
+            if (previousClose is not > 0)
+            {
+                return false;
+            }
+
+            PreviousClose = Round(previousClose.Value);
+            PreviousCloseAt = at;
+            return true;
+        }
+
         LastPrice = Round(last);
         LastPriceAt = at;
         LastPriceSource = PriceSource.Quote;
         if (previousClose is > 0)
         {
             PreviousClose = Round(previousClose.Value);
+            PreviousCloseAt = at;
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// A tick of the live feed (ADR 0024): the price, the time of the tick and source <see cref="PriceSource.Live"/>; the previous close is never written (a tick has none). Applied only when <see cref="LivePricePolicy.LiveReplaces"/>
+    /// says so: the holding is open, the price is positive, the tick is newer than the price held, and an indicative tick (before the open) does not replace a quote of the same India day. False when nothing changed.
+    /// The batch update of the store applies the same rules to many holdings in one statement (<c>ILivePrices.ApplyAsync</c>).
+    /// </summary>
+    public bool ApplyLive(decimal price, DateTimeOffset tickAt)
+    {
+        if (Status != HoldingStatus.Open || price <= 0 || !LivePricePolicy.LiveReplaces(LastPriceSource, LastPriceAt, tickAt, LastPrice, Round(price)))
+        {
+            return false;
+        }
+
+        LastPrice = Round(price);
+        LastPriceAt = tickAt;
+        LastPriceSource = PriceSource.Live;
         return true;
     }
 
@@ -341,12 +379,12 @@ public sealed class Holding : Entity<Guid>
     }
 
     /// <summary>
-    /// The price from a holdings sync (ADR 0019 §3): a price of zero or less is no price. A quote of the same India day stays — it is newer than anything the sync knows — otherwise the broker's price is taken, source
-    /// <see cref="PriceSource.Sync"/>. The previous close is never touched.
+    /// The price from a holdings sync (ADR 0019 §3, ADR 0024): a price of zero or less is no price. A quote or a live price of the same India day stays — it is newer than anything the sync knows — otherwise the broker's price is taken,
+    /// source <see cref="PriceSource.Sync"/>. The previous close is never touched.
     /// </summary>
     private void SetPrice(decimal price, DateTimeOffset now)
     {
-        if (price <= 0 || (LastPriceSource == PriceSource.Quote && LastPriceAt is { } at && IndiaTime.Today(at) == IndiaTime.Today(now)))
+        if (price <= 0 || (LastPriceSource != PriceSource.Sync && LastPriceAt is { } at && IndiaTime.Today(at) == IndiaTime.Today(now)))
         {
             return;
         }

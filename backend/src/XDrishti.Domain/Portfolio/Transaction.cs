@@ -3,13 +3,16 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Domain.Portfolio;
 
 /// <summary>
-/// One trade of an account: a buy or a sell of a security on an India date, from a tradebook CSV or typed in by the owner (ADR 0023). Immutable except for being voided: a mistake is voided and
-/// entered again, never edited, and the runtime role cannot delete it. <see cref="ExternalId"/> is the trade's identity (the trade id of the file, a hash of the line, or a random id for a manual
+/// One trade of an account: a buy or a sell of a security on an India date, from a tradebook CSV, typed in by the owner (ADR 0023) or read from the broker's trade history (ADR 0025). Immutable except for being voided - a mistake is voided and
+/// entered again, never edited - and, for a trade read from the broker, for being completed once with an ISIN, ticker or charges an earlier read left out (<see cref="EnrichFromBroker"/>); the runtime role cannot delete it. <see cref="ExternalId"/> is the trade's identity (the trade id of the file, a hash of the line, or a random id for a manual
 /// trade); it is unique among the account's trades that are not voided. <see cref="Seq"/> is the line of the file (0 for a manual trade) and orders trades that tie on date, side and time.
 /// </summary>
 public sealed class Transaction : Entity<Guid>
 {
     public const int MaxCreatedByLength = 256;
+
+    /// <summary>The <see cref="VoidedBy"/> of a bill-level row that the broker's own trades replaced.</summary>
+    public const string SupersededReason = "superseded";
 
     // Parameter names match property names so EF Core can bind this constructor when materialising.
     private Transaction(
@@ -30,7 +33,8 @@ public sealed class Transaction : Entity<Guid>
         int seq,
         string externalId,
         string createdBy,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? runId)
         : base(id)
     {
         AccountId = accountId;
@@ -50,6 +54,7 @@ public sealed class Transaction : Entity<Guid>
         ExternalId = externalId;
         CreatedBy = createdBy;
         CreatedAt = createdAt;
+        RunId = runId;
     }
 
     public Guid AccountId { get; private set; }
@@ -76,7 +81,7 @@ public sealed class Transaction : Entity<Guid>
 
     public decimal Price { get; private set; }
 
-    /// <summary>The charges of the trade as one total; informational (not part of cost or returns yet).</summary>
+    /// <summary>The charges of the trade as one total (rupees): not part of the cost or the lots, but counted as a cost in the net returns of the holding (ADR 0026).</summary>
     public decimal Charges { get; private set; }
 
     public TradeSource Source { get; private set; }
@@ -90,6 +95,12 @@ public sealed class Transaction : Entity<Guid>
     public string CreatedBy { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
+
+    /// <summary>The broker history run (<c>portfolio.broker_sync_runs</c>) that read the trade; null for a trade from a file or typed in (ADR 0025).</summary>
+    public Guid? RunId { get; private set; }
+
+    /// <summary>The broker history run whose trades replaced this bill-level row (ADR 0029); null for any other trade. A superseded row is voided with <see cref="SupersededReason"/>.</summary>
+    public Guid? SupersededBy { get; private set; }
 
     public DateTimeOffset? VoidedAt { get; private set; }
 
@@ -114,7 +125,8 @@ public sealed class Transaction : Entity<Guid>
         int seq,
         string externalId,
         string createdBy,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? runId = null)
     {
         if (accountId == Guid.Empty)
         {
@@ -133,7 +145,7 @@ public sealed class Transaction : Entity<Guid>
             throw new ArgumentOutOfRangeException(nameof(qty), qtyProblem);
         }
 
-        var rounded = TradeRules.Round(price);
+        var rounded = TradeRules.RoundPrice(price);
         if (TradeRules.PriceProblem(rounded) is { } priceProblem)
         {
             throw new ArgumentOutOfRangeException(nameof(price), priceProblem);
@@ -171,7 +183,60 @@ public sealed class Transaction : Entity<Guid>
             seq,
             externalId,
             actor,
-            now);
+            now,
+            runId);
+    }
+
+    /// <summary>
+    /// Fills in what an earlier read of the broker's history left out of a trade that came from the broker (ADR 0025, 0026), from the same trade read again: the ISIN when the trade has none, the charges when they are 0 and the read has some, the ticker when
+    /// it is empty and the read resolved one. Nothing else is ever changed - not the identity, side, date, quantity or price - and nothing is overwritten: a value that is there stays. A trade from a file or typed in, and a voided one, are left alone.
+    /// True when something was filled in.
+    /// </summary>
+    public bool EnrichFromBroker(string? isin, string? tradingSymbol, decimal charges)
+    {
+        if (Source != TradeSource.Broker || VoidedAt is not null)
+        {
+            return false;
+        }
+
+        var changed = false;
+        if (Isin is null && TradeRules.NormaliseIsin(isin) is { } code)
+        {
+            Isin = Cut(code, Holding.MaxIsinLength);
+            changed = true;
+        }
+
+        var symbol = TradeRules.NormaliseSymbol(tradingSymbol);
+        if (TradingSymbol.Length == 0 && symbol.Length > 0)
+        {
+            TradingSymbol = Cut(symbol, Holding.MaxSymbolLength);
+            changed = true;
+        }
+
+        var fees = TradeRules.Round(charges);
+        if (Charges == 0m && fees > 0m && TradeRules.ChargesProblem(fees) is null)
+        {
+            Charges = fees;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    /// <summary>
+    /// Voids a bill-level row of a downloaded report because the broker's own trades for the same day, security and side were stored by the run <paramref name="runId"/> (ADR 0029). False for any other trade and for one voided already.
+    /// </summary>
+    public bool Supersede(Guid runId, DateTimeOffset at)
+    {
+        if (Source != TradeSource.Bill || VoidedAt is not null)
+        {
+            return false;
+        }
+
+        VoidedBy = SupersededReason;
+        VoidedAt = at;
+        SupersededBy = runId;
+        return true;
     }
 
     /// <summary>Voids the trade (it stops counting, it is never deleted). False when it was voided already.</summary>

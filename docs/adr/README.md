@@ -28,3 +28,14 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0021](0021-portfolio-grouping-and-allocation-charts.md) | Portfolio grouping by account, bucket, sector or basket, computed on the server, with allocation charts | Accepted |
 | [0022](0022-action-center-and-price-alerts.md) | Portfolio Action center evaluated on read, and one-shot price alerts checked by the quotes service | Accepted |
 | [0023](0023-trade-import-and-lot-reconstruction.md) | Trades from CSV or by hand are stored as transactions and rebuild a holding's lots with real dates | Accepted |
+| [0024](0024-live-feed-xd-feed-and-live-prices.md) | Live feed in its own container (`xd-feed`), live prices in the holding price columns, SignalR hub for the Portfolio screen | Accepted |
+| [0025](0025-dhan-trade-history-and-ledger-sync.md) | Dhan trade history and ledger are read nightly; lots are rebuilt automatically where it is safe | Accepted |
+| [0026](0026-dividends-entered-by-the-owner-and-charges-in-net-returns.md) | Dividends are entered by the owner; charges and dividends form a net return next to the gross one | Accepted |
+| [0027](0027-self-healing-sync-and-actionable-notifications.md) | Syncs heal themselves; what only the owner can do arrives as one actionable notification | Accepted |
+| [0028](0028-dividend-csv-import-with-name-matching.md) | Dividend files are recognised by their headers and matched to holdings by name, with remembered corrections | Accepted |
+| [0029](0029-dhan-report-imports-and-source-precedence.md) | Dhan's downloaded reports are imported by kind, and API trades take precedence over bill-level report rows | Accepted |
+| [0030](0030-read-only-notices-retention-and-structured-failures.md) | Notices are read-only, attention rows are kept for 30 days, and failures carry a kind | Accepted |
+| [0031](0031-streaming-indicators-and-the-feature-frame.md) | Streaming indicators and the feature frame: closed bars only, one code path | Accepted |
+| [0032](0032-frame-history-closed-flags-and-the-remaining-indicators.md) | The frame exposes closed flags and value history; the remaining indicators and patterns | Accepted |
+| [0033](0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md) | Weekly and monthly timeframes, calendar features and a daily market context read as of the previous session | Accepted |
+| [0034](0034-the-rules-expression-language-lint-and-compiler.md) | The rules expression language: one grammar, three-valued logic, a look-ahead lint and a compiler to expression trees | Accepted (seven build deviations await the owner: Amendments 1, 2, 3, 4, 7, 14 and 18) |

@@ -1,11 +1,8 @@
 import type { AccountSummary } from '@/shared/api';
-import { formatDate, formatHoursMinutes, istDayIso } from '@/shared/lib/format';
-import { connectionState, keyExpiry } from '@/features/accounts';
+import { formatDate, istDayIso } from '@/shared/lib/format';
+import { keyExpiry } from '@/features/accounts';
 
 export type NotificationKind =
-  | 'not_connected'
-  | 'token_expired'
-  | 'token_expiring'
   | 'key_expiring'
   | 'key_expired'
   | 'data_run_failed'
@@ -14,8 +11,43 @@ export type NotificationKind =
   | 'data_corporate_actions_pending'
   | 'service_failed'
   | 'price_alert_triggered'
-  | 'actions_need_decision';
+  | 'actions_need_decision'
+  | 'reconnect_dhan'
+  | 'sync_failing'
+  | 'holdings_need_review'
+  | 'trades_unexplained'
+  | 'dividends_pending'
+  | 'securities_unmatched'
+  | 'rows_dropped';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
+
+/**
+ * The server-derived items that need the owner (ADR 0027), plus the API-key expiry the app derives itself: these pop up once
+ * while the app is open; the other notices wait in the bell.
+ */
+export const attentionKinds: ReadonlySet<NotificationKind> = new Set<NotificationKind>([
+  'reconnect_dhan',
+  'sync_failing',
+  'holdings_need_review',
+  'trades_unexplained',
+  'dividends_pending',
+  'securities_unmatched',
+  'rows_dropped',
+  'key_expired',
+  'key_expiring',
+]);
+
+/** What the owner can do about a notification: go to a place in the app, or run an existing endpoint of the API. */
+export interface NotificationAction {
+  label: string;
+  kind: 'route' | 'command';
+  /** `route`: an in-app path with its query. `command`: "METHOD /api/path". */
+  target: string;
+}
+
+/** The API says `error`, `warning` (`warn` in the older notices) or `info`; anything else is read as information. */
+export const severityOf = (severity: string): NotificationSeverity =>
+  severity === 'error' ? 'error' : severity === 'warn' || severity === 'warning' ? 'warn' : 'info';
 
 export interface AppNotification {
   /** `{accountId}:{kind}:{discriminator}` — a changed situation (new expiry) is a new id, hence unread again. */
@@ -30,6 +62,14 @@ export interface AppNotification {
   href: string;
   /** When it happened or will happen (ms since epoch); null when unknown. Shown as a relative time. */
   at: number | null;
+  /** A short bold first line ("Reconnect Dhan"); null for the notices that are a single sentence. */
+  title: string | null;
+  /** At most two buttons ("Retry now", "Open"); none for the notices that only have Open. */
+  actions: NotificationAction[];
+  /** When the situation began (ISO); with `id` it identifies the item, as the server re-raises a resolved one with a new `since`. */
+  since?: string | null;
+  /** The situation is over; it stays 24 h under "Resolved" and is not counted as unread. */
+  resolved: boolean;
 }
 
 /** API keys are flagged this many days ahead (the first day the key no longer works counts as day 0). */
@@ -49,37 +89,20 @@ function forAccount(account: AccountSummary, nowMs: number): AppNotification[] {
     discriminator: string,
     text: string,
     at: number | null,
-  ): AppNotification => ({ ...base, id: `${account.id}:${kind}:${discriminator}`, kind, severity, text, at });
+  ): AppNotification => ({
+    ...base,
+    id: `${account.id}:${kind}:${discriminator}`,
+    kind,
+    severity,
+    text,
+    at,
+    title: null,
+    actions: [],
+    resolved: false,
+  });
   const out: AppNotification[] = [];
 
-  const state = connectionState(account.connection, nowMs);
-  const expiry = state.expiresAt;
-  const expiryMs = expiry === null ? null : Date.parse(expiry);
-  if (state.status === 'not_connected') {
-    const last = account.connection.lastConnectedAt;
-    out.push(
-      make(
-        'not_connected',
-        'warn',
-        last ?? 'never',
-        `${account.name} is not connected`,
-        last === null ? null : Date.parse(last),
-      ),
-    );
-  } else if (state.status === 'expired') {
-    out.push(make('token_expired', 'error', expiry ?? 'unknown', `${account.name} token expired`, expiryMs));
-  } else if (state.secondsLeft !== null) {
-    out.push(
-      make(
-        'token_expiring',
-        'warn',
-        expiry ?? 'unknown',
-        `${account.name} token expires in ${formatHoursMinutes(state.secondsLeft)}`,
-        expiryMs,
-      ),
-    );
-  }
-
+  // The Dhan login (missing, expired, about to expire) is a server item now: `reconnect_dhan`.
   const key = keyExpiry(account.apiKeyExpiresOn, keyWarningDays, istDayIso(nowMs));
   const keyAt = Date.parse(`${account.apiKeyExpiresOn}T00:00:00+05:30`);
   const on = formatDate(account.apiKeyExpiresOn);
@@ -94,9 +117,10 @@ function forAccount(account: AccountSummary, nowMs: number): AppNotification[] {
   return out;
 }
 
-/** Urgent (error) first, then warnings, then information; within a level the newest first; ties by id (stable). */
+/** Open before resolved; urgent (error) first, then warnings, then information; within a level the newest first; ties by id (stable). */
 export function compareNotifications(a: AppNotification, b: AppNotification): number {
   return (
+    Number(a.resolved) - Number(b.resolved) ||
     rank[b.severity] - rank[a.severity] ||
     (b.at ?? Number.NEGATIVE_INFINITY) - (a.at ?? Number.NEGATIVE_INFINITY) ||
     a.id.localeCompare(b.id)

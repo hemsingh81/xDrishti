@@ -289,6 +289,31 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("portfolio_buckets", "accounts");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Accounts.ReportClientCode", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<DateTimeOffset>("RememberedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("remembered_at");
+
+                    b.HasKey("AccountId")
+                        .HasName("pk_report_client_codes");
+
+                    b.ToTable("report_client_codes", "accounts", t =>
+                        {
+                            t.HasCheckConstraint("ck_report_client_codes_hash", "length(hash) = 64");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.RiskProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1408,6 +1433,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(64)")
                         .HasColumnName("service_name");
 
+                    b.Property<string>("Details")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("details");
+
                     b.Property<string>("Instance")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -1421,6 +1450,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("started_at");
+
+                    b.Property<string>("State")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("state");
 
                     b.Property<string>("Version")
                         .IsRequired()
@@ -1610,6 +1644,667 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.AttentionRecord", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Actions")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("actions");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("severity");
+
+                    b.Property<DateTimeOffset>("Since")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("since");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attention_items");
+
+                    b.HasIndex("ResolvedAt")
+                        .HasDatabaseName("ix_attention_items_resolved");
+
+                    b.ToTable("attention_items", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_attention_items_severity", "severity IN ('error', 'warning', 'info')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Counts")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("counts");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("StartedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("started_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("status");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.Property<string>("Trigger")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("trigger");
+
+                    b.HasKey("Id")
+                        .HasName("pk_broker_sync_runs");
+
+                    b.HasIndex("AccountId", "Kind", "StartedAt")
+                        .HasDatabaseName("ix_broker_sync_runs_account_kind_started");
+
+                    b.HasIndex(new[] { "AccountId" }, "ux_broker_sync_runs_one_running")
+                        .IsUnique()
+                        .HasDatabaseName("ux_broker_sync_runs_one_running")
+                        .HasFilter("status = 'running'");
+
+                    b.ToTable("broker_sync_runs", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_broker_sync_runs_kind", "kind IN ('trades', 'ledger')");
+
+                            t.HasCheckConstraint("ck_broker_sync_runs_status", "status IN ('running', 'succeeded', 'failed', 'skipped')");
+
+                            t.HasCheckConstraint("ck_broker_sync_runs_trigger", "trigger IN ('manual', 'scheduled', 'first')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncState", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempts");
+
+                    b.Property<int>("ConsecutiveFailedDays")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("consecutive_failed_days");
+
+                    b.Property<bool>("DeepenExhausted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("deepen_exhausted");
+
+                    b.Property<DateOnly?>("DeepenedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("deepened_on");
+
+                    b.Property<DateOnly?>("DeepenedTo")
+                        .HasColumnType("date")
+                        .HasColumnName("deepened_to");
+
+                    b.Property<DateTimeOffset?>("LastFailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_failed_at");
+
+                    b.Property<string>("LastFailureReason")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("last_failure_reason");
+
+                    b.Property<int>("MapperVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("mapper_version");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<DateOnly?>("WatermarkDate")
+                        .HasColumnType("date")
+                        .HasColumnName("watermark_date");
+
+                    b.HasKey("AccountId", "Kind")
+                        .HasName("pk_broker_sync_state");
+
+                    b.ToTable("broker_sync_state", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_broker_sync_state_kind", "kind IN ('holdings', 'trades', 'ledger', 'quotes')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncWindow", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("kind");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<int>("Dropped")
+                        .HasColumnType("integer")
+                        .HasColumnName("dropped");
+
+                    b.Property<bool>("NeedsReread")
+                        .HasColumnType("boolean")
+                        .HasColumnName("needs_reread");
+
+                    b.Property<DateTimeOffset>("NotedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("noted_at");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.HasKey("AccountId", "Kind", "FromDate")
+                        .HasName("pk_broker_sync_windows");
+
+                    b.HasIndex(new[] { "AccountId", "Kind", "FromDate" }, "ix_broker_sync_windows_reread")
+                        .HasDatabaseName("ix_broker_sync_windows_reread")
+                        .HasFilter("needs_reread");
+
+                    b.ToTable("broker_sync_windows", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_broker_sync_windows_kind", "kind IN ('trades', 'ledger')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.CostBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<int>("Bad")
+                        .HasColumnType("integer")
+                        .HasColumnName("bad");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("Duplicates")
+                        .HasColumnType("integer")
+                        .HasColumnName("duplicates");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Imported")
+                        .HasColumnType("integer")
+                        .HasColumnName("imported");
+
+                    b.Property<int>("Parsed")
+                        .HasColumnType("integer")
+                        .HasColumnName("parsed");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("UndoneAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("undone_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cost_batches");
+
+                    b.HasIndex("AccountId", "CreatedAt")
+                        .HasDatabaseName("ix_cost_batches_account_created");
+
+                    b.ToTable("cost_batches", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_cost_batches_counts", "parsed >= 0 AND imported >= 0 AND duplicates >= 0 AND bad >= 0 AND amount >= 0");
+
+                            t.HasCheckConstraint("ck_cost_batches_status", "status IN ('imported', 'undone')");
+
+                            t.HasCheckConstraint("ck_cost_batches_undone", "(status = 'undone') = (undone_at IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Dividend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("external_id");
+
+                    b.Property<Guid?>("HoldingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holding_id");
+
+                    b.Property<Guid?>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("Isin")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<DateOnly>("PayDate")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_date");
+
+                    b.Property<decimal?>("PerShare")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("per_share");
+
+                    b.Property<long?>("Quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("ScripName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("scrip_name");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("TradingSymbol")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("trading_symbol");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
+                    b.Property<string>("VoidedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("voided_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividends");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_dividends_batch")
+                        .HasFilter("batch_id IS NOT NULL");
+
+                    b.HasIndex("AccountId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dividends_account_external_active")
+                        .HasFilter("voided_at IS NULL AND external_id IS NOT NULL");
+
+                    b.HasIndex("AccountId", "PayDate")
+                        .HasDatabaseName("ix_dividends_account_pay_date");
+
+                    b.HasIndex("HoldingId", "PayDate")
+                        .HasDatabaseName("ix_dividends_holding_pay_date")
+                        .HasFilter("holding_id IS NOT NULL");
+
+                    b.ToTable("dividends", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividends_amount", "amount > 0");
+
+                            t.HasCheckConstraint("ck_dividends_file", "(source = 'csv') = (external_id IS NOT NULL AND batch_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_dividends_per_share", "per_share IS NULL OR per_share > 0");
+
+                            t.HasCheckConstraint("ck_dividends_quantity", "quantity IS NULL OR quantity > 0");
+
+                            t.HasCheckConstraint("ck_dividends_source", "source IN ('manual', 'csv')");
+
+                            t.HasCheckConstraint("ck_dividends_voided", "(voided_at IS NULL) = (voided_by IS NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid?>("HoldingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("holding_id");
+
+                    b.Property<Guid?>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_key");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividend_aliases");
+
+                    b.HasIndex("HoldingId")
+                        .HasDatabaseName("ix_dividend_aliases_holding")
+                        .HasFilter("holding_id IS NOT NULL");
+
+                    b.HasIndex("AccountId", "NameKey")
+                        .IsUnique()
+                        .HasDatabaseName("ux_dividend_aliases_account_name");
+
+                    b.ToTable("dividend_aliases", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividend_aliases_target", "holding_id IS NULL OR instrument_id IS NULL");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendBatch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<int>("Bad")
+                        .HasColumnType("integer")
+                        .HasColumnName("bad");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<int>("Duplicates")
+                        .HasColumnType("integer")
+                        .HasColumnName("duplicates");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<int>("Imported")
+                        .HasColumnType("integer")
+                        .HasColumnName("imported");
+
+                    b.Property<int>("Parsed")
+                        .HasColumnType("integer")
+                        .HasColumnName("parsed");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("UndoneAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("undone_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividend_batches");
+
+                    b.HasIndex("AccountId", "CreatedAt")
+                        .HasDatabaseName("ix_dividend_batches_account_created");
+
+                    b.ToTable("dividend_batches", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividend_batches_counts", "parsed >= 0 AND imported >= 0 AND duplicates >= 0 AND bad >= 0 AND amount >= 0");
+
+                            t.HasCheckConstraint("ck_dividend_batches_status", "status IN ('imported', 'undone')");
+
+                            t.HasCheckConstraint("ck_dividend_batches_undone", "(status = 'undone') = (undone_at IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<Guid?>("DividendId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("dividend_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dividend_suggestions");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_dividend_suggestions_account");
+
+                    b.HasIndex("DividendId")
+                        .HasDatabaseName("ix_dividend_suggestions_dividend_id");
+
+                    b.ToTable("dividend_suggestions", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_dividend_suggestions_dividend", "(state = 'accepted') = (dividend_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_dividend_suggestions_state", "state IN ('accepted', 'dismissed')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1680,6 +2375,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("previous_close");
 
+                    b.Property<DateTimeOffset?>("PreviousCloseAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("previous_close_at");
+
                     b.Property<long>("Qty")
                         .HasColumnType("bigint")
                         .HasColumnName("qty");
@@ -1730,7 +2429,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("holdings", "portfolio", t =>
                         {
-                            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote')");
+                            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote', 'live')");
 
                             t.HasCheckConstraint("ck_holdings_qty", "qty >= 0");
 
@@ -1893,6 +2592,133 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.LedgerEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid?>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("EntryClass")
+                        .IsRequired()
+                        .HasMaxLength(9)
+                        .HasColumnType("character varying(9)")
+                        .HasColumnName("class");
+
+                    b.Property<DateOnly>("EntryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("entry_date");
+
+                    b.Property<string>("Exchange")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("exchange");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("Isin")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<string>("Narration")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("narration");
+
+                    b.Property<long?>("Quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
+
+                    b.Property<decimal?>("RunningBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("running_balance");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("source");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("voided_at");
+
+                    b.Property<string>("VoidedBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("voided_by");
+
+                    b.Property<string>("VoucherNo")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("voucher_no");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ledger_entries");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_ledger_entries_batch")
+                        .HasFilter("batch_id IS NOT NULL");
+
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_ledger_entries_run");
+
+                    b.HasIndex("AccountId", "EntryDate")
+                        .HasDatabaseName("ix_ledger_entries_account_date");
+
+                    b.HasIndex("AccountId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_ledger_entries_account_external")
+                        .HasFilter("voided_at IS NULL");
+
+                    b.ToTable("ledger_entries", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_ledger_entries_class", "class IN ('funds_in', 'funds_out', 'dividend', 'charges', 'other')");
+
+                            t.HasCheckConstraint("ck_ledger_entries_origin", "(source = 'broker') = (run_id IS NOT NULL) AND (source = 'import') = (batch_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_ledger_entries_quantity", "quantity IS NULL OR quantity > 0");
+
+                            t.HasCheckConstraint("ck_ledger_entries_source", "source IN ('broker', 'import')");
+
+                            t.HasCheckConstraint("ck_ledger_entries_voided", "(voided_at IS NULL) = (voided_by IS NULL) AND (voided_at IS NULL OR source = 'import')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.PriceAlert", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1959,6 +2785,66 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_price_alerts_status", "status IN ('active', 'triggered', 'cancelled')");
 
                             t.HasCheckConstraint("ck_price_alerts_triggered", "status <> 'triggered' OR (triggered_at IS NOT NULL AND trigger_price IS NOT NULL)");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.SecurityAlias", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("Isin")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("isin");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name_key");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id")
+                        .HasName("pk_security_aliases");
+
+                    b.HasIndex("AccountId", "Isin")
+                        .HasDatabaseName("ix_security_aliases_account_isin");
+
+                    b.HasIndex("AccountId", "NameKey", "Isin")
+                        .IsUnique()
+                        .HasDatabaseName("ux_security_aliases_account_name_isin");
+
+                    b.ToTable("security_aliases", "portfolio", t =>
+                        {
+                            t.HasCheckConstraint("ck_security_aliases_source", "source IN ('demat', 'dp', 'choice')");
                         });
                 });
 
@@ -2091,13 +2977,17 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnName("isin");
 
                     b.Property<decimal>("Price")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)")
                         .HasColumnName("price");
 
                     b.Property<long>("Qty")
                         .HasColumnType("bigint")
                         .HasColumnName("qty");
+
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("run_id");
 
                     b.Property<int>("Seq")
                         .HasColumnType("integer")
@@ -2114,6 +3004,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasMaxLength(6)
                         .HasColumnType("character varying(6)")
                         .HasColumnName("source");
+
+                    b.Property<Guid?>("SupersededBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("superseded_by");
 
                     b.Property<DateOnly>("TradeDate")
                         .HasColumnType("date")
@@ -2144,6 +3038,13 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasIndex("BatchId")
                         .HasDatabaseName("ix_transactions_batch");
 
+                    b.HasIndex("RunId")
+                        .HasDatabaseName("ix_transactions_run")
+                        .HasFilter("run_id IS NOT NULL");
+
+                    b.HasIndex("SupersededBy")
+                        .HasDatabaseName("ix_transactions_superseded_by");
+
                     b.HasIndex("AccountId", "ExternalId")
                         .IsUnique()
                         .HasDatabaseName("ux_transactions_account_external_active")
@@ -2165,7 +3066,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_transactions_side", "side IN ('buy', 'sell')");
 
-                            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual')");
+                            t.HasCheckConstraint("ck_transactions_source", "source IN ('csv', 'manual', 'broker', 'bill')");
+
+                            t.HasCheckConstraint("ck_transactions_superseded", "superseded_by IS NULL OR (voided_at IS NOT NULL AND source = 'bill')");
 
                             t.HasCheckConstraint("ck_transactions_voided", "(voided_at IS NULL) = (voided_by IS NULL)");
                         });
@@ -2640,6 +3543,32 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Live.LiveQuoteRecord", b =>
+                {
+                    b.Property<Guid>("InstrumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<decimal>("LastPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("last_price");
+
+                    b.Property<DateTimeOffset>("TickAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("tick_at");
+
+                    b.HasKey("InstrumentId")
+                        .HasName("pk_live_quotes");
+
+                    b.ToTable("live_quotes", "market", t =>
+                        {
+                            t.HasCheckConstraint("ck_live_quotes_last_price", "last_price > 0");
+                        });
+
+                    NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -2829,6 +3758,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_portfolio_buckets_broker_accounts_default_for_account_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Accounts.ReportClientCode", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Domain.Accounts.ReportClientCode", "AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_report_client_codes_broker_accounts_account_id");
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Auth.AuthSession", b =>
                 {
                     b.HasOne("XDrishti.Domain.Auth.OwnerAccount", null)
@@ -2912,6 +3851,117 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tracked_instruments_instruments_instrument_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncRun", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_broker_sync_runs_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncState", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_broker_sync_state_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.BrokerSyncWindow", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_broker_sync_windows_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.CostBatch", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cost_batches_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.Dividend", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividends_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.DividendBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividends_dividend_batches_batch_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.Holding", null)
+                        .WithMany()
+                        .HasForeignKey("HoldingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividends_holdings_holding_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendAlias", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_aliases_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.Holding", null)
+                        .WithMany()
+                        .HasForeignKey("HoldingId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividend_aliases_holdings_holding_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendBatch", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_batches_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.DividendSuggestion", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_suggestions_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.Dividend", null)
+                        .WithMany()
+                        .HasForeignKey("DividendId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_dividend_suggestions_dividends_dividend_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.LedgerEntry", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Domain.Portfolio.DividendSuggestion", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_dividend_suggestions_ledger_entries_id");
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -2949,6 +3999,38 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_holding_syncs_broker_accounts_account_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.LedgerEntry", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_entries_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.CostBatch", null)
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ledger_entries_cost_batches_batch_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.BrokerSyncRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_ledger_entries_broker_sync_runs_run_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Domain.Portfolio.SecurityAlias", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_security_aliases_broker_accounts_account_id");
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Portfolio.TradeBatch", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -2973,6 +4055,18 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("BatchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_transactions_trade_batches_batch_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.BrokerSyncRun", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_transactions_broker_sync_runs_run_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.BrokerSyncRun", null)
+                        .WithMany()
+                        .HasForeignKey("SupersededBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_transactions_broker_sync_runs_superseded_by");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Accounts.BrokerSecretRecord", b =>
@@ -3012,6 +4106,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_instrument_broker_ids_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Market.Live.LiveQuoteRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Market.InstrumentRecord", null)
+                        .WithOne()
+                        .HasForeignKey("XDrishti.Infrastructure.Market.Live.LiveQuoteRecord", "InstrumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_live_quotes_instruments_instrument_id");
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>

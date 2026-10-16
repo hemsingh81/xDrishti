@@ -10,11 +10,15 @@ using Serilog.Core;
 using Testcontainers.PostgreSql;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Platform;
+using XDrishti.Application;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Live.Push;
 using XDrishti.Domain.Market.Baskets;
+using XDrishti.Infrastructure;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Persistence;
@@ -79,6 +83,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Lets a test change the data "meanwhile", inside the trade use cases' unit of work (see <see cref="TradeHooks"/>).</summary>
     public TradeHooks TradeHooks { get; } = new();
 
+    /// <summary>Dhan's market-data socket: the live feed's engine (registered here as in the xd-feed host) connects to this one.</summary>
+    public FakeFeedSocket FeedSocket { get; } = new();
+
     /// <summary>Superuser (xd_owner) connection to the throw-away server, for tests that need their own database or roles.</summary>
     public string AdminConnectionString => _database.GetConnectionString();
 
@@ -107,6 +114,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Instruments:AutoRefresh:Enabled", "false"); // tests start refreshes themselves
         builder.UseSetting("Portfolio:AutoRefresh:Enabled", "false"); // tests drive the holdings schedule themselves
         builder.UseSetting("Data:Eod:Enabled", "false"); // first-start seed (ADR 0018): the end-of-day service starts paused; tests resume it and ask the scheduler themselves, with the clock pinned
+        builder.UseSetting("Portfolio:BrokerHistory:Enabled", "false"); // first-start seed (ADR 0018): the trades and ledger service starts paused; tests use Sync now or run it themselves
+        builder.UseSetting("Portfolio:BrokerHistory:CallSpacingMs", "0"); // no 250 ms between the calls to the fake Dhan
         builder.UseSetting("Data:CsvFolder", CsvFolder);
         builder.UseSetting("Auth:Owner:Email", OwnerEmail);
         builder.UseSetting("Auth:Owner:Name", OwnerName);
@@ -123,6 +132,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddHttpClient(BrokerHttpClientNames.DhanHoldings).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanChart).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
             services.AddHttpClient(BrokerHttpClientNames.DhanQuote).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
+            services.AddHttpClient(BrokerHttpClientNames.DhanHistory).ConfigurePrimaryHttpMessageHandler(Brokers.CreateHandler);
 
             // Same for the instrument master's two file servers and NSE's holiday list; refreshes are run by the tests, not by the background worker.
             services.AddHttpClient(MasterDataHttpClientNames.Dhan).ConfigurePrimaryHttpMessageHandler(MasterData.CreateHandler);
@@ -136,6 +146,21 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
             // The Dhan Data API source and the Data account: the real ones answer (over the fake Dhan server above) unless a test puts a fake in (FakeDhan).
             Dhan.Wrap(services);
+
+            // The live feed's adapters and engine run in the xd-feed host; here they run over the real database with the Dhan socket replaced, and the flush fast enough for a test to wait for.
+            services.AddLiveFeed();
+            services.AddFeedEngine();
+            services.AddSingleton(LiveFeedSettings.Default with { FlushInterval = TimeSpan.FromMilliseconds(200), SubscribeSpacing = TimeSpan.Zero });
+            services.AddSingleton<ILiveFeedConnector>(FeedSocket);
+
+            // The SignalR hub's push runs in this host (as in xd-api): its waits are shortened so that a test does not wait seconds for a push; the sweep stays at its 30 seconds, so a push in a test comes from a notification.
+            services.AddSingleton(PushSettings.Default with
+            {
+                MinPushInterval = TimeSpan.FromMilliseconds(100),
+                StatusPollInterval = TimeSpan.FromMilliseconds(200),
+                StatusRefreshInterval = TimeSpan.FromSeconds(2),
+                SessionCheckInterval = TimeSpan.FromMilliseconds(300),
+            });
 
             // The trade use cases read the applied corporate actions inside their unit of work: a test can act at that moment (TradeHooks).
             var reference = services.Single(d => d.ServiceType == typeof(ITradeReferenceData));
@@ -184,12 +209,24 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             await db.Database.ExecuteSqlRawAsync("""
                 DELETE FROM portfolio.price_alerts;
                 DELETE FROM portfolio.action_states;
+                DELETE FROM portfolio.dividend_suggestions;
+                DELETE FROM portfolio.dividends;
+                DELETE FROM portfolio.dividend_batches;
+                DELETE FROM portfolio.dividend_aliases;
+                DELETE FROM portfolio.ledger_entries;
+                DELETE FROM portfolio.cost_batches;
+                DELETE FROM portfolio.security_aliases;
                 DELETE FROM portfolio.transactions;
+                DELETE FROM portfolio.broker_sync_windows;
+                DELETE FROM portfolio.attention_items;
+                DELETE FROM portfolio.broker_sync_state;
+                DELETE FROM portfolio.broker_sync_runs;
                 DELETE FROM portfolio.trade_batches;
                 DELETE FROM portfolio.holding_lots;
                 DELETE FROM portfolio.holdings;
                 DELETE FROM portfolio.holding_syncs;
                 DELETE FROM accounts.account_events;
+                DELETE FROM accounts.report_client_codes;
                 UPDATE accounts.portfolio_settings SET default_bucket_id = NULL;
                 DELETE FROM accounts.portfolio_buckets;
                 DELETE FROM accounts.broker_accounts;
@@ -265,6 +302,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.baskets;
                 DELETE FROM market.tracked_instruments;
                 DELETE FROM accounts.account_events WHERE event LIKE 'Instruments%' OR event LIKE 'Basket%' OR event LIKE 'Calendar%' OR event LIKE 'CorporateAction%' OR event LIKE 'Service%' OR event = 'PortfolioBenchmarkChanged' OR event LIKE 'Action%' OR event LIKE 'PriceAlert%';
+                DELETE FROM market.live_quotes;
                 DELETE FROM market.instrument_broker_ids;
                 DELETE FROM market.instruments;
                 DELETE FROM market.master_refreshes;

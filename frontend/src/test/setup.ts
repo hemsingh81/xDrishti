@@ -1,9 +1,11 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
+import { setHubTransport } from '@/shared/realtime';
 import { installFakeIntersectionObserver } from './intersection';
 import { categoryStub, chartStub } from './chartStub';
 import { releasePending } from './gate';
 import { server } from './server';
+import { pinNow, unpinClock } from './pinClock';
 
 // Flows such as "save → password dialog → retry → toast" pass through several MUI transitions; under the parallel
 // full suite they can take longer than the 1 s default, so async queries (findBy*, waitFor) wait up to 5 s.
@@ -50,10 +52,33 @@ beforeAll(() => {
     }
   };
 });
+// Diagnostic (npm run test:clock): XD_TEST_NOW shifts `Date` for every test; the default is the real clock. A test that fakes
+// timers itself keeps control of them, but starts them at that instant unless it gives its own `now`.
+const shiftedNow = (import.meta.env as Record<string, string | undefined>).XD_TEST_NOW;
+if (shiftedNow) {
+  if (Number.isNaN(Date.parse(shiftedNow))) throw new Error(`XD_TEST_NOW is not an ISO instant: ${shiftedNow}`);
+  const fakeTimersOf = vi.useFakeTimers.bind(vi);
+  vi.useFakeTimers = (config) => fakeTimersOf({ now: new Date(shiftedNow), ...config });
+}
+beforeEach(() => {
+  if (shiftedNow) pinNow(shiftedNow);
+});
+afterEach(() => {
+  unpinClock(); // whatever a test pinned (pinClock, setNow) or faked is not for the next one
+});
+
+// The live hub: unless a test installs its own (see hubFake.ts), a connection never completes, which for the screens is the
+// same as having no hub (they read once a minute, as before it existed).
+beforeEach(() => {
+  setHubTransport(() => new Promise(() => undefined));
+});
 afterEach(async () => {
   // Answer what a test left hanging while the screen is still there (see gate.ts), then take the screen down.
   await releasePending();
   cleanup();
+  // What a test left in the browser's storage (the bell's read state, the pop-ups that were shown) is not for the next one.
+  window.localStorage.clear();
+  setHubTransport();
   if (escaped.length > 0) {
     throw new Error(`A request escaped the network mock and reached the real network: ${escaped.splice(0).join(', ')}`);
   }

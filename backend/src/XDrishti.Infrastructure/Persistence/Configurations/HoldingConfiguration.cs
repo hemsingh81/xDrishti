@@ -13,7 +13,7 @@ internal sealed class HoldingConfiguration : IEntityTypeConfiguration<Holding>
         {
             t.HasCheckConstraint("ck_holdings_status", "status IN ('open', 'closed')");
             t.HasCheckConstraint("ck_holdings_qty", "qty >= 0");
-            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote')");
+            t.HasCheckConstraint("ck_holdings_last_price_source", "last_price_source IN ('sync', 'quote', 'live')");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();
@@ -34,8 +34,9 @@ internal sealed class HoldingConfiguration : IEntityTypeConfiguration<Holding>
         builder.Property(x => x.LastPrice).HasPrecision(18, 4).IsRequired();
         builder.Property(x => x.LastPriceAt);
 
-        // The latest quote only (ADR 0019): the previous session's close and where the last price came from.
+        // The latest price only (ADR 0019, ADR 0024): the previous session's close and where the last price came from (sync, quote or live).
         builder.Property(x => x.PreviousClose).HasPrecision(18, 4);
+        builder.Property(x => x.PreviousCloseAt);
         builder.Property(x => x.LastPriceSource).HasConversion(EnumConversions.Lowercase<PriceSource>()).HasMaxLength(8).IsRequired().HasDefaultValue(PriceSource.Sync);
         builder.Property(x => x.Status).HasConversion(EnumConversions.Lowercase<HoldingStatus>()).HasMaxLength(8).IsRequired();
         builder.Property(x => x.FirstSeenAt).IsRequired();

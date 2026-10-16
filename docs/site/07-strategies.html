@@ -229,11 +229,11 @@ high/low) · <code>VWAP_PULLBACK</code> · <code>VWAP_RECLAIM</code> · <code>EM
 </tr>
 <tr>
 <td>Market context</td>
-<td>Index trend/ADX, VIX level/percentile/change, breadth</td>
+<td>Index trend/ADX, VIX level/percentile/change, breadth — <strong>built in P3-01c</strong> as the features <code>index_trend</code>, <code>index_adx</code>, <code>index_vol_pct</code>, <code>vix</code>, <code>vix_pct</code>, <code>vix_chg</code>, <code>breadth</code>, <code>regime_trend</code>, <code>regime_vol</code>, <code>regime</code>: daily, as of the previous session (<a href="11-strategy-lab.html">doc 11</a> §2, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>); the computation of breadth and <code>sector_rs</code> follow in P3-01d</td>
 </tr>
 <tr>
 <td>Calendar</td>
-<td>Weekday, time of day, expiry day/week, pre/post holiday, days to results</td>
+<td>Weekday, time of day, expiry day/week, pre/post holiday, days to results — <code>day_of_week</code> and <code>is_expiry_day</code> (the dates are passed in by the caller) are built; the rest follow</td>
 </tr>
 <tr>
 <td>Plan geometry</td>
@@ -243,6 +243,59 @@ high/low) · <code>VWAP_PULLBACK</code> · <code>VWAP_RECLAIM</code> · <code>EM
 <h2 id="6-market-regime">6. Market regime<a class="hash" href="#6-market-regime" aria-label="Link to this section">#</a></h2>
 <p>Daily label from index data: <strong>trend</strong> (UP / DOWN / RANGE via DMA slope + ADX) × <strong>volatility</strong> (LOW /
 NORMAL / HIGH via VIX and ATR percentiles) → up to 9 regimes. Used to condition statistics and as a feature.</p>
+<p><strong>As built (P3-01c, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>).</strong> The label of a day is computed from the regime index (Nifty 50 by default) and the VIX, from that day and
+earlier days only, and it is read <strong>as of the previous session</strong>: every minute of a date <em>D</em> sees the label of the latest day strictly before <em>D</em>, so the regime never contains the close of the day being traded and a
+back-test cannot look ahead through it. The numbers are <code>ContextOptions</code> (defaults below; later trading configuration in the database, <a href="../adr/0002-config-and-strategies-in-app.html">ADR 0002</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Rule</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Trend</td>
+<td><strong>UP (+1)</strong> when the index close is above its 50-day average, the average is higher than 5 days ago and ADX(14) ≥ 20; <strong>DOWN (−1)</strong> for the mirror image (close below the average, the average lower, ADX ≥ 20); otherwise <strong>RANGE (0)</strong>. Ready from day 55</td>
+</tr>
+<tr>
+<td>Volatility</td>
+<td>score = the mean of two percentile ranks over the last 252 days — the VIX close and the index&#39;s ATR(14) as a percent of its close (ties take the middle of their span: <code>100 × (#below + 0.5 × #equal) / 252</code>). <strong>LOW (0)</strong> below 100/3 (33.33…), <strong>HIGH (2)</strong> from 200/3 (66.67…), <strong>NORMAL (1)</strong> in between. When the VIX percentile is not ready (a day without a VIX, or fewer than 252 VIX days) the index percentile alone is the score. Ready from day 265. <em>Pending owner confirmation, ADR 0033 Amendments 1 and 2 (the VIX window and the fallback) and 13 (the exact thirds; the owner&#39;s wording was 33.3 and 66.7).</em></td>
+</tr>
+<tr>
+<td>Code</td>
+<td><code>regime = (1 − trend) × 3 + volatility + 1</code></td>
+</tr>
+</tbody></table>
+<table>
+<thead>
+<tr>
+<th>Trend ↓ / volatility →</th>
+<th align="right">LOW</th>
+<th align="right">NORMAL</th>
+<th align="right">HIGH</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>UP</td>
+<td align="right">1 <code>UP_LOW_VOL</code></td>
+<td align="right">2 <code>UP_NORMAL_VOL</code></td>
+<td align="right">3 <code>UP_HIGH_VOL</code></td>
+</tr>
+<tr>
+<td>RANGE</td>
+<td align="right">4 <code>RANGE_LOW_VOL</code></td>
+<td align="right">5 <code>RANGE_NORMAL_VOL</code></td>
+<td align="right">6 <code>RANGE_HIGH_VOL</code></td>
+</tr>
+<tr>
+<td>DOWN</td>
+<td align="right">7 <code>DOWN_LOW_VOL</code></td>
+<td align="right">8 <code>DOWN_NORMAL_VOL</code></td>
+<td align="right">9 <code>DOWN_HIGH_VOL</code></td>
+</tr>
+</tbody></table>
+<p>Breadth is carried next to the regime (feature <code>breadth</code>) but is not part of it; it feeds the market gate (<a href="09-learning-engine.html">doc 09</a>, P7). One regime index and the VIX only: Bank Nifty and the sector indices are not
+part of the regime. The configuration inputs are in <a href="16-configuration.html">doc 16</a>.</p>
 <h2 id="7-side-specifics">7. Side specifics<a class="hash" href="#7-side-specifics" aria-label="Link to this section">#</a></h2>
 <ul>
 <li>BUY and SELL are learned separately (different speed, stops, regimes).</li>
@@ -255,7 +308,7 @@ NORMAL / HIGH via VIX and ATR percentiles) → up to 9 regimes. Used to conditio
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-13 17:50</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-16 16:11</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

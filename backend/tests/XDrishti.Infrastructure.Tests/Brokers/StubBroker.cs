@@ -17,7 +17,7 @@ internal sealed class StubBroker : HttpMessageHandler, IHttpClientFactory
     public HttpClient CreateClient(string name)
     {
         var client = new HttpClient(new BrokerEndpointGuard { InnerHandler = this }, disposeHandler: false);
-        if (name == BrokerHttpClientNames.DhanHoldings)
+        if (name is BrokerHttpClientNames.DhanHoldings or BrokerHttpClientNames.DhanHistory)
         {
             BrokerHttp.ConfigureHoldings(client);
         }

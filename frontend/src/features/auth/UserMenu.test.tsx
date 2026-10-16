@@ -1,8 +1,8 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildSession } from '@/test/fixtures';
-import { renderWithProviders } from '@/test/render';
+import { renderRoutes, renderWithProviders } from '@/test/render';
 import { server } from '@/test/server';
 import { UserMenu } from './index';
 
@@ -33,5 +33,41 @@ describe('User menu', () => {
     const menu = await screen.findByRole('menu', { name: 'Account' });
     expect(within(menu).getByText('example@invalid.test')).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument();
+  });
+
+  it('lists My account above Sign out and opens the account page from it', async () => {
+    const { router } = renderRoutes([
+      { path: '/', element: <UserMenu /> },
+      { path: '/account', element: <h1>Account page</h1> },
+    ]);
+    await userEvent.click(await screen.findByRole('button', { name: /^Account menu/ }));
+    const menu = await screen.findByRole('menu', { name: 'Account' });
+    expect(
+      within(menu)
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent),
+    ).toEqual(['My account', 'Sign out']);
+
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'My account' }));
+
+    expect(await screen.findByRole('heading', { name: 'Account page' })).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/account');
+  });
+
+  it('is operable with the keyboard alone', async () => {
+    const { router } = renderRoutes([
+      { path: '/', element: <UserMenu /> },
+      { path: '/account', element: <h1>Account page</h1> },
+    ]);
+    await screen.findByRole('button', { name: /^Account menu/ });
+    await userEvent.tab();
+    await userEvent.keyboard('{Enter}');
+    const first = await screen.findByRole('menuitem', { name: 'My account' });
+    await waitFor(() => {
+      expect(first).toHaveFocus();
+    });
+    await userEvent.keyboard('{Enter}');
+
+    expect(router.state.location.pathname).toBe('/account');
   });
 });

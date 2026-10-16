@@ -16,8 +16,14 @@ export function useServiceActions() {
     busyId,
     runNow: (service: ServiceView) => {
       run.mutate(service.id, {
-        onSuccess: () => {
-          notify(`${service.name} started.`, 'info');
+        onSuccess: (started) => {
+          // a service that another process runs (the live feed) only has the request accepted: its run record comes from that process
+          notify(
+            started.status === 'queued'
+              ? 'Requested — the live feed opens its run within 15 seconds.'
+              : `${service.name} started.`,
+            'info',
+          );
         },
         onError: (error) => {
           notify(

@@ -2,10 +2,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { buildAccountDetail, buildPortfolioSaved, ids } from '@/test/fixtures';
+import { pinClock } from '@/test/pinClock';
 import { renderRoutes } from '@/test/render';
 import { createStepUpGate, problemResponse, server } from '@/test/server';
 import { AccountsPage } from './components/AccountsPage';
 import { istDayIso } from '@/shared/lib/format';
+
+// The warning window of the key expiry is read against today, and the dates of the keys that expire are built from it: the clock is pinned.
+pinClock('2026-10-14T06:00:00Z');
 
 const addDays = (iso: string, days: number) =>
   new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
@@ -31,7 +35,7 @@ describe('Connection tab', () => {
     expect(within(section).getByText('TEST••90')).toBeInTheDocument();
     expect(within(section).getByText('API key: set · updated 9 Oct 2026')).toBeInTheDocument();
     expect(within(section).getByText('API secret: set · updated 9 Oct 2026')).toBeInTheDocument();
-    expect(within(section).getByText('API key valid until 9 Oct 2027')).toBeInTheDocument();
+    expect(within(section).getByText('API key valid until 31 Dec 2099')).toBeInTheDocument();
     expect(within(section).queryByText(/Expires in/)).not.toBeInTheDocument();
   });
 

@@ -11,6 +11,9 @@ public interface ITradeReferenceData
     /// <summary>The NSE shares and ETFs of the master (retired ones too) with one of these ISINs or tickers. Ticker matches are upper case without <c>NSE:</c>.</summary>
     ValueTask<IReadOnlyList<TradeInstrument>> FindInstrumentsAsync(IReadOnlyCollection<string> isins, IReadOnlyCollection<string> symbols, CancellationToken cancellationToken);
 
+    /// <summary>The NSE shares and ETFs of the master (retired ones too) that carry one of these Dhan security ids in the NSE equity segment, by security id. Ids without an instrument are absent.</summary>
+    ValueTask<IReadOnlyDictionary<string, TradeInstrument>> FindInstrumentsByDhanIdsAsync(IReadOnlyCollection<string> securityIds, CancellationToken cancellationToken);
+
     /// <summary>The applied (not suggested, not ignored) corporate actions of each instrument, by ex-date ascending; instruments without any are absent.</summary>
     ValueTask<IReadOnlyDictionary<Guid, IReadOnlyList<AppliedAction>>> ListAppliedActionsAsync(IReadOnlyCollection<Guid> instrumentIds, CancellationToken cancellationToken);
 }

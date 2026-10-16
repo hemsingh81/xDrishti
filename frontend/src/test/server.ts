@@ -23,6 +23,8 @@ import {
   buildSystemStatus,
   summaryOf,
 } from './fixtures';
+import { brokerHistoryHandlers } from './brokerHistoryFixtures';
+import { dividendHandlers } from './dividendFixtures';
 import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
@@ -103,10 +105,16 @@ export const handlers = [
   ...actionCenterHandlers,
   // Trades (P2-03): no imports and no trades of a holding by default; the trade fake brings stateful ones.
   ...tradeHandlers,
+  // Dhan trade history and ledger (P2-13): both read, nothing running, an empty ledger.
+  ...brokerHistoryHandlers,
+  // Dividends (P2-14): none entered and none suggested by default; the dividend fake brings stateful ones.
+  ...dividendHandlers,
   // Services the Portfolio screen reads: the quote service in the list, and the trading-day timeline. The Services
   // fake replaces both when a test needs them to change.
   http.get('/api/services', () => HttpResponse.json({ items: sampleServicesWithQuotes() })),
   http.get('/api/services/timeline', () => HttpResponse.json(buildTimeline())),
+  // The live feed's state over REST (the Portfolio screen reads it while the live hub is not connected).
+  http.get('/api/live/status', () => HttpResponse.json({ state: 'not_running', subscribed: 0, lastTickAt: null })),
   // Data notices (bell): none by default; the Data fake and the bell tests bring their own.
   http.get('/api/data/notices', () => HttpResponse.json({ items: [] })),
   // Service notices (bell): none by default; the Services fake and the bell tests bring their own.

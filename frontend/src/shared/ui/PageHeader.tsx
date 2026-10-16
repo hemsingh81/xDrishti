@@ -1,7 +1,7 @@
 import { Box, Stack, Typography } from '@mui/material';
 import type { SvgIconComponent } from '@mui/icons-material';
 import type { ReactNode } from 'react';
-import type { IconHueName } from '@/theme';
+import { rem, type IconHueName } from '@/theme';
 import { IconChip } from './IconChip';
 
 interface PageHeaderProps {
@@ -20,13 +20,15 @@ export function PageHeader({ title, description, actions, icon, hue, dense = fal
   return (
     <Stack
       direction={{ xs: 'column', sm: 'row' }}
-      spacing={2}
-      sx={{ mb: dense ? 2 : 3, justifyContent: 'space-between', alignItems: { sm: 'flex-end' } }}
+      // The prototype's `.page-head`: 14 px between title block and actions, 18 px below.
+      sx={{ gap: '14px', mb: dense ? '14px' : '18px', justifyContent: 'space-between', alignItems: { sm: 'flex-end' } }}
     >
       <Box>
-        <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <Stack direction="row" sx={{ gap: '12px', alignItems: 'center' }}>
           {icon && hue && <IconChip icon={icon} hue={hue} size="sm" />}
-          <Typography variant="h1">{title}</Typography>
+          <Typography variant="h1" sx={{ fontSize: { xs: rem(19), sm: rem(20), md: rem(24) } }}>
+            {title}
+          </Typography>
         </Stack>
         {description && (
           // The shell is full width; a description keeps a readable line length of its own.
@@ -36,7 +38,7 @@ export function PageHeader({ title, description, actions, icon, hue, dense = fal
         )}
       </Box>
       {actions && (
-        <Stack direction="row" sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+        <Stack direction="row" sx={{ alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
           {actions}
         </Stack>
       )}

@@ -11,3 +11,5 @@ export { connectAuth } from './lib/connectAuth';
 
 /** Loaded on demand (route-level code splitting); render inside <Suspense>. */
 export const LoginPage = lazy(async () => ({ default: (await import('./components/LoginPage')).LoginPage }));
+
+export const AccountPage = lazy(async () => ({ default: (await import('./components/AccountPage')).AccountPage }));

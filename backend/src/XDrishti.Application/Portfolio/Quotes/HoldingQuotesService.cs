@@ -6,7 +6,9 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Domain.Platform.Services;
+using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Application.Portfolio.Quotes;
 
@@ -18,7 +20,8 @@ namespace XDrishti.Application.Portfolio.Quotes;
 /// message and changes no price (the next tick tries again — retries are 0). <b>When</b> it runs is the scheduler's: by default every 5 minutes from 09:15 to 15:30 on trading days (the last run is the closing price);
 /// Run now works at any time. <b>Price alerts</b> (ADR 0022): the securities of the active alerts join the same request (still at most 1,000 per call); after the holdings are updated, every alert whose condition holds on the quoted last price is triggered
 /// (once, in the transaction of its audit event; an alert without a quote stays active; a failed run triggers nothing) and the message adds "N alerts triggered"; then the Action center's done decisions whose condition ended are cleared.
-/// Nothing secret is logged or put into a message.
+/// <b>A poll that fails because Dhan did not answer or limited the rate is tried again by the next poll and is not shown</b> (ADR 0027): the run is recorded as skipped with the reason, the failure is counted against the Data account's health, and only when
+/// the polls have failed on <see cref="IHealSettings.PersistDays"/> days in a row does the run fail (the bell's failed-service notice). A refused token needs the owner and fails the run at once. Nothing secret is logged or put into a message.
 /// </summary>
 public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvider clock, ILogger<HoldingQuotesService> logger) : IScheduledService
 {
@@ -100,7 +103,7 @@ public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvid
         {
             // A failed run changes no price and triggers no alert.
             HoldingQuotesLog.Failed(logger, failure.Kind.ToString().ToLowerInvariant(), result.Requests);
-            return ServiceOutcome.Failed(failure.Message);
+            return await FailedAsync(services, account.AccountId, failure, cancellationToken);
         }
 
         var quotes = result.Quotes
@@ -123,8 +126,34 @@ public sealed class HoldingQuotesService(IServiceScopeFactory scopes, TimeProvid
         // The alerts are checked against the same answer, after the holdings were updated; then the done decisions whose condition the new prices ended are cleared.
         var triggered = await alerts.CheckAsync(active, quotes.ToDictionary(q => q.InstrumentId, q => q.LastPrice), at, cancellationToken);
         await services.GetRequiredService<ActionReconciler>().ReconcileAsync("quotes", cancellationToken);
+        if (account.AccountId is { } healthy)
+        {
+            await services.GetRequiredService<SyncHealthRecorder>().SucceededAsync(healthy, SyncHealthKind.Quotes, cancellationToken);
+        }
+
         var message = targets.OpenSecurities == 0 ? NoHoldingsMessage : Describe(heldQuotes.Count, targets.OpenSecurities, notOnNse, withoutQuote);
         return ServiceOutcome.Succeeded(triggered > 0 ? message + "; " + DescribeTriggered(triggered) : message);
+    }
+
+    /// <summary>
+    /// A failed request: counted against the Data account. One Dhan did not answer or limited (it passes) is a skipped run until the polls have failed on enough days in a row; a refused token is a failed run at once.
+    /// </summary>
+    private static async ValueTask<ServiceOutcome> FailedAsync(IServiceProvider services, Guid? accountId, QuoteFailure failure, CancellationToken cancellationToken)
+    {
+        var reason = SyncFailures.OfQuote(failure.Kind);
+        if (accountId is not { } id)
+        {
+            return ServiceOutcome.Failed(failure.Message);
+        }
+
+        await services.GetRequiredService<SyncHealthRecorder>().FailedAsync(id, SyncHealthKind.Quotes, reason, cancellationToken);
+        if (!SyncFailures.IsTransient(reason))
+        {
+            return ServiceOutcome.Failed(failure.Message);
+        }
+
+        var health = await services.GetRequiredService<ISyncHealthStore>().GetAsync(id, SyncHealthKind.Quotes, cancellationToken);
+        return health.ConsecutiveFailedDays >= services.GetRequiredService<IHealSettings>().PersistDays ? ServiceOutcome.Failed(failure.Message) : ServiceOutcome.Skipped(failure.Message);
     }
 
     /// <summary>"1 alert triggered" · "3 alerts triggered".</summary>

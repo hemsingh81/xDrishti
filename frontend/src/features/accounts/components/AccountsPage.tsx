@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { accountsQuery } from '../api/accountsQueries';
 import { parseTab, type AccountTab } from '../lib/tabs';
 import { AccountsBanner } from './AccountsBanner';
@@ -49,7 +48,7 @@ export function AccountsPage() {
   };
 
   return (
-    <ToastProvider>
+    <>
       <ConnectReturn />
       <PageHeader
         title="Accounts"
@@ -120,6 +119,6 @@ export function AccountsPage() {
           )}
         </>
       )}
-    </ToastProvider>
+    </>
   );
 }

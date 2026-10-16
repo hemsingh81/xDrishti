@@ -85,6 +85,9 @@ describe('deriveServiceNotifications', () => {
       text: 'End-of-day data run failed: Dhan refused the access token.',
       href: '/services',
       at: Date.parse('2026-10-12T15:51:00+05:30'),
+      title: null,
+      actions: [],
+      resolved: false,
     });
   });
 

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Heal;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Portfolio;
@@ -17,10 +18,10 @@ internal sealed record SyncRunOutcome<TResult>(Guid RunId, TResult Value);
 /// time), fetches Dhan's holdings, applies them in one database transaction together with the run's end, and records a failure on the run without
 /// touching any holding. A run that fails leaves the data exactly as it was.
 /// </summary>
-internal sealed class SyncRuns(IHoldingSyncStore syncs, IPortfolioUnitOfWork unitOfWork, TimeProvider clock, ILogger<SyncRuns> logger)
+internal sealed class SyncRuns(IHoldingSyncStore syncs, IPortfolioUnitOfWork unitOfWork, SyncHealthRecorder health, TimeProvider clock, ILogger<SyncRuns> logger)
 {
     /// <summary>A run that has been "running" this long was interrupted (Dhan's timeout is 30 seconds).</summary>
-    public static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(10);
+    public static readonly TimeSpan StaleAfter = SyncLimits.HoldingsStaleAfter;
 
     private const string Interrupted = "The sync was interrupted because the application is stopping.";
 
@@ -74,11 +75,13 @@ internal sealed class SyncRuns(IHoldingSyncStore syncs, IPortfolioUnitOfWork uni
 
             var counts = applied!.Counts;
             PortfolioLog.SyncSucceeded(logger, run.Id, counts.Added, counts.Increased, counts.Decreased, counts.Closed, counts.Unchanged);
+            await health.SucceededAsync(account.Id, SyncHealthKind.Holdings, cancellationToken);
             return Result.Success(new SyncRunOutcome<TResult>(run.Id, applied.Value));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             await syncs.CompleteAsync(run.Id, SyncStatus.Failed, SyncCounts.None, Interrupted, clock.GetUtcNow(), CancellationToken.None);
+            await health.FailedAsync(account.Id, SyncHealthKind.Holdings, SyncFailures.Interrupted, CancellationToken.None);
             throw;
         }
 #pragma warning disable CA1031 // any failure must end the run record as failed (and leave every holding untouched), never leave it running
@@ -114,6 +117,7 @@ internal sealed class SyncRuns(IHoldingSyncStore syncs, IPortfolioUnitOfWork uni
     {
         PortfolioLog.SyncFailed(logger, run.Id, error.Code);
         await syncs.CompleteAsync(run.Id, SyncStatus.Failed, SyncCounts.None, error.Message, clock.GetUtcNow(), CancellationToken.None);
+        await health.FailedAsync(run.AccountId, SyncHealthKind.Holdings, SyncFailures.Of(error), CancellationToken.None);
         return Result.Failure<SyncRunOutcome<TResult>>(error);
     }
 }

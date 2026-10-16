@@ -1,14 +1,14 @@
 import { Box } from '@mui/material';
 
 /** xDrishti logo: an eye (drishti = vision). */
-export function BrandMark({ size = 32 }: { size?: number }) {
+export function BrandMark({ size = 30 }: { size?: number }) {
   return (
     <Box
       aria-hidden
       sx={{
         width: size,
         height: size,
-        borderRadius: 2,
+        borderRadius: `${Math.round(size * 0.3)}px`,
         bgcolor: 'primary.main',
         color: 'primary.contrastText',
         display: 'grid',

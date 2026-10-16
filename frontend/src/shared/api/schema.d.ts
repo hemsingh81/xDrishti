@@ -89,6 +89,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auth/account': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The signed-in owner's e-mail, display name and password change time */
+    get: operations['GetOwnerAccount'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/change-password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Change the password (current password required); signs out every other session */
+    post: operations['ChangePassword'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/profile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Change the display name and sign-in e-mail (needs a recent step-up) */
+    put: operations['UpdateProfile'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/auth/verify': {
     parameters: {
       query?: never;
@@ -701,7 +752,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync or quote) */
+    /** Holdings with lots summary, profit/loss, XIRR and day change: accountId, bucketId, status (open default, closed, all), q (symbol, name, ISIN), sort (symbol, name, qty, avgCost, lastPrice, invested, value, pnl, pnlPct, xirr, dividends, dayChange, dayChangePct, acquiredOn, bucket, account; prefix - for descending; rows without a value last), page, pageSize (max 100), groupBy (account, bucket, sector, basket) with groupKey (account id, bucket id, sector name, basket id, or ~none for Unclassified / No basket) to list one group's holdings; an unknown key gives an empty page. With groupBy and no accountId only accounts that count in totals are listed (includeInTotals), like the groups and the summary, while the list without groupBy includes the others too. Each row has previousClose, dayChange (rupees), dayChangePct (percent), priceAt and priceSource (sync, quote or live) and income (null when the holding has no dividend and no trade charge recorded): dividends, charges (trade charges), totalReturnPct = (realised + unrealised + dividends) over invested, netTotalReturnPct (minus the charges), netXirr with netXirrState, and the dates coverageFrom, dividendsFrom and chargesFrom the figures are known from */
     get: operations['ListHoldings'];
     put?: never;
     post?: never;
@@ -718,7 +769,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync */
+    /** Totals of the holdings of an account or bucket (all accounts that count in totals when neither is given): invested, value, P&L, XIRR, day change (dayChange, dayChangePct, dayChangeExcluded: open holdings left out for lack of a previous close), counts, lots on the default date, pricesAsOf (oldest and newest price time), last sync. income (null when nothing is recorded): dividends, charges, unallocated (dividends of no holding), totalReturnPct, netTotalReturnPct, netXirr and netXirrState, coverageFrom / dividendsFrom / chargesFrom; for the portfolio or an account (no bucket) it includes the dividends of no holding and the ledger's costs, for a bucket only its holdings'. benchmarkXirr and alpha stay price returns, before dividends and charges */
     get: operations['GetHoldingsSummary'];
     put?: never;
     post?: never;
@@ -735,7 +786,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0) */
+    /** The holdings grouped by account, bucket, sector or basket (by): per group holdings, unpriced, invested, value, P&L (rupees and percent), realised, XIRR (from the union of the group's cash flows) and xirrState, day change, dayChangeExcluded and weightPct (share of the scope's total value), plus the scope total; additive is false for baskets (a holding is in every live basket that holds it, or in No basket; groups overlap). Filters: accountId, bucketId, status (open default, closed, all), q; sort (value, invested, pnl, pnlPct, xirr, dividends, dayChange, name; prefix - for descending; default largest value first; groups without a value last; at most 200 groups). stackBy (account when by=sector, sector when by=account) adds parts[{key, name, value}] to each group. Group keys: account id, bucket id, sector name, basket id, ~none for Unclassified / No basket (a master sector spelled ~none counts as Unclassified). Without accountId only accounts that count in totals (includeInTotals) are in the groups, the total and the children, unlike the flat holdings list which includes the others; an unknown accountId gives 200 with no groups (not 404 as for the summary); more than 200 groups are cut off without a flag, the total still covers the whole scope. A group of only unpriced holdings, and a total of only unpriced holdings, have null value, pnl, pnlPct, xirr and xirrState no_price (the summary shows value 0). Each group and the total have income (null when nothing is recorded; see the summary): a group by account also holds the account's dividends of no holding and its ledger costs; the dividends and costs of no group are in the total and in an extra last group with the key ~unallocated (name Unallocated, no holdings, no value, xirrState no_data) - only when no bucket and no q narrows the scope */
     get: operations['GetHoldingGroups'];
     put?: never;
     post?: never;
@@ -820,7 +871,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The account's refresh settings (mode, daily time, first import date, hasHoldings), the next scheduled run and the latest sync run */
+    /** The account's refresh settings (mode, daily time, first import date, hasHoldings), the next scheduled run and the latest sync run, and its health (ADR 0027): consecutiveFailedDays (days in a row whose last attempt failed; 0 when the latest succeeded), lastFailureReason (unavailable, rate_limited, interrupted, rejected, token_expired, token_refused, not_connected, data_changed, unexpected; null while healthy), attempts (failed attempts of the day of the latest failure) and retryAt (when the next quiet retry is due; null when none is pending - a failure that may pass is retried after 1, 5 and 15 minutes inside the day and nothing is shown while retries remain) */
     get: operations['GetAccountHoldingsSyncStatus'];
     put?: never;
     post?: never;
@@ -1556,7 +1607,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only */
+    /** Run now (trigger manual), also for a paused service. 202 with the run, which goes on in the background (for the end-of-day run its dataJobId links the data job whose progress /api/data/jobs/{id} shows). For the live feed, which another container runs, nothing starts here: the request is audited, the manual-run marker is written (Live:ManualRunMinutes, default 30) and the answer is a run with status queued and an empty id (the feed opens its run record within 15 seconds). Audited. 409 services.already_running when it runs (a skipped run is recorded), 404 services.not_found, 409 services.read_only */
     post: operations['RunServiceNow'];
     delete?: never;
     options?: never;
@@ -1674,7 +1725,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What the owner should know about the portfolio, for the notification bell: price_alert_triggered (warn; one per alert, id portfolio:alert:{alertId}, listed for 7 days after it triggered; carries alertId and instrumentId) and actions_need_decision (info; "N holdings need a decision" when the accounts that count in totals have open Action-center items; id portfolio:actions:{India date}, so it is raised again at most once a day) */
+    /** What the owner should know about the portfolio, for the notification bell. Every item has id, kind, severity, text, at, title, actions (at most two: {label, kind route|command, target}), since and resolved; alertId, instrumentId and accountId are set where they apply. Kinds: price_alert_triggered (warn; one per alert, id portfolio:alert:{alertId}, listed for 7 days after it triggered) and actions_need_decision (info; "N holdings need a decision" when the accounts that count in totals have open Action-center items; id portfolio:actions:{India date}, so it is raised again at most once a day) and, since ADR 0027, the attention items derived from the state of the accounts and syncs: reconnect_dhan (the Dhan login is missing, expired or about to expire), sync_failing (holdings, trades, ledger or prices failing on 2 days in a row, or at once when only the owner can fix it; never while a quiet retry is still to come), holdings_need_review (hand-dated lots), trades_unexplained (a quantity the trades do not explain once earlier history cannot help), dividends_pending (ledger credits that look like dividends) and securities_unmatched (no instrument-master match). Their severity is error, warning or info (the older kinds say warn/info), their id includes the situation (a changed situation is a new item), and a route action's target is an in-app path while a command action's target is an existing endpoint as METHOD /api/path. An item whose condition stopped holding stays for 24 hours with resolved true and is then dropped; resolved items are not counted in the badge. Order: unresolved before resolved, error, warning, info, newest first. This read remembers the items it derives (a set-based write; nothing is deleted) */
     get: operations['GetPortfolioNotices'];
     put?: never;
     post?: never;
@@ -1745,7 +1796,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Read a tradebook against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows). Returns the file (rows, parsed, skipped by reason, bad rows with line and reason - at most 200 listed, badTotal counts all -, duplicates, alreadyImported, newTrades), the securities - every held or master-listed one and at most 200 unmatched ones; securitiesTotal counts all, unmatchedListed the unmatched listed - (symbol, isin, matched, holdingId, trades, buys, sells, first and last trade date and the rebuild: status ok | unchanged | quantity_mismatch | no_holding | ambiguous, reason, lotsBefore, lotsAfter, handDatedLotsReplaced, syncLotsReplaced, realisedPnl, adjustedFor, q, net, openingQty {before, after}, openCostAfter, brokerCost, costDelta, costNote, digest), notHeld and unmatched {securities, trades} and the overall digest. 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off */
+    /** Read a tradebook against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows). Returns the file (rows, parsed, skipped by reason, bad rows with line and reason - at most 200 listed, badTotal counts all -, duplicates, alreadyImported, newTrades), the securities - every held or master-listed one and at most 200 unmatched ones; securitiesTotal counts all, unmatchedListed the unmatched listed - (symbol, isin, matched, holdingId, trades, buys, sells, first and last trade date and the rebuild: status ok | unchanged | quantity_mismatch | no_holding | ambiguous, reason, lotsBefore, lotsAfter, handDatedLotsReplaced, syncLotsReplaced, realisedPnl, adjustedFor, q, net, openingQty {before, after}, openCostAfter, brokerCost, costDelta, costNote, digest), notHeld and unmatched {securities, trades} and the overall digest. 400 portfolio.wrong_file_kind (extension detected: dividends for a dividend payout list - import it as dividends -, tradebook_without_sides for a tradebook with no buy/sell column); 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off */
     post: operations['PreviewTradeImport'];
     delete?: never;
     options?: never;
@@ -1762,7 +1813,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Import a tradebook: body multipart/form-data with accountId, file, rebuild (true | false, default true) and digest (required with rebuild: the digest of the preview). Stores the trades the account does not have yet as one batch (a trade id of the file together with the trade date - exchanges number trades per day -, else a hash of the line, is the identity: the same file again stores nothing and makes no batch) and, with rebuild, replaces the lots of every holding whose result is ok by lots built from the real buy and sell dates. Trades of securities not held, of mismatching or ambiguous holdings are stored and not applied. 409 portfolio.preview_stale when holdings, lots, corporate actions or trades changed since the preview (extension report: the fresh preview; nothing applied); 409 portfolio.sync_running while the account's holdings sync runs; 400 portfolio.invalid; 404 portfolio.not_found. Audited with counts only */
+    /** Import a tradebook: body multipart/form-data with accountId, file, rebuild (true | false, default true) and digest (required with rebuild: the digest of the preview). Stores the trades the account does not have yet as one batch (a trade id of the file together with the trade date - exchanges number trades per day -, else a hash of the line, is the identity: the same file again stores nothing and makes no batch) and, with rebuild, replaces the lots of every holding whose result is ok by lots built from the real buy and sell dates. Trades of securities not held, of mismatching or ambiguous holdings are stored and not applied. 409 portfolio.preview_stale when holdings, lots, corporate actions or trades changed since the preview (extension report: the fresh preview; nothing applied); 409 portfolio.sync_running while a holdings sync or a trades run of the account runs (a ledger-only run does not block it); 400 portfolio.wrong_file_kind (extension detected: dividends | tradebook_without_sides, as for the preview); 400 portfolio.invalid; 404 portfolio.not_found. Audited with counts only */
     post: operations['ImportTrades'];
     delete?: never;
     options?: never;
@@ -1830,7 +1881,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Undo an import: voids its trades (nothing is deleted) and rebuilds from the remaining trades the lots of the affected holdings whose lots came from trades - with none left, one lot of the broker's quantity and cost dated by the first import date, flagged default. LIMITATION: an undo cannot bring back lots the owner dated by hand or a sync added that an earlier rebuild replaced; handDatedLotsReplaced and syncLotsReplaced say how many the rebuild removes (the lots of holdings it rebuilds). Holdings whose lots did not come from trades keep their lots; holdings that cannot be rebuilt (quantity mismatch, ambiguous) keep theirs and are listed in notRebuilt [{symbol, holdingId, reason}] (holdingsNotRebuilt counts them). dryRun=true (default false) changes nothing and returns the same result (dryRun, applied=false) so the confirmation can say what will happen. Undoing twice is a no-op (alreadyUndone). 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only */
+    /** Undo an import: voids its trades (nothing is deleted) and rebuilds from the remaining trades the lots of the affected holdings whose lots came from trades - with none left, one lot of the broker's quantity and cost dated by the first import date, flagged default. LIMITATION: an undo cannot bring back lots the owner dated by hand or a sync added that an earlier rebuild replaced; handDatedLotsReplaced and syncLotsReplaced say how many the rebuild removes (the lots of holdings it rebuilds). Holdings whose lots did not come from trades keep their lots; holdings that cannot be rebuilt (quantity mismatch, ambiguous) keep theirs and are listed in notRebuilt [{symbol, holdingId, reason}] (holdingsNotRebuilt counts them). dryRun=true (default false) changes nothing and returns the same result (dryRun, applied=false) so the confirmation can say what will happen. Undoing twice is a no-op (alreadyUndone). 409 portfolio.sync_running while a holdings sync or a trades run of the account runs, with a message that it can take a few minutes (a ledger-only run does not block it; a dry run and an already undone batch never wait); 404 portfolio.not_found. Audited with counts only */
     post: operations['UndoTradeBatch'];
     delete?: never;
     options?: never;
@@ -1864,8 +1915,331 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Rebuild a holding's lots from its stored trades. dryRun (default true) returns the rebuild block - status, counts of lots replaced, realised profit, adjustments, the broker's quantity against the trades - and changes nothing; dryRun=false replaces the lots when the status is ok (applied) and leaves them for unchanged, quantity_mismatch and ambiguous. A holding without trades is rebuilt into one default-dated lot. 409 portfolio.sync_running (not for a dry run); 404 portfolio.not_found. Audited with counts only */
+    /** Rebuild a holding's lots from its stored trades. dryRun (default true) returns the rebuild block - status, counts of lots replaced, realised profit, adjustments, the broker's quantity against the trades - and changes nothing; dryRun=false replaces the lots when the status is ok (applied) and leaves them for unchanged, quantity_mismatch and ambiguous. A holding without trades is rebuilt into one default-dated lot. 409 portfolio.sync_running while a holdings sync or a trades run of the account runs, with a message that it can take a few minutes (a ledger-only run does not block it; a dry run never waits); 404 portfolio.not_found. Audited with counts only */
     post: operations['RebuildHoldingLots'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/sync/broker-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Sync now: read the account's trades and then its ledger from Dhan (needs the Portfolio role and a connected Dhan token). Optional body {from} (an India date from 1990-01-02 to today): the first date to read instead of the watermark - for an account never read, its first import date. An earlier date than the watermark reads dates again (nothing is stored twice); a date later than the day after the watermark of either kind is refused, because the dates in between would never be read (when only one kind was read so far, also a date later than the account's first import date, because the other kind would then begin at the chosen date). The dates are read in windows of at most 30 days; new trades are stored next to the imported ones (source broker) and the lots of the holdings are rebuilt from the real dates where that is safe. Answers at once with the trades run as it begins (status running); poll the status. 409 portfolio.sync_running while a holdings sync or another trades or ledger run of the account runs; 409 portfolio.not_connected or portfolio.token_expired without a usable Dhan token; 400 portfolio.invalid (field from: not a plausible date, or leaves a hole after the watermark); 404 accounts.not_found. Audited with counts only */
+    post: operations['SyncAccountBrokerHistory'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/sync/broker-history/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The status of the trades and ledger sync: running, for each kind the watermark (last date read), the latest run (status, dates, counts, error) and windowsDone / windowsTotal, the next scheduled run (null when the service is paused) and, from the latest SUCCEEDED trades run and no other (nothing is carried forward from older runs; a skipped, failed or running run neither changes nor erases them): holdingsRebuilt, holdingsNeedingReview (a hand-dated lot; use the holding's rebuild preview) and needsReviewSymbols (their trading symbols, at most 50; holdingsNeedingReview says how many in all). Health (ADR 0027): each kind also has attempts (the number of the latest run within the day's occurrence: 1 for the first, up to 4 with the three quiet retries), consecutiveFailedDays (days in a row whose last attempt failed; 0 when the latest succeeded), lastFailureReason (unavailable, rate_limited, interrupted, rejected, history_too_large, token_expired, token_refused, not_connected, data_changed, unexpected; null while healthy) and retryAt (when the next quiet retry is due, null when none is pending); the run counts carry attempts, failureReason and deepenedTo. deepenedTo is the earliest date the nightly deepening of the trade history reached (one earlier year a night while the trades do not explain a holding in a way earlier history could fix; null: none read) and deepenExhausted that it reads no more (Dhan's history ends there or the furthest year back is reached). Dropped rows (roadmap ISS-03): each kind also has droppedByReason (how many rows the latest run of that kind dropped per reason code; a later clean or skipped run shows none: unreadable_row, missing_id, bad_id, missing_side, bad_quantity, bad_price, bad_time for trades; bad_date, missing_amount, bad_amount, zero_amount for the ledger; failed_checks, store_refused, other) and droppedRows (from the same latest run: the place of the first five: windowFrom, windowTo, page, rowIndex, reason - never a row's content); the same two fields are in the run counts (lastRun.counts), where droppedByReason adds up to dropped. Old runs have both empty */
+    get: operations['GetAccountBrokerHistoryStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The account's ledger entries read from Dhan, newest first: from, to (India dates, inclusive), class (funds_in, funds_out, dividend, charges, other), page, pageSize (max 200, default 50). Each entry has date, voucherNo, description, narration (Dhan's free text - show as plain text), exchange, amount (signed: credit minus debit), class and runningBalance. totals lists the count and signed amount of every class for the period from to to, whatever class is filtered. The ledger's entries of class charges count as costs in the net returns of an account and the portfolio, and an entry of class dividend is offered as a suggested dividend (see the dividends endpoints); nothing else of the ledger is part of returns */
+    get: operations['ListAccountLedger'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add a dividend you received: holdingId (the account is then the holding's) or accountId alone (unallocated: no holding); payDate (1990-01-02 to today, India), amount (rupees, above 0), perShare (optional, above 0), note (optional plain text, at most 200 characters). The same account, holding, date and amount as a dividend that is not voided is a possible duplicate: 409 portfolio.possible_duplicate, repeat with confirm true to add the second payment. 400 portfolio.invalid with field errors; 404 portfolio.not_found (account); 409 portfolio.role_off. Audited with the id only, never the amount */
+    post: operations['AddDividend'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividends/{id}/void': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Void a dividend: it stops counting in the figures and is never deleted. Voiding a voided dividend is a no-op. 404 portfolio.not_found. Audited with the id only */
+    post: operations['VoidDividend'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/holdings/{id}/dividends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The dividends entered for a holding, newest first (pay date), voided ones included and flagged (voided, voidedAt, voidedBy): page, pageSize (max 200, default 50) */
+    get: operations['ListHoldingDividends'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The dividends entered for an account - every holding's and the unallocated ones (holdingId null) - newest first, voided ones included and flagged: page, pageSize (max 200, default 50) */
+    get: operations['ListAccountDividends'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends/suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The suggested dividends of an account: its ledger entries of class dividend that were not accepted or dismissed yet, newest first (the ledger entry shape: id, date, amount, description and narration - Dhan's free text, show as plain text): page, pageSize (max 200, default 50). Dhan's documented ledger has no entry for an ordinary dividend, so this is usually empty. Nothing is added without accepting */
+    get: operations['ListDividendSuggestions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends/suggestions/{entryId}/accept': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Accept a suggested dividend: creates a dividend of the ledger entry's amount and date, for the holding you choose in the optional body {holdingId, note} (one of the account's) or unallocated, and remembers the decision (final; voiding the dividend later does not bring the suggestion back). 404 portfolio.not_found (not a dividend entry of the account); 409 portfolio.conflict (decided meanwhile), portfolio.role_off. Audited with ids only */
+    post: operations['AcceptDividendSuggestion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/accounts/{id}/dividends/suggestions/{entryId}/dismiss': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Dismiss a suggested dividend: it is not offered again; nothing else changes. The decision is final. 404 portfolio.not_found (not a dividend entry of the account); 409 portfolio.conflict (decided meanwhile). Audited with ids only */
+    post: operations['DismissDividendSuggestion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividends/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Read a dividend payout file against an account and say what importing it would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role) and file (CSV, UTF-8, at most 10 MB and 20,000 data rows; header: a date, a scrip name or symbol or ISIN, and the amount paid (Dividend Paid, Dividend Amount, Payout; a plain Amount or Net Amount only beside a Dividend Per Share or DPS column) - for example Date, Scrip Name, Dividend Per Share, Quantity, Dividend Paid - names accepted in any case with punctuation ignored; dates like 13 Jun 2024, 23 Sept 2024, 2024-06-13, 13-06-2024; amounts like 1,134.00). Returns format dividends, the file (rows, parsed, parsedAmount, repeated and identicalRepeats - rows identical to an earlier row are counted once -, distinct, bad rows with line and reason - at most 200 listed, badTotal counts all -, alreadyImported, possibleDuplicates, toAdd, needsMatch, ambiguous), the items (line, payDate, name, nameKey - the name as the server compares names: two spellings of one company have one nameKey, so group rows and key choices by it -, perShare, quantity, amount, status new | imported | possible_duplicate | needs_match | ambiguous, match {kind alias | isin | symbol | name | contains | master | choice | none, holdingId, instrumentId, symbol, isin, name, candidates}, warnings amount_mismatch | before_first_lot | partial_name_match), totals {count, amount, byYear} of what would be added, beforeFirstLot {count, amount, firstLotDate} and the digest. 400 portfolio.wrong_file_kind (extension detected: trades | tradebook_without_sides for a tradebook, statement for a file of a date, a name and a plain Amount with nothing in the header that says dividend - the kind is judged from the header before any column is read); 400 portfolio.invalid (field file: unreadable, too big, missing columns - with the accepted names -, not UTF-8; accountId); 404 portfolio.not_found (account); 409 portfolio.role_off */
+    post: operations['PreviewDividendImport'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividends/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import a dividend payout file: body multipart/form-data with accountId, file, digest (required: the digest of the preview), choices (optional JSON array of {name, holdingId | instrumentId | none, remember}: what a scrip name of the file means - name is the name as written or the item's nameKey; choices for spellings with one nameKey that agree are one choice, ones that disagree are a 400; remember saves it as an alias for later files) and includeDuplicates (optional JSON array of the lines of possible duplicates to import anyway). Stores the rows that are to be added as one batch of dividends with source csv, each with an identity (account, date, normalised name, per share, quantity, amount - the same file again stores nothing and makes no batch; rows identical within a file count once), the file's quantity and, when no holding is matched, the file's scrip name (unallocated; nothing is guessed). Answers imported, amount, allocated, instrumentOnly, unallocated, alreadyImported, possibleDuplicatesSkipped, aliasesSaved and the batch (preview again for the report). 409 portfolio.preview_stale when holdings, remembered names or dividends changed since the preview (extension report: the fresh preview; nothing stored); 400 portfolio.invalid (digest; choices naming no row of the file or no holding of the account, or contradicting each other for one nameKey; form fields too long or too many); 400 portfolio.wrong_file_kind (as for the preview); 404 portfolio.not_found. Audited with counts and ids only */
+    post: operations['ImportDividends'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividend-batches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The imports of dividend files, newest first: accountId (optional), page, pageSize (max 100, default 50). Each has id, accountId, accountName, fileName, sha256, parsed, imported, duplicates, bad, amount, status imported | undone, activeDividends, createdBy, createdAt, undoneAt */
+    get: operations['ListDividendBatches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/dividend-batches/{id}/undo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Undo an import: voids its dividends (nothing is deleted; they stop counting in every figure) and marks the batch undone; the same file can be imported again afterwards. Remembered names stay. Undoing twice is a no-op (alreadyUndone, voided 0). 404 portfolio.not_found. Audited with counts and the batch id only */
+    post: operations['UndoDividendBatch'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/imports/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Recognise downloaded files by their title and header and say what importing each would do, storing and changing nothing. Body: multipart/form-data with accountId (an account with the Portfolio role), files (one or more, at most 20, 10 MB each; CSV, XLS or XLSX - the format is judged from the first bytes) and optionally choices (a JSON array of {name, holdingId | instrumentId | isin, remember}: what scrip names of a global transaction report mean; name is the name as written or the item's nameKey, and the choice applies to every file). Answers one result per file, in order: fileName, kind (global_transaction_report | dp_charges | demat_holding | pnl_report | trades | dividends | tradebook_without_sides | statement | unknown), supported, routeTo (dividends: import it on the dividend import), message (why a file cannot be imported), error (code and message: unreadable file, or portfolio.wrong_file_kind for an unknown shape - the message lists the accepted kinds), summary {rows, valid, toAdd, alreadyImported, skipped, bad, from, to}, warnings [{code, message, count}] (other_account, bad_rows, needs_match, partial_name_match, charges_differ_from_footer, negative_charges, value_not_reproduced, covered_by_dhan, totals_differ, holdings_differ, notice_only), and the block of the kind: trades (the tradebook preview of ADR 0023, as for a global transaction report: lots, hand-dated lots replaced, realised profit, digest) with bill {names [{name, nameKey, symbolHint, status resolved | ambiguous | needs_match, kind, isin, symbol, holdingId, instrumentId, rows, trades, candidates}], needsMatch, coverage {covered, differences}, charges {total, reportTotal, matches}} for a global transaction report, costs {lines, counts, amountToStore, names} for depository charges, demat {asOf, securities, matching, quantityDifferences, heldNotSynced, syncedNotInStatement, names} for a demat statement - which changes no holding and raises no notice. digest fingerprints what is shown. The personal lines of a report (name, client code, mobile, e-mail) are never read into the answer. 400 portfolio.invalid (form fields); 404 portfolio.not_found (account); 409 portfolio.role_off */
+    post: operations['PreviewImports'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/imports/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import downloaded files: body multipart/form-data with accountId, files (as for the preview), digests (a JSON array with the preview's digest, or null, for each file in order; required for depository charges and demat statements, and for trade files with rebuild), choices (as for the preview; remember saves a choice for later files), rebuild (true | false, default true: rebuild the lots of the holdings whose result is ok, like a tradebook import) and acceptOtherAccount (a JSON array of the indexes, from 0, of files to import although the report's client code (UCC) differs from that of the reports imported into the account before; the first import with a code remembers its hash - never the code - and an account that remembers none never warns). Each file is imported on its own, all or nothing, and answers: fileName, kind, status (imported | nothing_new | not_supported | rejected), message, error, preview (the fresh preview when the confirmed one went stale: error portfolio.preview_stale, nothing stored), trades (a TradeImportResult: batch, imported, alreadyImported, rebuilt, holdingsRebuilt, lotsReplaced, report - undo it with the trade batch endpoint), costs (batch, imported, amount, alreadyImported, alreadyInLedger, namesLearned - undo it with the cost batch endpoint), demat (namesLearned, namesKnown) and aliasesSaved. A global transaction report is stored as bill-level trades; a trade the broker's own history has for the same day, ISIN and side is left out, and bill-level rows are voided as superseded when the broker sync later stores such trades. 400 portfolio.invalid; 404 portfolio.not_found; 409 portfolio.role_off; 409 portfolio.sync_running (a file waits for the runs it would race, and the message says it can take a few minutes: a trade file - a tradebook or a Dhan report's bills - while a holdings sync or a trades run of the account runs; a depository-charges sheet while a holdings sync or a ledger run runs; a demat statement never waits; the preview never waits). Audited with counts only */
+    post: operations['ImportReports'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/cost-batches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The imports of depository-charges sheets, newest first: accountId (optional), page, pageSize (max 100, default 50). Each has id, accountId, accountName, fileName, sha256, parsed, imported, duplicates, bad, amount, status imported | undone, activeEntries, createdBy, createdAt, undoneAt */
+    get: operations['ListCostBatches'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/portfolio/cost-batches/{id}/undo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Undo a depository-charges import: voids its cost entries (nothing is deleted; they stop counting in the net figures) and marks the batch undone; the same sheet can be imported again afterwards. Learned names stay. Undoing twice is a no-op (alreadyUndone, voided 0). 404 portfolio.not_found. Audited with counts and the batch id only */
+    post: operations['UndoCostBatch'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/live/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** State of the live price feed from its heartbeat (same fields as the hub event feedStatus): state (connected, idle, connecting, reconnecting, closed, paused, no_token, token_refused, flapping, or not_running when it has not reported for 60 seconds), subscribed instruments and the exchange time of its latest tick */
+    get: operations['GetLiveStatus'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1876,6 +2250,12 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /** @description Accepting a suggested dividend: optionally the holding it is for (one of the account's; none: unallocated) and a note. The amount and the date are the ledger entry's. */
+    AcceptSuggestionInput: {
+      /** Format: uuid */
+      holdingId: null | string;
+      note: null | string;
+    };
     /**
      * @description Everything about one account. Secret values and tokens are never part of it (only set / not set); the client id is masked. ApiKeyIssuedOn and
      *     ApiKeyExpiresOn are the day the Dhan API key was generated and the first day it is no longer valid (12 months). TokenStatus repeats Connection.Status.
@@ -1923,6 +2303,15 @@ export interface components {
       maxOpenPositions: null | number;
       /** Format: double */
       dailyLossPct: null | number;
+    };
+    /** @description What the owner may see about their own account (never the hash or the lockout state). */
+    AccountResponse: {
+      email: string;
+      displayName: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      passwordChangedAt: string;
     };
     /**
      * @description One row of the accounts list. Broker is "dhan"; MaskedClientId shows the first four and last two characters; Secrets lists the
@@ -2229,6 +2618,15 @@ export interface components {
       /** Format: int64 */
       uptimeSeconds: number;
     };
+    /**
+     * @description What the owner can do about an item (ADR 0027), at most two per item. `Kind``route`: `Target` is an in-app path with its query (`/accounts?account=…&amp;tab=connection`) to navigate to. `Kind``command`: `Target` is an existing
+     *     endpoint as `METHOD /api/path` (`POST /api/accounts/{id}/sync/broker-history`), which the browser calls with its session and CSRF token like any other call of the app - no new surface.
+     */
+    AttentionAction: {
+      label: string;
+      kind: string;
+      target: string;
+    };
     AuditEventResponse: {
       /** Format: date-time */
       at: string;
@@ -2405,11 +2803,296 @@ export interface components {
       tracked: boolean;
       hasBars: boolean;
     };
+    /** @description A security a name may mean: `Isin`, `Symbol`, `Name` and — when it is a holding of the account or a share of the instrument master — `HoldingId` or `InstrumentId`. */
+    BillCandidate: {
+      isin: null | string;
+      symbol: null | string;
+      name: string;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: uuid */
+      instrumentId: null | string;
+    };
+    /** @description The charges of the report's rows added up (`Total`, every row, whatever becomes of it) against the report's own total charges (`ReportTotal`; null when the report has none); `Matches` within ₹0.01. */
+    BillCharges: {
+      /** Format: double */
+      total: number;
+      /** Format: double */
+      reportTotal: null | number;
+      matches: boolean;
+    };
+    /** @description What the broker's own trades cover (ADR 0029): `Covered` trades of the report are left out because Dhan's trade history has the same day, ISIN and side; the days whose totals differ are listed (at most 50; `DifferencesTotal` counts all). */
+    BillCoverage: {
+      /** Format: int32 */
+      covered: number;
+      differences: components['schemas']['BillDifference'][];
+      /** Format: int32 */
+      differencesTotal: number;
+    };
+    /** @description What is particular to a global transaction report: the names (every one that is a share or ETF, at most 500 listed; `NamesTotal` counts all) with what they mean, how many are unresolved, the coverage by the broker's trades and the charges check. */
+    BillDetails: {
+      names: components['schemas']['BillNameView'][];
+      /** Format: int32 */
+      namesTotal: number;
+      /** Format: int32 */
+      needsMatch: number;
+      /** Format: int32 */
+      needsMatchTrades: number;
+      coverage: components['schemas']['BillCoverage'];
+      charges: components['schemas']['BillCharges'];
+    };
+    /** @description A day, security and side whose total quantity differs between the report's bill rows and the broker's own trades (the broker's win; shown, not hidden). */
+    BillDifference: {
+      /** Format: date */
+      date: string;
+      isin: string;
+      symbol: null | string;
+      side: string;
+      /** Format: int64 */
+      billQty: number;
+      /** Format: int64 */
+      dhanQty: number;
+    };
+    /**
+     * @description A scrip name of a global transaction report. `Name` is the name as written (plain text, untrusted), `NameKey` the name reduced to what the server compares names by (key the choices by it), `SymbolHint` the ticker in brackets. `Status`: `resolved`,
+     *     `ambiguous` (more than one security fits: `Candidates`) or `needs_match` (none: its trades are kept without an ISIN). `Kind` is the rule that decided: `choice`, `alias`, `symbol`, `holding`, `master`, `learned` (a demat or depository file taught
+     *     it), `partial` (a spelling that differs by a word's ending: check it), `none`.
+     */
+    BillNameView: {
+      name: string;
+      nameKey: string;
+      symbolHint: null | string;
+      status: string;
+      kind: string;
+      isin: null | string;
+      symbol: null | string;
+      securityName: null | string;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: uuid */
+      instrumentId: null | string;
+      /** Format: int32 */
+      rows: number;
+      /** Format: int32 */
+      trades: number;
+      candidates: components['schemas']['BillCandidate'][];
+    };
+    /**
+     * @description Where one dropped row of a broker read lies, and why it was dropped: the dates of the request that returned it (DateOnly BrokerDroppedRow.WindowFrom, DateOnly BrokerDroppedRow.WindowTo; after a split, the half that was asked), the int BrokerDroppedRow.Page of the answer (0 for the
+     *     ledger, which has one) and the zero-based int BrokerDroppedRow.RowIndex of the row in that answer, so the owner can look the row up in Dhan's own statement. <b>Location and reason code only</b>: never a name, symbol, amount, id or narration of the row (roadmap ISS-03).
+     */
+    BrokerDroppedRow: {
+      /** Format: date */
+      windowFrom: string;
+      /** Format: date */
+      windowTo: string;
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      rowIndex: number;
+      reason: string;
+    };
+    /** @description Optional body of "Sync now" for the broker history: the first date to read, instead of the watermark (or, for an account never read, the first import date). */
+    BrokerHistoryInput: {
+      /** Format: date */
+      from: null | string;
+    };
+    /** @description The answer of "Sync now": the trades run and, when it succeeded and has been carried on to it, the ledger run. Started over the API, the answer holds the trades run as it begins (`running`); the status says how far both are. */
+    BrokerHistoryRunView: {
+      trades: components['schemas']['BrokerSyncRunView'];
+      ledger: null | components['schemas']['BrokerSyncRunView'];
+    };
+    /**
+     * @description The status of the broker history sync of an account: whether a run is running, both kinds, the next scheduled run (null when the service is paused or there is none) and three figures that come from <b>the latest <i>succeeded</i> trades run</b> and
+     *     from no other (nothing is carried forward from older runs, and a run that was skipped, failed or is still running does not change them): `HoldingsRebuilt` (rebuilt automatically by that run), `HoldingsNeedingReview` (a hand-dated lot; the owner
+     *     uses the holding's rebuild preview) and `NeedsReviewSymbols`, the trading symbols of those holdings (at most 50, in the order the run listed them: alphabetical; `HoldingsNeedingReview` says how many there are in all). A quiet run that skipped the rebuild
+     *     because nothing changed reports 0 rebuilt (holdings that need review are never skipped: every run looks at them again). `DeepenedTo` is the earliest date the nightly deepening of the trade history reached (null: it has not read an earlier year) and
+     *     `DeepenExhausted` that it reads no more years (Dhan's history ends there, or the furthest year back is reached; ADR 0027).
+     */
+    BrokerHistoryStatusView: {
+      running: boolean;
+      trades: components['schemas']['BrokerKindStatus'];
+      ledger: components['schemas']['BrokerKindStatus'];
+      /** Format: date-time */
+      nextRunAt: null | string;
+      /** Format: int32 */
+      holdingsRebuilt: number;
+      /** Format: int32 */
+      holdingsNeedingReview: number;
+      needsReviewSymbols: string[];
+      /** Format: date */
+      deepenedTo?: null | string;
+      /** @default false */
+      deepenExhausted: boolean;
+    };
     /** @description The id a broker uses for the instrument (Dhan: security id + exchange segment). */
     BrokerIdView: {
       broker: string;
       brokerId: string;
       segment: string;
+    };
+    /**
+     * @description How far one kind is read: the `Watermark` (last date read; null when nothing was read yet), the latest run and its windows done of total. The health (ADR 0027): `Attempts` is the number of the latest run within the day's occurrence (1 for the first, up to 4 with
+     *     the three quiet retries; 0 while there is no run), `ConsecutiveFailedDays` the days in a row whose last attempt failed (0 when the latest attempt succeeded), `LastFailureReason` a code (`unavailable`, `rate_limited`, `interrupted`, `rejected`,
+     *     `history_too_large`, `token_expired`, `token_refused`, `not_connected`, `data_changed`, `unexpected`; null while healthy) and `RetryAt` when the next quiet retry is due (null when none is pending). While a retry is pending the owner is told nothing. `DroppedByReason` and `DroppedRows` say why the latest run dropped rows (see below).
+     */
+    BrokerKindStatus: {
+      /** Format: date */
+      watermark: null | string;
+      lastRun: null | components['schemas']['BrokerSyncRunView'];
+      /** Format: int32 */
+      windowsDone: number;
+      /** Format: int32 */
+      windowsTotal: number;
+      /**
+       * Format: int32
+       * @default 0
+       */
+      attempts: number;
+      /**
+       * Format: int32
+       * @default 0
+       */
+      consecutiveFailedDays: number;
+      lastFailureReason?: null | string;
+      /** Format: date-time */
+      retryAt?: null | string;
+      /** @description Why the latest run of this kind dropped rows (roadmap ISS-03): the number per reason code, the same figures as `LastRun.Counts.DroppedByReason`. Only the latest run counts: a later clean or skipped run shows none (empty when that run dropped none, or when there is no run, or it ran before the reasons were recorded). The codes are listed on `BrokerDropReasons`. */
+      droppedByReason?: {
+        [key: string]: number;
+      };
+      /** @description The place of the first five rows the latest run of this kind dropped (dates of the request, page, row index, reason code) - never the rows' content; a later clean or skipped run shows none. The same as `LastRun.Counts.DroppedRows`. */
+      droppedRows?: components['schemas']['BrokerDroppedRow'][];
+    };
+    /**
+     * @description A holding (or security) the automatic rebuild after a trade sync left alone, and why: `needs_review`, `quantity_mismatch`, `ambiguous`, `no_holding` or `changed_meanwhile`. The symbol is a ticker, never trade content.
+     *     `Detail` is the kind of mismatch for `quantity_mismatch` (`negative_opening`, `sell_exceeds_open`, `fractional_after_adjustment`: the first two are what an earlier read of the history can fix) and
+     *     `HoldingId` the single holding it is about (null for a security without one), so that a notice can open it.
+     */
+    BrokerNotRebuilt: {
+      symbol: string;
+      reason: string;
+      detail?: null | string;
+      /** Format: uuid */
+      holdingId?: null | string;
+    };
+    /**
+     * @description What a broker history run did (ADR 0025), kept as JSON on the run. int BrokerSyncCounts.WindowsDone of int BrokerSyncCounts.WindowsTotal date windows are read and stored; int BrokerSyncCounts.Halved windows were split in half because Dhan refused them as too large or answered "no data" for a stretch of several dates (the halves settle which).
+     *     int BrokerSyncCounts.Read rows came from Dhan, int BrokerSyncCounts.Stored are new, int BrokerSyncCounts.Duplicates were stored already, int BrokerSyncCounts.Dropped were unusable rows, int BrokerSyncCounts.Enriched of the int BrokerSyncCounts.Duplicates were completed (a trade stored by an earlier read without its ISIN or charges got them from this one; nothing else of it is touched) and int BrokerSyncCounts.Skipped were not NSE equity trades (by reason in
+     *     IReadOnlyDictionary&lt;string, int&gt; BrokerSyncCounts.SkippedByReason). After a trade run the automatic rebuild adds int BrokerSyncCounts.Rebuilt holdings rebuilt, int BrokerSyncCounts.Unchanged already right, int BrokerSyncCounts.NeedsReview holdings with a hand-dated lot that were left alone and the
+     *     first int BrokerSyncCounts.MaxNotRebuiltListed of the holdings or securities that were left alone with their reason (int BrokerSyncCounts.NotRebuiltTotal counts all of them). int BrokerSyncCounts.EmptyByNoData counts the windows (or half-windows) that were taken as
+     *     empty only because Dhan answered DH-907 ("incorrect parameters or no data present") to the first page: that code means both "nothing there" and "bad request", so the owner can see how often an empty stretch rested on it alone.
+     *     `Attempts` is the number of this attempt within the day's occurrence (1 for the scheduled or manual start, 2 to 4 for the quiet retries of ADR 0027), `FailureReason` the plain reason code of a failed run (`unavailable`, `rate_limited`,
+     *     `token_expired` ...) and `DeepenedTo` the earliest date an earlier-history read of this run reached. Counts only: no trade or ledger content.
+     */
+    BrokerSyncCounts: {
+      /** Format: int32 */
+      windowsDone?: number;
+      /** Format: int32 */
+      windowsTotal?: number;
+      /** Format: int32 */
+      halved?: number;
+      /** Format: int32 */
+      read?: number;
+      /** Format: int32 */
+      stored?: number;
+      /** Format: int32 */
+      duplicates?: number;
+      /** Format: int32 */
+      dropped?: number;
+      /** @description Why rows were dropped: the number of int BrokerSyncCounts.Dropped rows per reason code (`missing_id`, `bad_quantity`, `zero_amount` ...; see `BrokerDropReasons`). Empty in a run recorded before ISS-03 and when nothing was dropped; the figures add up to int BrokerSyncCounts.Dropped for a run that has them. */
+      droppedByReason?: {
+        [key: string]: number;
+      };
+      /** @description The location of the first int BrokerDrops.MaxLocations dropped rows of the run (request dates, page, row index and reason code) - never their content. */
+      droppedRows?: components['schemas']['BrokerDroppedRow'][];
+      /**
+       * Format: int32
+       * @description Trades stored already (counted in int BrokerSyncCounts.Duplicates too) that got an ISIN, charges or ticker they lacked from this read.
+       */
+      enriched?: number;
+      /** Format: int32 */
+      skipped?: number;
+      /**
+       * Format: int32
+       * @description Windows (or half-windows) taken as empty only because Dhan answered DH-907 to the first page.
+       */
+      emptyByNoData?: number;
+      skippedByReason?: {
+        [key: string]: number;
+      };
+      /** Format: int32 */
+      rebuilt?: number;
+      /** Format: int32 */
+      unchanged?: number;
+      /** Format: int32 */
+      needsReview?: number;
+      /** Format: int32 */
+      notRebuiltTotal?: number;
+      notRebuilt?: components['schemas']['BrokerNotRebuilt'][];
+      /**
+       * Format: int32
+       * @description The number of this attempt within the occurrence: 1 for the first, up to 4 with the three retries. 0 for a run recorded before ADR 0027 (read as 1).
+       */
+      attempts?: number;
+      /** @description The plain reason code of why the run failed; null while it runs and when it succeeded. */
+      failureReason?: null | string;
+      /**
+       * Format: date
+       * @description The earliest date a read of earlier history reached in this run (null: none was made).
+       */
+      deepenedTo?: null | string;
+      /**
+       * Format: int32
+       * @description Trades run: bill-level rows of an imported Dhan report that the trades of this run replaced. Ledger run: imported depository-charge entries that the charges of this run replaced. Voided as superseded, ADR 0029.
+       */
+      superseded?: number;
+      /**
+       * Format: int32
+       * @description Of the replaced rows' day-security-side groups, how many had a different total quantity than the broker's trades.
+       */
+      supersededDiffering?: number;
+      /**
+       * Format: int32
+       * @description The version of the Dhan mapping the windows in IReadOnlyList&lt;BrokerWindowSpan&gt; BrokerSyncCounts.RereadDone were read again with (0: none were read again). A failed run's list is only taken over by the run that follows it when the version is still the same (ADR 0030).
+       */
+      rereadVersion?: number;
+      /**
+       * @description The windows read again since the mapping changed (ADR 0027) that are done: each is added in the unit of work that stores the window, so a run that fails later does not make the retry read them again (ADR 0030). The run that follows a failed
+       *     one starts with the failed run's list (same int BrokerSyncCounts.RereadVersion) and adds its own. Dates only.
+       */
+      rereadDone?: components['schemas']['BrokerWindowSpan'][];
+    };
+    /**
+     * @description A run that reads an account's trades or its ledger. `Kind``trades` or `ledger`; `Trigger``manual`, `scheduled` or `first` (the scheduled backfill of an account never read); `Status``running`,
+     *     `succeeded`, `failed` or `skipped`; `From` and `To` the dates it reads. `Counts` says what it did (windows done of total, rows read, new, already stored, unusable (`Counts.Dropped`, and `Counts.DroppedByReason`: how many per reason code, with `Counts.DroppedRows`: the place of the first five - request dates, page, row index and reason, never the row's content), skipped by reason; after a trade run the holdings
+     *     rebuilt, unchanged and needing review). `Error` is a short safe text.
+     */
+    BrokerSyncRunView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      kind: string;
+      trigger: string;
+      status: string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      counts: components['schemas']['BrokerSyncCounts'];
+      error: null | string;
+    };
+    /** @description A stretch of whole India dates, DateOnly BrokerWindowSpan.From to DateOnly BrokerWindowSpan.To inclusive, that a run read again (IReadOnlyList&lt;BrokerWindowSpan&gt; BrokerSyncCounts.RereadDone). Dates only: no content of any row. */
+    BrokerWindowSpan: {
+      /** Format: date */
+      from?: string;
+      /** Format: date */
+      to?: string;
     };
     /** @description A new custom bucket. The name has 1 to 40 letters, digits, spaces, '_' or '-' and is unique ignoring case. */
     BucketInput: {
@@ -2481,6 +3164,11 @@ export interface components {
       days: components['schemas']['CalendarDayView'][];
       proposals: components['schemas']['CalendarDayView'][];
       nextHoliday: null | components['schemas']['CalendarDayView'];
+    };
+    /** @description Body of `POST /api/auth/change-password`. */
+    ChangePasswordRequest: {
+      currentPassword: string;
+      newPassword: string;
     };
     /**
      * @description Completeness: the 1-minute bars the trading calendar expects in the window against the ones stored. `missingPercent` is of the expected minutes; `unfillableMinutes` are missing
@@ -2575,6 +3263,65 @@ export interface components {
       decidedBy: null | string;
       /** Format: date */
       csvAdjustedThrough?: null | string;
+    };
+    /** @description One page of cost import batches, newest first. */
+    CostBatchPage: {
+      items: components['schemas']['CostBatchView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description One import of a depository-charges sheet. `Status` is `imported` or `undone`; `ActiveEntries` counts its cost entries that are not voided; `Amount` is the rupees it stored. */
+    CostBatchView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      accountName: string;
+      fileName: string;
+      sha256: string;
+      /** Format: int32 */
+      parsed: number;
+      /** Format: int32 */
+      imported: number;
+      /** Format: int32 */
+      duplicates: number;
+      /** Format: int32 */
+      bad: number;
+      /** Format: double */
+      amount: number;
+      status: string;
+      /** Format: int32 */
+      activeEntries: number;
+      createdBy: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      undoneAt: null | string;
+    };
+    /** @description What an import of a depository-charges sheet did. `Batch` is null when nothing new was stored. `Imported` entries (`Amount` rupees) were stored; `AlreadyImported` and `AlreadyInLedger` lines were left out; `NamesLearned` names were remembered. */
+    CostImportResult: {
+      batch: null | components['schemas']['CostBatchView'];
+      /** Format: int32 */
+      imported: number;
+      /** Format: double */
+      amount: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      /** Format: int32 */
+      alreadyInLedger: number;
+      /** Format: int32 */
+      namesLearned: number;
+    };
+    /** @description What undoing a cost batch did: its entries are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0). */
+    CostUndoResult: {
+      batch: components['schemas']['CostBatchView'];
+      alreadyUndone: boolean;
+      /** Format: int32 */
+      voided: number;
     };
     /**
      * @description A new Dhan account. ClientId and Secrets (API key and secret) are required. ApiKeyIssuedOn is the day the API key was generated
@@ -2938,6 +3685,59 @@ export interface components {
       latencyMs: number;
       error: null | string;
     };
+    /** @description A security whose depository quantity differs from the synced holding's. */
+    DematDifference: {
+      isin: string;
+      name: string;
+      /** Format: double */
+      statement: number;
+      /** Format: double */
+      synced: number;
+    };
+    /** @description A security the depository holds that the account has no open holding for. */
+    DematHeld: {
+      isin: string;
+      name: string;
+      /** Format: double */
+      quantity: number;
+    };
+    /** @description What an import of a demat holding statement did: it changed no holding. `NamesLearned` names were remembered, `NamesKnown` were remembered already. */
+    DematImportResult: {
+      /** Format: int32 */
+      namesLearned: number;
+      /** Format: int32 */
+      namesKnown: number;
+    };
+    /**
+     * @description The preview of a demat holding statement: its securities, how many agree with the synced holdings, the quantity differences, the securities held at Dhan but not synced and the synced holdings missing from the statement (each list at most 200 long, the totals count all) and the names
+     *     it teaches. Nothing here changes a holding. <b>No notice is raised for these differences; they are shown here only.</b>
+     */
+    DematPreview: {
+      /** Format: date */
+      asOf: null | string;
+      /** Format: int32 */
+      securities: number;
+      /** Format: int32 */
+      matching: number;
+      quantityDifferences: components['schemas']['DematDifference'][];
+      /** Format: int32 */
+      quantityDifferencesTotal: number;
+      heldNotSynced: components['schemas']['DematHeld'][];
+      /** Format: int32 */
+      heldNotSyncedTotal: number;
+      syncedNotInStatement: components['schemas']['DematSynced'][];
+      /** Format: int32 */
+      syncedNotInStatementTotal: number;
+      names: components['schemas']['NameLearning'];
+    };
+    /** @description An open holding of the account that the statement does not list. */
+    DematSynced: {
+      symbol: string;
+      isin: null | string;
+      name: string;
+      /** Format: double */
+      quantity: number;
+    };
     /** @description What a detection run did: `instruments` looked at, `candidates` found, `suggested` new suggestions stored (the others were known already, ignored ones included) and `pending` suggestions now waiting. */
     DetectionResult: {
       /** Format: int32 */
@@ -3020,6 +3820,358 @@ export interface components {
     /** @description The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`. */
     DhanRedirectView: {
       redirectUrl: string;
+    };
+    /** @description A row that cannot be imported: the line of the file it starts on and why. */
+    DividendBadRow: {
+      /** Format: int32 */
+      line: number;
+      reason: string;
+    };
+    /** @description One page of import batches, newest first. */
+    DividendBatchPage: {
+      items: components['schemas']['DividendBatchView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description One import of a dividend file. `Status` is `imported` or `undone`; `ActiveDividends` counts its dividends that are not voided; `Amount` is the rupees it stored. */
+    DividendBatchView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      accountName: string;
+      fileName: string;
+      sha256: string;
+      /** Format: int32 */
+      parsed: number;
+      /** Format: int32 */
+      imported: number;
+      /** Format: int32 */
+      duplicates: number;
+      /** Format: int32 */
+      bad: number;
+      /** Format: double */
+      amount: number;
+      status: string;
+      /** Format: int32 */
+      activeDividends: number;
+      createdBy: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      undoneAt: null | string;
+    };
+    /** @description The dividends to be added that are dated before the account's first lot (`FirstLotDate`; null: the account has no lot): the net XIRR cannot count an inflow before the first outflow — read the earlier trade history. */
+    DividendBeforeFirstLot: {
+      /** Format: int32 */
+      count: number;
+      /** Format: double */
+      amount: number;
+      /** Format: date */
+      firstLotDate: null | string;
+    };
+    /** @description A holding that fits an ambiguous scrip name. */
+    DividendCandidate: {
+      /** Format: uuid */
+      holdingId: string;
+      symbol: string;
+      name: string;
+    };
+    /**
+     * @description What the owner decided for a scrip name of the file: exactly one of `HoldingId` (one of the account's holdings), `InstrumentId` (an NSE share or ETF of the instrument list) and `None` (keep the dividends unallocated). It applies to every
+     *     row with that name. `Name` is the scrip name as the file wrote it or the item's `NameKey` (best: send the `NameKey`); either way it is reduced to the key names are compared by (case, punctuation and company suffixes
+     *     ignored), so two spellings of one company are one scrip. Several choices for one scrip are fine when they agree (one is made of them) and a 400 when they disagree. With `Remember` the choice is saved as an alias, so later files with that name need no question.
+     */
+    DividendChoice: {
+      name: string;
+      /** Format: uuid */
+      holdingId?: null | string;
+      /** Format: uuid */
+      instrumentId?: null | string;
+      /** @default false */
+      none: boolean;
+      /** @default false */
+      remember: boolean;
+    };
+    /**
+     * @description What was in the file. `Rows` are the data rows (empty lines do not count), `Parsed` the valid rows (`ParsedAmount` their rupees), `Repeated` the valid rows that repeat an earlier row of the file identically (counted once; listed in
+     *     `IdenticalRepeats`, at most 200), `Distinct` the rows left (`Parsed - Repeated`). Of the distinct rows: `AlreadyImported` are stored already, `PossibleDuplicates` equal a dividend you typed in, and `ToAdd` would be stored,
+     *     among them `NeedsMatch` (no holding or instrument found: stored unallocated with the file's name) and `Ambiguous` (more than one holding fits: stored unallocated unless you choose). `Bad` lists the first 200 bad rows (line, reason);
+     *     `BadTotal` counts all of them.
+     */
+    DividendFileSummary: {
+      fileName: string;
+      /** Format: int32 */
+      rows: number;
+      /** Format: int32 */
+      parsed: number;
+      /** Format: double */
+      parsedAmount: number;
+      /** Format: int32 */
+      repeated: number;
+      /** Format: int32 */
+      distinct: number;
+      identicalRepeats: components['schemas']['DividendRepeat'][];
+      bad: components['schemas']['DividendBadRow'][];
+      /** Format: int32 */
+      badTotal: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      /** Format: int32 */
+      possibleDuplicates: number;
+      /** Format: int32 */
+      toAdd: number;
+      /** Format: int32 */
+      needsMatch: number;
+      /** Format: int32 */
+      ambiguous: number;
+    };
+    /**
+     * @description What an import did. `Batch` is null when nothing new was stored. `Imported` dividends (`Amount` rupees) were stored: `Allocated` to a holding, `InstrumentOnly` with an instrument but no holding, `Unallocated` with the
+     *     file's name only. `AlreadyImported` rows were stored before, `PossibleDuplicatesSkipped` equal a dividend you typed in and were not ticked, `AliasesSaved` names were remembered.
+     */
+    DividendImportResult: {
+      batch: null | components['schemas']['DividendBatchView'];
+      /** Format: int32 */
+      imported: number;
+      /** Format: double */
+      amount: number;
+      /** Format: int32 */
+      allocated: number;
+      /** Format: int32 */
+      instrumentOnly: number;
+      /** Format: int32 */
+      unallocated: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      /** Format: int32 */
+      possibleDuplicatesSkipped: number;
+      /** Format: int32 */
+      aliasesSaved: number;
+    };
+    /**
+     * @description A dividend typed in by the owner: for a holding (`HoldingId`; the account is then the holding's) or, left unallocated, for an account (`AccountId` alone). `PayDate` is the day the money was credited (not in the future),
+     *     `Amount` the rupees received (above 0, to the paisa), `PerShare` optional (above 0), `Note` optional plain text (at most 200 characters). The same account, holding, date and amount twice is allowed (two genuine payments) but the second asks
+     *     for a confirmation: `409 portfolio.possible_duplicate`, repeat with `Confirm` true.
+     */
+    DividendInput: {
+      /** Format: uuid */
+      accountId: null | string;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: date */
+      payDate: null | string;
+      /** Format: double */
+      amount: null | number;
+      /** Format: double */
+      perShare: null | number;
+      note: null | string;
+      confirm: null | boolean;
+    };
+    /**
+     * @description What a row's scrip name means. `Kind` is the rule that decided: `alias` (remembered), `isin`, `symbol` (the file's columns), `name` (equal names), `contains` (part of a name), `master` (a share of the instrument list that
+     *     is not held), `choice` (your pick in an import) or `none`. With a `HoldingId` the dividend belongs to that holding; with only an `InstrumentId` it keeps the instrument, ISIN and symbol but no holding; with neither it is
+     *     unallocated. `Candidates` (two or more) are the holdings an ambiguous name fits: nothing is guessed. `Symbol`, `Isin` and `Name` are those of the holding or instrument (plain text).
+     */
+    DividendMatchView: {
+      kind: string;
+      /** Format: uuid */
+      holdingId: null | string;
+      /** Format: uuid */
+      instrumentId: null | string;
+      symbol: null | string;
+      isin: null | string;
+      name: null | string;
+      candidates: components['schemas']['DividendCandidate'][];
+    };
+    /** @description One page of dividends, newest first (pay date), voided ones included and flagged. */
+    DividendPage: {
+      items: components['schemas']['DividendView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /**
+     * @description A distinct row of the file. `Name` is the scrip name as the file wrote it (plain text, untrusted); `NameKey` is the name reduced to what the server compares names by (case, punctuation and company suffixes ignored,
+     *     the ampersand read as and): two spellings of one company have one `NameKey`, so group the rows that need a choice by it and key the choices by it. `Status`: `new`, `imported` (stored already), `possible_duplicate`, `needs_match`, `ambiguous`.
+     *     `Warnings`: `amount_mismatch` (per share × quantity differs from the amount paid by more than ₹0.01; the amount paid is used), `before_first_lot` (the date is before the account's first lot, so the net XIRR cannot count it),
+     *     `partial_name_match` (matched by part of the name: check it).
+     */
+    DividendPreviewItem: {
+      /** Format: int32 */
+      line: number;
+      /** Format: date */
+      payDate: string;
+      name: string;
+      nameKey: string;
+      /** Format: double */
+      perShare: null | number;
+      /** Format: int64 */
+      quantity: null | number;
+      /** Format: double */
+      amount: number;
+      status: string;
+      match: components['schemas']['DividendMatchView'];
+      warnings: string[];
+    };
+    /**
+     * @description The preview of a dividend file import — nothing is stored. `Format` is `dividends`. `Items` are the distinct rows in file order. `Digest` fingerprints what is shown; an import must send it back, and answers
+     *     `409 portfolio.preview_stale` when holdings, aliases or dividends changed since.
+     */
+    DividendPreviewReport: {
+      format: string;
+      file: components['schemas']['DividendFileSummary'];
+      items: components['schemas']['DividendPreviewItem'][];
+      totals: components['schemas']['DividendTotals'];
+      beforeFirstLot: components['schemas']['DividendBeforeFirstLot'];
+      digest: string;
+    };
+    /** @description A payment that appears more than once, identically, in the file: counted once. `Lines` are the lines of its occurrences (at most 10 listed). */
+    DividendRepeat: {
+      name: string;
+      /** Format: date */
+      payDate: string;
+      /** Format: double */
+      amount: number;
+      /** Format: int32 */
+      occurrences: number;
+      /** Format: int32 */
+      firstLine: number;
+      lines: number[];
+    };
+    /**
+     * @description The suggested dividends of an account: its ledger entries of class `dividend` the owner has not accepted or dismissed, newest first. Dhan's documented ledger has no entry for an ordinary dividend, so the list is usually empty. The entries'
+     *     `Description` and `Narration` are Dhan's free text: untrusted, show as plain text.
+     */
+    DividendSuggestionPage: {
+      items: components['schemas']['LedgerEntryView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description What an import would add: the number of dividends and rupees (the rows that are to be added — not stored yet, not possible duplicates) and the same by pay year. */
+    DividendTotals: {
+      /** Format: int32 */
+      count: number;
+      /** Format: double */
+      amount: number;
+      byYear: components['schemas']['DividendYearTotal'][];
+    };
+    /** @description What undoing a batch did: its dividends are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0). */
+    DividendUndoResult: {
+      batch: components['schemas']['DividendBatchView'];
+      alreadyUndone: boolean;
+      /** Format: int32 */
+      voided: number;
+    };
+    /**
+     * @description The multipart form of the dividend preview and import, for the API contract only (the request is read by DividendUploads). `AccountId` is the account, `File` the dividend list (CSV). For the import also `Digest` (required: the
+     *     digest of the preview), `Choices` and `IncludeDuplicates`. A form field is text: <b>send `Choices` and `IncludeDuplicates` as JSON text</b> (`JSON.stringify` of a `DividendChoice[]` and of a list of line numbers of possible
+     *     duplicates to import anyway); the types here say what the JSON holds.
+     */
+    DividendUploadForm: {
+      /** Format: uuid */
+      accountId: string;
+      file: components['schemas']['IFormFile'];
+      digest: null | string;
+      choices: null | components['schemas']['DividendChoice'][];
+      includeDuplicates: null | number[];
+    };
+    /**
+     * @description A dividend. `HoldingId` is null for an unallocated one; `Symbol` and `Isin` are the holding's (or the matched instrument's) at the time. `Source` is `manual` or `csv` (read from a dividend file, ADR 0028). A dividend from a file
+     *     has its import's `BatchId`, the file's `Quantity` (shares) when it had one and, when it belongs to no holding, the file's `ScripName` (plain text, untrusted). A voided dividend does not count.
+     */
+    DividendView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      accountId: string;
+      /** Format: uuid */
+      holdingId: null | string;
+      symbol: null | string;
+      isin: null | string;
+      /** Format: date */
+      payDate: string;
+      /** Format: double */
+      amount: number;
+      /** Format: double */
+      perShare: null | number;
+      note: null | string;
+      source: string;
+      createdBy: string;
+      /** Format: date-time */
+      createdAt: string;
+      voided: boolean;
+      /** Format: date-time */
+      voidedAt: null | string;
+      voidedBy: null | string;
+      /** Format: int64 */
+      quantity?: null | number;
+      scripName?: null | string;
+      /** Format: uuid */
+      batchId?: null | string;
+    };
+    /** @description Rows and rupees of one year. */
+    DividendYearTotal: {
+      /** Format: int32 */
+      year: number;
+      /** Format: int32 */
+      count: number;
+      /** Format: double */
+      amount: number;
+    };
+    /** @description The lines of a depository-charges sheet by what happens to them. `OffMarket` counts (among the others) the lines of type off-market. */
+    DpCounts: {
+      /** Format: int32 */
+      read: number;
+      /** Format: int32 */
+      toStore: number;
+      /** Format: int32 */
+      zero: number;
+      /** Format: int32 */
+      buySide: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      /** Format: int32 */
+      alreadyInLedger: number;
+      /** Format: int32 */
+      offMarket: number;
+    };
+    /** @description A line of a depository-charges sheet. `Status`: `new` (stored by an import), `zero` (costs nothing), `buy_side` (not charged), `already_imported`, `already_in_ledger` (Dhan's ledger has a charge of that amount that day). `Side` is `buy`, `sell` or `other`. */
+    DpLineView: {
+      /** Format: int32 */
+      line: number;
+      /** Format: date */
+      date: string;
+      isin: string;
+      name: string;
+      /** Format: int64 */
+      quantity: number;
+      side: string;
+      type: string;
+      /** Format: double */
+      charge: number;
+      status: string;
+    };
+    /** @description The preview of a depository-charges sheet: the lines (at most 300 listed, `LinesTotal` counts all), their counts, the rupees an import would add to the account's costs and the names it teaches. */
+    DpPreview: {
+      lines: components['schemas']['DpLineView'][];
+      /** Format: int32 */
+      linesTotal: number;
+      counts: components['schemas']['DpCounts'];
+      /** Format: double */
+      amountToStore: number;
+      names: components['schemas']['NameLearning'];
     };
     /**
      * @description The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)
@@ -3225,7 +4377,9 @@ export interface components {
     };
     /**
      * @description One group. Key is the account id, bucket id, sector name or basket id, or `~none` for the sector "Unclassified" and the basket "No basket". Holdings counts every holding of the group in the scope;
-     *     Unpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`.
+     *     Unpriced the open ones without a usable price. DayChangeExcluded counts the open holdings left out of the day change. Parts is set only when the request had a `stackBy`. Income is the group's dividends and trade
+     *     charges and the net returns (ADR 0026), null when none is recorded; a group by account also holds the account's own dividends and costs (those of no holding). The group with the key `~unallocated` (name "Unallocated", no holdings,
+     *     no value) is added last when dividends and costs belong to no group, so that the columns add up to the total.
      */
     HoldingGroup: {
       key: string;
@@ -3256,8 +4410,9 @@ export interface components {
       /** Format: double */
       weightPct: null | number;
       parts: null | components['schemas']['GroupPart'][];
+      income?: null | components['schemas']['IncomeView'];
     };
-    /** @description The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value. */
+    /** @description The scope's totals, computed once over every holding of the scope (for basket groupings this is not the sum of the groups). WeightPct is 100 when the scope has a value. Income includes the dividends and costs of no holding. */
     HoldingGroupTotal: {
       /** Format: int32 */
       holdings: number;
@@ -3284,6 +4439,7 @@ export interface components {
       dayChangeExcluded: number;
       /** Format: double */
       weightPct: null | number;
+      income?: null | components['schemas']['IncomeView'];
     };
     /**
      * @description The groups of the scope. By is `account`, `bucket`, `sector` or `basket`; Additive is false for baskets (a holding is in every basket that contains it, so the groups overlap). StackBy is the second dimension of the
@@ -3329,7 +4485,9 @@ export interface components {
      *     import's default date. Returns cover all lots (closed lots add to RealisedPnl and to the XIRR).
      *     PreviousClose is the previous session's close as the last quote reported it (null until a quote gave one). DayChange (rupees) and DayChangePct (percent number) are
      *     against it, for an open, priced holding with a previous close; otherwise both are null and the holding is left out of the summary's day change. PriceAt is the time of
-     *     LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync) or "quote" (a market quote).
+     *     LastPrice (the same instant as LastPriceAt) and PriceSource says where the price came from: "sync" (the holdings list at the last sync), "quote" (a market quote) or "live" (a tick of the live feed).
+     *     Income is the holding's dividends and trade charges and the net returns that include them (ADR 0026); null when nothing is recorded for the holding. It does not change with the price, except the two total return percentages: the
+     *     browser works those out again at a live price from Returns.RealisedPnl, Returns.Pnl, Returns.Invested and Income's Dividends and Charges.
      */
     HoldingRow: {
       /** Format: uuid */
@@ -3380,6 +4538,7 @@ export interface components {
       /** Format: date-time */
       priceAt: null | string;
       priceSource: string;
+      income?: null | components['schemas']['IncomeView'];
     };
     /**
      * @description Totals over the holdings of the filter (all accounts that count in totals, one account, one bucket). DefaultDateLots counts open lots that
@@ -3390,6 +4549,8 @@ export interface components {
      *     from the first cash flow: track it and run Update data), "insufficient" (the same reasons as for XIRR) or "n_m" (beyond ±1,000 %). BenchmarkXirr and Alpha are null unless their rates are meaningful (Alpha also needs the portfolio's XirrState "ok").
      *     BenchmarkAsOf is the date of the index close the benchmark was valued at: the index has no live quote, so on a trading day before its bar is fetched it is the previous close while the portfolio is valued at today's prices. AlphaBasis says which
      *     it is when Alpha is set: "last_close" (portfolio and index are both as of their last close) or "live_vs_last_close" (the portfolio at prices of a later trading day than the index close, so the alpha includes the day's move of the portfolio only).
+     *     Alpha compares price returns: the gross XIRR and the index's price index, both before dividends and charges (ADR 0026). Income holds the dividends and costs of the scope and the net returns (null when nothing is recorded): for the whole portfolio or
+     *     an account (no bucket) it includes the dividends not allocated to a holding and the ledger's costs, for a bucket only its holdings'.
      */
     HoldingsSummary: {
       returns: components['schemas']['ReturnsView'];
@@ -3421,6 +4582,7 @@ export interface components {
       /** Format: date */
       benchmarkAsOf: null | string;
       alphaBasis: null | string;
+      income?: null | components['schemas']['IncomeView'];
     };
     HttpValidationProblemDetails: {
       type?: null | string;
@@ -3467,6 +4629,7 @@ export interface components {
     };
     /** Format: binary */
     IFormFile: string;
+    IFormFileCollection: components['schemas']['IFormFile'][];
     /**
      * @description The outcome of a CSV import (or its preview). `lines`: data lines read; `importable`: new valid actions; `imported`: written (0 for a preview); `duplicates`: lines that repeat an action
      *     that exists (any status) or an earlier line; `invalid`: lines with a problem (the first 50 in `errors`, among them lines that clash with an applied action of the other kind on the same day);
@@ -3490,6 +4653,50 @@ export interface components {
       /** Format: int32 */
       adjustsCsvTwice?: null | number;
       warnings?: null | components['schemas']['ImportLineWarning'][];
+    };
+    /** @description Why a file could not be read or imported: `portfolio.invalid` (`Field``file`), `portfolio.wrong_file_kind` (an unknown shape; the message lists the accepted kinds), `portfolio.preview_stale`, `portfolio.other_account`, `portfolio.sync_running`, `portfolio.conflict`. */
+    ImportFileError: {
+      code: string;
+      message: string;
+      field?: null | string;
+    };
+    /**
+     * @description What a file is and what importing it would do — nothing is stored. `Kind`: `global_transaction_report`, `dp_charges`, `demat_holding`, `pnl_report`, `trades` (a tradebook with a buy/sell column), `dividends`, `tradebook_without_sides`,
+     *     `statement`, `unknown`. `Supported` is true when the file can be imported here. A file that belongs on another screen has `RouteTo` (`dividends`); one that cannot be imported has a `Message` saying why; a file that cannot be read has an `Error`. Of
+     *     the blocks only the one of the kind is set: `Trades` (the tradebook preview: global transaction report and tradebook) with `Bill` beside it for the global transaction report, `Costs` (depository charges), `Demat`. `Digest` fingerprints what is shown;
+     *     an import sends it back.
+     */
+    ImportFilePreview: {
+      fileName: string;
+      kind: string;
+      supported: boolean;
+      routeTo: null | string;
+      message: null | string;
+      error: null | components['schemas']['ImportFileError'];
+      summary: null | components['schemas']['ImportSummary'];
+      warnings: components['schemas']['ImportWarning'][];
+      trades: null | components['schemas']['TradePreviewReport'];
+      bill: null | components['schemas']['BillDetails'];
+      costs: null | components['schemas']['DpPreview'];
+      demat: null | components['schemas']['DematPreview'];
+      digest: null | string;
+    };
+    /**
+     * @description What importing one file did. `Status`: `imported` (something was stored), `nothing_new` (nothing to store: the file is imported already), `not_supported` (the kind cannot be imported; `Message` says why), `rejected` (`Error` says why; a
+     *     `portfolio.preview_stale` error comes with the fresh `Preview` and nothing was stored). Of the results only the one of the kind is set: `Trades` (global transaction report and tradebook), `Costs`, `Demat`. `AliasesSaved` counts the choices remembered.
+     */
+    ImportFileResult: {
+      fileName: string;
+      kind: string;
+      status: string;
+      message: null | string;
+      error: null | components['schemas']['ImportFileError'];
+      preview: null | components['schemas']['ImportFilePreview'];
+      trades: null | components['schemas']['TradeImportResult'];
+      costs: null | components['schemas']['CostImportResult'];
+      demat: null | components['schemas']['DematImportResult'];
+      /** Format: int32 */
+      aliasesSaved: number;
     };
     /** @description A line of an imported text that could not be used, with the reason (no free text from the file is repeated). */
     ImportLineError: {
@@ -3517,11 +4724,84 @@ export interface components {
       defaultDate: string;
       rows: components['schemas']['PreviewRow'][];
     };
+    /** @description The previews of the files of one request, in the order they were sent. */
+    ImportPreviewResponse: {
+      files: components['schemas']['ImportFilePreview'][];
+    };
     /** @description One holding to import (a key from the preview). AcquiredOn left out means "use the first import date" (the lot is then flagged). */
     ImportRowInput: {
       key: null | string;
       /** Format: date */
       acquiredOn: null | string;
+    };
+    /** @description The results of the files of one request, in the order they were sent. */
+    ImportRunResponse: {
+      files: components['schemas']['ImportFileResult'][];
+    };
+    /** @description The counts every kind of file has. `Rows` are the data rows, `Valid` the rows that can be used, `ToAdd` what an import would store, `AlreadyImported` what is stored already, `Skipped` the valid rows left out (by reason in the kind's own block), `Bad` the rows that cannot be used. `From`/`To` are the period the report says it covers. */
+    ImportSummary: {
+      /** Format: int32 */
+      rows: number;
+      /** Format: int32 */
+      valid: number;
+      /** Format: int32 */
+      toAdd: number;
+      /** Format: int32 */
+      alreadyImported: number;
+      /** Format: int32 */
+      skipped: number;
+      /** Format: int32 */
+      bad: number;
+      /** Format: date */
+      from: null | string;
+      /** Format: date */
+      to: null | string;
+    };
+    /** @description A notice about a file. `Code`: `other_account` (the report's client code differs from that of the reports imported into the account before; the account remembers a hash of the first code, never the code), `charges_differ_from_footer`, `needs_match` (`Count` names that could not be tied to a security), `partial_name_match`, `negative_charges`, `value_not_reproduced`, `covered_by_dhan`, `totals_differ`, `bad_rows`, `holdings_differ` (a demat statement and the synced holdings differ; nothing is changed), `notice_only` (the file is recognised and not imported). */
+    ImportWarning: {
+      code: string;
+      message: string;
+      /** Format: int32 */
+      count?: null | number;
+    };
+    /**
+     * @description What a scope (a holding, a group, an account, the portfolio) received and paid beyond its price return (ADR 0026, P2-14). Money is rupees, percentages are percent numbers (16.1 = 16.1 %), dates are India dates. `Dividends` are the
+     *     dividends the owner entered (not voided) and `Charges` the trade charges of the stored trades plus, for an account and the portfolio only, the ledger's costs of the account as such (DP charges, annual maintenance, delayed-payment interest ...;
+     *     never the costs of trades, which the trade rows already carry). `LedgerCharges` is that ledger part of `Charges` (0 when the account has none; null when the scope does not include account-level items: a holding, a bucket), so the screen can show
+     *     the ledger's costs apart from the charges of trades. `Unallocated` is the part of the dividends not allocated to a holding (set for an account and the portfolio only, otherwise null). `TotalReturnPct` is (realised + unrealised +
+     *     dividends) over invested, `NetTotalReturnPct` the same minus the charges; both are null when nothing is invested or the scope has no usable price. `NetXirr` is the XIRR of the lot cash flows plus the dividends (in) and the charges (out) on
+     *     their dates, with `NetXirrState` as for the gross XIRR (`ok`, `insufficient`, `n_m`, `no_data`, `no_price`).
+     *     Only what was entered or read is counted, and the dates say from when each source is known (null: the source has nothing for the scope): `DividendsFrom` is the first dividend the owner entered, `TradeChargesFrom` the first stored trade that
+     *     carries charges (trades read before charges were stored, and CSV or manual trades, carry none — so a trade without charges is "unknown", not "free"), `LedgerChargesFrom` the first ledger date stored. `ChargesFrom` is the later of
+     *     `TradeChargesFrom` and `LedgerChargesFrom` when both exist, otherwise the one that does. `CoverageFrom` is the LATER start of the sources that exist for the scope: the date from which every kind of income that is counted at all is known, so
+     *     the net figures are never presented as complete from before any of their sources begins. The whole object is null when the scope has no dividend and no charge recorded.
+     */
+    IncomeView: {
+      /** Format: double */
+      dividends: number;
+      /** Format: double */
+      charges: number;
+      /** Format: double */
+      ledgerCharges: null | number;
+      /** Format: double */
+      unallocated: null | number;
+      /** Format: double */
+      totalReturnPct: null | number;
+      /** Format: double */
+      netTotalReturnPct: null | number;
+      /** Format: double */
+      netXirr: null | number;
+      netXirrState: string;
+      /** Format: date */
+      coverageFrom: null | string;
+      /** Format: date */
+      dividendsFrom: null | string;
+      /** Format: date */
+      chargesFrom: null | string;
+      /** Format: date */
+      tradeChargesFrom: null | string;
+      /** Format: date */
+      ledgerChargesFrom: null | string;
     };
     /**
      * @description The latest bars of an instrument and timeframe, newest first. `adjustment` is set only when the read asked for adjusted prices (`adjusted=true`): the bars then have the open, high, low and close multiplied by
@@ -3618,6 +4898,20 @@ export interface components {
       /** Format: int32 */
       total: number;
     };
+    /**
+     * @description The latest known price of an instrument: `lastPrice` at `priceAt` (the time of the exchange's tick for `live`, the time of the quote for `quote`, the time of the sync for `sync`; UTC) and where it came from:
+     *     `live` (the live feed), `quote` (the 5-minute quote poll) or `sync` (the broker's holdings list). The same values as `lastPrice`, `priceAt` and `priceSource` of the holdings list. An older price never follows a newer one
+     *     for the same instrument; a client that gets one anyway ignores it.
+     */
+    InstrumentPrice: {
+      /** Format: uuid */
+      instrumentId: string;
+      /** Format: double */
+      lastPrice: number;
+      /** Format: date-time */
+      priceAt: string;
+      source: string;
+    };
     /** @description A row of the master list. `type`: share · etf · index · future. */
     InstrumentSummary: {
       /** Format: uuid */
@@ -3656,6 +4950,79 @@ export interface components {
       csv: null | components['schemas']['DataJobView'];
       dhan: null | components['schemas']['DataJobView'];
       aggregate: null | components['schemas']['DataJobView'];
+    };
+    /** @description The entries of one class in the period and their signed total. */
+    LedgerClassTotal: {
+      class: string;
+      /** Format: int32 */
+      count: number;
+      /** Format: double */
+      amount: number;
+    };
+    /**
+     * @description A ledger entry. `Class` is `funds_in`, `funds_out`, `dividend`, `charges` or `other`; `Amount` is signed (credit minus debit). `Description` and `Narration` are Dhan's free text (untrusted: show as plain text).
+     *     `Source` is `broker` (read from Dhan's ledger) or `import` (a cost imported from a downloaded report, such as the depository-charges sheet, which can be undone).
+     */
+    LedgerEntryView: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date */
+      date: string;
+      voucherNo: string;
+      description: string;
+      narration: string;
+      exchange: null | string;
+      /** Format: double */
+      amount: number;
+      class: string;
+      /** Format: double */
+      runningBalance: null | number;
+      /** @default broker */
+      source: string;
+    };
+    /**
+     * @description One page of the ledger, newest first, and the totals of every class for the period (`from` to `to`, whatever class is filtered). `CoverageFrom` is the earliest date of any ledger entry stored for the account, whatever the filters
+     *     (null: none stored): the ledger's costs are known from this date on, which reading from an earlier date can move back (ADR 0026).
+     */
+    LedgerPage: {
+      items: components['schemas']['LedgerEntryView'][];
+      /** Format: int32 */
+      page: number;
+      /** Format: int32 */
+      pageSize: number;
+      /** Format: int32 */
+      total: number;
+      totals: components['schemas']['LedgerClassTotal'][];
+      /** Format: date */
+      coverageFrom?: null | string;
+    };
+    /**
+     * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
+     *     `state` is the feed's own word: `connected` (streaming), `idle` (connected, nothing to follow), `connecting`, `reconnecting`, `closed` (outside its window), `paused` (the owner paused the service), `no_token`, `token_refused`,
+     *     `flapping`; or `not_running` when the feed reports nothing (never started, stopped, crashed: no heartbeat in the last 60 seconds). `subscribed` is the number of instruments the feed follows (0 unless it reports); `lastTickAt` the exchange
+     *     time of its latest tick of any instrument (UTC), null when none yet.
+     */
+    LiveFeedStatus: {
+      state: string;
+      /** Format: int32 */
+      subscribed: number;
+      /** Format: date-time */
+      lastTickAt: null | string;
+    };
+    /**
+     * @description What a Portfolio screen asks the hub to follow (argument of `Subscribe`, ADR 0024 §7): the prices of the instruments of these holdings are pushed, nothing else.
+     *     `accountId` and `bucketId` are the screen's scope, with the meaning they have for `GET /api/holdings/summary`: without `accountId` every open holding of the accounts that count in totals, with it every open holding of that account
+     *     (any account that is not archived); `bucketId` narrows either to one bucket. This is the set the tiles and the group rows are made of.
+     *     `holdingIds` are the holdings the screen shows (rows of the grid, the open drawer); they are added to the scope's holdings even when the scope would not include them (an account that does not count in totals, a filter applied on the screen only).
+     *     At most 1000 are read; holdings that are closed or have no instrument are ignored. Leave `accountId`, `bucketId` and `holdingIds` null or empty for all accounts that count in totals.
+     *     The server turns holdings into instruments; the messages carry instrument ids (as `instrumentId` of the holdings list). A second `Subscribe` replaces the first.
+     */
+    LiveScope: {
+      /** Format: uuid */
+      accountId: null | string;
+      /** Format: uuid */
+      bucketId: null | string;
+      holdingIds: null | string[];
     };
     /** @description Body of `POST /api/auth/login`. */
     LoginRequest: {
@@ -3736,6 +5103,13 @@ export interface components {
       date: string;
       time: string;
     };
+    /** @description Names a depository or demat file teaches: `Known` are remembered already, `New` would be remembered by an import. */
+    NameLearning: {
+      /** Format: int32 */
+      known: number;
+      /** Format: int32 */
+      new: number;
+    };
     /** @description The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched. */
     OfficialDailyCheck: {
       status: string;
@@ -3803,7 +5177,12 @@ export interface components {
       firstImportDate?: null | string;
       firstImport?: null | components['schemas']['FirstImportInput'];
     };
-    /** @description One notice of the Portfolio module for the top-bar bell. `Kind` is `price_alert_triggered` (`Severity` warn; `AlertId` and `InstrumentId` set) or `actions_need_decision` (info). `Id` is stable, so the bell keeps what was read by id. */
+    /**
+     * @description One notice of the Portfolio module for the top-bar bell. `Kind` is `price_alert_triggered` (`Severity` warn; `AlertId` and `InstrumentId` set), `actions_need_decision` (info) or - since ADR 0027 - an <b>attention item</b>:
+     *     `reconnect_dhan`, `sync_failing`, `holdings_need_review`, `trades_unexplained`, `dividends_pending`, `securities_unmatched` or `rows_dropped` (`Severity` error, warning or info; `AccountId` set). `Id` is stable and, for an attention item,
+     *     includes its situation, so a changed situation is a new item and the bell keeps what was read by id. Since ADR 0027 every notice also has a `Title`, at most two `Actions` (a route to open or an existing endpoint to call), `Since` (when it was first seen; null for a notice derived on read that is not remembered - `actions_need_decision` - whose id already changes with the India date, so a client that keys read state on id and since sees the same key on every poll)
+     *     and `Resolved`: an attention item whose condition stopped holding is kept for 24 hours with `Resolved` true and then dropped; resolved items are not counted in the badge. `At` is kept as it was (the time of the event, or `Since` for an attention item).
+     */
     PortfolioNotice: {
       id: string;
       kind: string;
@@ -3815,6 +5194,14 @@ export interface components {
       alertId: null | string;
       /** Format: uuid */
       instrumentId: null | string;
+      title?: null | string;
+      actions?: null | components['schemas']['AttentionAction'][];
+      /** Format: date-time */
+      since?: null | string;
+      /** @default false */
+      resolved: boolean;
+      /** Format: uuid */
+      accountId?: null | string;
     };
     PortfolioNotices: {
       items: components['schemas']['PortfolioNotice'][];
@@ -3946,6 +5333,23 @@ export interface components {
       oldest: null | string;
       /** Format: date-time */
       newest: null | string;
+    };
+    /**
+     * @description Hub event `pricesChanged`: the prices that changed for the instruments the connection follows since the last message sent to it (the first messages after `Subscribe` carry all of them). At most one burst a second;
+     *     at most 500 instruments and 32 KB per message (a larger change comes as several messages with the same `asOf`). `asOf` is the server's time when it read the prices (UTC).
+     */
+    PricesChanged: {
+      /** Format: date-time */
+      asOf: string;
+      instruments: {
+        /** Format: uuid */
+        instrumentId: string;
+        /** Format: double */
+        lastPrice: number;
+        /** Format: date-time */
+        priceAt: string;
+        source: string;
+      }[];
     };
     ProblemDetails: {
       type?: null | string;
@@ -4314,6 +5718,20 @@ export interface components {
       /** Format: int32 */
       memberCount: number;
     };
+    /**
+     * @description The multipart form of the report preview and import, for the API contract only (the request is read by ReportUploads). `AccountId` is the account, `Files` the downloaded reports (one or more; CSV, XLS or XLSX). `Choices` is a JSON array of
+     *     `{name, holdingId | instrumentId | isin, remember}`: what scrip names of a transaction report mean. For the import also `Digests` (a JSON array with the preview's digest, or null, for each file in order), `Rebuild` (whether to rebuild the lots of
+     *     trade files, default true) and `AcceptOtherAccount` (a JSON array of the indexes, from 0, of the files to import although the report is for another client code).
+     */
+    ReportUploadForm: {
+      /** Format: uuid */
+      accountId: string;
+      files: components['schemas']['IFormFileCollection'];
+      choices: null | string;
+      digests: null | string;
+      rebuild: null | boolean;
+      acceptOtherAccount: null | string;
+    };
     /** @description Pasted tickers, canonical symbols (`NSE:RELIANCE`) or ISINs, up to 5,000 entries. */
     ResolveInput: {
       symbols: null | string[];
@@ -4500,6 +5918,24 @@ export interface components {
     ServiceList: {
       items: components['schemas']['ServiceView'][];
     };
+    /**
+     * @description What a service that another process runs (the live feed) says about itself, from that process's heartbeat: `state` is its state word (connected · idle · connecting · reconnecting · closed · paused · no_token · token_refused · flapping ·
+     *     stopped · not_running when it reports nothing), `connected` whether it holds a connection, `subscribed` the instruments it carries, `lastTickAt` the time of the last price, `ticksPerSecond` its rate, `lastSeenAt` the
+     *     time of the heartbeat (null when it has never reported) and `summary` the one line the card shows.
+     */
+    ServiceLiveView: {
+      state: string;
+      connected: boolean;
+      /** Format: int32 */
+      subscribed: number;
+      /** Format: date-time */
+      lastTickAt: null | string;
+      /** Format: double */
+      ticksPerSecond: number;
+      /** Format: date-time */
+      lastSeenAt: null | string;
+      summary: string;
+    };
     /** @description A failure to tell the owner of (the bell). `id` is `service:failed:{serviceId}:{yyyy-MM-dd}` (the India date of the failed run): one notice per service per day, with the text and time of the latest failure. `kind` is service_failed; `severity` error. */
     ServiceNotice: {
       id: string;
@@ -4523,7 +5959,10 @@ export interface components {
       /** Format: int32 */
       total: number;
     };
-    /** @description One run (or attempt) of a service. `trigger`: scheduled · catch_up · after · manual. `status`: running · succeeded · failed · skipped. `dataJobId` links the data job a run started. */
+    /**
+     * @description One run (or attempt) of a service. `trigger`: scheduled · catch_up · after · manual. `status`: running · succeeded · failed · skipped; `queued` only in the answer to Run now for a service that another process runs (the live feed):
+     *     the request was accepted and the record does not exist yet (`id` is empty). `dataJobId` links the data job a run started.
+     */
     ServiceRunView: {
       /** Format: uuid */
       id: string;
@@ -4560,6 +5999,10 @@ export interface components {
        */
       revision: number;
     };
+    /**
+     * @description A background process by its heartbeat. `isAlive`: it reported within the last 60 seconds. `state`: what it says about itself (the feed: connected, idle, closed, paused, …; `stopped` in the last beat of a process that was told
+     *     to stop on purpose, which does not make the system unhealthy for ten minutes); null for a process that only says it is alive (the worker).
+     */
     ServiceStatus: {
       name: string;
       instance: string;
@@ -4569,12 +6012,14 @@ export interface components {
       /** Format: date-time */
       lastSeenAt: string;
       isAlive: boolean;
+      state?: null | string;
     };
     /**
      * @description A service on the Services screen (ADR 0018). `status`: healthy · running · failed (its latest run failed) · paused. `schedule` is the stored form (`scheduleWords` says it in words);
      *     `allowedScheduleTypes` are the types the owner may choose; `isDefault` says the choices are the definition's defaults; `lastRun` is the latest run of any kind, `nextRun` the next
      *     scheduled start (null when paused, when it follows another service, is always up or has no day ahead). `revision` is sent back with a save (0 until the first save or seed). A `readOnly`
-     *     entry is set elsewhere (`manageUrl`) and refuses writes.
+     *     entry is set elsewhere (`manageUrl`) and refuses writes. `live` is only given for a service that another process runs (the live feed): what its heartbeat says; its `status` is then derived from the stored row, the
+     *     latest run and that heartbeat (failed when it should be up and does not report).
      */
     ServiceView: {
       id: string;
@@ -4597,6 +6042,7 @@ export interface components {
       isDefault: boolean;
       /** Format: int64 */
       revision: number;
+      live?: null | components['schemas']['ServiceLiveView'];
     };
     /** @description The trading-day timeline: market hours (null on a day without a session), the review cutoff, whether the date is a trading day and every enabled service's starts and bands. */
     ServicesTimeline: {
@@ -4698,6 +6144,25 @@ export interface components {
       elevatedUntil: string;
     };
     /**
+     * @description The answer to `Subscribe`: how many instruments the connection now follows, whether the scope had more than the server follows per connection (1000 instruments, 1000 holding ids), in which case the rest get no pushes and the screen
+     *     keeps their prices from its reads, and `failed` when the server could not read the scope (the database is unavailable): the connection then follows nothing and the screen should subscribe again later. After a good answer the server sends the
+     *     current price of every followed instrument (one or more `pricesChanged` messages, within about a second), then only changes.
+     */
+    SubscribeAck: {
+      /** Format: int32 */
+      subscribed: number;
+      truncated: boolean;
+      failed: boolean;
+    };
+    /** @description The decision about a suggested dividend: `State` is `accepted` (with the `DividendId` created) or `dismissed`. */
+    SuggestionDecisionView: {
+      /** Format: uuid */
+      ledgerEntryId: string;
+      state: string;
+      /** Format: uuid */
+      dividendId: null | string;
+    };
+    /**
      * @description Body of "Sync now" (optional). Confirm: true applies an answer that would close all or most open holdings, which is otherwise refused with
      *     `409 portfolio.confirmation_required` (the problem carries `listedHoldings`, `openHoldings` and `wouldClose`). With Confirm: true both
      *     ExpectedOpenHoldings and ExpectedWouldClose are required (400 portfolio.invalid otherwise): the numbers the owner saw in the 409. If Dhan's answer differs
@@ -4737,7 +6202,8 @@ export interface components {
     /**
      * @description The refresh settings of an account and its latest run. Mode "off" or "daily"; NextRunAt is null when the mode is off. FirstImportDate is the date holdings
      *     get when they are imported without a date of their own; HasHoldings is true once the account has any holding (the first import has happened). Running is
-     *     true while a sync or import of the account is in progress.
+     *     true while a sync or import of the account is in progress. The health (ADR 0027): `ConsecutiveFailedDays` are the days in a row whose last attempt failed (0 when the latest succeeded), `LastFailureReason` a code (`unavailable`, `rate_limited`,
+     *     `interrupted`, `rejected`, `token_expired`, `token_refused`, `not_connected`, `unexpected`; null while healthy), `Attempts` the failed attempts of the day of the latest failure and `RetryAt` when the next quiet retry is due (null when none is pending).
      */
     SyncStatusView: {
       mode: string;
@@ -4749,6 +6215,19 @@ export interface components {
       nextRunAt: null | string;
       running: boolean;
       last: null | components['schemas']['SyncRunView'];
+      /**
+       * Format: int32
+       * @default 0
+       */
+      consecutiveFailedDays: number;
+      lastFailureReason?: null | string;
+      /**
+       * Format: int32
+       * @default 0
+       */
+      attempts: number;
+      /** Format: date-time */
+      retryAt?: null | string;
     };
     SystemStatusResponse: {
       application: components['schemas']['ApplicationStatus'];
@@ -5199,6 +6678,11 @@ export interface components {
       note: null | string;
       acknowledgeCsvAdjusted?: null | boolean;
     };
+    /** @description Body of `PUT /api/auth/profile`. */
+    UpdateProfileRequest: {
+      displayName: string;
+      email: string;
+    };
     /**
      * @description Replaces the account's API key and/or secret (write-only). A value that is left out stays as it is; an empty one is invalid.
      *     ApiKeyIssuedOn is the day the key was generated: it defaults to today when a new API key is given and can also be corrected on its own.
@@ -5379,6 +6863,135 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  GetOwnerAccount: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountResponse'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ChangePassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangePasswordRequest'];
+      };
+    };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Locked */
+      423: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  UpdateProfile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProfileRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AccountResponse'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
       };
     };
   };
@@ -9916,6 +11529,803 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  SyncAccountBrokerHistory: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['BrokerHistoryInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrokerHistoryRunView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAccountBrokerHistoryStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrokerHistoryStatusView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAccountLedger: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        class?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AddDividend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DividendInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  VoidDividend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListHoldingDividends: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListAccountDividends: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListDividendSuggestions: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendSuggestionPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  AcceptDividendSuggestion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['AcceptSuggestionInput'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DismissDividendSuggestion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        entryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionDecisionView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PreviewDividendImport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['DividendUploadForm'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendPreviewReport'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ImportDividends: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['DividendUploadForm'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendImportResult'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListDividendBatches: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendBatchPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  UndoDividendBatch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DividendUndoResult'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  PreviewImports: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ReportUploadForm'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportPreviewResponse'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ImportReports: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['ReportUploadForm'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportRunResponse'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListCostBatches: {
+    parameters: {
+      query?: {
+        accountId?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CostBatchPage'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+    };
+  };
+  UndoCostBatch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CostUndoResult'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLiveStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LiveFeedStatus'];
         };
       };
     };

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -21,6 +22,7 @@ using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Actions;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Calendar;
+using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
@@ -63,6 +65,16 @@ public static class DependencyInjection
         services.AddScoped<IServiceRunStore, ServiceRunStore>();
         services.AddScoped<IPlatformUnitOfWork, PlatformUnitOfWork>();
         services.AddScoped<IDatabaseInfoProvider, DatabaseInfoProvider>();
+        services.AddScoped<ILiveNotifier, LiveNotifier>();
+        services.AddSingleton<ILivePriceChanges, LivePriceChanges>(); // the API's listener on live_prices (ADR 0024 §6)
+
+        // The live feed runs in xd-feed, but the API shows it on the Services screen and its Run now writes the marker the feed reads (ADR 0024 §1).
+        services.AddScoped<IFeedManualRun, FeedManualRun>();
+        services.AddOptions<LiveManualRunOptions>()
+            .Bind(configuration.GetSection(LiveManualRunOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton(sp => new FeedManualRunSettings(TimeSpan.FromMinutes(sp.GetRequiredService<IOptions<LiveManualRunOptions>>().Value.ManualRunMinutes)));
 
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddSingleton<ITokenGenerator, TokenGenerator>();
@@ -123,6 +135,15 @@ public static class DependencyInjection
             .RemoveAllLoggers();
         services.AddScoped<IBrokerHoldings, DhanHoldingsClient>();
 
+        // The trade history and the ledger (ADR 0025) have the holdings read's limits (30 seconds, answers up to 5 MB); the guard allows only GET /v2/trades/{from}/{to}/{page} and GET /v2/ledger with its two dates. Calls are spaced (a singleton throttle).
+        services.AddHttpClient(BrokerHttpClientNames.DhanHistory, BrokerHttp.ConfigureHoldings)
+            .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
+            .AddHttpMessageHandler<BrokerEndpointGuard>()
+            .RemoveAllLoggers();
+        services.AddSingleton<DhanHistoryThrottle>();
+        services.AddScoped<IBrokerTrades, DhanTradesClient>();
+        services.AddScoped<IBrokerLedger, DhanLedgerClient>();
+
         // The market quote of the holdings (ADR 0019): the guard allows only POST /v2/marketfeed/quote; one request a second, shared by every run (a singleton throttle, apart from the bar fetch's).
         services.AddHttpClient(BrokerHttpClientNames.DhanQuote, BrokerHttp.ConfigureQuote)
             .ConfigurePrimaryHttpMessageHandler(BrokerHttp.CreatePrimaryHandler)
@@ -146,14 +167,43 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
         services.AddSingleton<IPortfolioRefreshSettings, PortfolioRefreshSettings>();
+        services.AddOptions<BrokerHistoryOptions>()
+            .Bind(configuration.GetSection(BrokerHistoryOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IBrokerHistorySettings, BrokerHistorySettings>();
+        services.AddSingleton<IBrokerHistoryChannel, BrokerHistoryChannel>();
+        services.AddOptions<HealOptions>()
+            .Bind(configuration.GetSection(HealOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddSingleton<IHealSettings, HealSettings>();
+        services.AddScoped<ISyncHealthStore, SyncHealthStore>();
+        services.AddScoped<IAttentionStore, AttentionStore>();
+        services.AddScoped<IAttentionQueries, AttentionQueries>();
+        services.AddScoped<IBrokerSyncStore, BrokerSyncStore>();
+        services.AddScoped<ILedgerStore, LedgerStore>();
         services.AddScoped<IHoldingStore, HoldingStore>();
         services.AddScoped<IHoldingQueries, HoldingQueries>();
         services.AddScoped<IHoldingClassifications, HoldingClassifications>();
         services.AddScoped<IHoldingSyncStore, HoldingSyncStore>();
         services.AddScoped<ITradeStore, TradeStore>();
+        services.AddScoped<IDividendStore, DividendStore>();
+        services.AddScoped<IDividendSuggestionStore, DividendSuggestionStore>();
+        services.AddScoped<IDividendBatches, DividendBatches>();
+        services.AddScoped<IDividendAliases, DividendAliases>();
+        services.AddScoped<ISecurityAliases, SecurityAliases>();
+        services.AddScoped<IReportClientCodes, ReportClientCodes>();
+        services.AddScoped<ICostBatches, CostBatches>();
+        services.AddSingleton<ISpreadsheetReader, SpreadsheetReader>();
+        services.AddScoped<IInstrumentNames, InstrumentNames>();
+        services.AddScoped<IIncomeQueries, IncomeQueries>();
         services.AddScoped<ITradeBatches, TradeBatches>();
         services.AddScoped<ITradeReferenceData, TradeReferenceData>();
         services.AddScoped<IHoldingQuotes, HoldingQuotes>();
+        services.AddScoped<ILivePrices, LivePrices>();
+        services.AddScoped<ILivePriceReader, LivePriceReader>();
+        services.AddScoped<ILiveScopeResolver, LiveScopeResolver>();
         services.AddScoped<IPortfolioUnitOfWork, PortfolioUnitOfWork>();
         services.AddScoped<IActionStates, ActionStates>();
         services.AddScoped<IActionSettings, ActionSettings>();
@@ -233,6 +283,7 @@ public static class DependencyInjection
         services.AddScoped<IQualityRuns, QualityRunStore>();
         services.AddScoped<IQualityQueries, QualityQueries>();
         services.AddScoped<IListedInstruments, ListedInstruments>();
+        services.AddScoped<ILiveQuotes, LiveQuotes>();
         services.AddScoped<ITradingDayStore, TradingDayStore>();
         services.AddScoped<ICorporateActionStore, CorporateActionStore>();
         services.AddScoped<ICorporateActionQueries, CorporateActionQueries>();
@@ -245,6 +296,18 @@ public static class DependencyInjection
         services.AddSingleton(sp => new RequestThrottle(sp.GetRequiredService<IDataSettings>().DhanRequestsPerSecond, sp.GetRequiredService<TimeProvider>()));
         services.AddScoped<DhanIntradayChartClient>();
         services.AddScoped<IIntradayBarSource, DhanIntradayBarSource>();
+    }
+
+    /// <summary>
+    /// The adapters of the live feed (ADR 0024) - for the <c>xd-feed</c> host: the Dhan feed connector (the WebSocket client behind its allow-list), the <c>LISTEN</c> listener and the index lookup. The sink's own
+    /// ports (<c>ILivePrices</c>, <c>ILiveQuotes</c>, <c>ILiveNotifier</c>) are registered with the modules by <see cref="AddInfrastructure"/>.
+    /// </summary>
+    public static IServiceCollection AddLiveFeed(this IServiceCollection services)
+    {
+        services.AddSingleton<ILiveFeedConnector, DhanFeedConnector>();
+        services.AddSingleton<IActiveSetChanges, ActiveSetChanges>();
+        services.AddScoped<IIndexSecurities, IndexSecurities>();
+        return services;
     }
 
     /// <summary>

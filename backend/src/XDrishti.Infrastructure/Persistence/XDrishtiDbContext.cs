@@ -13,6 +13,7 @@ using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
+using XDrishti.Infrastructure.Market.Live;
 
 namespace XDrishti.Infrastructure.Persistence;
 
@@ -82,6 +83,30 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     public DbSet<TradeBatch> TradeBatches => Set<TradeBatch>();
 
+    public DbSet<BrokerSyncRun> BrokerSyncRuns => Set<BrokerSyncRun>();
+
+    public DbSet<BrokerSyncState> BrokerSyncStates => Set<BrokerSyncState>();
+
+    public DbSet<BrokerSyncWindow> BrokerSyncWindows => Set<BrokerSyncWindow>();
+
+    public DbSet<AttentionRecord> AttentionItems => Set<AttentionRecord>();
+
+    public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
+
+    public DbSet<Dividend> Dividends => Set<Dividend>();
+
+    public DbSet<DividendSuggestion> DividendSuggestions => Set<DividendSuggestion>();
+
+    public DbSet<DividendBatch> DividendBatches => Set<DividendBatch>();
+
+    public DbSet<DividendAlias> DividendAliases => Set<DividendAlias>();
+
+    public DbSet<CostBatch> CostBatches => Set<CostBatch>();
+
+    public DbSet<SecurityAlias> SecurityAliases => Set<SecurityAlias>();
+
+    public DbSet<ReportClientCode> ReportClientCodes => Set<ReportClientCode>();
+
     /// <summary>The master list; written only by bulk import, read by search.</summary>
     internal DbSet<InstrumentRecord> Instruments => Set<InstrumentRecord>();
 
@@ -92,6 +117,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<BarAggRecord> BarsAgg => Set<BarAggRecord>();
 
     internal DbSet<BarCoverageRecord> BarCoverage => Set<BarCoverageRecord>();
+
+    internal DbSet<LiveQuoteRecord> LiveQuotes => Set<LiveQuoteRecord>();
 
     internal DbSet<CsvFileRecord> CsvFiles => Set<CsvFileRecord>();
 

@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
-# One build stage for the whole solution, one small runtime image per host (target: api | worker).
+# One build stage for the whole solution, one small runtime image per host (target: api | worker | feed).
 # Runtime images are Ubuntu "chiseled": no shell, no package manager, non-root user — minimal attack surface.
 ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.400-noble
-ARG ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.12-noble-chiseled
+# 10.0.13: SignalR (the hub of xd-api) in 10.0.12 and earlier has a known denial-of-service vulnerability (GHSA-334f-vvp4-7g6p).
+ARG ASPNET_IMAGE=mcr.microsoft.com/dotnet/aspnet:10.0.13-noble-chiseled
 ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/runtime:10.0.12-noble-chiseled
 
 FROM ${SDK_IMAGE} AS build
@@ -14,20 +15,25 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/XDrishti.Domain/XDrishti.Domain.csproj src/XDrishti.Domain/
 COPY src/XDrishti.Application/XDrishti.Application.csproj src/XDrishti.Application/
+COPY src/XDrishti.Indicators/XDrishti.Indicators.csproj src/XDrishti.Indicators/
+COPY src/XDrishti.Strategies/XDrishti.Strategies.csproj src/XDrishti.Strategies/
 COPY src/XDrishti.Infrastructure/XDrishti.Infrastructure.csproj src/XDrishti.Infrastructure/
 COPY src/XDrishti.Hosting/XDrishti.Hosting.csproj src/XDrishti.Hosting/
 COPY src/XDrishti.Api/XDrishti.Api.csproj src/XDrishti.Api/
 COPY src/XDrishti.Worker/XDrishti.Worker.csproj src/XDrishti.Worker/
+COPY src/XDrishti.Feed/XDrishti.Feed.csproj src/XDrishti.Feed/
 RUN --mount=type=cache,id=xd-nuget,target=/root/.nuget/packages \
     dotnet restore src/XDrishti.Api/XDrishti.Api.csproj && \
-    dotnet restore src/XDrishti.Worker/XDrishti.Worker.csproj
+    dotnet restore src/XDrishti.Worker/XDrishti.Worker.csproj && \
+    dotnet restore src/XDrishti.Feed/XDrishti.Feed.csproj
 
-# 2) Build and publish both hosts.
+# 2) Build and publish the hosts.
 COPY src/ src/
 ARG VERSION=0.1.0
 RUN --mount=type=cache,id=xd-nuget,target=/root/.nuget/packages \
     dotnet publish src/XDrishti.Api/XDrishti.Api.csproj -c Release -o /out/api --no-restore -p:UseAppHost=false -p:Version=${VERSION} && \
-    dotnet publish src/XDrishti.Worker/XDrishti.Worker.csproj -c Release -o /out/worker --no-restore -p:UseAppHost=false -p:Version=${VERSION}
+    dotnet publish src/XDrishti.Worker/XDrishti.Worker.csproj -c Release -o /out/worker --no-restore -p:UseAppHost=false -p:Version=${VERSION} && \
+    dotnet publish src/XDrishti.Feed/XDrishti.Feed.csproj -c Release -o /out/feed --no-restore -p:UseAppHost=false -p:Version=${VERSION}
 
 FROM ${ASPNET_IMAGE} AS api
 WORKDIR /app
@@ -43,3 +49,10 @@ WORKDIR /app
 COPY --from=build /out/worker ./
 USER $APP_UID
 ENTRYPOINT ["dotnet", "XDrishti.Worker.dll"]
+
+FROM ${RUNTIME_IMAGE} AS feed
+WORKDIR /app
+COPY --from=build /out/feed ./
+USER $APP_UID
+HEALTHCHECK --interval=15s --timeout=10s --start-period=20s --retries=3 CMD ["dotnet", "XDrishti.Feed.dll", "--healthcheck"]
+ENTRYPOINT ["dotnet", "XDrishti.Feed.dll"]

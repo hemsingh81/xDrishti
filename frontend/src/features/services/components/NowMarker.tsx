@@ -1,5 +1,6 @@
 import { Box } from '@mui/material';
 import { istClockParts } from '@/shared/lib/istClock';
+import { rem } from '@/theme';
 import { minutesPerDay } from '../lib/timeline';
 import { nowRowHeight, trackHeight } from './timelineMetrics';
 
@@ -25,7 +26,7 @@ export function NowMarker({ minutes, at }: { minutes: number; at: number }) {
           borderRadius: 1,
           bgcolor: 'primary.main',
           color: 'primary.contrastText',
-          fontSize: '0.75rem',
+          fontSize: rem(12),
           fontWeight: 700,
           whiteSpace: 'nowrap',
           fontVariantNumeric: 'tabular-nums',

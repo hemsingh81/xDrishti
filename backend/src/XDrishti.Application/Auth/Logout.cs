@@ -29,7 +29,8 @@ internal sealed class LogoutHandler(
         audit.Record(AuditEvent.Record(AuditEventType.Logout, now, found.Owner.Email, command.Client.Ip, command.Client.UserAgent));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        AuthLog.LoggedOut(logger, found.Owner.Email);
+        var logEmail = LogSanitizer.Email(found.Owner.Email);
+        AuthLog.LoggedOut(logger, logEmail);
         return Result.Success();
     }
 }

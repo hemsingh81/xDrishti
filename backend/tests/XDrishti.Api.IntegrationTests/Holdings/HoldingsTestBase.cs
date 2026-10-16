@@ -18,7 +18,7 @@ public abstract class HoldingsTestBase(ApiFactory factory) : IAsyncLifetime
 
     protected static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    protected SignedInClient Owner { get; private set; } = null!;
+    protected SignedInClient Owner { get; set; } = null!;
 
     protected HttpClient Client => Owner.Client;
 

@@ -1,0 +1,112 @@
+namespace XDrishti.Domain.Portfolio;
+
+/// <summary>
+/// What a broker history run did (ADR 0025), kept as JSON on the run. <see cref="WindowsDone"/> of <see cref="WindowsTotal"/> date windows are read and stored; <see cref="Halved"/> windows were split in half because Dhan refused them as too large or answered "no data" for a stretch of several dates (the halves settle which).
+/// <see cref="Read"/> rows came from Dhan, <see cref="Stored"/> are new, <see cref="Duplicates"/> were stored already, <see cref="Dropped"/> were unusable rows, <see cref="Enriched"/> of the <see cref="Duplicates"/> were completed (a trade stored by an earlier read without its ISIN or charges got them from this one; nothing else of it is touched) and <see cref="Skipped"/> were not NSE equity trades (by reason in
+/// <see cref="SkippedByReason"/>). After a trade run the automatic rebuild adds <see cref="Rebuilt"/> holdings rebuilt, <see cref="Unchanged"/> already right, <see cref="NeedsReview"/> holdings with a hand-dated lot that were left alone and the
+/// first <see cref="MaxNotRebuiltListed"/> of the holdings or securities that were left alone with their reason (<see cref="NotRebuiltTotal"/> counts all of them). <see cref="EmptyByNoData"/> counts the windows (or half-windows) that were taken as
+/// empty only because Dhan answered DH-907 ("incorrect parameters or no data present") to the first page: that code means both "nothing there" and "bad request", so the owner can see how often an empty stretch rested on it alone.
+/// <c>Attempts</c> is the number of this attempt within the day's occurrence (1 for the scheduled or manual start, 2 to 4 for the quiet retries of ADR 0027), <c>FailureReason</c> the plain reason code of a failed run (<c>unavailable</c>, <c>rate_limited</c>,
+/// <c>token_expired</c> ...) and <c>DeepenedTo</c> the earliest date an earlier-history read of this run reached. Counts only: no trade or ledger content.
+/// </summary>
+public sealed record BrokerSyncCounts
+{
+    /// <summary>The most holdings or securities listed in <see cref="NotRebuilt"/>.</summary>
+    public const int MaxNotRebuiltListed = 50;
+
+    public static BrokerSyncCounts None { get; } = new();
+
+    public int WindowsDone { get; init; }
+
+    public int WindowsTotal { get; init; }
+
+    public int Halved { get; init; }
+
+    public int Read { get; init; }
+
+    public int Stored { get; init; }
+
+    public int Duplicates { get; init; }
+
+    public int Dropped { get; init; }
+
+    /// <summary>Why rows were dropped: the number of <see cref="Dropped"/> rows per reason code (<c>missing_id</c>, <c>bad_quantity</c>, <c>zero_amount</c> ...; see <c>BrokerDropReasons</c>). Empty in a run recorded before ISS-03 and when nothing was dropped; the figures add up to <see cref="Dropped"/> for a run that has them.</summary>
+    public IReadOnlyDictionary<string, int> DroppedByReason { get; init; } = new Dictionary<string, int>();
+
+    /// <summary>The location of the first <see cref="BrokerDrops.MaxLocations"/> dropped rows of the run (request dates, page, row index and reason code) - never their content.</summary>
+    public IReadOnlyList<BrokerDroppedRow> DroppedRows { get; init; } = [];
+
+    /// <summary>Trades stored already (counted in <see cref="Duplicates"/> too) that got an ISIN, charges or ticker they lacked from this read.</summary>
+    public int Enriched { get; init; }
+
+    public int Skipped { get; init; }
+
+    /// <summary>Windows (or half-windows) taken as empty only because Dhan answered DH-907 to the first page.</summary>
+    public int EmptyByNoData { get; init; }
+
+    public IReadOnlyDictionary<string, int> SkippedByReason { get; init; } = new Dictionary<string, int>();
+
+    public int Rebuilt { get; init; }
+
+    public int Unchanged { get; init; }
+
+    public int NeedsReview { get; init; }
+
+    public int NotRebuiltTotal { get; init; }
+
+    public IReadOnlyList<BrokerNotRebuilt> NotRebuilt { get; init; } = [];
+
+    /// <summary>The number of this attempt within the occurrence: 1 for the first, up to 4 with the three retries. 0 for a run recorded before ADR 0027 (read as 1).</summary>
+    public int Attempts { get; init; }
+
+    /// <summary>The plain reason code of why the run failed; null while it runs and when it succeeded.</summary>
+    public string? FailureReason { get; init; }
+
+    /// <summary>The earliest date a read of earlier history reached in this run (null: none was made).</summary>
+    public DateOnly? DeepenedTo { get; init; }
+
+    /// <summary>Trades run: bill-level rows of an imported Dhan report that the trades of this run replaced. Ledger run: imported depository-charge entries that the charges of this run replaced. Voided as superseded, ADR 0029.</summary>
+    public int Superseded { get; init; }
+
+    /// <summary>Of the replaced rows' day-security-side groups, how many had a different total quantity than the broker's trades.</summary>
+    public int SupersededDiffering { get; init; }
+
+    /// <summary>The version of the Dhan mapping the windows in <see cref="RereadDone"/> were read again with (0: none were read again). A failed run's list is only taken over by the run that follows it when the version is still the same (ADR 0030).</summary>
+    public int RereadVersion { get; init; }
+
+    /// <summary>
+    /// The windows read again since the mapping changed (ADR 0027) that are done: each is added in the unit of work that stores the window, so a run that fails later does not make the retry read them again (ADR 0030). The run that follows a failed
+    /// one starts with the failed run's list (same <see cref="RereadVersion"/>) and adds its own. Dates only.
+    /// </summary>
+    public IReadOnlyList<BrokerWindowSpan> RereadDone { get; init; } = [];
+
+    /// <summary>Adds the figures of one window read; <paramref name="drops"/> explains the <paramref name="dropped"/> rows (those it does not account for are counted as <see cref="BrokerDrops.Other"/>).</summary>
+    public BrokerSyncCounts AddWindow(int read, int stored, int duplicates, int dropped, IReadOnlyDictionary<string, int> skipped, bool halved, int emptyByNoData = 0, int enriched = 0, int superseded = 0, int supersededDiffering = 0, BrokerDrops? drops = null)
+    {
+        ArgumentNullException.ThrowIfNull(skipped);
+        var merged = new SortedDictionary<string, int>(SkippedByReason.ToDictionary(p => p.Key, p => p.Value), StringComparer.Ordinal);
+        foreach (var (reason, count) in skipped)
+        {
+            merged[reason] = merged.GetValueOrDefault(reason) + count;
+        }
+
+        var dropsOfWindow = (drops ?? BrokerDrops.None).Reconciled(dropped);
+        return this with
+        {
+            WindowsDone = WindowsDone + 1,
+            Halved = Halved + (halved ? 1 : 0),
+            Read = Read + read,
+            Stored = Stored + stored,
+            Duplicates = Duplicates + duplicates,
+            Dropped = Dropped + dropped,
+            DroppedByReason = BrokerDrops.Merge(DroppedByReason, dropsOfWindow.ByReason),
+            DroppedRows = [.. DroppedRows.Concat(dropsOfWindow.Rows).Take(BrokerDrops.MaxLocations)],
+            Enriched = Enriched + enriched,
+            EmptyByNoData = EmptyByNoData + emptyByNoData,
+            Superseded = Superseded + superseded,
+            SupersededDiffering = SupersededDiffering + supersededDiffering,
+            Skipped = merged.Values.Sum(),
+            SkippedByReason = merged,
+        };
+    }
+}

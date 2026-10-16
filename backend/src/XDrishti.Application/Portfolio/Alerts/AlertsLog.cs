@@ -16,4 +16,7 @@ internal static partial class AlertsLog
 
     [LoggerMessage(EventId = 4064, Level = LogLevel.Information, Message = "Price alerts checked: {Active} active, {Quoted} quoted, {Triggered} triggered")]
     public static partial void Checked(ILogger logger, int active, int quoted, int triggered);
+
+    [LoggerMessage(EventId = 4065, Level = LogLevel.Warning, Message = "Price alert check not saved ({Hits} alerts hit, none triggered): {Code}; the alerts stay active and the next tick checks them again")]
+    public static partial void CheckNotSaved(ILogger logger, int hits, string code);
 }

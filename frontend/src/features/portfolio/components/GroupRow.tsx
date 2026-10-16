@@ -4,6 +4,8 @@ import type { HoldingGroup } from '@/shared/api';
 import { figureCellSx, groupColumns } from './groupColumns';
 import { GroupChildren, type GroupScope } from './GroupChildren';
 import { GroupExpander } from './GroupExpander';
+import { isUnallocatedGroup } from '../lib/income';
+import { UnallocatedRow } from './UnallocatedRow';
 
 interface GroupRowProps {
   group: HoldingGroup;
@@ -15,6 +17,8 @@ interface GroupRowProps {
 /** One group: its name (the button that opens it) and figures, and below it, when opened, its holdings. */
 export function GroupRow({ group, expanded, scope, onToggle }: GroupRowProps) {
   const regionId = useId();
+  // Dividends and costs that belong to no group: a row of its own, not a group of holdings (nothing to open).
+  if (isUnallocatedGroup(group)) return <UnallocatedRow group={group} />;
   return (
     <>
       <TableRow hover>

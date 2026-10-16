@@ -7,7 +7,9 @@ using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Portfolio;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Portfolio.Refresh;
+using XDrishti.Application.Tests.Portfolio.Heal;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Portfolio;
 using static XDrishti.Application.Tests.Portfolio.PortfolioFixture;
@@ -26,6 +28,8 @@ public sealed class PortfolioRefreshRunnerTests
 
     private readonly FixedSettings _settings = new();
 
+    private readonly RecordingAttentionReconciler _attention = new();
+
     // Dhan states a token valid for days, so that it does not expire while a test moves the clock from day to day.
     public PortfolioRefreshRunnerTests() => _fx.Connections.Dhan.StatedExpiry = new DateTimeOffset(2026, 10, 30, 0, 0, 0, TimeSpan.Zero);
 
@@ -36,6 +40,7 @@ public sealed class PortfolioRefreshRunnerTests
         provider.GetService(typeof(IHoldingSyncStore)).Returns(_fx.Data);
         provider.GetService(typeof(ICommandHandler<SyncHoldingsCommand, SyncRunView>)).Returns(_ => _fx.Sync());
         provider.GetService(typeof(ICommandHandler<RecoverInterruptedSyncsCommand>)).Returns(_ => _fx.Recover());
+        provider.GetService(typeof(IAttentionReconciler)).Returns(_attention);
         var scope = Substitute.For<IServiceScope>();
         scope.ServiceProvider.Returns(provider);
         var scopes = Substitute.For<IServiceScopeFactory>();
@@ -276,6 +281,37 @@ public sealed class PortfolioRefreshRunnerTests
 
         interrupted.Status.ShouldBe(SyncStatus.Failed);
         _fx.Dhan.Tokens.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_disabled_refresh_still_reconciles_the_attention_items_and_applies_their_retention_once_before_returning()
+    {
+        _settings.Enabled = false;
+        SetTime(12, 10, 0);
+
+        await Runner().RunAsync(CancellationToken.None);
+
+        (_attention.Reconciles, _attention.Retentions).ShouldBe((1, 1));
+    }
+
+    [Fact]
+    public async Task An_enabled_refresh_reconciles_once_at_startup_before_the_first_sync_starts()
+    {
+        await OnAsync(Daily("09:00"));
+        _fx.Dhan.Rows.Add(Row());
+        SetTime(12, 10, 0); // the first look finds the account due
+        using var stop = new CancellationTokenSource();
+        var reconcilesWhenTheSyncReachedDhan = -1;
+        _fx.Dhan.BeforeAnswer = () =>
+        {
+            reconcilesWhenTheSyncReachedDhan = _attention.Reconciles;
+            return stop.CancelAsync();
+        };
+
+        await Runner().RunAsync(stop.Token);
+
+        reconcilesWhenTheSyncReachedDhan.ShouldBe(1);
+        _attention.Retentions.ShouldBe(1);
     }
 
     private sealed class FixedSettings : IPortfolioRefreshSettings

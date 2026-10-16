@@ -2,14 +2,19 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.HttpOverrides;
 using Scalar.AspNetCore;
 using Serilog;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
+using XDrishti.Api.Live;
 using XDrishti.Api.Market;
 using XDrishti.Api.Platform;
 using XDrishti.Api.Portfolio;
+using XDrishti.Application;
+using XDrishti.Application.Abstractions.Live;
+using XDrishti.Application.Live.Push;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -34,6 +39,8 @@ internal static class ApiSetup
                 return Task.CompletedTask;
             });
             o.AddSchemaTransformer(ProblemDetailsSchema.AddExtensions);
+            o.AddDocumentTransformer(HubContractDocument.AddAsync);
+            o.AddDocumentTransformer(AttentionCommandsContractDocument.AddAsync);
         });
         services.ConfigureHttpJsonOptions(o =>
         {
@@ -63,6 +70,11 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PortfolioActionsEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioAlertsEndpoints>();
         services.AddSingleton<IEndpointModule, PortfolioTradesEndpoints>();
+        services.AddSingleton<IEndpointModule, BrokerHistoryEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioDividendsEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioDividendImportEndpoints>();
+        services.AddSingleton<IEndpointModule, PortfolioImportsEndpoints>();
+        services.AddSingleton<IEndpointModule, LiveEndpoints>();
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes.
         services.AddHostedService<RefreshJobWorker>();
@@ -75,7 +87,33 @@ internal static class ApiSetup
 
         // Holdings (ADR 0012): the automatic refresh of the accounts that switched it on.
         services.AddHostedService<PortfolioRefreshService>();
+
+        // Trades and ledger read from Dhan (ADR 0025): the worker that carries out the runs "Sync now" registered; the nightly read is a service of the scheduler above.
+        services.AddHostedService<BrokerHistoryWorker>();
+
+        services.AddLiveHub();
         return services;
+    }
+
+    /// <summary>
+    /// The SignalR hub <c>/hubs/events</c> (ADR 0024 §7, P2-10a): the push coordinator of the Application layer, the way out to the connections, and the hosted loop that runs the listener and the pushes. The hub is not mapped to the
+    /// feed: <c>xd-api</c> never references it and runs the same without it. Messages use the API's source-generated JSON (camelCase, numbers as numbers).
+    /// </summary>
+    private static void AddLiveHub(this IServiceCollection services)
+    {
+        services.AddSignalR(o =>
+        {
+            o.MaximumReceiveMessageSize = 64 * 1024; // a Subscribe with 1000 holding ids is about 40 KB
+            o.EnableDetailedErrors = false;
+        }).AddJsonProtocol(o =>
+        {
+            o.PayloadSerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+            o.PayloadSerializerOptions.TypeInfoResolverChain.Insert(0, ApiJsonContext.Default);
+        });
+        services.AddSingleton<SignalRLiveClients>();
+        services.AddSingleton<ILiveClients>(sp => sp.GetRequiredService<SignalRLiveClients>());
+        services.AddLivePush();
+        services.AddHostedService<LivePushService>();
     }
 
     public static WebApplication UseApi(this WebApplication app)
@@ -89,6 +127,7 @@ internal static class ApiSetup
             o.Logger = app.Services.GetRequiredService<Serilog.ILogger>(); // the host's logger (HostDefaults keeps the static one out)
         });
 
+        app.UseMiddleware<HubOriginMiddleware>(); // before the session is looked at: another origin gets its 403 without touching it
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseMiddleware<CsrfProtectionMiddleware>();
@@ -110,6 +149,9 @@ internal static class ApiSetup
             .DisableTelemetry()
             .HideClientButton())
             .RequireAuthorization();
+
+        // The hub: owner session (the fallback policy, stated again by [Authorize] on the hub), WebSockets only.
+        app.MapHub<EventsHub>(LiveHubContract.Route, o => o.Transports = HttpTransportType.WebSockets).RequireAuthorization();
 
         var api = app.MapGroup("/api");
         foreach (var module in app.Services.GetServices<IEndpointModule>())

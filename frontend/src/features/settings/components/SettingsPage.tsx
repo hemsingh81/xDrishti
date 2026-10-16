@@ -3,7 +3,6 @@ import { Box, Tab, Tabs } from '@mui/material';
 import { useSearchParams } from 'react-router';
 import { RiskProfilesView, RoleMatrixView } from '@/features/accounts';
 import { PageHeader } from '@/shared/ui';
-import { ToastProvider } from '@/shared/ui/ToastProvider';
 import { ActionThresholdsCard } from './ActionThresholdsCard';
 
 const settingsTabs = [
@@ -23,7 +22,7 @@ export function SettingsPage() {
   const tab = parseTab(params.get('tab'));
 
   return (
-    <ToastProvider>
+    <>
       <PageHeader
         title="Settings"
         icon={TuneIcon}
@@ -50,6 +49,6 @@ export function SettingsPage() {
         {tab === 'roles' && <RoleMatrixView />}
         {tab === 'actions' && <ActionThresholdsCard />}
       </Box>
-    </ToastProvider>
+    </>
   );
 }

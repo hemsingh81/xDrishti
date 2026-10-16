@@ -247,11 +247,11 @@ internal sealed class InMemoryServiceData : IServiceScheduleStore, IServiceRunSt
         }
     }
 
-    public ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, string message, CancellationToken cancellationToken)
+    public ValueTask<int> FailInterruptedAsync(DateTimeOffset processStartedAt, DateTimeOffset now, string message, IReadOnlyCollection<string> exceptServiceIds, CancellationToken cancellationToken)
     {
         lock (_gate)
         {
-            var running = Runs.Where(r => r.IsRunning && r.StartedAt < processStartedAt).ToList();
+            var running = Runs.Where(r => r.IsRunning && r.StartedAt < processStartedAt && !exceptServiceIds.Contains(r.ServiceId)).ToList();
             foreach (var run in running)
             {
                 run.Fail(now, message);

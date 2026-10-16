@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
@@ -7,6 +8,8 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Live;
+using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
@@ -25,9 +28,16 @@ using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Attention;
+using XDrishti.Application.Portfolio.BrokerHistory;
+using XDrishti.Application.Portfolio.DividendImport;
+using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Portfolio.Heal;
+using XDrishti.Application.Portfolio.Live;
 using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
+using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Domain.Common;
 
@@ -42,11 +52,16 @@ public static class DependencyInjection
 
         services.AddScoped<IQueryHandler<GetSystemStatusQuery, SystemStatusResponse>, GetSystemStatusHandler>();
         services.AddScoped<ICommandHandler<RecordHeartbeatCommand>, RecordHeartbeatHandler>();
+        services.AddScoped<IFeedHeartbeats, FeedHeartbeats>();
 
         services.AddScoped<ICommandHandler<LoginCommand, LoginResult>, LoginHandler>();
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutHandler>();
         services.AddScoped<ICommandHandler<StepUpCommand, StepUpResult>, StepUpHandler>();
         services.AddScoped<IQueryHandler<VerifySessionQuery, Result<VerifiedSession>>, VerifySessionHandler>();
+        services.AddScoped<IQueryHandler<ListEndedSessionsQuery, IReadOnlyList<Guid>>, ListEndedSessionsHandler>();
+        services.AddScoped<IQueryHandler<GetOwnerAccountQuery, Result<AccountResponse>>, GetOwnerAccountHandler>();
+        services.AddScoped<ICommandHandler<ChangePasswordCommand>, ChangePasswordHandler>();
+        services.AddScoped<ICommandHandler<UpdateProfileCommand, AccountResponse>, UpdateProfileHandler>();
         services.AddScoped<IQueryHandler<GetAuditQuery, IReadOnlyList<AuditEventResponse>>, GetAuditHandler>();
         services.AddScoped<ICommandHandler<ProvisionOwnerCommand, ProvisionOutcome>, ProvisionOwnerHandler>();
         services.AddScoped<ICommandHandler<ResetOwnerPasswordCommand>, ResetOwnerPasswordHandler>();
@@ -60,6 +75,40 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// The live feed's engine (ADR 0024) - only for the <c>xd-feed</c> host: the active set (providers, loader), the connection manager, the supervisor that owns the window, the run record and the heartbeat, and their figures. The host provides
+    /// <see cref="LiveFeedSettings"/> (from its options) and, through <c>AddInfrastructure</c> and <c>AddLiveFeed</c>, the ports they use.
+    /// </summary>
+    public static IServiceCollection AddFeedEngine(this IServiceCollection services)
+    {
+        services.AddScoped<IActiveSetProvider, HoldingsProvider>();
+        services.AddScoped<IActiveSetProvider, AlertsProvider>();
+        services.AddScoped<IActiveSetProvider, IndicesProvider>();
+        services.AddSingleton<MissingIndexReport>();
+        services.AddSingleton<ActiveSetLoader>();
+        services.AddSingleton<FeedPacketStats>();
+        services.AddSingleton<FeedMetrics>();
+        services.AddSingleton<ReconnectBackoff>();
+        services.AddSingleton<FeedConnectionManager>();
+        services.AddSingleton<IFeedSession>(sp => sp.GetRequiredService<FeedConnectionManager>());
+        services.AddSingleton<IFeedSupervisor, LiveFeedSupervisor>();
+        return services;
+    }
+
+    /// <summary>
+    /// The SignalR hub's push (ADR 0024 §7, P2-10a) - only for the <c>xd-api</c> host: the coordinator that follows the connected screens (a singleton; the host runs its loop) and the status query. The host provides <see cref="ILiveClients"/>
+    /// (the way out to the connections); <c>AddInfrastructure</c> provides the listener, the scope resolver and the price reader.
+    /// </summary>
+    public static IServiceCollection AddLivePush(this IServiceCollection services)
+    {
+        services.AddSingleton(PushSettings.Default);
+        services.AddSingleton<LivePushCoordinator>();
+        services.AddSingleton<ILiveSubscriptions>(sp => sp.GetRequiredService<LivePushCoordinator>());
+        services.AddSingleton<ILivePushLoop>(sp => sp.GetRequiredService<LivePushCoordinator>());
+        services.AddScoped<IQueryHandler<GetLiveStatusQuery, LiveFeedStatus>, GetLiveStatusHandler>();
+        return services;
+    }
+
+    /// <summary>
     /// The services framework (ADR 0018): the registry of the services other modules register as <see cref="IScheduledService"/>, the runner and the scheduler (singletons: the API's hosted service runs the
     /// scheduler for the lifetime of the process), the reads of the Services screen and the use cases behind its endpoints.
     /// </summary>
@@ -69,6 +118,8 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, EodService>();
         services.AddSingleton<IScheduledService, InstrumentMasterService>();
         services.AddSingleton<IScheduledService, HoldingQuotesService>();
+        services.AddSingleton<IScheduledService, PortfolioBrokerHistoryService>();
+        services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
         services.AddSingleton<ServiceScheduler>();
@@ -276,6 +327,55 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<VoidTradeCommand, TradeView>, VoidTradeHandler>();
         services.AddScoped<ICommandHandler<RebuildLotsCommand, HoldingRebuildResult>, RebuildLotsHandler>();
         services.AddScoped<IQueryHandler<GetTradeTemplateQuery, string>, GetTradeTemplateHandler>();
+
+        // The trades and the ledger read from Dhan, and the automatic rebuild of lots after a trade sync (ADR 0025). "Sync now" registers the run and a background worker carries it on; the scheduled service (AddServices) uses the waiting form.
+        services.AddScoped<BrokerHistoryAccess>();
+        services.AddScoped<BrokerHistoryReader>();
+        services.AddScoped<BrokerLotRebuilder>();
+        services.AddScoped<BrokerHistoryPipeline>();
+        services.AddScoped<SyncHealthRecorder>();
+        services.AddScoped<PortfolioHealer>();
+        services.AddScoped<IAttentionFactsSource, AttentionFactsLoader>();
+        services.AddScoped<IAttentionReconciler, AttentionReconciler>();
+        services.AddScoped<ICommandHandler<StartBrokerHistoryCommand, BrokerHistoryRunView>, StartBrokerHistoryHandler>();
+        services.AddScoped<ICommandHandler<ExecuteBrokerHistoryCommand>, ExecuteBrokerHistoryHandler>();
+        services.AddScoped<ICommandHandler<SyncBrokerHistoryCommand, BrokerHistoryRunView>, SyncBrokerHistoryHandler>();
+        services.AddScoped<IQueryHandler<GetBrokerHistoryStatusQuery, Result<BrokerHistoryStatusView>>, GetBrokerHistoryStatusHandler>();
+        services.AddScoped<IQueryHandler<ListLedgerQuery, Result<LedgerPage>>, ListLedgerHandler>();
+
+        // Dividends entered by the owner, and the suggestions from the ledger (ADR 0026).
+        services.AddScoped<ICommandHandler<AddDividendCommand, DividendView>, AddDividendHandler>();
+        services.AddScoped<ICommandHandler<VoidDividendCommand, DividendView>, VoidDividendHandler>();
+        services.AddScoped<IQueryHandler<ListHoldingDividendsQuery, Result<DividendPage>>, ListHoldingDividendsHandler>();
+        services.AddScoped<IQueryHandler<ListAccountDividendsQuery, Result<DividendPage>>, ListAccountDividendsHandler>();
+        services.AddScoped<IQueryHandler<ListDividendSuggestionsQuery, Result<DividendSuggestionPage>>, ListDividendSuggestionsHandler>();
+        services.AddScoped<ICommandHandler<AcceptDividendSuggestionCommand, DividendView>, AcceptDividendSuggestionHandler>();
+        services.AddScoped<ICommandHandler<DismissDividendSuggestionCommand, SuggestionDecisionView>, DismissDividendSuggestionHandler>();
+
+        // Dividends from a payout file: preview, import with choices and remembered names, history, undo (ADR 0028). The workspace is shared by the use cases.
+        services.AddScoped<DividendWorkspace>();
+        services.AddScoped<IQueryHandler<PreviewDividendsQuery, Result<DividendPreviewReport>>, PreviewDividendsHandler>();
+        services.AddScoped<ICommandHandler<ImportDividendsCommand, DividendImportResult>, ImportDividendsHandler>();
+        services.AddScoped<IQueryHandler<ListDividendBatchesQuery, Result<DividendBatchPage>>, ListDividendBatchesHandler>();
+        services.AddScoped<ICommandHandler<UndoDividendBatchCommand, DividendUndoResult>, UndoDividendBatchHandler>();
+
+        // Dhan's downloaded reports - global transaction report, depository charges, demat holding - recognised by their title and header, previewed and imported with Undo (ADR 0029). The workspace and the services are shared by the use cases.
+        services.AddScoped<SyncGuard>();
+        services.AddScoped<TradeImporter>();
+        services.AddScoped<ReportWorkspace>();
+        services.AddScoped<ReportClientCodes>();
+        services.AddScoped<BillService>();
+        services.AddScoped<DpService>();
+        services.AddScoped<DematService>();
+        services.AddScoped<ReportPreviewer>();
+        services.AddScoped<IQueryHandler<PreviewImportFileQuery, Result<ImportFilePreview>>, PreviewImportFileHandler>();
+        services.AddScoped<ICommandHandler<ImportFileCommand, ImportFileResult>, ImportFileHandler>();
+        services.AddScoped<IQueryHandler<ListCostBatchesQuery, Result<CostBatchPage>>, ListCostBatchesHandler>();
+        services.AddScoped<ICommandHandler<UndoCostBatchCommand, CostUndoResult>, UndoCostBatchHandler>();
+
+        // The live price sink (ADR 0024): a singleton for the lifetime of the feed process; it resolves the scoped ports per flush.
+        services.AddSingleton<LiveFlush>();
+        services.AddSingleton<ILiveFlush>(sp => sp.GetRequiredService<LiveFlush>());
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();

@@ -42,7 +42,8 @@ internal sealed class ProvisionOwnerHandler(
         audit.Record(AuditEvent.Record(AuditEventType.OwnerProvisioned, now, owner.Email, ClientInfo.Deployment.Ip, null));
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        AuthLog.OwnerProvisioned(logger, owner.Email);
+        var logEmail = LogSanitizer.Email(owner.Email);
+        AuthLog.OwnerProvisioned(logger, logEmail);
         return Result.Success(ProvisionOutcome.Created);
     }
 }

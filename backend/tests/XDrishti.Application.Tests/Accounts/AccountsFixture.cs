@@ -54,7 +54,12 @@ internal sealed class AccountsFixture
 
     public HoldingsFetcher Fetcher => new(Data, Data, Connections, Data, HoldingsDhan, HoldingsInstruments, Clock);
 
-    public SyncRuns Runs => new(PortfolioData, PortfolioData, Clock, NullLogger<SyncRuns>.Instance);
+    public SyncRuns Runs => new(PortfolioData, PortfolioData, HealthRecorder, Clock, NullLogger<SyncRuns>.Instance);
+
+    /// <summary>What the recorder calls when a sync ends: it only counts (the items themselves are tested on their own).</summary>
+    public XDrishti.Application.Tests.Portfolio.Heal.RecordingAttentionReconciler Attention { get; } = new();
+
+    public XDrishti.Application.Portfolio.Heal.SyncHealthRecorder HealthRecorder => new(PortfolioData.Health, Attention, Clock, NullLogger<XDrishti.Application.Portfolio.Heal.SyncHealthRecorder>.Instance);
 
     public HoldingsImporter Importer => new(Fetcher, Runs, PortfolioData, Data, Clock, NullLogger<HoldingsImporter>.Instance);
 

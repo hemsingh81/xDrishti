@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Portfolio.Returns;
 
 namespace XDrishti.Application.Portfolio.Groups;
@@ -11,19 +12,36 @@ internal static class GroupCalculator
 {
     private const int Decimals = 4;
 
-    public static HoldingGroup Group(GroupSlice slice, DateOnly valuationDate, decimal? scopeValue, IReadOnlyList<GroupPart>? parts)
+    /// <summary>
+    /// The figures of one group. <paramref name="accountLevel"/> are the accounts whose own dividends and costs (those of no holding) belong to the group: the group's account when grouping by account, none otherwise (ADR 0026).
+    /// </summary>
+    public static HoldingGroup Group(
+        GroupSlice slice, DateOnly valuationDate, decimal? scopeValue, IReadOnlyList<GroupPart>? parts, IncomeBook book, IReadOnlyCollection<Guid> accountLevel)
     {
         ArgumentNullException.ThrowIfNull(slice);
-        var f = Figures(slice.Holdings, valuationDate);
+        var f = Figures(slice.Holdings, valuationDate, book, accountLevel);
         return new HoldingGroup(
-            slice.Key, slice.Name, f.Holdings, f.Unpriced, f.Invested, f.Value, f.Pnl, f.PnlPct, f.Realised, f.Xirr, f.XirrState, f.DayChange, f.DayChangePct, f.DayChangeExcluded, Weight(f.Value, scopeValue), parts);
+            slice.Key, slice.Name, f.Holdings, f.Unpriced, f.Invested, f.Value, f.Pnl, f.PnlPct, f.Realised, f.Xirr, f.XirrState, f.DayChange, f.DayChangePct, f.DayChangeExcluded, Weight(f.Value, scopeValue), parts, f.Income);
     }
 
-    public static HoldingGroupTotal Total(IReadOnlyList<HoldingData> holdings, DateOnly valuationDate)
+    /// <summary>The scope's total; <paramref name="accountLevel"/> are the accounts whose own dividends and costs are part of it (all accounts of the scope when it is not narrowed to a bucket or a text).</summary>
+    public static HoldingGroupTotal Total(IReadOnlyList<HoldingData> holdings, DateOnly valuationDate, IncomeBook book, IReadOnlyCollection<Guid> accountLevel)
     {
-        var f = Figures(holdings, valuationDate);
+        var f = Figures(holdings, valuationDate, book, accountLevel);
         return new HoldingGroupTotal(
-            f.Holdings, f.Unpriced, f.Invested, f.Value, f.Pnl, f.PnlPct, f.Realised, f.Xirr, f.XirrState, f.DayChange, f.DayChangePct, f.DayChangeExcluded, Weight(f.Value, f.Value));
+            f.Holdings, f.Unpriced, f.Invested, f.Value, f.Pnl, f.PnlPct, f.Realised, f.Xirr, f.XirrState, f.DayChange, f.DayChangePct, f.DayChangeExcluded, Weight(f.Value, f.Value), f.Income);
+    }
+
+    /// <summary>
+    /// The row for what no group of the grouping holds: the dividends and costs of the given accounts that belong to none of their holdings, so that the columns of the groups add up to the total. Null when they have nothing recorded. It has no holding,
+    /// no value and no XIRR (<c>no_data</c>); its income carries the amounts.
+    /// </summary>
+    public static HoldingGroup? Unallocated(IncomeBook book, IReadOnlyCollection<Guid> accounts)
+    {
+        var income = IncomeViews.View(IncomeCalculator.OfAccounts(book, accounts));
+        return income is null
+            ? null
+            : new HoldingGroup(HoldingPartitions.UnallocatedKey, HoldingPartitions.Unallocated, 0, 0, 0m, null, null, null, 0m, null, "no_data", null, null, 0, null, null, income);
     }
 
     /// <summary>
@@ -68,9 +86,10 @@ internal static class GroupCalculator
     private static decimal? Weight(decimal? value, decimal? scopeValue) =>
         value is { } v && scopeValue is > 0m ? Math.Round(v / scopeValue.Value * 100m, Decimals, MidpointRounding.AwayFromZero) : null;
 
-    private static GroupMetrics Figures(IReadOnlyList<HoldingData> holdings, DateOnly valuationDate)
+    private static GroupMetrics Figures(IReadOnlyList<HoldingData> holdings, DateOnly valuationDate, IncomeBook book, IReadOnlyCollection<Guid> accountLevel)
     {
         var returns = ReturnsCalculator.ForGroup(holdings, valuationDate);
+        var income = IncomeViews.View(IncomeCalculator.Of(returns, holdings, book, accountLevel, valuationDate));
         var dayChange = DayChangeCalculator.ForGroup(holdings);
         var unpriced = holdings.Count(h => h.IsOpen && !h.IsPriced);
 
@@ -91,7 +110,8 @@ internal static class GroupCalculator
             view.XirrState,
             dayChange.Amount,
             dayChange.Pct,
-            dayChange.Excluded);
+            dayChange.Excluded,
+            income);
     }
 
     private sealed record GroupMetrics(
@@ -106,5 +126,6 @@ internal static class GroupCalculator
         string XirrState,
         decimal? DayChange,
         decimal? DayChangePct,
-        int DayChangeExcluded);
+        int DayChangeExcluded,
+        IncomeView? Income);
 }

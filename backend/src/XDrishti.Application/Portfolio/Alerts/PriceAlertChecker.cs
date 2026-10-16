@@ -16,12 +16,20 @@ internal sealed class PriceAlertChecker(IPriceAlerts alerts, IAccountEventLog ev
 {
     public const string Actor = "system:holdings-quotes";
 
+    /// <summary>The audit actor of an alert triggered by a tick of the live feed (ADR 0024), distinguishable from <see cref="Actor"/>, the 5-minute quote poll.</summary>
+    public const string LiveActor = "system:live-feed";
+
     /// <summary>The active alerts (at most 200), read once per tick: their instruments join the quoted set and the same list is checked against the answer.</summary>
     public ValueTask<IReadOnlyList<ActiveAlert>> ListActiveAsync(CancellationToken cancellationToken) => alerts.ListActiveAsync(cancellationToken);
 
-    /// <summary>Triggers the <paramref name="active"/> alerts that the quoted last prices (by instrument) hit; returns how many this call triggered.</summary>
-    public async ValueTask<int> CheckAsync(IReadOnlyList<ActiveAlert> active, IReadOnlyDictionary<Guid, decimal> lastPrices, DateTimeOffset at, CancellationToken cancellationToken)
+    /// <summary>Triggers the <paramref name="active"/> alerts that the quoted last prices (by instrument) hit; returns how many this call triggered. The audit actor is <see cref="Actor"/> (the quote poll).</summary>
+    public ValueTask<int> CheckAsync(IReadOnlyList<ActiveAlert> active, IReadOnlyDictionary<Guid, decimal> lastPrices, DateTimeOffset at, CancellationToken cancellationToken) =>
+        CheckAsync(active, lastPrices, at, Actor, cancellationToken);
+
+    /// <summary>Triggers the <paramref name="active"/> alerts that the last prices (by instrument) hit, recording <paramref name="actor"/> in the audit event; returns how many this call triggered.</summary>
+    public async ValueTask<int> CheckAsync(IReadOnlyList<ActiveAlert> active, IReadOnlyDictionary<Guid, decimal> lastPrices, DateTimeOffset at, string actor, CancellationToken cancellationToken)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(actor);
         ArgumentNullException.ThrowIfNull(active);
         ArgumentNullException.ThrowIfNull(lastPrices);
         if (active.Count == 0)
@@ -35,7 +43,7 @@ internal sealed class PriceAlertChecker(IPriceAlerts alerts, IAccountEventLog ev
         List<ActiveAlert> triggered = [];
         if (hits.Count > 0)
         {
-            await unitOfWork.RunAsync(
+            var saved = await unitOfWork.RunAsync(
                 async token =>
                 {
                     // The work may run again after a transient failure of the transaction: it starts from nothing each time.
@@ -52,7 +60,7 @@ internal sealed class PriceAlertChecker(IPriceAlerts alerts, IAccountEventLog ev
                             AccountEventType.PriceAlertTriggered,
                             null,
                             $"Price alert triggered: {hit.Symbol} {AlertText.Condition(hit.Direction)} {AlertText.Price(hit.Level)} (last price {AlertText.Price(price)})",
-                            Actor,
+                            actor,
                             at));
                         triggered.Add(hit);
                     }
@@ -61,6 +69,13 @@ internal sealed class PriceAlertChecker(IPriceAlerts alerts, IAccountEventLog ev
                     return Result.Success();
                 },
                 cancellationToken);
+            if (saved.IsFailure)
+            {
+                // Rolled back (a concurrency conflict, twice): no alert was triggered, nothing is recorded; they stay active and the next tick finds them again.
+                triggered.Clear();
+                AlertsLog.CheckNotSaved(logger, hits.Count, saved.Error.Code);
+            }
+
             foreach (var hit in triggered)
             {
                 AlertsLog.Triggered(logger, hit.Id, hit.Symbol);

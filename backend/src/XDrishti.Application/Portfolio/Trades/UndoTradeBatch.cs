@@ -12,7 +12,7 @@ namespace XDrishti.Application.Portfolio.Trades;
 /// Undoes an import (ADR 0023): voids every trade of the batch (nothing is deleted) and rebuilds from the remaining trades the lots of the holdings that were affected and whose lots came from trades — with no trades left, a holding is back to
 /// one lot of the broker's quantity and cost dated by the account's first import date, flagged as default. <b>Lots the owner dated by hand or a sync added, which an earlier rebuild replaced, are not brought back</b> (the result counts
 /// what the rebuild removes). A holding whose lots did not come from trades (the file was imported without a rebuild) keeps its lots; so does one whose remaining trades do not fit its quantity (listed in <c>NotRebuilt</c>). With
-/// <c>DryRun</c> nothing is changed and the same result says what an undo would do. Undoing a batch again is a no-op. <c>409 portfolio.sync_running</c> while a holdings sync of the account runs (not for a dry run). Audited with counts only.
+/// <c>DryRun</c> nothing is changed and the same result says what an undo would do. Undoing a batch again is a no-op. <c>409 portfolio.sync_running</c> while a holdings sync or a trades run of the account runs (not for a dry run; a ledger run does not stop it, ADR 0030). Audited with counts only.
 /// </summary>
 public sealed record UndoTradeBatchCommand(Guid BatchId, string Actor, bool DryRun = false) : ICommand;
 
@@ -21,7 +21,7 @@ internal sealed class UndoTradeBatchHandler(
     ITradeBatches batches,
     ITradeStore trades,
     IHoldingStore holdings,
-    IHoldingSyncStore syncs,
+    SyncGuard guard,
     IAccountStore accounts,
     IAccountEventLog events,
     IPortfolioUnitOfWork unitOfWork,
@@ -70,9 +70,9 @@ internal sealed class UndoTradeBatchHandler(
                     return Result.Success();
                 }
 
-                if (await syncs.IsRunningAsync(batch.AccountId, token))
+                if (await guard.RunningAsync(batch.AccountId, SyncWaits.TradeWrite, token))
                 {
-                    return Result.Failure(PortfolioErrors.SyncRunning);
+                    return Result.Failure(PortfolioErrors.SyncRunningWait);
                 }
 
                 var now = clock.GetUtcNow();

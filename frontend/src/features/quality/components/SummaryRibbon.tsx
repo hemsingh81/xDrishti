@@ -1,7 +1,7 @@
 import { Box, Typography } from '@mui/material';
 import type { QualityOverview } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
-import { numeric } from '@/theme';
+import { numeric, rem } from '@/theme';
 import type { QualityStatus } from '../lib/filters';
 import { limitsText, windowText } from '../lib/summary';
 import { GateChip } from './GateChip';
@@ -23,7 +23,7 @@ function Score({ score }: { score: number | null }) {
       </Typography>
       <Typography
         component="strong"
-        sx={{ fontSize: '1.25rem', fontWeight: 700, lineHeight: 1, color: tone, ...numeric }}
+        sx={{ fontSize: rem(20), fontWeight: 700, lineHeight: 1, color: tone, ...numeric }}
       >
         {score === null ? '—' : formatNumber(Math.round(score))}
       </Typography>

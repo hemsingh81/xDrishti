@@ -82,7 +82,11 @@ describe('Portfolio page: totals', () => {
     expect(screen.getByText('Realised (est.)')).toBeInTheDocument();
     expect(screen.getByText('+₹800')).toBeInTheDocument();
     expect(screen.getByText('1 closed · 1 not in master list')).toBeInTheDocument();
-    expect(screen.getByText('Dividends, charges and corporate actions are not included.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Dividends and charges are not recorded yet, so these are price returns. Corporate actions are not included.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('shows a loss with a minus sign and a down arrow, never by colour alone', async () => {
@@ -236,6 +240,7 @@ describe('Portfolio page: holdings', () => {
       'P&L',
       'P&L %',
       'XIRR',
+      'Dividends',
       'Acquired',
       'Bucket',
     ]) {
@@ -255,6 +260,7 @@ describe('Portfolio page: holdings', () => {
       '▲+₹16,100',
       '▲+16.10%',
       '▲+14.20%',
+      '—',
       '5 Mar 20241 lot',
       'Test Dhan Main · Portfolio',
     ]);
@@ -270,7 +276,7 @@ describe('Portfolio page: holdings', () => {
 
     const infy = await rowTexts('INFY');
     expect(infy[10]).toBe('—'); // too young for an XIRR
-    expect(infy[11]).toBe('1 Jan 2025Default date2 lots');
+    expect(infy[12]).toBe('1 Jan 2025Default date2 lots');
 
     const small = await rowTexts('SMALLCO');
     expect(small[0]).toBe('SMALLCONot in master list');
@@ -570,12 +576,13 @@ describe('Portfolio page: empty and blocked states', () => {
     );
   });
 
-  it('has no import or auto refresh control, only Sync now', async () => {
+  it('has no holdings import or auto refresh control, only Sync now and Import files (Dhan’s reports)', async () => {
     renderPortfolio();
 
     await screen.findByRole('gridcell', { name: 'RELIANCE' });
     expect(screen.getByRole('button', { name: 'Sync now' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /import/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import files' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /import (holdings|csv)/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Auto refresh' })).not.toBeInTheDocument();
   });
 

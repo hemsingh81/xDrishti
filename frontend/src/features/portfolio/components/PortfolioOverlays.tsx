@@ -9,6 +9,10 @@ import type { TradesTab } from '../lib/tradesTab';
 const AlertsDrawer = lazy(async () => ({ default: (await import('./alerts/AlertsDrawer')).AlertsDrawer }));
 const AlertDialog = lazy(async () => ({ default: (await import('./alerts/AlertDialog')).AlertDialog }));
 const TradesDrawer = lazy(async () => ({ default: (await import('./trades/TradesDrawer')).TradesDrawer }));
+const CashDrawer = lazy(async () => ({ default: (await import('./broker/CashDrawer')).CashDrawer }));
+const ImportFilesDialog = lazy(async () => ({
+  default: (await import('./imports/ImportFilesDialog')).ImportFilesDialog,
+}));
 const AddTradeDialog = lazy(async () => ({ default: (await import('./trades/AddTradeDialog')).AddTradeDialog }));
 
 export interface PortfolioOverlaysProps {
@@ -25,6 +29,10 @@ export interface PortfolioOverlaysProps {
     tab: TradesTab | null;
     onTab: (tab: TradesTab) => void;
     onClose: () => void;
+    /** A dividend file was dropped on the trade import: the dividend import opens instead. */
+    onImportDividends: () => void;
+    /** Opens the Import files dialog (a report was dropped on the trade import, or its header button). */
+    onImportFiles: () => void;
     accounts: readonly AccountSummary[];
     scopeAccountId: string | null;
     /** The Add trade dialog is open. */
@@ -32,9 +40,35 @@ export interface PortfolioOverlaysProps {
     onAdd: () => void;
     onCloseAdd: () => void;
   };
+  /** The Cash & dividends panel: open or not, the accounts it can show and the page's account. */
+  cash: {
+    open: boolean;
+    /** Opened to add a dividend straight away. */
+    adding: boolean;
+    /** Opened on the dividend import. */
+    importing: boolean;
+    /** Opened on the suggested dividends of the ledger. */
+    suggestions?: boolean;
+    /** A tradebook was dropped on the dividend import: the trade import opens instead. */
+    onImportTrades: () => void;
+    /** Opens the Import files dialog (a report was dropped on the dividend import, or its button). */
+    onImportFiles: () => void;
+    onClose: () => void;
+    accounts: readonly AccountSummary[];
+    scopeAccountId: string | null;
+  };
+  /** The Import files dialog: Dhan's downloaded reports, imported together. */
+  files: {
+    open: boolean;
+    onClose: () => void;
+    /** A dividend list was among the files: the dividend import opens instead. */
+    onImportDividends: () => void;
+    accounts: readonly AccountSummary[];
+    scopeAccountId: string | null;
+  };
 }
 
-/** The Alerts and Trades panels and the alert and Add trade dialogs on top of the Portfolio screen. */
+/** The Alerts, Trades and Cash & dividends panels and the alert and Add trade dialogs on top of the Portfolio screen. */
 export function PortfolioOverlays({
   alertsTab,
   onAlertsTab,
@@ -43,6 +77,8 @@ export function PortfolioOverlays({
   onNewAlert,
   onCloseDialog,
   trades,
+  cash,
+  files,
 }: PortfolioOverlaysProps) {
   return (
     <Suspense fallback={null}>
@@ -56,8 +92,30 @@ export function PortfolioOverlays({
           onTabChange={trades.onTab}
           onClose={trades.onClose}
           onAddTrade={trades.onAdd}
+          onImportDividends={trades.onImportDividends}
+          onImportFiles={trades.onImportFiles}
           accounts={trades.accounts}
           scopeAccountId={trades.scopeAccountId}
+        />
+      )}
+      {cash.open && (
+        <CashDrawer
+          onClose={cash.onClose}
+          accounts={cash.accounts}
+          scopeAccountId={cash.scopeAccountId}
+          startAdding={cash.adding}
+          startImporting={cash.importing}
+          focusSuggestions={cash.suggestions}
+          onImportTrades={cash.onImportTrades}
+          onImportFiles={cash.onImportFiles}
+        />
+      )}
+      {files.open && (
+        <ImportFilesDialog
+          accounts={files.accounts}
+          scopeAccountId={files.scopeAccountId}
+          onClose={files.onClose}
+          onImportDividends={files.onImportDividends}
         />
       )}
       {trades.adding && (

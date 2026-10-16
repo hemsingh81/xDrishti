@@ -5,6 +5,7 @@ using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Application.Tests.Portfolio.Groups;
 using XDrishti.Application.Tests.Portfolio.History;
 using XDrishti.Domain.Accounts;
@@ -71,7 +72,20 @@ internal sealed class ActionsHarness
 
     public ListPriceAlertsHandler Alerts() => new(Data);
 
-    public GetPortfolioNoticesHandler Notices() => new(Data, Evaluator(), Cache, Clock, NullLogger<GetPortfolioNoticesHandler>.Instance);
+    public GetPortfolioNoticesHandler Notices() => new(Data, Evaluator(), Cache, AttentionStore, Clock, NullLogger<GetPortfolioNoticesHandler>.Instance);
+
+    /// <summary>The writer of the attention items, over the same facts and memory as <see cref="Notices"/> reads (ADR 0030).</summary>
+    public AttentionReconciler AttentionReconciler() => new(AttentionFacts, AttentionStore, HealSettings, Clock, NullLogger<AttentionReconciler>.Instance);
+
+    /// <summary>The memory of the attention items; it lives as long as the harness, so a second read sees what the first remembered.</summary>
+    public XDrishti.Application.Tests.Portfolio.Heal.InMemoryAttentionStore AttentionStore { get; } = new();
+
+    public XDrishti.Application.Tests.Portfolio.Heal.FixedHealSettings HealSettings { get; } = new();
+
+    /// <summary>The facts the attention items are derived from: none, unless a test adds some.</summary>
+    public XDrishti.Application.Tests.Portfolio.Heal.StaticAttentionFacts AttentionFacts => _attentionFacts ??= new(Clock);
+
+    private XDrishti.Application.Tests.Portfolio.Heal.StaticAttentionFacts? _attentionFacts;
 
     public DateTimeOffset Now => Clock.GetUtcNow();
 

@@ -191,6 +191,7 @@ export const buildRebuildResult = (
 /** Default API mocks: no imports, no trades, and a rebuild that changes nothing. The trade fake replaces them. */
 export const tradeHandlers = [
   http.get('/api/portfolio/trade-batches', () => HttpResponse.json(buildBatchPage([]))),
+  http.get('/api/portfolio/cost-batches', () => HttpResponse.json({ items: [], page: 1, pageSize: 50, total: 0 })),
   http.get('/api/holdings/:id/trades', () => HttpResponse.json(buildTradePage([]))),
   http.post('/api/holdings/:id/rebuild-lots', () =>
     HttpResponse.json(

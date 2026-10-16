@@ -2,10 +2,11 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dragWithKeyboard, announced, stubLayout } from './dndTestkit';
 import { basketIds, membersGrid, portfolioSeeds, renderBaskets, symbolsShown } from './testing';
+import { findToast } from '@/test/toast';
 
 const dhan = basketIds.dhanPortfolio;
 const empty = basketIds.zerodhaPortfolio;
-const toast = () => screen.findByRole('alert');
+const toast = findToast;
 const rowBox = (symbol: string) => screen.getByRole('checkbox', { name: `Select ${symbol}` });
 const portfolioCard = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
 

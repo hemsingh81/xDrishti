@@ -79,6 +79,19 @@ internal sealed class TradeColumns
 
     public IReadOnlyList<int> ChargeParts { get; private init; } = [];
 
+    /// <summary>Which of the parts of a tradebook the header has, without reading the rest (the file-kind detector uses it).</summary>
+    public static TradeColumnProbe Probe(IReadOnlyList<string> header)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+        var names = header.Select(Normalise).ToArray();
+        return new TradeColumnProbe(
+            Pick(names, DateAliases) >= 0,
+            Pick(names, SymbolAliases) >= 0 || Pick(names, IsinAliases) >= 0,
+            Pick(names, SideAliases) >= 0,
+            Pick(names, QtyAliases) >= 0,
+            Pick(names, PriceAliases) >= 0);
+    }
+
     /// <summary>The name of a header cell as the aliases are written: lower case letters and digits only.</summary>
     public static string Normalise(string? header)
     {
@@ -167,4 +180,11 @@ internal sealed class TradeColumns
 
         return -1;
     }
+}
+
+/// <summary>Which parts of a tradebook a header has: a date, a symbol or ISIN, a side, a quantity and a price.</summary>
+internal readonly record struct TradeColumnProbe(bool Date, bool SymbolOrIsin, bool Side, bool Qty, bool Price)
+{
+    /// <summary>Every required part is there: the file is a tradebook the trade reader can read.</summary>
+    public bool Complete => Date && SymbolOrIsin && Side && Qty && Price;
 }

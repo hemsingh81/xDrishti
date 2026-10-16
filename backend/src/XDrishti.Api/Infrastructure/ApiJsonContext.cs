@@ -8,6 +8,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
 using XDrishti.Application.Market.Bars.Eod;
@@ -24,8 +25,15 @@ using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
 using XDrishti.Application.Portfolio.Actions;
 using XDrishti.Application.Portfolio.Alerts;
+using XDrishti.Application.Portfolio.Attention;
+using XDrishti.Application.Portfolio.BrokerHistory;
+using XDrishti.Application.Portfolio.DividendImport;
+using XDrishti.Application.Portfolio.Dividends;
 using XDrishti.Application.Portfolio.Groups;
+using XDrishti.Application.Portfolio.Income;
+using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
+using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -35,9 +43,17 @@ namespace XDrishti.Api.Infrastructure;
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, NumberHandling = JsonNumberHandling.Strict)]
 [JsonSerializable(typeof(SystemStatusResponse))]
+[JsonSerializable(typeof(LiveFeedStatus))]
+[JsonSerializable(typeof(LiveScope))]
+[JsonSerializable(typeof(SubscribeAck))]
+[JsonSerializable(typeof(PricesChanged))]
+[JsonSerializable(typeof(InstrumentPrice))]
 [JsonSerializable(typeof(LoginRequest))]
 [JsonSerializable(typeof(StepUpRequest))]
 [JsonSerializable(typeof(StepUpResult))]
+[JsonSerializable(typeof(ChangePasswordRequest))]
+[JsonSerializable(typeof(UpdateProfileRequest))]
+[JsonSerializable(typeof(AccountResponse))]
 [JsonSerializable(typeof(SessionInfo))]
 [JsonSerializable(typeof(IReadOnlyList<AuditEventResponse>))]
 [JsonSerializable(typeof(IReadOnlyList<AccountSummary>))]
@@ -143,6 +159,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PriceAlertView))]
 [JsonSerializable(typeof(PriceAlertPage))]
 [JsonSerializable(typeof(PortfolioNotices))]
+[JsonSerializable(typeof(AttentionAction))]
 [JsonSerializable(typeof(TradePreviewReport))]
 [JsonSerializable(typeof(TradeFileSummary))]
 [JsonSerializable(typeof(TradeSkipped))]
@@ -159,6 +176,70 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(TradePage))]
 [JsonSerializable(typeof(ManualTradeInput))]
 [JsonSerializable(typeof(HoldingRebuildResult))]
+[JsonSerializable(typeof(BrokerHistoryInput))]
+[JsonSerializable(typeof(BrokerHistoryRunView))]
+[JsonSerializable(typeof(BrokerSyncRunView))]
+[JsonSerializable(typeof(BrokerSyncCounts))]
+[JsonSerializable(typeof(BrokerNotRebuilt))]
+[JsonSerializable(typeof(BrokerDroppedRow))]
+[JsonSerializable(typeof(BrokerHistoryStatusView))]
+[JsonSerializable(typeof(BrokerKindStatus))]
+[JsonSerializable(typeof(LedgerPage))]
+[JsonSerializable(typeof(LedgerEntryView))]
+[JsonSerializable(typeof(LedgerClassTotal))]
+[JsonSerializable(typeof(IncomeView))]
+[JsonSerializable(typeof(DividendInput))]
+[JsonSerializable(typeof(DividendView))]
+[JsonSerializable(typeof(DividendPage))]
+[JsonSerializable(typeof(DividendSuggestionPage))]
+[JsonSerializable(typeof(AcceptSuggestionInput))]
+[JsonSerializable(typeof(SuggestionDecisionView))]
+[JsonSerializable(typeof(DividendPreviewReport))]
+[JsonSerializable(typeof(DividendFileSummary))]
+[JsonSerializable(typeof(DividendRepeat))]
+[JsonSerializable(typeof(DividendBadRow))]
+[JsonSerializable(typeof(DividendPreviewItem))]
+[JsonSerializable(typeof(DividendMatchView))]
+[JsonSerializable(typeof(DividendCandidate))]
+[JsonSerializable(typeof(DividendTotals))]
+[JsonSerializable(typeof(DividendYearTotal))]
+[JsonSerializable(typeof(DividendBeforeFirstLot))]
+[JsonSerializable(typeof(DividendChoice))]
+[JsonSerializable(typeof(DividendChoice[]))]
+[JsonSerializable(typeof(int[]))]
+[JsonSerializable(typeof(DividendImportResult))]
+[JsonSerializable(typeof(DividendBatchView))]
+[JsonSerializable(typeof(DividendBatchPage))]
+[JsonSerializable(typeof(DividendUndoResult))]
+[JsonSerializable(typeof(string[]))]
+[JsonSerializable(typeof(ImportWarning))]
+[JsonSerializable(typeof(ImportFileError))]
+[JsonSerializable(typeof(ImportSummary))]
+[JsonSerializable(typeof(BillCandidate))]
+[JsonSerializable(typeof(BillNameView))]
+[JsonSerializable(typeof(BillDifference))]
+[JsonSerializable(typeof(BillCoverage))]
+[JsonSerializable(typeof(BillCharges))]
+[JsonSerializable(typeof(BillDetails))]
+[JsonSerializable(typeof(DpLineView))]
+[JsonSerializable(typeof(DpCounts))]
+[JsonSerializable(typeof(NameLearning))]
+[JsonSerializable(typeof(DpPreview))]
+[JsonSerializable(typeof(DematDifference))]
+[JsonSerializable(typeof(DematHeld))]
+[JsonSerializable(typeof(DematSynced))]
+[JsonSerializable(typeof(DematPreview))]
+[JsonSerializable(typeof(ImportFilePreview))]
+[JsonSerializable(typeof(ImportPreviewResponse))]
+[JsonSerializable(typeof(BillChoice))]
+[JsonSerializable(typeof(BillChoice[]))]
+[JsonSerializable(typeof(CostBatchView))]
+[JsonSerializable(typeof(CostBatchPage))]
+[JsonSerializable(typeof(CostImportResult))]
+[JsonSerializable(typeof(CostUndoResult))]
+[JsonSerializable(typeof(DematImportResult))]
+[JsonSerializable(typeof(ImportFileResult))]
+[JsonSerializable(typeof(ImportRunResponse))]
 [JsonSerializable(typeof(ServiceList))]
 [JsonSerializable(typeof(ServiceView))]
 [JsonSerializable(typeof(ServiceRunView))]

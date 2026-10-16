@@ -1,0 +1,6 @@
+# UNVERIFIED - constructed from Dhan's documentation (made-up id and prices), not recorded from the real feed.
+# Quote packet (response code 4), little-endian, 50 bytes: NSE_EQ (segment 1), security id 2885.
+# header: code 04 | length 50 (0x0032) | segment 01 | security id 2885
+# payload: last price float32 2950.5 | last quantity int16 25 | last trade time int32 1791781200 | average price float32 2948.1 | volume int32 1234567 |
+# total sell quantity int32 50000 | total buy quantity int32 61000 | day open float32 2940 | day close float32 2931 | day high float32 2955.75 | day low float32 2938.5
+04 32 00 01 45 0b 00 00 00 68 38 45 19 00 50 69 cc 6a 9a 41 38 45 87 d6 12 00 50 c3 00 00 48 ee 00 00 00 c0 37 45 00 30 37 45 00 bc 38 45 00 a8 37 45

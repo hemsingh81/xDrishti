@@ -63,7 +63,7 @@ public sealed class TradesDatabaseTests(ApiFactory factory)
 
         (await ColumnsAsync(connection, "transactions")).ShouldBe(
         [
-            "id", "account_id", "instrument_id", "isin", "trading_symbol", "exchange", "side", "trade_date", "trade_time", "qty", "price", "charges", "source", "batch_id", "seq", "external_id", "created_by", "created_at", "voided_at", "voided_by",
+            "id", "account_id", "instrument_id", "isin", "trading_symbol", "exchange", "side", "trade_date", "trade_time", "qty", "price", "charges", "source", "batch_id", "seq", "external_id", "created_by", "created_at", "voided_at", "voided_by", "run_id", "superseded_by",
         ]);
         (await ColumnsAsync(connection, "trade_batches")).ShouldBe(["id", "account_id", "file_name", "sha256", "parsed", "imported", "duplicates", "skipped", "bad", "status", "created_by", "created_at", "undone_at"]);
         var index = (await AppRoleProbe.ScalarAsync(connection, "SELECT indexdef FROM pg_indexes WHERE schemaname = 'portfolio' AND indexname = 'ux_transactions_account_external_active'", Ct))!.ToString()!;

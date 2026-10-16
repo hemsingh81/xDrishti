@@ -21,6 +21,7 @@ import { noDayChangeReason, xirrOf } from '../lib/figures';
 import { isEarlierDay } from '../lib/prices';
 import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
 import { Alpha, BenchmarkXirr, MaxDrawdown } from './HistoryFigures';
+import { IncomeInvite, IncomeTiles } from './income/IncomeTiles';
 
 /** "1.2% · as of 10 Oct" style hint: the percentage, and the date of the session when the prices are from an earlier day. */
 function DayChangeHint({ data, now }: { data: HoldingsSummary; now: number }) {
@@ -41,7 +42,14 @@ interface HistoryTiles {
   rangeLabel: string;
 }
 
-function Tiles({ data, history }: { data: HoldingsSummary; history: HistoryTiles }) {
+interface IncomeActions {
+  /** Opens the Cash & dividends panel on its Add dividend form. */
+  onAddDividend: () => void;
+  /** Takes the owner to the Sync trades & ledger control. */
+  onReadLedger: () => void;
+}
+
+function Tiles({ data, history, income }: { data: HoldingsSummary; history: HistoryTiles; income: IncomeActions }) {
   // The benchmark's name and reason are those of the history on screen, once it is the one asked for.
   const benchmark = history.query.isPlaceholderData ? undefined : history.query.data?.benchmark;
   const { returns } = data;
@@ -49,92 +57,112 @@ function Tiles({ data, history }: { data: HoldingsSummary; history: HistoryTiles
   const xirr = xirrOf(returns);
   const unmapped = data.unmappedCount > 0 ? ` · ${formatNumber(data.unmappedCount)} not in master list` : '';
   return (
-    <Box
-      sx={(theme) => ({
-        display: 'grid',
-        gap: 2,
-        mb: 1,
-        // Ten tiles in even rows, never an orphan: one column on a phone, two up to a wide laptop, then two rows of five
-        // (five need about 200 px each, so not before the content is ~1050 px wide).
-        gridTemplateColumns: 'minmax(0, 1fr)',
-        [theme.breakpoints.up('sm')]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
-        // A label such as "Max drawdown (All)" wraps at this width: every tile reserves two lines, so the values line up.
-        [theme.breakpoints.up(1350)]: {
-          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-          '--stat-tile-label-min': '2.9em',
-        },
-      })}
-    >
-      <StatTile label="Invested" value={formatInr(returns.invested)} icon={SavingsIcon} hue="portfolio" />
-      <StatTile
-        label="Current value"
-        value={returns.value === null ? '—' : formatInr(returns.value)}
-        hint={`as of ${formatDate(data.valuationDate)}`}
-        icon={AccountBalanceWalletIcon}
-        hue="sky"
-      />
-      <StatTile
-        label="Day change"
-        value={<DayChangeAmount value={data.dayChange} reason={noDayChangeReason} focusable />}
-        hint={<DayChangeHint data={data} now={now} />}
-        icon={TodayIcon}
-        hue="today"
-      />
-      <StatTile
-        label="Unrealised P&L"
-        value={<Pnl value={returns.pnl} focusable />}
-        hint={<PnlPercent value={returns.pnlPct} />}
-        icon={TrendingUpIcon}
-        hue="green"
-      />
-      <StatTile
-        label={returns.realisedEstimated ? 'Realised (est.)' : 'Realised'}
-        value={<Pnl value={returns.realisedPnl} />}
-        hint={returns.realisedEstimated ? 'sales priced at the last price' : 'from closed lots'}
-        icon={PaidIcon}
-        hue="amber"
-      />
-      <StatTile
-        label="XIRR"
-        value={<Xirr returns={returns} focusable />}
-        hint={'short' in xirr ? xirr.short : 'annualised'}
-        icon={ShowChartIcon}
-        hue="violet"
-      />
-      <StatTile
-        label="Benchmark XIRR"
-        value={<BenchmarkXirr summary={data} benchmark={benchmark} />}
-        hint={benchmarkXirrHint(data, benchmark)}
-        icon={CompareArrowsIcon}
-        hue="indigo"
-      />
-      <StatTile
-        label="Alpha"
-        value={<Alpha summary={data} benchmark={benchmark} />}
-        hint={alphaHint(data, benchmark)}
-        icon={ScaleIcon}
-        hue="pink"
-      />
-      <StatTile
-        label={`Max drawdown (${history.rangeLabel})`}
-        value={<MaxDrawdown query={history.query} rangeLabel={history.rangeLabel} />}
-        hint={drawdownTileHint(history.query)}
-        icon={TrendingDownIcon}
-        hue="rose"
-      />
-      <StatTile
-        label="Holdings"
-        value={formatNumber(data.openCount)}
-        hint={`${formatNumber(data.closedCount)} closed${unmapped}`}
-        icon={DonutSmallIcon}
-        hue="teal"
-      />
-    </Box>
+    <>
+      <Box
+        sx={(theme) => ({
+          display: 'grid',
+          gap: 2,
+          mb: 1,
+          // Ten tiles in even rows, never an orphan: one column on a phone, two up to a wide laptop, then two rows of five
+          // (five need about 200 px each, so not before the content is ~1050 px wide).
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          [theme.breakpoints.up('sm')]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+          // A label such as "Max drawdown (All)" wraps at this width: every tile reserves two lines, so the values line up.
+          [theme.breakpoints.up(1350)]: {
+            gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+            '--stat-tile-label-min': '3em',
+          },
+        })}
+      >
+        <StatTile label="Invested" value={formatInr(returns.invested)} icon={SavingsIcon} hue="portfolio" />
+        <StatTile
+          label="Current value"
+          value={returns.value === null ? '—' : formatInr(returns.value)}
+          hint={`as of ${formatDate(data.valuationDate)}`}
+          icon={AccountBalanceWalletIcon}
+          hue="sky"
+        />
+        <StatTile
+          label="Day change"
+          value={<DayChangeAmount value={data.dayChange} reason={noDayChangeReason} focusable />}
+          hint={<DayChangeHint data={data} now={now} />}
+          icon={TodayIcon}
+          hue="today"
+        />
+        <StatTile
+          label="Unrealised P&L"
+          value={<Pnl value={returns.pnl} focusable />}
+          hint={<PnlPercent value={returns.pnlPct} />}
+          icon={TrendingUpIcon}
+          hue="green"
+        />
+        <StatTile
+          label={returns.realisedEstimated ? 'Realised (est.)' : 'Realised'}
+          value={<Pnl value={returns.realisedPnl} />}
+          hint={returns.realisedEstimated ? 'sales priced at the last price' : 'from closed lots'}
+          icon={PaidIcon}
+          hue="amber"
+        />
+        <StatTile
+          label="XIRR"
+          value={<Xirr returns={returns} focusable />}
+          hint={'short' in xirr ? xirr.short : 'annualised'}
+          icon={ShowChartIcon}
+          hue="violet"
+        />
+        <StatTile
+          label="Benchmark XIRR"
+          value={<BenchmarkXirr summary={data} benchmark={benchmark} />}
+          hint={benchmarkXirrHint(data, benchmark)}
+          icon={CompareArrowsIcon}
+          hue="indigo"
+        />
+        <StatTile
+          label="Alpha"
+          value={<Alpha summary={data} benchmark={benchmark} />}
+          hint={alphaHint(data, benchmark)}
+          icon={ScaleIcon}
+          hue="pink"
+        />
+        <StatTile
+          label={`Max drawdown (${history.rangeLabel})`}
+          value={<MaxDrawdown query={history.query} rangeLabel={history.rangeLabel} />}
+          hint={drawdownTileHint(history.query)}
+          icon={TrendingDownIcon}
+          hue="rose"
+        />
+        <StatTile
+          label="Holdings"
+          value={formatNumber(data.openCount)}
+          hint={`${formatNumber(data.closedCount)} closed${unmapped}`}
+          icon={DonutSmallIcon}
+          hue="teal"
+        />
+      </Box>
+      {/* Without any dividend or charge recorded there are no zeros to show: an invitation takes the place of the tiles. */}
+      {data.income ? (
+        <IncomeTiles income={data.income} />
+      ) : (
+        data.openCount + data.closedCount > 0 && <IncomeInvite {...income} />
+      )}
+    </>
   );
 }
 
-/** The totals of the chosen account and bucket: invested, value, P&L, XIRR, benchmark XIRR, alpha, max drawdown, realised and the counts. */
-export function SummaryTiles({ query, history }: { query: UseQueryResult<HoldingsSummary>; history: HistoryTiles }) {
+interface SummaryTilesProps {
+  query: UseQueryResult<HoldingsSummary>;
+  history: HistoryTiles;
+  /** The totals at the prices the live hub pushed since the last read; shown instead of the query's data. */
+  live?: HoldingsSummary;
+  /** What the invitation under the tiles does when no dividend or charge is recorded. */
+  income: IncomeActions;
+}
+
+/**
+ * The totals of the chosen account and bucket: invested, value, P&L, XIRR, benchmark XIRR, alpha, max drawdown, realised and the
+ * counts - the price returns - and under them the dividends, costs and net returns (or the invitation to record them).
+ */
+export function SummaryTiles({ query, history, live, income }: SummaryTilesProps) {
   if (query.isPending) return <LoadingState label="Loading totals" />;
   if (query.isError) {
     return (
@@ -157,5 +185,5 @@ export function SummaryTiles({ query, history }: { query: UseQueryResult<Holding
       </Alert>
     );
   }
-  return <Tiles data={query.data} history={history} />;
+  return <Tiles data={live ?? query.data} history={history} income={income} />;
 }

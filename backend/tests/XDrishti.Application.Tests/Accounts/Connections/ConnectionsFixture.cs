@@ -29,7 +29,7 @@ internal sealed class ConnectionsFixture
         new(Data, Connections, Data, Writer, Dhan, Clock, NullLogger<StartConnectHandler>.Instance);
 
     public CompleteConnectHandler CompleteHandler() =>
-        new(Data, Connections, Data, Data, Writer, Dhan, Clock, NullLogger<CompleteConnectHandler>.Instance);
+        new(Data, Connections, Data, Data, Writer, Dhan, Accounts.Attention, Clock, NullLogger<CompleteConnectHandler>.Instance);
 
     public DisconnectHandler DisconnectHandler() => new(Data, Data, Connections, Data, Data, Writer, Accounts.Views, Clock, NullLogger<DisconnectHandler>.Instance);
 

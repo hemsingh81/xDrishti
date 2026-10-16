@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Portfolio.Attention;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
 
@@ -28,6 +29,7 @@ internal sealed class CompleteConnectHandler(
     IAccountUnitOfWork unitOfWork,
     ConnectionWriter writer,
     IBrokerConnector connector,
+    IAttentionReconciler attention,
     TimeProvider clock,
     ILogger<CompleteConnectHandler> logger) : ICommandHandler<CompleteConnectCommand, ConnectReturn>
 {
@@ -96,6 +98,7 @@ internal sealed class CompleteConnectHandler(
         }
 
         AccountsLog.Connected(logger, account.Slug);
+        await attention.ReconcileAsync(cancellationToken); // the "reconnect" item resolves now, not at the next tick (ADR 0030)
         return Result.Success(new ConnectReturn(account.Id, null));
     }
 

@@ -22,12 +22,12 @@ broker/exchange APIs.
 
 | Container | Image basis | Profile | Notes |
 |-----------|-------------|---------|-------|
-| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health` (later `/hubs`, `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site) — both only for a signed-in owner (`forward_auth` to `/api/auth/verify`, otherwise redirect to `/login`); compression, security headers |
+| `xd-proxy` | Caddy (+ React build) | core | Only published HTTP port (127.0.0.1:8080 until login/TLS, then LAN); routes `/api`, `/health`, `/hubs` (the SignalR hub, WebSocket upgrade; later `/hangfire`); serves the docs read-only at `/prototype/` (clickable prototype, delivery plan at `/prototype/delivery/`) and `/docs/` (design-docs site) — both only for a signed-in owner (`forward_auth` to `/api/auth/verify`, otherwise redirect to `/login`); compression, security headers |
 | `xd-migrate` | API image, `migrate` | core | One-shot: applies migrations, provisions the owner account when none exists, then exits |
 | `xd-owner-reset` | API image, `owner-reset` | tools | On-demand one-shot (`xd-up.sh --owner-reset`): replaces the owner's password from the secrets, revokes all sessions |
 | `xd-api` | .NET 10 ASP.NET Core | core | REST, SignalR, auth, assistant endpoint; the only holder of the broker vault key (`BrokerVault__Key`, refuses to start without it); `Brokers__PublicBaseUrl` = `http://localhost:${XD_HTTP_PORT}` (broker redirect URLs); background workers for the instrument master (manual and daily refresh, `Instruments__AutoRefresh__*`, [doc 06](06-instruments-and-baskets.md) §2.2); networks `back` + `egress` (broker sign-in, master files) |
 | `xd-worker` | .NET 10 + Hangfire | core | CSV import (watches `data/inbox`), EOD fetch, aggregation, account & portfolio sync, nightly pipeline, backtests, Lab runs, ML.NET training; scale replicas |
-| `xd-feed` | .NET 10 | core | Market hours: Dhan WebSocket for the active set, quote polling for holdings, live bars & alerts (later also depth recording) |
+| `xd-feed` | .NET 10 | core | Market hours: Dhan WebSocket for the active set (**built**, P2-10, [ADR 0024](../adr/0024-live-feed-xd-feed-and-live-prices.md)): live prices written into the holdings and `market.live_quotes`, price alerts on every flush, heartbeat in `platform.service_heartbeats`; the vault key and the app DB password as secret files, networks `back` + `egress`, 256 MB, health check = heartbeat < 60 s old. The quote poll of holdings stays in `xd-api` (service `holdings-quotes`); live bars and depth recording come later |
 | `xd-sandbox` | .NET 10 worker | core | User C# plugins; **no network**, read-only data, CPU/memory/time limits |
 | `xd-db` | PostgreSQL + TimescaleDB (official image) | core | Named volume; read-only role for tools |
 | `xd-seq` | Seq | ops | Logs |
@@ -51,17 +51,19 @@ Defined in `deploy/compose.yaml` with profiles `core`, `ops`, `ai`, `live`
 | Egress allowed later | worker, feed, exec (broker/exchange hosts only) |
 
 *`xd-sandbox` has no egress and no access except its job inputs/outputs.
-`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)), for the read of the account's holdings ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)), for the 1-minute chart data of the Data API ([ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)) and for the instrument master files and NSE's trading-holiday list ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md), [ADR 0017](../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md)): outbound only, no
+`xd-api` joins `egress` for Dhan's sign-in ([ADR 0008](../adr/0008-broker-credentials-vault-and-connection.md), [0009](../adr/0009-dhan-consent-flow-only.md)), for the read of the account's holdings ([ADR 0012](../adr/0012-holdings-acquisition-dates-and-returns-model.md)), for the 1-minute chart data of the Data API ([ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)), for the trade history and the ledger of the account ([ADR 0025](../adr/0025-dhan-trade-history-and-ledger-sync.md)) and for the instrument master files and NSE's trading-holiday list ([ADR 0010](../adr/0010-instrument-master-sources-and-scope.md), [ADR 0017](../adr/0017-trading-calendar-eod-schedule-quality-adjustments-and-csv-undo.md)): outbound only, no
 published ports, no other member. The network itself does not filter hosts; the API's HTTP clients do (HTTPS, exact host and path, method, no redirects, no cookies or credentials, size caps and timeouts):
 
 | Client | Reaches only | Method | Limits |
 |--------|--------------|--------|--------|
 | Broker (Dhan sign-in) | `auth.dhan.co`: `/app/generate-consent`, `/app/consumeApp-consent` (doc 05 §8.1) | POST | 15 s, 256 KB; no order, position or funds endpoint is callable |
-| Broker (Dhan holdings) | `api.dhan.co`: `/v2/holdings` only, no query (doc 05 §8.2) | GET | 30 s, 5 MB; the stored access token goes in the `access-token` header and is never logged; nothing else of `api.dhan.co` is callable |
+| Broker (Dhan holdings) | `api.dhan.co`: `/v2/holdings` only, no query (doc 05 §8.2) | GET | 30 s, 5 MB; the stored access token goes in the `access-token` header and is never logged; the other `api.dhan.co` paths that are callable are the rows below, never an order, position or funds path |
+| Broker (Dhan trade history) | `api.dhan.co`: `/v2/trades/{yyyy-MM-dd}/{yyyy-MM-dd}/{page}` — two valid dates and a page number in the path, **no query** (doc 05 §8.3; ADR 0025) | GET | 30 s, 5 MB; calls at least `Portfolio__BrokerHistory__CallSpacingMs` (250) apart; the account's access token goes in the `access-token` header and is never logged, nor are the URL or the rows |
+| Broker (Dhan ledger) | `api.dhan.co`: `/v2/ledger` with the query of **exactly** `from-date` and `to-date`, each once, valid dates (doc 05 §8.3; ADR 0025) | GET | same limits and spacing as the trade history |
 | Broker (Dhan chart data) | `api.dhan.co`: `/v2/charts/intraday` only, no query (doc 05 §6; ADR 0016) | POST | 15 s, 16 MB; one request at a time, at most `Data__Dhan__RequestsPerSecond` (4) per second, one retry on 429/5xx; the Data account's access token goes in the `access-token` header and is never logged; no other chart, order, position or funds path is callable |
 | Instrument master — Dhan | `images.dhan.co`: `/api-data/api-scrip-master-detailed.csv` (doc 05 §7.1) | GET | 120 s, 100 MB |
 | Instrument master — NSE | `nsearchives.nseindia.com`: `/content/indices/ind_niftytotalmarket_list.csv` | GET | 30 s, 5 MB |
-| Trading calendar — NSE holidays | `www.nseindia.com`: `/api/holiday-master` with the query exactly `type=trading` (the only allow-listed URL that has a query; doc 05 §4.1, ADR 0017) | GET | 20 s, 1 MB; browser-like `User-Agent` and `Accept: application/json`, **no cookie** (none is kept or sent, and nothing from a stored secret), no redirects; a refusal is only a warning |
+| Trading calendar — NSE holidays | `www.nseindia.com`: `/api/holiday-master` with the query exactly `type=trading` (a fixed query text; the Dhan ledger above takes two date keys, the sign-in calls one key each; doc 05 §4.1, ADR 0017) | GET | 20 s, 1 MB; browser-like `User-Agent` and `Accept: application/json`, **no cookie** (none is kept or sent, and nothing from a stored secret), no redirects; a refusal is only a warning |
 
 Nothing else is needed for the master: no published port, no volume (the file is streamed, never written to disk), no secret; `xd-api` stays within its 1 GB limit (the 35 MB file is read as a stream). The database image already includes `pg_trgm`, which the migration enables for the search indexes (created by `xd-migrate` as `xd_owner`).
 
@@ -104,7 +106,7 @@ Nothing else is needed for the master: no published port, no volume (the file is
 | Disk | Timescale compression; tick data (later) ~50–100 GB/year → external SSD volume |
 | CSV inbox | Host folder `data/inbox/` bind-mounted into `xd-worker`; processed files moved to `data/processed/<job-id>/` |
 | CSV folder (P1-17a) | Host folder `data/Stocks_CSV/` (`XD_CSV_DIR`) bind-mounted **read-only** at `/data/csv` into `xd-api` (`Data__CsvFolder`); `xd-up.sh` creates it when missing; nothing is written there ([ADR 0016](../adr/0016-market-bars-csv-load-dhan-fetch-and-app-managed-aggregates.md)) |
-| Market hours | `xd-feed` starts 09:00 and stops 15:35 on trading days (scheduled); Mac must be awake |
+| Market hours | `xd-feed` runs all day and connects between 09:00 and 15:35 on trading days (the window of the service `live-feed`, editable on the Services screen); it heartbeats outside the window. Mac must be awake (the owner's job; `xd-up.sh` holds no keep-awake) |
 | Remote access | Off by default; optional WireGuard on home router |
 | Dev loop | `dotnet watch` and Vite dev server on the host against containerised db/llm/ml; same images for "prod" |
 

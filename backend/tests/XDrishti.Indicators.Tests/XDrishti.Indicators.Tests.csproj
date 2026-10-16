@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Indicators\XDrishti.Indicators.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Test-only cross-check of sma/ema/rsi/atr (ADR 0031 §6); never referenced by src. -->
+    <PackageReference Include="Skender.Stock.Indicators" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

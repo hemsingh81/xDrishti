@@ -228,6 +228,34 @@ describe('Grid: rows and keyboard', () => {
     expect(dataRows()[0]).toHaveFocus();
   });
 
+  it('keeps the zebra tint on a row that is not clickable, and tints a clickable row on hover', () => {
+    // jsdom has no pointer: read the rules emotion injected for the row's class.
+    const rulesFor = (row: Element) => {
+      const cls = Array.from(row.classList).find((name) => name.startsWith('css-'))!;
+      return Array.from(document.styleSheets)
+        .flatMap((sheet) => Array.from(sheet.cssRules))
+        .filter((rule): rule is CSSStyleRule => 'selectorText' in rule && String(rule.selectorText).includes(`.${cls}`))
+        .map((rule) => `${rule.selectorText} { ${rule.style.cssText} }`);
+    };
+    const hoverTints = (rules: string[]) =>
+      rules.filter(
+        (rule) => rule.includes(':hover') && !rule.includes('Mui-selected') && rule.includes('--grid-row-tint:'),
+      );
+    const { unmount } = render(view());
+    const plain = rulesFor(dataRows()[0]!);
+    expect(hoverTints(plain)).toEqual([]);
+    // One source for the zebra: the row paints the tint variable, also on even rows.
+    expect(
+      plain.some(
+        (rule) => rule.includes('nth-of-type(even)') && rule.includes('background-color: var(--grid-row-tint)'),
+      ),
+    ).toBe(true);
+    unmount();
+
+    render(view({ onRowClick: vi.fn() }));
+    expect(hoverTints(rulesFor(dataRows()[0]!))).toHaveLength(1);
+  });
+
   it('marks the row that is open elsewhere', () => {
     render(view({ activeRowId: 'c', onRowClick: vi.fn() }));
 

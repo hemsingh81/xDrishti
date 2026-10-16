@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatHoursMinutes,
   formatInr,
+  formatInrPerShare,
   formatInrPrecise,
   formatCompact,
   formatIstDate,
@@ -51,6 +52,17 @@ describe('formatInrPrecise', () => {
   it('keeps the paise and groups the Indian way', () => {
     expect(formatInrPrecise(2_456.3)).toBe('₹2,456.30');
     expect(formatInrPrecise(12_34_567.891)).toBe('₹12,34,567.89');
+  });
+});
+
+describe('formatInrPerShare', () => {
+  it('shows up to four decimals, trims trailing zeros and never shows fewer than two', () => {
+    expect(formatInrPerShare(0.0125)).toBe('₹0.0125');
+    expect(formatInrPerShare(31.25)).toBe('₹31.25');
+    expect(formatInrPerShare(2.5)).toBe('₹2.50');
+    expect(formatInrPerShare(12)).toBe('₹12.00');
+    expect(formatInrPerShare(1.1)).toBe('₹1.10');
+    expect(formatInrPerShare(1_234.5675)).toBe('₹1,234.5675');
   });
 });
 

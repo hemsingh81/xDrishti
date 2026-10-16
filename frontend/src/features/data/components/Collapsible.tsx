@@ -2,7 +2,7 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { Box, Button, Collapse } from '@mui/material';
 import { useId, useState } from 'react';
-import { monoFontFamily } from '@/theme';
+import { monoFontFamily, rem } from '@/theme';
 
 interface CollapsibleProps {
   /** The button's text, e.g. "3 unknown symbols". */
@@ -41,7 +41,7 @@ export function Collapsible({ label, items }: CollapsibleProps) {
             overflowY: 'auto',
             overflowWrap: 'anywhere',
             fontFamily: monoFontFamily,
-            fontSize: '0.85rem',
+            fontSize: rem(13),
           }}
         >
           {items.map((item) => (

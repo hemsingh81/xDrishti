@@ -129,6 +129,8 @@ internal sealed class FakePortfolioBenchmark : IPortfolioBenchmark, IPortfolioUn
 
     public ValueTask<Domain.Common.Result> RunAsync(Func<CancellationToken, ValueTask<Domain.Common.Result>> work, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+    public ValueTask<Domain.Common.Result> RunOnceAsync(Func<CancellationToken, ValueTask<Domain.Common.Result>> work, CancellationToken cancellationToken) => throw new NotSupportedException();
+
     public void Record(AccountEvent accountEvent) => Events.Add(accountEvent);
 
     public ValueTask<IReadOnlyList<AccountEvent>> ListForAccountAsync(Guid accountId, int take, CancellationToken cancellationToken) => ValueTask.FromResult<IReadOnlyList<AccountEvent>>([]);

@@ -138,7 +138,7 @@ describe('Group by: group rows, the total row and the figures', () => {
       within(table)
         .getAllByRole('columnheader')
         .map((h) => h.textContent),
-    ).toEqual(['Sector', 'Holdings', 'Invested', 'Value', 'P&L%', 'XIRR', 'Day change', 'Weight']);
+    ).toEqual(['Sector', 'Holdings', 'Invested', 'Value', 'P&L%', 'XIRR', 'Dividends', 'Day change', 'Weight']);
     expect(groupNames()).toEqual(['All holdings', 'Energy', 'Information Technology', 'Unclassified']);
     expect(cellTexts(rowOf('All holdings'))).toEqual([
       '4',
@@ -146,6 +146,7 @@ describe('Group by: group rows, the total row and the figures', () => {
       '₹2,03,400',
       '▲+₹18,400▲+9.95%',
       '▲+11.30%',
+      '—',
       '▲+₹900▲+0.56%1 excluded',
       '100.0%',
     ]);
@@ -161,11 +162,12 @@ describe('Group by: group rows, the total row and the figures', () => {
       '₹1,16,100',
       '▲+₹16,100▲+16.10%',
       '▲+14.20%',
+      '—',
       '▲+₹900▲+0.78%',
       '57.1%',
     ]);
     expect(cellTexts(rowOf('Information Technology'))[3]).toBe('▲+₹1,300▲+1.63%');
-    expect(cellTexts(rowOf('Information Technology'))[5]).toBe('▼−₹200▼−0.51%1 excluded');
+    expect(cellTexts(rowOf('Information Technology'))[6]).toBe('▼−₹200▼−0.51%1 excluded');
   });
 
   it('says in words why a group has no XIRR, not only in a tooltip', async () => {
@@ -207,7 +209,16 @@ describe('Group by: group rows, the total row and the figures', () => {
     const oil = rowOf('Oil & Gas');
     expect(within(oil).getByText('2 holdings without a price')).toBeInTheDocument();
     // No invested (the API sends 0: the unpriced are left out), value, P&L, XIRR or weight: dashes, never zeros or a loss of 100 %.
-    expect(cellTexts(oil)).toEqual(['22 holdings without a price', '—', '—', '—', '—No price yet', '—2 excluded', '—']);
+    expect(cellTexts(oil)).toEqual([
+      '22 holdings without a price',
+      '—',
+      '—',
+      '—',
+      '—No price yet',
+      '—',
+      '—2 excluded',
+      '—',
+    ]);
     expect(cellTexts(oil).join(' ')).not.toMatch(/₹0|100\.0%|−₹/);
     expect(within(oil).getByRole('img', { name: /None of these holdings has a price yet/ })).toHaveTextContent('—');
     expect(

@@ -308,4 +308,19 @@ public sealed class HoldingQueriesTests
         result.Error.ShouldBe(PortfolioErrors.LotChanged);
         _fx.Events(AccountEventType.LotDateChanged).Count.ShouldBe(1); // recorded with the (discarded) change; the real store drops it with the rest
     }
+
+    [Fact]
+    public async Task A_lot_edit_that_conflicts_again_after_its_repeat_is_the_lot_changed_conflict_and_not_an_error()
+    {
+        await ImportedAsync(rows: Row("AAA", 100, 50m, 60m, "1", "INE000A00001"));
+        var holding = _fx.HoldingOf("AAA");
+        var before = holding.Lots.Single().AcquiredOn;
+        _fx.Data.ConflictingRuns = 1;
+
+        var result = await _fx.UpdateLotDate().HandleAsync(new UpdateLotDateCommand(holding.Id, holding.Lots.Single().Id, new LotDateInput(_fx.Today), Actor), CancellationToken.None);
+
+        result.Error.ShouldBe(PortfolioErrors.LotChanged);
+        result.Error.Message.ShouldBe("The holding changed while you edited; reload and try again");
+        _fx.HoldingOf("AAA").Lots.Single().AcquiredOn.ShouldBe(before);
+    }
 }

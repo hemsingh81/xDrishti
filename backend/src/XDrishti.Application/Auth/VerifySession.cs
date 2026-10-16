@@ -71,7 +71,8 @@ internal sealed class VerifySessionHandler(
         session.Revoke(now);
         audit.Record(AuditEvent.Record(type, now, owner.Email, client.Ip, client.UserAgent));
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        AuthLog.SessionExpired(logger, owner.Email, reason);
+        var logEmail = LogSanitizer.Email(owner.Email);
+        AuthLog.SessionExpired(logger, logEmail, reason);
         return Result.Failure<VerifiedSession>(AuthErrors.SessionExpired);
     }
 }

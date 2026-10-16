@@ -371,7 +371,8 @@ public sealed class HoldingGroupsApiTests(ApiFactory factory) : HoldingsTestBase
     {
         var reads = await StatementsDuringAsync(async () => await GroupsAsync($"?by={by}"));
 
-        reads.Count(s => s.Contains("portfolio.holdings ", StringComparison.Ordinal)).ShouldBe(1, string.Join("\n", reads));
+        reads.Count(IsHoldingsRead).ShouldBe(1, string.Join("\n", reads));
+        reads.Count(IsHoldingKeysRead).ShouldBe(1, string.Join("\n", reads)); // the income's one read of the holdings' keys (ADR 0026): what a trade's charges are matched against
         reads.Count(s => s.Contains("portfolio.holding_lots", StringComparison.Ordinal)).ShouldBe(1);
         reads.Count(IsSectorRead).ShouldBe(sectorReads, string.Join("\n", reads));
         reads.Count(s => s.Contains("market.basket_members", StringComparison.Ordinal)).ShouldBe(basketReads);
@@ -390,9 +391,52 @@ public sealed class HoldingGroupsApiTests(ApiFactory factory) : HoldingsTestBase
     {
         var reads = await StatementsDuringAsync(async () => await Client.ListHoldingsAsync($"?groupBy=basket&groupKey={_core}", Ct));
 
-        reads.Count(s => s.Contains("portfolio.holdings ", StringComparison.Ordinal)).ShouldBe(1);
+        reads.Count(IsHoldingsRead).ShouldBe(1);
         reads.Count(s => s.Contains("market.basket_members", StringComparison.Ordinal)).ShouldBe(1);
     }
+
+    [Theory]
+    [InlineData("?status=all&sort=-dividends", 0)]
+    [InlineData("?status=all&sort=-xirr", 0)]
+    [InlineData("?sort=symbol", 1)]
+    public async Task A_page_of_holdings_reads_each_income_table_once_and_never_the_ledger(string query, int keyReads)
+    {
+        var reads = await StatementsDuringAsync(async () => await Client.ListHoldingsAsync(query, Ct));
+
+        reads.Count(IsHoldingsRead).ShouldBe(1, string.Join("\n", reads));
+        reads.Count(IsHoldingKeysRead).ShouldBe(keyReads, string.Join("\n", reads)); // handed over when the holdings read are all the account's holdings, else read once by the income
+        reads.Count(s => s.Contains("portfolio.holding_lots", StringComparison.Ordinal)).ShouldBe(1);
+        reads.Count(s => s.Contains("portfolio.dividends", StringComparison.Ordinal)).ShouldBe(1, string.Join("\n", reads));
+        reads.Count(s => s.Contains("portfolio.transactions", StringComparison.Ordinal)).ShouldBe(1, string.Join("\n", reads));
+        reads.Count(s => s.Contains("portfolio.ledger_entries", StringComparison.Ordinal)).ShouldBe(0, string.Join("\n", reads)); // rows have no account-level costs
+        reads.Count.ShouldBeLessThanOrEqualTo(PageBudget + keyReads, string.Join("\n", reads));
+    }
+
+    [Fact]
+    public async Task The_summary_reads_each_income_table_once_and_hands_over_the_holdings_it_read()
+    {
+        var reads = await StatementsDuringAsync(async () => await Client.SummaryAsync(string.Empty, Ct));
+
+        reads.Count(IsHoldingsRead).ShouldBe(1, string.Join("\n", reads));
+        reads.Count(IsHoldingKeysRead).ShouldBe(0, string.Join("\n", reads));
+        reads.Count(s => s.Contains("portfolio.dividends", StringComparison.Ordinal)).ShouldBe(1);
+        reads.Count(s => s.Contains("portfolio.transactions", StringComparison.Ordinal)).ShouldBe(1);
+        reads.Count(s => s.Contains("portfolio.ledger_entries", StringComparison.Ordinal)).ShouldBe(2, string.Join("\n", reads)); // the costs, and the first date of the ledger
+    }
+
+    /// <summary>
+    /// The statements of a page of holdings, whatever the number of holdings or the sort: the session, the holdings, their lots and the income's accounts, dividends and trade charges (6), and the income's read of the holdings' keys (1) when the holdings
+    /// listed are not all the account's. Before the review of P2-14 a page also read the ledger twice and always read the keys: 9 statements.
+    /// </summary>
+    private const int PageBudget = 6;
+
+    /// <summary>The read of the holdings with their names (it joins the master list for the canonical symbol); the lots are read apart.</summary>
+    private static bool IsHoldingsRead(string statement) =>
+        statement.Contains("portfolio.holdings ", StringComparison.Ordinal) && statement.Contains("market.instruments", StringComparison.Ordinal);
+
+    /// <summary>The projection of the holdings' keys the income read needs: no join, no lots.</summary>
+    private static bool IsHoldingKeysRead(string statement) =>
+        statement.Contains("portfolio.holdings ", StringComparison.Ordinal) && !statement.Contains("market.instruments", StringComparison.Ordinal);
 
     /// <summary>The sector read is the one statement on the master list that is not the holdings read (which joins the master list for the canonical symbol).</summary>
     private static bool IsSectorRead(string statement) =>

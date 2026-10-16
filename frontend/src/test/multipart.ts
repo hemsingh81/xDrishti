@@ -57,3 +57,30 @@ export async function readUpload(request: Request): Promise<Upload> {
   }
   return upload;
 }
+
+export interface Uploads {
+  /** The text fields of the form (accountId, choices, digests, ...). */
+  fields: Record<string, string>;
+  /** Every file part, in the order sent. */
+  files: { name: string; text: string }[];
+}
+
+/** Like `readUpload` for a form with several file parts (the reports import: one `files` part per file). */
+export async function readUploads(request: Request): Promise<Uploads> {
+  const type = request.headers.get('content-type') ?? '';
+  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/.exec(type);
+  const marker = `--${boundary?.[1] ?? boundary?.[2] ?? ''}`;
+  const uploads: Uploads = { fields: {}, files: [] };
+  for (const part of (await request.text()).split(marker)) {
+    const split = part.indexOf('\r\n\r\n');
+    if (split < 0) continue;
+    const head = part.slice(0, split);
+    const body = part.slice(split + 4).replace(/\r\n$/, '');
+    const name = /name="([^"]*)"/.exec(head)?.[1];
+    const filename = /filename="([^"]*)"/.exec(head)?.[1];
+    if (name === undefined) continue;
+    if (filename !== undefined) uploads.files.push({ name: filename, text: body });
+    else uploads.fields[name] = body;
+  }
+  return uploads;
+}

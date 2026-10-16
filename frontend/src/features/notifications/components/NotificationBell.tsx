@@ -1,9 +1,10 @@
 import NotificationsIcon from '@mui/icons-material/NotificationsNoneOutlined';
 import { Badge, IconButton, Tooltip } from '@mui/material';
 import { useState } from 'react';
+import { useForgetResolved } from '../hooks/useForgetResolved';
 import { useNotifications } from '../hooks/useNotifications';
 import { useReadState } from '../hooks/useReadState';
-import type { ReadStorage } from '../lib/readState';
+import { stateKey, type ReadStorage } from '../lib/readState';
 import { NotificationDrawer } from './NotificationDrawer';
 
 export interface NotificationBellProps {
@@ -14,9 +15,10 @@ export interface NotificationBellProps {
 /** Top-bar bell with the unread count; opens the notifications drawer. Usable while loading or after an error. */
 export function NotificationBell({ storage }: NotificationBellProps) {
   const state = useNotifications();
-  const { readIds, markIdsRead } = useReadState(storage);
+  const { readIds, markItemsRead, forget } = useReadState(storage);
+  useForgetResolved(state.notifications, forget);
   const [open, setOpen] = useState(false);
-  const unread = state.notifications.filter((n) => !readIds.has(n.id)).length;
+  const unread = state.notifications.filter((n) => !n.resolved && !readIds.has(stateKey(n))).length;
 
   return (
     <>
@@ -40,7 +42,7 @@ export function NotificationBell({ storage }: NotificationBellProps) {
         }}
         state={state}
         readIds={readIds}
-        onMarkRead={markIdsRead}
+        onMarkRead={markItemsRead}
       />
     </>
   );

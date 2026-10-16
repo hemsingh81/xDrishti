@@ -10,6 +10,9 @@ internal sealed class HoldingStore(XDrishtiDbContext db) : IHoldingStore
     public async ValueTask<bool> AnyForAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
         await db.Holdings.AsNoTracking().AnyAsync(x => x.AccountId == accountId, cancellationToken);
 
+    public async ValueTask<bool> AnyAppearedSinceAsync(Guid accountId, DateTimeOffset since, CancellationToken cancellationToken) =>
+        await db.Holdings.AsNoTracking().AnyAsync(x => x.AccountId == accountId && (x.FirstSeenAt > since || x.Lots.Any(l => l.CreatedAt > since)), cancellationToken);
+
     public async ValueTask<IReadOnlyList<Holding>> ListForAccountAsync(Guid accountId, CancellationToken cancellationToken) =>
         await db.Holdings.Include(x => x.Lots).Where(x => x.AccountId == accountId).OrderBy(x => x.FirstSeenAt).ThenBy(x => x.Id).ToListAsync(cancellationToken);
 

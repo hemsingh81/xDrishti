@@ -24,7 +24,7 @@
     <button class="icon-btn" id="theme-btn" aria-label="Toggle dark mode" title="Toggle dark mode">◐</button>
   </div>
 </header>
-<div class="layout no-toc">
+<div class="layout">
 <nav class="sidebar" id="sidebar" aria-label="Documents">
   <a class="side-home" href="index.html">Home</a>
   <div class="side-group"><div class="side-title">Foundation</div>
@@ -108,18 +108,23 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td><strong>P1 Data platform &amp; instruments</strong> (5w)</td>
-<td>Dhan adapter (instrument master, history, accounts); <strong>CSV import</strong> (profiles, preview, validation, upsert, undo, folder watch, CLI); Timescale hypertables + continuous aggregates (5m…1h, 1D/1W/1M); corporate actions; calendar; context data; <strong>master list, tracked instruments, baskets</strong> (manual, rule-based, system); EOD fetch + backfill jobs; quality checks; <strong>Data quality window</strong> (validation service, stored-vs-recomputed aggregates, repair); React shell with <strong>login (password; re-entry for sensitive actions), Accounts (list/detail tabs, role matrix, risk profiles, wizard), Services screen with schedule configuration &amp; dependency checks</strong>, Instruments, Baskets and Data/Import screens; commands/desired-state + audit</td>
+<td>Dhan adapter (instrument master, history, accounts); <strong>CSV import</strong> (profiles, preview, validation, upsert, undo, folder watch, CLI); Timescale hypertables + continuous aggregates (5m…1h, 1D/1W/1M); corporate actions; calendar; <em>(the daily <strong>context data</strong> — index, VIX, breadth — is not part of P1: it moved to <strong>P3-01d</strong>, see the P3 rows)</em>; <strong>master list, tracked instruments, baskets</strong> (manual, rule-based, system); EOD fetch + backfill jobs; quality checks; <strong>Data quality window</strong> (validation service, stored-vs-recomputed aggregates, repair); React shell with <strong>login (password; re-entry for sensitive actions), Accounts (list/detail tabs, role matrix, risk profiles, wizard), Services screen with schedule configuration &amp; dependency checks</strong>, Instruments, Baskets and Data/Import screens; commands/desired-state + audit</td>
 <td>Your CSV history imported; 5 unattended EOD fetches; all timeframes match a hand-check on 10 samples</td>
 </tr>
 <tr>
 <td><strong>P2 Portfolio monitor &amp; live feed</strong> (4w)</td>
-<td>Account sync (holdings, positions, trade history, ledger); transactions, FIFO lots, positions, buckets; CSV/manual trade import; <strong>XIRR</strong>, returns, benchmark; daily valuations; <code>xd-feed</code> live feed for the active set + quote polling for holdings; Portfolio screen (per-account tiles, <strong>Action center</strong>, price alerts, group by bucket/basket/account/sector, tree-grid, charts)</td>
+<td>Account sync (holdings, positions, trade history, ledger — <strong>trade history and ledger sync built in P2-13</strong> (<a href="../adr/0025-dhan-trade-history-and-ledger-sync.html">ADR 0025</a>); dividends entered by the owner and charges in <strong>net</strong> returns and net XIRR are <strong>built in P2-14</strong> (<a href="../adr/0026-dividends-entered-by-the-owner-and-charges-in-net-returns.html">ADR 0026</a>); a <strong>dividend payout file (CSV) is recognised by its headers, matched to holdings by scrip name with remembered corrections, previewed and imported with Undo — built in P2-15</strong> (<a href="../adr/0028-dividend-csv-import-with-name-matching.html">ADR 0028</a>); positions are not built); <strong>self-healing syncs and actionable notifications are built in P2-16</strong> (<a href="../adr/0027-self-healing-sync-and-actionable-notifications.html">ADR 0027</a>: quiet retries with back-off, catch-up after a reconnect, one earlier year of trade history read per day, attention items with buttons in the bell and as pop-ups); <strong>Dhan&#39;s downloaded reports — the global transaction report (bill-level trades with charges), DP-charges sheets and the demat holding statement, as CSV, <code>.xls</code> or <code>.xlsx</code> — are previewed and imported with Undo in P2-17</strong> (<a href="../adr/0029-dhan-report-imports-and-source-precedence.html">ADR 0029</a>; Dhan&#39;s own trades take precedence over the report&#39;s bill rows); <strong>the review follow-ups of P2-13 … P2-17 are closed in P2-18</strong> (<a href="../adr/0030-read-only-notices-retention-and-structured-failures.html">ADR 0030</a>: read-only notices, 30-day retention of resolved items, a bell item for dropped rows, structured failure kinds, a kind-aware sync guard, one phrase table, an <code>.xlsx</code> guard); transactions, FIFO lots, positions, buckets; CSV/manual trade import; <strong>XIRR</strong>, returns, benchmark; daily valuations; <code>xd-feed</code> live feed for the active set + quote polling for holdings; Portfolio screen (per-account tiles, <strong>Action center</strong>, price alerts, group by bucket/basket/account/sector, tree-grid, charts)</td>
 <td>Portfolio values and XIRR match a spreadsheet check for 3 accounts/buckets; live P&amp;L updates during market hours</td>
 </tr>
 <tr>
 <td><strong>P3 Simulator, DSL &amp; first strategies</strong> (5w)</td>
-<td>Streaming indicators/features; DSL parser → expression trees + look-ahead lint; event-driven simulator (conditional entries, stops, square-off, max hold, gaps, costs, slippage, MAE/MFE); <code>ORB</code>, <code>VWAP_PULLBACK</code>, <code>BASE_BREAKOUT</code>; scans scoped by basket</td>
+<td>Streaming indicators/features (<strong>built in P3-01</strong>, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>: 19 indicators and session fields, a <code>TimeframeBuilder</code> and a <code>FeatureFrame</code> over closed bars only, tested for look-ahead (the frame never shows the forming bar; a prefix property guards against hidden state) and cross-checked against Skender; <strong>P3-01b built</strong>, <a href="../adr/0032-frame-history-closed-flags-and-the-remaining-indicators.html">ADR 0032</a>: the frame API the DSL needs (closed flags per timeframe, value history for <code>close[1]</code> / crossings / <code>rising</code>, raw <code>open high low close volume</code>, an ordering guard) and the other 25 features (ADX/DMI, MACD, Bollinger, Supertrend, ROC, <code>inside_bar</code>, <code>nr</code>, <code>engulfing</code>, <code>pivot_high/low</code> with ages), 44 in all; <strong>P3-01c built</strong>, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>: weekly and monthly timeframes (a 1W / 1M bar closes at the last session of its period with a calendar, at the first bar of the next period without one), the <code>day_of_week</code> and <code>is_expiry_day</code> features and a daily <code>MarketContext</code> read as of the previous session (index trend / ADX / volatility percentile, VIX level / percentile / change, breadth and the nine-value regime), 12 new names, 56 in all; <strong>P3-01d</strong> — the context data job that writes <code>market.context_daily</code> (index and VIX bars, breadth, <code>sector_rs</code>) — is still to build, before the simulator needs <code>by_regime</code>; <strong>P3-02 built</strong>, <a href="../adr/0034-the-rules-expression-language-lint-and-compiler.html">ADR 0034</a>: the rules expression language for one condition — parser (Superpower), binder against the 56 names, look-ahead lint and a compiler to expression trees, with three-valued logic (a condition on data that is not ready is unknown, not false), <code>time</code> as the close time of the evaluated bar, lagged builtins refused across timeframes, errors as data with codes, spans and suggestions; zero allocation per evaluation; tested against an independent interpreter and for look-ahead (a truncation and future-perturbation property with negative controls). Seven build deviations from, or narrowings of, the approved spec wait for the owner (ADR 0034 Amendments 1, 2, 3, 4, 7, 14 and 18, among them the cold start of 39–41 ms against a target of 20 ms, ISS-12). A lagged read of a per-session feature (<code>vwap</code>, <code>today_*</code>, <code>prev_day_*</code>, <code>gap_pct</code>) crosses the session open — <code>crosses_above(close, vwap)</code> compares the first bar of a session with the last bar of the one before — and the lint warns (<code>lag_across_session</code>, Amendment 19; the stronger rule is ISS-13). <strong>P3-02b</strong> — the strategy file around the language (YAML sections, <code>params</code> of at most four, the <code>sell:</code> block and the BUY → SELL mirror, the JSON Schema, storage in <code>lab.strategies</code>) — is next, then the simulator); DSL parser → expression trees + look-ahead lint (<strong>built in P3-02</strong>); strategy file (<strong>P3-02b</strong>); event-driven simulator (conditional entries, stops, square-off, max hold, gaps, costs, slippage, MAE/MFE); <code>ORB</code>, <code>VWAP_PULLBACK</code>, <code>BASE_BREAKOUT</code>; scans scoped by basket</td>
 <td>20 random trades hand-verified against charts</td>
+</tr>
+<tr>
+<td><strong>P3-01d Context data job</strong> (inside P3, before the simulator needs <code>by_regime</code>: P3-03 / P3-04)</td>
+<td>The job that writes <code>market.context_daily</code> (<a href="05-data-and-brokers.html">doc 05</a> §9; a new migration): daily bars of the regime index (Nifty 50) and the VIX from Dhan, <strong>breadth</strong> and the sector composites for <code>sector_rs(n)</code> from the tracked stocks&#39; daily bars — all <strong>point-in-time</strong>, because a restated close or a breadth computed with later prices would be look-ahead in the data (<a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>); a reader that builds the <code>MarketContext</code> from the table; the age of the last context day is visible, because a context that is not extended keeps its last day for ever and <code>regime</code> would go stale without a signal (ADR 0033, known risk; the market gate of P7 uses it)</td>
+<td>A <code>MarketContext</code> built from the table gives the values of one built from the same records; <code>sector_rs(n)</code> exists; the age of the last day is shown and a stale context raises an attention item</td>
 </tr>
 <tr>
 <td><strong>P4 Exits &amp; exit learning</strong> (3w)</td>
@@ -182,15 +187,141 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>Features/filters improve OOS or are dropped</td>
 </tr>
 </tbody></table>
+<h2 id="open-issues-log">Open issues log<a class="hash" href="#open-issues-log" aria-label="Link to this section">#</a></h2>
+<p>Findings from the first real runs that are not fixed yet. Each entry says what was seen, why it matters and the direction to take; none blocks the current work. New entries go at the bottom with the next number; closed ones are marked <strong>Closed</strong> with the story that fixed them, never deleted. Figures from the owner&#39;s own accounts are kept out of this file (they live in the local, uncommitted analysis under <code>data/dhan/</code>).</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Issue</th>
+<th>Seen</th>
+<th>Why it matters</th>
+<th>Direction</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ISS-01</td>
+<td><strong>Dhan&#39;s trade-history API misses whole days.</strong> Several multi-stock &quot;bulk&quot; days that Dhan&#39;s own transaction report lists are absent from the API answer (only some trades of the period come back).</td>
+<td>First scheduled trades run after the mapper fix (2026-10-15).</td>
+<td>Lots cannot be rebuilt for the holdings whose buys or sells fall on those days; dates and returns stay approximate.</td>
+<td>Fill the gaps from the downloaded reports (P2-17 <em>Import files</em>); find out whether the API pages, filters or time limits explain it (compare an API day with its report day) and record the finding in ADR 0025.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-02</td>
+<td><strong>Many holdings cannot be rebuilt</strong> (<code>quantity_mismatch</code> / <code>negative_opening</code>: the stored sells are larger than the buys the app knows).</td>
+<td>Same run; the holdings are listed in the run counts.</td>
+<td>Their lots keep the single default-dated lot, so XIRR and net returns for them are approximate; the bell item &quot;trades don&#39;t explain a holding&quot; will show.</td>
+<td>Import the transaction reports first (ISS-01), then re-run the rebuild; for IPO allotments, demergers and transfers (shares with no trade at all) decide how to record an <em>opening position</em> by hand.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-03</td>
+<td><strong>Dropped rows are not explained.</strong> A run reports how many rows it dropped but not why (no symbol, unmapped product, bad number…).</td>
+<td>Same run; a handful of rows dropped.</td>
+<td>The owner cannot tell whether the loss matters; the mapper-version re-read cannot be judged.</td>
+<td><strong>Done (2026-10-15):</strong> every trade or ledger row a mapper drops carries a reason code from a closed set (<code>BrokerDropReasons</code>: <code>unreadable_row</code>, <code>missing_id</code>, <code>bad_id</code>, <code>missing_side</code>, <code>bad_quantity</code>, <code>bad_price</code>, <code>bad_time</code>, <code>bad_date</code>, <code>missing_amount</code>, <code>bad_amount</code>, <code>zero_amount</code>, <code>failed_checks</code>, <code>store_refused</code>, <code>other</code>). The run counts carry <code>droppedByReason</code> (rows per code, adding up to <code>dropped</code>) and <code>droppedRows</code> (at most five locations: request window, page, row index, reason - never a name, amount, id or narration); the status of each kind shows the latest run&#39;s two fields; the Portfolio sync line says how many rows could not be read and why, with a <em>Details</em> disclosure for the locations; the audit entry and the log list the reasons as <code>reason×count</code>. <code>missing_symbol_unresolved</code> stays a <em>skip</em> (<code>no_symbol</code>), not a drop. Not done there: the bell item for drops (ISS-09, closed later by P2-18) and the reason on <code>needs_reread</code> (ISS-10). See <a href="12-portfolio-monitoring.html">doc 12</a> §3 and <a href="../adr/0025-dhan-trade-history-and-ledger-sync.html">ADR 0025</a> / <a href="../adr/0027-self-healing-sync-and-actionable-notifications.html">0027</a> amendments.</td>
+<td><strong>Closed</strong></td>
+</tr>
+<tr>
+<td>ISS-04</td>
+<td><strong>Deepening history rarely changes a verdict.</strong> In the reconstruction model a sell fits or not mainly by what is held now, so reading an earlier year seldom fixes <code>negative_opening</code>.</td>
+<td>Review of P2-16; confirmed by the first run (the earlier years returned no equity trades).</td>
+<td>Nightly calls with little benefit.</td>
+<td>Keep (bounded, harmless) but stop deepening once a year returns no equity trades; revisit whether the rule helps at all after ISS-01/02 are solved.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-05</td>
+<td><strong>Derivatives, commodity and intraday trading is not modelled.</strong> The sync and the importers count and skip those rows (a large share of all rows).</td>
+<td>Skip counts of the first run.</td>
+<td>Realised results of that trading (and its charges) are outside every figure in the app.</td>
+<td>Decide whether the app should track it (positions and intraday P&amp;L story, P&amp;L reconciliation against Dhan&#39;s statements); until then the Portfolio screen says what is left out.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-06</td>
+<td><strong>Report matching rules are unverified against real files.</strong> DP charges are matched to ledger charges by account, day and amount (and a depository label); the client-code check learns the code from the first accepted report; ISIN-less rows rely on name matching.</td>
+<td>Design of P2-17; no real upload yet.</td>
+<td>A wrong assumption silently double-counts or undercounts a cost, or blocks a file.</td>
+<td>First real uploads: check the preview counts (covered by Dhan, already in the ledger, other account); adjust the one phrase table <code>LedgerText.Phrases</code> (read by <code>DepositoryCharges</code>, <code>LedgerClassifier</code> and <code>LedgerCosts</code> since P2-18; before that the three lists differed).</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-07</td>
+<td><strong>Time-dependent tests.</strong> Tests whose fixtures use fixed dates against the real clock failed depending on the time of day or the date (relative times such as &quot;2 days ago&quot;, forms that refuse future dates, API-key expiry warnings).</td>
+<td>Final checks of P2-16/P2-17; found again by the review.</td>
+<td>A green check could turn red overnight or on a given future date.</td>
+<td><strong>Done (2026-10-15):</strong> <code>XD_TEST_NOW=&lt;ISO instant&gt;</code> is a diagnostic that fakes <code>Date</code> for every test that does not pin it; <code>npm run test:clock</code> (manual, about 15 minutes, not part of <code>check.sh</code>) runs the suite at several instants, including after the old fixture expiry; the <code>pinClock</code> helper (<code>frontend/src/test/pinClock.ts</code>) pins <code>Date</code> for a file or <code>describe</code>; <code>src/test/clockGuard.test.ts</code> fails a test file that asserts relative-time wording without pinning (it covers wording only; <code>test:clock</code> covers the rest); the fixtures&#39; API keys now never expire (2099) so no test depends on an expiry date; the rule is in <code>frontend/CLAUDE.md</code>. The diagnostic found the pinned-test list; the review found the 2027 expiry bomb, fixed at its source.</td>
+<td><strong>Closed</strong></td>
+</tr>
+<tr>
+<td>ISS-08</td>
+<td><strong>Review follow-ups are scattered in the specs.</strong> Minor findings of the reviews (GET <code>/notices</code> writes attention rows, attention-items retention, message-text matching for transient errors, guard granularity, phrase-list mismatch, command-target fixture drift…) sit in the <em>Follow-ups</em> section of P2-13 … P2-17.</td>
+<td>Reviews of P2-13 … P2-17.</td>
+<td>Easy to lose.</td>
+<td>Pick them up as one hardening story before P3; this entry points to the specs: P2-14, P2-15, P2-16 and P2-17. <strong>Done (2026-10-15, <a href="../specs/P2-18-sync-and-import-hardening.html">P2-18</a>, <a href="../adr/0030-read-only-notices-retention-and-structured-failures.html">ADR 0030</a>):</strong> GET <code>/notices</code> only reads (the attention items are reconciled by the healer tick, at the end of every holdings, trades or ledger attempt and after a Dhan sign-in); resolved items are deleted after 30 days (<code>Portfolio:Heal:AttentionRetentionDays</code>; DELETE granted on that one table); failures carry a structured kind and no code matches a message; every <code>RunAsync</code> result is checked and manual flows get a neutral text; <code>SyncGuard</code> is kind-aware; a late failure keeps the progress of its re-read windows; the command list is generated from the server&#39;s; one phrase table; the supersede and the sheet&#39;s plan decide a day from the whole stored day; bill identities count every equity leg as a sibling; an <code>.xlsx</code> decompression-bomb guard; capped <code>includeDuplicates</code>; and the screen items (Cash drawer wording, suggestion refresh, per-share decimals, toast focus, the mixed priced/unpriced rule, the database test for &quot;holding appeared since&quot;). What stays open from those lists is named in them (quote items, the mapper-version fallback, the DP date assumption, the other first-real-read checks).</td>
+<td><strong>Closed</strong></td>
+</tr>
+<tr>
+<td>ISS-09</td>
+<td><strong>Dropped rows raise no bell item.</strong> ISS-03 explains the drops on the sync line and in the audit text, but the owner is only told if they open the Portfolio screen.</td>
+<td>Closing ISS-03.</td>
+<td>A run that drops many rows (for example after a Dhan format change) goes unnoticed.</td>
+<td>Add an attention item (e.g. <code>sync_dropping</code>) derived from the latest run of a kind whose dropped share is high or whose dominant reason is not a known benign one (<code>zero_amount</code>); its text names the dominant reason and count, with an action that opens the sync line&#39;s Details. Raise and resolve like the other items of <a href="12-portfolio-monitoring.html">doc 12</a> §3 &quot;Self-healing and attention items&quot;. <strong>Done (2026-10-15, <a href="../specs/P2-18-sync-and-import-hardening.html">P2-18</a>):</strong> the attention kind is <code>rows_dropped</code> (not <code>sync_dropping</code>): one item per Portfolio account and kind (trades, ledger) derived from the latest <strong>succeeded</strong> run of that kind; information when the only reason is <code>zero_amount</code>, a warning otherwise (not by a dropped share: any dropped row raises it); the text names the counts and the plain words of at most three reasons, biggest first; the action <em>Open</em> goes to <code>/portfolio?focus=sync</code>, which focuses <strong>Sync trades &amp; ledger</strong> (the <em>Details</em> disclosure of the sync line holds the places of the first rows); it resolves when the latest succeeded run of that kind drops nothing, and a running, skipped or failed latest run neither raises nor resolves it.</td>
+<td><strong>Closed</strong></td>
+</tr>
+<tr>
+<td>ISS-10</td>
+<td><strong><code>needs_reread</code> does not say why.</strong> A stored window that dropped rows is noted for a re-read after a mapper update, but not with the reason, so the re-read cannot be limited to windows whose reason a new mapper could mend, and the owner cannot see why a window is waiting.</td>
+<td>Closing ISS-03.</td>
+<td>Re-reads cover windows whose drops could never be mended (a row without an id).</td>
+<td>Store the dominant drop reason on <code>portfolio.broker_sync_windows</code> (a nullable column: a migration) and read again only windows whose reason is one a mapper change can fix; show the reason where the window is listed. P2-18 (F4) did not touch this: it kept the progress of a failed run&#39;s re-read windows in the run&#39;s counts JSON (<code>rereadDone</code>, <code>rereadVersion</code>), not on the window rows, so the migration of <code>broker_sync_windows</code> is still to do.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-11</td>
+<td><strong>Throughput of the 1W and 1M builders swings by a factor of 3 or more between runs of the same binary.</strong></td>
+<td>P3-01c review (2026-10-16): seven runs of the explicit benchmark <code>Timeframe_builders_bars_per_second</code> on one Release build gave 1W 34–44 M bars/s in six runs and 106 M in one, and 1M 108–111 M in four and 62 M and 31 M in two.</td>
+<td>The benchmark has no assertion (it is explicit and only reports; the recorded figures are all above 10 M bars/s), so a builder far slower than the figures — three times slower, or more — would still pass, and the figures quoted in ADR 0033 are not reproducible. The frame step (0.06–0.09 µs against a target of 1 µs) is not at risk.</td>
+<td>Find the cause — a change of tier in the JIT (tiered compilation or PGO; run with <code>DOTNET_TieredPGO=0</code> and <code>DOTNET_TieredCompilation=0</code> to see), or the zeroing of the <code>out ClosedBar</code> results through the three <code>Push</code> layers (<code>TimeframeBuilder</code>, <code>WeekMonthBuilder</code>, the inner day builder; see the follow-up on the shape of <code>TimeframeBuilder</code> in the P3-01c spec) — then add an assertion with a lower bound near the slow mode to the benchmark.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-12</td>
+<td><strong>The first compile of a process takes about 40 ms against a target of 20 ms.</strong> <code>ConditionCompiler.Compile</code> of ten conditions plus the ten delegates, the first time in a fresh process, measured 39–41 ms in three runs (30–31 ms parse + bind + lint, 8–9.5 ms building the delegates) and 37 ms in the build&#39;s own run; warm it is a median of 2.5–2.7 ms (target 3 ms).</td>
+<td>P3-02 build and documentation pass (2026-10-16), explicit benchmark <code>Compile_bind_and_build_ten_conditions_cold_and_warm</code>, Release, Apple-silicon Mac.</td>
+<td>The approved target of P3-02 (criterion 12, ADR 0034 Amendment 2) is missed once per process: a host that compiles conditions on request (the Lab API, a worker) pays it on its first request. The likely cause is the first-use JIT of Superpower&#39;s generic tokenizer, the binder and the expression compiler (the stage timings point there; no profile was taken).</td>
+<td>Try <code>PublishReadyToRun</code> (and the tiered-compilation settings) for the hosts that compile conditions and measure the same benchmark in a fresh process; or a lighter lexer; then add an assertion on the cold figure to the explicit benchmark (today only the warm median ≤ 3 ms and the evaluation share ≤ 300 ns are asserted, by the explicit benchmarks, which are not part of <code>scripts/check.sh</code>: the 300 ns and the 3 ms have no automated guard in the gates, and the 300 ns is the difference of two independently minimised best-of-5 timings, a guide and not a regression gate). Or the owner accepts the figure.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-13</td>
+<td><strong>A lagged read of a per-session feature crosses the session open.</strong> <code>vwap[1]</code>, <code>today_open[1]</code>, <code>prev_day_*[1]</code>, <code>gap_pct[1]</code> — and so <code>crosses_above(close, vwap)</code>, <code>rising(vwap, 1)</code> and <code>crosses_above(close, today_open)</code> — read the <em>previous session&#39;s</em> last value on the first bar of a session, because the history of the frame runs on across sessions (ADR 0031, decision 4) while these features start again at the open.</td>
+<td>P3-02 final review (2026-10-16): a seeded random walk of 500 sessions had <code>crosses_above(close, vwap)</code> true on the first bar of about a quarter of the sessions on 1m and 15m, against a few percent at every other bar; <code>SessionBoundaryExamplesTests</code> pins a hand-calculated two-session case.</td>
+<td>A simulator or live engine that uses such a trigger without a <code>time</code> guard takes spurious opening trades; <code>prev_day_*</code> lags compare &quot;yesterday&quot; with &quot;the day before&quot; there.</td>
+<td><strong>Done in P3-02 (Amendment 19):</strong> the meaning of <code>x[k]</code> is unchanged and the lint warns, <code>lag_across_session</code>, with the <code>time &gt;= &quot;HH:MM&quot;</code> check that clears it (recognised in the same condition). <strong>Open:</strong> the stronger rule, a lagged read of such a feature that is <em>unknown</em> across a session reset, needs the frame to know the session of each history slot (a new member of <code>FeatureFrame</code>, listed by name in the architecture test of <code>XDrishti.Strategies</code>), a rule for <code>prev_day_*</code>, and the oracle and the tests changed with it; and P3-02b must make the check visible across the sections of a strategy file (doc 11&#39;s example has it in <code>setup</code> and the crossing in <code>trigger</code>). Decide with P3-03, which is the first user.</td>
+<td>Open</td>
+</tr>
+<tr>
+<td>ISS-14</td>
+<td><strong><code>FeedConnectionManagerTests.A_packet_now_and_then_keeps_the_connection_alive</code> fails when it is run alone and failed once inside a full <code>scripts/check.sh</code>.</strong> Run alone (<code>dotnet test --project tests/XDrishti.Application.Tests --filter-method *A_packet_now_and_then_keeps_the_connection_alive*</code>) it fails every time at <code>FeedWorld.UntilAsync</code> (the tick of the first loop is never added, also after 10 s of real time), at the committed HEAD as well; run with its class (32 tests) or with the whole project (3,936 tests, three runs) it passes.</td>
+<td>P3-02 final check (2026-10-16 21:36): 1 failure in 18,384 tests, in <code>XDrishti.Application.Tests</code>, none of whose code the change touched; a copy of HEAD behaves the same.</td>
+<td>A test that depends on what ran before it is a flake in waiting: it can turn a green check red for no reason connected to the change, and it hides whether the feed&#39;s keep-alive is really correct when nothing else has warmed the process.</td>
+<td>Find what the other tests of the class set up (a static, a pool turn, a first-use cost) and make the test self-contained; the spin of <code>FeedWorld.UntilAsync</code> is bounded by a count of turns, not by time.</td>
+<td>Open</td>
+</tr>
+</tbody></table>
 
   </article>
   <nav class="pager" aria-label="Previous and next document">
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-13 17:50</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-16 16:11</footer>
 </main>
-
+<aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#open-issues-log" class="d2">Open issues log</a></aside>
 </div>
 <div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
 <script src="assets/search-index.js"></script>

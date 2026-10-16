@@ -2,9 +2,10 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { dragWithKeyboard, announced, stubLayout } from './dndTestkit';
 import { basketCard, basketIds, membersGrid, renderBaskets, symbolsShown } from './testing';
+import { findToast } from '@/test/toast';
 
 const rowBox = (symbol: string) => screen.getByRole('checkbox', { name: `Select ${symbol}` });
-const toast = () => screen.findByRole('alert');
+const toast = findToast;
 
 async function pickFromRowMenu(symbol: string, item: string) {
   await userEvent.click(screen.getByRole('button', { name: `Copy or move ${symbol}` }));
