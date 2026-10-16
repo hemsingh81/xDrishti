@@ -23,7 +23,7 @@ namespace XDrishti.Indicators;
 /// </para>
 /// <para>
 /// <b>Past the last day.</b> A reader at a date after the last day of the context gets that last day, however far away the date is: the context does not know what the clock says and the values carry no age
-/// (<see cref="ContextValues.Date"/> says which day they belong to, but <see cref="ContextFeature"/> and so the frame do not pass it on). <b>The caller must extend the context</b> (<see cref="Append"/>) as the days pass; a context
+/// (<see cref="ContextValues.Date"/> says which day they belong to, but <see cref="DateFeature"/> and so the frame do not pass it on). <b>The caller must extend the context</b> (<see cref="Append"/>) as the days pass; a context
 /// that is not extended makes the features keep the last day's values and stay ready (ADR 0033 lists it as a known risk for the context data job and the market gate).
 /// </para>
 /// </summary>

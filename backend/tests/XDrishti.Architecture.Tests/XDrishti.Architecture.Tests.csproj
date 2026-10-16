@@ -4,6 +4,7 @@
     <ProjectReference Include="..\..\src\XDrishti.Worker\XDrishti.Worker.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Feed\XDrishti.Feed.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Indicators\XDrishti.Indicators.csproj" />
+    <ProjectReference Include="..\..\src\XDrishti.Strategies\XDrishti.Strategies.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />

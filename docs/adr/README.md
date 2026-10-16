@@ -38,3 +38,4 @@ ADR's decision — supersede it with a new one and link both ways.
 | [0031](0031-streaming-indicators-and-the-feature-frame.md) | Streaming indicators and the feature frame: closed bars only, one code path | Accepted |
 | [0032](0032-frame-history-closed-flags-and-the-remaining-indicators.md) | The frame exposes closed flags and value history; the remaining indicators and patterns | Accepted |
 | [0033](0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md) | Weekly and monthly timeframes, calendar features and a daily market context read as of the previous session | Accepted |
+| [0034](0034-the-rules-expression-language-lint-and-compiler.md) | The rules expression language: one grammar, three-valued logic, a look-ahead lint and a compiler to expression trees | Accepted (seven build deviations await the owner: Amendments 1, 2, 3, 4, 7, 14 and 18) |

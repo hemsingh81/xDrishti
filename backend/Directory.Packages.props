@@ -42,6 +42,9 @@
   <ItemGroup Label="Indicator cross-check (P3-01, test projects only)">
     <PackageVersion Include="Skender.Stock.Indicators" Version="2.7.3" />
   </ItemGroup>
+  <ItemGroup Label="Rules language (P3-02)">
+    <PackageVersion Include="Superpower" Version="3.2.1" />
+  </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />

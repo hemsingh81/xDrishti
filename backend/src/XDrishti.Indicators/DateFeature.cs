@@ -9,12 +9,12 @@ namespace XDrishti.Indicators;
 /// feature's history (one entry per date).
 /// <para>
 /// <b>Strictly before today.</b> A context value at the date <i>D</i> is that of the latest context day strictly before <i>D</i> (<see cref="MarketContext.TryAsOf(DateOnly, out ContextValues)"/>): a strategy at 10:30
-/// on a Tuesday sees Monday's close, never Tuesday's. <see cref="ContextFeatureKind.Weekday"/> and <see cref="ContextFeatureKind.ExpiryDay"/> read the date itself. A date outside the range of <see cref="DateOnly"/>
+/// on a Tuesday sees Monday's close, never Tuesday's. <see cref="DateFeatureKind.Weekday"/> and <see cref="DateFeatureKind.ExpiryDay"/> read the date itself. A date outside the range of <see cref="DateOnly"/>
 /// (a garbage epoch) has no context and no expiry day: those values are not ready, and the weekday is still computed from the day number.
 /// </para>
 /// <para>
-/// <b>Not ready.</b> A context feature is <see cref="double.NaN"/> without a <see cref="MarketContext"/>, before the context has a day earlier than the date, and while the value the day carries is not ready (the warm-up
-/// of its rolling windows, a day without a VIX, a day without a breadth). <see cref="ContextFeatureKind.Weekday"/> is ready from the first bar; <see cref="ContextFeatureKind.ExpiryDay"/> from the first bar once it
+/// <b>Not ready.</b> A feature that reads the context (every kind but <see cref="DateFeatureKind.Weekday"/> and <see cref="DateFeatureKind.ExpiryDay"/>) is <see cref="double.NaN"/> without a <see cref="MarketContext"/>, before the context has a day earlier than the date, and while the value the day carries is not ready (the warm-up
+/// of its rolling windows, a day without a VIX, a day without a breadth). <see cref="DateFeatureKind.Weekday"/> is ready from the first bar; <see cref="DateFeatureKind.ExpiryDay"/> from the first bar once it
 /// has been given a set of dates (an empty set is a valid set: always 0).
 /// </para>
 /// <para>
@@ -26,15 +26,15 @@ namespace XDrishti.Indicators;
 /// <para>
 /// <b>Warm-up</b> is counted in <b>days of the context</b>, not in bars: the number of context days that must lie before the date for the feature to be ready on a context with no gaps (and, where it matters, a VIX
 /// on each day) — for example 55 for <c>index_trend</c> and 265 for <c>regime</c> with the default <see cref="ContextOptions"/>. It is exact for the options of the context the instance was given, and for the
-/// default options when it has none; <see cref="ContextFeatureKind.Weekday"/> and <see cref="ContextFeatureKind.ExpiryDay"/> report 1 (ready at the first date).
+/// default options when it has none; <see cref="DateFeatureKind.Weekday"/> and <see cref="DateFeatureKind.ExpiryDay"/> report 1 (ready at the first date).
 /// </para>
 /// <para>Thread-confined like every indicator; the <see cref="MarketContext"/> behind it may be shared by any number of instances and frames.</para>
 /// </summary>
-public sealed class ContextFeature : IIndicator
+public sealed class DateFeature : IIndicator
 {
     private static readonly ContextOptions DefaultOptions = new();
 
-    private readonly ContextFeatureKind _kind;
+    private readonly DateFeatureKind _kind;
 
     private readonly MarketContext? _context;
 
@@ -51,14 +51,14 @@ public sealed class ContextFeature : IIndicator
     private double _value = double.NaN;
 
     /// <param name="kind">Which feature this instance reports.</param>
-    /// <param name="context">The daily context the context features read; none gives a feature that is never ready (the weekday and the expiry day do not need it).</param>
-    /// <param name="expiryDays">The India dates that are expiry days, for <see cref="ContextFeatureKind.ExpiryDay"/>; none gives a feature that is never ready. The set is read as given, so it must not change while the
+    /// <param name="context">The daily context the features that read it use; none gives a feature that is never ready (the weekday and the expiry day do not need it).</param>
+    /// <param name="expiryDays">The India dates that are expiry days, for <see cref="DateFeatureKind.ExpiryDay"/>; none gives a feature that is never ready. The set is read as given, so it must not change while the
     /// feature is in use (<see cref="FeatureFrame"/> takes its own copy).</param>
-    public ContextFeature(ContextFeatureKind kind, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null)
+    public DateFeature(DateFeatureKind kind, MarketContext? context = null, IReadOnlySet<DateOnly>? expiryDays = null)
     {
         if (!Enum.IsDefined(kind))
         {
-            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a known context feature.");
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a known date feature.");
         }
 
         _kind = kind;
@@ -68,7 +68,7 @@ public sealed class ContextFeature : IIndicator
     }
 
     /// <summary>Which feature this instance reports.</summary>
-    public ContextFeatureKind Kind => _kind;
+    public DateFeatureKind Kind => _kind;
 
     public double Value => _value;
 
@@ -98,27 +98,27 @@ public sealed class ContextFeature : IIndicator
         _value = double.NaN;
     }
 
-    /// <summary>Whether the feature reads the <see cref="MarketContext"/> (everything but the two calendar features).</summary>
-    internal static bool ReadsContext(ContextFeatureKind kind) => kind is not (ContextFeatureKind.Weekday or ContextFeatureKind.ExpiryDay);
+    /// <summary>Whether the feature reads the <see cref="MarketContext"/> (everything but the two calendar features): the catalog sets <see cref="IndicatorInfo.RequiresContext"/> from it.</summary>
+    internal static bool ReadsContext(DateFeatureKind kind) => kind is not (DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay);
 
     /// <summary>
     /// The context days that must precede the date for the feature to be ready, for a context with no gaps: the average, its slope and the ADX for the trend (the later of the two), the ATR and a full window of its
     /// values for the volatility percentile, a full window of VIX closes for the VIX percentile, a second VIX for the change, and one day for the rest. The regime needs both parts.
     /// </summary>
-    internal static int WarmUpDays(ContextFeatureKind kind, ContextOptions options)
+    internal static int WarmUpDays(DateFeatureKind kind, ContextOptions options)
     {
         var trend = Math.Max(options.TrendSmaPeriod + options.TrendSlopeDays, 2 * options.AdxPeriod);
         var volatility = options.AtrPeriod + options.PercentileWindow - 1;
         return kind switch
         {
-            ContextFeatureKind.Weekday or ContextFeatureKind.ExpiryDay or ContextFeatureKind.Vix or ContextFeatureKind.Breadth => 1,
-            ContextFeatureKind.VixChg => 2,
-            ContextFeatureKind.VixPct => options.PercentileWindow,
-            ContextFeatureKind.IndexAdx => 2 * options.AdxPeriod,
-            ContextFeatureKind.IndexTrend or ContextFeatureKind.RegimeTrend => trend,
-            ContextFeatureKind.IndexVolPct or ContextFeatureKind.RegimeVol => volatility,
-            ContextFeatureKind.Regime => Math.Max(trend, volatility),
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a known context feature."),
+            DateFeatureKind.Weekday or DateFeatureKind.ExpiryDay or DateFeatureKind.Vix or DateFeatureKind.Breadth => 1,
+            DateFeatureKind.VixChg => 2,
+            DateFeatureKind.VixPct => options.PercentileWindow,
+            DateFeatureKind.IndexAdx => 2 * options.AdxPeriod,
+            DateFeatureKind.IndexTrend or DateFeatureKind.RegimeTrend => trend,
+            DateFeatureKind.IndexVolPct or DateFeatureKind.RegimeVol => volatility,
+            DateFeatureKind.Regime => Math.Max(trend, volatility),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a known date feature."),
         };
     }
 
@@ -127,7 +127,7 @@ public sealed class ContextFeature : IIndicator
 
     private double Read(long day)
     {
-        if (_kind == ContextFeatureKind.Weekday)
+        if (_kind == DateFeatureKind.Weekday)
         {
             return IsoWeekday(day);
         }
@@ -137,7 +137,7 @@ public sealed class ContextFeature : IIndicator
             return double.NaN;
         }
 
-        if (_kind == ContextFeatureKind.ExpiryDay)
+        if (_kind == DateFeatureKind.ExpiryDay)
         {
             return _expiryDays is null ? double.NaN : _expiryDays.Contains(date) ? 1.0 : 0.0;
         }
@@ -149,15 +149,15 @@ public sealed class ContextFeature : IIndicator
 
         return _kind switch
         {
-            ContextFeatureKind.IndexTrend => values.IndexTrend,
-            ContextFeatureKind.IndexAdx => values.IndexAdx,
-            ContextFeatureKind.IndexVolPct => values.IndexVolPct,
-            ContextFeatureKind.Vix => values.Vix,
-            ContextFeatureKind.VixPct => values.VixPct,
-            ContextFeatureKind.VixChg => values.VixChg,
-            ContextFeatureKind.Breadth => values.Breadth,
-            ContextFeatureKind.RegimeTrend => values.RegimeTrend,
-            ContextFeatureKind.RegimeVol => values.RegimeVol,
+            DateFeatureKind.IndexTrend => values.IndexTrend,
+            DateFeatureKind.IndexAdx => values.IndexAdx,
+            DateFeatureKind.IndexVolPct => values.IndexVolPct,
+            DateFeatureKind.Vix => values.Vix,
+            DateFeatureKind.VixPct => values.VixPct,
+            DateFeatureKind.VixChg => values.VixChg,
+            DateFeatureKind.Breadth => values.Breadth,
+            DateFeatureKind.RegimeTrend => values.RegimeTrend,
+            DateFeatureKind.RegimeVol => values.RegimeVol,
             _ => values.Regime,
         };
     }

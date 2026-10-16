@@ -16,6 +16,7 @@ COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/XDrishti.Domain/XDrishti.Domain.csproj src/XDrishti.Domain/
 COPY src/XDrishti.Application/XDrishti.Application.csproj src/XDrishti.Application/
 COPY src/XDrishti.Indicators/XDrishti.Indicators.csproj src/XDrishti.Indicators/
+COPY src/XDrishti.Strategies/XDrishti.Strategies.csproj src/XDrishti.Strategies/
 COPY src/XDrishti.Infrastructure/XDrishti.Infrastructure.csproj src/XDrishti.Infrastructure/
 COPY src/XDrishti.Hosting/XDrishti.Hosting.csproj src/XDrishti.Hosting/
 COPY src/XDrishti.Api/XDrishti.Api.csproj src/XDrishti.Api/

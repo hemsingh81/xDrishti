@@ -262,7 +262,7 @@ public sealed class FrameContextCreateTests
             info.UsesSource.ShouldBeFalse(name);
             info.SupportedTimeframes.ShouldBe([Timeframe.M1], name);
             info.Summary.ShouldNotBeNullOrWhiteSpace();
-            info.Create(info.DefaultSpec()).ShouldBeOfType<ContextFeature>();
+            info.Create(info.DefaultSpec()).ShouldBeOfType<DateFeature>();
         }
 
         IndicatorCatalog.All.Where(i => i.DateDriven).Select(i => i.Name).ShouldBe(AllNames);

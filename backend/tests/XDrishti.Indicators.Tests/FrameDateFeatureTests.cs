@@ -4,22 +4,22 @@ using XDrishti.Indicators.Tests.Support;
 namespace XDrishti.Indicators.Tests;
 
 /// <summary>
-/// The indicator behind the date-driven features on its own (<see cref="ContextFeature"/>, P3-01c): fed closed bars like any <see cref="IIndicator"/>, it takes a value at the first bar of each India date and
+/// The indicator behind the date-driven features on its own (<see cref="DateFeature"/>, P3-01c): fed closed bars like any <see cref="IIndicator"/>, it takes a value at the first bar of each India date and
 /// holds it for the date; its warm-up is counted in days of the context, exactly for the options of the context it was given.
 /// </summary>
-public sealed class FrameContextFeatureTests
+public sealed class FrameDateFeatureTests
 {
     private static readonly DateOnly Monday = new(2026, 3, 2);
 
     [Fact]
     public void A_kind_that_is_not_one_of_the_twelve_is_refused()
     {
-        Should.Throw<ArgumentOutOfRangeException>(() => new ContextFeature((ContextFeatureKind)99));
-        Should.Throw<ArgumentOutOfRangeException>(() => new ContextFeature((ContextFeatureKind)(-1)));
-        Enum.GetValues<ContextFeatureKind>().Length.ShouldBe(12);
-        foreach (var kind in Enum.GetValues<ContextFeatureKind>())
+        Should.Throw<ArgumentOutOfRangeException>(() => new DateFeature((DateFeatureKind)99));
+        Should.Throw<ArgumentOutOfRangeException>(() => new DateFeature((DateFeatureKind)(-1)));
+        Enum.GetValues<DateFeatureKind>().Length.ShouldBe(12);
+        foreach (var kind in Enum.GetValues<DateFeatureKind>())
         {
-            new ContextFeature(kind).Kind.ShouldBe(kind);
+            new DateFeature(kind).Kind.ShouldBe(kind);
         }
     }
 
@@ -30,24 +30,24 @@ public sealed class FrameContextFeatureTests
         var context = FrameContextFixtures.Build(days, FrameContextFixtures.Small);
         var date = days[45].Date;
         context.TryAsOf(date, out var values).ShouldBeTrue();
-        var expected = new Dictionary<ContextFeatureKind, double>
+        var expected = new Dictionary<DateFeatureKind, double>
         {
-            [ContextFeatureKind.IndexTrend] = values.IndexTrend,
-            [ContextFeatureKind.IndexAdx] = values.IndexAdx,
-            [ContextFeatureKind.IndexVolPct] = values.IndexVolPct,
-            [ContextFeatureKind.Vix] = values.Vix,
-            [ContextFeatureKind.VixPct] = values.VixPct,
-            [ContextFeatureKind.VixChg] = values.VixChg,
-            [ContextFeatureKind.Breadth] = values.Breadth,
-            [ContextFeatureKind.RegimeTrend] = values.RegimeTrend,
-            [ContextFeatureKind.RegimeVol] = values.RegimeVol,
-            [ContextFeatureKind.Regime] = values.Regime,
+            [DateFeatureKind.IndexTrend] = values.IndexTrend,
+            [DateFeatureKind.IndexAdx] = values.IndexAdx,
+            [DateFeatureKind.IndexVolPct] = values.IndexVolPct,
+            [DateFeatureKind.Vix] = values.Vix,
+            [DateFeatureKind.VixPct] = values.VixPct,
+            [DateFeatureKind.VixChg] = values.VixChg,
+            [DateFeatureKind.Breadth] = values.Breadth,
+            [DateFeatureKind.RegimeTrend] = values.RegimeTrend,
+            [DateFeatureKind.RegimeVol] = values.RegimeVol,
+            [DateFeatureKind.Regime] = values.Regime,
         };
 
         values.Date.ShouldBe(days[44].Date);
         foreach (var (kind, value) in expected)
         {
-            var feature = new ContextFeature(kind, context);
+            var feature = new DateFeature(kind, context);
 
             feature.Update(Minutes.Close(date, Minutes.Open, 100));
 
@@ -63,14 +63,14 @@ public sealed class FrameContextFeatureTests
     {
         var bar = Minutes.Close(Monday, Minutes.Open, 100);
 
-        foreach (var kind in Enum.GetValues<ContextFeatureKind>())
+        foreach (var kind in Enum.GetValues<DateFeatureKind>())
         {
-            var feature = new ContextFeature(kind);
+            var feature = new DateFeature(kind);
 
             feature.IsReady.ShouldBeFalse();
             feature.Value.ShouldBeNaN();
             feature.Update(bar);
-            feature.IsReady.ShouldBe(kind == ContextFeatureKind.Weekday, kind.ToString());
+            feature.IsReady.ShouldBe(kind == DateFeatureKind.Weekday, kind.ToString());
         }
     }
 
@@ -79,7 +79,7 @@ public sealed class FrameContextFeatureTests
     {
         var days = FrameContextFixtures.Consecutive(31, 40, Monday);
         var context = FrameContextFixtures.Build(days.Take(30), FrameContextFixtures.Small);
-        var feature = new ContextFeature(ContextFeatureKind.Vix, context);
+        var feature = new DateFeature(DateFeatureKind.Vix, context);
         var date = days[30].Date;
 
         feature.Update(Minutes.Close(date, Minutes.Open, 100));
@@ -97,7 +97,7 @@ public sealed class FrameContextFeatureTests
     public void Reset_forgets_the_date_and_the_value_and_the_same_date_is_read_again()
     {
         var days = FrameContextFixtures.Consecutive(32, 40, Monday);
-        var feature = new ContextFeature(ContextFeatureKind.Breadth, FrameContextFixtures.Build(days, FrameContextFixtures.Small));
+        var feature = new DateFeature(DateFeatureKind.Breadth, FrameContextFixtures.Build(days, FrameContextFixtures.Small));
         var bar = Minutes.Close(days[20].Date, Minutes.Open, 100);
 
         feature.Update(bar);
@@ -116,7 +116,7 @@ public sealed class FrameContextFeatureTests
     {
         // India 1970-01-01 is day number 0, the value of a cleared "last date" field; it was a Thursday
         var bar = new Bar(0, 1, 1, 1, 1, 1);
-        var feature = new ContextFeature(ContextFeatureKind.Weekday);
+        var feature = new DateFeature(DateFeatureKind.Weekday);
 
         feature.Update(bar);
         feature.Value.ShouldBe(4.0);
@@ -131,9 +131,9 @@ public sealed class FrameContextFeatureTests
     public void The_weekday_and_the_expiry_day_read_the_date_of_the_bar()
     {
         var expiry = new HashSet<DateOnly> { Monday.AddDays(3) };
-        var weekday = new ContextFeature(ContextFeatureKind.Weekday);
-        var expiryDay = new ContextFeature(ContextFeatureKind.ExpiryDay, null, expiry);
-        var withoutSet = new ContextFeature(ContextFeatureKind.ExpiryDay);
+        var weekday = new DateFeature(DateFeatureKind.Weekday);
+        var expiryDay = new DateFeature(DateFeatureKind.ExpiryDay, null, expiry);
+        var withoutSet = new DateFeature(DateFeatureKind.ExpiryDay);
 
         for (var i = 0; i < 7; i++)
         {
@@ -151,31 +151,31 @@ public sealed class FrameContextFeatureTests
     [Fact]
     public void The_warm_up_is_in_days_of_the_context_and_exact_for_the_options_the_instance_was_given()
     {
-        int Warm(ContextFeatureKind kind, ContextOptions? options = null) =>
-            new ContextFeature(kind, options is null ? null : FrameContextFixtures.Build([], options)).WarmUp;
+        int Warm(DateFeatureKind kind, ContextOptions? options = null) =>
+            new DateFeature(kind, options is null ? null : FrameContextFixtures.Build([], options)).WarmUp;
 
         // the defaults, with or without a context built with them
-        Warm(ContextFeatureKind.Weekday).ShouldBe(1);
-        Warm(ContextFeatureKind.ExpiryDay).ShouldBe(1);
-        Warm(ContextFeatureKind.Vix).ShouldBe(1);
-        Warm(ContextFeatureKind.Breadth).ShouldBe(1);
-        Warm(ContextFeatureKind.VixChg).ShouldBe(2);
-        Warm(ContextFeatureKind.IndexAdx).ShouldBe(28);
-        Warm(ContextFeatureKind.IndexTrend).ShouldBe(55);
-        Warm(ContextFeatureKind.RegimeTrend, new ContextOptions()).ShouldBe(55);
-        Warm(ContextFeatureKind.VixPct).ShouldBe(252);
-        Warm(ContextFeatureKind.IndexVolPct).ShouldBe(265);
-        Warm(ContextFeatureKind.RegimeVol, new ContextOptions()).ShouldBe(265);
-        Warm(ContextFeatureKind.Regime).ShouldBe(265);
+        Warm(DateFeatureKind.Weekday).ShouldBe(1);
+        Warm(DateFeatureKind.ExpiryDay).ShouldBe(1);
+        Warm(DateFeatureKind.Vix).ShouldBe(1);
+        Warm(DateFeatureKind.Breadth).ShouldBe(1);
+        Warm(DateFeatureKind.VixChg).ShouldBe(2);
+        Warm(DateFeatureKind.IndexAdx).ShouldBe(28);
+        Warm(DateFeatureKind.IndexTrend).ShouldBe(55);
+        Warm(DateFeatureKind.RegimeTrend, new ContextOptions()).ShouldBe(55);
+        Warm(DateFeatureKind.VixPct).ShouldBe(252);
+        Warm(DateFeatureKind.IndexVolPct).ShouldBe(265);
+        Warm(DateFeatureKind.RegimeVol, new ContextOptions()).ShouldBe(265);
+        Warm(DateFeatureKind.Regime).ShouldBe(265);
 
         // other options: small ones, and a trend that takes longer than the volatility (the regime waits for it)
-        Warm(ContextFeatureKind.IndexTrend, FrameContextFixtures.Small).ShouldBe(8);
-        Warm(ContextFeatureKind.IndexAdx, FrameContextFixtures.Small).ShouldBe(6);
-        Warm(ContextFeatureKind.VixPct, FrameContextFixtures.Small).ShouldBe(10);
-        Warm(ContextFeatureKind.Regime, FrameContextFixtures.Small).ShouldBe(12);
-        Warm(ContextFeatureKind.IndexTrend, FrameContextFixtures.SlowTrend).ShouldBe(34);
-        Warm(ContextFeatureKind.RegimeVol, FrameContextFixtures.SlowTrend).ShouldBe(6);
-        Warm(ContextFeatureKind.Regime, FrameContextFixtures.SlowTrend).ShouldBe(34);
-        Warm(ContextFeatureKind.IndexTrend, new ContextOptions(TrendSmaPeriod: 5, TrendSlopeDays: 1, AdxPeriod: 20)).ShouldBe(40, "the ADX takes longer than the average and its slope");
+        Warm(DateFeatureKind.IndexTrend, FrameContextFixtures.Small).ShouldBe(8);
+        Warm(DateFeatureKind.IndexAdx, FrameContextFixtures.Small).ShouldBe(6);
+        Warm(DateFeatureKind.VixPct, FrameContextFixtures.Small).ShouldBe(10);
+        Warm(DateFeatureKind.Regime, FrameContextFixtures.Small).ShouldBe(12);
+        Warm(DateFeatureKind.IndexTrend, FrameContextFixtures.SlowTrend).ShouldBe(34);
+        Warm(DateFeatureKind.RegimeVol, FrameContextFixtures.SlowTrend).ShouldBe(6);
+        Warm(DateFeatureKind.Regime, FrameContextFixtures.SlowTrend).ShouldBe(34);
+        Warm(DateFeatureKind.IndexTrend, new ContextOptions(TrendSmaPeriod: 5, TrendSlopeDays: 1, AdxPeriod: 20)).ShouldBe(40, "the ADX takes longer than the average and its slope");
     }
 }

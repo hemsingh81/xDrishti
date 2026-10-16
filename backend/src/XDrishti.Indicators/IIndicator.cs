@@ -5,7 +5,7 @@ namespace XDrishti.Indicators;
 /// <summary>
 /// A streaming indicator (ADR 0031): it is fed one <b>closed</b> bar at a time, in time order, and keeps constant (or amortised constant) work and memory per bar. It holds no reference to
 /// future data, so its value after bar <i>k</i> is a function of the bars <i>1..k</i> only — with one family of exceptions that read no more than the past as well: the <b>date-driven</b> features
-/// (<see cref="ContextFeature"/>, ADR 0033) are a function of the <i>India dates</i> of the bars <i>1..k</i> and of read-only data given at construction (the days of a <see cref="MarketContext"/> strictly before each date, the
+/// (<see cref="DateFeature"/>, ADR 0033) are a function of the <i>India dates</i> of the bars <i>1..k</i> and of read-only data given at construction (the days of a <see cref="MarketContext"/> strictly before each date, the
 /// set of expiry dates), not of the prices of those bars; a later bar or a later context day never changes a value already given. An instance is thread-confined (no locking).
 /// </summary>
 /// <remarks>
@@ -23,7 +23,7 @@ public interface IIndicator
 
     /// <summary>
     /// The number of bars after which the indicator is first ready on an unbroken series (session indicators: counted from the first bar of the first session). <b>The unit of a date-driven feature is not the bar:</b>
-    /// <see cref="ContextFeature.WarmUp"/> counts <i>days of the market context</i> that must lie before the date, so a preload for it is sized in daily context records, never in 1-minute bars.
+    /// <see cref="DateFeature.WarmUp"/> counts <i>days of the market context</i> that must lie before the date, so a preload for it is sized in daily context records, never in 1-minute bars.
     /// </summary>
     int WarmUp { get; }
 

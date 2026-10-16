@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Strategies\XDrishti.Strategies.csproj" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

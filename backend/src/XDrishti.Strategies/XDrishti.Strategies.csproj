@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Rules language (P3-02, ADR 0034): the text of a condition becomes a checked, compiled predicate over a feature frame. Pure library, no I/O:
+       depends only on Domain and Indicators, plus the Superpower parser library (enforced by architecture tests). -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+    <ProjectReference Include="..\XDrishti.Indicators\XDrishti.Indicators.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Superpower" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Strategies.Tests" />
+  </ItemGroup>
+</Project>

@@ -14,7 +14,7 @@ namespace XDrishti.Indicators;
 /// <b>Closed flags.</b> <see cref="BarClosed"/>, <see cref="ClosedBarsAt"/> and <see cref="TryLastClosed"/> say what the last step closed on each timeframe the frame was asked for. <b>History.</b> Each feature
 /// remembers the values it had after each of the last <see cref="HistoryDepth"/> closed bars <i>of its own timeframe</i>: <see cref="At"/> and <see cref="IsReadyAt"/> read them (<c>close[1]</c>, crossings,
 /// <c>rising(x, n)</c>). The history is written only when the feature's timeframe closes a bar — twice in one step when the minute closes two buckets. <b>Ordering guard.</b> A 1-minute bar at or before the previous
-/// one is counted in <see cref="IgnoredBars"/> and skipped by every lane, so the 1-minute lane and the builders cannot diverge.
+/// one is counted in <see cref="IgnoredBars"/> and skipped by every lane, so the 1-minute lane and the builders cannot diverge. <see cref="LastBarTime"/> is the start of the last bar that was accepted.
 /// </para>
 /// <para>
 /// Incomplete higher-timeframe bars (a minute was missing) are consumed like any other and counted in <see cref="IncompleteBarsConsumed"/>. Thread-confined: one frame per instrument and worker.
@@ -96,6 +96,14 @@ public sealed class FeatureFrame
     /// <summary>The number of incomplete higher-timeframe bars (a minute was missing) the indicators have consumed.</summary>
     public long IncompleteBarsConsumed { get; private set; }
 
+    /// <summary>
+    /// The start, in epoch seconds (<see cref="Bar.EpochSeconds"/>: UTC, a multiple of 60), of the last 1-minute bar the frame <b>accepted</b>; 0 before the first step. It is the clock of the frame, whatever timeframes it was
+    /// asked for (a frame with only weekly or monthly features, or without any feature on 1m, still keeps it: it is the minute that was fed, not the start of a higher bar). A bar the ordering guard skipped (see
+    /// <see cref="IgnoredBars"/>) does not change it, and <see cref="Reset"/> sets it back to 0. The minute covers <c>[LastBarTime, LastBarTime + 60)</c> and closed at <c>LastBarTime + 60</c>: that is the time
+    /// the rules language reports as <c>time</c> once converted to India time (ADR 0034). Reading it allocates nothing.
+    /// </summary>
+    public long LastBarTime => _lastEpoch;
+
     /// <summary>The value of the feature as of the last closed bar of its timeframe; <see cref="double.NaN"/> while it is not ready.</summary>
     public double this[int handle] => _byHandle[handle].Value;
 
@@ -137,16 +145,14 @@ public sealed class FeatureFrame
 
             infos[i] = info;
             info.Validate(spec, path, errors);
-            if (info.DateFeature is { } kind)
+            if (info.RequiresContext && options.Context is null)
             {
-                if (ContextFeature.ReadsContext(kind) && options.Context is null)
-                {
-                    Note(ref needContext, info.Name);
-                }
-                else if (kind == ContextFeatureKind.ExpiryDay && options.ExpiryDays is null)
-                {
-                    Note(ref needExpiryDays, info.Name);
-                }
+                Note(ref needContext, info.Name);
+            }
+
+            if (info.RequiresExpiryDays && options.ExpiryDays is null)
+            {
+                Note(ref needExpiryDays, info.Name);
             }
         }
 

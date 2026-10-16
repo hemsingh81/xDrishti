@@ -377,11 +377,44 @@ public sealed class AllocationTests
     }
 
     [Fact]
+    public void Reading_the_last_bar_time_after_every_step_allocates_nothing_also_when_bars_are_skipped_and_after_a_reset()
+    {
+        AllocationProbe.ShouldAllocateNothing(window =>
+        {
+            var frame = TwentyFeatureFrame();
+            for (var i = 0; i < WarmUpSteps; i++)
+            {
+                frame.Step(Bars[i]);
+            }
+
+            frame.Reset();
+            for (var i = 0; i < WarmUpSteps; i++)
+            {
+                frame.Step(Bars[i]);
+            }
+
+            var wrong = 0;
+            window.Begin();
+            for (var i = WarmUpSteps; i < WarmUpSteps + MeasuredSteps; i++)
+            {
+                frame.Step(Bars[i]);
+                wrong += frame.LastBarTime == Bars[i].EpochSeconds ? 0 : 1;
+                frame.Step(Bars[i - 1]);
+                wrong += frame.LastBarTime == Bars[i].EpochSeconds ? 0 : 1;
+            }
+
+            window.End();
+            wrong.ShouldBe(0, "LastBarTime is the last accepted bar, also after the skipped one");
+            frame.IgnoredBars.ShouldBe(MeasuredSteps);
+        });
+    }
+
+    [Fact]
     public void The_date_driven_indicators_allocate_nothing_through_the_interface_including_the_step_that_changes_the_date()
     {
         AllocationProbe.ShouldAllocateNothing(window =>
         {
-            IIndicator[] indicators = [.. Enum.GetValues<ContextFeatureKind>().Select(kind => new ContextFeature(kind, Context, Tuesdays))];
+            IIndicator[] indicators = [.. Enum.GetValues<DateFeatureKind>().Select(kind => new DateFeature(kind, Context, Tuesdays))];
             foreach (var indicator in indicators)
             {
                 for (var i = 0; i < WarmUpSteps; i++)

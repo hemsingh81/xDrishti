@@ -81,7 +81,7 @@ public static class IndicatorCatalog
             new("lowest", "Lowest value of the source over the last n bars, current bar included.", [period], SessionBehaviour.Continuous, true, PriceSource.Low, false,
                 spec => (int)spec.P1, spec => new Lowest((int)spec.P1, spec.Source)),
             new("vwap", "Volume-weighted average price of the typical price since the session open.", [], SessionBehaviour.PerSession, false, PriceSource.Close, true,
-                _ => 1, _ => new Vwap()),
+                _ => 1, _ => new Vwap(), valueAtSessionOpen: true),
             new("rel_volume", "Volume divided by the mean volume of the previous n bars (current bar excluded).", [period], SessionBehaviour.Continuous, false, PriceSource.Close, false,
                 spec => (int)spec.P1 + 1, spec => new RelVolume((int)spec.P1)),
             new("or_high", "Highest high of the first m minutes of the session; ready once they have closed.", [minutes], SessionBehaviour.PerSession, false, PriceSource.Close, true,
@@ -112,7 +112,8 @@ public static class IndicatorCatalog
             list.Add(new IndicatorInfo(
                 name, text, [], SessionBehaviour.PerSession, false, PriceSource.Close, false,
                 spec => captured is SessionField.TodayOpen or SessionField.TodayHigh or SessionField.TodayLow ? 1 : BarsPerSession(spec.Timeframe) + 1,
-                spec => new SessionContext(captured, BarsPerSession(spec.Timeframe))));
+                spec => new SessionContext(captured, BarsPerSession(spec.Timeframe)),
+                valueAtSessionOpen: true));
         }
 
         return [.. list];
@@ -201,24 +202,25 @@ public static class IndicatorCatalog
         var defaults = new ContextOptions();
         foreach (var (name, kind, text) in new[]
         {
-            ("day_of_week", ContextFeatureKind.Weekday, "ISO weekday of the India date of the step: Monday 1 to Sunday 7."),
-            ("is_expiry_day", ContextFeatureKind.ExpiryDay, "1 when the India date of the step is one of the expiry dates given in the frame options, else 0."),
-            ("index_trend", ContextFeatureKind.IndexTrend, "Trend of the regime index as of the previous session: +1 up, 0 range, -1 down (by default: close against its 50-day average, the average's 5-day slope and an ADX(14) of at least 20)."),
-            ("index_adx", ContextFeatureKind.IndexAdx, "Wilder ADX(14) of the regime index's daily bars as of the previous session."),
-            ("index_vol_pct", ContextFeatureKind.IndexVolPct, "Percentile rank (0 to 100) of the regime index's ATR as a percent of its close over the last 252 sessions (by default), as of the previous session."),
-            ("vix", ContextFeatureKind.Vix, "VIX close of the previous session; not ready when that session has none."),
-            ("vix_pct", ContextFeatureKind.VixPct, "Percentile rank (0 to 100) of the VIX close of the previous session over the last 252 sessions (by default) that have one."),
-            ("vix_chg", ContextFeatureKind.VixChg, "Percent change of the VIX close of the previous session against the session before it; not ready when either has none."),
-            ("breadth", ContextFeatureKind.Breadth, "Breadth of the previous session in percent (tracked stocks above their 20-day average); not ready when that session has none."),
-            ("regime_trend", ContextFeatureKind.RegimeTrend, "Trend part of the market regime as of the previous session: +1 up, 0 range, -1 down (the same as index_trend)."),
-            ("regime_vol", ContextFeatureKind.RegimeVol, "Volatility part of the market regime as of the previous session: 0 low, 1 normal, 2 high (terciles of the mean of the VIX and index percentiles)."),
-            ("regime", ContextFeatureKind.Regime, "Market regime as of the previous session: 1 (UP_LOW_VOL) to 9 (DOWN_HIGH_VOL), (1 - regime_trend) * 3 + regime_vol + 1."),
+            ("day_of_week", DateFeatureKind.Weekday, "ISO weekday of the India date of the step: Monday 1 to Sunday 7."),
+            ("is_expiry_day", DateFeatureKind.ExpiryDay, "1 when the India date of the step is one of the expiry dates given in the frame options, else 0."),
+            ("index_trend", DateFeatureKind.IndexTrend, "Trend of the regime index as of the previous session: +1 up, 0 range, -1 down (by default: close against its 50-day average, the average's 5-day slope and an ADX(14) of at least 20)."),
+            ("index_adx", DateFeatureKind.IndexAdx, "Wilder ADX(14) of the regime index's daily bars as of the previous session."),
+            ("index_vol_pct", DateFeatureKind.IndexVolPct, "Percentile rank (0 to 100) of the regime index's ATR as a percent of its close over the last 252 sessions (by default), as of the previous session."),
+            ("vix", DateFeatureKind.Vix, "VIX close of the previous session; not ready when that session has none."),
+            ("vix_pct", DateFeatureKind.VixPct, "Percentile rank (0 to 100) of the VIX close of the previous session over the last 252 sessions (by default) that have one."),
+            ("vix_chg", DateFeatureKind.VixChg, "Percent change of the VIX close of the previous session against the session before it; not ready when either has none."),
+            ("breadth", DateFeatureKind.Breadth, "Breadth of the previous session in percent (tracked stocks above their 20-day average); not ready when that session has none."),
+            ("regime_trend", DateFeatureKind.RegimeTrend, "Trend part of the market regime as of the previous session: +1 up, 0 range, -1 down (the same as index_trend)."),
+            ("regime_vol", DateFeatureKind.RegimeVol, "Volatility part of the market regime as of the previous session: 0 low, 1 normal, 2 high (terciles of the mean of the VIX and index percentiles)."),
+            ("regime", DateFeatureKind.Regime, "Market regime as of the previous session: 1 (UP_LOW_VOL) to 9 (DOWN_HIGH_VOL), (1 - regime_trend) * 3 + regime_vol + 1."),
         })
         {
             var captured = kind;
             list.Add(new IndicatorInfo(
                 name, text, [], SessionBehaviour.Continuous, false, PriceSource.Close, false,
-                _ => ContextFeature.WarmUpDays(captured, defaults), _ => new ContextFeature(captured), dateFeature: kind));
+                _ => DateFeature.WarmUpDays(captured, defaults), _ => new DateFeature(captured),
+                dateFeature: kind, requiresContext: DateFeature.ReadsContext(kind), requiresExpiryDays: kind == DateFeatureKind.ExpiryDay));
         }
     }
 

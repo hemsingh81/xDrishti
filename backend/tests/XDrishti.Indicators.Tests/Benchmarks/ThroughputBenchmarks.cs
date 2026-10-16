@@ -188,14 +188,14 @@ public sealed class ThroughputBenchmarks
     {
         var report = new List<string>();
         var rates = new List<double>();
-        foreach (var kind in Enum.GetValues<ContextFeatureKind>())
+        foreach (var kind in Enum.GetValues<DateFeatureKind>())
         {
-            var rate = BestRate(() => Run(new ContextFeature(kind, LazyContext.Value, LazyTuesdays.Value)));
+            var rate = BestRate(() => Run(new DateFeature(kind, LazyContext.Value, LazyTuesdays.Value)));
             report.Add($"{kind,-16} {rate / 1e6,8:F1} M updates/s   {1e9 / rate,6:F1} ns/update");
             rates.Add(rate);
         }
 
-        Report("ContextFeature.Update through IIndicator, one date per 375 bars (best of " + Repeats + ")", report);
+        Report("DateFeature.Update through IIndicator, one date per 375 bars (best of " + Repeats + ")", report);
         rates.ShouldAllBe(x => x > 10_000_000, "target: 10 million updates per second per core");
     }
 
