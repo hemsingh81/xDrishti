@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Globalization;
+using System.Runtime;
 using XDrishti.Indicators;
 using XDrishti.Strategies.Compilation;
 using XDrishti.Strategies.Tests.Support;
@@ -6,12 +8,15 @@ using XDrishti.Strategies.Tests.Support;
 namespace XDrishti.Strategies.Tests.Benchmarks;
 
 /// <summary>
-/// A small benchmark harness without BenchmarkDotNet, like the one of the Indicators tests. The tests are <b>explicit</b>: <c>dotnet test</c> and <c>scripts/check.sh</c> skip them. Run them in Release, one at a time so
-/// that the cold figures are those of a fresh process:
+/// A small benchmark harness without BenchmarkDotNet, like the one of the Indicators tests. The tests are <b>explicit</b>: <c>dotnet test</c> and <c>scripts/check.sh</c> skip them. Run them in Release, one at a time and each in
+/// a fresh process, because the cold figures are the first thing a process does (<c>scripts/bench-coldstart.sh</c> does so 15 times and reports the minimum, median and maximum):
 /// <c>dotnet test --project tests/XDrishti.Strategies.Tests -c Release -- --explicit only --filter-method "*Compile_bind_and_build_ten_conditions*"</c>.
-/// They report the nanoseconds to evaluate the ten conditions of <see cref="TenConditions"/> over a 20-feature frame (criterion 12: 0.3 µs per set) and the milliseconds to parse, bind, check and compile the ten
-/// (≤ 20 ms cold, ≤ 3 ms warm). The cold figure is the first run in the process: it contains the JIT of the parser, the binder and the expression compiler, which is why it only means something when this is the first
-/// thing the process does. The delegates are built when a condition is first bound to a frame, so "compile" below is <c>Compile</c> of the ten texts plus <c>Merge</c>, the frame, and the ten binds.
+/// They report the nanoseconds to evaluate the ten conditions of <see cref="TenConditions"/> over a 20-feature frame (criterion 12: 0.3 µs per set) and the milliseconds to parse, bind, check and compile the ten.
+/// The compile has three figures (criterion 12 as amended for ISS-12, ADR 0034 amendment 2). <b>Warm</b>, with the compiler already compiled to machine code by use: ≤ 3 ms, asserted. <b>First compile after the warm-up</b>:
+/// ≤ 20 ms, asserted; the process has run <see cref="CompilerWarmup.Run"/> first, as a host does right after it starts, and this is what a person waits for. <b>Process-cold</b>, the very first compile of a process
+/// with no warm-up: reported, not asserted; it is dominated by the JIT compiling about a thousand methods of the parser, the binder and the expression compiler (about 40 ms on an Apple M4 Pro, JIT only), and no setting
+/// of the runtime brings it under 20 ms. The delegates are built when a condition is first bound to a frame, so "compile" below is <c>Compile</c> of the ten texts plus <c>Merge</c>, the frame, and the ten binds; the frame is not part of the figures.
+/// Each report ends with <c>metric name value</c> lines that the script reads.
 /// </summary>
 [Collection(ExclusiveRun.Name)]
 public sealed class EvaluationBenchmarks
@@ -20,9 +25,63 @@ public sealed class EvaluationBenchmarks
 
     private const int WarmRuns = 40;
 
+    /// <summary>The time asserted for the first compile after the warm-up (milliseconds), and for the warm-up itself.</summary>
+    private const double FirstCompileAfterWarmUpMilliseconds = 20;
+
+    private const double WarmUpMilliseconds = 150;
+
     private static void Report(string title, IEnumerable<string> lines)
     {
         TestContext.Current.TestOutputHelper?.WriteLine(title + "\n" + string.Join("\n", lines.Select(l => "  " + l)));
+    }
+
+    /// <summary>The line the script reads: <c>metric</c>, the name and the value with a point as the decimal separator.</summary>
+    private static string Metric(string name, double value) => string.Create(CultureInfo.InvariantCulture, $"metric {name} {value:F2}");
+
+    /// <summary>What one pass over the ten conditions cost, in milliseconds, and how many methods the JIT compiled on this thread while it ran.</summary>
+    private readonly record struct Timing(double Compile, double Merge, double Frame, double Bind, double Total, long JitMethods, double JitMilliseconds)
+    {
+        /// <summary>The figure of the criterion: everything but the creation of the frame.</summary>
+        public double WithoutFrame => Total - Frame;
+    }
+
+    /// <summary>Parse, bind, lint and merge the ten conditions, make a frame for them and bind them to it (which builds their delegates).</summary>
+    private static Timing CompileTen(MarketContext context)
+    {
+        var jitMethods = JitInfo.GetCompiledMethodCount(currentThread: true);
+        var jitTime = JitInfo.GetCompilationTime(currentThread: true);
+        var watch = Stopwatch.StartNew();
+        var conditions = new CompiledCondition[TenConditions.Sources.Length];
+        for (var i = 0; i < conditions.Length; i++)
+        {
+            var result = ConditionCompiler.Compile(TenConditions.Sources[i], new CompileContext(TenConditions.Evaluation));
+            conditions[i] = result.Condition ?? throw new InvalidOperationException(TenConditions.Sources[i]);
+        }
+
+        var compile = watch.Elapsed.TotalMilliseconds;
+        var plan = ConditionSet.Merge(conditions);
+        var merge = watch.Elapsed.TotalMilliseconds - compile;
+        var frame = FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth, Context = context }).Value;
+        var created = watch.Elapsed.TotalMilliseconds - compile - merge;
+        var bound = plan.BindAll(frame);
+        var total = watch.Elapsed.TotalMilliseconds;
+        var timing = new Timing(compile, merge, created, total - compile - merge - created, total, JitInfo.GetCompiledMethodCount(currentThread: true) - jitMethods, (JitInfo.GetCompilationTime(currentThread: true) - jitTime).TotalMilliseconds);
+
+        // after the figures are taken: the first call of an assertion is itself JIT-compiled
+        bound.Count.ShouldBe(10);
+        return timing;
+    }
+
+    private static MarketContext ContextOfTheBenchmark()
+    {
+        var bars = Series.Sessions(5, 3);
+        return Contexts.Covering(DateOnly.FromDateTime(bars[0].Start.UtcDateTime), DateOnly.FromDateTime(bars[^1].Start.UtcDateTime), 4, daysBefore: 120);
+    }
+
+    private static Timing Median(IEnumerable<Timing> timings)
+    {
+        var ordered = timings.OrderBy(t => t.WithoutFrame).ToList();
+        return ordered[ordered.Count / 2];
     }
 
     [Fact(Explicit = true)]
@@ -120,44 +179,51 @@ public sealed class EvaluationBenchmarks
     [Fact(Explicit = true)]
     public void Compile_bind_and_build_ten_conditions_cold_and_warm()
     {
-        var bars = Series.Sessions(5, 3);
-        var context = Contexts.Covering(DateOnly.FromDateTime(bars[0].Start.UtcDateTime), DateOnly.FromDateTime(bars[^1].Start.UtcDateTime), 4, daysBefore: 120);
-        var times = new List<(double Compile, double Merge, double Frame, double Bind, double Total)>();
-        for (var run = 0; run < WarmRuns + 1; run++)
-        {
-            var watch = Stopwatch.StartNew();
-            var conditions = new CompiledCondition[TenConditions.Sources.Length];
-            for (var i = 0; i < conditions.Length; i++)
-            {
-                var result = ConditionCompiler.Compile(TenConditions.Sources[i], new CompileContext(TenConditions.Evaluation));
-                conditions[i] = result.Condition ?? throw new InvalidOperationException(TenConditions.Sources[i]);
-            }
-
-            var compile = watch.Elapsed.TotalMilliseconds;
-            var plan = ConditionSet.Merge(conditions);
-            var merge = watch.Elapsed.TotalMilliseconds - compile;
-            var frame = FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth, Context = context }).Value;
-            var created = watch.Elapsed.TotalMilliseconds - compile - merge;
-            var bound = plan.BindAll(frame);
-            var total = watch.Elapsed.TotalMilliseconds;
-            times.Add((compile, merge, created, total - compile - merge - created, total));
-            bound.Count.ShouldBe(10);
-        }
-
-        var cold = times[0];
-        var warm = times.Skip(1).OrderBy(t => t.Total).ToList();
-        var median = warm[warm.Count / 2];
-        var best = warm[0];
+        var context = ContextOfTheBenchmark();
+        var cold = CompileTen(context);
+        var warm = Enumerable.Range(0, WarmRuns).Select(_ => CompileTen(context)).ToList();
+        var median = Median(warm);
+        var best = warm.OrderBy(t => t.WithoutFrame).First();
         Report(
-            "Parse + bind + lint + compile of ten conditions (milliseconds)",
+            "Parse + bind + lint + compile of ten conditions, no warm-up (milliseconds)",
             [
-                $"cold (first run of the process)  total {cold.Total,7:F2}   parse+bind+lint {cold.Compile,7:F2}   merge {cold.Merge,5:F2}   frame {cold.Frame,5:F2}   delegates (Bind) {cold.Bind,6:F2}",
-                $"warm median of {WarmRuns}                total {median.Total,7:F2}   parse+bind+lint {median.Compile,7:F2}   merge {median.Merge,5:F2}   frame {median.Frame,5:F2}   delegates (Bind) {median.Bind,6:F2}",
-                $"warm best                        total {best.Total,7:F2}",
-                "targets of the spec: cold <= 20 ms, warm <= 3 ms (parse + bind + lint + compile; the frame is not part of it)",
-                $"cold without the frame: {cold.Total - cold.Frame,6:F2} ms   warm median without the frame: {median.Total - median.Frame,6:F2} ms",
+                $"process-cold (first run, no warm-up)  total {cold.Total,7:F2}   parse+bind+lint {cold.Compile,7:F2}   merge {cold.Merge,5:F2}   frame {cold.Frame,5:F2}   delegates (Bind) {cold.Bind,6:F2}   JIT {cold.JitMethods} methods, {cold.JitMilliseconds:F1} ms",
+                $"warm median of {WarmRuns}                    total {median.Total,7:F2}   parse+bind+lint {median.Compile,7:F2}   merge {median.Merge,5:F2}   frame {median.Frame,5:F2}   delegates (Bind) {median.Bind,6:F2}   JIT {median.JitMethods} methods",
+                $"warm best                             total {best.Total,7:F2}",
+                "process-cold is reported, not asserted (ISS-12): it is the JIT compiling the compiler. See Compile_ten_conditions_first_run_after_the_warmup for the figure that a person waits for, and CompilerWarmup.",
+                "target of the spec: warm <= 3 ms (parse + bind + lint + compile; the frame is not part of it), asserted",
+                $"process-cold without the frame: {cold.WithoutFrame,6:F2} ms   warm median without the frame: {median.WithoutFrame,6:F2} ms",
+                Metric("process_cold_ms", cold.WithoutFrame),
+                Metric("process_cold_jit_methods", cold.JitMethods),
+                Metric("warm_median_ms", median.WithoutFrame),
             ]);
-        (median.Total - median.Frame).ShouldBeLessThanOrEqualTo(3, "target: parse + bind + lint + compile of a 10-condition strategy in 3 ms warm");
+        median.WithoutFrame.ShouldBeLessThanOrEqualTo(3, "target: parse + bind + lint + compile of a 10-condition strategy in 3 ms warm");
+    }
+
+    [Fact(Explicit = true)]
+    public void Compile_ten_conditions_first_run_after_the_warmup()
+    {
+        // The assertion assumes what a host does: the warm-up has run to its end before the first request (it runs on a thread-pool thread right after the host starts, and a host needs far longer than the warm-up to be
+        // ready). Here both run on this thread, one after the other. A request that arrives while the warm-up is still running waits for the part of the JIT that it has not done yet.
+        var context = ContextOfTheBenchmark();
+        var watch = Stopwatch.StartNew();
+        CompilerWarmup.Run();
+        var warmUp = watch.Elapsed.TotalMilliseconds;
+        var first = CompileTen(context);
+        var second = CompileTen(context);
+        Report(
+            "Parse + bind + lint + compile of ten conditions, first run after CompilerWarmup.Run (milliseconds)",
+            [
+                $"warm-up                      {warmUp,7:F2}   (once per process, on a background thread of the host; asserted <= {WarmUpMilliseconds:F0})",
+                $"first compile after warm-up  total {first.Total,7:F2}   parse+bind+lint {first.Compile,7:F2}   merge {first.Merge,5:F2}   frame {first.Frame,5:F2}   delegates (Bind) {first.Bind,6:F2}   JIT {first.JitMethods} methods, {first.JitMilliseconds:F1} ms",
+                $"second compile               total {second.Total,7:F2}",
+                $"first without the frame: {first.WithoutFrame,6:F2} ms (asserted <= {FirstCompileAfterWarmUpMilliseconds:F0}); the JIT methods are what the warm-up did not cover",
+                Metric("warmup_ms", warmUp),
+                Metric("after_warmup_first_ms", first.WithoutFrame),
+                Metric("after_warmup_jit_methods", first.JitMethods),
+            ]);
+        first.WithoutFrame.ShouldBeLessThanOrEqualTo(FirstCompileAfterWarmUpMilliseconds, "target: the first compile of a 10-condition strategy in a process that has run the warm-up");
+        warmUp.ShouldBeLessThanOrEqualTo(WarmUpMilliseconds, "target: the warm-up costs a core for no more than 150 ms, once");
     }
 
     [Fact(Explicit = true)]

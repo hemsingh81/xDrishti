@@ -103,6 +103,41 @@ public sealed class StrategiesArchitectureTests
         indicators.GetReferencedAssemblies().Select(a => a.Name).ShouldNotContain("XDrishti.Strategies");
     }
 
+    [Fact]
+    public void A_project_that_uses_the_library_runs_the_compiler_warm_up_when_it_starts()
+    {
+        // ISS-12, ADR 0034 amendment 2: the first compile of a process takes about 40 ms (the JIT compiling the compiler), 4 ms after CompilerWarmup.Run. No project outside the library references it yet; the first that does must
+        // call the warm-up (from a hosted service, on a thread-pool thread), or its first Lab request pays the 40 ms.
+        var sourceRoot = Path.Combine(Path.GetDirectoryName(RepositoryFile("backend", "Directory.Packages.props"))!, "src");
+        var users = Directory.GetFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(file => Path.GetFileNameWithoutExtension(file) != "XDrishti.Strategies" && ProjectReferences(XDocument.Load(file)).Contains("XDrishti.Strategies"))
+            .Select(Path.GetFileNameWithoutExtension)
+            .ToList();
+        var callers = Directory.GetFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(file => !IsBuildOutput(file) && !IsUnder(file, Path.Combine(sourceRoot, "XDrishti.Strategies")) && CallsTheWarmUp(File.ReadAllText(file)))
+            .ToList();
+
+        if (users.Count > 0)
+        {
+            callers.ShouldNotBeEmpty(string.Join(", ", users) + " reference(s) XDrishti.Strategies, but no source file outside the library calls CompilerWarmup.Run: start it from a hosted service so that the first compile does not pay for the JIT");
+        }
+    }
+
+    [Fact]
+    public void The_warm_up_rule_does_see_a_call_and_a_reference()
+    {
+        CallsTheWarmUp("_ = Task.Run(CompilerWarmup.Run, cancellationToken);").ShouldBeTrue();
+        CallsTheWarmUp("CompilerWarmup.Run();").ShouldBeTrue();
+        CallsTheWarmUp("// the compiler is warmed up at start").ShouldBeFalse();
+        ProjectReferences(XDocument.Parse("<Project><ItemGroup><ProjectReference Include=\"..\\XDrishti.Strategies\\XDrishti.Strategies.csproj\" /></ItemGroup></Project>")).ShouldBe(["XDrishti.Strategies"]);
+    }
+
+    private static bool CallsTheWarmUp(string source) => source.Contains("CompilerWarmup.Run", StringComparison.Ordinal);
+
+    private static bool IsBuildOutput(string file) => file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
+
+    private static bool IsUnder(string file, string directory) => file.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+
     private static List<string> ProjectReferences(XDocument project) =>
         [.. project.Descendants("ProjectReference").Select(r => Path.GetFileNameWithoutExtension(((string?)r.Attribute("Include") ?? string.Empty).Replace('\\', '/')))];
 

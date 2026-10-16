@@ -7,6 +7,7 @@ Developer helpers (macOS). They use the .NET SDK in `~/.dotnet` and Podman Deskt
 | `check.sh` | **All quality gates**: backend format/build/tests (incl. integration tests on Podman), frontend typecheck/lint/format/tests/build. Must pass before every commit. |
 | `gen-api.sh` | Regenerates the OpenAPI contract and the frontend's typed API client. Run after any API change. |
 | `dev-api.sh` | Runs the API on the host with hot reload (port 5080) against the containerised database; reads the DB password and the broker vault key from the Keychain (start the stack once first). |
+| `bench-coldstart.sh` | P3-02 / ISS-12: cold-start figures of the rules compiler, N fresh processes (default 15) of the explicit compile benchmarks, min/median/max: the very first compile of a process (reported), the first compile after `CompilerWarmup.Run` (≤ 20 ms) and the warm compile (≤ 3 ms); exit 1 when a median is over its target. Not part of `check.sh` (needs a quiet machine); run before a release and when the Strategies or Indicators libraries change. |
 | `build-docs.sh` | Rebuilds the HTML docs (`docs/site`) from `docs/design/*.md`. |
 | `_fingerprint.sh` | Internal: hash of uncommitted code changes; `check.sh` stores it after a green run and the Stop hook compares (ADR 0004). |
 | `auth-secrets.sh` | P1-01: store or change the owner's sign-in e-mail, name and password in the Keychain (hidden password prompt); then `deploy/xd-up.sh` (first start) or `deploy/xd-up.sh --owner-reset` (change password). |
