@@ -63,7 +63,7 @@ public sealed class DividendSuggestionTests
         Ok(await ListAsync(s)).Items.ShouldBeEmpty();
         var audit = s.Fx.Events(AccountEventType.DividendSuggestionAccepted).ShouldHaveSingleItem();
         audit.Detail.ShouldBe($"Suggested dividend {entry.Id} accepted as dividend {view.Id}");
-        audit.Detail!.ShouldNotContain("1500");
+        audit.Detail!.Replace(entry.Id.ToString(), string.Empty, StringComparison.Ordinal).Replace(view.Id.ToString(), string.Empty, StringComparison.Ordinal).ShouldNotContain("1500"); // without the ids: a random id can contain any short run of digits
     }
 
     [Theory]

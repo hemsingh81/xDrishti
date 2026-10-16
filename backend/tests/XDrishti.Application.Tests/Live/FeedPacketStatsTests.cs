@@ -280,7 +280,7 @@ public sealed partial class FeedPacketStatsTests
 
         world.Metrics.Packets.Record(2, 14, 16, FeedDropReason.LengthMismatch);
 
-        await world.RunClockUntilAsync(() => world.Log.Events.Any(e => e.Event == 4125), TimeSpan.FromSeconds(10));
+        await world.RunClockUntilAsync(() => world.Log.Events.Any(e => e.Event == 4125));
 
         var line = world.Log.Events.First(e => e.Event == 4125).Message;
         line.ShouldContain("code=99 reason=unknownCode count=1370 lastLength=20");
@@ -298,7 +298,7 @@ public sealed partial class FeedPacketStatsTests
         world.Metrics.Packets.Record(2, 16, 16, FeedDropReason.None);
         var start = world.Flush.Flushes;
 
-        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 40, TimeSpan.FromSeconds(2));
+        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 40);
 
         world.Log.Events.ShouldNotContain(e => e.Event == 4125);
         await world.StopAsync();

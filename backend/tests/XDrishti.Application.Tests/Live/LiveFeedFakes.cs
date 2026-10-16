@@ -191,15 +191,25 @@ internal sealed class FakeFeedConnector(TimeProvider clock) : ILiveFeedConnector
     }
 }
 
-/// <summary>The price sink in memory.</summary>
+/// <summary>The price sink in memory. <see cref="HoldNextFlush"/> makes the next flush take as long as the test wants: the stand-in for a manager that is slow (a cold process, a busy machine) without any clock or sleep.</summary>
 internal sealed class FakeLiveFlush : ILiveFlush
 {
     private readonly object _gate = new();
     private readonly List<LivePrice> _added = [];
+    private TaskCompletionSource? _hold;
 
     public int Resets { get; private set; }
 
+    /// <summary>How many flushes were started (a flush that is held counts from the moment it begins).</summary>
     public int Flushes { get; private set; }
+
+    /// <summary>The next flush, and only that one, does not finish until the returned gate is completed.</summary>
+    public TaskCompletionSource HoldNextFlush()
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Volatile.Write(ref _hold, gate);
+        return gate;
+    }
 
     public IReadOnlyList<LivePrice> Added
     {
@@ -232,7 +242,13 @@ internal sealed class FakeLiveFlush : ILiveFlush
     public ValueTask<LiveFlushResult> FlushAsync(CancellationToken cancellationToken)
     {
         Flushes++;
-        return ValueTask.FromResult(LiveFlushResult.Nothing());
+        return Interlocked.Exchange(ref _hold, null) is { } gate ? HeldAsync(gate, cancellationToken) : ValueTask.FromResult(LiveFlushResult.Nothing());
+    }
+
+    private static async ValueTask<LiveFlushResult> HeldAsync(TaskCompletionSource gate, CancellationToken cancellationToken)
+    {
+        await gate.Task.WaitAsync(cancellationToken);
+        return LiveFlushResult.Nothing();
     }
 }
 

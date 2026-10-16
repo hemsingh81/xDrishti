@@ -132,7 +132,7 @@ public sealed class FeedConnectionManagerTests
         await world.StartConnectedAsync();
         await world.Clock.WhenWaitingForAsync(Flush);
 
-        await world.RunClockUntilAsync(() => world.Flush.Flushes >= 3, Flush);
+        await world.RunClockUntilAsync(() => world.Flush.Flushes >= 3);
         var before = world.Flush.Flushes;
         await world.StopAsync();
 
@@ -150,7 +150,7 @@ public sealed class FeedConnectionManagerTests
         world.Provider.Candidates.Add(Holding(Guid.NewGuid(), "11536", 100m)); // changed meanwhile, before the drop is seen
 
         world.Connector.Connection(0)!.Close();
-        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is { Subscribed.Count: > 0 }, TimeSpan.FromMilliseconds(500));
+        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is not null && world.Manager.State == FeedStates.Connected); // connected is set once the whole set is subscribed: the quote message follows the ticker message
 
         var second = world.Connector.Connection(1)!;
         second.Subscribed.Single(s => s.Mode == FeedMode.Quote).Securities.Length.ShouldBe(2);
@@ -170,7 +170,7 @@ public sealed class FeedConnectionManagerTests
         {
             await FeedWorld.UntilAsync(() => world.Connector.Connection(i) is not null);
             world.Connector.Connection(i)!.Close();
-            await world.RunClockUntilAsync(() => world.Connector.Connection(i + 1) is not null, TimeSpan.FromMilliseconds(500));
+            await world.RunClockUntilAsync(() => world.Connector.Connection(i + 1) is not null);
         }
 
         world.Clock.Waits.Where(w => w != Quiet.FlushInterval && w != TimeSpan.FromSeconds(5)).Take(3).ShouldBe([TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)]);
@@ -185,16 +185,16 @@ public sealed class FeedConnectionManagerTests
         world.Begin();
         await FeedWorld.UntilAsync(() => world.Connector.Connection(0) is not null);
         world.Connector.Connection(0)!.Close();
-        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is not null, TimeSpan.FromMilliseconds(500)); // waited 1 s
+        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is not null); // waited 1 s
         await FeedWorld.UntilAsync(() => world.Manager.State == FeedStates.Connected);
         world.Connector.Connection(1)!.Close();
-        await world.RunClockUntilAsync(() => world.Connector.Connection(2) is not null, TimeSpan.FromMilliseconds(500)); // waited 2 s
+        await world.RunClockUntilAsync(() => world.Connector.Connection(2) is not null); // waited 2 s
         await FeedWorld.UntilAsync(() => world.Manager.State == FeedStates.Connected);
 
         world.Connector.Connection(2)!.Push(Tick(FeedSegments.NseEquity, 2885, 100m, world.Clock.GetUtcNow()));
         await FeedWorld.UntilAsync(() => world.Flush.Added.Count == 1);
         world.Connector.Connection(2)!.Close();
-        await world.RunClockUntilAsync(() => world.Connector.Connection(3) is not null, TimeSpan.FromMilliseconds(500));
+        await world.RunClockUntilAsync(() => world.Connector.Connection(3) is not null);
 
         world.Clock.Waits.Where(w => w != Quiet.FlushInterval && w != TimeSpan.FromSeconds(5)).Take(3).ShouldBe([TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(1)]);
         await world.StopAsync();
@@ -208,7 +208,7 @@ public sealed class FeedConnectionManagerTests
         AddTypicalSet(world);
         world.Begin();
 
-        await world.RunClockUntilAsync(() => world.Connector.Connection(0) is { Subscribed.Count: > 0 }, TimeSpan.FromMilliseconds(500));
+        await world.RunClockUntilAsync(() => world.Connector.Connection(0) is { Subscribed.Count: > 0 });
 
         world.Connector.Attempts.ShouldBe(2);
         world.Log.Events.ShouldContain(e => e.Event == 4110);
@@ -223,7 +223,7 @@ public sealed class FeedConnectionManagerTests
         AddTypicalSet(world);
         world.Begin();
 
-        await world.RunClockUntilAsync(() => world.Connector.Connection(0) is { Subscribed.Count: > 0 }, TimeSpan.FromMilliseconds(500));
+        await world.RunClockUntilAsync(() => world.Connector.Connection(0) is { Subscribed.Count: > 0 });
 
         world.Connector.Attempts.ShouldBe(2);
         world.Log.Events.ShouldContain(e => e.Event == 4115 && e.Message.Contains("InvalidOperationException", StringComparison.Ordinal));
@@ -238,7 +238,7 @@ public sealed class FeedConnectionManagerTests
         world.Connector.AlwaysFail = FeedConnectFailureKind.Failed;
 
         var run = world.Start();
-        await world.RunClockUntilAsync(() => run.IsCompleted, TimeSpan.FromSeconds(1));
+        await world.RunClockUntilAsync(() => run.IsCompleted);
         var result = await run;
 
         result.End.ShouldBe(FeedSessionEnd.Flapping);
@@ -258,7 +258,7 @@ public sealed class FeedConnectionManagerTests
             await FeedWorld.UntilAsync(() => world.Connector.Connection(i) is { Subscribed.Count: > 0 });
             world.Clock.Advance(TimeSpan.FromMinutes(1)); // each connection lives a minute
             world.Connector.Connection(i)!.Close();
-            await world.RunClockUntilAsync(() => world.Connector.Connection(i + 1) is not null, TimeSpan.FromSeconds(5));
+            await world.RunClockUntilAsync(() => world.Connector.Connection(i + 1) is not null);
         }
 
         world.Manager.State.ShouldNotBe(FeedStates.Flapping);
@@ -275,7 +275,7 @@ public sealed class FeedConnectionManagerTests
         AddTypicalSet(world);
         await world.StartConnectedAsync();
 
-        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is not null, Flush);
+        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is not null);
 
         world.Connector.Connection(0)!.Disposed.ShouldBeTrue();
         world.Log.Events.ShouldContain(e => e.Event == 4113);
@@ -290,7 +290,7 @@ public sealed class FeedConnectionManagerTests
         await world.StartConnectedAsync();
 
         var start = world.Flush.Flushes;
-        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 10, Flush); // 20 s
+        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 10); // 20 s
 
         world.Connector.Attempts.ShouldBe(1);
         world.Connector.Connection(0)!.Disposed.ShouldBeFalse();
@@ -307,11 +307,11 @@ public sealed class FeedConnectionManagerTests
 
         for (var i = 0; i < 6; i++)
         {
+            var seen = world.Flush.Added.Count; // before the push: the reader is on another thread and may have added the tick before the next line
             connection.Push(Tick(FeedSegments.Index, 13, 24800m + i, world.Clock.GetUtcNow()));
-            var seen = world.Flush.Added.Count;
             await FeedWorld.UntilAsync(() => world.Flush.Added.Count > seen);
             var flushes = world.Flush.Flushes;
-            await world.RunClockUntilAsync(() => world.Flush.Flushes >= flushes + 7, Flush); // 14 s of quiet each time, 84 s in all
+            await world.RunClockUntilAsync(() => world.Flush.Flushes >= flushes + 7); // 14 s of quiet each time, 84 s in all
         }
 
         world.Connector.Attempts.ShouldBe(1);
@@ -326,7 +326,7 @@ public sealed class FeedConnectionManagerTests
         await world.StartConnectedAsync();
 
         var start = world.Flush.Flushes;
-        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 15, Flush); // 30 s, still before 09:15
+        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 15); // 30 s, still before 09:15
 
         world.Connector.Attempts.ShouldBe(1);
         await world.StopAsync();
@@ -340,7 +340,7 @@ public sealed class FeedConnectionManagerTests
         await world.StartConnectedAsync();
 
         var start = world.Flush.Flushes;
-        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 25, Flush); // 50 s
+        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 25); // 50 s
 
         world.Connector.Attempts.ShouldBe(1);
         await world.StopAsync();
@@ -359,7 +359,7 @@ public sealed class FeedConnectionManagerTests
         world.Provider.Candidates.RemoveAll(c => c.InstrumentId == Infosys);
 
         world.Changes.Raise();
-        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Unsubscribed.Count > 0, Flush);
+        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Unsubscribed.Count > 0 && world.Connector.Connection(0)!.Subscribed.Count > 2); // the difference is two messages, the unsubscribe first
 
         var connection = world.Connector.Connection(0)!;
         var subscribed = connection.Subscribed[connection.Subscribed.Count - 1];
@@ -382,7 +382,7 @@ public sealed class FeedConnectionManagerTests
         var messages = world.Connector.Connection(0)!.Subscribed.Count;
         world.Provider.Candidates.Add(Holding(Guid.NewGuid(), "11536", 100m));
 
-        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Subscribed.Count > messages, TimeSpan.FromSeconds(10));
+        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Subscribed.Count > messages);
 
         world.Connector.Attempts.ShouldBe(1);
         await world.StopAsync();
@@ -397,7 +397,7 @@ public sealed class FeedConnectionManagerTests
         var added = Guid.NewGuid();
         world.Provider.Candidates.Add(Holding(added, "11536", 100m));
         world.Changes.Raise();
-        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Subscribed.Count > 2, Flush);
+        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Subscribed.Count > 2);
 
         world.Connector.Connection(0)!.Push(Tick(FeedSegments.NseEquity, 11536, 55m, world.Clock.GetUtcNow()));
         await FeedWorld.UntilAsync(() => world.Flush.Added.Count == 1);
@@ -415,7 +415,7 @@ public sealed class FeedConnectionManagerTests
         world.Provider.Candidates.Add(Holding(Reliance, "2885", 100m)); // the alert instrument is now held too
 
         world.Changes.Raise();
-        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Unsubscribed.Count > 0, Flush);
+        await world.RunClockUntilAsync(() => world.Connector.Connection(0)!.Unsubscribed.Count > 0 && world.Connector.Connection(0)!.Subscribed.Count > 1); // the difference is two messages, the unsubscribe first
 
         var connection = world.Connector.Connection(0)!;
         var unsubscribed = connection.Unsubscribed.ShouldHaveSingleItem();
@@ -437,7 +437,7 @@ public sealed class FeedConnectionManagerTests
 
         world.Changes.Raise();
         var start = world.Flush.Flushes;
-        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 3, Flush);
+        await world.RunClockUntilAsync(() => world.Flush.Flushes >= start + 3);
 
         world.Connector.Attempts.ShouldBe(1);
         world.Connector.Connection(0)!.Unsubscribed.ShouldBeEmpty();
@@ -485,7 +485,7 @@ public sealed class FeedConnectionManagerTests
         await world.StartConnectedAsync();
 
         world.Connector.Connection(0)!.Push(new FeedPacket(FeedPacketKind.Disconnect, default, Reason: 805));
-        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is not null, TimeSpan.FromMilliseconds(500));
+        await world.RunClockUntilAsync(() => world.Connector.Connection(1) is not null);
 
         world.Connector.Attempts.ShouldBe(2);
         await world.StopAsync();
