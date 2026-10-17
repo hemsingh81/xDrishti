@@ -128,6 +128,44 @@ public sealed class TypeRulesTests
         error.Message.ShouldContain("`" + Snippets[right] + "`", Case.Sensitive);
     }
 
+    /// <summary>How a message calls the type an operand has.</summary>
+    private static string TypeWords(Kind kind) => kind switch
+    {
+        Kind.Number or Kind.Constant => "a number",
+        Kind.Bool => "a true/false value",
+        Kind.Time => "the time of day",
+        Kind.Regime => "a market regime",
+        _ => "a text",
+    };
+
+    [Theory]
+    [MemberData(nameof(Pairs))]
+    public void A_wrong_operand_of_a_logical_or_arithmetic_operator_is_reported_on_itself_with_the_type_it_needs_and_the_one_it_has_and_both_when_both_are_wrong(string op, Kind left, Kind right)
+    {
+        if (op is not ("and" or "or" or "+" or "-" or "*" or "/"))
+        {
+            return;
+        }
+
+        var logical = op is "and" or "or";
+        var firstStart = logical ? 0 : 1; // an arithmetic operand is written inside "( … ) > 0"
+        var secondStart = firstStart + Snippets[left].Length + op.Length + 2;
+        var source = Written(op, left, right);
+        (string Side, Kind Kind, int Start)[] operands = [("left", left, firstStart), ("right", right, secondStart)];
+        var wrong = operands.Where(o => logical ? o.Kind != Kind.Bool : !Numeric(o.Kind)).ToList();
+
+        var errors = Of(source).Errors.ToList();
+
+        errors.Count.ShouldBe(wrong.Count, source + " -> " + string.Join(" | ", errors.Select(e => e.Message)));
+        foreach (var (side, kind, start) in wrong)
+        {
+            var error = errors.Single(e => e.Span.Start == start);
+            error.Code.ShouldBe(LintCodes.TypeMismatch, source);
+            error.Span.End.ShouldBe(start + Snippets[kind].Length, source + ": the span is the operand and nothing more");
+            error.Message.ShouldStartWith($"The {side} side of `{op}` needs {(logical ? "a true/false value" : "a number")}, but `{Snippets[kind]}` is {TypeWords(kind)}.", Case.Sensitive);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(Kinds))]
     public void Only_a_true_false_value_is_a_condition(Kind kind)

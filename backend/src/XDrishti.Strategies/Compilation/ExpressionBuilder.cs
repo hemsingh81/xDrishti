@@ -119,6 +119,8 @@ internal sealed class ExpressionBuilder
         var lag = Expression.Variable(typeof(int), "lag");
         var done = Expression.Label("done");
         var step = run.IsRising ? KernelMethods.StepRising : KernelMethods.StepFalling;
+
+        // No early exit, on purpose: a run is atomic over NaN (a missing value anywhere makes it unknown, even after a step has failed), so every step is read and the work is n x reads whatever the data.
         var loop = Expression.Loop(
             Expression.Block(
                 Expression.IfThen(Expression.GreaterThan(lag, Expression.Constant(run.Count)), Expression.Break(done)),

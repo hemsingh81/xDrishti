@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Strategies.Lint;
 using XDrishti.Strategies.Tests.Support;
@@ -6,39 +5,60 @@ using XDrishti.Strategies.Tests.Support;
 namespace XDrishti.Strategies.Tests.Lint;
 
 /// <summary>
-/// <c>lag_across_session</c> (warning; ADR 0034, Amendment 19): a lagged read is by position and the frame's history runs on across sessions, so for a feature that starts again at the session open and has a value at
-/// once, the first bars of every session read the previous session. The table of <see cref="LintCases"/> pins one message per shape; here are the rules behind it: which names, which timeframes and lags, the
-/// <c>time</c> guard that clears it, and what the warning says about the guard it asks for. That the numbers are the frame's is shown by <see cref="Evaluation.LagAcrossSessionTruthTests"/>.
+/// <c>lag_across_session</c> (warning; ADR 0035, narrowing ADR 0034 Amendment 19): the frame keeps the history of a per-session feature for the current session only, so a lagged read never compares two sessions and
+/// needs no help from the condition. What the lint still says is that a read from <i>further back than a whole session holds</i> is never known: <c>k</c> bars of timeframe <c>T</c> back with <c>k · T</c> at least
+/// the 375 minutes of a session (<c>vwap[75]</c> on 5m, <c>rising(vwap, 7)</c> on 1h). The table of <see cref="LintCases"/> pins one message per shape; here are the rules behind it: which names, which timeframes and
+/// lags, that the strategy's own timeframe and a <c>time</c> check make no difference, and what the warning says. That the numbers are the frame's is shown by <see cref="Evaluation.SessionLagTruthTests"/>.
 /// </summary>
-public sealed partial class LagAcrossSessionTests
+public sealed class LagAcrossSessionTests
 {
-    /// <summary>The ten features that restart at the session open and have a value at once (written out; not derived from the catalog).</summary>
-    private static readonly string[] SessionValues =
+    /// <summary>The twelve features that restart each session (written out; not derived from the catalog).</summary>
+    private static readonly string[] Restarting =
     [
-        "vwap", "today_open", "today_high", "today_low", "prev_day_open", "prev_day_high", "prev_day_low", "prev_day_close", "prev_day_volume", "gap_pct",
+        "vwap", "or_high", "or_low", "today_open", "today_high", "today_low", "prev_day_open", "prev_day_high", "prev_day_low", "prev_day_close", "prev_day_volume", "gap_pct",
     ];
+
+    private static readonly Timeframe[] Intraday = [Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1];
 
     public static TheoryData<string> AllNames { get; } = [.. AllFeatureForms.Forms.Keys];
 
-    [GeneratedRegex("`and time >= \"(\\d\\d:\\d\\d)\"`")]
-    private static partial Regex GuardLiteral();
+    /// <summary>The bars a session of the timeframe holds (375 minutes, the last bar may be short), written by hand: 375, 75, 38, 25, 13, 7.</summary>
+    private static int BarsInSession(Timeframe timeframe) => timeframe switch
+    {
+        Timeframe.M1 => 375,
+        Timeframe.M5 => 75,
+        Timeframe.M10 => 38,
+        Timeframe.M15 => 25,
+        Timeframe.M30 => 13,
+        Timeframe.H1 => 7,
+        _ => throw new ArgumentOutOfRangeException(nameof(timeframe)),
+    };
 
     private static string Reference(Timeframe feature, Timeframe evaluation) => feature == evaluation ? "vwap" : "tf(\"" + feature.ToCode() + "\").vwap";
 
-    private static Problem[] Warned(string source, Timeframe timeframe) =>
-        [.. Compiling.Of(source, timeframe).Problems.Where(p => p.Code == LintCodes.LagAcrossSession)];
+    private static Problem[] Warned(string source, Timeframe timeframe, IReadOnlyDictionary<string, double>? parameters = null) =>
+        [.. Compiling.Of(source, timeframe, parameters).Problems.Where(p => p.Code == LintCodes.LagAcrossSession)];
 
     // ---- which features -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     [Theory]
     [MemberData(nameof(AllNames))]
-    public void Only_the_ten_session_values_are_warned_about_when_they_are_lagged(string name)
+    public void Only_the_twelve_restarting_features_are_warned_about_when_they_are_read_from_further_back_than_a_session_holds(string name)
     {
         var form = AllFeatureForms.Forms[name];
 
-        var warnings = Warned("rising(" + form + ", 1)", Timeframe.M5);
+        var warnings = Warned("rising(" + form + ", 75)", Timeframe.M5);
 
-        warnings.Length.ShouldBe(SessionValues.Contains(name) ? 1 : 0, name);
+        warnings.Length.ShouldBe(Restarting.Contains(name) ? 1 : 0, name);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllNames))]
+    public void No_feature_is_warned_about_one_bar_short_of_a_session(string name)
+    {
+        var form = AllFeatureForms.Forms[name];
+
+        Warned("rising(" + form + ", 74)", Timeframe.M5).ShouldBeEmpty(name);
     }
 
     [Theory]
@@ -51,164 +71,157 @@ public sealed partial class LagAcrossSessionTests
     }
 
     [Fact]
-    public void The_names_written_out_here_are_ten_of_the_catalogs_fifty_six()
+    public void The_names_written_out_here_are_twelve_of_the_catalogs_fifty_six()
     {
         AllFeatureForms.Forms.Count.ShouldBe(56);
-        SessionValues.Distinct().Count().ShouldBe(10);
-        SessionValues.ShouldAllBe(n => AllFeatureForms.Forms.ContainsKey(n));
+        Restarting.Distinct().Count().ShouldBe(12);
+        Restarting.ShouldAllBe(n => AllFeatureForms.Forms.ContainsKey(n));
     }
 
     // ---- which timeframes and lags ---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-    /// <summary>
-    /// The strategy timeframe E, the timeframe T of the feature and the lag L; whether the read crosses a session open at some evaluation, and the clock time from which every evaluation stays inside the session
-    /// (09:15 plus (L + 1) · T minutes, at most 15:30; none when even the last bar of the session is within L bars of the open). Worked out by hand.
-    /// </summary>
-    public static TheoryData<Timeframe, Timeframe, int, string?, bool> Shapes => new()
+    /// <summary>Timeframe of the feature and the lag at the boundary: the last lag that is not warned and the first that is (k · T below and at 375 minutes). Worked out by hand: 74/75, 37/38, 24/25, 12/13, 6/7.</summary>
+    public static TheoryData<Timeframe, int> Boundaries => new()
     {
-        // the strategy reads its own timeframe: the first evaluation is the first bar, so any lag crosses
-        { Timeframe.M1, Timeframe.M1, 1, "09:17", true },
-        { Timeframe.M5, Timeframe.M5, 1, "09:25", true },
-        { Timeframe.M5, Timeframe.M5, 2, "09:30", true },
-        { Timeframe.M15, Timeframe.M15, 1, "09:45", true },
-        { Timeframe.M30, Timeframe.M30, 1, "10:15", true },
-        { Timeframe.H1, Timeframe.H1, 1, "11:15", true },
-
-        // a feature on a finer timeframe than the strategy: the first evaluation already has E / T bars of the session
-        { Timeframe.M5, Timeframe.M1, 4, null, false },
-        { Timeframe.M5, Timeframe.M1, 5, "09:21", true },
-        { Timeframe.M10, Timeframe.M5, 1, null, false },
-        { Timeframe.M10, Timeframe.M5, 2, "09:30", true },
-        { Timeframe.M30, Timeframe.M10, 2, null, false },
-        { Timeframe.M30, Timeframe.M10, 3, "09:55", true },
-        { Timeframe.M15, Timeframe.M1, 14, null, false },
-        { Timeframe.M15, Timeframe.M1, 15, "09:31", true },
-
-        // a feature on a coarser timeframe than the strategy
-        { Timeframe.M15, Timeframe.H1, 1, "11:15", true },
-        { Timeframe.M5, Timeframe.M30, 1, "10:15", true },
-
-        // the end of the session: the last bar may be short, and is the farthest from the open
-        { Timeframe.H1, Timeframe.H1, 5, "15:15", true },
-        { Timeframe.H1, Timeframe.H1, 6, "15:30", true },
-        { Timeframe.H1, Timeframe.H1, 7, "none", true },
-        { Timeframe.M30, Timeframe.M30, 11, "15:15", true },
-        { Timeframe.M30, Timeframe.M30, 12, "15:30", true },
-        { Timeframe.M30, Timeframe.M30, 13, "none", true },
-        { Timeframe.M15, Timeframe.M15, 24, "15:30", true },
-        { Timeframe.M15, Timeframe.M15, 25, "none", true },
+        { Timeframe.M5, 74 },
+        { Timeframe.M10, 37 },
+        { Timeframe.M15, 24 },
+        { Timeframe.M30, 12 },
+        { Timeframe.H1, 6 },
     };
 
     [Theory]
-    [MemberData(nameof(Shapes))]
-    public void A_lag_is_warned_about_when_the_first_evaluation_comes_before_the_read_stays_inside_the_session(Timeframe evaluation, Timeframe feature, int lag, string? clearsAt, bool warned)
+    [MemberData(nameof(Boundaries))]
+    public void A_read_one_bar_short_of_a_session_is_clean_and_the_next_bar_back_is_warned_on_any_strategy_timeframe(Timeframe feature, int lastClean)
     {
-        var source = "rising(" + Reference(feature, evaluation) + ", " + lag + ")";
-
-        var warnings = Warned(source, evaluation);
-
-        warnings.Length.ShouldBe(warned ? 1 : 0, source + " on " + evaluation.ToCode());
-        if (!warned)
+        foreach (var evaluation in new[] { feature, Timeframe.M15, Timeframe.H1, Timeframe.D1 })
         {
-            return;
+            var clean = "rising(" + Reference(feature, evaluation) + ", " + lastClean + ")";
+            var dead = "rising(" + Reference(feature, evaluation) + ", " + (lastClean + 1) + ")";
+
+            Warned(clean, evaluation).ShouldBeEmpty(clean + " on " + evaluation.ToCode());
+            Warned(dead, evaluation).Length.ShouldBe(1, dead + " on " + evaluation.ToCode());
         }
+    }
 
-        var message = warnings[0].Message;
-        if (clearsAt == "none")
+    [Fact]
+    public void A_one_minute_read_is_never_warned_below_the_depth_the_frame_keeps_and_is_warned_from_375_where_it_is_also_too_deep()
+    {
+        Warned("rising(vwap, 255)", Timeframe.M1).ShouldBeEmpty("255 minutes are inside a session of 375");
+
+        var beyond = Compiling.Of("close > vwap[375]", Timeframe.M1);
+
+        beyond.Problems.Select(p => p.Code).ShouldBe([LintCodes.LagTooDeep, LintCodes.LagAcrossSession], "a read of 375 bars is both too deep for the frame and a whole session back");
+        Warned("close > vwap[374]", Timeframe.M1).ShouldBeEmpty("374 minutes are inside a session of 375 (the frame keeps 256, so it is too deep, but not warned about twice)");
+    }
+
+    [Theory]
+    [InlineData(Timeframe.M5)]
+    [InlineData(Timeframe.M10)]
+    [InlineData(Timeframe.M15)]
+    [InlineData(Timeframe.M30)]
+    [InlineData(Timeframe.H1)]
+    public void The_warning_follows_the_arithmetic_of_the_lag_and_the_minutes_of_the_features_timeframe_at_every_lag(Timeframe feature)
+    {
+        var minutes = feature.Minutes();
+
+        for (var lag = 1; lag <= 255; lag++)
         {
-            GuardLiteral().IsMatch(message).ShouldBeFalse(message);
-            message.ShouldEndWith("No bar of a session is far enough from its open for a read that far back; read fewer bars back.");
-        }
-        else
-        {
-            GuardLiteral().Match(message).Groups[1].Value.ShouldBe(clearsAt, message);
+            var expected = lag * minutes >= SessionClock.RegularBars;
+
+            Warned("rising(" + Reference(feature, feature) + ", " + lag + ")", feature).Length.ShouldBe(expected ? 1 : 0, $"{feature.ToCode()}, lag {lag}");
         }
     }
 
     [Theory]
-    [InlineData(Timeframe.D1)]
-    [InlineData(Timeframe.W1)]
-    [InlineData(Timeframe.Mo1)]
-    public void A_strategy_on_a_daily_or_longer_timeframe_evaluates_at_the_end_of_a_session_and_is_not_warned(Timeframe evaluation)
+    [InlineData(Timeframe.D1, "tf(\"5m\").vwap[80] > 0", 1)]
+    [InlineData(Timeframe.D1, "tf(\"1h\").today_open[7] > 0", 1)]
+    [InlineData(Timeframe.D1, "tf(\"1h\").today_open[6] > 0", 0)]
+    [InlineData(Timeframe.D1, "rising(tf(\"15m\").prev_day_high, 25)", 1)]
+    [InlineData(Timeframe.W1, "tf(\"30m\").gap_pct[13] > 0", 1)]
+    [InlineData(Timeframe.M5, "tf(\"1h\").vwap[7] > 0", 1)]
+    [InlineData(Timeframe.H1, "tf(\"5m\").vwap[75] > 0", 1)]
+    [InlineData(Timeframe.H1, "tf(\"5m\").vwap[74] > 0", 0)]
+    public void The_strategys_own_timeframe_does_not_matter_a_read_of_a_lane_is_judged_by_the_lane(Timeframe evaluation, string source, int warnings)
     {
-        // today_open, prev_day_close and gap_pct exist on 1D; on 1W and 1M the session values are refused, and a feature read on 1m by tf() is the one that could be lagged
-        var source = evaluation == Timeframe.D1 ? "rising(today_open, 3) or crosses_above(close, prev_day.high)" : "rising(tf(\"1m\").vwap, 3)";
+        Warned(source, evaluation).Length.ShouldBe(warnings, source + " on " + evaluation.ToCode());
+    }
 
-        Warned(source, evaluation).ShouldBeEmpty();
+    [Theory]
+    [InlineData(Timeframe.D1, "rising(today_open, 200)")]
+    [InlineData(Timeframe.D1, "gap_pct[200] > 0")]
+    [InlineData(Timeframe.D1, "prev_day.close[200] > 0")]
+    [InlineData(Timeframe.M15, "tf(\"1D\").gap_pct[200] > 0")]
+    [InlineData(Timeframe.M5, "rising(tf(\"1D\").today_open, 200)")]
+    [InlineData(Timeframe.H1, "tf(\"1D\").prev_day_close[255] > 0")]
+    public void A_read_of_a_restarting_feature_on_the_daily_lane_is_by_position_and_is_never_warned(Timeframe evaluation, string source)
+    {
+        Warned(source, evaluation).ShouldBeEmpty(source + " on " + evaluation.ToCode());
     }
 
     [Fact]
-    public void A_deeper_lag_never_removes_a_warning_a_shallower_one_has()
+    public void A_crossing_adds_one_lag_to_the_subscript_and_rising_adds_its_count()
     {
-        foreach (var evaluation in new[] { Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1 })
-        {
-            foreach (var feature in new[] { Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1 })
-            {
-                var warnedBefore = false;
-                for (var lag = 1; lag <= 100; lag++)
-                {
-                    var warned = Warned("rising(" + Reference(feature, evaluation) + ", " + lag + ")", evaluation).Length == 1;
-                    (warnedBefore && !warned).ShouldBeFalse($"E {evaluation.ToCode()}, T {feature.ToCode()}: warned at lag {lag - 1} and not at {lag}");
-                    warnedBefore |= warned;
-                }
+        // crosses_above(close, vwap[k]) reads the vwap k and k + 1 bars back; rising(vwap[k], n) reads k to k + n
+        Warned("crosses_above(close, vwap[74])", Timeframe.M5).Length.ShouldBe(1, "74 + 1 = 75 bars of 5m are 375 minutes");
+        Warned("crosses_above(close, vwap[73])", Timeframe.M5).ShouldBeEmpty("73 + 1 = 74 bars of 5m are 370 minutes");
+        Warned("rising(vwap[20], 5)", Timeframe.M15).Length.ShouldBe(1, "20 + 5 = 25 bars of 15m are 375 minutes");
+        Warned("rising(vwap[20], 4)", Timeframe.M15).ShouldBeEmpty("20 + 4 = 24 bars of 15m are 360 minutes");
+        Warned("falling(vwap[10], 15)", Timeframe.M15).Length.ShouldBe(1, "10 + 15 = 25");
+    }
 
-                warnedBefore.ShouldBeTrue($"E {evaluation.ToCode()}, T {feature.ToCode()}: a lag of 100 bars of the feature is more than the 60 minutes of the longest first evaluation, whatever the timeframes");
+    [Fact]
+    public void A_lag_that_fits_a_session_but_is_large_is_not_warned_it_is_unknown_for_the_first_bars_only()
+    {
+        // 60 bars of 1m is 60 minutes into the session: unknown for the first 60 minutes, known after; the lint says nothing, the frame says so (SessionLagTruthTests)
+        Warned("rising(vwap, 60)", Timeframe.M1).ShouldBeEmpty();
+        Warned("rising(vwap, 20)", Timeframe.M15).ShouldBeEmpty();
+    }
+
+    // ---- a time check changes nothing ------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("rising(vwap, 25)", 1)]
+    [InlineData("rising(vwap, 24)", 0)]
+    [InlineData("crosses_above(close, vwap)", 0)]
+    [InlineData("rising(today_open, 25) or rising(vwap, 3)", 1)]
+    public void A_time_check_neither_adds_nor_removes_the_warning(string source, int warnings)
+    {
+        foreach (var variant in new[]
+        {
+            source,
+            "(" + source + ") and time >= \"09:45\"",
+            "time >= \"09:30\" and (" + source + ")",
+            "(" + source + ") and time >= \"15:00\"",
+            "(" + source + ") or time >= \"09:45\"",
+            "(" + source + ") and not (time < \"10:00\")",
+            "(" + source + ") and time <= \"14:00\"",
+        })
+        {
+            Warned(variant, Timeframe.M15).Length.ShouldBe(warnings, variant);
+        }
+    }
+
+    [Fact]
+    public void The_headline_examples_compile_with_no_problem_at_all_with_or_without_a_time_check()
+    {
+        foreach (var timeframe in Intraday)
+        {
+            foreach (var source in new[]
+            {
+                "crosses_above(close, vwap)",
+                "crosses_below(close, vwap)",
+                "close > vwap and close[1] <= vwap[1]",
+                "rising(vwap, 3)",
+                "crosses_above(close, today_open)",
+                "crosses_above(close, prev_day.high)",
+                "crosses_above(close, vwap) and time >= \"09:45\"",
+                "crosses_above(close, vwap) and time >= \"09:16\"",
+            })
+            {
+                Compiling.Of(source, timeframe).Problems.ShouldBeEmpty(source + " on " + timeframe.ToCode());
             }
         }
-    }
-
-    // ---- the guard -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-    [Theory]
-    [InlineData(Timeframe.M15, ">=", "09:15", false)]
-    [InlineData(Timeframe.M15, ">=", "09:16", false)]
-    [InlineData(Timeframe.M15, ">=", "09:30", false)]
-    [InlineData(Timeframe.M15, ">=", "09:31", true)]
-    [InlineData(Timeframe.M15, ">=", "09:45", true)]
-    [InlineData(Timeframe.M15, ">", "09:15", false)]
-    [InlineData(Timeframe.M15, ">", "09:29", false)]
-    [InlineData(Timeframe.M15, ">", "09:30", true)]
-    [InlineData(Timeframe.M15, ">", "09:45", true)]
-    [InlineData(Timeframe.M1, ">=", "09:16", false)]
-    [InlineData(Timeframe.M1, ">=", "09:17", true)]
-    [InlineData(Timeframe.M1, ">", "09:16", true)]
-    [InlineData(Timeframe.H1, ">=", "10:15", false)]
-    [InlineData(Timeframe.H1, ">=", "10:16", true)]
-    [InlineData(Timeframe.H1, ">", "10:15", true)]
-    public void A_time_check_clears_the_warning_when_the_first_evaluation_it_lets_through_is_clean(Timeframe evaluation, string op, string time, bool cleared)
-    {
-        var source = "crosses_above(close, vwap) and time " + op + " \"" + time + "\"";
-
-        Warned(source, evaluation).Length.ShouldBe(cleared ? 0 : 1, source + " on " + evaluation.ToCode());
-    }
-
-    [Theory]
-    [InlineData("crosses_above(close, vwap) and time >= \"09:45\"", 0)]
-    [InlineData("time >= \"09:45\" and crosses_above(close, vwap)", 0)]
-    [InlineData("rsi(14) > 55 and time >= \"09:45\" and ema(20) > ema(50) and crosses_above(close, vwap)", 0)]
-    [InlineData("(rsi(14) > 55 or ema(20) > ema(50)) and crosses_above(close, vwap) and time >= \"09:45\"", 0)]
-    [InlineData("crosses_above(close, vwap) and time >= \"09:30\" and time >= \"09:45\"", 0)]
-    [InlineData("crosses_above(close, vwap) and (time >= \"09:45\" and rsi(14) > 55)", 0)]
-    [InlineData("crosses_above(close, vwap) or time >= \"09:45\"", 1)]
-    [InlineData("not (time >= \"09:45\") and crosses_above(close, vwap)", 1)]
-    [InlineData("crosses_above(close, vwap) and not (time < \"09:45\")", 1)]
-    [InlineData("(crosses_above(close, vwap) and rsi(14) > 55) or (time >= \"09:45\" and rsi(14) > 60)", 1)]
-    [InlineData("crosses_above(close, vwap) and time == \"09:45\"", 1)]
-    [InlineData("crosses_above(close, vwap) and time <= \"15:00\"", 1)]
-    [InlineData("crosses_above(close, vwap) and time < \"15:00\"", 1)]
-    [InlineData("crosses_above(close, vwap) and time != \"09:30\"", 1)]
-    public void Only_a_lower_bound_of_the_time_in_the_chain_of_ands_clears_it(string source, int warnings)
-    {
-        Warned(source, Timeframe.M15).Length.ShouldBe(warnings, source);
-    }
-
-    [Fact]
-    public void A_check_of_the_time_clears_only_the_reads_it_is_late_enough_for()
-    {
-        var warnings = Warned("rising(vwap, 1) and rising(today_low, 3) and rising(today_open, 8) and time >= \"10:15\"", Timeframe.M15);
-
-        // 10:15 is 60 minutes after the open: one bar back needs 30, three bars back 60, eight bars back 135
-        warnings.Select(w => w.Message[..w.Message.IndexOf(" reads", StringComparison.Ordinal)]).ShouldBe(["`rising(today_open, 8)`"]);
     }
 
     // ---- what the warning is --------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -216,82 +229,99 @@ public sealed partial class LagAcrossSessionTests
     [Fact]
     public void It_is_a_warning_with_no_suggestion_and_the_condition_still_compiles()
     {
-        var result = Compiling.Of("crosses_above(close, vwap)");
+        var result = Compiling.Of("rising(vwap, 25)");
 
         result.IsSuccess.ShouldBeTrue(Compiling.Describe(result));
         var warning = result.Condition!.Warnings.ShouldHaveSingleItem();
         warning.Code.ShouldBe("strategy.lint.lag_across_session");
         warning.Severity.ShouldBe(ProblemSeverity.Warning);
         warning.Suggestion.ShouldBeNull();
-        (warning.Span.Start, warning.Span.End).ShouldBe((0, 26));
-        result.Condition.HistoryDepth.ShouldBe(2);
-        result.Condition.Features.Count.ShouldBe(2);
+        (warning.Span.Start, warning.Span.End).ShouldBe((0, 16));
+        result.Condition.HistoryDepth.ShouldBe(26);
+        result.Condition.Features.Count.ShouldBe(1);
     }
 
-    [Fact]
-    public void A_condition_with_the_guard_has_no_warnings_and_the_same_plan()
+    [Theory]
+    [InlineData(Timeframe.M5, 75, 74)]
+    [InlineData(Timeframe.M10, 38, 37)]
+    [InlineData(Timeframe.M15, 25, 24)]
+    [InlineData(Timeframe.M30, 13, 12)]
+    [InlineData(Timeframe.H1, 7, 6)]
+    public void The_message_says_how_many_bars_a_session_holds_and_how_far_back_to_read(Timeframe feature, int holds, int atMost)
     {
-        var bare = Compiling.Condition("crosses_above(close, vwap)");
-        var guarded = Compiling.Condition("crosses_above(close, vwap) and time >= \"09:45\"");
+        BarsInSession(feature).ShouldBe(holds);
 
-        guarded.Warnings.ShouldBeEmpty();
-        guarded.Features.ShouldBe(bare.Features);
-        guarded.HistoryDepth.ShouldBe(bare.HistoryDepth);
+        var warning = Warned("rising(vwap, " + holds + ")", feature).ShouldHaveSingleItem();
+
+        warning.Message.ShouldBe(
+            $"`rising(vwap, {holds})` reads `vwap` up to {holds} closed bars back, but a session holds at most {holds} bars of {feature.ToCode()} and a per-session feature has no value from an earlier session: "
+            + $"that part of the condition is never known, and unknown is not true. Read at most {atMost} bars back.");
     }
 
     [Fact]
     public void One_call_gives_one_warning_naming_each_feature_once_in_the_order_written()
     {
-        var warning = Warned("rising(vwap + today_open - vwap * today_low, 2)", Timeframe.M15).ShouldHaveSingleItem();
+        var warning = Warned("rising(vwap + today_open - vwap * today_low, 25)", Timeframe.M15).ShouldHaveSingleItem();
 
-        warning.Message.ShouldStartWith("`rising(vwap + today_open - vwap * today_low, 2)` reads `vwap`, `today_open`, `today_low` up to 2 closed bars back");
+        warning.Message.ShouldStartWith("`rising(vwap + today_open - vwap * today_low, 25)` reads `vwap`, `today_open`, `today_low` up to 25 closed bars back");
     }
 
     [Fact]
-    public void The_features_that_are_not_session_values_are_left_out_of_the_names()
+    public void The_features_that_are_not_restarting_ones_are_left_out_of_the_names()
     {
-        var warning = Warned("crosses_above(close * ema(20), vwap * rsi(14))", Timeframe.M15).ShouldHaveSingleItem();
+        var warning = Warned("rising(close * ema(20) + vwap * rsi(14), 25)", Timeframe.M15).ShouldHaveSingleItem();
 
-        warning.Message.ShouldStartWith("`crosses_above(close * ema(20), vwap * rsi(14))` reads `vwap` one closed bar back");
+        warning.Message.ShouldStartWith("`rising(close * ema(20) + vwap * rsi(14), 25)` reads `vwap` up to 25 closed bars back");
     }
 
     [Fact]
-    public void The_deepest_read_of_the_call_is_the_one_named_and_the_latest_guard_is_the_one_asked_for()
+    public void The_deepest_read_of_the_call_is_the_one_named()
     {
-        var warning = Warned("rising(vwap + today_open[3], 2)", Timeframe.M15).ShouldHaveSingleItem();
+        var warning = Warned("rising(vwap + today_open[3], 25)", Timeframe.M15).ShouldHaveSingleItem();
 
-        // vwap is read 2 bars back, today_open 5: the guard must clear the 5 (6 bars of 15 minutes after the open: 10:45)
-        warning.Message.ShouldStartWith("`rising(vwap + today_open[3], 2)` reads `vwap`, `today_open` up to 5 closed bars back");
-        GuardLiteral().Match(warning.Message).Groups[1].Value.ShouldBe("10:45");
+        // vwap is read 25 bars back, today_open 28
+        warning.Message.ShouldStartWith("`rising(vwap + today_open[3], 25)` reads `vwap`, `today_open` up to 28 closed bars back");
     }
 
     [Fact]
     public void A_lagged_read_in_any_position_of_the_condition_is_found()
     {
-        Warned("not crosses_above(close, vwap)", Timeframe.M15).Length.ShouldBe(1);
-        Warned("rsi(14) > 55 and (ema(20) > ema(50) or between(close, vwap[1], 100))", Timeframe.M15).Length.ShouldBe(1);
-        Warned("min(vwap[1], close) > abs(today_open[2])", Timeframe.M15).Length.ShouldBe(2);
-        Warned("crosses_above(close, vwap) and crosses_below(close, vwap)", Timeframe.M15).Length.ShouldBe(2);
+        Warned("not rising(vwap, 25)", Timeframe.M15).Length.ShouldBe(1);
+        Warned("rsi(14) > 55 and (ema(20) > ema(50) or between(close, vwap[25], 100))", Timeframe.M15).Length.ShouldBe(1);
+        Warned("min(vwap[25], close) > abs(today_open[26])", Timeframe.M15).Length.ShouldBe(2);
+        Warned("rising(vwap, 25) and falling(vwap, 26)", Timeframe.M15).Length.ShouldBe(2);
     }
 
     [Fact]
     public void A_lagged_call_that_could_not_be_bound_still_gets_it_so_that_fixing_the_other_fault_does_not_bring_it_in()
     {
-        var result = Compiling.Of("crosses_above(close + true, vwap)");
+        var result = Compiling.Of("rising(vwap + true, 25)");
 
         result.IsSuccess.ShouldBeFalse();
         result.Problems.Select(p => p.Code).ShouldBe([LintCodes.LagAcrossSession, LintCodes.TypeMismatch]);
-        Compiling.Of("crosses_above(close, vwap)").Problems.Select(p => p.Code).ShouldBe([LintCodes.LagAcrossSession]);
+        Compiling.Of("rising(vwap, 25)").Problems.Select(p => p.Code).ShouldBe([LintCodes.LagAcrossSession]);
     }
 
     [Fact]
     public void A_count_given_by_a_parameter_is_read_as_the_number_it_is()
     {
-        var result = Compiling.Of("rising(vwap, n)", Timeframe.M5, Compiling.Params(("n", 3)));
+        var result = Compiling.Of("rising(vwap, n)", Timeframe.M5, Compiling.Params(("n", 75)));
 
         var warning = result.Problems.ShouldHaveSingleItem();
         warning.Code.ShouldBe(LintCodes.LagAcrossSession);
-        warning.Message.ShouldStartWith("`rising(vwap, n)` reads `vwap` up to 3 closed bars back");
-        GuardLiteral().Match(warning.Message).Groups[1].Value.ShouldBe("09:35");
+        warning.Message.ShouldStartWith("`rising(vwap, n)` reads `vwap` up to 75 closed bars back, but a session holds at most 75 bars of 5m");
+        Warned("rising(vwap, n)", Timeframe.M5, Compiling.Params(("n", 74))).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_condition_that_reads_less_far_back_has_no_warning_and_the_same_plan_as_with_a_time_check()
+    {
+        var bare = Compiling.Condition("rising(vwap, 24)");
+        var checkedOne = Compiling.Condition("rising(vwap, 24) and time >= \"09:45\"");
+
+        bare.Warnings.ShouldBeEmpty();
+        checkedOne.Warnings.ShouldBeEmpty();
+        checkedOne.Features.ShouldBe(bare.Features);
+        checkedOne.HistoryDepth.ShouldBe(bare.HistoryDepth);
     }
 }

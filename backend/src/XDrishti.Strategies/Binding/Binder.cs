@@ -93,7 +93,8 @@ internal sealed partial class Binder(BindingScope scope)
 
     /// <summary>
     /// True when the node has the expected type. A node that could not be bound is not true (and says nothing more: its problem is reported); a node of another type is reported as a type mismatch, with
-    /// <paramref name="beginning"/> (which ends before the quoted text) and the name of the type it has.
+    /// <paramref name="beginning"/> (which ends before the quoted text), the name of the type it has and what to do instead. Where a true/false value is needed (<c>and</c>, <c>or</c>, <c>not</c>) the advice is the one of a
+    /// whole condition that is a number (<see cref="ConditionHint"/>): <c>rsi(14) and …</c> gets "Compare it with something".
     /// </summary>
     private bool Expect(IBoundExpression node, BoundType expected, string beginning)
     {
@@ -104,7 +105,10 @@ internal sealed partial class Binder(BindingScope scope)
 
         if (node.Type != BoundType.Invalid)
         {
-            scope.Error(LintCodes.TypeMismatch, beginning + scope.Quoted(node.Span) + " is " + Describe.Type(node.Type) + "." + Describe.Hint(node.Type), node.Span);
+            scope.Error(
+                LintCodes.TypeMismatch,
+                beginning + scope.Quoted(node.Span) + " is " + Describe.Type(node.Type) + "." + (expected == BoundType.Bool ? ConditionHint(node) : Describe.Hint(node.Type)),
+                node.Span);
         }
 
         return false;

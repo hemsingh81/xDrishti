@@ -5,9 +5,10 @@ namespace XDrishti.Indicators;
 /// <summary>
 /// One value of the session context: <c>prev_day</c> open/high/low/close/volume (the previous session <b>that had bars</b>, not "yesterday": weekends and holidays are skipped by the data, not guessed),
 /// <c>today</c> open/high/low so far, and <c>gap_pct = (today.open − prev_day.close)/prev_day.close·100</c>. It resets per India trading date: the first bar of a new date makes the finished date the
-/// previous session. <c>today.*</c> are ready from the first bar, <c>prev_day.*</c> and the gap from the first bar of the second session.
+/// previous session. <c>today.*</c> are ready from the first bar, <c>prev_day.*</c> and the gap from the first bar of the second session. When the frame has moved to a new date and this instance has not been fed a
+/// bar of it yet (a coarser timeframe), none of them is ready (ADR 0035).
 /// </summary>
-public sealed class SessionContext : IIndicator
+public sealed class SessionContext : IIndicator, IRestartingIndicator
 {
     private readonly SessionField _field;
 
@@ -18,6 +19,8 @@ public sealed class SessionContext : IIndicator
     private bool _started;
 
     private bool _hasPrevious;
+
+    private bool _pending;
 
     private double _todayOpen;
 
@@ -51,12 +54,13 @@ public sealed class SessionContext : IIndicator
     public double Value => IsReady ? Read() : double.NaN;
 
     public bool IsReady =>
-        _started && (_field is SessionField.TodayOpen or SessionField.TodayHigh or SessionField.TodayLow || (_hasPrevious && (_field != SessionField.GapPct || _prevClose != 0)));
+        !_pending && _started && (_field is SessionField.TodayOpen or SessionField.TodayHigh or SessionField.TodayLow || (_hasPrevious && (_field != SessionField.GapPct || _prevClose != 0)));
 
     public int WarmUp => _warmUp;
 
     public void Update(in Bar bar)
     {
+        _pending = false;
         var day = IndiaDays.DayOf(bar.EpochSeconds);
         if (!_started || day != _day)
         {
@@ -93,7 +97,10 @@ public sealed class SessionContext : IIndicator
         _hasPrevious = false;
         _todayOpen = _todayHigh = _todayLow = _todayClose = _todayVolume = 0;
         _prevOpen = _prevHigh = _prevLow = _prevClose = _prevVolume = 0;
+        _pending = false;
     }
+
+    void IRestartingIndicator.MarkPending() => _pending = true;
 
     private double Read() => _field switch
     {

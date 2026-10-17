@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime;
+using XDrishti.Domain.Market.Bars;
 using XDrishti.Indicators;
 using XDrishti.Strategies.Compilation;
 using XDrishti.Strategies.Tests.Support;
@@ -17,6 +18,12 @@ namespace XDrishti.Strategies.Tests.Benchmarks;
 /// with no warm-up: reported, not asserted; it is dominated by the JIT compiling about a thousand methods of the parser, the binder and the expression compiler (about 40 ms on an Apple M4 Pro, JIT only), and no setting
 /// of the runtime brings it under 20 ms. The delegates are built when a condition is first bound to a frame, so "compile" below is <c>Compile</c> of the ten texts plus <c>Merge</c>, the frame, and the ten binds; the frame is not part of the figures.
 /// Each report ends with <c>metric name value</c> lines that the script reads.
+/// <para>
+/// <b>Runs.</b> <c>Evaluate_runs_by_count</c> (ADR 0034, Amendment 18) measures what <c>rising(x, n)</c> and <c>falling(x, n)</c> cost by count: a loop of n steps with no early exit, about 1.75 ns per value read, whatever the data.
+/// It is explicit like the others and not part of <c>check.sh</c>: <c>dotnet test --project tests/XDrishti.Strategies.Tests -c Release -- --explicit only --filter-method "*Evaluate_runs_by_count*"</c>. It asserts only absolute caps with
+/// a margin of four, and a loose linearity check; the shape of the loop itself is pinned without a clock in <c>RunCostTests</c>. The figures for small counts are not trusted (they swing about two to one with the state of the
+/// process), so the benchmark starts at 10 and discards its first pass.
+/// </para>
 /// </summary>
 [Collection(ExclusiveRun.Name)]
 public sealed class EvaluationBenchmarks
@@ -174,6 +181,130 @@ public sealed class EvaluationBenchmarks
                 "(checksum " + sum + ")",
             ]);
         (stepAndEvaluate - stepOnly).ShouldBeLessThanOrEqualTo(300, "target: 0.3 µs per evaluation of a 10-condition set, measured while the frame moves");
+    }
+
+    // ---- runs ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>Eight sessions (3,000 bars) of a close that rises by a cent a minute.</summary>
+    private static Bar[] Rising(int sessions)
+    {
+        var bars = new List<Bar>(sessions * 375);
+        var date = Clock.Mon;
+        var price = 100.0;
+        for (var s = 0; s < sessions; s++)
+        {
+            while (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
+            {
+                date = date.AddDays(1);
+            }
+
+            for (var m = 0; m < 375; m++)
+            {
+                price += 0.01;
+                bars.Add(Clock.Close(date, Clock.Open + m, price));
+            }
+
+            date = date.AddDays(1);
+        }
+
+        return [.. bars];
+    }
+
+    /// <summary>The condition bound to a 1-minute frame of full history that has run over the bars and then stands still, the way the explicit benchmarks of this class measure a throughput.</summary>
+    private static (BoundCondition Bound, FeatureFrame Frame) StandingFrame(string source, IReadOnlyList<Bar> bars)
+    {
+        var condition = Compiling.Condition(source, Timeframe.M1);
+        var frame = Frames.Of(new FrameOptions { HistoryDepth = FrameOptions.MaxHistoryDepth }, [.. condition.Features]);
+        var bound = condition.Bind(frame);
+        foreach (var bar in bars)
+        {
+            frame.Step(bar);
+        }
+
+        return (bound, frame);
+    }
+
+    /// <summary>The nanoseconds of one <c>Evaluate</c>, best of <paramref name="repeats"/> runs of <paramref name="sets"/> evaluations on the frame as it stands; the checksum keeps the loop from being removed.</summary>
+    private static double NanosecondsPerEvaluate((BoundCondition Bound, FeatureFrame Frame) standing, int sets, int repeats, ref long checksum)
+    {
+        var best = double.MaxValue;
+        for (var repeat = 0; repeat < repeats; repeat++)
+        {
+            var watch = Stopwatch.StartNew();
+            for (var s = 0; s < sets; s++)
+            {
+                checksum += standing.Bound.Evaluate(standing.Frame) ? 1 : 0;
+            }
+
+            best = Math.Min(best, watch.Elapsed.TotalMilliseconds * 1e6 / sets);
+        }
+
+        return best;
+    }
+
+    [Fact(Explicit = true)]
+    public void Evaluate_runs_by_count()
+    {
+        // A run is a loop of exactly n steps, one read of the operand per feature in it per step, with no early exit (runs are atomic over NaN): the work is n x reads whatever the data, about 1.75 ns per read. and/or skip
+        // the right side when the left one decides, so a bar can cost less than that bound; the two cases at the end show it and are reported, not asserted. The throughput is measured on a frame that stands still, which
+        // equals the figure while the frame moves for n >= 50. The first pass is discarded and the process evaluates for about a second first: the figures of a fresh process are slow, and the smallest counts swing
+        // about two to one with its state, so none under 10 is measured (the difference of a step and a step with an evaluation cannot resolve a run of 1 to 3 values at all).
+        (string Source, int Count, int Reads)[] cells =
+        [
+            ("rising(close, 10)", 10, 1), ("rising(close, 50)", 50, 1), ("rising(close, 100)", 100, 1), ("rising(close, 255)", 255, 1), ("rising(rsi(14) + ema(20), 255)", 255, 2),
+        ];
+        (string Source, string Meaning)[] shortCircuits =
+        [
+            ("close > 1000000 and rising(close, 255)", "the left side is false: the run is skipped"),
+            ("close > 0 and rising(close, 255)", "the left side is true: the run is evaluated"),
+        ];
+        (string Name, Bar[] Bars)[] series = [("rise", Rising(8)), ("noise", Series.Sessions(7, 8))];
+        long checksum = 0;
+
+        var warming = StandingFrame("rising(close, 255)", series[0].Bars);
+        var warmUp = Stopwatch.StartNew();
+        while (warmUp.ElapsedMilliseconds < 1_000)
+        {
+            _ = NanosecondsPerEvaluate(warming, 20_000, 1, ref checksum);
+        }
+
+        var measured = new Dictionary<(string Series, string Source), double>();
+        var report = new List<string>();
+        for (var pass = 0; pass < 2; pass++)
+        {
+            var final = pass == 1;
+            foreach (var (name, bars) in series)
+            {
+                foreach (var (source, count, reads) in cells)
+                {
+                    var sets = (int)(77_000_000L / (count * reads));
+                    var ns = NanosecondsPerEvaluate(StandingFrame(source, bars), sets, final ? Repeats : 1, ref checksum);
+                    if (final)
+                    {
+                        measured[(name, source)] = ns;
+                        report.Add($"{name,-6} {source,-34} {ns,8:F1} ns per Evaluate   {ns / count,6:F2} ns per step   {ns / (count * reads),5:F2} ns per read");
+                    }
+                }
+
+                if (final)
+                {
+                    foreach (var (source, meaning) in shortCircuits)
+                    {
+                        report.Add($"{name,-6} {source,-45} {NanosecondsPerEvaluate(StandingFrame(source, bars), 1_000_000, Repeats, ref checksum),8:F1} ns per Evaluate   ({meaning}; reported, not asserted)");
+                    }
+                }
+            }
+        }
+
+        report.Add("(checksum " + checksum + ")");
+        Report("Runs: rising(x, n) by count, best of " + Repeats + " on a frame that stands still (the first pass is discarded)", report);
+        foreach (var (name, _) in series)
+        {
+            measured[(name, "rising(close, 255)")].ShouldBeLessThanOrEqualTo(2_000, name + ": target 450 ns for n = 255 on one feature, asserted with a margin of four");
+            measured[(name, "rising(rsi(14) + ema(20), 255)")].ShouldBeLessThanOrEqualTo(4_000, name + ": target 900 ns for n = 255 on two features, asserted with a margin of four");
+            var growth = measured[(name, "rising(close, 255)")] / measured[(name, "rising(close, 50)")];
+            growth.ShouldBeInRange(3, 8, name + ": the cost is linear in n (255 / 50 = 5.1); a loop that is quadratic would be 25 times");
+        }
     }
 
     [Fact(Explicit = true)]

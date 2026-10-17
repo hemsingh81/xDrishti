@@ -75,10 +75,11 @@ public static class CompilerWarmup
         // strategy parameters
         new("rsi(rsi_len) > level and ema(fast) > ema(slow) and rising(close, steps)"),
 
-        // the warnings: a condition that is the same on every bar, and a timeframe that is the strategy's own
+        // the warnings: a condition that is the same on every bar, a timeframe that is the strategy's own, and a read of a per-session feature from further back than a session holds (75 bars of 5m are 375 minutes)
         new("1 < 2"),
         new("close > open and true"),
         new("tf(\"5m\").close > 0"),
+        new("rising(vwap, 75)"),
 
         // a daily strategy
         new("close > sma(200) and rsi(14) < 70", Timeframe.D1),

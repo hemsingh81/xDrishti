@@ -163,6 +163,56 @@ public sealed class DeterminismAndResetTests
     }
 
     [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void A_frame_that_was_reset_while_its_coarser_lanes_were_pending_equals_a_new_one(int seed)
+    {
+        // ADR 0035: after the first minute of a new date the 5m to 1h lanes are pending (their restarting features are not ready until the lane closes its first bar of the date); the state that says so (the flag in the
+        // indicators, the date of each lane, the date of the frame) must all be gone after a Reset
+        var specs = new[] { Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.H1 }
+            .SelectMany(t => TestSpecs.Variants(t).Where(s => SessionBars.RestartingNames.Contains(s.Name) || s.Name is "ema" or "close"))
+            .ToList();
+        var bars = SeriesGenerator.Random(seed + 40, 800, 1_200, specialSessions: true);
+        var used = FeatureFrame.Create(specs).Value;
+        var stop = 0;
+        for (var i = 1; i < bars.Count && stop == 0; i++)
+        {
+            if (SessionClock.DateOf(bars[i].EpochSeconds) != SessionClock.DateOf(bars[i - 1].EpochSeconds) && i > 400)
+            {
+                stop = i + 2;
+            }
+        }
+
+        stop.ShouldBeGreaterThan(0);
+        for (var i = 0; i < stop; i++)
+        {
+            used.Step(bars[i]);
+        }
+
+        used.IsReady(used.HandleOf(new FeatureSpec("today_open", Timeframe.H1))).ShouldBeFalse("the 1h lane is pending two minutes into the date");
+        used.Reset();
+        var fresh = FeatureFrame.Create(specs).Value;
+
+        foreach (var bar in bars)
+        {
+            used.Step(bar);
+            fresh.Step(bar);
+            for (var h = 0; h < specs.Count; h++)
+            {
+                for (var lag = 0; lag < 8; lag += 3)
+                {
+                    if (!Tolerance.Identical(used.At(h, lag), fresh.At(h, lag)))
+                    {
+                        Assert.Fail($"seed {seed}, {TestSpecs.Describe(specs[h])}, lag {lag} at {bar.Start:u}: the reset frame has {used.At(h, lag):R}, a new one {fresh.At(h, lag):R}");
+                    }
+                }
+            }
+        }
+    }
+
+    [Theory]
     [InlineData(CalendarKnowledge.None)]
     [InlineData(CalendarKnowledge.Full)]
     public void A_frame_with_weekly_and_monthly_lanes_that_was_reset_equals_a_new_one(CalendarKnowledge kind)

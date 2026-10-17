@@ -12,9 +12,11 @@ namespace XDrishti.Strategies.Tests.Support.Oracle;
 /// strategy parameters, the dotted spellings (<c>prev_day.high</c>, <c>today.open</c>, <c>index.trend</c>, <c>index.adx</c>), defaults left out (<c>rsi()</c>), <c>source=</c>, <c>time</c> against a text (intraday
 /// evaluation only), <c>day_of_week</c> against <c>MON … SUN</c>, <c>regime()</c> by name or by code, and the calendar and context features (when allowed). A lagged call (<c>crosses_*</c>, <c>rising</c>, <c>falling</c>) only
 /// ever has leaves on one clock — the same bar timeframe, or only features of the date (the calendar and the context: their previous value is the previous <i>date</i>, so they are never mixed with a bar feature,
-/// 1m included) —, so every condition is one the language accepts; <see cref="Parameters"/> must be given to the compiler with the text.
+/// 1m included) —, so every condition is one the language accepts; <see cref="Parameters"/> must be given to the compiler with the text. With <c>sessionBound</c> every feature leaf is one of the twelve per-session
+/// features (<c>vwap</c>, single and multi-bar <c>or_high</c> and <c>or_low</c>, <c>today.*</c>, <c>prev_day.*</c>, <c>gap_pct</c>) on any of the six intraday timeframes, now and then on 1D where the catalog runs them, with
+/// subscripts, crossings and runs, so that the rule of ADR 0035 is exercised at every date change; the default draws are not touched (the seeds of the main corpus give the same conditions as before).
 /// </summary>
-internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowContext, bool allowExpiryDays)
+internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowContext, bool allowExpiryDays, bool sessionBound = false)
 {
     /// <summary>The strategy parameters the conditions use.</summary>
     public static readonly IReadOnlyDictionary<string, double> Parameters = new Dictionary<string, double> { ["fast_len"] = 9, ["slow_len"] = 21, ["level"] = 55 };
@@ -42,6 +44,14 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
     [
         "sma", "ema", "rsi", "atr", "highest", "lowest", "rel_volume", "or_high", "or_low", "adx", "plus_di", "minus_di", "macd_line", "macd_signal", "macd_hist",
         "bb_upper", "bb_middle", "bb_lower", "bb_width", "supertrend", "supertrend_dir", "roc", "nr", "pivot_high", "pivot_low", "pivot_high_age", "pivot_low_age",
+    ];
+
+    private static readonly Timeframe[] IntradayFrames = [Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1];
+
+    private static readonly (string Dotted, string Flat)[] SessionValues =
+    [
+        ("prev_day.open", "prev_day_open"), ("prev_day.high", "prev_day_high"), ("prev_day.low", "prev_day_low"), ("prev_day.close", "prev_day_close"), ("prev_day.volume", "prev_day_volume"),
+        ("today.open", "today_open"), ("today.high", "today_high"), ("today.low", "today_low"), ("gap_pct", "gap_pct"),
     ];
 
     private static readonly string[] TimeTexts = ["09:15", "09:16", "09:30", "09:45", "10:00", "11:30", "12:00", "14:30", "15:00", "15:29", "15:30"];
@@ -78,6 +88,11 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
 
     private Node TruthLeaf()
     {
+        if (sessionBound)
+        {
+            return SessionTruthLeaf();
+        }
+
         var roll = _random.Next(100);
         if (roll < 28)
         {
@@ -278,12 +293,87 @@ internal sealed class ModelGenerator(int seed, Timeframe evaluation, bool allowC
     private Timeframe LaggedFrame() => Chance(60) ? evaluation : Pick(AllFrames);
 
     /// <summary>The clock of a lagged call: a bar timeframe, now and then the date (a lagged call over the calendar and the context only, which the language accepts on any evaluation timeframe).</summary>
-    private Pin LaggedPin() => Chance(14) ? new Pin(Timeframe.M1, true) : new Pin(LaggedFrame(), false);
+    private Pin LaggedPin() => sessionBound ? new Pin(SessionFrame(), false) : Chance(14) ? new Pin(Timeframe.M1, true) : new Pin(LaggedFrame(), false);
+
+    // ---- per-session features (the session-bound corpus) ----------------------------------------------------------------------------------------------------------------------------------------------
+
+    /// <summary>The timeframe of a per-session leaf: the evaluation timeframe more often than not, otherwise any intraday one, and now and then 1D (where nothing restarts: a control that the rule leaves it alone).</summary>
+    private Timeframe SessionFrame() => Chance(55) && evaluation.Minutes() > 0 ? evaluation : Chance(90) ? Pick(IntradayFrames) : Timeframe.D1;
+
+    private Node SessionTruthLeaf()
+    {
+        var roll = _random.Next(100);
+        if (roll < 28)
+        {
+            return Compare();
+        }
+
+        if (roll < 55)
+        {
+            var pin = LaggedPin();
+            return new Crosses(Chance(50), Number(1, pin), Chance(30) ? Level() : Number(1, pin));
+        }
+
+        if (roll < 78)
+        {
+            return new Streak(Chance(50), Number(1, LaggedPin()), Chance(85) ? _random.Next(1, 4) : _random.Next(4, 8));
+        }
+
+        if (roll < 90)
+        {
+            return new Between(Number(1, null), Chance(30) ? Level() : Number(1, null), Chance(30) ? Level() : Number(1, null));
+        }
+
+        return roll < 97 ? TimeCompare() ?? (Node)Compare() : new BoolLit(Chance(50));
+    }
+
+    /// <summary>A leaf of one of the twelve per-session features on <paramref name="frame"/> (on 1D the nine that the catalog runs there), with a subscript now and then.</summary>
+    private Leaf SessionLeaf(Timeframe frame)
+    {
+        var feature = frame != Timeframe.D1 && Chance(25) ? OpeningRange(frame) : null;
+        if (feature is null && frame != Timeframe.D1 && Chance(22))
+        {
+            var call = Chance(30);
+            var text = call ? "vwap()" : "vwap";
+            feature = new Feature(text, text, !call, new FeatureSpec("vwap"));
+        }
+
+        if (feature is null)
+        {
+            var (dotted, flat) = Pick(SessionValues);
+            feature = new Feature(Chance(60) ? dotted : flat, flat, true, new FeatureSpec(flat));
+        }
+
+        return Finish(feature, frame);
+    }
+
+    /// <summary><c>or_high(m)</c> or <c>or_low(m)</c> with <c>m</c> one bar of the timeframe or several (a whole number of bars), or null when no valid choice was found.</summary>
+    private Feature? OpeningRange(Timeframe frame)
+    {
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            if (IndicatorCatalog.TryGet(Chance(50) ? "or_high" : "or_low", out var info))
+            {
+                var feature = BuildIndicator(info, frame);
+                if (ValidSpecs.GetOrAdd(feature.Spec with { Timeframe = frame }, spec => FeatureFrame.Create([spec], new FrameOptions()).IsSuccess))
+                {
+                    return feature;
+                }
+            }
+        }
+
+        return null;
+    }
 
     // ---- features -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     private Leaf LeafOf(Pin? pin)
     {
+        if (sessionBound)
+        {
+            return SessionLeaf(pin?.Frame ?? SessionFrame());
+        }
+
         var roll = _random.Next(100);
         if (pin is { Date: true } || (pin is null && roll < 14))
         {

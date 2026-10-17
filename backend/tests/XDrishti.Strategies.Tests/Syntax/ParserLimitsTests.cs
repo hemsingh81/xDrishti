@@ -1,4 +1,6 @@
 using System.Runtime.CompilerServices;
+using XDrishti.Indicators;
+using XDrishti.Strategies.Compilation;
 using XDrishti.Strategies.Syntax;
 using XDrishti.Strategies.Tests.Support;
 
@@ -199,6 +201,83 @@ public sealed class ParserLimitsTests
 
         ConditionParser.Parse(sixtyThree).IsSuccess.ShouldBeTrue();
         ConditionParser.Parse(sixtyFour).Problems.ShouldHaveSingleItem().Code.ShouldBe(SyntaxCodes.TooDeep);
+    }
+
+    [Fact]
+    public void The_message_for_a_tree_that_is_too_deep_says_how_many_conditions_one_condition_can_hold()
+    {
+        var problem = ConditionParser.Parse(Chain(65)).Problems.ShouldHaveSingleItem();
+
+        problem.Code.ShouldBe(SyntaxCodes.TooDeep);
+        problem.Message.ShouldContain("more than 64 levels");
+        problem.Message.ShouldContain("about 60 conditions joined by `and`");
+        problem.Message.ShouldContain("Split it into several conditions.");
+    }
+
+    [Fact]
+    public void A_dense_sum_of_1990_ones_is_under_the_length_limit_and_is_still_refused_for_its_depth()
+    {
+        // 3,985 characters, a left-deep tree about 1,990 levels deep. The length limit alone would let it through, and the printer, the delegate builder and the plan recurse once per level (about half a kilobyte each, and
+        // they have no stack guard of their own): it overflowed a 512 KB stack, and the compiler could not even check it on a 1.4 MB one. The tree check is why it is refused here, with a problem and no tree.
+        var source = "close>" + string.Join('+', Enumerable.Repeat("1", 1990));
+
+        var parsed = ConditionParser.Parse(source);
+        var compiled = Compiling.Of(source);
+
+        source.Length.ShouldBe(3985);
+        var problem = parsed.Problems.ShouldHaveSingleItem();
+        problem.Code.ShouldBe(SyntaxCodes.TooDeep);
+        problem.Span.ShouldBe(new SourceSpan(0, source.Length, 1, 1));
+        parsed.Tree.ShouldBeNull();
+        compiled.Problems.ShouldHaveSingleItem().ShouldBe(problem);
+        compiled.Condition.ShouldBeNull();
+    }
+
+    [Fact]
+    public void The_deepest_accepted_chain_is_printed_merged_framed_bound_and_evaluated_on_a_thread_with_a_256_kilobyte_stack()
+    {
+        // The deepest chain the tree check lets through: the conditions that fit one under the limit. Printing, merging, creating the frame, building the delegate (BindAll) and evaluating walk the tree once per level; the
+        // measured need is under 64 KB in Release and in Debug, so 256 KB is four times the room. Raising the limit without guarding those walks makes this test run out of stack, which ends the test host.
+        var conditions = ConditionParser.MaxNesting - 1;
+        var source = string.Join(" and ", Enumerable.Repeat("rsi(14) > 55", conditions));
+        var tree = ConditionParser.Parse(source).Tree.ShouldNotBeNull();
+        var chain = Compiling.Condition(source);
+        var single = Compiling.Condition("rsi(14) > 55");
+        string? printed = null;
+        Truth[]? truths = null;
+        Exception? failure = null;
+
+        var thread = new Thread(
+            () =>
+            {
+                try
+                {
+                    printed = ExpressionPrinter.Print(tree);
+                    var plan = ConditionSet.Merge([chain, single]);
+                    var frame = FeatureFrame.Create(plan.Features, new FrameOptions { HistoryDepth = plan.HistoryDepth }).Value;
+                    var bound = plan.BindAll(frame);
+                    foreach (var bar in Series.Sessions(5, 2))
+                    {
+                        frame.Step(bar);
+                    }
+
+                    truths = [.. bound.Select(b => b.EvaluateTruth(frame))];
+                }
+                catch (Exception e)
+                {
+                    failure = e;
+                }
+            },
+            256 * 1024);
+
+        thread.Start();
+        thread.Join();
+
+        failure.ShouldBeNull();
+        printed.ShouldBe(source);
+        truths.ShouldNotBeNull().Length.ShouldBe(2);
+        truths[0].ShouldBe(truths[1], "63 copies of a condition joined by and are that condition");
+        truths[0].ShouldNotBe(Truth.Unknown, "the frame has run long enough for rsi(14) to be ready");
     }
 
     [Fact]

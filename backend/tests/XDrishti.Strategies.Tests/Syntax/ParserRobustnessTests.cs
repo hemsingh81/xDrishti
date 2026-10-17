@@ -109,7 +109,7 @@ public sealed class ParserRobustnessTests
     }
 
     [Fact]
-    public void A_text_made_of_nothing_but_faults_ends_with_all_of_them_reported_in_order()
+    public void A_text_made_of_nothing_but_faults_gets_problems_that_obey_the_contract()
     {
         foreach (var unit in new[] { "$ ", "a b ", "( ", ") ", "f(, ", "x[ ", "1e400 ", "\" ", "tf( ", "a < b < ", ", ", ". ", "= ", "and ", "not ", "- " })
         {

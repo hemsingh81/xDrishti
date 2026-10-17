@@ -5,7 +5,7 @@ namespace XDrishti.Strategies.Lint;
 
 /// <summary>
 /// The look-ahead and timeframe rules over a bound tree (spec P3-02, <i>Lint rules</i>), and the facts the plan is made of. It runs on a tree that has binder errors too (the parts that could not be bound are
-/// skipped), so a condition with several faults gets all of them at once. The rules: <see cref="LagRules"/> (the history a condition needs, <c>lag_too_deep</c>, <c>mixed_timeframes_in_lag</c> and the warning <c>lag_across_session</c>),
+/// skipped), so a condition with several faults gets all of them at once. The rules: <see cref="LagRules"/> (the history a condition needs, <c>lag_too_deep</c>, <c>mixed_timeframes_in_lag</c> and the warning <c>lag_across_session</c>: a read of a per-session feature from further back than a session holds),
 /// <see cref="TimeRule"/> (<c>time_on_daily</c>), <see cref="ConstantRule"/> (<c>constant_condition</c>) and <see cref="Requirements"/> (<c>needs_context</c>, <c>needs_expiry_days</c>, reported only for a
 /// condition without errors). The rules that need the names
 /// or the text (<c>unknown_name</c>, <c>bad_arguments</c>, <c>unsupported_timeframe</c>, <c>negative_or_zero_lag</c>, <c>lag_on_non_feature</c>, <c>bad_time_literal</c>, <c>type_mismatch</c>,

@@ -214,6 +214,37 @@ internal static class LintMessages
         [
             "A subscript counts closed bars back and must be a whole number from 1 up; `close[0]` is just `close`.",
         ],
+        ["negative_or_zero_lag: a subscript of minus zero"] =
+        [
+            "A subscript counts closed bars back and must be a whole number from 1 up; `close[-0]` is just `close`.",
+        ],
+        ["negative_or_zero_lag: a subscript of two zeros"] =
+        [
+            "A subscript counts closed bars back and must be a whole number from 1 up; `close[00]` is just `close`.",
+        ],
+        ["negative_or_zero_lag: a subscript of zero on a dotted feature"] =
+        [
+            "A subscript counts closed bars back and must be a whole number from 1 up; `prev_day.high[0]` is just `prev_day.high`.",
+        ],
+        ["negative_or_zero_lag: a subscript of zero on a qualified feature"] =
+        [
+            "A subscript counts closed bars back and must be a whole number from 1 up; `tf(\"1h\").close[0]` is just `tf(\"1h\").close`.",
+        ],
+        ["negative_or_zero_lag: a subscript of zero on an unknown name has no suggestion"] =
+        [
+            "`closee` is not a parameter, a function, a constant or a feature. Did you mean `close`?",
+            "A subscript counts closed bars back and must be a whole number from 1 up; `closee[0]` is just `closee`.",
+        ],
+        ["negative_or_zero_lag: a subscript of zero on a feature of a timeframe that does not exist"] =
+        [
+            "A subscript counts closed bars back and must be a whole number from 1 up; `tf(\"2h\").close[0]` is just `tf(\"2h\").close`.",
+            "`\"2h\"` is not a timeframe: tf(\"…\") takes 1m, 5m, 10m, 15m, 30m, 1h, 1D, 1W or 1M (the case matters: 1m is a minute, 1M a month). Did you mean `\"1h\"`?",
+        ],
+        ["negative_or_zero_lag: a subscript of zero on a name that is not a feature"] =
+        [
+            "A subscript reads a feature some closed bars ago, but `rsi_len` is a strategy parameter, not a feature. Use crosses_above, crosses_below, rising or falling to compare with an earlier value, or write the feature twice.",
+            "A subscript counts closed bars back and must be a whole number from 1 up; `rsi_len[0]` is just `rsi_len`.",
+        ],
         ["negative_or_zero_lag: a negative subscript"] =
         [
             "A subscript counts closed bars back and must be a whole number from 1 up; `-1` would read the future.",
@@ -253,12 +284,11 @@ internal static class LintMessages
         ["lag_too_deep: the extra lag of a crossing"] =
         [
             "`crosses_above(close[255], vwap)` reads values up to 256 closed bars back (the lags add up), so it needs a history of 257; the frame keeps at most 256 (lags 0 to 255).",
-            "`crosses_above(close[255], vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
         ],
         ["lag_too_deep: the extra lag of a downward crossing"] =
         [
             "`crosses_below(close, vwap[255])` reads values up to 256 closed bars back (the lags add up), so it needs a history of 257; the frame keeps at most 256 (lags 0 to 255).",
-            "`crosses_below(close, vwap[255])` reads `vwap` up to 256 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. No bar of a session is far enough from its open for a read that far back; read fewer bars back.",
+            "`crosses_below(close, vwap[255])` reads `vwap` up to 256 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
         ],
         ["lag_too_deep: two places"] =
         [
@@ -268,7 +298,6 @@ internal static class LintMessages
         ["lag_too_deep: a type error in a side does not hide the depth of a crossing"] =
         [
             "`crosses_above(close[255] + true, vwap)` reads values up to 256 closed bars back (the lags add up), so it needs a history of 257; the frame keeps at most 256 (lags 0 to 255).",
-            "`crosses_above(close[255] + true, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
             "The right side of `+` needs a number, but `true` is a true/false value.",
         ],
         ["lag_too_deep: a type error in the operand does not hide the depth of rising"] =
@@ -326,19 +355,19 @@ internal static class LintMessages
         ],
         ["mixed_timeframes_in_lag: a product of a bar feature and the context in rising on a 1m strategy"] =
         [
-            "`rising(close * vix, 2)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe.",
+            "`rising(close * vix, 2)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: a calendar feature against a bar feature in falling on a 1m strategy"] =
         [
-            "`falling(close - day_of_week, 1)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe.",
+            "`falling(close - day_of_week, 1)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: a 1m bar feature written with tf against the context on a 15m strategy"] =
         [
-            "`crosses_above(tf(\"1m\").close, vix)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe.",
+            "`crosses_above(tf(\"1m\").close, vix)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: a 1m bar feature written with tf against the context on a daily strategy"] =
         [
-            "`crosses_above(tf(\"1m\").close, vix)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe.",
+            "`crosses_above(tf(\"1m\").close, vix)` mixes the timeframes 1m and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: the context against a bar feature on a daily strategy"] =
         [
@@ -346,11 +375,10 @@ internal static class LintMessages
         ],
         ["mixed_timeframes_in_lag: two bar timeframes and the context"] =
         [
-            "`rising(close + tf(\"1h\").close - vix, 2)` mixes the timeframes 15m, 1h and the date (calendar and context features): the previous value of each side would be a different moment. Compare on one timeframe.",
+            "`rising(close + tf(\"1h\").close - vix, 2)` mixes the timeframes 15m, 1h and the date (calendar and context features): the previous value of each side would be a different moment. A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand.",
         ],
         ["mixed_timeframes_in_lag: only the second crossing mixes"] =
         [
-            "`crosses_above(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
             "`crosses_above(close, tf(\"1W\").close)` mixes the timeframes 15m and 1W: the previous value of each side would be a different moment. Compare on one timeframe, or say what you mean: `close > tf(\"1W\").close and close[1] <= tf(\"1W\").close`.",
         ],
         ["mixed_timeframes_in_lag: a first side that already has a subscript cannot be lagged by hand"] =
@@ -381,87 +409,68 @@ internal static class LintMessages
             "`rising(close + true + tf(\"1h\").close, 2)` mixes the timeframes 15m and 1h: the previous value of each side would be a different moment. Compare on one timeframe.",
             "The right side of `+` needs a number, but `true` is a true/false value.",
         ],
-        ["lag_across_session: the crossing of the close and the vwap"] =
+        ["lag_across_session: the first subscript that a 5m session cannot hold"] =
         [
-            "`crosses_above(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
+            "`vwap[75]` reads `vwap` up to 75 closed bars back, but a session holds at most 75 bars of 5m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 74 bars back.",
         ],
-        ["lag_across_session: a downward crossing on a 1m strategy"] =
+        ["lag_across_session: the first count that an hourly session cannot hold"] =
         [
-            "`crosses_below(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:17\"`.",
+            "`rising(vwap, 7)` reads `vwap` up to 7 closed bars back, but a session holds at most 7 bars of 1h and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 6 bars back.",
         ],
-        ["lag_across_session: the crossing written out lags the vwap by hand"] =
+        ["lag_across_session: the first count that a 5m session cannot hold"] =
         [
-            "`vwap[1]` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
+            "`rising(vwap, 75)` reads `vwap` up to 75 closed bars back, but a session holds at most 75 bars of 5m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 74 bars back.",
         ],
-        ["lag_across_session: a lone subscript of two bars"] =
+        ["lag_across_session: the first count that a 15m session cannot hold"] =
         [
-            "`vwap[2]` reads `vwap` up to 2 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"10:00\"`.",
+            "`falling(today_low, 25)` reads `today_low` up to 25 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
         ],
-        ["lag_across_session: three bars of rising on a 5m strategy"] =
+        ["lag_across_session: a subscript on 1m at the whole session"] =
         [
-            "`rising(vwap, 3)` reads `vwap` up to 3 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:35\"`.",
+            "`vwap[375]` needs a history of 376 closed bars, but the frame keeps at most 256 (lags 0 to 255).",
+            "`vwap[375]` reads `vwap` up to 375 closed bars back, but a session holds at most 375 bars of 1m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 374 bars back.",
         ],
-        ["lag_across_session: the open of the day on an hourly strategy"] =
+        ["lag_across_session: a 5m feature read on a daily strategy"] =
         [
-            "`crosses_above(close, today_open)` reads `today_open` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"11:15\"`.",
+            "`tf(\"5m\").vwap[80]` reads `tf(\"5m\").vwap` up to 80 closed bars back, but a session holds at most 75 bars of 5m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 74 bars back.",
         ],
-        ["lag_across_session: the high of the previous day"] =
+        ["lag_across_session: a time check does not clear a read that is never known"] =
         [
-            "`crosses_above(close, prev_day.high)` reads `prev_day.high` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
+            "`rising(vwap, 25)` reads `vwap` up to 25 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
+        ],
+        ["lag_across_session: the extra lag of a crossing counts"] =
+        [
+            "`crosses_above(close, vwap[74])` reads `vwap` up to 75 closed bars back, but a session holds at most 75 bars of 5m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 74 bars back.",
+        ],
+        ["lag_across_session: the lags of a subscript and of rising add up"] =
+        [
+            "`rising(vwap[20], 5)` reads `vwap` up to 25 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
         ],
         ["lag_across_session: two features in one call give one warning"] =
         [
-            "`rising(vwap - today_open, 2)` reads `vwap`, `today_open` up to 2 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"10:00\"`.",
+            "`rising(vwap - today_open, 25)` reads `vwap`, `today_open` up to 25 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
         ],
         ["lag_across_session: two calls give two warnings"] =
         [
-            "`crosses_above(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
-            "`rising(today_low, 2)` reads `today_low` up to 2 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"10:00\"`.",
+            "`rising(vwap, 25)` reads `vwap` up to 25 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
+            "`rising(today_low, 30)` reads `today_low` up to 30 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
         ],
         ["lag_across_session: a feature of another timeframe"] =
         [
-            "`crosses_above(tf(\"1h\").close, tf(\"1h\").vwap)` reads `tf(\"1h\").vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"11:15\"`.",
+            "`rising(tf(\"1h\").vwap, 7)` reads `tf(\"1h\").vwap` up to 7 closed bars back, but a session holds at most 7 bars of 1h and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 6 bars back.",
         ],
-        ["lag_across_session: an opening range of a single bar"] =
+        ["lag_across_session: an opening range"] =
         [
-            "`crosses_above(close, or_high(15))` reads `or_high(15)` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
+            "`rising(or_high(15), 25)` reads `or_high(15)` up to 25 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
         ],
-        ["lag_across_session: a 1m feature read as far back as the first evaluation of a 15m strategy"] =
+        ["lag_across_session: the previous day's value"] =
         [
-            "`rising(tf(\"1m\").vwap, 15)` reads `tf(\"1m\").vwap` up to 15 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:31\"`.",
-        ],
-        ["lag_across_session: the last bar of an hourly session is the first that clears six bars"] =
-        [
-            "`rising(vwap, 6)` reads `vwap` up to 6 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"15:30\"`.",
-        ],
-        ["lag_across_session: no bar of an hourly session is far enough from its open for seven bars"] =
-        [
-            "`rising(vwap, 7)` reads `vwap` up to 7 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. No bar of a session is far enough from its open for a read that far back; read fewer bars back.",
+            "`rising(prev_day.high, 30)` reads `prev_day.high` up to 30 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
         ],
         ["lag_across_session: a type error in an operand does not hide it"] =
         [
-            "`crosses_above(close + true, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
+            "`rising(vwap + true, 25)` reads `vwap` up to 25 closed bars back, but a session holds at most 25 bars of 15m and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most 24 bars back.",
             "The right side of `+` needs a number, but `true` is a true/false value.",
-        ],
-        ["lag_across_session: a check of the time that comes too early does not clear it"] =
-        [
-            "`crosses_above(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
-        ],
-        ["lag_across_session: a check of the time under or does not clear it"] =
-        [
-            "`crosses_above(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
-        ],
-        ["lag_across_session: a check of the time under not does not clear it"] =
-        [
-            "`crosses_above(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
-        ],
-        ["lag_across_session: a check of the time that is an upper bound does not clear it"] =
-        [
-            "`crosses_above(close, vwap)` reads `vwap` one closed bar back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"09:45\"`.",
-        ],
-        ["lag_across_session: a check that clears one call and not the other"] =
-        [
-            "`rising(today_low, 8)` reads `today_low` up to 8 closed bars back, and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, where the feature starts again. Wait until the session has bars of its own, for example with `and time >= \"11:30\"`.",
         ],
         ["time_on_daily: a daily strategy"] =
         [
@@ -537,7 +546,19 @@ internal static class LintMessages
         ],
         ["type_mismatch: and of a number"] =
         [
-            "The left side of `and` needs a true/false value, but `rsi(14)` is a number.",
+            "The left side of `and` needs a true/false value, but `rsi(14)` is a number. Compare it with something, like rsi(14) > 55.",
+        ],
+        ["type_mismatch: or of a number on the right"] =
+        [
+            "The right side of `or` needs a true/false value, but `rsi(14)` is a number. Compare it with something, like rsi(14) > 55.",
+        ],
+        ["type_mismatch: and of the time"] =
+        [
+            "The left side of `and` needs a true/false value, but `time` is the time of day. Compare `time` with a text, like time >= \"09:45\".",
+        ],
+        ["type_mismatch: not of a regime"] =
+        [
+            "`not` needs a true/false value, but `regime()` is a market regime. Compare it with a regime name, like regime() == \"UP_LOW_VOL\".",
         ],
         ["type_mismatch: the time against a number"] =
         [
@@ -557,7 +578,7 @@ internal static class LintMessages
         ],
         ["type_mismatch: not of a number"] =
         [
-            "`not` needs a true/false value, but `close` is a number.",
+            "`not` needs a true/false value, but `close` is a number. Compare it with something, like rsi(14) > 55.",
         ],
         ["type_mismatch: minus of a true/false value"] =
         [

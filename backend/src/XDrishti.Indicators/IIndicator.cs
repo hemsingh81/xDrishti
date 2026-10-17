@@ -11,7 +11,9 @@ namespace XDrishti.Indicators;
 /// <remarks>
 /// A value that is not ready is <see cref="double.NaN"/> with <see cref="IsReady"/> false; callers treat it as a false condition. For a bar-driven indicator readiness is reached after <see cref="WarmUp"/> bars and
 /// kept on an unbroken series; for a date-driven one it follows the data and can be lost again (a context day without a VIX makes <c>vix</c> not ready on the dates that read it). <see cref="Reset"/> returns the
-/// instance to the state it had after construction. After construction (and warm-up of the JIT) <see cref="Update"/> allocates nothing.
+/// instance to the state it had after construction. After construction (and warm-up of the JIT) <see cref="Update"/> allocates nothing. The ones that start again at each India date (<c>vwap</c>, <c>or_high</c>, <c>or_low</c>,
+/// <c>today_*</c>, <c>prev_day_*</c>, <c>gap_pct</c>) are also told by the <see cref="FeatureFrame"/> when a new date has begun before they have been fed a bar of it (a coarser timeframe): until the next <see cref="Update"/> they are
+/// not ready, so readiness of such an indicator is not a function of the bars it was fed alone (ADR 0035; see the internal <c>IRestartingIndicator</c>).
 /// </remarks>
 public interface IIndicator
 {

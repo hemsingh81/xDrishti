@@ -81,7 +81,7 @@ public static class IndicatorCatalog
             new("lowest", "Lowest value of the source over the last n bars, current bar included.", [period], SessionBehaviour.Continuous, true, PriceSource.Low, false,
                 spec => (int)spec.P1, spec => new Lowest((int)spec.P1, spec.Source)),
             new("vwap", "Volume-weighted average price of the typical price since the session open.", [], SessionBehaviour.PerSession, false, PriceSource.Close, true,
-                _ => 1, _ => new Vwap(), valueAtSessionOpen: true),
+                _ => 1, _ => new Vwap()),
             new("rel_volume", "Volume divided by the mean volume of the previous n bars (current bar excluded).", [period], SessionBehaviour.Continuous, false, PriceSource.Close, false,
                 spec => (int)spec.P1 + 1, spec => new RelVolume((int)spec.P1)),
             new("or_high", "Highest high of the first m minutes of the session; ready once they have closed.", [minutes], SessionBehaviour.PerSession, false, PriceSource.Close, true,
@@ -112,8 +112,7 @@ public static class IndicatorCatalog
             list.Add(new IndicatorInfo(
                 name, text, [], SessionBehaviour.PerSession, false, PriceSource.Close, false,
                 spec => captured is SessionField.TodayOpen or SessionField.TodayHigh or SessionField.TodayLow ? 1 : BarsPerSession(spec.Timeframe) + 1,
-                spec => new SessionContext(captured, BarsPerSession(spec.Timeframe)),
-                valueAtSessionOpen: true));
+                spec => new SessionContext(captured, BarsPerSession(spec.Timeframe))));
         }
 
         return [.. list];

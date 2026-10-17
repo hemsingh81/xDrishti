@@ -36,17 +36,42 @@ public sealed class EvaluationAllocationTests
     [Fact]
     public void The_ten_conditions_take_every_value_during_the_run_so_the_measurement_covers_real_work()
     {
+        // ADR 0035: two of the ten read a per-session feature of the 5-minute strategy (condition 1: crosses_above(close, vwap); condition 6: close > prev_day.high), which is unknown until the 5-minute lane has closed
+        // its first bar of the date (minutes 0 to 3 of the session, counted from 09:15; the first 5-minute bar closes at minute 4) and, for the crossing, also while the bar before the first one does not exist (until
+        // the second bar closes at minute 9). Everything else is known after the warm-up. The expectations are counted from the minute of the session and the bars, not taken from the frame.
+        const int SessionMinutes = 375;
         var (frame, bound, _) = TenConditions.Build(Bars);
         var seen = new HashSet<(int, Truth)>();
 
         for (var i = 0; i < WarmUpSteps + 5_000; i++)
         {
             frame.Step(Bars[i]);
-            if (i >= WarmUpSteps)
+            if (i < WarmUpSteps)
             {
-                for (var c = 0; c < bound.Count; c++)
+                continue;
+            }
+
+            var session = i / SessionMinutes;
+            var minute = i % SessionMinutes;
+            for (var c = 0; c < bound.Count; c++)
+            {
+                var truth = bound[c].EvaluateTruth(frame);
+                seen.Add((c, truth));
+                if (c == 1)
                 {
-                    seen.Add((c, bound[c].EvaluateTruth(frame)));
+                    (truth == Truth.Unknown).ShouldBe(minute < 9, $"crosses_above(close, vwap) at minute {minute} of session {session}");
+                }
+                else if (c == 6)
+                {
+                    // tf("1D").close[1] is the close of the session before the last closed one (a day bar closes at minute 374); close is the last closed 5-minute bar: the one ending at minute 5·⌊(m + 1)/5⌋ − 1, which is the
+                    // last bar of the session before for minutes 0 to 3
+                    var dayBefore = Bars[(minute < SessionMinutes - 1 ? session - 2 : session - 1) * SessionMinutes + SessionMinutes - 1].Close;
+                    var fiveMinuteClose = Bars[session * SessionMinutes + 5 * ((minute + 1) / 5) - 1].Close;
+                    (truth == Truth.Unknown).ShouldBe(minute < 4 && dayBefore < fiveMinuteClose, $"the previous day's high at minute {minute} of session {session}");
+                }
+                else
+                {
+                    truth.ShouldNotBe(Truth.Unknown, $"condition {c} is still unknown after the warm-up (minute {minute})");
                 }
             }
         }
@@ -55,8 +80,10 @@ public sealed class EvaluationAllocationTests
         {
             seen.ShouldContain((c, Truth.True), "condition " + c + " is never true after the warm-up");
             seen.ShouldContain((c, Truth.False), "condition " + c + " is never false after the warm-up");
-            seen.ShouldNotContain((c, Truth.Unknown), "condition " + c + " is still unknown after the warm-up");
         }
+
+        seen.ShouldContain((1, Truth.Unknown), "the crossing against the vwap is unknown at the start of each session");
+        seen.ShouldContain((6, Truth.Unknown), "so is the previous day's high");
     }
 
     [Fact]

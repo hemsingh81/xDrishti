@@ -74,11 +74,13 @@ public sealed class IndicatorCatalogTests
             info.SessionBehaviour.ShouldBe(SessionBehaviour.Continuous, name);
         }
 
-        foreach (var name in new[] { "vwap", "or_high", "or_low", "prev_day_close", "today_open", "gap_pct" })
+        foreach (var name in SessionBound)
         {
             IndicatorCatalog.TryGet(name, out var info).ShouldBeTrue();
             info.SessionBehaviour.ShouldBe(SessionBehaviour.PerSession, name);
         }
+
+        IndicatorCatalog.All.Where(i => i.SessionBehaviour == SessionBehaviour.PerSession).Select(i => i.Name).ShouldBe(SessionBound, ignoreOrder: true, "exactly the twelve, no more");
     }
 
     [Fact]

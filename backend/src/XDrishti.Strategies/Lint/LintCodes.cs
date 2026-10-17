@@ -29,7 +29,11 @@ public static class LintCodes
     /// </summary>
     public const string UnsupportedTimeframe = "strategy.lint.unsupported_timeframe";
 
-    /// <summary>A subscript or <c>rising/falling</c> count that is not a whole number of at least 1 (<c>close[0]</c>, <c>close[-1]</c>, <c>rising(close, 0)</c>, <c>rising(close, 1.5)</c>). The span is the number. Error.</summary>
+    /// <summary>
+    /// A subscript or <c>rising/falling</c> count that is not a whole number of at least 1 (<c>close[0]</c>, <c>close[-1]</c>, <c>rising(close, 0)</c>, <c>rising(close, 1.5)</c>). The span is the number, except for a subscript
+    /// of zero (<c>close[0]</c>, <c>close[-0]</c>, <c>close[00]</c>), where it is the whole subscript, so that the suggestion (the feature without the subscript) replaces its own span; a subscript of a name that could
+    /// not be bound (<c>closee[0]</c>) has no suggestion. A negative subscript has none either. Error.
+    /// </summary>
     public const string NegativeOrZeroLag = "strategy.lint.negative_or_zero_lag";
 
     /// <summary>
@@ -43,15 +47,17 @@ public static class LintCodes
 
     /// <summary>
     /// A <c>crosses_above/below</c>, <c>rising</c> or <c>falling</c> whose features are not all on one timeframe, so that "the previous value" of each side would be a different time. The span is the call; the message
-    /// names the timeframes and, when the first side is a plain reference, the explicit form that says what is meant. Error.
+    /// names the timeframes and, when one side is a plain reference, the explicit form that says what is meant (the suggestion). A feature of the date (calendar and context features) is a clock of its own, on any strategy timeframe;
+    /// when it is one of the clocks and there is no explicit form, the message says that such a feature changes once a date, so it is compared without a lag or only the bar side is lagged by hand. Error.
     /// </summary>
     public const string MixedTimeframesInLag = "strategy.lint.mixed_timeframes_in_lag";
 
     /// <summary>
-    /// A lagged read (a subscript, or the lags of <c>crosses_*</c>, <c>rising</c> and <c>falling</c>) of a feature that starts again at every session open and already has a value on the session's first bar
-    /// (<c>vwap</c>, <c>today_*</c>, <c>prev_day_*</c>, <c>gap_pct</c>), on an intraday strategy. A lagged read is by position, k closed bars back, and the frame's history runs on across sessions, so on the first bars
-    /// of every session the "previous value" is a value of the previous session (<c>crosses_above(close, vwap)</c> compares the first bar of a session with the last bar of the one before). The span is the call, or the
-    /// subscripted feature; the message names the features and gives a <c>time</c> guard that clears the read. Warning.
+    /// A lagged read (a subscript, or the lags of <c>crosses_*</c>, <c>rising</c> and <c>falling</c>) of a feature that starts again at every session (<c>vwap</c>, <c>or_*</c>, <c>today_*</c>, <c>prev_day_*</c>,
+    /// <c>gap_pct</c>, on 1m to 1h; ADR 0035) from further back than a whole session holds: <c>k</c> bars of its timeframe <c>T</c> with <c>k · T</c> at least the 375 minutes of a session (<c>vwap[375]</c> on 1m,
+    /// <c>rising(vwap, 7)</c> on 1h, <c>tf("5m").vwap[80]</c> on a 1D strategy). The frame keeps such a feature's history for the current session only, so every bar that far back is in an earlier session and the read is
+    /// never known (unknown is not true). A shorter read that reaches before the session's first bars is unknown on those bars only and is not warned. The strategy's own timeframe does not matter. The span is the call, or
+    /// the subscripted feature; the message names the features, how far back, and the most that a session holds. Warning.
     /// </summary>
     public const string LagAcrossSession = "strategy.lint.lag_across_session";
 

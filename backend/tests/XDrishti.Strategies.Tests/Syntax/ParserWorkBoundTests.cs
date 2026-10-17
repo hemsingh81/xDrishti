@@ -31,7 +31,23 @@ public sealed class ParserWorkBoundTests
         ["chained comparisons"] = string.Concat(Enumerable.Repeat("a < b < ", 500)),
         ["values side by side"] = string.Concat(Enumerable.Repeat("a ", 2000)),
         ["dots"] = string.Concat(Enumerable.Repeat("a. ", 1300)),
+
+        // repairs that report nothing (they open or close a bracket the text did not): only the attempt bound stops them, one parse at a time, with a problem or two listed
+        ["a subscript bracket opened and a parenthesis closed"] = BracketShape("[ ) "),
+        ["a subscript bracket opened and closed with nothing in it"] = BracketShape("[ ] "),
+        ["a parenthesis closed and a subscript bracket opened"] = BracketShape(") [ "),
+        ["a subscript bracket closed and another opened"] = BracketShape("] [ "),
     };
+
+    /// <summary>The four shapes of brackets that mend silently: 1,000 repeats of a unit of four characters, 4,000 in all.</summary>
+    private static readonly string[] SilentShapes =
+    [
+        "a subscript bracket opened and a parenthesis closed", "a subscript bracket opened and closed with nothing in it", "a parenthesis closed and a subscript bracket opened", "a subscript bracket closed and another opened",
+    ];
+
+    private static string BracketShape(string unit) => string.Concat(Enumerable.Repeat(unit, 1000));
+
+    public static TheoryData<string> SilentShapeNames { get; } = [.. SilentShapes];
 
     public static TheoryData<string> Shapes { get; } = [.. Worst.Keys];
 
@@ -79,6 +95,80 @@ public sealed class ParserWorkBoundTests
         }
 
         result.Problems.Select(p => p.Span.Start).ShouldBeInOrder();
+    }
+
+    [Theory]
+    [MemberData(nameof(SilentShapeNames))]
+    public void A_text_of_repairs_that_report_nothing_stops_at_exactly_the_attempt_bound_and_says_that_there_is_more(string shape)
+    {
+        // The problem cap cannot stop these (they list one problem or two); only the bound on the parses does. Without it each of them is parsed 1,001 times.
+        var source = Worst[shape];
+        var (tokens, problems) = LexicalPass.Run(source);
+
+        Recovery.Run(source, tokens, problems, out var outcome);
+        var result = ConditionParser.Parse(source);
+
+        outcome.Attempts.ShouldBe(Recovery.MaxAttempts);
+        outcome.Truncated.ShouldBeTrue();
+        result.Problems.Count.ShouldBeLessThan(ConditionParser.MaxProblems, "it is the attempts that ran out, not the problems");
+        result.Problems[^1].Code.ShouldBe(SyntaxCodes.TooManyProblems);
+    }
+
+    [Theory]
+    [MemberData(nameof(SilentShapeNames))]
+    public void The_note_of_a_text_that_stopped_before_the_limit_does_not_claim_a_limit(string shape)
+    {
+        var note = ConditionParser.Parse(Worst[shape]).Problems[^1];
+
+        note.Code.ShouldBe(SyntaxCodes.TooManyProblems);
+        note.Message.ShouldNotContain("limit", Case.Insensitive);
+        note.Message.ShouldContain("Fix them and read the condition again to see the rest.");
+    }
+
+    [Fact]
+    public void The_note_of_a_text_that_reached_the_limit_says_how_many_are_shown_and_not_that_the_limit_is_100()
+    {
+        var source = string.Join(" and ", Enumerable.Repeat("rsi(14,) > 55", ConditionParser.MaxProblems + 1));
+
+        var note = ConditionParser.Parse(source).Problems[^1];
+
+        note.Message.ShouldBe("There are more problems than are listed: the first 100 are shown. Fix them and read the condition again to see the rest.");
+    }
+
+    [Fact]
+    public void The_problems_listed_are_the_first_100_found_and_an_unclosed_bracket_is_found_after_the_commas_inside_it()
+    {
+        // The recovery reports a missing bracket when it reaches the end of the text, after every comma inside it, so with enough faults before it the bracket is cut off although it stands first in the text.
+        string Open(int conditions) => "(" + string.Join(" and ", Enumerable.Repeat("rsi(14,) > 55", conditions));
+
+        var within = ConditionParser.Parse(Open(ConditionParser.MaxProblems - 1)).Problems;
+        var over = ConditionParser.Parse(Open(150)).Problems;
+
+        within.Count.ShouldBe(ConditionParser.MaxProblems, "99 commas and the bracket are 100 problems, all listed");
+        within[0].Code.ShouldBe(SyntaxCodes.UnclosedBracket, "in the order of the text the bracket comes first");
+        within.Skip(1).ShouldAllBe(p => p.Code == SyntaxCodes.TrailingComma);
+        over.Count.ShouldBe(ConditionParser.MaxProblems + 1);
+        over.Take(ConditionParser.MaxProblems).ShouldAllBe(p => p.Code == SyntaxCodes.TrailingComma);
+        over.ShouldNotContain(p => p.Code == SyntaxCodes.UnclosedBracket, "found after the 100th problem, so not listed");
+        over[^1].Code.ShouldBe(SyntaxCodes.TooManyProblems);
+    }
+
+    [Fact]
+    public void The_unknown_characters_are_found_before_the_syntax_problems_so_100_of_them_cut_off_an_earlier_syntax_problem()
+    {
+        // The lexical pass runs over the whole text before the grammar: a trailing comma at offset 6 is the first problem in the text, and it is not listed when 100 unknown characters come after it.
+        const string Start = "rsi(14,) > 55 and close > vwap ";
+
+        var within = ConditionParser.Parse(Start + string.Concat(Enumerable.Repeat("$ ", ConditionParser.MaxProblems - 1))).Problems;
+        var over = ConditionParser.Parse(Start + string.Concat(Enumerable.Repeat("$ ", 150))).Problems;
+
+        within.Count.ShouldBe(ConditionParser.MaxProblems, "the comma and 99 unknown characters are 100 problems, all listed");
+        within[0].Code.ShouldBe(SyntaxCodes.TrailingComma);
+        within[0].Span.Start.ShouldBe(6);
+        over.Count.ShouldBe(ConditionParser.MaxProblems + 1);
+        over.Take(ConditionParser.MaxProblems).ShouldAllBe(p => p.Code == SyntaxCodes.UnknownCharacter);
+        over.ShouldNotContain(p => p.Code == SyntaxCodes.TrailingComma, "found after the lexical problems, so cut off although it comes first in the text");
+        over[^1].Code.ShouldBe(SyntaxCodes.TooManyProblems);
     }
 
     [Fact]

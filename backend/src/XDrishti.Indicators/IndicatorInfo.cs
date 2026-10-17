@@ -19,8 +19,6 @@ public sealed class IndicatorInfo
 
     private readonly DateFeatureKind? _dateFeature;
 
-    private readonly bool _valueAtSessionOpen;
-
     internal IndicatorInfo(
         string name,
         string summary,
@@ -34,8 +32,7 @@ public sealed class IndicatorInfo
         Func<FeatureSpec, SpecProblem?>? extraCheck = null,
         DateFeatureKind? dateFeature = null,
         bool requiresContext = false,
-        bool requiresExpiryDays = false,
-        bool valueAtSessionOpen = false)
+        bool requiresExpiryDays = false)
     {
         Name = name;
         Summary = summary;
@@ -50,7 +47,6 @@ public sealed class IndicatorInfo
         _dateFeature = dateFeature;
         RequiresContext = requiresContext;
         RequiresExpiryDays = requiresExpiryDays;
-        _valueAtSessionOpen = valueAtSessionOpen;
 
         // Built here, once, from the fixed order of the timeframes: the catalog is shared by the whole process, so nothing in it may be filled in lazily by whichever thread reads first.
         var supported = new List<Timeframe>(IndicatorCatalog.Timeframes.Length);
@@ -92,14 +88,14 @@ public sealed class IndicatorInfo
     public bool DateDriven => _dateFeature is not null;
 
     /// <summary>
-    /// Whether the feature, once it is warmed up, already holds a value of the <b>new</b> session on the first bar of every session, so that the value one closed bar earlier (<see cref="FeatureFrame.At"/>(handle, 1),
-    /// <c>vwap[1]</c>) is the last value of the <b>previous</b> session: the history of the frame runs on across sessions (ADR 0031), only the indicator starts again. True for <c>vwap</c>, <c>today_open/high/low</c>,
-    /// <c>prev_day_*</c> and <c>gap_pct</c> (the last six from the second session on), and for an opening range of a single bar (<c>or_high(1)</c> on 1m is ready as soon as the first bar has closed); false for every
-    /// continuous indicator, and for an opening range of several bars, which is not ready (NaN) until the range has closed, so that on the first bars of a session its value at lag 0 is unknown, never a value of the old session.
-    /// The rules language (ADR 0034) asks the catalog here instead of knowing which names those are.
+    /// Whether the feature restarts at each India trading date <b>in the frame</b> (ADR 0035): <c>vwap</c>, <c>or_high</c>, <c>or_low</c>, <c>today_open/high/low</c>, <c>prev_day_open/high/low/close/volume</c> and
+    /// <c>gap_pct</c> — the twelve <see cref="SessionBehaviour.PerSession"/> names — on an <b>intraday</b> timeframe (1m, 5m, 10m, 15m, 30m, 1h). For such a feature the frame keeps the value history of the current
+    /// session only (<see cref="FeatureFrame.At"/> is unknown for a lag that reaches before the lane's first bar of the date) and reports it unknown at every lag from the start of a new date until its timeframe has closed
+    /// its first bar of the date. False for every continuous indicator and every date-driven one, and false on 1D (a daily bar is a whole session: nothing restarts, so a lag is by position), 1W and 1M (refused for these
+    /// names, see <see cref="Supports"/>). It is the one place that says which features restart: the frame, the rules language's lint and the tests ask here and do not know the names.
     /// </summary>
-    /// <param name="spec">The feature: the opening range is ready at the first bar only when its minutes are one bar of the spec's timeframe.</param>
-    public bool HasValueAtSessionOpen(in FeatureSpec spec) => SessionBehaviour == SessionBehaviour.PerSession && (_valueAtSessionOpen || WarmUp(spec) <= 1);
+    /// <param name="spec">The feature: the same name restarts on 1m to 1h and not on 1D.</param>
+    public bool RestartsEachSession(in FeatureSpec spec) => SessionBehaviour == SessionBehaviour.PerSession && spec.Timeframe.Minutes() > 0;
 
     /// <summary>
     /// Whether a frame that computes this feature must be given <see cref="FrameOptions.Context"/>: true for exactly the ten date-driven features that read the daily <see cref="MarketContext"/>

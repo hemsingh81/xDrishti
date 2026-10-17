@@ -20,7 +20,7 @@ namespace XDrishti.Strategies.Tests.Evaluation;
 /// checked against what the model reads (the features, the history depth, the needs of the frame), so the binder is covered as well.
 /// </para>
 /// </summary>
-public sealed class InterpreterOracleTests
+public sealed partial class InterpreterOracleTests
 {
     private const int Flavours = 2;
 
@@ -88,7 +88,7 @@ public sealed class InterpreterOracleTests
         {
             for (var block = 0; block < Blocks; block++)
             {
-                var seed = 700_000 + (int)evaluation * 1_000 + flavour * 100 + block;
+                var seed = SeedOf(evaluation, flavour, block);
                 var run = Prepare(seed, evaluation, withContext: flavour == 0, block, rejected);
                 conditions += run.Models.Count;
                 if (run.Plan is null)
@@ -103,21 +103,25 @@ public sealed class InterpreterOracleTests
                 }
 
                 var (frame, bound) = run.NewFrame();
-                var interpreter = new Interpreter(frame);
-                var boundTreeInterpreter = new BoundTreeInterpreter(frame);
+                var sessions = SessionReference.For(frame);
+                var interpreter = new Interpreter(frame, sessions);
+                var boundTreeInterpreter = new BoundTreeInterpreter(frame, sessions);
                 tally.Compare(run, frame, interpreter, boundTreeInterpreter, bound);
                 foreach (var bar in run.Bars)
                 {
                     frame.Step(bar);
+                    sessions.Feed(bar);
                     tally.Compare(run, frame, interpreter, boundTreeInterpreter, bound);
                 }
 
                 // the same bound conditions on the same frame after a reset: nothing of the first run may linger
                 frame.Reset();
+                sessions.Reset();
                 tally.Compare(run, frame, interpreter, boundTreeInterpreter, bound);
                 foreach (var bar in run.Bars.Take(150))
                 {
                     frame.Step(bar);
+                    sessions.Feed(bar);
                     tally.Compare(run, frame, interpreter, boundTreeInterpreter, bound);
                 }
             }
@@ -162,11 +166,13 @@ public sealed class InterpreterOracleTests
         var bars = OracleSeries.For(seed, Timeframe.M5);
         var scenario = Scenario.Create(Timeframe.M5, ["close > close[1]", "time >= \"10:00\"", "rsi(3) > 50 or day_of_week == WED"]);
         var (frame, bound) = scenario.NewFrame();
-        var interpreter = new Interpreter(frame);
+        var sessions = SessionReference.For(frame);
+        var interpreter = new Interpreter(frame, sessions);
 
         foreach (var bar in bars)
         {
             frame.Step(bar);
+            sessions.Feed(bar);
             for (var k = 0; k < bound.Count; k++)
             {
                 Of(bound[k].EvaluateTruth(frame)).ShouldBe(interpreter.Evaluate(Models[k]), scenario.Sources[k] + " at step " + frame.Steps);
@@ -261,10 +267,13 @@ public sealed class InterpreterOracleTests
         }
     }
 
+    /// <summary>The seed of a block of the corpus: shared with the mutant control (<c>InterpreterOracleTests.Mutants.cs</c>), which has to walk the very same blocks.</summary>
+    private static int SeedOf(Timeframe evaluation, int flavour, int block) => 700_000 + (int)evaluation * 1_000 + flavour * 100 + block;
+
     /// <summary>Generates the models, prints and compiles them (what the compiler refuses is added to <paramref name="rejected"/>), and makes the frame from what the <i>models</i> read, not from the plan.</summary>
-    private static Block Prepare(int seed, Timeframe evaluation, bool withContext, int block, List<string> rejected)
+    private static Block Prepare(int seed, Timeframe evaluation, bool withContext, int block, List<string> rejected, bool sessionBound = false)
     {
-        var generator = new ModelGenerator(seed, evaluation, allowContext: withContext, allowExpiryDays: block % 2 == 0);
+        var generator = new ModelGenerator(seed, evaluation, allowContext: withContext, allowExpiryDays: block % 2 == 0, sessionBound);
         var models = Enumerable.Range(0, ConditionsPerBlock).Select(_ => generator.Next()).ToList();
         var sources = models.Select((m, i) => Printer.Print(m, (i + block) % 2 == 0 ? Parens.Always : Parens.Minimal, (Spacing)(((i + block) / 2) % 3))).ToList();
         var facts = models.Select(ModelFacts.Of).ToList();

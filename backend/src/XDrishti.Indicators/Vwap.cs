@@ -4,9 +4,10 @@ namespace XDrishti.Indicators;
 
 /// <summary>
 /// <c>vwap</c>: the volume-weighted average price since the session open, <c>Σ(typical·volume) / Σvolume</c> with <c>typical = (high + low + close)/3</c>. It resets at the first bar of each India
-/// trading date and is <see cref="double.NaN"/> until the session has traded volume (zero-volume bars add nothing).
+/// trading date and is <see cref="double.NaN"/> until the session has traded volume (zero-volume bars add nothing). When the frame has moved to a new date and this instance has not been fed a bar of it yet
+/// (a coarser timeframe), it is not ready (ADR 0035).
 /// </summary>
-public sealed class Vwap : IIndicator
+public sealed class Vwap : IIndicator, IRestartingIndicator
 {
     private CompensatedSum _priceVolume;
 
@@ -16,14 +17,17 @@ public sealed class Vwap : IIndicator
 
     private bool _started;
 
+    private bool _pending;
+
     public double Value => IsReady ? _priceVolume.Value / _volume : double.NaN;
 
-    public bool IsReady => _volume > 0;
+    public bool IsReady => !_pending && _volume > 0;
 
     public int WarmUp => 1;
 
     public void Update(in Bar bar)
     {
+        _pending = false;
         var day = IndiaDays.DayOf(bar.EpochSeconds);
         if (!_started || day != _day)
         {
@@ -46,5 +50,8 @@ public sealed class Vwap : IIndicator
         _volume = 0;
         _day = 0;
         _started = false;
+        _pending = false;
     }
+
+    void IRestartingIndicator.MarkPending() => _pending = true;
 }
