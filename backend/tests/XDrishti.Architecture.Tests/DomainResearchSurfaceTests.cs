@@ -23,8 +23,8 @@ public sealed class DomainResearchSurfaceTests
         research.ShouldBe(
         [
             "AppliedAdjustment", "BarStreamHash", "CalendarExceptionDay", "CanonicalText", "ConditionCounter", "CostBasis", "DateSpan", "DiscontinuityNote", "EntryFill", "ExitReason", "FillBasis", "FillDescription", "FillLimit", "FillLimits",
-            "FillRules", "GapFillRule", "InstrumentReplay", "InstrumentReplayInput", "InstrumentRun", "NoTradeReason", "ReplayOptions", "RunAssembler", "RunCounters", "RunFates", "RunHeader", "RunTrade", "ScanCounters", "SessionCounts",
-            "SessionExclusion", "SessionExclusions", "SessionNote", "Side", "SimTrade", "SimulationErrors", "SimulationRun", "SkipCount", "SkipReason", "SkipReasons", "SlippageConfig", "StrategyRecord", "TickSpec", "UniverseKind",
+            "FillRules", "GapFillRule", "InstrumentReplay", "InstrumentReplayInput", "InstrumentRun", "NoTradeReason", "ReplayOptions", "RunAssembler", "RunCounters", "RunFates", "RunHeader", "RunLabelSet", "RunLabels", "RunTrade", "ScanCounters", "SessionCounts",
+            "SessionExclusion", "SessionExclusions", "SessionNote", "Side", "SimTrade", "SimulationErrors", "SimulationRun", "SkipCount", "SkipReason", "SkipReasons", "SlippageConfig", "StrategyRecord", "TickProbe", "TickSpec", "TickUnitCheck", "UniverseKind",
             "UniverseLabels", "UniverseMember", "UniverseRecord", "WalkCounters",
         ]);
     }

@@ -7,7 +7,7 @@ public static class FillLimits
     [
         new("auction_open", "The first 1-minute open of the data can be the auction price; no P3 strategy fills in the 09:15 minute, and a repaired opening bar has a wider range, so its slippage is larger, never smaller."),
         new("circuit_locks", "Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused."),
-        new("touch_is_fill", "A resting limit fills when the price touches it; real queues fill less often, and paying the base slippage on targets would take about 0.1 R off every winner."),
+        new("touch_is_fill", "A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs."),
         new("no_queue_or_impact", "There is no queue position, partial fill, market impact of the order size or liquidity cap."),
         new("grid_approximate", "The tick is today's tick from the instrument master; old prices can lie on a finer grid or off the grid, so rounding to the tick is approximate."),
         new("minute_path", "Inside one minute only the open, high, low and close are known; a minute that reaches both stop and target is taken as the stop."),

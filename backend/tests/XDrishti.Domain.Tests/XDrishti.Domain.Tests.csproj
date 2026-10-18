@@ -2,5 +2,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\XDrishti.Domain\XDrishti.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The word list of the labels and the texts of a run (ForbiddenWords), shared with the tests of the export (P3-04b1): one source file, compiled into each project that needs it. -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
   <Import Project="..\Tests.props" />
 </Project>

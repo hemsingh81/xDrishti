@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The export library (P3-04b1): turns a finished SimulationRun into the bytes of trades.csv, open_at_end.csv, run.json, README.txt and manifest.json.
+       Pure: depends only on Domain, does no I/O (it writes UTF-8 to an IBufferWriter the host owns), reads no clock, no random source and no machine fact (enforced by architecture tests).
+       Only XDrishti.Api references it (the folder writer lives there, ADR 0040). -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.SimExport.Tests" />
+  </ItemGroup>
+</Project>

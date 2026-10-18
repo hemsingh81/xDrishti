@@ -16,7 +16,7 @@ namespace XDrishti.Simulation.Running;
 public sealed record SimulationHeader(string EngineVersion, int SchemaVersion, string StrategyId, FillRules FillRules, FillBasis Fills, CostBasis Costs, IReadOnlyList<string> Labels)
 {
     /// <summary>The last three labels of this engine (D11), which do not depend on the fill rules.</summary>
-    public static IReadOnlyList<string> FixedLabels { get; } = Array.AsReadOnly(["costs: none", "portfolio limits: not simulated", "sample: in-sample"]);
+    public static IReadOnlyList<string> FixedLabels => RunLabels.FixedLabels;
 
     /// <summary>The five labels for these fill rules: the two of <see cref="FillDescription.Labels"/>, then <see cref="FixedLabels"/>.</summary>
     public static IReadOnlyList<string> LabelsOf(FillRules rules) => Array.AsReadOnly([.. FillDescription.Labels(rules), .. FixedLabels]);

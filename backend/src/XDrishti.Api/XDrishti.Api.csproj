@@ -12,6 +12,8 @@
     <ProjectReference Include="..\XDrishti.Hosting\XDrishti.Hosting.csproj" />
     <!-- The rules compiler is warmed up when the host starts (StrategyWarmupService, ADR 0034 amendment 2). -->
     <ProjectReference Include="..\XDrishti.Strategies\XDrishti.Strategies.csproj" />
+    <!-- The export of a simulation run (P3-04b1): the pure library that renders the files; the folder writer in this project puts them on disk (ADR 0040). -->
+    <ProjectReference Include="..\XDrishti.SimExport\XDrishti.SimExport.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
