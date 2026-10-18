@@ -32,7 +32,7 @@ public sealed class CostRunKeyTests
         costedText.ShouldContain("\ncosts=test-synthetic-1|" + TestCostSheet.Sheet.RatesSha256 + "|1000000|standard|0.5|25|0.1\nuniverse=");
         gross.Costs.ShouldBeNull();
         costed.Costs.ShouldBe(Record());
-        costed.SchemaVersion.ShouldBe(4);
+        costed.SchemaVersion.ShouldBe(5);
     }
 
     [Fact]

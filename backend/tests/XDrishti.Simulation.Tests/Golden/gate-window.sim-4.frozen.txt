@@ -1,0 +1,86 @@
+engine sim-4
+G1 trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-000000000101 symbol=TEST side=Buy date=2026-03-02 decision=1772426700 trigger=M15/1772424900/100/100/100/100/15000/15/True entry=1772426700@100 stop=99 target=102 exit=1772599500@99 reason=Stop R=-1 mae=1 mfe=0.3 fills=Modelled costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 rFilled=-1.3 slippageR=-0.3 entryFilled=100.1 exitFilled=98.8 entryFill=AtOpen tickFallback=False sessionsHeld=3 sessionsUnseen=0 | examined=751 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G1 no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G1 no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G1 trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-000000000101 symbol=TEST side=Buy date=2026-03-04 decision=1772601300 trigger=M15/1772597700/99/99/99/99/15000/15/True entry=1772601300@99 stop=98 target=101 exit=1772618340@99 reason=EndOfData R=0 mae=0 mfe=0 fills=Modelled costs=None snapshot=null key=ORB|TEST|Buy|2026-03-04 rFilled=-0.1 slippageR=-0.1 entryFilled=99.05 exitFilled=98.95 entryFill=AtOpen tickFallback=False sessionsHeld=1 sessionsUnseen=0 | examined=285 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G1 total candidates=4 trades=2 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1036 limitNotReached=0 entriesAtOpen=2 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=2 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=4 sessionsUnseen=0
+G2 trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-000000000101 symbol=TEST side=Buy date=2026-03-02 decision=1772426700 trigger=M15/1772424900/100/100/100/100/15000/15/True entry=1772426700@100 stop=99 target=102 exit=1772531940@100.2 reason=EndOfData R=0.2 mae=0.2 mfe=0.3 fills=Modelled costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 rFilled=0.05 slippageR=-0.15 entryFilled=100.1 exitFilled=100.15 entryFill=AtOpen tickFallback=False sessionsHeld=2 sessionsUnseen=0 | examined=690 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2 no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2 no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2 total candidates=3 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=690 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=2 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=2 sessionsUnseen=0
+G2b-long trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-000000000101 symbol=TEST side=Buy date=2026-03-02 decision=1772426700 trigger=M15/1772424900/100/100/100/100/15000/15/True entry=1772426700@100 stop=99 target=102 exit=1772617200@100.2 reason=MaxHold R=0.2 mae=0.2 mfe=0.3 fills=Modelled costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 rFilled=0.05 slippageR=-0.15 entryFilled=100.1 exitFilled=100.15 entryFill=AtOpen tickFallback=False sessionsHeld=3 sessionsUnseen=0 | examined=1046 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0 maxHoldAtLastClose=True holdEnd=1772618400
+G2b-long no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2b-long no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2b-long trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-000000000101 symbol=TEST side=Buy date=2026-03-05 decision=1772685900 trigger=M15/1772684100/100.2/100.2/100.2/100.2/15000/15/True entry=1772685900@100.2 stop=99 target=102.6 exit=1772704740@100.2 reason=EndOfData R=0 mae=0 mfe=0 fills=Modelled costs=None snapshot=null key=ORB|TEST|Buy|2026-03-05 rFilled=-0.08333333333333334 slippageR=-0.08333333333333334 entryFilled=100.25 exitFilled=100.15 entryFill=AtOpen tickFallback=False sessionsHeld=1 sessionsUnseen=0 | examined=315 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2b-long total candidates=4 trades=2 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1361 limitNotReached=0 entriesAtOpen=2 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=2 exitsMaxHold=1 maxHoldAtLastClose=1 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=4 sessionsUnseen=0
+G2b-short trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-000000000101 symbol=TEST side=Buy date=2026-03-02 decision=1772426700 trigger=M15/1772424900/100/100/100/100/15000/15/True entry=1772426700@100 stop=99 target=102 exit=1772617200@100.2 reason=EndOfData R=0.2 mae=0.2 mfe=0.3 fills=Modelled costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 rFilled=0.05 slippageR=-0.15 entryFilled=100.1 exitFilled=100.15 entryFill=AtOpen tickFallback=False sessionsHeld=3 sessionsUnseen=0 | examined=1046 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2b-short no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2b-short no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G2b-short total candidates=3 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1046 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=2 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=3 sessionsUnseen=0
+G3 trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-000000000101 symbol=TEST side=Buy date=2026-03-02 decision=1772426700 trigger=M15/1772424900/100/100/100/100/15000/15/True entry=1772426700@100 stop=99 target=110 exit=1772531940@103.1 reason=EndOfData R=3.1 mae=0.2 mfe=3.2 fills=Modelled costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 rFilled=2.95 slippageR=-0.15 entryFilled=100.1 exitFilled=103.05 entryFill=AtOpen tickFallback=False sessionsHeld=2 sessionsUnseen=0 | examined=690 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G3 no-trade PositionOpen | examined=0 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+G3 total candidates=2 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=690 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=1 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=2 sessionsUnseen=0
+J1
+instrument 00000000-0000-0000-0000-0000000000a1 TEST skipped=- detail=-
+  data first=2026-03-02 last=2026-03-04 replayFrom=2026-03-02 cover=2026-03-02..2026-03-04
+  bars read=1125 fed=1125 excluded=0 outside=0 sha256=5c437ccccb9f3479d9f6d95d843cc904cd4eb81289e24068b5736c84b30d2909
+  tick=0.05 fallback=False
+  sessions ran=3 closed=0 special=0 short=0 missing=0
+  notesTruncated=False
+  counters Buy bars=1125 ignored=0 incomplete=0 decisions=21 lost=0 stale=0 outOfWindow=6 window=15 fullyReady=15 candidates=1 later=3 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+    buy.trigger[0] T=4 F=11 U=0 N=0
+  walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1005 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=1 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=3 sessionsUnseen=0
+  fates suppressed=0 beforeWindow=0 openAtEnd=0 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 limitNotReached=0 excludedAcrossDiscontinuity=0 positionOpen=0 skippedQuantity=0 skippedCost=0
+  inWindow candidates=1 trades=1
+trades trade schema=4 strategy=SWING_1H_TEST instrument=00000000-0000-0000-0000-0000000000a1 symbol=TEST side=Buy date=2026-03-02 decision=1772430300 tf=1h bar=1772426700/99/101.5/99/101.5/60000/60/True entry=1772430300@101.5 stop=98 target=108.5 exit=1772618340@101.7 reason=MaxHold rExact=0.05714285714285715 mae=0 mfe=0.08571428571428572 fills=Modelled costs=None snapshot=null rFilled=0.014285714285714287 slippageR=-0.04285714285714286 entryFilled=101.55 exitFilled=101.6 entryFill=AtOpen tickFallback=False sessionsHeld=3 sessionsUnseen=0
+J2
+instrument 00000000-0000-0000-0000-0000000000a1 TEST skipped=- detail=-
+  data first=2026-03-02 last=2026-03-03 replayFrom=2026-03-02 cover=2026-03-02..2026-03-03
+  bars read=750 fed=750 excluded=0 outside=0 sha256=ab5b6572c046b477a3da0c1d1f324904e71efc382b8206e844516d39f48b3c4b
+  tick=0.05 fallback=False
+  sessions ran=2 closed=0 special=0 short=0 missing=0
+  notesTruncated=False
+  counters Buy bars=750 ignored=0 incomplete=0 decisions=14 lost=0 stale=0 outOfWindow=4 window=10 fullyReady=10 candidates=1 later=3 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+    buy.trigger[0] T=4 F=6 U=0 N=0
+  walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=630 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=2 sessionsUnseen=0
+  fates suppressed=0 beforeWindow=0 openAtEnd=1 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 limitNotReached=0 excludedAcrossDiscontinuity=0 positionOpen=0 skippedQuantity=0 skippedCost=0
+  inWindow candidates=1 trades=1
+openAtEnd trade schema=4 strategy=SWING_1H_TEST instrument=00000000-0000-0000-0000-0000000000a1 symbol=TEST side=Buy date=2026-03-02 decision=1772430300 tf=1h bar=1772426700/99/101.5/99/101.5/60000/60/True entry=1772430300@101.5 stop=98 target=108.5 exit=1772531940@101.5 reason=EndOfData rExact=0 mae=0 mfe=0 fills=Modelled costs=None snapshot=null rFilled=-0.028571428571428574 slippageR=-0.028571428571428574 entryFilled=101.55 exitFilled=101.45 entryFill=AtOpen tickFallback=False sessionsHeld=2 sessionsUnseen=0
+J3
+instrument 00000000-0000-0000-0000-0000000000a1 TEST skipped=- detail=-
+  data first=2026-03-02 last=2026-03-06 replayFrom=2026-03-02 cover=2026-03-02..2026-03-06
+  bars read=1875 fed=1875 excluded=0 outside=0 sha256=e1f0b84c575e14a69a47f5bb17ebff5735e0e5303a636e7b1ba3ba7b0051bdb3
+  tick=0.05 fallback=False
+  sessions ran=5 closed=0 special=0 short=0 missing=0
+  notesTruncated=False
+  counters Buy bars=1875 ignored=0 incomplete=0 decisions=35 lost=0 stale=0 outOfWindow=10 window=25 fullyReady=25 candidates=1 later=3 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+    buy.trigger[0] T=4 F=21 U=0 N=0
+  walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1005 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=1 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=3 sessionsUnseen=0
+  fates suppressed=0 beforeWindow=1 openAtEnd=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 limitNotReached=0 excludedAcrossDiscontinuity=0 positionOpen=0 skippedQuantity=0 skippedCost=0
+  inWindow candidates=0 trades=0
+J4
+instrument 00000000-0000-0000-0000-0000000000a1 TEST skipped=- detail=-
+  data first=2026-03-02 last=2026-03-06 replayFrom=2026-03-02 cover=2026-03-02..2026-03-06
+  bars read=1875 fed=1875 excluded=0 outside=0 sha256=e1f0b84c575e14a69a47f5bb17ebff5735e0e5303a636e7b1ba3ba7b0051bdb3
+  tick=0.05 fallback=False
+  sessions ran=5 closed=0 special=0 short=0 missing=0
+  notesTruncated=False
+  counters Buy bars=1875 ignored=0 incomplete=0 decisions=35 lost=0 stale=0 outOfWindow=10 window=25 fullyReady=25 candidates=1 later=3 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+    buy.trigger[0] T=4 F=21 U=0 N=0
+  walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1005 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=1 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=3 sessionsUnseen=0
+  fates suppressed=0 beforeWindow=0 openAtEnd=0 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 limitNotReached=0 excludedAcrossDiscontinuity=0 positionOpen=0 skippedQuantity=0 skippedCost=0
+  inWindow candidates=1 trades=1
+trades trade schema=4 strategy=SWING_1H_TEST instrument=00000000-0000-0000-0000-0000000000a1 symbol=TEST side=Buy date=2026-03-02 decision=1772430300 tf=1h bar=1772426700/99/101.5/99/101.5/60000/60/True entry=1772430300@101.5 stop=98 target=108.5 exit=1772618340@101.7 reason=MaxHold rExact=0.05714285714285715 mae=0 mfe=0.08571428571428572 fills=Modelled costs=None snapshot=null rFilled=0.014285714285714287 slippageR=-0.04285714285714286 entryFilled=101.55 exitFilled=101.6 entryFill=AtOpen tickFallback=False sessionsHeld=3 sessionsUnseen=0
+Q2
+instrument 00000000-0000-0000-0000-0000000000a1 TEST skipped=- detail=-
+  data first=2026-03-02 last=2026-03-04 replayFrom=2026-03-02 cover=2026-03-02..2026-03-04
+  bars read=1125 fed=1125 excluded=0 outside=0 sha256=707665e9c51093a5b05d99038d2d20dacf5ab5bb34dfa7c13f8f5e906e92c8bc
+  tick=0.05 fallback=False
+  sessions ran=3 closed=0 special=0 short=0 missing=0
+  notesTruncated=False
+  counters Buy bars=1125 ignored=0 incomplete=0 decisions=21 lost=0 stale=0 outOfWindow=6 window=15 fullyReady=15 candidates=1 later=3 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+    buy.trigger[0] T=4 F=11 U=0 N=0
+  walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=1 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=256 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=1 overnightTargetGaps=0 sessionsHeld=2 sessionsUnseen=0
+  fates suppressed=0 beforeWindow=0 openAtEnd=0 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 limitNotReached=0 excludedAcrossDiscontinuity=0 positionOpen=0 skippedQuantity=0 skippedCost=0
+  inWindow candidates=1 trades=1
+trades trade schema=4 strategy=SWING_1H_TEST instrument=00000000-0000-0000-0000-0000000000a1 symbol=TEST side=Buy date=2026-03-02 decision=1772430300 tf=1h bar=1772426700/99/101.5/99/101.5/60000/60/True entry=1772430300@101.5 stop=98 target=108.5 exit=1772509500@81.3 reason=Stop rExact=-5.771428571428571 mae=5.771428571428571 mfe=0 fills=Modelled costs=None snapshot=null rFilled=-5.842857142857143 slippageR=-0.07142857142857144 entryFilled=101.55 exitFilled=81.1 entryFill=AtOpen tickFallback=False sessionsHeld=2 sessionsUnseen=0

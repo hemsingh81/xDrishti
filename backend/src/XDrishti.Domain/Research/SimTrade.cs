@@ -79,6 +79,11 @@ public sealed record SimTrade(
     /// <summary>The schema version this code writes.</summary>
     public const int CurrentSchemaVersion = 4;
 
-    /// <summary><c>StrategyId|Symbol|Side|TradeDate</c>: unique by construction for the one-trade-per-instrument-side-day rule. Computed, not stored.</summary>
-    public string Key => string.Create(CultureInfo.InvariantCulture, $"{StrategyId}|{Symbol}|{Side}|{TradeDate:yyyy-MM-dd}");
+    /// <summary>
+    /// <c>StrategyId|Symbol|Side|DecisionDate</c>, the India date of the minute that closed the evaluation bar (ADR 0043, D6): unique by construction because the scanner makes one candidate per instrument, side and decision date. For an intraday
+    /// trade and for a swing trade filled on the day it was decided this is <see cref="TradeDate"/>; for an order that rested overnight it is the day before the fill. Computed, not stored.
+    /// </summary>
+    public string Key => string.Create(CultureInfo.InvariantCulture, $"{StrategyId}|{Symbol}|{Side}|{SessionClock.DateOf(DecisionEpochSeconds - SecondsPerMinute):yyyy-MM-dd}");
+
+    private const long SecondsPerMinute = 60;
 }

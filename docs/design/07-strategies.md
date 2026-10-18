@@ -45,6 +45,8 @@ BUY RELIANCE | INTRADAY | 15m | ORB         basket: Best stocks   account: dhan_
 Swing tickets from daily bars: signal known at close; trigger typically "buy-stop above today's high
 tomorrow" or "enter at open if gap within limits".
 
+In the simulator (P3-03e, [ADR 0043](../adr/0043-the-daily-evaluation-and-the-overnight-entry-order-sim-5-and-run-record-schema-5.md)) the second form is built and the first is not: a 1D strategy is evaluated at the step of the 15:29 minute, its order rests overnight and fills at the first minute that holds a trade of the next session, within five minutes of its open and within the 0.1 % limit of the daily close (a gap above the limit is a counted miss, a gap through the stop is no trade). A buy-stop above the day's high, which lives across bars, is not run yet.
+
 The ticket is what the planner (P7) shows; the model above evaluates the same conditions at every closed bar. What an `at_close` entry fills at ("at trigger-candle close, limit +0.1 %") is the simulator's
 decision (P3-03), not the model's.
 

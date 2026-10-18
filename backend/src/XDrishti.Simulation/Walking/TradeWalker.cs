@@ -23,6 +23,12 @@ namespace XDrishti.Simulation.Walking;
 /// on over the dates of the position (<see cref="SwingWalk"/>), leaves with <see cref="ExitReason.MaxHold"/> at the close of the due session (X8) and ends with <see cref="ExitReason.EndOfData"/> only when the list of bars ends (X9).
 /// </para>
 /// <para>
+/// <b>An order that rests overnight</b> (ADR 0043, E8 and E9). In a swing walk a decision at or after the end of its session (15:30, or the end of a special session) places its order for the next trading session by the calendar: it fills at the
+/// first minute that holds a trade on that date and at most five minutes after the session's open, with the limit and the stop rows of the intraday entry (E2 to E6). A minute of another date that is not the fill session ends the search
+/// (<see cref="NoTradeReason.NoFillBar"/>: a later session is never used); a list that has no minute after the candidate's own is <see cref="NoTradeReason.OrderPendingAtEnd"/>, because a longer list may fill the order. The due session is counted
+/// from the fill session, the trade is dated on the fill date and <see cref="WalkOutcome.OvernightEntry"/> is set. An intraday walk never rests overnight.
+/// </para>
+/// <para>
 /// Failures that are not an outcome are data: <c>simulation.fill_rules_invalid</c> and <c>simulation.tick_size_invalid</c> (a <see cref="WalkRules"/> that bypassed the factories), <c>simulation.rules_invalid</c> (a stop level or
 /// trigger close that is not a finite number, a reward-to-risk that is not above 0, a square-off minute outside 1 to 1439), <c>simulation.candidate_not_in_bars</c>, <c>simulation.bars_not_ascending</c> (two equal epochs or a
 /// descending pair among the minutes the walk visits; the whole list is checked once by the caller, never per candidate) and <c>simulation.bar_price_invalid</c> (a visited minute whose price is not a finite number).
@@ -92,11 +98,29 @@ public static class TradeWalker
             return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.CandidateNotInBarsCode, "The candidate's minute is not at its index in the list of bars, or does not end at the decision instant."));
         }
 
-        // X8: the due session of a swing walk comes from the calendar alone, before any minute is read.
+        // E8: in a swing walk a decision at or after the end of its session places an order for the next session; an intraday walk never does.
+        var decisionDate = SessionClock.DateOf(bars[index].EpochSeconds);
+        var entryDate = decisionDate;
+        var overnight = false;
+        var fillOpen = 0L;
+        if (rules.Hold is { } resting && SessionClock.MinuteOfDay(bars[index].EpochSeconds) + 1 >= resting.SessionEndMinute(decisionDate))
+        {
+            var next = resting.NextSession(decisionDate);
+            if (next.IsFailure)
+            {
+                return Result.Failure<WalkOutcome>(next.Error);
+            }
+
+            overnight = true;
+            entryDate = next.Value;
+            fillOpen = resting.SessionOpen(entryDate);
+        }
+
+        // X8: the due session of a swing walk comes from the calendar alone, before any minute is read; the entry session (the fill session of an order resting overnight) is session 1.
         var due = default(DateOnly);
         if (rules.Hold is { } hold)
         {
-            var found = hold.DueSession(SessionClock.DateOf(bars[index].EpochSeconds));
+            var found = hold.DueSession(entryDate);
             if (found.IsFailure)
             {
                 return Result.Failure<WalkOutcome>(found.Error);
@@ -105,11 +129,11 @@ public static class TradeWalker
             due = found.Value;
         }
 
-        // E1: the fill minute is the first minute after the candidate's own that holds a trade (E0), on its date and at most five minutes after the decision instant.
-        var entryDate = SessionClock.DateOf(bars[index].EpochSeconds);
+        // E1 (E9 for an order resting overnight): the fill minute is the first minute after the candidate's own that holds a trade (E0), on the fill date and at most five minutes after the decision instant (after the open of the fill session).
         var previousEpoch = bars[index].EpochSeconds;
         var zeroMinutes = 0;
         var fillIndex = -1;
+        var ranOff = true;   // the loop ran off the end of the list while the order could still fill
         for (var j = index + 1; j < bars.Count; j++)
         {
             var bar = bars[j];
@@ -119,8 +143,29 @@ public static class TradeWalker
             }
 
             previousEpoch = bar.EpochSeconds;
-            if (SessionClock.DateOf(bar.EpochSeconds) != entryDate || bar.EpochSeconds - candidate.DecisionEpochSeconds > SimulationEngine.MaxFillDelayMinutes * SecondsPerMinute)
+            var barDate = SessionClock.DateOf(bar.EpochSeconds);
+            if (overnight)
             {
+                if (barDate == decisionDate)
+                {
+                    continue;
+                }
+
+                var delay = bar.EpochSeconds - fillOpen;
+                if (barDate != entryDate || delay > SimulationEngine.MaxFillDelayMinutes * SecondsPerMinute)
+                {
+                    ranOff = false;
+                    break;
+                }
+
+                if (delay < 0)
+                {
+                    continue;
+                }
+            }
+            else if (barDate != entryDate || bar.EpochSeconds - candidate.DecisionEpochSeconds > SimulationEngine.MaxFillDelayMinutes * SecondsPerMinute)
+            {
+                ranOff = false;
                 break;
             }
 
@@ -136,7 +181,8 @@ public static class TradeWalker
 
         if (fillIndex < 0)
         {
-            return WalkResults.NoTrade(NoTradeReason.NoFillBar, 0, zeroMinutes);
+            // D3: when the list ended while the order could still fill (no minute of another date, no minute past the five minutes), it cannot be said to have missed anything: a longer list may fill it.
+            return WalkResults.NoTrade(overnight && ranOff ? NoTradeReason.OrderPendingAtEnd : NoTradeReason.NoFillBar, 0, zeroMinutes);
         }
 
         var fillBar = bars[fillIndex];
@@ -187,7 +233,7 @@ public static class TradeWalker
         var entryFilled = kind == EntryFill.AtOpen ? slip.Entry(isBuy, entry, limit, fill.High - fill.Low) : entry;
         var position = new Position(
             candidate, fillBar.EpochSeconds, isBuy, entry, entryFilled, kind, stop, target, risk, slip,
-            fillBar.EpochSeconds > candidate.DecisionEpochSeconds, risk < RiskFloorTicks * tick, rules.Fills.Basis, rules.Tick.FromFallback);
+            overnight ? fillBar.EpochSeconds > fillOpen : fillBar.EpochSeconds > candidate.DecisionEpochSeconds, risk < RiskFloorTicks * tick, rules.Fills.Basis, rules.Tick.FromFallback, overnight);
 
         return rules.Hold is { } swing
             ? SwingWalk.Follow(position, bars, fillIndex, swing, entryDate, due, zeroMinutes)

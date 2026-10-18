@@ -48,11 +48,11 @@ public sealed class SimulatorDeterminismTests
     }
 
     [Fact]
-    public void Only_the_strategy_of_f22_is_refused()
+    public void Every_fixture_strategy_is_run_now_that_the_level_stops_are_lifted_F22_was_the_only_one_refused_before()
     {
         var refused = Fixtures.All.Where(f => Simulator.Create(f.Definition, f.Timeframe).Simulator is null).Select(f => f.Name);
 
-        refused.ShouldBe(["F22"]);
+        refused.ShouldBeEmpty();
     }
 
     [Fact]

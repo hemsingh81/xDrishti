@@ -30,8 +30,8 @@ public sealed class SimulatorCreateTests
         { "entry limit_pullback on sell", Sell(s => s with { Entry = new EntrySpec(EntryKind.LimitPullback) }), "simulation.unsupported_entry", "sell.entry", "limit_pullback" },
         { "stop fixed_pct", Buy(b => b with { Stop = new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(1)) }), "simulation.unsupported_stop", "buy.stop", "fixed_pct" },
         { "stop atr_mult", Buy(b => b with { Stop = new StopSpec(StopKind.AtrMult, Mult: Quantity.Of(2)) }), "simulation.unsupported_stop", "buy.stop", "atr_mult" },
-        { "stop swing_low", Buy(b => b with { Stop = new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(3)) }), "simulation.unsupported_stop", "buy.stop", "swing_low" },
-        { "stop bar_high on sell", Sell(s => s with { Stop = new StopSpec(StopKind.BarHigh) }), "simulation.unsupported_stop", "sell.stop", "bar_high" },
+        { "stop swing_low with a buffer", Buy(b => b with { Stop = new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(3), BufferAtr: Quantity.Of(0.5)) }), "simulation.unsupported_stop", "buy.stop.buffer_atr", "swing_low" },
+        { "stop bar_high on sell on another timeframe", Sell(s => s with { Stop = new StopSpec(StopKind.BarHigh, Timeframe.M5) }), "simulation.unsupported_stop", "sell.stop.timeframe", "bar_high" },
         { "stop or_opposite with a buffer", Buy(b => b with { Stop = new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Of(15), BufferAtr: Quantity.Of(0.5)) }), "simulation.unsupported_stop", "buy.stop.buffer_atr", "buffer_atr" },
         { "stop or_opposite on another timeframe", Buy(b => b with { Stop = new StopSpec(StopKind.OrOpposite, Timeframe.M5, Minutes: Quantity.Of(15)) }), "simulation.unsupported_stop", "buy.stop.timeframe", "5m" },
         { "two exit policies", Buy(b => b with { Exits = [Rr(2), new ExitSpec(ExitPolicy.AtrTrail, [new ExitParameter("atr_mult", [Quantity.Of(2)])])] }), "simulation.unsupported_exit", "buy.exits", "FIXED_RR" },
@@ -61,6 +61,18 @@ public sealed class SimulatorCreateTests
         problem.Message.ShouldContain(word, Case.Insensitive, label);
     }
 
+    [Theory]
+    [InlineData(StopKind.SwingHigh)]
+    [InlineData(StopKind.BarHigh)]
+    public void The_high_level_stops_with_a_zero_buffer_on_the_evaluation_timeframe_are_accepted_for_a_sell(StopKind kind)
+    {
+        var stop = kind is StopKind.SwingHigh ? new StopSpec(kind, Lookback: Quantity.Of(5)) : new StopSpec(kind);
+
+        var build = Simulator.Create(Sell(s => s with { Stop = stop }), Timeframe.M15);
+
+        build.Simulator.ShouldNotBeNull(kind + ": " + string.Join("; ", build.Problems.Select(p => p.Path + " " + p.Problem.Code)));
+    }
+
     [Fact]
     public void A_filter_is_refused_at_its_own_index_and_one_problem_per_filter_is_given()
     {
@@ -72,13 +84,13 @@ public sealed class SimulatorCreateTests
     }
 
     [Fact]
-    public void A_daily_evaluation_is_refused_by_name_with_the_code_the_scanner_uses()
+    public void A_daily_evaluation_is_accepted_and_the_four_level_stops_run_beside_or_opposite()
     {
         var build = Simulator.Create(TestStrategies.Swing(Timeframe.D1), Timeframe.D1);
 
-        build.Simulator.ShouldBeNull();
-        build.Problems.ShouldContain(p => p.Problem.Code == "simulation.scanner_timeframe_unsupported" && p.Path == "timeframes");
-        build.Problems.ShouldNotContain(p => p.Problem.Code == "simulation.unsupported_style");
+        build.Simulator.ShouldNotBeNull(string.Join("; ", build.Problems.Select(p => p.Path + " " + p.Problem.Code)));
+        build.Simulator.HoldsOvernight.ShouldBeTrue();
+        build.Problems.ShouldNotContain(p => p.Problem.Code == "simulation.scanner_timeframe_unsupported");
     }
 
     [Fact]

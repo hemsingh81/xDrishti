@@ -61,10 +61,16 @@ internal static class OutcomeFormatter
             text.Append(" overnightTargetGap=True");
         }
 
+        // A fact of P3-03e: printed only when set, so that every line of an earlier row is what it was.
+        if (outcome.OvernightEntry)
+        {
+            text.Append(" overnightEntry=True");
+        }
+
         return text.ToString();
     }
 
     public static string Render(WalkCounters c) =>
         string.Create(CultureInfo.InvariantCulture,
-            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined} limitNotReached={c.LimitNotReached} entriesAtOpen={c.EntriesAtOpen} entriesAtLimit={c.EntriesAtLimit} ambiguousMinutes={c.AmbiguousMinutes} lateSquareOffs={c.LateSquareOffs} zeroVolumeMinutes={c.ZeroVolumeMinutes} riskUnderFourTicks={c.RiskUnderFourTicks} positionOpen={c.PositionOpen} exitsMaxHold={c.ExitsMaxHold} maxHoldAtLastClose={c.MaxHoldAtLastClose} overnightStopGaps={c.OvernightStopGaps} overnightTargetGaps={c.OvernightTargetGaps} sessionsHeld={c.SessionsHeld} sessionsUnseen={c.SessionsUnseen}");
+            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined} limitNotReached={c.LimitNotReached} entriesAtOpen={c.EntriesAtOpen} entriesAtLimit={c.EntriesAtLimit} ambiguousMinutes={c.AmbiguousMinutes} lateSquareOffs={c.LateSquareOffs} zeroVolumeMinutes={c.ZeroVolumeMinutes} riskUnderFourTicks={c.RiskUnderFourTicks} positionOpen={c.PositionOpen} exitsMaxHold={c.ExitsMaxHold} maxHoldAtLastClose={c.MaxHoldAtLastClose} overnightStopGaps={c.OvernightStopGaps} overnightTargetGaps={c.OvernightTargetGaps} sessionsHeld={c.SessionsHeld} sessionsUnseen={c.SessionsUnseen} overnightEntries={c.OvernightEntries} orderPendingAtEnd={c.OrderPendingAtEnd}");
 }

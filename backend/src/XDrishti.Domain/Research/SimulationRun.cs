@@ -40,5 +40,5 @@ public sealed record SimulationRun(
     CostRecord? Costs = null)
 {
     /// <summary>The schema of the record and of the run key this code writes.</summary>
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 }

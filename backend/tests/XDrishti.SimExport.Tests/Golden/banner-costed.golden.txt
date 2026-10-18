@@ -11,7 +11,7 @@ data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 t
 engine: not yet verified (P3-08)
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
-not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.
+not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
 not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.
 not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.
 not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.

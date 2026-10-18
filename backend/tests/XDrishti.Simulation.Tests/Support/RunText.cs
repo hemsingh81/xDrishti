@@ -83,7 +83,7 @@ internal static class RunText
     }
 
     public static string Fates(RunFates f) =>
-        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached} excludedAcrossDiscontinuity={f.ExcludedAcrossDiscontinuity} positionOpen={f.PositionOpen} skippedQuantity={f.SkippedQuantity} skippedCost={f.SkippedCost}");
+        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached} excludedAcrossDiscontinuity={f.ExcludedAcrossDiscontinuity} positionOpen={f.PositionOpen} skippedQuantity={f.SkippedQuantity} skippedCost={f.SkippedCost} orderPendingAtEnd={f.OrderPendingAtEnd}");
 
     public static string Replay(InstrumentReplay replay)
     {

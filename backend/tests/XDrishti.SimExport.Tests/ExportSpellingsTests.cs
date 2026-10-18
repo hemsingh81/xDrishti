@@ -73,6 +73,7 @@ public sealed class ExportSpellingsTests
         ExportSpellings.Of(SkipReason.TickSizeInvalid).ShouldBe("tick_size_invalid");
         ExportSpellings.Of(NoTradeReason.LimitNotReached).ShouldBe("limit_not_reached");
         ExportSpellings.Of(NoTradeReason.PositionOpen).ShouldBe("position_open");
+        ExportSpellings.Of(NoTradeReason.OrderPendingAtEnd).ShouldBe("order_pending_at_end");
         ExportSpellings.Of(UniverseKind.InstrumentList).ShouldBe("instrument_list");
         ExportSpellings.Of(UniverseKind.Basket).ShouldBe("basket");
         ExportSpellings.Of(SessionExclusion.ShortSession).ShouldBe("short_session");
