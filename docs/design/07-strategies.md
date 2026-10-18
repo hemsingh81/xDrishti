@@ -39,6 +39,17 @@ BUY RELIANCE | INTRADAY | 15m | ORB         basket: Best stocks   account: dhan_
 Swing tickets from daily bars: signal known at close; trigger typically "buy-stop above today's high
 tomorrow" or "enter at open if gap within limits".
 
+**As the simulator realises the ticket (P3-03, [ADR 0037](../adr/0037-simulation-conventions-and-the-two-stage-seam.md)).** The first stage walks the entry and the exit of an intraday ticket on 1-minute bars with *exact* fills,
+and says so on every trade (`fills: exact`, `entry limit: not applied`, `costs: none`); the fill realism of the ticket above (the limit of +0.1 %, slippage, ticks) is P3-03b and costs are P3-03c.
+- *Entry.* "At trigger-candle close" cannot be filled: the bar has closed. The entry is the **open of the first minute after the trigger bar**, when that minute starts at most five minutes after the decision instant, on the same
+  day and before the square-off; otherwise the ticket is no trade (`NoFillBar`, `AfterSquareOff`). A fill at or through the stop is no trade (`EntryThroughStop`). All are counted.
+- *Stop and target.* Risk per unit is `|entry − stop|`; with `FIXED_RR` the target is the entry plus `rr` times that risk (minus for a sell). Touching a level counts. **Stop first:** a minute that holds both is a stop. A stop that
+  the market gapped through fills at that minute's **open**; a target it gapped through fills at the target (no improvement).
+- *Square-off.* The always-on `SESSION_EXIT`: the first minute that starts at or after the square-off time (15:15) leaves at its open. A position still open when the day's data ends leaves at the last close and is
+  reported apart (`EndOfData`), never among the trades that statistics count.
+- *Result.* R, MAE and MFE in units of the risk; the minute in which the position leaves counts as ADR 0037 decision D5 says (stop first is assumed because the path inside a minute is unknown). The partial exit, the break-even
+  move and the trail of the ticket above are P4 (the entry and the exit are separate stages so that exit policies can be compared on the same entries).
+
 ## 3. Starter library
 
 Each mirrored for SELL where sensible. Most cells will fail qualification — expected and healthy.

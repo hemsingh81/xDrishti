@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The simulator (P3-03, ADR 0037): the trade walker turns an entry candidate and the 1-minute bars after it into a simulated trade. Pure library, no I/O:
+       depends only on Domain and no package (enforced by architecture tests). P3-03a adds the references to Indicators and Strategies on purpose. -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+  </ItemGroup>
+</Project>
