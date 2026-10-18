@@ -53,12 +53,12 @@ public static class TradeWalker
 
         if (!TickGrid.TryConvert(candidate.StopLevel, out var stop))
         {
-            return Result.Failure<WalkOutcome>(Error.Validation("simulation.rules_invalid", "The stop level is not a finite number."));
+            return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.RulesInvalidCode, "The stop level is not a finite number."));
         }
 
         if (!TickGrid.TryConvert(candidate.TriggerBar.Close, out var triggerClose))
         {
-            return Result.Failure<WalkOutcome>(Error.Validation("simulation.rules_invalid", "The close of the trigger bar is not a finite number."));
+            return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.RulesInvalidCode, "The close of the trigger bar is not a finite number."));
         }
 
         decimal? multiple = null;
@@ -66,7 +66,7 @@ public static class TradeWalker
         {
             if (!(rewardRisk > 0 && TickGrid.TryConvert(rewardRisk, out var converted) && converted > 0))
             {
-                return Result.Failure<WalkOutcome>(Error.Validation("simulation.rules_invalid", "The reward-to-risk must be a finite number above 0."));
+                return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.RulesInvalidCode, "The reward-to-risk must be a finite number above 0."));
             }
 
             multiple = converted;
@@ -74,13 +74,13 @@ public static class TradeWalker
 
         if (rules.SquareOffMinute is < 1 or > 1439)
         {
-            return Result.Failure<WalkOutcome>(Error.Validation("simulation.rules_invalid", "The square-off minute must be a minute of the India day, from 1 to 1439 (915 is 15:15)."));
+            return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.RulesInvalidCode, "The square-off minute must be a minute of the India day, from 1 to 1439 (915 is 15:15)."));
         }
 
         var index = candidate.DecisionBarIndex;
         if ((uint)index >= (uint)bars.Count || bars[index].EpochSeconds != candidate.DecisionEpochSeconds - SecondsPerMinute)
         {
-            return Result.Failure<WalkOutcome>(Error.Validation("simulation.candidate_not_in_bars", "The candidate's minute is not at its index in the list of bars, or does not end at the decision instant."));
+            return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.CandidateNotInBarsCode, "The candidate's minute is not at its index in the list of bars, or does not end at the decision instant."));
         }
 
         // E1: the fill minute is the first minute after the candidate's own that holds a trade (E0), on its date and at most five minutes after the decision instant.
@@ -317,14 +317,14 @@ public static class TradeWalker
             exitEpoch,
             (double)exit,
             reason,
-            (double)rExact,
-            (double)adverse,
-            (double)favourable,
+            D(rExact),
+            D(adverse),
+            D(favourable),
             position.Basis,
             CostBasis.None,
             EntrySnapshotJson: null,
-            (double)rFilled,
-            (double)(rFilled - rExact),
+            D(rFilled),
+            D(rFilled - rExact),
             (double)position.EntryFilled,
             (double)exitFilled,
             position.EntryFill,
@@ -332,6 +332,9 @@ public static class TradeWalker
 
         return Result.Success(new WalkOutcome(trade, null, examined, position.AfterMissingMinutes, flags.StopGap, flags.TargetGap, flags.Ambiguous, flags.LateSquareOff, position.RiskUnderFourTicks, zero));
     }
+
+    /// <summary>A decimal figure as the double of a <see cref="SimTrade"/> field. A decimal zero can carry a sign (<c>-1m * 0m</c>), and a double <c>-0</c> is printed as "-0" in a golden file or in JSON: zero is always +0.</summary>
+    private static double D(decimal value) => value == 0m ? 0d : (double)value;
 
     /// <summary>The extremes after the adverse side reaches <paramref name="price"/>: the low of a buy, the high of a sell.</summary>
     private static (decimal Low, decimal High) Worsen(bool isBuy, decimal low, decimal high, decimal price) =>
@@ -363,7 +366,7 @@ public static class TradeWalker
         Result.Success(new WalkOutcome(null, reason, examined, EntryAfterMissingMinutes: false, StopGapExit: false, TargetGapExit: false, AmbiguousMinute: false, LateSquareOff: false, RiskUnderFourTicks: false, zeroMinutes));
 
     private static Result<WalkOutcome> NotAscending() =>
-        Result.Failure<WalkOutcome>(Error.Validation("simulation.bars_not_ascending", "The minutes of the walk are not strictly ascending: two have the same start or one is earlier than the one before."));
+        Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.BarsNotAscendingCode, "The minutes of the walk are not strictly ascending: two have the same start or one is earlier than the one before."));
 
     private static Result<WalkOutcome> PriceInvalid() =>
         Result.Failure<WalkOutcome>(Error.Validation("simulation.bar_price_invalid", "A minute the walk visits has a price that is not a finite number."));

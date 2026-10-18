@@ -11,6 +11,9 @@ public sealed record TickSpec
 
     private const decimal PaisePerRupee = 100m;
 
+    /// <summary>Dividing by this strips the trailing zeros of a decimal (5.0000 / 100 is 0.050000), so that the same tick has the same scale, prints the same and serialises the same however it was given.</summary>
+    private const decimal Unscale = 1.0000000000000000000000000000m;
+
     private TickSpec(decimal size, bool fromFallback)
     {
         Size = size;
@@ -30,6 +33,6 @@ public sealed record TickSpec
 
     private static Result<TickSpec> Check(decimal rupees) =>
         rupees > 0 && rupees <= 1
-            ? Result.Success(new TickSpec(rupees, false))
+            ? Result.Success(new TickSpec(rupees / Unscale, false))
             : Result.Failure<TickSpec>(SimulationErrors.TickSizeInvalid($"{rupees.ToString(CultureInfo.InvariantCulture)} rupees is not above 0 and at most 1"));
 }

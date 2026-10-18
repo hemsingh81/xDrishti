@@ -84,6 +84,15 @@ public class FillRulesTests
     }
 
     [Fact]
+    public void Create_turns_a_negative_zero_limit_percent_into_zero_so_the_canonical_json_never_says_minus_zero()
+    {
+        var rules = FillRules.Create(-0.0, SlippageConfig.None).Value;
+
+        double.IsNegative(rules.EntryLimitPercent).ShouldBeFalse();
+        rules.ToCanonicalJson().ShouldBe("{\"entry_limit_percent\":0,\"slippage\":{\"ticks\":0,\"bar_range_frac\":0,\"stop_exit_extra_ticks\":0,\"gap_fill\":\"at_open\"}}");
+    }
+
+    [Fact]
     public void Only_Create_can_build_one_and_nothing_can_be_changed()
     {
         typeof(FillRules).GetConstructors().ShouldBeEmpty();

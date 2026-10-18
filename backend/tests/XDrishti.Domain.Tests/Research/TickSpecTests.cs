@@ -65,6 +65,32 @@ public class TickSpecTests
         result.Error.Code.ShouldBe("simulation.tick_size_invalid");
     }
 
+    [Theory]
+    [InlineData("1.0000", "0.01")]
+    [InlineData("5.0000", "0.05")]
+    [InlineData("10.0000", "0.1")]
+    public void The_same_tick_has_the_same_scale_and_text_however_it_was_given(string paise, string rupees)
+    {
+        var fromMaster = TickSpec.FromMasterPaise(decimal.Parse(paise, System.Globalization.CultureInfo.InvariantCulture)).Value;
+        var fromRupees = TickSpec.FromRupees(decimal.Parse(rupees, System.Globalization.CultureInfo.InvariantCulture)).Value;
+
+        fromMaster.Size.ToString(System.Globalization.CultureInfo.InvariantCulture).ShouldBe(rupees);
+        fromMaster.Size.Scale.ShouldBe(fromRupees.Size.Scale);
+        fromMaster.Size.ToString(System.Globalization.CultureInfo.InvariantCulture).ShouldBe(fromRupees.Size.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        fromMaster.ShouldBe(fromRupees);
+    }
+
+    [Fact]
+    public void Five_paise_prints_as_0_05_whatever_the_scale_of_the_master_value()
+    {
+        var fromMaster = TickSpec.FromMasterPaise(5.0000m).Value;
+
+        fromMaster.Size.ShouldBe(TickSpec.FromRupees(0.05m).Value.Size);
+        fromMaster.Size.ToString(System.Globalization.CultureInfo.InvariantCulture).ShouldBe("0.05");
+        TickSpec.FromRupees(0.0500m).Value.Size.ToString(System.Globalization.CultureInfo.InvariantCulture).ShouldBe("0.05");
+        TickSpec.FromMasterPaise(null).Value.Size.ToString(System.Globalization.CultureInfo.InvariantCulture).ShouldBe("0.05");
+    }
+
     [Fact]
     public void Only_the_factories_can_build_one()
     {

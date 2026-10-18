@@ -67,4 +67,50 @@ public sealed class TradeWalkerBoundaryTests
 
         TradeWalker.Walk(f1.Items[0].Candidate, f1.Bars, Cand.Standard with { SquareOffMinute = squareOffMinute }).IsSuccess.ShouldBeTrue();
     }
+    [Theory]
+    [InlineData(1e12)]
+    [InlineData(1e13)]
+    [InlineData(1e17)]
+    [InlineData(1e18)]
+    [InlineData(1e300)]
+    public void A_price_near_the_largest_the_walker_converts_never_throws_a_decimal_overflow_it_walks_or_refuses_by_name(double price)
+    {
+        // k × risk with both near 1e18 is 1e36, past the 7.9e28 of decimal: the largest accepted magnitude is 1e12, so the product stays near 2e24 (ADR 0038, decision 12).
+        Bar Flat(string time) => new(DayBuilder.Epoch(DayBuilder.Monday, time), price, price, price, price, 1_000);
+        var own = Flat("10:00");
+        var fill = Flat("10:01");
+        var squareOff = Flat("15:15");
+        var candidate = Cand.Make(Side.Buy, 0, "10:01", 1.00, "09:45", (price, price, price, price));
+        var rules = Cand.Modelled with { RewardRisk = price };
+
+        var result = Should.NotThrow(() => TradeWalker.Walk(candidate, [own, fill, squareOff], rules));
+
+        if (price <= 1e12)
+        {
+            result.IsSuccess.ShouldBeTrue(result.IsFailure ? result.Error.Code + result.Error.Message : string.Empty);
+            result.Value.Trade.ShouldNotBeNull().TargetPrice.ShouldNotBeNull();
+        }
+        else
+        {
+            result.IsFailure.ShouldBeTrue();
+            result.Error.Code.ShouldBe(SimulationErrors.RulesInvalidCode);
+        }
+    }
+
+    [Fact]
+    public void A_trade_that_exits_where_it_entered_has_plus_zero_in_every_figure_never_minus_zero()
+    {
+        // A sell that leaves at its entry price: sign (-1) × 0 / risk is a decimal -0 that a plain cast to double turns into -0.0, which prints as "-0" in a golden file or in JSON.
+        var own = new Bar(DayBuilder.Epoch(DayBuilder.Monday, "10:00"), 100.00, 100.00, 100.00, 100.00, 1_000);
+        var flat = new Bar(DayBuilder.Epoch(DayBuilder.Monday, "10:01"), 100.00, 100.00, 100.00, 100.00, 1_000);
+        var squareOff = new Bar(DayBuilder.Epoch(DayBuilder.Monday, "15:15"), 100.00, 100.00, 100.00, 100.00, 1_000);
+        var candidate = Cand.Sell(0, "10:01", 101.00, "09:45", (100.00, 100.00, 100.00, 100.00));
+
+        var trade = TradeWalker.Walk(candidate, [own, flat, squareOff], Cand.Standard).Value.Trade.ShouldNotBeNull();
+
+        trade.ExitReason.ShouldBe(ExitReason.SquareOff);
+        var figures = new[] { trade.RExact, trade.MaeR, trade.MfeR, trade.RFilled, trade.SlippageR };
+        figures.ShouldAllBe(v => v == 0);
+        figures.ShouldAllBe(v => !double.IsNegative(v));
+    }
 }

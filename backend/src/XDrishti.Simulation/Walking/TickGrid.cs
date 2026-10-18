@@ -6,8 +6,11 @@ namespace XDrishti.Simulation.Walking;
 /// </summary>
 internal static class TickGrid
 {
-    /// <summary>The largest price magnitude the walker converts; far beyond any share price and far inside the range of <see cref="decimal"/>.</summary>
-    private const double MaxPrice = 1e18;
+    /// <summary>
+    /// The largest magnitude the walker converts (a price, a level, a reward-to-risk, a slippage figure): far beyond any share price, and small enough that no product of two converted figures
+    /// (<c>reward-to-risk × risk</c> is at most 2e24) comes near the 7.9e28 of <see cref="decimal"/>. A decimal conversion never throws (ADR 0038, decision 12).
+    /// </summary>
+    private const double MaxPrice = 1e12;
 
     private const int Decimals = 8;
 

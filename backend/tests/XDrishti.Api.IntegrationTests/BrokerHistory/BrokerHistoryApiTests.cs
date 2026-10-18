@@ -81,7 +81,8 @@ public sealed class BrokerHistoryApiTests(ApiFactory factory) : BrokerHistoryTes
         var lines = Factory.Logs.All.Skip(logged).ToList();
         lines.ShouldContain(line => line.Contains("Broker history", StringComparison.Ordinal)); // the run did log
         lines.ShouldAllBe(line => !line.Contains(AccountsApi.Marker, StringComparison.Ordinal) && !line.Contains(FakeBrokers.DhanAccessToken, StringComparison.Ordinal));
-        lines.ShouldAllBe(line => !line.Contains("FUNDS DEPOSIT", StringComparison.Ordinal) && !line.Contains("T1", StringComparison.Ordinal) && !line.Contains("EXMPL", StringComparison.Ordinal));
+        // "T1" is the trade id of the fixture: match it as a word of its own, because the request id Kestrel puts into every log line ("0HNPD4GT1LGAA") contains those two letters by chance about one run in a hundred.
+        lines.ShouldAllBe(line => !line.Contains("FUNDS DEPOSIT", StringComparison.Ordinal) && !System.Text.RegularExpressions.Regex.IsMatch(line, @"\bT1\b") && !line.Contains("EXMPL", StringComparison.Ordinal));
     }
 
     [Fact]

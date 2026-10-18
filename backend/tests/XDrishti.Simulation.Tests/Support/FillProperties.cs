@@ -7,6 +7,11 @@ namespace XDrishti.Simulation.Tests.Support;
 /// <summary>
 /// The properties of P3-03 AC9 as ADR 0038 restates them (fill minute, entry price, exit price bounds, R and the excursions against a plain reference loop), written once and applied to the trades of
 /// <c>Simulator.Run</c> (P3-03a AC16). They read the exact layer of a trade (<c>EntryPrice</c>, <c>ExitPrice</c>, <c>RExact</c>), which does not depend on the slippage.
+/// <para>
+/// Scope: this is the <b>Simulator path</b> (the seeded series of <see cref="SeededSeries"/>, where the candidate is the first trigger of a date). The reference loop knows the minutes without a trade (E0), the fill minute of an
+/// entry at the limit (X5) and the gapped target (no adverse range), so it also agrees with the walker on the 500 <see cref="SeededDays"/>; but the full criterion 19 of P3-03b (the walker's own timing, range, grid and
+/// square-off scan over those days, and the signal-minute control) is <see cref="FillTimingCheck"/>, which returns violations instead of throwing.
+/// </para>
 /// </summary>
 internal static class FillProperties
 {
@@ -80,7 +85,7 @@ internal static class FillProperties
         trade.MfeR.ShouldBeGreaterThanOrEqualTo(0);
         (-trade.MaeR).ShouldBeLessThanOrEqualTo(trade.RExact + Tolerance);
         trade.RExact.ShouldBeLessThanOrEqualTo(trade.MfeR + Tolerance);
-        outcome.BarsExamined.ShouldBe(settled - fillIndex + 1, label);
+        outcome.BarsExamined.ShouldBe(Enumerable.Range(fillIndex, settled - fillIndex + 1).Count(i => bars[i].Volume > 0), label + " BarsExamined (the minutes that hold a trade, E0)");
     }
 
     /// <summary>
@@ -100,11 +105,25 @@ internal static class FillProperties
             worst = Math.Min(worst, Move(price));
         }
 
+        var buy = trade.Side == Side.Buy;
         for (var i = fillIndex; i <= exitIndex; i++)
         {
             var bar = bars[i];
+            if (bar.Volume == 0)
+            {
+                // E0: a minute without a trade counts nowhere
+                continue;
+            }
+
             if (i < exitIndex || trade.ExitReason == ExitReason.EndOfData)
             {
+                if (i == fillIndex && trade.EntryFill == EntryFill.AtLimit)
+                {
+                    // X5: the favourable extreme of the fill minute of an entry at the limit may have come before the fill; only the adverse one is known to come after it
+                    See(buy ? bar.Low : bar.High);
+                    continue;
+                }
+
                 See(bar.Low);
                 See(bar.High);
                 continue;
@@ -116,8 +135,15 @@ internal static class FillProperties
                     See(trade.ExitPrice);
                     break;
                 case ExitReason.Target:
-                    // only the adverse side of the minute counts, and only where it is below the entry (a minute that gapped beyond the target is wholly favourable)
-                    worst = Math.Min(worst, Move(trade.Side == Side.Buy ? bar.Low : bar.High));
+                    // D5b: a minute whose open is already at or beyond the target ends the trade at that first print and contributes no range (a gapped target, X1, the exception of X4); any other target minute
+                    // counts its adverse side in full
+                    var target = trade.TargetPrice.ShouldNotBeNull();
+                    var gapped = buy ? bar.Open >= target : bar.Open <= target;
+                    if (!gapped)
+                    {
+                        worst = Math.Min(worst, Move(buy ? bar.Low : bar.High));
+                    }
+
                     See(trade.ExitPrice);
                     break;
                 case ExitReason.SquareOff:

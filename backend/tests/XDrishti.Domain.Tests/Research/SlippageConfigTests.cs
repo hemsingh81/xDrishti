@@ -35,6 +35,19 @@ public class SlippageConfigTests
     }
 
     [Fact]
+    public void Create_turns_a_negative_zero_into_zero_so_no_text_says_minus_zero()
+    {
+        var created = SlippageConfig.Create(-0.0, -0.0, -0.0).Value;
+
+        double.IsNegative(created.Ticks).ShouldBeFalse();
+        double.IsNegative(created.BarRangeFrac).ShouldBeFalse();
+        double.IsNegative(created.StopExitExtraTicks).ShouldBeFalse();
+        created.IsNone.ShouldBeTrue();
+        FillRules.Create(0.1, created).Value.ToCanonicalJson().ShouldBe(FillRules.Create(0.1, SlippageConfig.None).Value.ToCanonicalJson());
+        FillRules.Create(0.1, created).Value.ToCanonicalJson().ShouldNotContain("-0");
+    }
+
+    [Fact]
     public void Create_of_zeros_equals_None()
     {
         SlippageConfig.Create(0, 0, 0).Value.ShouldBe(SlippageConfig.None);

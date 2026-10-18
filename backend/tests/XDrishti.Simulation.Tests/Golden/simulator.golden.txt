@@ -168,7 +168,7 @@ candidate ORB TEST Sell index=59 decision=2026-03-02 10:15 tf=M15 stop=100 bar=2
   sell.trigger[0] `close < or_low(or_min) and close[1] >= or_low(or_min)` True
     close@15m [97.5, 100.5]
     or_low(15)@15m [98, 98]
-  -> trade schema=2 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Sell date=2026-03-02 decision=1772426700 trigger=M15/1772425800/100.5/100.5/97.5/97.5/15000/15/True entry=1772426700@97.5 stop=100 target=92.5 exit=1772444700@97.5 reason=SquareOff R=-0 mae=0 mfe=0 fills=Modelled costs=None snapshot=null key=ORB|TEST|Sell|2026-03-02 rFilled=-0.04 slippageR=-0.04 entryFilled=97.45 exitFilled=97.55 entryFill=AtOpen tickFallback=False | examined=301 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
+  -> trade schema=2 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Sell date=2026-03-02 decision=1772426700 trigger=M15/1772425800/100.5/100.5/97.5/97.5/15000/15/True entry=1772426700@97.5 stop=100 target=92.5 exit=1772444700@97.5 reason=SquareOff R=0 mae=0 mfe=0 fills=Modelled costs=None snapshot=null key=ORB|TEST|Sell|2026-03-02 rFilled=-0.04 slippageR=-0.04 entryFilled=97.45 exitFilled=97.55 entryFill=AtOpen tickFallback=False | examined=301 delayed=False stopGap=False targetGap=False ambiguous=False late=False under4=False zero=0
 trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45 ORB|TEST|Sell|2026-03-02@2026-03-02 10:15
 openAtEnd 
 counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0

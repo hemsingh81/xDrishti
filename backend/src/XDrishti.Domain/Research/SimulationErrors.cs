@@ -9,6 +9,15 @@ public static class SimulationErrors
     public const string FillRulesInvalidCode = "simulation.fill_rules_invalid";
     public const string TickSizeInvalidCode = "simulation.tick_size_invalid";
 
+    /// <summary>Two equal epochs or a descending pair among the minutes of a walk or a run.</summary>
+    public const string BarsNotAscendingCode = "simulation.bars_not_ascending";
+
+    /// <summary>A stop level, trigger close, reward-to-risk or square-off minute the walker cannot use.</summary>
+    public const string RulesInvalidCode = "simulation.rules_invalid";
+
+    /// <summary>A candidate whose minute is not at its index in the list of bars, or does not end at its decision instant.</summary>
+    public const string CandidateNotInBarsCode = "simulation.candidate_not_in_bars";
+
     public static Error SlippageInvalid(string field, string reason) =>
         Error.Validation(SlippageInvalidCode, $"The slippage setting '{field}' is invalid: {reason}.");
 

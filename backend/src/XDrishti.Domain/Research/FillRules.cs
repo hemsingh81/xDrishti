@@ -41,7 +41,8 @@ public sealed record FillRules
             return Result.Failure<FillRules>(SimulationErrors.FillRulesInvalid(nameof(Slippage), "is required"));
         }
 
-        return Result.Success(new FillRules(entryLimitPercent, slippage));
+        // -0.0 passes the range check and is a different double: it would print as "-0" in the canonical JSON. Zero is always +0.
+        return Result.Success(new FillRules(entryLimitPercent == 0 ? 0 : entryLimitPercent, slippage));
     }
 
     private static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);

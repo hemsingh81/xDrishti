@@ -1,3 +1,4 @@
+using XDrishti.Domain.Research;
 using XDrishti.Simulation.Scanning;
 
 namespace XDrishti.Simulation.Running;
@@ -33,5 +34,5 @@ public static class SimulatorCodes
     public const string ScannerTimeframeUnsupported = ScannerCodes.TimeframeUnsupported;
 
     /// <summary>Two equal epochs or a descending pair among the minutes of a run. Returned by <c>Run</c> before any step.</summary>
-    public const string BarsNotAscending = "simulation.bars_not_ascending";
+    public const string BarsNotAscending = SimulationErrors.BarsNotAscendingCode;
 }

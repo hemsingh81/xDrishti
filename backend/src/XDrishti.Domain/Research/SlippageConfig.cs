@@ -54,6 +54,9 @@ public sealed record SlippageConfig
             return Result.Failure<SlippageConfig>(SimulationErrors.SlippageInvalid(nameof(GapFill), "only 'at open' is supported"));
         }
 
-        return Result.Success(new SlippageConfig(ticks, barRangeFrac, stopExitExtraTicks, gapFill));
+        // -0.0 passes every check above and is a different double: it would print as "-0" in the canonical JSON. Zero is always +0.
+        return Result.Success(new SlippageConfig(PlusZero(ticks), PlusZero(barRangeFrac), PlusZero(stopExitExtraTicks), gapFill));
     }
+
+    private static double PlusZero(double value) => value == 0 ? 0 : value;
 }

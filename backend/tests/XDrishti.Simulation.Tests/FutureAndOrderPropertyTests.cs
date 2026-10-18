@@ -110,14 +110,14 @@ public sealed class FutureAndOrderPropertyTests
     }
 
     [Fact]
-    public void A_walker_that_decides_one_minute_early_fills_before_the_true_decision_instant_on_at_least_ten_seeds_while_the_honest_one_never_does()
+    public void A_walker_that_decides_one_minute_early_breaks_the_fill_timing_check_of_criterion_19_on_at_least_ten_seeds_while_the_honest_one_never_does()
     {
         var early = 0;
         var honest = 0;
         foreach (var day in SeededDays.All)
         {
-            early += day.Walks.Any(w => FillsBeforeTheTrueDecision(day, w, WalkProperties.OneMinuteEarlier(w.Candidate, day.Bars))) ? 1 : 0;
-            honest += day.Walks.Any(w => FillsBeforeTheTrueDecision(day, w, w.Candidate)) ? 1 : 0;
+            early += day.Walks.Any(w => BreaksCriterion19(day, w, WalkProperties.OneMinuteEarlier(w.Candidate, day.Bars))) ? 1 : 0;
+            honest += day.Walks.Any(w => BreaksCriterion19(day, w, w.Candidate)) ? 1 : 0;
         }
 
         TestContext.Current.TestOutputHelper?.WriteLine($"the early decision is caught on {early} of {SeededDays.All.Count} seeds");
@@ -125,11 +125,14 @@ public sealed class FutureAndOrderPropertyTests
         honest.ShouldBe(0);
     }
 
-    /// <summary>The fill minute of the walk of <paramref name="candidate"/> starts before the instant the series really decided (the criterion 19 check, with the true decision instant).</summary>
-    private static bool FillsBeforeTheTrueDecision(SeededDay day, SeededWalk walk, EntryCandidate candidate)
+    /// <summary>
+    /// The walk of <paramref name="candidate"/> (possibly doctored) breaks criterion 19 measured against the instant the series really decided: the whole check of <see cref="FillTimingCheck"/> (fill minute at or after the
+    /// true decision instant, the first minute that holds a trade, ...), with the true candidate as the truth.
+    /// </summary>
+    private static bool BreaksCriterion19(SeededDay day, SeededWalk walk, EntryCandidate candidate)
     {
         var result = WalkProperties.Run(walk with { Candidate = candidate }, day.Bars, FillRules.Default);
-        return result.IsSuccess && result.Value.Trade is { } trade && trade.EntryEpochSeconds < walk.Candidate.DecisionEpochSeconds;
+        return result.IsSuccess && FillTimingCheck.Violations(day, walk.Candidate, result.Value, FillRules.Default).Count > 0;
     }
 
     /// <summary>
