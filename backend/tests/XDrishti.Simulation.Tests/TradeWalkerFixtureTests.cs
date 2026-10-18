@@ -67,7 +67,14 @@ public sealed class TradeWalkerFixtureTests
             StopGapExits: 0,
             TargetGapExits: 0,
             EntriesAfterMissingMinutes: 2,
-            BarsExamined: 2683));
+            BarsExamined: 2683,
+            LimitNotReached: 0,
+            EntriesAtOpen: 15,
+            EntriesAtLimit: 0,
+            AmbiguousMinutes: 1,
+            LateSquareOffs: 1,
+            ZeroVolumeMinutes: 0,
+            RiskUnderFourTicks: 0));
     }
 
     [Fact]
@@ -79,8 +86,9 @@ public sealed class TradeWalkerFixtureTests
             {
                 var c = WalkAssert.Walk(walkCase, item).Value.ToCounters();
 
-                c.Candidates.ShouldBe(c.Trades + c.NoFillBar + c.AfterSquareOff + c.EntryThroughStop, walkCase.Name);
+                c.Candidates.ShouldBe(c.Trades + c.NoFillBar + c.AfterSquareOff + c.EntryThroughStop + c.LimitNotReached, walkCase.Name);
                 c.Trades.ShouldBe(c.ExitsStop + c.ExitsTarget + c.ExitsSquareOff + c.ExitsEndOfData, walkCase.Name);
+                c.Trades.ShouldBe(c.EntriesAtOpen + c.EntriesAtLimit, walkCase.Name);
             }
         }
     }

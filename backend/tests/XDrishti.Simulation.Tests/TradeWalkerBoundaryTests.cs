@@ -51,7 +51,7 @@ public sealed class TradeWalkerBoundaryTests
     {
         var f1 = Cases.F("F1");
 
-        var result = TradeWalker.Walk(f1.Items[0].Candidate, f1.Bars, new WalkRules(2.0, squareOffMinute));
+        var result = TradeWalker.Walk(f1.Items[0].Candidate, f1.Bars, Cand.Standard with { SquareOffMinute = squareOffMinute });
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("simulation.rules_invalid");
@@ -65,6 +65,6 @@ public sealed class TradeWalkerBoundaryTests
     {
         var f1 = Cases.F("F1");
 
-        TradeWalker.Walk(f1.Items[0].Candidate, f1.Bars, new WalkRules(2.0, squareOffMinute)).IsSuccess.ShouldBeTrue();
+        TradeWalker.Walk(f1.Items[0].Candidate, f1.Bars, Cand.Standard with { SquareOffMinute = squareOffMinute }).IsSuccess.ShouldBeTrue();
     }
 }

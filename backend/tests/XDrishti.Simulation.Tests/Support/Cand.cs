@@ -10,8 +10,17 @@ internal static class Cand
     /// <summary>The one invented instrument of the fixtures.</summary>
     public static readonly InstrumentRef Test = new(new Guid("00000000-0000-0000-0000-000000000101"), "TEST");
 
-    /// <summary>The rules of the fixtures unless a row says otherwise: reward-risk 2.0, square-off at 15:15.</summary>
-    public static readonly WalkRules Standard = new(2.0, 915);
+    /// <summary>The NSE equity tick, 0.05 rupees, as the walker takes it.</summary>
+    public static readonly TickSpec Tick05 = TickSpec.FromRupees(0.05m).Value;
+
+    /// <summary>The fill rules of the compatibility with P3-03 (criterion 17): the 0.1 % entry limit and no slippage, so that the fills are the exact prices of the table.</summary>
+    public static readonly FillRules NoSlippage = FillRules.Create(0.1, SlippageConfig.None).Value;
+
+    /// <summary>The rules of the fixtures unless a row says otherwise: reward-risk 2.0, square-off at 15:15, the 0.1 % entry limit, no slippage, tick 0.05 (the compatibility rules of criterion 17).</summary>
+    public static readonly WalkRules Standard = new(2.0, 915, NoSlippage, Tick05);
+
+    /// <summary>The same exit rules with the doc 16 defaults for slippage: what a run uses.</summary>
+    public static readonly WalkRules Modelled = Standard with { Fills = FillRules.Default };
 
     /// <summary>A candidate on the date <paramref name="date"/>: the decision is at <paramref name="decision"/> (HH:MM), the end of the minute <c>bars[index]</c>.</summary>
     public static EntryCandidate Make(

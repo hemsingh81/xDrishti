@@ -122,6 +122,21 @@ public sealed class SimulationArchitectureTests
     }
 
     [Fact]
+    public void The_tick_grid_is_internal_to_the_walking_stage_and_the_root_and_the_domain_know_nothing_of_it()
+    {
+        // P3-03b criterion 23: the grid arithmetic is a detail of Walking (decimal, no public surface); the value types the stage shares with the run record are in Domain.Research.
+        var grid = Simulation.GetType("XDrishti.Simulation.Walking.TickGrid");
+
+        grid.ShouldNotBeNull();
+        grid.IsPublic.ShouldBeFalse();
+        grid.IsAbstract.ShouldBeTrue("a static class");
+        grid.IsSealed.ShouldBeTrue("a static class");
+        Simulation.GetExportedTypes().ShouldNotContain(grid);
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespaceMatching("^XDrishti\\.Simulation$").ShouldNot().HaveDependencyOn("XDrishti.Simulation.Walking.TickGrid").GetResult());
+        typeof(XDrishti.Domain.Research.TickSpec).Assembly.GetTypes().ShouldNotContain(t => t.Name == "TickGrid");
+    }
+
+    [Fact]
     public void The_stage_rule_does_catch_a_stage_that_reads_another()
     {
         // the scanning stage does read Strategies and Indicators, so the rule that forbids them to the root fails on it
@@ -328,7 +343,7 @@ internal static class AmbientSentinel
 internal static class WalkerUserSentinel
 {
     public static object Use(XDrishti.Simulation.EntryCandidate candidate) =>
-        XDrishti.Simulation.Walking.TradeWalker.Walk(candidate, [], new XDrishti.Simulation.Walking.WalkRules(null, 915));
+        XDrishti.Simulation.Walking.TradeWalker.Walk(candidate, [], new XDrishti.Simulation.Walking.WalkRules(null, 915, XDrishti.Domain.Research.FillRules.Default, XDrishti.Domain.Research.TickSpec.FromRupees(0.05m).Value));
 }
 
 /// <summary>Exposes a frame in public signatures and reads its ready flag on purpose, to prove the rules on the frame see such a use (it is never used by anything else).</summary>

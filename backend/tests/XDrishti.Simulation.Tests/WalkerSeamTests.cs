@@ -34,7 +34,7 @@ public sealed class WalkerSeamTests
         trade.TargetPrice.ShouldBe(104.25);
         trade.ExitReason.ShouldBe(ExitReason.Target);
         trade.ExitEpochSeconds.ShouldBe(DayBuilder.Epoch(DayBuilder.Monday, "10:30"));
-        trade.R.ShouldBe(1.5);
+        trade.RExact.ShouldBe(1.5);
         trade.MfeR.ShouldBe(1.5);
         outcome.BarsExamined.ShouldBe(46);
     }
@@ -57,7 +57,7 @@ public sealed class WalkerSeamTests
         trade.ExitReason.ShouldBe(ExitReason.SquareOff);
         trade.ExitPrice.ShouldBe(105.00);
         trade.ExitEpochSeconds.ShouldBe(DayBuilder.Epoch(DayBuilder.Monday, "15:15"));
-        trade.R.ShouldBe(1.8);
+        trade.RExact.ShouldBe(1.8);
         trade.MaeR.ShouldBe(0.4);
         trade.MfeR.ShouldBe(2.0);
         outcome.BarsExamined.ShouldBe(331);

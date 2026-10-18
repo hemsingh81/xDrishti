@@ -48,7 +48,7 @@ tomorrow" or "enter at open if gap within limits".
 The ticket is what the planner (P7) shows; the model above evaluates the same conditions at every closed bar. What an `at_close` entry fills at ("at trigger-candle close, limit +0.1 %") is the simulator's
 decision (P3-03), not the model's.
 
-**As the simulator realises the ticket (P3-03, [ADR 0037](../adr/0037-simulation-conventions-and-the-two-stage-seam.md)).** The first stage walks the entry and the exit of an intraday ticket on 1-minute bars with *exact* fills,
+**As the simulator realises the ticket (P3-03, [ADR 0037](../adr/0037-simulation-conventions-and-the-two-stage-seam.md); the entry limit of +0.1 %, slippage and the tick are P3-03b, [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md), which supersede the exact entry described next: the entry is a limit order at the trigger close +0.1 % rounded to the tick that lives for one minute and fills at the open, at the limit or is a counted miss).** The first stage walks the entry and the exit of an intraday ticket on 1-minute bars with *exact* fills,
 and says so on every trade (`fills: exact`, `entry limit: not applied`, `costs: none`); the fill realism of the ticket above (the limit of +0.1 %, slippage, ticks) is P3-03b and costs are P3-03c.
 - *Entry.* "At trigger-candle close" cannot be filled: the bar has closed. The entry is the **open of the first minute after the trigger bar**, when that minute starts at most five minutes after the decision instant, on the same
   day and before the square-off; otherwise the ticket is no trade (`NoFillBar`, `AfterSquareOff`). A fill at or through the stop is no trade (`EntryThroughStop`). All are counted.

@@ -59,13 +59,13 @@ internal static class Cases
             Case("F2", DayBuilder.Prefix().B().Row("10:20 100.50/101.50/100.50/101.00").Row("10:50 101.00/102.00/97.50/98.50"),
                 BuyB(Trade("09:45", 100.50, 98.00, 105.50, "10:50", 98.00, Stop, -1.0, 1.0, 0.4, 66))),
             Case("F3", DayBuilder.Prefix().B().Row("10:20 100.50/106.00/97.50/101.00"),
-                BuyB(Trade("09:45", 100.50, 98.00, 105.50, "10:20", 98.00, Stop, -1.0, 1.0, 0.0, 36))),
+                BuyB(new ExpectedTrade("09:45", 100.50, 98.00, 105.50, "10:20", 98.00, Stop, -1.0, 1.0, 0.0, 36, Ambiguous: true))),
             Case("F4", DayBuilder.Prefix().B().Row("09:45 100.50/100.50/97.50/98.50"),
                 BuyB(Trade("09:45", 100.50, 98.00, 105.50, "09:45", 98.00, Stop, -1.0, 1.0, 0.0, 1))),
             Case("F5", F5Day(), BuyB(Trade("09:45", 100.50, 98.00, 105.50, "15:15", 103.00, SquareOff, 1.0, 0.6, 1.6, 331))),
             Case("F6", F5Day().Until("15:09"), BuyB(Trade("09:45", 100.50, 98.00, 105.50, "15:09", 103.00, EndOfData, 1.0, 0.6, 1.6, 325))),
             Case("F7", F5Day().Absent("15:10", "15:15").Row("15:16 103.50/106.00/97.00/103.50"),
-                BuyB(Trade("09:45", 100.50, 98.00, 105.50, "15:16", 103.50, SquareOff, 1.2, 0.6, 1.6, 326))),
+                BuyB(new ExpectedTrade("09:45", 100.50, 98.00, 105.50, "15:16", 103.50, SquareOff, 1.2, 0.6, 1.6, 326, Late: true))),
             Case("F9", DayBuilder.Prefix().Row("11:29 99.00/100.50/99.00/100.50"),
                 WalkItem.Trades(
                     Cand.Make(Side.Buy, 134, "11:30", 98.00, "11:15", (99.00, 100.50, 99.00, 100.50)),
@@ -123,9 +123,12 @@ internal static class Cases
                 [.. F5Day().Until("15:09").Build(), .. nextDay],
                 Rules,
                 [BuyB(Trade("09:45", 100.50, 98.00, 105.50, "15:09", 103.00, EndOfData, 1.0, 0.6, 1.6, 325))]),
-            Case("W13", DayBuilder.Prefix().B().Row("10:30 106.00/106.50/97.50/100.00"), BuyB(Trade("09:45", 100.50, 98.00, 105.50, "10:30", 98.00, Stop, -1.0, 1.0, 0.0, 46))),
-            Case("W14-opens-beyond-the-stop", DayBuilder.Prefix().B().Row("15:15 97.50/97.75/97.00/97.25"), BuyB(Trade("09:45", 100.50, 98.00, 105.50, "15:15", 97.50, SquareOff, -1.2, 1.2, 0.0, 331))),
-            Case("W14-opens-beyond-the-target", DayBuilder.Prefix().B().Row("15:15 106.00/106.50/105.75/106.25"), BuyB(Trade("09:45", 100.50, 98.00, 105.50, "15:15", 106.00, SquareOff, 2.2, 0.0, 2.2, 331))),
+
+            // W13 and W14 are the two rows on which ADR 0038 differs from P3-03: the first print beyond the target decides for the target (was: Stop 98.00, R -1.0), and the square-off minute that opens beyond a level fills that level
+            // (was: SquareOff at the open, 97.50 with the same R and 106.00 with R +2.2).
+            Case("W13", DayBuilder.Prefix().B().Row("10:30 106.00/106.50/97.50/100.00"), BuyB(new ExpectedTrade("09:45", 100.50, 98.00, 105.50, "10:30", 105.50, Target, 2.0, 0.0, 2.0, 46, TargetGap: true))),
+            Case("W14-opens-beyond-the-stop", DayBuilder.Prefix().B().Row("15:15 97.50/97.75/97.00/97.25"), BuyB(new ExpectedTrade("09:45", 100.50, 98.00, 105.50, "15:15", 97.50, Stop, -1.2, 1.2, 0.0, 331, StopGap: true))),
+            Case("W14-opens-beyond-the-target", DayBuilder.Prefix().B().Row("15:15 106.00/106.50/105.75/106.25"), BuyB(new ExpectedTrade("09:45", 100.50, 98.00, 105.50, "15:15", 105.50, Target, 2.0, 0.0, 2.0, 331, TargetGap: true))),
         ];
     }
 }

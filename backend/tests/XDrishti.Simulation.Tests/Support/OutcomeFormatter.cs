@@ -34,17 +34,19 @@ internal static class OutcomeFormatter
                 .Append(CultureInfo.InvariantCulture,
                 $"entry={t.EntryEpochSeconds}@{Number(t.EntryPrice)} stop={Number(t.StopPrice)} target={Number(t.TargetPrice)} exit={t.ExitEpochSeconds}@{Number(t.ExitPrice)} reason={t.ExitReason} ")
                 .Append(CultureInfo.InvariantCulture,
-                $"R={Number(t.R)} mae={Number(t.MaeR)} mfe={Number(t.MfeR)} fills={t.Fills} costs={t.Costs} snapshot={t.EntrySnapshotJson ?? "null"} key={t.Key}");
+                $"R={Number(t.RExact)} mae={Number(t.MaeR)} mfe={Number(t.MfeR)} fills={t.Fills} costs={t.Costs} snapshot={t.EntrySnapshotJson ?? "null"} key={t.Key} ")
+                .Append(CultureInfo.InvariantCulture,
+                $"rFilled={Number(t.RFilled)} slippageR={Number(t.SlippageR)} entryFilled={Number(t.EntryFilledPrice)} exitFilled={Number(t.ExitFilledPrice)} entryFill={t.EntryFill} tickFallback={t.TickFallback}");
         }
         else
         {
             text.Append(CultureInfo.InvariantCulture, $"no-trade {outcome.NoTrade}");
         }
 
-        return text.Append(CultureInfo.InvariantCulture, $" | examined={outcome.BarsExamined} delayed={outcome.EntryAfterMissingMinutes} stopGap={outcome.StopGapExit} targetGap={outcome.TargetGapExit}").ToString();
+        return text.Append(CultureInfo.InvariantCulture, $" | examined={outcome.BarsExamined} delayed={outcome.EntryAfterMissingMinutes} stopGap={outcome.StopGapExit} targetGap={outcome.TargetGapExit} ambiguous={outcome.AmbiguousMinute} late={outcome.LateSquareOff} under4={outcome.RiskUnderFourTicks} zero={outcome.ZeroVolumeMinutes}").ToString();
     }
 
     public static string Render(WalkCounters c) =>
         string.Create(CultureInfo.InvariantCulture,
-            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined}");
+            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined} limitNotReached={c.LimitNotReached} entriesAtOpen={c.EntriesAtOpen} entriesAtLimit={c.EntriesAtLimit} ambiguousMinutes={c.AmbiguousMinutes} lateSquareOffs={c.LateSquareOffs} zeroVolumeMinutes={c.ZeroVolumeMinutes} riskUnderFourTicks={c.RiskUnderFourTicks}");
 }

@@ -6,7 +6,7 @@ using XDrishti.Simulation.Walking;
 namespace XDrishti.Simulation.Tests;
 
 /// <summary>
-/// AC7: same input, same bytes. Every fixture and every seeded run, walked twice (the second time on a copy of the bars), renders identical text; the rendering of the F-days and the W-rows equals the golden file checked in
+/// AC7 and criterion 21: same input, same bytes. Every fixture and every seeded day, walked twice (the second time on a copy of the bars), renders identical text; the rendering of the F-days and the W-rows equals the golden file checked in
 /// with the tests (see <see cref="GoldenFile"/>: the engine version on the first line, regenerated on purpose with <c>XD_UPDATE_GOLDEN=1</c>).
 /// </summary>
 public sealed class WalkerDeterminismTests
@@ -27,16 +27,14 @@ public sealed class WalkerDeterminismTests
     }
 
     [Fact]
-    public void Every_seeded_run_walked_twice_once_on_a_copy_of_the_bars_renders_the_same_text_and_counters()
+    public void Every_seeded_day_walked_twice_once_on_a_copy_of_the_minutes_renders_the_same_text_and_counters()
     {
-        foreach (var seed in Enumerable.Range(1, 100))
+        foreach (var day in SeededDays.All)
         {
-            var run = SeededRuns.Make(seed);
-            var copy = SeededRuns.Make(seed);
-            var first = RenderRun(run, run.Bars);
-            var second = RenderRun(copy, [.. copy.Bars]);
+            var first = RenderDay(day, day.Bars);
+            var second = RenderDay(SeededDays.Make(day.Seed), [.. SeededDays.Make(day.Seed).Bars]);
 
-            second.ShouldBe(first, "seed " + seed);
+            second.ShouldBe(first, "seed " + day.Seed);
         }
     }
 
@@ -46,11 +44,11 @@ public sealed class WalkerDeterminismTests
         GoldenFile.Check("walker", RenderGolden());
     }
 
-    private static string RenderRun(SeededRun run, IReadOnlyList<Domain.Market.Bars.Bar> bars)
+    private static string RenderDay(SeededDay day, IReadOnlyList<Domain.Market.Bars.Bar> bars)
     {
         var text = new StringBuilder();
         var counters = WalkCounters.Empty;
-        foreach (var walk in run.Walks)
+        foreach (var walk in day.Walks)
         {
             var result = TradeWalker.Walk(walk.Candidate, bars, walk.Rules);
             text.AppendLine(OutcomeFormatter.Render(result));

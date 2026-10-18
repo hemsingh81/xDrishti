@@ -25,7 +25,7 @@ public sealed class TradeWalkerRuleTests
     [Theory]
     [InlineData("W6", 1, 0)]
     [InlineData("W7", 0, 1)]
-    [InlineData("W13", 0, 0)]
+    [InlineData("W13", 0, 1)]
     [InlineData("W5", 0, 0)]
     public void The_gap_counters_count_only_exits_at_a_level_the_minute_opened_beyond(string name, long stopGaps, long targetGaps)
     {
@@ -72,13 +72,15 @@ public sealed class TradeWalkerRuleTests
     [InlineData("W14-opens-beyond-the-target")]
     public void The_sell_mirror_of_a_buy_row_gives_the_mirrored_result(string name)
     {
-        // Prices p become 200 - p (exact for multiples of 0.25), high and low swap, the side flips: R, MAE, MFE, the reason, the minutes and the flags must not change.
+        // Prices p become 200 - p (exact for multiples of 0.25), high and low swap, the side flips (the trigger bar is mirrored too, so that the limit does not bind): R, MAE, MFE, the reason, the minutes and the flags must not change.
         var walkCase = Cases.All.Single(c => c.Name == name);
         var mirroredBars = walkCase.Bars.Select(b => b with { Open = 200 - b.Open, High = 200 - b.Low, Low = 200 - b.High, Close = 200 - b.Close }).ToList();
 
         foreach (var item in walkCase.Items.Where(i => i.Candidate.Side == Side.Buy))
         {
-            var mirroredCandidate = item.Candidate with { Side = Side.Sell, StopLevel = 200 - item.Candidate.StopLevel };
+            var trigger = item.Candidate.TriggerBar;
+            var mirroredTrigger = trigger with { Open = 200 - trigger.Open, High = 200 - trigger.Low, Low = 200 - trigger.High, Close = 200 - trigger.Close };
+            var mirroredCandidate = item.Candidate with { Side = Side.Sell, StopLevel = 200 - item.Candidate.StopLevel, TriggerBar = mirroredTrigger };
 
             var buy = WalkAssert.Walk(walkCase, item);
             var sell = TradeWalker.Walk(mirroredCandidate, mirroredBars, walkCase.Rules);
@@ -89,13 +91,15 @@ public sealed class TradeWalkerRuleTests
             sell.Value.EntryAfterMissingMinutes.ShouldBe(buy.Value.EntryAfterMissingMinutes);
             sell.Value.StopGapExit.ShouldBe(buy.Value.StopGapExit);
             sell.Value.TargetGapExit.ShouldBe(buy.Value.TargetGapExit);
+            sell.Value.AmbiguousMinute.ShouldBe(buy.Value.AmbiguousMinute);
+            sell.Value.LateSquareOff.ShouldBe(buy.Value.LateSquareOff);
             if (buy.Value.Trade is { } b)
             {
                 var s = sell.Value.Trade.ShouldNotBeNull();
                 s.EntryPrice.ShouldBe(200 - b.EntryPrice);
                 s.ExitPrice.ShouldBe(200 - b.ExitPrice);
                 s.TargetPrice.ShouldBe(b.TargetPrice is { } t ? 200 - t : null);
-                s.R.ShouldBe(b.R);
+                s.RExact.ShouldBe(b.RExact);
                 s.MaeR.ShouldBe(b.MaeR);
                 s.MfeR.ShouldBe(b.MfeR);
                 s.ExitReason.ShouldBe(b.ExitReason);
@@ -262,7 +266,7 @@ public sealed class TradeWalkerRuleTests
     public void The_fill_delay_bound_is_read_from_the_engine()
     {
         SimulationEngine.MaxFillDelayMinutes.ShouldBe(5);
-        SimulationEngine.Version.ShouldBe("sim-1");
+        SimulationEngine.Version.ShouldBe("sim-2");
     }
 
     [Theory]
@@ -288,15 +292,20 @@ public sealed class TradeWalkerRuleTests
     private static string ToTime(int minuteOfDay) => $"{minuteOfDay / 60:00}:{minuteOfDay % 60:00}";
 
     [Fact]
-    public void A_walk_of_bars_of_a_later_date_with_an_earlier_trigger_does_not_read_the_trigger_bar()
+    public void The_walker_reads_only_the_close_of_the_trigger_bar()
     {
-        // The walker never reads the trigger bar or the trace: a candidate with an empty trace and a trigger bar of nonsense gives the same trade as F1.
+        // The walker reads the close of the trigger bar (the entry limit is set from it) and nothing else of it, and never the trace: a candidate with an empty trace and a trigger bar of nonsense but for its close gives the same trade as F1.
         var f1 = Cases.F("F1");
-        var candidate = f1.Items[0].Candidate with { TriggerBar = default, Trace = new DecisionTrace([new TraceItem("buy.trigger[0]", "x", TraceTruth.Unknown, [])]) };
+        var trigger = f1.Items[0].Candidate.TriggerBar;
+        var candidate = f1.Items[0].Candidate with
+        {
+            TriggerBar = new Bar(0, -5, 1e9, 7, trigger.Close, -1),
+            Trace = new DecisionTrace([new TraceItem("buy.trigger[0]", "x", TraceTruth.Unknown, [])]),
+        };
 
         var outcome = TradeWalker.Walk(candidate, f1.Bars, f1.Rules).Value;
 
-        outcome.Trade.ShouldNotBeNull().R.ShouldBe(2.0);
+        outcome.Trade.ShouldNotBeNull().RExact.ShouldBe(2.0);
         outcome.Trade.TriggerTimeframe.ShouldBe(Timeframe.M15);
     }
 }

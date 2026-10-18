@@ -23,6 +23,9 @@ internal static class WalkAssert
             outcome.EntryAfterMissingMinutes.ShouldBeFalse(label);
             outcome.StopGapExit.ShouldBeFalse(label);
             outcome.TargetGapExit.ShouldBeFalse(label);
+            outcome.AmbiguousMinute.ShouldBeFalse(label);
+            outcome.LateSquareOff.ShouldBeFalse(label);
+            outcome.ZeroVolumeMinutes.ShouldBe(0, label);
             return;
         }
 
@@ -49,12 +52,24 @@ internal static class WalkAssert
         trade.ExitEpochSeconds.ShouldBe(DayBuilder.Epoch(date, expected.ExitTime), label + " exit instant");
         trade.ExitPrice.ShouldBe(expected.Exit, label + " exit price");
         trade.ExitReason.ShouldBe(expected.Reason, label);
-        trade.R.ShouldBe(expected.R, label + " R");
+        trade.RExact.ShouldBe(expected.R, label + " R");
         trade.MaeR.ShouldBe(expected.Mae, label + " MAE");
         trade.MfeR.ShouldBe(expected.Mfe, label + " MFE");
         trade.Fills.ShouldBe(FillBasis.Exact, label);
         trade.Costs.ShouldBe(CostBasis.None, label);
         trade.EntrySnapshotJson.ShouldBeNull(label);
+
+        // The compatibility rules (no slippage) and a limit that does not bind: the filled layer is the exact one and every entry is at the open.
+        trade.EntryFilledPrice.ShouldBe(trade.EntryPrice, label);
+        trade.ExitFilledPrice.ShouldBe(trade.ExitPrice, label);
+        trade.RFilled.ShouldBe(trade.RExact, label);
+        trade.SlippageR.ShouldBe(0, label);
+        trade.EntryFill.ShouldBe(EntryFill.AtOpen, label);
+        trade.TickFallback.ShouldBeFalse(label);
+        outcome.AmbiguousMinute.ShouldBe(expected.Ambiguous, label + " ambiguous");
+        outcome.LateSquareOff.ShouldBe(expected.Late, label + " late square-off");
+        outcome.RiskUnderFourTicks.ShouldBeFalse(label);
+        outcome.ZeroVolumeMinutes.ShouldBe(0, label);
         outcome.EntryAfterMissingMinutes.ShouldBe(expected.Delayed, label + " entry after missing minutes");
         outcome.StopGapExit.ShouldBe(expected.StopGap, label + " stop gap");
         outcome.TargetGapExit.ShouldBe(expected.TargetGap, label + " target gap");

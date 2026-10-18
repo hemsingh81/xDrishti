@@ -8,8 +8,8 @@
 | Multiple-testing luck | Test ledger, deflated thresholds, consistency across folds/years |
 | Look-ahead bias | Closed-bar-only DSL, point-in-time features, single code path, automated tests |
 | Survivorship bias | Bounded and disclosed, not avoided: a basket is tested with today's members and every run says so (ISS-22 in the [roadmap](18-roadmap.md)); point-in-time membership, with delisted stocks, is not built |
-| Intrabar ambiguity | Resolve on 1-minute path; if still ambiguous assume the worse outcome |
-| Unrealistic fills | Gap fills at open, slippage model, no fills at locked circuits |
+| Intrabar ambiguity | Resolve on 1-minute path; if still ambiguous assume the worse outcome: a minute that holds the stop and the target is a stop, unless its open is already beyond the target (the first print decides; [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md)) |
+| Unrealistic fills | Gap fills at open, slippage model, no fills at locked circuits (rules in ADR 0038; the circuit effect is not modelled and every run says so: ISS-18) |
 | Cost blindness | Costs in every simulation from P3-03c on (earlier runs are gross and say so); `max_cost_R` filter |
 | Regime dependence | Regime-conditioned stats, drift monitor, auto-pause |
 | ML leakage | Purged & embargoed walk-forward |

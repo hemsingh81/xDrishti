@@ -31,7 +31,7 @@ public sealed class WalkBenchmarks
             }
         }
 
-        var walks = new List<(Simulation.EntryCandidate Candidate, WalkRules Rules)>();
+        var walks = new List<Simulation.EntryCandidate>();
         for (var s = 0; s < Sessions; s++)
         {
             foreach (var side in new[] { Domain.Research.Side.Buy, Domain.Research.Side.Sell })
@@ -41,23 +41,27 @@ public sealed class WalkBenchmarks
                     var index = (s * 375) + 30 + (c * 60);
                     var close = bars[index].Close;
                     var stop = side == Domain.Research.Side.Buy ? close * 0.995 : close * 1.005;
-                    walks.Add((new Simulation.EntryCandidate("ORB", Cand.Test, side, index, bars[index].EpochSeconds + 60, Domain.Market.Bars.Timeframe.M15, bars[index], 15, true, stop, Simulation.DecisionTrace.Empty), Cand.Standard));
+                    walks.Add(new Simulation.EntryCandidate("ORB", Cand.Test, side, index, bars[index].EpochSeconds + 60, Domain.Market.Bars.Timeframe.M15, bars[index], 15, true, stop, Simulation.DecisionTrace.Empty));
                 }
             }
         }
 
-        var watch = Stopwatch.StartNew();
-        long minutes = 0;
-        foreach (var (candidate, rules) in walks)
+        // The exact layer (the rules of the compatibility with P3-03) and the modelled one (the doc 16 slippage on the tick grid): the same walks, so that the price of the decimal arithmetic and the slippage is visible.
+        foreach (var (name, rules) in new[] { ("exact", Cand.Standard), ("modelled", Cand.Modelled) })
         {
-            var outcome = TradeWalker.Walk(candidate, bars, rules).Value;
-            minutes += outcome.BarsExamined;
-        }
+            var watch = Stopwatch.StartNew();
+            long minutes = 0;
+            foreach (var candidate in walks)
+            {
+                var outcome = TradeWalker.Walk(candidate, bars, rules).Value;
+                minutes += outcome.BarsExamined;
+            }
 
-        watch.Stop();
-        var seconds = watch.Elapsed.TotalSeconds;
-        TestContext.Current.TestOutputHelper?.WriteLine(string.Create(
-            CultureInfo.InvariantCulture,
-            $"walks {walks.Count} minutes visited {minutes} of {bars.Count} in {seconds * 1000:F2} ms: {walks.Count / seconds:F0} walks/s, {minutes / seconds:F0} minutes/s"));
+            watch.Stop();
+            var seconds = watch.Elapsed.TotalSeconds;
+            TestContext.Current.TestOutputHelper?.WriteLine(string.Create(
+                CultureInfo.InvariantCulture,
+                $"{name}: walks {walks.Count} minutes visited {minutes} of {bars.Count} in {seconds * 1000:F2} ms: {walks.Count / seconds:F0} walks/s, {minutes / seconds:F0} minutes/s"));
+        }
     }
 }
