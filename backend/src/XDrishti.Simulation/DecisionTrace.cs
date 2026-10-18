@@ -1,8 +1,11 @@
 namespace XDrishti.Simulation;
 
-/// <summary>Which conditions were true, false or unknown at the decision bar, and the values they read (doc 09 §3 step 3 in miniature). Filled by the entry scanner; the walker never reads it.</summary>
+/// <summary>
+/// Why a decision was taken: the conditions and the values they read at that moment. Filled by the entry scanner of P3-03a; the trade walker never reads it, so that it can be empty in a hand-made candidate.
+/// </summary>
+/// <param name="Items">The conditions, in the order of the strategy.</param>
 public sealed record DecisionTrace(IReadOnlyList<TraceItem> Items)
 {
-    /// <summary>A trace with no items (a hand-made candidate).</summary>
+    /// <summary>A trace with no items.</summary>
     public static DecisionTrace Empty { get; } = new([]);
 }

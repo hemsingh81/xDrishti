@@ -153,6 +153,18 @@ simulator tests exactly this ticket on history:</p>
 tomorrow&quot; or &quot;enter at open if gap within limits&quot;.</p>
 <p>The ticket is what the planner (P7) shows; the model above evaluates the same conditions at every closed bar. What an <code>at_close</code> entry fills at (&quot;at trigger-candle close, limit +0.1 %&quot;) is the simulator&#39;s
 decision (P3-03), not the model&#39;s.</p>
+<p><strong>As the simulator realises the ticket (P3-03, <a href="../adr/0037-simulation-conventions-and-the-two-stage-seam.html">ADR 0037</a>).</strong> The first stage walks the entry and the exit of an intraday ticket on 1-minute bars with <em>exact</em> fills,
+and says so on every trade (<code>fills: exact</code>, <code>entry limit: not applied</code>, <code>costs: none</code>); the fill realism of the ticket above (the limit of +0.1 %, slippage, ticks) is P3-03b and costs are P3-03c.</p>
+<ul>
+<li><em>Entry.</em> &quot;At trigger-candle close&quot; cannot be filled: the bar has closed. The entry is the <strong>open of the first minute after the trigger bar</strong>, when that minute starts at most five minutes after the decision instant, on the same
+day and before the square-off; otherwise the ticket is no trade (<code>NoFillBar</code>, <code>AfterSquareOff</code>). A fill at or through the stop is no trade (<code>EntryThroughStop</code>). All are counted.</li>
+<li><em>Stop and target.</em> Risk per unit is <code>|entry − stop|</code>; with <code>FIXED_RR</code> the target is the entry plus <code>rr</code> times that risk (minus for a sell). Touching a level counts. <strong>Stop first:</strong> a minute that holds both is a stop. A stop that
+the market gapped through fills at that minute&#39;s <strong>open</strong>; a target it gapped through fills at the target (no improvement).</li>
+<li><em>Square-off.</em> The always-on <code>SESSION_EXIT</code>: the first minute that starts at or after the square-off time (15:15) leaves at its open. A position still open when the day&#39;s data ends leaves at the last close and is
+reported apart (<code>EndOfData</code>), never among the trades that statistics count.</li>
+<li><em>Result.</em> R, MAE and MFE in units of the risk; the minute in which the position leaves counts as ADR 0037 decision D5 says (stop first is assumed because the path inside a minute is unknown). The partial exit, the break-even
+move and the trail of the ticket above are P4 (the entry and the exit are separate stages so that exit policies can be compared on the same entries).</li>
+</ul>
 <h2 id="3-starter-library">3. Starter library<a class="hash" href="#3-starter-library" aria-label="Link to this section">#</a></h2>
 <p>Each mirrored for SELL where sensible. Most cells will fail qualification — expected and healthy.</p>
 <p><strong>Intraday (5m–1h):</strong> <code>ORB</code> (opening-range breakout) · <code>PDH_PDL_BREAK</code> / <code>PDH_PDL_REJECT</code> (previous-day
@@ -316,7 +328,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 10:58</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 11:17</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

@@ -1,14 +1,14 @@
 namespace XDrishti.Simulation;
 
-/// <summary>The truth of one condition at the decision step, as the trace of a candidate keeps it.</summary>
+/// <summary>The three values of a condition at the moment of a decision (the logic of ADR 0034).</summary>
 public enum TraceTruth
 {
-    /// <summary>The condition did not hold.</summary>
+    /// <summary>The condition was false.</summary>
     False,
 
-    /// <summary>The condition held.</summary>
+    /// <summary>The condition was true.</summary>
     True,
 
-    /// <summary>The condition could not be decided (a feature had no value yet, a lag the history cannot give).</summary>
+    /// <summary>The condition could not be decided (a value was not ready); never fires an entry.</summary>
     Unknown,
 }

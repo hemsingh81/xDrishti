@@ -1,14 +1,17 @@
 namespace XDrishti.Simulation;
 
-/// <summary>
-/// The version of the simulation rules and the limits they share (P3-03, ADR 0037). <see cref="Version"/> is bumped by any change of the entry, exit or R rules, of the schema of a simulated trade or of a replay rule, so that a
-/// stored result says which rules made it.
-/// </summary>
+/// <summary>The identity and the bounds of the simulation rules (ADR 0037).</summary>
 public static class SimulationEngine
 {
-    /// <summary>The version of the rules.</summary>
+    /// <summary>
+    /// The version of the simulation rules, stored in the run record of P3-04. Bumped by any change of decisions D3 to D5, of the <c>SimTrade</c> schema or of a replay rule of P3-04; a changed rule also regenerates the golden
+    /// file of the tests, on purpose.
+    /// </summary>
     public const string Version = "sim-1";
 
-    /// <summary>The most minutes the first minute at or after the decision instant may start after it for the order to still fill (the entry is a market-type fill at the open of that minute).</summary>
+    /// <summary>
+    /// How many minutes after the decision instant the fill minute may start. A market-type fill at the open of a minute far from the signal is a price unrelated to it; later is no trade
+    /// (<c>NoTradeReason.NoFillBar</c>). An engineering bound, not a trading choice (ADR 0037, decision D3).
+    /// </summary>
     public const int MaxFillDelayMinutes = 5;
 }

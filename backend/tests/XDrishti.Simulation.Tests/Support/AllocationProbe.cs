@@ -7,7 +7,8 @@ namespace XDrishti.Simulation.Tests.Support;
 /// again from scratch, up to <see cref="MaxAttempts"/> times. Two outcomes are final at once: <b>zero bytes</b> (a collection was only ever seen to add to the counter, never to hide an allocation) and <b>bytes
 /// without a collection</b> (the code allocated). Nothing is averaged or tolerated: one allocation of one object in 100,000 steps is reported, as the self-test in <c>AllocationProbeSelfTests</c> proves.
 /// <para>
-/// <b>A copy.</b> The probe of <c>XDrishti.Strategies.Tests</c> and <c>XDrishti.Indicators.Tests</c>, unchanged but for the namespace (a test project must not reference another); change them together. P3-03 adds the same three files to this project.
+/// <b>A copy.</b> This is the probe of <c>XDrishti.Indicators.Tests</c> and <c>XDrishti.Strategies.Tests</c> (<c>AllocationProbe</c>, <c>AllocationWindow</c>, <c>ExclusiveRun</c>), unchanged but for the namespace. The repository has no
+/// shared test-support project and no linked test file, and a test project must not reference another, so the three small files are duplicated here (a third copy); change them together.
 /// </para>
 /// </summary>
 internal static class AllocationProbe
