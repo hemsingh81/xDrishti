@@ -22,8 +22,10 @@ public sealed class DomainResearchSurfaceTests
 
         research.ShouldBe(
         [
-            "ConditionCounter", "CostBasis", "EntryFill", "ExitReason", "FillBasis", "FillDescription", "FillLimit", "FillLimits", "FillRules", "GapFillRule", "NoTradeReason", "ScanCounters", "Side", "SimTrade",
-            "SimulationErrors", "SlippageConfig", "TickSpec", "WalkCounters",
+            "AppliedAdjustment", "BarStreamHash", "CalendarExceptionDay", "CanonicalText", "ConditionCounter", "CostBasis", "DateSpan", "DiscontinuityNote", "EntryFill", "ExitReason", "FillBasis", "FillDescription", "FillLimit", "FillLimits",
+            "FillRules", "GapFillRule", "InstrumentReplay", "InstrumentReplayInput", "InstrumentRun", "NoTradeReason", "ReplayOptions", "RunAssembler", "RunCounters", "RunFates", "RunHeader", "RunTrade", "ScanCounters", "SessionCounts",
+            "SessionExclusion", "SessionExclusions", "SessionNote", "Side", "SimTrade", "SimulationErrors", "SimulationRun", "SkipCount", "SkipReason", "SkipReasons", "SlippageConfig", "StrategyRecord", "TickSpec", "UniverseKind",
+            "UniverseLabels", "UniverseMember", "UniverseRecord", "WalkCounters",
         ]);
     }
 
@@ -31,6 +33,18 @@ public sealed class DomainResearchSurfaceTests
     public void The_domain_has_no_namespace_beyond_the_known_ones_so_the_simulator_adds_nothing_elsewhere()
     {
         Domain.GetExportedTypes().Select(t => t.Namespace ?? string.Empty).Distinct().Except(Namespaces).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_research_types_do_no_io_read_no_clock_and_draw_no_random_number()
+    {
+        // spec P3-04, criterion 15: the run record, the hash and the assembly are values and pure functions (the SHA-256 is System.Security.Cryptography, which is not I/O)
+        var result = NetArchTest.Rules.Types.InAssembly(Domain).That().ResideInNamespace("XDrishti.Domain.Research")
+            .ShouldNot().HaveDependencyOnAny("System.IO", "System.Net", "System.Data", "System.Threading.Tasks", "System.Diagnostics", "System.TimeProvider", "System.Environment", "System.Random", "System.Text.Json")
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
+        NetArchTest.Rules.Types.InAssembly(Domain).That().ResideInNamespace("XDrishti.Domain.Research").ShouldNot().HaveDependencyOnAny("System.Security.Cryptography").GetResult().IsSuccessful.ShouldBeFalse("the scan sees the hash");
     }
 
     [Fact]

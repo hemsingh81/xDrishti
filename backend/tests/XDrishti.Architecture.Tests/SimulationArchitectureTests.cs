@@ -16,7 +16,7 @@ public sealed class SimulationArchitectureTests
 {
     private static readonly Assembly Simulation = typeof(XDrishti.Simulation.SimulationEngine).Assembly;
 
-    private static readonly string[] DocumentedNamespaces = ["XDrishti.Simulation", "XDrishti.Simulation.Walking", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running"];
+    private static readonly string[] DocumentedNamespaces = ["XDrishti.Simulation", "XDrishti.Simulation.Walking", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running", "XDrishti.Simulation.Replay"];
 
     /// <summary>The members of the feature frame the library may reference: all of them used, none other (spec P3-03a, criterion 18b).</summary>
     private static readonly string[] FrameMembers =
@@ -28,6 +28,7 @@ public sealed class SimulationArchitectureTests
         "Microsoft.EntityFrameworkCore", "Microsoft.AspNetCore", "Microsoft.Extensions", "Npgsql", "Serilog",
         "System.Net", "System.IO", "System.Data", "System.Threading.Tasks", "System.Diagnostics",
         "System.TimeProvider", "System.Environment", "System.Random",
+        "System.Text.Json", // the canonical JSON of the replay is hand-written: the bytes are ours and not a framework version's (spec P3-04, Scope 2)
     ];
 
     private static void ShouldHaveNone(ArchResult result) => result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
@@ -116,10 +117,11 @@ public sealed class SimulationArchitectureTests
         TypeNamesIn("XDrishti.Simulation.Walking").ShouldNotBeEmpty();
         TypeNamesIn("XDrishti.Simulation.Scanning").ShouldNotBeEmpty();
         TypeNamesIn("XDrishti.Simulation.Running").ShouldNotBeEmpty();
+        TypeNamesIn("XDrishti.Simulation.Replay").ShouldNotBeEmpty();
 
-        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespaceMatching("^XDrishti\\.Simulation$").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Simulation.Walking", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running").GetResult());
-        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Walking").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running").GetResult());
-        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Scanning").ShouldNot().HaveDependencyOnAny("XDrishti.Simulation.Walking", "XDrishti.Simulation.Running").GetResult());
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespaceMatching("^XDrishti\\.Simulation$").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Simulation.Walking", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running", "XDrishti.Simulation.Replay").GetResult());
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Walking").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running", "XDrishti.Simulation.Replay").GetResult());
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Scanning").ShouldNot().HaveDependencyOnAny("XDrishti.Simulation.Walking", "XDrishti.Simulation.Running", "XDrishti.Simulation.Replay").GetResult());
     }
 
     private static readonly string[] RunningTypes = ["Simulator", "SimulatorBuild", "SimulationResult", "SimulationHeader", "CandidateOutcome", "SimulatorCodes"];
@@ -141,7 +143,35 @@ public sealed class SimulationArchitectureTests
     [Fact]
     public void The_running_stage_does_not_reach_the_frame_the_indicators_or_the_bound_side()
     {
-        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Running").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators").GetResult());
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Running").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators", "XDrishti.Simulation.Replay").GetResult());
+    }
+
+    [Fact]
+    public void The_replay_namespace_uses_the_running_stage_and_the_strategies_library_but_not_the_walker_the_frame_or_the_indicators()
+    {
+        // spec P3-04, criterion 15: the replay calls Simulator.Run once per segment; it reads no frame and no indicator (it reads the WalkOutcome that Running hands it, but never calls the walker)
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Replay").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators").GetResult());
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Replay").ShouldNot().HaveDependencyOn("XDrishti.Simulation.Walking.TradeWalker").GetResult());
+        Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Running").ShouldNot().HaveDependencyOn("XDrishti.Simulation.Walking.TradeWalker").GetResult().IsSuccessful.ShouldBeFalse("the rule sees a call of the walker where there is one");
+        // ... and the rules above can fail: the same namespace does depend on the running stage and on the strategies library
+        Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Replay").ShouldNot().HaveDependencyOnAny("XDrishti.Simulation.Running").GetResult().IsSuccessful.ShouldBeFalse();
+        Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Replay").ShouldNot().HaveDependencyOnAny("XDrishti.Strategies").GetResult().IsSuccessful.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_replay_namespace_holds_the_documented_types_and_the_canonical_json_writer_is_internal()
+    {
+        TypeNamesIn("XDrishti.Simulation.Replay").Where(n => !n.Contains('+', StringComparison.Ordinal) && !n.Contains('<', StringComparison.Ordinal)).Select(n => n["XDrishti.Simulation.Replay.".Length..]).Order().ShouldBe(
+            ["BarSegment", "BuiltInBuild", "BuiltInStrategies", "DefinitionJson", "Discontinuity", "InstrumentReplayer", "PreparedBuild", "PreparedStrategy", "RanSession", "ReplayBars", "ReplayCodes", "SessionScan", "StrategyPreparation"]);
+        Simulation.GetType("XDrishti.Simulation.Replay.DefinitionJson")!.IsPublic.ShouldBeFalse();
+        Simulation.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Simulation.Replay").Select(t => t.Name).Order().ShouldBe(
+            ["BuiltInBuild", "BuiltInStrategies", "InstrumentReplayer", "PreparedBuild", "PreparedStrategy", "ReplayCodes", "StrategyPreparation"]);
+    }
+
+    [Fact]
+    public void The_json_rule_does_catch_a_type_that_uses_the_json_serializer()
+    {
+        Violates(nameof(JsonSentinel), "System.Text.Json").ShouldBeTrue();
     }
 
     [Fact]
@@ -265,6 +295,7 @@ public sealed class SimulationArchitectureTests
         namespaces.ShouldContain("XDrishti.Simulation.Scanning");
         namespaces.ShouldContain("XDrishti.Simulation.Running");
         namespaces.ShouldContain("XDrishti.Simulation.Walking");
+        namespaces.ShouldContain("XDrishti.Simulation.Replay");
         Assembly.GetAssembly(typeof(XDrishti.Strategies.Problem))!.GetExportedTypes().Select(t => t.Namespace ?? string.Empty).Distinct().Except(DocumentedNamespaces).ShouldNotBeEmpty("the rule can fail");
     }
 
@@ -370,6 +401,12 @@ internal static class AmbientSentinel
     public static int Draw() => new Random().Next();
 
     public static long Now(TimeProvider time) => time.GetUtcNow().ToUnixTimeSeconds();
+}
+
+/// <summary>Serializes with <c>System.Text.Json</c> on purpose, to prove the rule that the library writes its canonical text by hand sees such a use (it is never used by anything else).</summary>
+internal static class JsonSentinel
+{
+    public static string Write(int value) => System.Text.Json.JsonSerializer.Serialize(value);
 }
 
 /// <summary>Calls the trade walker on purpose, to prove the rule that the root namespace of the library never depends on <c>Walking</c> sees such a dependency (it is never used by anything else).</summary>
