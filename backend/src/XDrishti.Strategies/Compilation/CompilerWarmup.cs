@@ -8,7 +8,7 @@ namespace XDrishti.Strategies.Compilation;
 /// Runs the compiler once over a fixed, representative set of conditions, so that the .NET JIT has compiled the parser, the binder, the lint and the expression compiler before a person asks for the first compile
 /// (ISS-12, ADR 0034 amendment 2). The first compile of a process takes about 40 ms because the JIT turns about a thousand small methods into machine code on the way (no setting of the runtime changes that); in a
 /// process that has run the warm-up, the first compile of ten conditions takes 3 to 5 ms. A host calls <see cref="Run"/> once, on a thread-pool thread, right after it starts, and does not wait for it: nothing depends on
-/// it, and it costs about 70 ms of one core, once per process (measured 67 to 76 ms on an Apple M4 Pro). A compile that starts while it is still running waits for the part of the JIT it has not done yet, which is
+/// it, and it costs about 60 ms of one core, once per process (measured 60 to 63 ms on a quiet Apple M4 Pro, 76 to 90 ms on a loaded one). A compile that starts while it is still running waits for the part of the JIT it has not done yet, which is
 /// no worse than not having it.
 /// <para>
 /// What it does: compiles every source of <see cref="Valid"/>, merges them into a plan, makes a frame for the plan and binds every condition to it (which builds the delegates), then compiles every source of
