@@ -54,8 +54,8 @@ public sealed class SimulatorSeamTests
         var one = Run(1.5, bars).Trades.Single();
         var two = Run(2.0, bars).Trades.Single();
 
-        (one.TargetPrice, one.ExitReason, one.ExitEpochSeconds, one.R).ShouldBe((104.25, ExitReason.Target, Day.Epoch(Day.Monday, Day.Minute("10:30")), 1.5));
-        (two.TargetPrice, two.ExitReason, two.ExitEpochSeconds, two.R).ShouldBe((105.50, ExitReason.Target, Day.Epoch(Day.Monday, Day.Minute("11:10")), 2.0));
+        (one.TargetPrice, one.ExitReason, one.ExitEpochSeconds, one.RExact).ShouldBe((104.25, ExitReason.Target, Day.Epoch(Day.Monday, Day.Minute("10:30")), 1.5));
+        (two.TargetPrice, two.ExitReason, two.ExitEpochSeconds, two.RExact).ShouldBe((105.50, ExitReason.Target, Day.Epoch(Day.Monday, Day.Minute("11:10")), 2.0));
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class SimulatorSeamTests
         var three = Run(3.0, bars).Trades.Single();
 
         (three.TargetPrice, three.ExitReason, three.ExitPrice, three.ExitEpochSeconds).ShouldBe((108.00, ExitReason.SquareOff, 105.00, Day.Epoch(Day.Monday, Day.Minute("15:15"))));
-        three.R.ShouldBe(1.8);
+        three.RExact.ShouldBe(1.8);
     }
 
     [Fact]

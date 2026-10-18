@@ -154,7 +154,7 @@ tomorrow&quot; or &quot;enter at open if gap within limits&quot;.</p>
 <p>The ticket is what the planner (P7) shows; the model above evaluates the same conditions at every closed bar. What an <code>at_close</code> entry fills at (&quot;at trigger-candle close, limit +0.1 %&quot;) is the simulator&#39;s
 decision (P3-03), not the model&#39;s.</p>
 <p><strong>As the simulator realises the ticket (P3-03, <a href="../adr/0037-simulation-conventions-and-the-two-stage-seam.html">ADR 0037</a>; the entry limit of +0.1 %, slippage and the tick are P3-03b, <a href="../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.html">ADR 0038</a>, which supersede the exact entry described next: the entry is a limit order at the trigger close +0.1 % rounded to the tick that lives for one minute and fills at the open, at the limit or is a counted miss).</strong> The first stage walks the entry and the exit of an intraday ticket on 1-minute bars with <em>exact</em> fills,
-and says so on every trade (<code>fills: exact</code>, <code>entry limit: not applied</code>, <code>costs: none</code>); the fill realism of the ticket above (the limit of +0.1 %, slippage, ticks) is P3-03b and costs are P3-03c.</p>
+and says so on every trade (<code>fills: modelled</code> or <code>fills: exact</code>, <code>entry limit: +0.1 %</code>, <code>costs: none</code>); the fill realism of the ticket above (the limit of +0.1 %, slippage, ticks) is built by P3-03b (ADR 0038) and wired into the <code>Simulator</code>, and costs are P3-03c.</p>
 <ul>
 <li><em>Entry.</em> &quot;At trigger-candle close&quot; cannot be filled: the bar has closed. The entry is the <strong>open of the first minute after the trigger bar</strong>, when that minute starts at most five minutes after the decision instant, on the same
 day and before the square-off; otherwise the ticket is no trade (<code>NoFillBar</code>, <code>AfterSquareOff</code>). A fill at or through the stop is no trade (<code>EntryThroughStop</code>). All are counted.</li>
@@ -358,7 +358,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 13:00</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 13:07</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

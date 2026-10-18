@@ -52,7 +52,7 @@ internal static class Render
     {
         var text = new StringBuilder();
         var h = result.Header;
-        text.Append(CultureInfo.InvariantCulture, $"header engine={h.EngineVersion} schema={h.SchemaVersion} strategy={h.StrategyId} fills={h.Fills} costs={h.Costs} labels=[{string.Join(" | ", h.Labels)}]\n");
+        text.Append(CultureInfo.InvariantCulture, $"header engine={h.EngineVersion} schema={h.SchemaVersion} strategy={h.StrategyId} rules={h.FillRules.ToCanonicalJson()} fills={h.Fills} costs={h.Costs} labels=[{string.Join(" | ", h.Labels)}]\n");
         foreach (var outcome in result.Outcomes)
         {
             text.Append(Candidate(outcome.Candidate)).Append("\n  -> ").Append(OutcomeFormatter.Render(XDrishti.Domain.Common.Result.Success(outcome.Walk))).Append('\n');

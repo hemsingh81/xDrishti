@@ -44,5 +44,15 @@ internal static class Feeds
     }
 
     /// <summary>The peeking walker input of P3-03 (AC8): every low becomes the lower of its own and the next minute's, every high the higher of its own and the next one's.</summary>
-    public static Bar[] PeekingExtremes(Bar[] bars) => [.. LookAhead.Peek(bars)];
+    public static Bar[] PeekingExtremes(Bar[] bars)
+    {
+        var result = new Bar[bars.Length];
+        for (var i = 0; i < result.Length; i++)
+        {
+            var next = i + 1 < bars.Length ? bars[i + 1] : bars[i];
+            result[i] = bars[i] with { Low = Math.Min(bars[i].Low, next.Low), High = Math.Max(bars[i].High, next.High) };
+        }
+
+        return result;
+    }
 }

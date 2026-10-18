@@ -90,6 +90,19 @@ public sealed class CounterTests
     }
 
     [Fact]
+    public void The_scanner_column_of_f11_does_not_move_when_the_fill_minute_never_trades_back_to_the_limit()
+    {
+        var plain = Scan.Both(Fixtures.OrbDays.Single(f => f.Name == "F11").Definition, Fixtures.F11().Bars())[0];
+        var missed = Scan.Both(Fixtures.OrbDays.Single(f => f.Name == "F11").Definition, Fixtures.F11().Set("09:45 101.00/101.20/100.70/101.00").Bars())[0];
+
+        // The scanner decides at the close of the trigger bar and knows no fill: the first candidate is made and the second trigger is still a later one (the walk of the miss is in SimulatorRunTests).
+        missed.Candidates.Count.ShouldBe(1);
+        (missed.Counters.Candidates, missed.Counters.LaterTriggers).ShouldBe((1, 1));
+        Render.Candidate(missed.Candidates[0]).ShouldBe(Render.Candidate(plain.Candidates[0]));
+        Identities.Of(missed.Counters, "buy.trigger[0]").ShouldBe(Identities.Of(plain.Counters, "buy.trigger[0]"));
+    }
+
+    [Fact]
     public void A_stale_bucket_is_counted_and_not_evaluated_f18()
     {
         var c = BuyCounters("F18");

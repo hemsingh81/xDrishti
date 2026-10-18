@@ -31,7 +31,7 @@ public sealed class SimulatorBenchmarks
         var sell = Scan.Compile(definition, Side.Sell);
         var simulator = Sim.Create(definition);
         var candidates = Sim.Run(simulator, bars).Outcomes.Select(o => o.Candidate).ToList();
-        var rules = new WalkRules(2.0, 915);
+        var rules = new WalkRules(2.0, 915, FillRules.Default, Sim.Tick);
 
         var scan = MinutesPerSecond(bars.Length, () =>
         {

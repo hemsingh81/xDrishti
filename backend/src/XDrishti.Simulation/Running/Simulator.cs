@@ -23,8 +23,8 @@ namespace XDrishti.Simulation.Running;
 /// </para>
 /// <para>
 /// <b>Where P3-03b plugs in.</b> The fill rules enter at two places only: <c>Create</c> takes <c>FillRules? fills = null</c> and keeps it next to the sides, and <c>Run</c> takes the instrument's <c>TickSpec</c> before the calendar
-/// (<c>Run(instrument, bars, tick, calendar = null)</c>); <see cref="RulesOf"/> then builds <c>WalkRules(rr, squareOff, fills, tick)</c>, <see cref="HeaderOf"/> takes the first two labels from the description of the fills, and the
-/// walker's new counters are summed in <see cref="Run"/> where <c>Walk</c> is built. Nothing else in this class knows how a fill is made.
+/// (<c>Run(instrument, bars, tick, calendar = null)</c>); <see cref="RulesOf"/> then builds <c>WalkRules(rr, squareOff, fills, tick)</c>, <see cref="HeaderOf"/> takes the first two labels from the description of the fills
+/// (<c>FillDescription.Labels</c>), and the walker's counters, the new ones included, are summed in <see cref="Run"/> where <c>Walk</c> is built. Nothing else in this class knows how a fill is made.
 /// </para>
 /// </summary>
 public sealed class Simulator
@@ -33,12 +33,17 @@ public sealed class Simulator
 
     private readonly string _strategyId;
     private readonly SideRun[] _sides;
+    private readonly FillRules _fills;
 
-    private Simulator(string strategyId, SideRun[] sides)
+    private Simulator(string strategyId, SideRun[] sides, FillRules fills)
     {
         _strategyId = strategyId;
         _sides = sides;
+        _fills = fills;
     }
+
+    /// <summary>The fill rules every walk of this simulator applies (the default ones when <see cref="Create"/> was given none).</summary>
+    public FillRules Fills => _fills;
 
     /// <summary>The sides this simulator runs, Buy first.</summary>
     public IReadOnlyList<Side> Sides => _sides.Select(s => s.Compiled.Side).ToList().AsReadOnly();
@@ -48,9 +53,12 @@ public sealed class Simulator
     /// compile are passed on unchanged, with their paths and spans; a <c>simulation.*</c> refusal carries the path of the field and the span of a model problem (0, 0, line 1, column 1). When a simulator exists, the problems are the
     /// warnings of the compile.
     /// </summary>
+    /// <param name="definition">The strategy.</param>
+    /// <param name="evaluationTimeframe">The timeframe the rules are evaluated on.</param>
+    /// <param name="fills">The entry limit and the slippage of every walk (ADR 0038); null means <see cref="FillRules.Default"/>.</param>
     /// <exception cref="ArgumentNullException"><paramref name="definition"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="evaluationTimeframe"/> is not one of the nine timeframes (a programming error, as in the compiler).</exception>
-    public static SimulatorBuild Create(StrategyDefinition definition, Timeframe evaluationTimeframe)
+    public static SimulatorBuild Create(StrategyDefinition definition, Timeframe evaluationTimeframe, FillRules? fills = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
 
@@ -100,7 +108,7 @@ public sealed class Simulator
             return new SimulatorBuild(null, distinct.AsReadOnly());
         }
 
-        return new SimulatorBuild(new Simulator(definition.Id, [.. runs]), distinct.AsReadOnly());
+        return new SimulatorBuild(new Simulator(definition.Id, [.. runs], fills ?? FillRules.Default), distinct.AsReadOnly());
     }
 
     /// <summary>
@@ -110,11 +118,13 @@ public sealed class Simulator
     /// </summary>
     /// <param name="instrument">The instrument; its id and symbol are written on every trade.</param>
     /// <param name="bars">The instrument's 1-minute bars in ascending order.</param>
+    /// <param name="tick">The instrument's tick size (<see cref="TickSpec.FromMasterPaise"/>); the price grid of its fills and of its entry limit.</param>
     /// <param name="calendar">The trading calendar, or null for the regular 09:15 to 15:30 session.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="bars"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TradingCalendar? calendar = null)
+    /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
+        ArgumentNullException.ThrowIfNull(tick);
         for (var i = 1; i < bars.Count; i++)
         {
             if (bars[i].EpochSeconds <= bars[i - 1].EpochSeconds)
@@ -141,7 +151,7 @@ public sealed class Simulator
             }
 
             scans.Add(scanner.Counters);
-            var rules = RulesOf(side);
+            var rules = RulesOf(side, _fills, tick);
             foreach (var candidate in scanner.Candidates)
             {
                 var walked = TradeWalker.Walk(candidate, bars, rules);
@@ -159,12 +169,12 @@ public sealed class Simulator
         return Result.Success(new SimulationResult(HeaderOf(), ordered, scans.AsReadOnly(), walk));
     }
 
-    /// <summary>The one place the exit rules of a walk are built (P3-03b adds the fill rules and the tick here).</summary>
-    private static WalkRules RulesOf(SideRun side) => new(side.RewardRisk, side.SquareOffMinute);
+    /// <summary>The one place the rules of a walk are built: the exit rules of the side, the fill rules and the tick of the instrument.</summary>
+    private static WalkRules RulesOf(SideRun side, FillRules fills, TickSpec tick) => new(side.RewardRisk, side.SquareOffMinute, fills, tick);
 
-    /// <summary>The one place the header is built (P3-03b takes the first two labels from the description of its fill rules here).</summary>
+    /// <summary>The one place the header is built: the first two labels come from the description of the fill rules, the other three are fixed.</summary>
     private SimulationHeader HeaderOf() =>
-        new(SimulationEngine.Version, SimTrade.CurrentSchemaVersion, _strategyId, FillBasis.Exact, CostBasis.None, SimulationHeader.StandardLabels);
+        new(SimulationEngine.Version, SimTrade.CurrentSchemaVersion, _strategyId, _fills, _fills.Basis, CostBasis.None, SimulationHeader.LabelsOf(_fills));
 
     private static LocatedProblem Refusal(string path, string code, string message) => new(path, new Problem(code, message, NoText));
 

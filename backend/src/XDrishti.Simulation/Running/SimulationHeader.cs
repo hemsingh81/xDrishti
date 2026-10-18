@@ -9,21 +9,24 @@ namespace XDrishti.Simulation.Running;
 /// <param name="EngineVersion"><see cref="SimulationEngine.Version"/> of the engine that ran.</param>
 /// <param name="SchemaVersion"><see cref="SimTrade.CurrentSchemaVersion"/> of the trades.</param>
 /// <param name="StrategyId">The strategy that decided.</param>
-/// <param name="Fills">How the prices were obtained.</param>
+/// <param name="FillRules">The entry limit and the slippage the walks applied (ADR 0038).</param>
+/// <param name="Fills">How the prices were obtained: <see cref="XDrishti.Domain.Research.FillRules.Basis"/> of <paramref name="FillRules"/>.</param>
 /// <param name="Costs">Whether charges were taken off.</param>
-/// <param name="Labels">The five labels, in order: fills, entry limit, costs, portfolio limits, sample.</param>
-public sealed record SimulationHeader(string EngineVersion, int SchemaVersion, string StrategyId, FillBasis Fills, CostBasis Costs, IReadOnlyList<string> Labels)
+/// <param name="Labels">The five labels, in order: fills, entry limit (both from <see cref="FillDescription.Labels"/>), costs, portfolio limits, sample.</param>
+public sealed record SimulationHeader(string EngineVersion, int SchemaVersion, string StrategyId, FillRules FillRules, FillBasis Fills, CostBasis Costs, IReadOnlyList<string> Labels)
 {
-    /// <summary>The five labels of this engine (D11); P3-03b replaces the first two with the description of its fill rules when it merges.</summary>
-    public static IReadOnlyList<string> StandardLabels { get; } =
-        Array.AsReadOnly(["fills: exact", "entry limit: not applied", "costs: none", "portfolio limits: not simulated", "sample: in-sample"]);
+    /// <summary>The last three labels of this engine (D11), which do not depend on the fill rules.</summary>
+    public static IReadOnlyList<string> FixedLabels { get; } = Array.AsReadOnly(["costs: none", "portfolio limits: not simulated", "sample: in-sample"]);
+
+    /// <summary>The five labels for these fill rules: the two of <see cref="FillDescription.Labels"/>, then <see cref="FixedLabels"/>.</summary>
+    public static IReadOnlyList<string> LabelsOf(FillRules rules) => Array.AsReadOnly([.. FillDescription.Labels(rules), .. FixedLabels]);
 
     /// <summary>Value equality: every field, and the labels in order.</summary>
     public bool Equals(SimulationHeader? other) =>
         other is not null
-        && EngineVersion == other.EngineVersion && SchemaVersion == other.SchemaVersion && StrategyId == other.StrategyId && Fills == other.Fills && Costs == other.Costs
+        && EngineVersion == other.EngineVersion && SchemaVersion == other.SchemaVersion && StrategyId == other.StrategyId && FillRules == other.FillRules && Fills == other.Fills && Costs == other.Costs
         && Labels.SequenceEqual(other.Labels);
 
     /// <summary>A hash consistent with <see cref="Equals(SimulationHeader?)"/>.</summary>
-    public override int GetHashCode() => HashCode.Combine(EngineVersion, SchemaVersion, StrategyId, Fills, Costs, Labels.Count);
+    public override int GetHashCode() => HashCode.Combine(EngineVersion, SchemaVersion, StrategyId, FillRules, Fills, Costs, Labels.Count);
 }

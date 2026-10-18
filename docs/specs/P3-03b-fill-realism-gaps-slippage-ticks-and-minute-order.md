@@ -277,6 +277,6 @@ Unit only (`XDrishti.Simulation.Tests`, xUnit v3 and Shouldly as elsewhere, no m
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [x] No contract or migration change (no endpoint, no table; `XDrishti.Domain.Research`, `XDrishti.Simulation` and their tests only; no project or package reference)
-- [ ] Architecture tests green
+- [x] Architecture tests green
 - [ ] Design docs/ADR updated: the new ADR (expected 0038, superseding D3, D4, D5 and D7 of ADR 0037 and linked both ways: criterion 24), docs 08, 07, 19 and 16 as in criterion 24, the roadmap issues log, `scripts/build-docs.sh`
 - [ ] Hand-overs written down: the `Simulator` list in the roadmap row of P3-03a, the record and runner list in P3-04's *Obligations from P3-03b* and in the scope of P3-04a; the unit of the master tick recorded in the ADR; P3-04b prints the labels of `FillDescription` and `FillLimits` in its banner

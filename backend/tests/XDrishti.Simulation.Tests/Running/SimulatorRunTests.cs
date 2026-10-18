@@ -14,7 +14,8 @@ namespace XDrishti.Simulation.Tests.Running;
 /// </summary>
 public sealed class SimulatorRunTests
 {
-    private static readonly Simulator Orb = Sim.Create(OrbV1.Create());
+    /// <summary>The rules of P3-03's tables: the 0.1 % limit and no slippage (the fills are exact), so that the walker tables apply field by field.</summary>
+    private static readonly Simulator Orb = Sim.Create(OrbV1.Create(), fills: Cand.NoSlippage);
 
     /// <summary>The days of P3-03 that have a candidate: the scanner must make exactly the candidates its tables walk.</summary>
     public static TheoryData<string> Days => [.. Cases.FDays.Select(c => c.Name)];
@@ -149,9 +150,107 @@ public sealed class SimulatorRunTests
         result.Header.EngineVersion.ShouldBe(SimulationEngine.Version);
         result.Header.SchemaVersion.ShouldBe(SimTrade.CurrentSchemaVersion);
         result.Header.StrategyId.ShouldBe("ORB");
+        result.Header.FillRules.ShouldBe(Cand.NoSlippage);
         result.Header.Fills.ShouldBe(FillBasis.Exact);
         result.Header.Costs.ShouldBe(CostBasis.None);
-        result.Header.Labels.ShouldBe(["fills: exact", "entry limit: not applied", "costs: none", "portfolio limits: not simulated", "sample: in-sample"]);
+        result.Header.Labels.ShouldBe(["fills: exact", "entry limit: +0.1 %", "costs: none", "portfolio limits: not simulated", "sample: in-sample"]);
+    }
+
+    [Fact]
+    public void Without_fill_rules_the_header_carries_the_defaults_and_says_the_fills_are_modelled()
+    {
+        var result = Sim.Run(OrbV1.Create(), Cases.F("F1").Bars, instrument: Cand.Test);
+
+        result.Header.FillRules.ShouldBe(FillRules.Default);
+        result.Header.Fills.ShouldBe(FillBasis.Modelled);
+        result.Header.Labels.ShouldBe(["fills: modelled", "entry limit: +0.1 %", "costs: none", "portfolio limits: not simulated", "sample: in-sample"]);
+        result.Trades.Single().Fills.ShouldBe(FillBasis.Modelled);
+    }
+
+    [Fact]
+    public void A_null_fill_rules_argument_is_the_default_rules()
+    {
+        var explicitDefault = Sim.Create(OrbV1.Create(), fills: FillRules.Default);
+        var implicitDefault = Sim.Create(OrbV1.Create(), fills: null);
+
+        implicitDefault.Fills.ShouldBe(FillRules.Default);
+        Render.Result(Sim.Run(implicitDefault, Cases.F("F1").Bars, Cand.Test)).ShouldBe(Render.Result(Sim.Run(explicitDefault, Cases.F("F1").Bars, Cand.Test)));
+    }
+
+    [Fact]
+    public void The_header_labels_follow_the_fill_rules_given_to_create()
+    {
+        var wide = FillRules.Create(0.25, SlippageConfig.Default).Value;
+
+        var result = Sim.Run(Sim.Create(OrbV1.Create(), fills: wide), Cases.F("F1").Bars, Cand.Test);
+
+        result.Header.FillRules.ShouldBe(wide);
+        result.Header.Labels.Take(2).ShouldBe(FillDescription.Labels(wide));
+        result.Header.Labels.Skip(2).ShouldBe(SimulationHeader.FixedLabels);
+    }
+
+    [Fact]
+    public void A_modelled_run_fills_on_the_tick_grid_of_the_instrument_and_the_exact_layer_does_not_move()
+    {
+        var bars = Cases.F("F1").Bars;
+        var exact = Sim.Run(Orb, bars, Cand.Test).Trades.Single();
+
+        var modelled = Sim.Run(OrbV1.Create(), bars, instrument: Cand.Test).Trades.Single();
+        var coarse = Sim.Run(Sim.Create(OrbV1.Create()), bars, Cand.Test, tick: TickSpec.FromRupees(0.10m).Value).Trades.Single();
+
+        (modelled.EntryPrice, modelled.ExitPrice, modelled.RExact).ShouldBe((exact.EntryPrice, exact.ExitPrice, exact.RExact));
+        modelled.EntryFilledPrice.ShouldBeGreaterThan(modelled.EntryPrice);
+        modelled.RFilled.ShouldBeLessThan(modelled.RExact);
+        (Math.Round((decimal)modelled.EntryFilledPrice / 0.05m) * 0.05m).ShouldBe((decimal)modelled.EntryFilledPrice);
+        (Math.Round((decimal)coarse.EntryFilledPrice / 0.10m) * 0.10m).ShouldBe((decimal)coarse.EntryFilledPrice);
+        modelled.TickFallback.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_miss_spends_the_days_ticket_f11_with_a_09_45_minute_that_never_trades_back_to_the_limit()
+    {
+        var bars = Fixtures.F11().Set("09:45 101.00/101.20/100.70/101.00").Bars();
+
+        var result = Sim.Run(Orb, bars, Cand.Test);
+
+        var only = result.Outcomes.Single();
+        only.Candidate.TriggerBar.Close.ShouldBe(100.50);
+        only.Walk.Trade.ShouldBeNull();
+        only.Walk.NoTrade.ShouldBe(NoTradeReason.LimitNotReached);
+        only.Walk.BarsExamined.ShouldBe(1);
+        result.Trades.ShouldBeEmpty();
+        result.OpenAtEnd.ShouldBeEmpty();
+        var buy = result.Scans[0];
+        (buy.Side, buy.Candidates, buy.LaterTriggers).ShouldBe((Side.Buy, 1, 1));
+        (result.Walk.Candidates, result.Walk.Trades, result.Walk.LimitNotReached).ShouldBe((1, 0, 1));
+    }
+
+    [Fact]
+    public void The_same_day_without_the_listed_minute_enters_at_the_open_and_counts_it()
+    {
+        var result = Sim.Run(Orb, Fixtures.F11().Bars(), Cand.Test);
+
+        result.Walk.EntriesAtOpen.ShouldBe(1);
+        (result.Walk.EntriesAtLimit, result.Walk.LimitNotReached).ShouldBe((0, 0));
+    }
+
+    [Fact]
+    public void The_new_counters_of_the_walker_are_summed_over_every_candidate_of_the_run()
+    {
+        var results = Fixtures.OrbDays.Select(f => Sim.Run(Orb, f.Bars, Cand.Test)).ToList();
+
+        var expected = results.SelectMany(r => r.Outcomes).Aggregate(WalkCounters.Empty, (sum, o) => sum.Add(o.Walk.ToCounters()));
+        var summed = results.Aggregate(WalkCounters.Empty, (sum, r) => sum.Add(r.Walk));
+
+        summed.ShouldBe(expected);
+        summed.EntriesAtOpen.ShouldBe(summed.Trades);
+        summed.LateSquareOffs.ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public void A_null_tick_is_a_programming_error()
+    {
+        Should.Throw<ArgumentNullException>(() => Orb.Run(Scan.Instrument, Cases.F("F1").Bars, null!));
     }
 
     [Fact]
@@ -242,7 +341,7 @@ public sealed class SimulatorRunTests
     [Fact]
     public void A_null_list_of_bars_or_definition_is_a_programming_error()
     {
-        Should.Throw<ArgumentNullException>(() => Orb.Run(Scan.Instrument, null!));
+        Should.Throw<ArgumentNullException>(() => Orb.Run(Scan.Instrument, null!, Sim.Tick));
         Should.Throw<ArgumentNullException>(() => Simulator.Create(null!, Timeframe.M15));
     }
 }

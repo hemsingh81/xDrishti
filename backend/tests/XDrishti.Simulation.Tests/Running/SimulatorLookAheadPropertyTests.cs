@@ -46,7 +46,7 @@ public sealed class SimulatorLookAheadPropertyTests
         if (exits.Count > 0)
         {
             var chosen = exits[rng.Int(exits.Count)];
-            var exit = LookAhead.SettledAt(chosen.Candidate, bars, chosen.Walk);
+            var exit = WalkProperties.SettledAt(chosen.Candidate, bars, chosen.Walk);
             cuts.Add(exit);
             cuts.Add(exit - 1);
         }
@@ -67,7 +67,7 @@ public sealed class SimulatorLookAheadPropertyTests
         foreach (var k in Cuts(seed, bars, full))
         {
             var expectedCandidates = full.Outcomes.Where(o => o.Candidate.DecisionBarIndex <= k).Select(o => Render.Candidate(o.Candidate)).ToList();
-            var settled = full.Outcomes.Where(o => LookAhead.SettledAt(o.Candidate, fullFeed, o.Walk) <= k).ToList();
+            var settled = full.Outcomes.Where(o => WalkProperties.SettledAt(o.Candidate, fullFeed, o.Walk) <= k).ToList();
             candidates += expectedCandidates.Count;
             outcomes += settled.Count;
             trades += settled.Count(o => o.Walk.Trade is not null);

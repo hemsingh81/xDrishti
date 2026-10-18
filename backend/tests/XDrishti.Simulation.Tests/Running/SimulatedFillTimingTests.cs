@@ -1,6 +1,7 @@
 using XDrishti.Domain.Research;
 using XDrishti.Simulation.Running;
 using XDrishti.Simulation.Tests.Support;
+using XDrishti.Simulation.Walking;
 using XDrishti.Strategies.BuiltIn;
 
 namespace XDrishti.Simulation.Tests.Running;
@@ -20,7 +21,7 @@ public sealed class SimulatedFillTimingTests
 
     private static IEnumerable<(string Label, CandidateOutcome Outcome, SimTrade Trade, XDrishti.Domain.Market.Bars.Bar[] Bars, int Settled)> Trades() =>
         Runs.SelectMany(run => run.Result.Outcomes.Where(o => o.Walk.Trade is not null)
-            .Select(o => ("seed " + run.Seed, o, o.Walk.Trade!, run.Bars, LookAhead.SettledAt(o.Candidate, run.Bars, o.Walk))));
+            .Select(o => ("seed " + run.Seed, o, o.Walk.Trade!, run.Bars, WalkProperties.SettledAt(o.Candidate, run.Bars, o.Walk))));
 
     [Fact]
     public void Enough_trades_are_checked_on_both_sides_and_with_every_kind_of_exit()
@@ -47,7 +48,7 @@ public sealed class SimulatedFillTimingTests
     {
         foreach (var (label, outcome, trade, bars, settled) in Trades())
         {
-            FillProperties.AssertExit(trade, bars, outcome.Walk, settled, outcome.Candidate.DecisionBarIndex + 1, SquareOff, label);
+            FillProperties.AssertExit(trade, bars, outcome.Walk, settled, FillProperties.AssertFill(trade, outcome.Candidate, bars, outcome.Walk, SquareOff), SquareOff, label);
         }
     }
 
@@ -56,7 +57,7 @@ public sealed class SimulatedFillTimingTests
     {
         foreach (var (label, outcome, trade, bars, settled) in Trades())
         {
-            FillProperties.AssertExcursions(trade, bars, outcome.Walk, settled, outcome.Candidate.DecisionBarIndex + 1, label);
+            FillProperties.AssertExcursions(trade, bars, outcome.Walk, settled, FillProperties.AssertFill(trade, outcome.Candidate, bars, outcome.Walk, SquareOff), label);
         }
     }
 
@@ -74,6 +75,47 @@ public sealed class SimulatedFillTimingTests
             trade.TriggerBarMinutes.ShouldBe(candidate.TriggerBarMinutes, label);
             trade.DecisionEpochSeconds.ShouldBe(candidate.DecisionEpochSeconds, label);
             trade.InstrumentId.ShouldBe(candidate.Instrument.Id, label);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Every_walk_of_the_simulator_equals_the_walker_on_the_same_candidate_with_the_fill_rules_and_tick_of_the_run(bool withoutSlippage)
+    {
+        var fills = withoutSlippage ? Cand.NoSlippage : FillRules.Default;
+        var simulator = Sim.Create(OrbV1.Create(), fills: fills);
+        var rules = new WalkRules(2.0, SquareOff, fills, Sim.Tick);
+
+        foreach (var run in Runs)
+        {
+            var result = Sim.Run(simulator, run.Bars);
+            foreach (var outcome in result.Outcomes)
+            {
+                var alone = TradeWalker.Walk(outcome.Candidate, run.Bars, rules);
+
+                OutcomeFormatter.Render(XDrishti.Domain.Common.Result.Success(outcome.Walk)).ShouldBe(OutcomeFormatter.Render(alone), "seed " + run.Seed);
+            }
+        }
+    }
+
+    [Fact]
+    public void The_trades_of_a_run_without_slippage_have_filled_prices_equal_to_the_exact_ones_and_those_with_slippage_never_beat_them()
+    {
+        var exact = Sim.Create(OrbV1.Create(), fills: Cand.NoSlippage);
+
+        foreach (var run in Runs)
+        {
+            foreach (var trade in Sim.Run(exact, run.Bars).Outcomes.Select(o => o.Walk.Trade).OfType<SimTrade>())
+            {
+                (trade.RFilled, trade.SlippageR, trade.Fills).ShouldBe((trade.RExact, 0, FillBasis.Exact), "seed " + run.Seed);
+            }
+
+            foreach (var trade in run.Result.Outcomes.Select(o => o.Walk.Trade).OfType<SimTrade>())
+            {
+                trade.Fills.ShouldBe(FillBasis.Modelled);
+                trade.RFilled.ShouldBeLessThanOrEqualTo(trade.RExact + 1e-12, "seed " + run.Seed);
+            }
         }
     }
 }

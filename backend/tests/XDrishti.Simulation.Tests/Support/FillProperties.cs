@@ -5,24 +5,45 @@ using XDrishti.Simulation.Walking;
 namespace XDrishti.Simulation.Tests.Support;
 
 /// <summary>
-/// The properties of P3-03 AC9 (fill minute, entry price, exit price bounds, R and the excursions against a plain reference loop), written once and applied to the trades of the walker's seeded runs
-/// and to those of <c>Simulator.Run</c> (P3-03a AC16).
+/// The properties of P3-03 AC9 as ADR 0038 restates them (fill minute, entry price, exit price bounds, R and the excursions against a plain reference loop), written once and applied to the trades of
+/// <c>Simulator.Run</c> (P3-03a AC16). They read the exact layer of a trade (<c>EntryPrice</c>, <c>ExitPrice</c>, <c>RExact</c>), which does not depend on the slippage.
 /// </summary>
 internal static class FillProperties
 {
-    /// <summary>The trade fills in the minute after the candidate, on its date, within the delay and before the square-off, at that minute's open.</summary>
-    public static void AssertFill(SimTrade trade, EntryCandidate candidate, IReadOnlyList<Bar> bars, WalkOutcome outcome, int squareOffMinute)
+    /// <summary>The walker computes in decimal and the reference loop in double: the same figure to well within this.</summary>
+    private const double Tolerance = 1e-9;
+
+    /// <summary>
+    /// The index of the fill minute: the first minute after the candidate's that holds a trade (volume above 0). The trade fills in it, on its date, within the delay and before the square-off; at that minute's open
+    /// when it is within the limit, otherwise at the limit, which the minute traded back to.
+    /// </summary>
+    public static int AssertFill(SimTrade trade, EntryCandidate candidate, IReadOnlyList<Bar> bars, WalkOutcome outcome, int squareOffMinute)
     {
         var own = bars[candidate.DecisionBarIndex];
-        var fill = bars[candidate.DecisionBarIndex + 1];
+        var index = candidate.DecisionBarIndex + 1;
+        while (bars[index].Volume == 0)
+        {
+            index++;
+        }
+
+        var fill = bars[index];
 
         trade.EntryEpochSeconds.ShouldBe(fill.EpochSeconds);
         SessionClock.DateOf(fill.EpochSeconds).ShouldBe(SessionClock.DateOf(own.EpochSeconds));
         (fill.EpochSeconds - candidate.DecisionEpochSeconds).ShouldBeInRange(0, SimulationEngine.MaxFillDelayMinutes * 60L);
         SessionClock.MinuteOfDay(fill.EpochSeconds).ShouldBeLessThan(squareOffMinute);
-        trade.EntryPrice.ShouldBe(fill.Open);
         trade.TradeDate.ShouldBe(SessionClock.DateOf(fill.EpochSeconds));
         outcome.EntryAfterMissingMinutes.ShouldBe(fill.EpochSeconds > candidate.DecisionEpochSeconds);
+        if (trade.EntryFill == EntryFill.AtOpen)
+        {
+            trade.EntryPrice.ShouldBe(fill.Open);
+        }
+        else
+        {
+            trade.EntryPrice.ShouldBeInRange(fill.Low, fill.High);
+        }
+
+        return index;
     }
 
     /// <summary>The exit price lies in its minute or is the open or the close that the rule names; a square-off leaves at the open, at or after its minute; the end of the data at the close.</summary>
@@ -52,13 +73,13 @@ internal static class FillProperties
     {
         var (r, mae, mfe) = Reference(trade, bars, fillIndex, settled);
 
-        trade.R.ShouldBe(r, $"{label} R");
-        trade.MaeR.ShouldBe(mae, $"{label} MAE");
-        trade.MfeR.ShouldBe(mfe, $"{label} MFE");
+        trade.RExact.ShouldBe(r, Tolerance, $"{label} R");
+        trade.MaeR.ShouldBe(mae, Tolerance, $"{label} MAE");
+        trade.MfeR.ShouldBe(mfe, Tolerance, $"{label} MFE");
         trade.MaeR.ShouldBeGreaterThanOrEqualTo(0);
         trade.MfeR.ShouldBeGreaterThanOrEqualTo(0);
-        (-trade.MaeR).ShouldBeLessThanOrEqualTo(trade.R);
-        trade.R.ShouldBeLessThanOrEqualTo(trade.MfeR);
+        (-trade.MaeR).ShouldBeLessThanOrEqualTo(trade.RExact + Tolerance);
+        trade.RExact.ShouldBeLessThanOrEqualTo(trade.MfeR + Tolerance);
         outcome.BarsExamined.ShouldBe(settled - fillIndex + 1, label);
     }
 

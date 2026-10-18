@@ -151,7 +151,7 @@ public sealed class SimulatorCreateTests
     {
         var bars = Fixtures.F1().Bars();
 
-        var result = Sim.Create(OrbV1.Create()).Run(Scan.Instrument, [bars[0], bars[1], bars[1], bars[2]]);
+        var result = Sim.Create(OrbV1.Create()).Run(Scan.Instrument, [bars[0], bars[1], bars[1], bars[2]], Sim.Tick);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe("simulation.bars_not_ascending");
@@ -163,7 +163,7 @@ public sealed class SimulatorCreateTests
         var bars = Fixtures.F1().Bars();
         (bars[200], bars[201]) = (bars[201], bars[200]);
 
-        var result = Sim.Create(OrbV1.Create()).Run(Scan.Instrument, bars);
+        var result = Sim.Create(OrbV1.Create()).Run(Scan.Instrument, bars, Sim.Tick);
 
         result.Error.Code.ShouldBe("simulation.bars_not_ascending");
     }
@@ -171,6 +171,6 @@ public sealed class SimulatorCreateTests
     [Fact]
     public void An_ascending_list_is_not_refused()
     {
-        Sim.Create(OrbV1.Create()).Run(Scan.Instrument, Fixtures.F1().Bars()).IsSuccess.ShouldBeTrue();
+        Sim.Create(OrbV1.Create()).Run(Scan.Instrument, Fixtures.F1().Bars(), Sim.Tick).IsSuccess.ShouldBeTrue();
     }
 }

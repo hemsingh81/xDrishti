@@ -132,7 +132,7 @@ public sealed record ScanCounters(Side Side, long Bars, long IgnoredBars, long I
 
 // XDrishti.Simulation.Running  (depends on Walking, so the result types are here)
 public sealed record CandidateOutcome(EntryCandidate Candidate, WalkOutcome Walk);      // Walk.Trade / Walk.NoTrade; the walker's counts are summed from it
-public sealed record SimulationHeader(string EngineVersion, int SchemaVersion, string StrategyId, FillBasis Fills, CostBasis Costs, IReadOnlyList<string> Labels);   // the five labels of D11
+public sealed record SimulationHeader(string EngineVersion, int SchemaVersion, string StrategyId, FillRules FillRules, FillBasis Fills, CostBasis Costs, IReadOnlyList<string> Labels);   // the five labels of D11; Fills = FillRules.Basis; the first two labels are FillDescription.Labels(FillRules) (P3-03b merged)
 public sealed record SimulationResult(SimulationHeader Header, IReadOnlyList<CandidateOutcome> Outcomes, IReadOnlyList<ScanCounters> Scans, WalkCounters Walk)
 { public IReadOnlyList<SimTrade> Trades { get; } public IReadOnlyList<SimTrade> OpenAtEnd { get; } }
     // Scans: Buy, then Sell. Trades: the trades whose reason is not EndOfData, ordered by entry instant, then Buy before Sell. OpenAtEnd: the EndOfData trades, same order. Outcomes holds both and the candidates without a trade.
@@ -180,10 +180,10 @@ None needs the owner before the build: plan questions Q1 and Q2 (fills and exits
 ## Done when
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] No contract or migration change (no endpoint, no table; `scripts/gen-api.sh` not needed); the build changes are the references of the library to `Indicators` and `Strategies`, of `XDrishti.Api` to `Strategies`, and the hosted service
-- [ ] Architecture tests green (AC18), the compiler warm-up rule satisfied non-vacuously
+- [x] No contract or migration change (no endpoint, no table; `scripts/gen-api.sh` not needed); the build changes are the references of the library to `Indicators` and `Strategies`, of `XDrishti.Api` to `Strategies`, and the hosted service
+- [x] Architecture tests green (AC18), the compiler warm-up rule satisfied non-vacuously
 - [ ] Design docs/ADR updated: the amendment of the simulation ADR and its line in `docs/adr/README.md`; doc 03, doc 07, doc 11 §3 and the roadmap as in AC20; `scripts/build-docs.sh`
-- [ ] *Order with P3-03b* done by whichever slice merges second (the `FillRules`/`TickSpec` arguments, the labels, the regenerated golden file, one version bump); written in the roadmap rows
+- [x] *Order with P3-03b* done by whichever slice merges second (the `FillRules`/`TickSpec` arguments, the labels, the regenerated golden file, one version bump: `sim-2`, raised once by P3-03b for the pair); written in the roadmap rows (the roadmap rows are the owner's to update: not edited in the wiring change)
 - [ ] The P3-02 follow-ups "P3-03 — the frame and the plan" and "`StrategyWarmupService`" are closed; ISS-17(3) gets the statement of the *Out* list; ISS-15 keeps its place (its figure is not taken here)
 - [ ] P3-03's text that cites "D6", "D7" and "D9" for the scanner counters, the header labels and the scanner fixtures is re-pointed to D10, D11 and D12 here
 - [ ] Cross-spec names kept equal in P3-03, P3-03b and P3-04: `ScanCounters` (with `FullyReadySteps`, `LostDecisions`, `IgnoredBars`, `IncompleteBarsConsumed`) and `ConditionCounter` in `XDrishti.Domain.Research`; `SimulationResult.Trades` ordered by entry instant, then `Buy` before `Sell`, with the `EndOfData` trades in `OpenAtEnd`; the optional `TradingCalendar` argument of `EntryScanner.Create` and `Simulator.Run`; `Simulator.Create(definition, evaluationTimeframe)` giving `SimulatorBuild(Simulator?, Problems)`
