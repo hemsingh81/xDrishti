@@ -13,8 +13,13 @@ namespace XDrishti.Api.IntegrationTests.DividendImport;
 /// delete them — and a database that already holds dividends when the migration runs and rolls back.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
-public sealed class DividendImportDatabaseTests(ApiFactory factory)
+public sealed class DividendImportDatabaseTests(ApiFactory factory) : IAsyncLifetime
 {
+    // These tests write accounts straight into the tables and reset at the start of the test that needs it; the rows must not outlive the class.
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
+
     private const string MigrationDatabase = "xd_dividend_import_migration_probe";
 
     private const string BeforeMigration = "20261014163207_AddDividends";

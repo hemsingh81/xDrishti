@@ -26,8 +26,7 @@ public abstract class HoldingsTestBase(ApiFactory factory) : IAsyncLifetime
 
     public virtual async ValueTask InitializeAsync()
     {
-        await Factory.ResetAccountsAsync();
-        await Factory.ResetInstrumentsAsync();
+        await Factory.ResetAllAsync();
         Factory.Brokers.Reset();
         Factory.Clock.Pin(MondayMorning);
         Owner = await Factory.SignInElevatedAsync(Ct);
@@ -37,6 +36,7 @@ public abstract class HoldingsTestBase(ApiFactory factory) : IAsyncLifetime
     {
         Factory.Brokers.Reset();
         await Factory.ResetClockAsync();
+        await Factory.ResetAccountsAsync();
         GC.SuppressFinalize(this);
     }
 

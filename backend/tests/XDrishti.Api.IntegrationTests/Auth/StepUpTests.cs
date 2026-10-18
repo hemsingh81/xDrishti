@@ -15,7 +15,7 @@ public sealed class StepUpTests(ApiFactory factory) : IAsyncLifetime
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     private static Task<HttpResponseMessage> SensitiveCallAsync(HttpClient client, string name = "Step Up Probe") =>
         client.PostJsonAsync("/api/risk-profiles", AccountsApi.RiskProfile(name), Ct);
@@ -76,7 +76,7 @@ public sealed class StepUpTests(ApiFactory factory) : IAsyncLifetime
         }
         finally
         {
-            factory.Clock.Reset();
+            await factory.ResetClockAsync();
         }
     }
 
@@ -95,7 +95,7 @@ public sealed class StepUpTests(ApiFactory factory) : IAsyncLifetime
         }
         finally
         {
-            factory.Clock.Reset();
+            await factory.ResetClockAsync();
         }
     }
 

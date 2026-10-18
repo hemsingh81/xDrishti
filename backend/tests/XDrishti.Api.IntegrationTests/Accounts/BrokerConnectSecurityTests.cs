@@ -24,10 +24,10 @@ public sealed class BrokerConnectSecurityTests(ApiFactory factory) : IAsyncLifet
         factory.Brokers.Reset();
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         factory.Brokers.Reset();
-        return ValueTask.CompletedTask;
+        await factory.ResetAccountsAsync();
     }
 
     [Fact]

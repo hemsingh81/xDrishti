@@ -10,8 +10,13 @@ namespace XDrishti.Api.IntegrationTests.Holdings;
 /// end of the previous run plus a margin of one second (its own rebuild stamps the lots it makes a moment after its start), so a holding stamped inside the margin is not news.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
-public sealed class HoldingAppearedSinceTests(ApiFactory factory)
+public sealed class HoldingAppearedSinceTests(ApiFactory factory) : IAsyncLifetime
 {
+    // These tests write accounts straight into the tables and reset at the start of the test that needs it; the rows must not outlive the class.
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
+
     private const string AccountId = "00000000-0000-7000-8000-00000000a201";
 
     private const string OtherAccountId = "00000000-0000-7000-8000-00000000a202";

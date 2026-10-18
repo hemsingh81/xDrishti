@@ -12,8 +12,13 @@ namespace XDrishti.Api.IntegrationTests.Trades;
 /// lots keep their DELETE (a rebuild replaces them) — and a database that already holds lots when the migration runs.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
-public sealed class TradesDatabaseTests(ApiFactory factory)
+public sealed class TradesDatabaseTests(ApiFactory factory) : IAsyncLifetime
 {
+    // These tests write accounts straight into the tables and reset at the start of the test that needs it; the rows must not outlive the class.
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
+
     private const string MigrationDatabase = "xd_trades_migration_probe";
 
     private const string BeforeMigration = "20261013131938_AddActionCenterAndPriceAlerts";

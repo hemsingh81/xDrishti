@@ -15,8 +15,13 @@ namespace XDrishti.Api.IntegrationTests.BrokerHistory;
 /// the exclusion between holdings syncs and broker history runs, the watermark that only moves forward, and a database that already holds trades when the migration runs.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
-public sealed class BrokerHistoryDatabaseTests(ApiFactory factory)
+public sealed class BrokerHistoryDatabaseTests(ApiFactory factory) : IAsyncLifetime
 {
+    // These tests write accounts straight into the tables and reset at the start of the test that needs it; the rows must not outlive the class.
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
+
     private const string MigrationDatabase = "xd_broker_history_migration_probe";
 
     private const string BeforeMigration = "20261013211905_AddPreviousCloseTime";

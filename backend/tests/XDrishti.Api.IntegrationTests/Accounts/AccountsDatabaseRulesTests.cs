@@ -12,7 +12,7 @@ public sealed class AccountsDatabaseRulesTests(ApiFactory factory) : IAsyncLifet
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     private async Task ExecuteAsync(string sql, params (string Name, object Value)[] parameters)
     {

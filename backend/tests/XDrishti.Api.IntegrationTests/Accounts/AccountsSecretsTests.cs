@@ -28,7 +28,7 @@ public sealed class AccountsSecretsTests(ApiFactory factory) : IAsyncLifetime
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     private static async Task<string> TextAsync(HttpResponseMessage response) => response.StatusCode + " " + await response.Content.ReadAsStringAsync(Ct);
 
@@ -88,7 +88,7 @@ public sealed class AccountsSecretsTests(ApiFactory factory) : IAsyncLifetime
         }
         finally
         {
-            factory.Clock.Reset();
+            await factory.ResetClockAsync();
         }
 
         refusedStatus.ShouldBe(HttpStatusCode.Forbidden);

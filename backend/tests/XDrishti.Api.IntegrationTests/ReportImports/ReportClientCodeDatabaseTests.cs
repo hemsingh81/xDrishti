@@ -12,8 +12,13 @@ namespace XDrishti.Api.IntegrationTests.ReportImports;
 /// that already holds accounts and rolls back to the report imports.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
-public sealed class ReportClientCodeDatabaseTests(ApiFactory factory)
+public sealed class ReportClientCodeDatabaseTests(ApiFactory factory) : IAsyncLifetime
 {
+    // These tests write accounts straight into the tables and reset at the start of the test that needs it; the rows must not outlive the class.
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
+
     private const string MigrationDatabase = "xd_report_client_code_migration_probe";
 
     private const string BeforeMigration = "20261015062939_AddReportImports";
