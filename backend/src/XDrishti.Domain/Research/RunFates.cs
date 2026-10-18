@@ -17,6 +17,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="ExcludedAcrossDiscontinuity">Swing trades dated in the window whose walk ended with the data of a segment that a flagged day follows: neither a trade nor open at the end, excluded and counted (D13).</param>
 /// <param name="PositionOpen">No-trade: see <see cref="NoTradeReason.PositionOpen"/>.</param>
 /// <param name="SkippedQuantity">Trades dated in the window that sizing gave less than one share (ADR 0042, D13); neither a trade nor open at the end. Always 0 in a gross run.</param>
+/// <param name="OrderPendingAtEnd">No-trade: see <see cref="NoTradeReason.OrderPendingAtEnd"/> (ADR 0043, D3).</param>
 /// <param name="SkippedCost">Trades dated in the window whose charge in R was above <c>max_cost_R</c> (ADR 0042, D13), after the quantity check. Always 0 in a gross run.</param>
 public sealed record RunFates(
     long EntriesSuppressed,
@@ -30,16 +31,17 @@ public sealed record RunFates(
     long ExcludedAcrossDiscontinuity = 0,
     long PositionOpen = 0,
     long SkippedQuantity = 0,
-    long SkippedCost = 0)
+    long SkippedCost = 0,
+    long OrderPendingAtEnd = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
-    public static RunFates Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public static RunFates Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>The sum of every fate.</summary>
     public long Total => EntriesSuppressed + TradesBeforeWindow + OpenAtEnd + Trades + NoTrade + ExcludedAcrossDiscontinuity + SkippedQuantity + SkippedCost;
 
     /// <summary>The walker no-trades, all reasons.</summary>
-    public long NoTrade => NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen;
+    public long NoTrade => NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd;
 
     /// <summary>The field-by-field sum.</summary>
     public RunFates Add(RunFates other)
@@ -57,6 +59,7 @@ public sealed record RunFates(
             ExcludedAcrossDiscontinuity + other.ExcludedAcrossDiscontinuity,
             PositionOpen + other.PositionOpen,
             SkippedQuantity + other.SkippedQuantity,
-            SkippedCost + other.SkippedCost);
+            SkippedCost + other.SkippedCost,
+            OrderPendingAtEnd + other.OrderPendingAtEnd);
     }
 }

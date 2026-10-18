@@ -7,7 +7,7 @@ namespace XDrishti.Simulation.Walking;
 /// </summary>
 /// <param name="Trade">The trade, or null when there is none.</param>
 /// <param name="NoTrade">The reason there is no trade, or null when there is one.</param>
-/// <param name="BarsExamined">The minutes that hold a trade, from the fill minute to the exit minute, both included: 0 for <c>NoFillBar</c>, <c>AfterSquareOff</c> and <c>PositionOpen</c>, 1 for <c>EntryThroughStop</c> and <c>LimitNotReached</c>.</param>
+/// <param name="BarsExamined">The minutes that hold a trade, from the fill minute to the exit minute, both included: 0 for <c>NoFillBar</c>, <c>AfterSquareOff</c>, <c>PositionOpen</c> and <c>OrderPendingAtEnd</c>, 1 for <c>EntryThroughStop</c> and <c>LimitNotReached</c>.</param>
 /// <param name="EntryAfterMissingMinutes">The trade was filled in a minute that starts later than the decision instant; false when there is no trade.</param>
 /// <param name="StopGapExit">The trade left at a stop (or at the open beyond it) that its minute had opened strictly beyond.</param>
 /// <param name="TargetGapExit">The trade left at a target that its minute had opened strictly beyond.</param>
@@ -18,6 +18,7 @@ namespace XDrishti.Simulation.Walking;
 /// <param name="MaxHoldAtLastClose">The trade left with <c>MaxHold</c> at the close of the last minute that holds a trade because its due minute held none (ADR 0040, X8).</param>
 /// <param name="OvernightStopGap">A stop gap exit whose minute is the first that holds a trade on a date later than the entry date.</param>
 /// <param name="OvernightTargetGap">A target gap exit whose minute is the first that holds a trade on a date later than the entry date.</param>
+/// <param name="OvernightEntry">The trade was filled on a later date than the one on which it was decided: an order that rested overnight (ADR 0043, E8 and E9).</param>
 /// <param name="HoldEndEpochSeconds">The instant the position counts as open until, for the position gate (D11): the exit instant, or the end of the due session for a <c>MaxHoldAtLastClose</c> trade; 0 when there is no trade.</param>
 public readonly record struct WalkOutcome(
     SimTrade? Trade,
@@ -33,7 +34,8 @@ public readonly record struct WalkOutcome(
     bool MaxHoldAtLastClose = false,
     bool OvernightStopGap = false,
     bool OvernightTargetGap = false,
-    long HoldEndEpochSeconds = 0)
+    long HoldEndEpochSeconds = 0,
+    bool OvernightEntry = false)
 {
     /// <summary>The counts of this one walk, to be summed with <see cref="WalkCounters.Add"/>.</summary>
     public WalkCounters ToCounters()
@@ -67,6 +69,8 @@ public readonly record struct WalkOutcome(
             OvernightStopGaps: OvernightStopGap ? 1 : 0,
             OvernightTargetGaps: OvernightTargetGap ? 1 : 0,
             SessionsHeld: Trade?.SessionsHeld ?? 0,
-            SessionsUnseen: Trade?.SessionsUnseen ?? 0);
+            SessionsUnseen: Trade?.SessionsUnseen ?? 0,
+            OvernightEntries: OvernightEntry ? 1 : 0,
+            OrderPendingAtEnd: NoTrade == NoTradeReason.OrderPendingAtEnd ? 1 : 0);
     }
 }

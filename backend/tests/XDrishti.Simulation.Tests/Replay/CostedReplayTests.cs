@@ -242,11 +242,11 @@ public sealed class CostedReplayTests
         costs.SheetJson.ShouldBe(TestCostSheet.Json);
         costedRun.Trades.Select(t => t.Trade with { Costing = null, Costs = CostBasis.None }).ShouldBe(grossRun.Trades.Select(t => t.Trade));
         costedRun.RunKey.ShouldNotBe(grossRun.RunKey);
-        costedRun.SchemaVersion.ShouldBe(4);
-        costedRun.EngineVersion.ShouldBe("sim-4");
+        costedRun.SchemaVersion.ShouldBe(5);
+        costedRun.EngineVersion.ShouldBe("sim-5");
         RunAssembler.KeyText(Header(null), grossRun.Instruments, grossRun.CalendarExceptions).ShouldContain("\ncosts=none\n");
         RunAssembler.KeyText(Header(costs), costedRun.Instruments, costedRun.CalendarExceptions).ShouldContain("\ncosts=test-synthetic-1|" + TestCostSheet.Sheet.RatesSha256 + "|1000000|standard|0.5|25|0.1\n");
-        RunAssembler.KeyText(Header(null), grossRun.Instruments, grossRun.CalendarExceptions).ShouldStartWith("xd-run 4\nengine=sim-4\n");
+        RunAssembler.KeyText(Header(null), grossRun.Instruments, grossRun.CalendarExceptions).ShouldStartWith("xd-run 5\nengine=sim-5\n");
         costedRun.Totals.Fates.Trades.ShouldBe(2);
     }
 

@@ -35,6 +35,27 @@ public sealed class SwingCreateTests
         build.Simulator.Sides.ShouldBe([Side.Buy]);
     }
 
+    [Theory]
+    [InlineData(StopKind.SwingLow)]
+    [InlineData(StopKind.BarLow)]
+    public void The_low_level_stops_with_a_zero_buffer_on_the_evaluation_timeframe_are_accepted_for_a_swing_buy(StopKind kind)
+    {
+        var stop = kind is StopKind.SwingLow ? new StopSpec(kind, Lookback: Quantity.Of(5)) : new StopSpec(kind);
+
+        var build = Simulator.Create(Buy(b => b with { Stop = stop }), Timeframe.H1);
+
+        build.Simulator.ShouldNotBeNull(kind + ": " + string.Join("; ", build.Problems.Select(p => p.Path + " " + p.Problem.Code)));
+    }
+
+    [Fact]
+    public void A_daily_swing_strategy_is_accepted()
+    {
+        var build = Simulator.Create(TestStrategies.Swing(Timeframe.D1), Timeframe.D1);
+
+        build.Simulator.ShouldNotBeNull(string.Join("; ", build.Problems.Select(p => p.Path + " " + p.Problem.Code)));
+        build.Simulator.HoldsOvernight.ShouldBeTrue();
+    }
+
     [Fact]
     public void An_intraday_strategy_does_not_hold_overnight()
     {
@@ -53,12 +74,11 @@ public sealed class SwingCreateTests
         { "entry limit_pullback", Buy(b => b with { Entry = new EntrySpec(EntryKind.LimitPullback) }), Timeframe.H1, "simulation.unsupported_entry", "buy.entry" },
         { "stop fixed_pct", Buy(b => b with { Stop = new StopSpec(StopKind.FixedPct, Pct: Quantity.Of(2)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop" },
         { "stop atr_mult", Buy(b => b with { Stop = new StopSpec(StopKind.AtrMult, Mult: Quantity.Of(2)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop" },
-        { "stop swing_low", Buy(b => b with { Stop = new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(5)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop" },
-        { "stop bar_low", Buy(b => b with { Stop = new StopSpec(StopKind.BarLow) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop" },
+        { "a buffer on the swing_low stop", Buy(b => b with { Stop = new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(5), BufferAtr: Quantity.Of(0.5)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop.buffer_atr" },
+        { "a bar_low stop read on another timeframe", Buy(b => b with { Stop = new StopSpec(StopKind.BarLow, Timeframe.M30) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop.timeframe" },
         { "a buffer on the or_opposite stop", Buy(b => b with { Stop = new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Of(60), BufferAtr: Quantity.Of(0.5)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop.buffer_atr" },
         { "an or_opposite stop read on another timeframe", Buy(b => b with { Stop = new StopSpec(StopKind.OrOpposite, Timeframe.M30, Minutes: Quantity.Of(60)) }), Timeframe.H1, "simulation.unsupported_stop", "buy.stop.timeframe" },
         { "two reward-to-risk values", Buy(b => b with { Exits = [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Of(2), Quantity.Of(3)])])] }), Timeframe.H1, "simulation.unsupported_exit", "buy.exits" },
-        { "a daily evaluation", TestStrategies.Swing(Timeframe.D1), Timeframe.D1, "simulation.scanner_timeframe_unsupported", "timeframes" },
     };
 
     [Theory]

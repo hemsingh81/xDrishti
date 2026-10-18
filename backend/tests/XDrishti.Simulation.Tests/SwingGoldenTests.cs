@@ -1,9 +1,4 @@
-using System.Text;
-using XDrishti.Domain.Market.Bars;
-using XDrishti.Domain.Research;
 using XDrishti.Simulation.Tests.Support;
-using XDrishti.Simulation.Walking;
-using static XDrishti.Simulation.Tests.Support.TestCalendars;
 
 namespace XDrishti.Simulation.Tests;
 
@@ -25,25 +20,5 @@ public sealed class SwingGoldenTests
         RenderAll().ShouldBe(RenderAll());
     }
 
-    private static string RenderAll()
-    {
-        var text = new StringBuilder();
-        var total = WalkCounters.Empty;
-        foreach (var swingCase in SwingCases.All)
-        {
-            var hand = swingCase.Hand;
-            var result = TradeWalker.Walk(hand.Candidate(), hand.Bars, hand.Rules(FillRules.Default));
-            text.Append(hand.Name).Append(' ').Append(OutcomeFormatter.Render(result)).Append('\n');
-            total = total.Add(result.Value.ToCounters());
-        }
-
-        text.Append("total ").Append(OutcomeFormatter.Render(total)).Append('\n');
-
-        var run = Sim.Run(TestStrategies.Swing1h(), FixtureR.Bars(Fri), Timeframe.H1, calendar: DefaultWeek());
-        text.Append("fixture R\n").Append(Render.Result(run));
-
-        var replay = Rep.Replay(Rep.Prepare(TestStrategies.Swing1h(), Timeframe.H1, FillRules.Default), FixtureR.CrashBars(Wed, "09:15 60.00/60.00/60.00/60.00"), Mon, Wed, calendar: DefaultWeek());
-        text.Append("flagged boundary Q1\n").Append(RunText.Replay(replay));
-        return text.ToString();
-    }
+    private static string RenderAll() => Sim4Rows.SwingText();
 }

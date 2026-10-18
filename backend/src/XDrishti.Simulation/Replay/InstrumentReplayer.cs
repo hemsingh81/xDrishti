@@ -10,7 +10,7 @@ namespace XDrishti.Simulation.Replay;
 /// values out, no clock, no random source, no I/O.
 /// <list type="number">
 /// <item><b>It starts at the first stored session, whatever <c>From</c> is.</b> The raw bars run from the first stored bar to the end of <c>To</c>; the replay scans and counts from the first session that runs, and only the <i>trades</i> are cut
-/// to <c>[From, To]</c> (a trade dated before <c>From</c> is dropped and counted). So an <c>ema(10)</c> is seeded by the first stored bar, not by the first bar of the window.</item>
+/// to <c>[From, To]</c> (a trade decided before <c>From</c> is dropped and counted; an order that rests overnight belongs to the day of its decision, ADR 0043). So an <c>ema(10)</c> is seeded by the first stored bar, not by the first bar of the window.</item>
 /// <item><b>Sessions</b> are classified (<see cref="SessionScan"/>): closed days, special sessions, short sessions and missing sessions are excluded, counted and noted; none of their bars is fed. A frame is always fed whole sessions (ADR 0035).</item>
 /// <item><b>Prices</b> are adjusted on a copy (<see cref="ReplayBars"/>); the raw list and the hash of it are never touched.</item>
 /// <item><b>Discontinuities</b>: on the adjusted series a day whose first open differs from the last close of the previous session that ran by more than the threshold (compared in <c>decimal</c>; exactly the threshold is not flagged) is
@@ -176,6 +176,7 @@ public static class InstrumentReplayer
             DateOnly? flaggedDate = s == 0 ? null : ran[firstSession].Date;
             foreach (var outcome in result.Outcomes)
             {
+                // The date of a candidate is the one of its decision (ADR 0043, D6): an order that rests overnight is filled on the next session, and the window cuts by the day of the decision.
                 var date = SessionClock.DateOf(outcome.Candidate.DecisionEpochSeconds - 60);
                 if (date >= input.From && date <= input.To)
                 {
@@ -188,7 +189,7 @@ public static class InstrumentReplayer
                 }
                 else if (outcome.Walk.Trade is { } trade)
                 {
-                    if (trade.TradeDate < input.From)
+                    if (date < input.From)
                     {
                         beforeWindow++;
                     }
@@ -282,6 +283,7 @@ public static class InstrumentReplayer
         NoTradeReason.EntryThroughStop => RunFates.Empty with { EntryThroughStop = 1 },
         NoTradeReason.LimitNotReached => RunFates.Empty with { LimitNotReached = 1 },
         NoTradeReason.PositionOpen => RunFates.Empty with { PositionOpen = 1 },
+        NoTradeReason.OrderPendingAtEnd => RunFates.Empty with { OrderPendingAtEnd = 1 },
         _ => throw new InvalidOperationException("A candidate outcome of instrument " + symbol + " is neither a trade nor a known no-trade reason."),
     };
 

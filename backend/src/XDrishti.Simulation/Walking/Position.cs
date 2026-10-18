@@ -17,4 +17,5 @@ internal readonly record struct Position(
     bool AfterMissingMinutes,
     bool RiskUnderFourTicks,
     FillBasis Basis,
-    bool TickFallback);
+    bool TickFallback,
+    bool OvernightEntry = false);

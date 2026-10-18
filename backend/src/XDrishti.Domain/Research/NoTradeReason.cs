@@ -20,4 +20,10 @@ public enum NoTradeReason
 
     /// <summary>The instrument already had an open position on this side (ADR 0040, D11): the candidate was not walked. Produced by the simulator's position gate, never by the walker.</summary>
     PositionOpen,
+
+    /// <summary>
+    /// The order was placed for the next session (ADR 0043, E8) and the list of minutes ends at the candidate's own minute, so the fill session is not in the data: the order may be filled by a longer list, and no miss can be said of it. A no-trade of its own,
+    /// never <see cref="NoFillBar"/>, so that the last day of a window does not depend on how far the read goes.
+    /// </summary>
+    OrderPendingAtEnd,
 }

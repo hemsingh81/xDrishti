@@ -24,7 +24,7 @@ public sealed class RunSimulationGrossTests
         var run = result.Value;
         fixture.Engine.Replays.ShouldAllBe(input => input.Costs == null, "the handler gives the engine no cost context");
         run.Costs.ShouldBeNull();
-        run.SchemaVersion.ShouldBe(4);
+        run.SchemaVersion.ShouldBe(5);
         run.Trades.ShouldNotBeEmpty();
         run.Trades.Concat(run.OpenAtEnd).ShouldAllBe(t => t.Trade.Costs == CostBasis.None && t.Trade.Costing == null);
         run.Totals.Fates.SkippedQuantity.ShouldBe(0);

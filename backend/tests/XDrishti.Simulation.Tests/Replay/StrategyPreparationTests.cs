@@ -40,9 +40,9 @@ public sealed class StrategyPreparationTests
     }
 
     [Fact]
-    public void Prepare_refuses_a_daily_evaluation_by_name()
+    public void Prepare_refuses_a_weekly_evaluation_by_name()
     {
-        var build = StrategyPreparation.Prepare(OrbV1.Create(), Params(), Timeframe.D1);
+        var build = StrategyPreparation.Prepare(OrbV1.Create(), Params(), Timeframe.W1);
 
         build.Strategy.ShouldBeNull();
         build.Problems.ShouldContain(p => p.Problem.Code == SimulatorCodes.ScannerTimeframeUnsupported);
