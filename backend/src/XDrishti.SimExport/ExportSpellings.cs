@@ -17,6 +17,7 @@ public static class ExportSpellings
         [typeof(ExitReason)] = (Func<ExitReason, string>)Of,
         [typeof(FillBasis)] = (Func<FillBasis, string>)Of,
         [typeof(CostBasis)] = (Func<CostBasis, string>)Of,
+        [typeof(CostSegment)] = (Func<CostSegment, string>)Of,
         [typeof(EntryFill)] = (Func<EntryFill, string>)Of,
         [typeof(Timeframe)] = (Func<Timeframe, string>)Of,
         [typeof(SkipReason)] = (Func<SkipReason, string>)Of,
@@ -56,11 +57,20 @@ public static class ExportSpellings
         _ => throw Unknown(basis),
     };
 
-    /// <summary><c>none</c>.</summary>
+    /// <summary><c>none</c> · <c>charged</c>.</summary>
     public static string Of(CostBasis basis) => basis switch
     {
         CostBasis.None => "none",
+        CostBasis.Charged => "charged",
         _ => throw Unknown(basis),
+    };
+
+    /// <summary><c>intraday_equity</c> · <c>delivery_equity</c>, the names of the segments in the charge sheet.</summary>
+    public static string Of(CostSegment segment) => segment switch
+    {
+        CostSegment.IntradayEquity => "intraday_equity",
+        CostSegment.Delivery => "delivery_equity",
+        _ => throw Unknown(segment),
     };
 
     /// <summary><c>at_open</c> · <c>at_limit</c>.</summary>

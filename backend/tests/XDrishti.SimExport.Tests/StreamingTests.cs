@@ -14,6 +14,23 @@ public sealed class StreamingTests
     private static readonly Lazy<SimulationRun> Run = new(() => FabricatedRun.Large(Trades));
 
     [Fact]
+    public void The_csv_of_200000_costed_trades_allocates_a_small_fraction_of_its_size()
+    {
+        var gross = Run.Value;
+        var costing = FabricatedRun.CostedStandard().Trades[0].Trade.Costing;
+        var run = gross with { Trades = [.. gross.Trades.Select(t => t with { Trade = t.Trade with { Costs = CostBasis.Charged, Costing = costing } })] };
+        var sink = new CountingSink();
+        TradesCsv.Write(new CountingSink(), run.RunKey, run.Trades.Take(1000).ToList());
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        TradesCsv.Write(sink, run.RunKey, run.Trades);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        TestContext.Current.SendDiagnosticMessage(string.Format(CultureInfo.InvariantCulture, "costed trades.csv of {0:N0} trades: {1:N0} bytes written, {2:N0} bytes allocated", Trades, sink.Bytes, allocated));
+        allocated.ShouldBeLessThan(sink.Bytes / 100, "the decimals are formatted into the row buffer, not into a string each");
+    }
+
+    [Fact]
     public void The_csv_of_200000_trades_allocates_a_small_fraction_of_its_size()
     {
         var run = Run.Value;

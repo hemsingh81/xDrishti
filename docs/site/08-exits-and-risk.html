@@ -225,6 +225,7 @@ time rule, so that the same stored text (and hash) always means the same behavio
 qty         = min(risk_amount / |entry − stop|, max_capital_per_trade / entry, liquidity_cap)
 qty         = round_down_to_lot(qty)        # futures
 skip if qty &lt; 1 lot, or cost_R &gt; max_cost_R</code></pre></div>
+<p>The simulator&#39;s version of this block (built in P3-03c, <a href="../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.html">ADR 0042</a>): <code>qty = floor(min(risk_amount / |entry − stop|, max_capital_per_trade / entry))</code> from the <strong>exact</strong> entry, whole shares, on a fixed simulated capital with the <code>standard</code> profile; below 1 share, or a charge above <code>max_cost_R</code> of the risk taken, the trade is skipped and <strong>counted</strong> (<code>SkippedQuantity</code>, <code>SkippedCost</code>); the lot rounding and the liquidity cap are not applied (named limits).</p>
 <p>Optional confidence scaling (capped fractional Kelly, 0.5×–1.25×) — off until calibration is proven in paper trading.</p>
 <p>Learned multipliers on top (<a href="09-learning-engine.html">doc 09</a> §14): <strong>meta-labelling</strong> size × 0.5–1.5,
 <strong>equity-curve throttle</strong> × 0.5 while the system&#39;s equity is below its 20-trade average, <strong>reduced market-gate
@@ -278,6 +279,7 @@ day</strong> × 0.75. The multipliers never raise risk above the profile&#39;s m
 <p>Brokerage, exchange charges, STT/CTT, GST, stamp duty, SEBI fees — <strong>from your broker&#39;s current charge
 sheet in config</strong> (rates change with budgets). Slippage: ticks + fraction of bar range; extra for stop exits
 and gaps. Every simulation includes costs.</p>
+<p>The simulator charges every simulated order from an effective-dated <strong>charge sheet</strong> (ten rates per segment, intraday and delivery) on the rates in force on the date of that order, on the filled price, each line rounded to the paisa once; it reports <code>RFilled</code> (R from the filled prices) and <code>RNet = RFilled − CostR</code> side by side with <code>RExact</code>, with the 16 lines of the charge visible per trade. A run with no sheet is gross and says <code>costs: none</code>; the choice of a sheet by a request, the stored sheet and the check against the owner&#39;s bills are P3-03f. The model, the rounding and what is not modelled are in <a href="../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.html">ADR 0042</a>.</p>
 <p>The simulator&#39;s slippage is <code>SlippageConfig</code> with these defaults (<code>costs.slippage</code> in <a href="16-configuration.html">doc 16</a>): market-type fills pay <code>(ticks + extra) × tick + bar_range_frac × (high − low)</code> against the trade, rounded to the instrument&#39;s tick, with the extra ticks on stop exits; a resting limit (a target, an entry at the limit) does not slip. The rules and what is not modelled are in <a href="../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.html">ADR 0038</a>.</p>
 
   </article>
@@ -285,7 +287,7 @@ and gaps. Every simulation includes costs.</p>
     <a class="prev" href="07-strategies.html"><small>← Previous  [</small>07 · Strategies</a>
     <a class="next" href="09-learning-engine.html"><small>Next  ] →</small>09 · Learning engine</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 19:52</footer>
+  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 20:52</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-r-multiples" class="d2">1. R-multiples</a>
 <a href="#2-exit-policy-library" class="d2">2. Exit policy library</a>

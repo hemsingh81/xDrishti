@@ -49,6 +49,20 @@ internal sealed class CharBuffer
         _length += NumberText.Write(value, _chars.AsSpan(_length));
     }
 
+    /// <summary>The decimal with the fewest digits that keep its value (<see cref="XDrishti.Domain.Research.CanonicalText.Number(decimal)"/>): <c>0.05</c>, never <c>0.0500</c>; zero is <c>0</c>.</summary>
+    public void Append(decimal value)
+    {
+        if (value == 0)
+        {
+            Append('0');
+            return;
+        }
+
+        Ensure(48);
+        value.TryFormat(_chars.AsSpan(_length), out var written, "0.############################", CultureInfo.InvariantCulture);
+        _length += written;
+    }
+
     public void Append(Guid value)
     {
         Ensure(36);

@@ -13,7 +13,9 @@ public sealed class TradesCsvTests
     [
         "run_key", "schema_version", "strategy_id", "instrument_id", "symbol", "side", "trade_date", "decision_epoch", "decision_ist", "trigger_timeframe", "trigger_bar_epoch", "trigger_bar_open", "trigger_bar_high",
         "trigger_bar_low", "trigger_bar_close", "trigger_bar_volume", "trigger_bar_minutes", "trigger_bar_complete", "entry_epoch", "entry_ist", "entry_price", "stop_price", "target_price", "exit_epoch", "exit_ist",
-        "exit_price", "exit_reason", "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "sessions_held", "sessions_unseen", "basket_ids", "key",
+        "exit_price", "exit_reason", "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "sessions_held", "sessions_unseen",
+        "costing_segment", "costing_sheet", "costing_quantity", "costing_risk_taken", "costing_entry_turnover", "costing_exit_turnover", "costing_brokerage", "costing_stt", "costing_exchange_txn", "costing_sebi_fee",
+        "costing_stamp_duty", "costing_other", "costing_dp_charge", "costing_gst", "costing_total_cost", "cost_r", "r_net", "basket_ids", "key",
     ];
 
     /// <summary>For each positional property of <see cref="SimTrade"/>, the columns it feeds.</summary>
@@ -50,6 +52,7 @@ public sealed class TradesCsvTests
         ["TickFallback"] = ["tick_fallback"],
         ["SessionsHeld"] = ["sessions_held"],
         ["SessionsUnseen"] = ["sessions_unseen"],
+        ["Costing"] = ["costing_segment", "costing_sheet", "costing_quantity", "costing_risk_taken", "costing_entry_turnover", "costing_exit_turnover", "costing_brokerage", "costing_stt", "costing_exchange_txn", "costing_sebi_fee", "costing_stamp_duty", "costing_other", "costing_dp_charge", "costing_gst", "costing_total_cost", "cost_r", "r_net"],
     };
 
     private static string Csv(SimulationRun run, IReadOnlyList<RunTrade> trades) => Sinks.Render(s => TradesCsv.Write(s, run.RunKey, trades));
@@ -117,7 +120,7 @@ public sealed class TradesCsvTests
             Cell("trigger_bar_close").ShouldBe(trade.TriggerBar.Close);
             long.Parse(row[header.IndexOf("entry_epoch")], CultureInfo.InvariantCulture).ShouldBe(trade.EntryEpochSeconds);
             row[header.IndexOf("key")].ShouldBe(trade.Key);
-            row[header.IndexOf("schema_version")].ShouldBe("3");
+            row[header.IndexOf("schema_version")].ShouldBe("4");
         }
     }
 

@@ -103,7 +103,7 @@ public sealed class SwingBoundPropertyTests
             trade.MfeR.ShouldBeGreaterThanOrEqualTo(0, label);
             trade.ExitEpochSeconds.ShouldBeGreaterThanOrEqualTo(trade.EntryEpochSeconds, label);
             trade.EntryEpochSeconds.ShouldBeGreaterThanOrEqualTo(trade.DecisionEpochSeconds, label);
-            trade.SchemaVersion.ShouldBe(3, label);
+            trade.SchemaVersion.ShouldBe(4, label);
             if (trade.ExitReason == ExitReason.Target)
             {
                 trade.RExact.ShouldBe(walk.Series.RewardRisk, 1e-9, label + ": a target exit is exactly k");

@@ -361,10 +361,6 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 <td>Off by default; optional WireGuard on home router</td>
 </tr>
 <tr>
-<td>Simulation runs (P3-04b2)</td>
-<td>The <code>simulate</code> verb is not a container service: <code>scripts/simulate.sh</code> runs it on the host (<code>dotnet run</code> of the API project with the argument <code>simulate</code>) against the developer database port (<code>xd-db</code> on 127.0.0.1:5433, <code>compose.dev.yaml</code>). The one secret is the database password, read from the Keychain item <code>xdrishti/db/app</code>; no vault key and no owner secret. Files go to <code>data/exports/sim/&lt;run-id&gt;/</code> (<code>Export__Directory</code>, git-ignored, owner-only); nothing is written to the database. The Lab (P5) and the scanner (P7) reuse the handlers, not the verb</td>
-</tr>
-<tr>
 <td>Dev loop</td>
 <td><code>dotnet watch</code> and Vite dev server on the host against containerised db/llm/ml; same images for &quot;prod&quot;</td>
 </tr>
@@ -408,7 +404,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-18 20:37</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-18 19:52</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

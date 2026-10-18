@@ -15,4 +15,5 @@ public sealed record RunHeader(
     bool AcknowledgeCsvAdjusted,
     string Fills,
     UniverseRecord Universe,
-    TradingCalendar Calendar);
+    TradingCalendar Calendar,
+    CostRecord? Costs = null);

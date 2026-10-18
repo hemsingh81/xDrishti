@@ -26,6 +26,7 @@ public sealed class RunBannerTests
             ("basket run", FabricatedRun.Assemble(FabricatedRun.BasketOf((FabricatedRun.IdA, "NSE:AAA")), [ran]), FillRules.Default),
             ("nothing ran", FabricatedRun.Assemble(FabricatedRun.List((FabricatedRun.IdA, "NSE:AAA")), [FabricatedRun.Skipped(FabricatedRun.IdA, "NSE:AAA", SkipReason.NoBars)]), FillRules.Default),
             ("starts in April and December 2024", FabricatedRun.Assemble(FabricatedRun.List((FabricatedRun.IdA, "NSE:AAA"), (FabricatedRun.IdB, "NSE:BBB")), [ran, late]), FillRules.Default),
+            ("costed run, TEST sheet", FabricatedRun.CostedStandard(), FillRules.Default),
         ];
     }
 

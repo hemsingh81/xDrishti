@@ -17,10 +17,10 @@ public sealed class RunAssemblerTests
     private const string Fills = "{\"entry_limit_percent\":0.1,\"slippage\":{\"ticks\":1,\"bar_range_frac\":0.05,\"stop_exit_extra_ticks\":2,\"gap_fill\":\"at_open\"}}";
 
     /// <summary>The SHA-256 of <see cref="PinnedKeyText"/> (UTF-8, as written, each line ending in a line feed).</summary>
-    private const string PinnedKey = "ffb7c227dbc113bf16a5a8d94b205de820c26b6671d1167268defed6951be252";
+    private const string PinnedKey = "84828cb4b53ac04fbcb154bf8329698405471c0d81705fc798fbb418da25f712";
 
     private const string PinnedKeyText =
-        "xd-run 3\n"
+        "xd-run 4\n"
         + "engine=sim-3\n"
         + "strategy=1111111111111111111111111111111111111111111111111111111111111111\n"
         + "params=or_min=15,rr=2\n"
@@ -29,6 +29,7 @@ public sealed class RunAssemblerTests
         + "options=0.9,0.2\n"
         + "ack=0\n"
         + "fills={\"entry_limit_percent\":0.1,\"slippage\":{\"ticks\":1,\"bar_range_frac\":0.05,\"stop_exit_extra_ticks\":2,\"gap_fill\":\"at_open\"}}\n"
+        + "costs=none\n"
         + "universe=instruments as listed\n"
         + "i=00000000-0000-0000-0000-000000000001|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa|-|2026-03-03:Split:1:2|0.05|0\n"
         + "i=00000000-0000-0000-0000-000000000002|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb|no_sessions_in_window||0.1|1\n"
@@ -60,7 +61,7 @@ public sealed class RunAssemblerTests
     private static InstrumentReplay Replay(InstrumentRun run, IReadOnlyList<SimTrade>? trades = null, IReadOnlyList<SimTrade>? openAtEnd = null) => new(run, trades ?? [], openAtEnd ?? []);
 
     private static SimTrade Trade(Guid instrument, Side side, long entryEpoch, ExitReason exit = ExitReason.Target) => new(
-        3, "ORB", instrument, "X", side, Monday, entryEpoch - 60, Timeframe.M15, new Bar(entryEpoch - 960, 99, 100.5, 99, 100.5, 15000), 15, true,
+        4, "ORB", instrument, "X", side, Monday, entryEpoch - 60, Timeframe.M15, new Bar(entryEpoch - 960, 99, 100.5, 99, 100.5, 15000), 15, true,
         entryEpoch, 100.5, 98, 105.5, entryEpoch + 600, 105.5, exit, 2, 0, 2, FillBasis.Exact, CostBasis.None, null,
         2, 0, 100.5, 105.5, EntryFill.AtOpen, false, 1, 0);
 
@@ -88,7 +89,7 @@ public sealed class RunAssemblerTests
         RunAssembler.KeyText(header, run.Instruments, run.CalendarExceptions).ShouldBe(PinnedKeyText);
         run.RunKey.ShouldBe(PinnedKey);
         run.RunKey.ShouldBe(CanonicalText.Sha256Hex(PinnedKeyText));
-        run.SchemaVersion.ShouldBe(3);
+        run.SchemaVersion.ShouldBe(4);
     }
 
     [Fact]

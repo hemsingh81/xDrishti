@@ -53,8 +53,8 @@ public sealed class SwingReplayTests
         Q(trade.MaeR).ShouldBe(0.0000m);
         Q(trade.MfeR).ShouldBe(0.0857m);
         (trade.SessionsHeld, trade.SessionsUnseen).ShouldBe((3, 0));
-        result.Header.EngineVersion.ShouldBe("sim-3");
-        result.Header.SchemaVersion.ShouldBe(3);
+        result.Header.EngineVersion.ShouldBe("sim-4");
+        result.Header.SchemaVersion.ShouldBe(4);
         result.Walk.PositionOpen.ShouldBe(0);
     }
 
@@ -162,7 +162,7 @@ public sealed class SwingReplayTests
         run.Totals.Fates.ExcludedAcrossDiscontinuity.ShouldBe(1);
         run.Totals.DiscontinuitiesFlagged.ShouldBe(1);
         run.Totals.Fates.Total.ShouldBe(run.Totals.Scans.Sum(s => s.Candidates));
-        run.SchemaVersion.ShouldBe(3);
+        run.SchemaVersion.ShouldBe(4);
     }
 
     [Fact]
@@ -272,7 +272,7 @@ public sealed class SwingReplayTests
     }
 
     [Fact]
-    public void The_run_key_starts_with_the_schema_3_line_and_a_holiday_inside_a_hold_changes_it()
+    public void The_run_key_starts_with_the_schema_4_line_and_a_holiday_inside_a_hold_changes_it()
     {
         var universe = new UniverseRecord(UniverseKind.InstrumentList, null, null, UniverseLabels.InstrumentsAsListed, [new UniverseMember(Rep.Id, "TEST")]);
         string Key(Domain.Market.Calendar.TradingCalendar calendar)
@@ -287,8 +287,8 @@ public sealed class SwingReplayTests
         var instruments = new[] { InstrumentRun.NotFound(Rep.Id) };
         var text = RunAssembler.KeyText(new RunHeader(Swing.Record, SimulationEngine.Version, Mon, Fri, ReplayOptions.Default, false, Swing.Fills.ToCanonicalJson(), universe, DefaultWeek()), instruments, []);
 
-        text.ShouldStartWith("xd-run 3\n");
-        SimulationRun.CurrentSchemaVersion.ShouldBe(3);
+        text.ShouldStartWith("xd-run 4\n");
+        SimulationRun.CurrentSchemaVersion.ShouldBe(4);
         holiday.ShouldNotBe(plain, "a run that counted a holiday differently has a different key");
     }
 }

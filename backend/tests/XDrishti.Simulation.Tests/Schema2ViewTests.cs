@@ -5,7 +5,7 @@ using XDrishti.Simulation.Tests.Support;
 namespace XDrishti.Simulation.Tests;
 
 /// <summary>
-/// Criterion 14 of P3-03d: an intraday trade is byte-identical under sim-3 in the schema-2 view. The three frozen files (<c>Golden/*.sim-2.*</c>) were made with the sim-2 code before the first change of the slice and are never
+/// Criterion 14 of P3-03d: an intraday trade is byte-identical under sim-3 and sim-4 in the schema-2 view. The three frozen files (<c>Golden/*.sim-2.*</c>) were made with the sim-2 code before the first change of the slice and are never
 /// regenerated (<see cref="GoldenFile.Check"/> does not read them); <see cref="Schema2View"/> prints exactly the 30 fields and the 20 counters of schema 2 and writes <c>schema=2</c> itself. The two appended fields are 1 and 0 on every
 /// one of these trades.
 /// </summary>
@@ -49,7 +49,7 @@ public sealed class Schema2ViewTests
             .ToList();
 
         trades.Count.ShouldBeGreaterThan(1_000);
-        trades.ShouldAllBe(o => o.Trade!.SessionsHeld == 1 && o.Trade.SessionsUnseen == 0 && o.Trade.SchemaVersion == 3);
+        trades.ShouldAllBe(o => o.Trade!.SessionsHeld == 1 && o.Trade.SessionsUnseen == 0 && o.Trade.SchemaVersion == 4);
         trades.ShouldAllBe(o => o.Trade!.ExitReason != ExitReason.MaxHold && !o.MaxHoldAtLastClose && !o.OvernightStopGap && !o.OvernightTargetGap);
     }
 

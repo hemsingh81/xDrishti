@@ -18,6 +18,8 @@ namespace XDrishti.Simulation.Replay;
 /// <item><b>Swing positions</b> (ADR 0040, Amendment 4 of ADR 0037): the read ends at <c>To</c>, so a position still open there is <c>EndOfData</c> and goes to <c>OpenAtEnd</c>; a swing position that is open at the end of a segment that a
 /// flagged day follows cannot be followed across it and is excluded and counted (<c>ExcludedAcrossDiscontinuity</c>, and <c>ExcludedPositions</c> of the day's note), by the style of the strategy; every other candidate outcome keeps its one fate,
 /// <c>PositionOpen</c> included.</item>
+/// <item><b>Costs</b> (ADR 0042): when the input has a <see cref="CostContext"/>, every trade that survives the window cut and the exclusion is sized and charged by <see cref="TradeCostApplier"/>, with the segment of the strategy's style; a trade it skips leaves
+/// the lists and is counted (<c>SkippedQuantity</c>, <c>SkippedCost</c>). Without a context the trades are the walker's, gross. The walker, the simulator and the scanner know nothing of costs.</item>
 /// <item><b>One list.</b> The segments are windows (<see cref="BarSegment"/>) onto one list of fed bars. The scanner of a call steps the list it is given from element 0 and the walker reads that same list, so a candidate's decision
 /// index is its index in it; the replay never feeds the scanner a sub-list it did not also give the walker.</item>
 /// </list>
@@ -151,9 +153,10 @@ public static class InstrumentReplayer
         var walk = WalkCounters.Empty;
         var trades = new List<SimTrade>();
         var openAtEnd = new List<SimTrade>();
-        long suppressed = 0, beforeWindow = 0, excludedAcross = 0, candidatesInWindow = 0;
+        long suppressed = 0, beforeWindow = 0, excludedAcross = 0, candidatesInWindow = 0, skippedQuantity = 0, skippedCost = 0;
         var noTrades = RunFates.Empty;
         var holdsOvernight = strategy.Simulator.HoldsOvernight;
+        var segment = holdsOvernight ? CostSegment.Delivery : CostSegment.IntradayEquity;
         var excludedAtDay = new Dictionary<DateOnly, int>();
         for (var s = 0; s < segmentStarts.Count; s++)
         {
@@ -196,13 +199,17 @@ public static class InstrumentReplayer
                         var nextDay = ran[segmentStarts[s + 1]].Date;
                         excludedAtDay[nextDay] = excludedAtDay.GetValueOrDefault(nextDay) + 1;
                     }
-                    else if (trade.ExitReason == ExitReason.EndOfData)
+                    else if (Costed(trade, input.Costs, segment, input.Symbol, ref skippedQuantity, ref skippedCost) is { } kept)
                     {
-                        openAtEnd.Add(trade);
-                    }
-                    else
-                    {
-                        trades.Add(trade);
+                        // ADR 0042, D1: costing comes after the window cut and the exclusion, and before the fates are counted; a skipped trade has left the lists.
+                        if (kept.ExitReason == ExitReason.EndOfData)
+                        {
+                            openAtEnd.Add(kept);
+                        }
+                        else
+                        {
+                            trades.Add(kept);
+                        }
                     }
                 }
                 else
@@ -226,12 +233,42 @@ public static class InstrumentReplayer
             walk = walk.Add(result.Walk);
         }
 
-        var fates = noTrades with { EntriesSuppressed = suppressed, TradesBeforeWindow = beforeWindow, OpenAtEnd = openAtEnd.Count, Trades = trades.Count, ExcludedAcrossDiscontinuity = excludedAcross };
+        var fates = noTrades with { EntriesSuppressed = suppressed, TradesBeforeWindow = beforeWindow, OpenAtEnd = openAtEnd.Count, Trades = trades.Count, ExcludedAcrossDiscontinuity = excludedAcross, SkippedQuantity = skippedQuantity, SkippedCost = skippedCost };
         var notes = flagged.Select(n => excludedAtDay.TryGetValue(n.Date, out var count) ? n with { ExcludedPositions = count } : n).ToList();
         var scanned = new Scanned(ran[0].Date, new DateSpan(ran[0].Date, ran[^1].Date), scans.AsReadOnly(), walk, fates, notes.AsReadOnly(), candidatesInWindow, trades.Count + openAtEnd.Count);
         trades = [.. trades.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
         openAtEnd = [.. openAtEnd.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
         return (scanned, trades, openAtEnd);
+    }
+
+    /// <summary>
+    /// The trade as the run keeps it: the walker's trade for a gross replay, else the trade sized and charged by <see cref="TradeCostApplier"/> (ADR 0042, D1), or null when costing skipped it (the matching counter is raised). A
+    /// result that is not an outcome (a date before the first schedule of the sheet, a trade with no risk) is a caller error: the request check of P3-03f prevents the first and the walker makes no trade of the second.
+    /// </summary>
+    private static SimTrade? Costed(SimTrade trade, CostContext? context, CostSegment segment, string symbol, ref long skippedQuantity, ref long skippedCost)
+    {
+        if (context is null)
+        {
+            return trade;
+        }
+
+        var applied = TradeCostApplier.Apply(trade, context, segment);
+        if (applied.IsFailure)
+        {
+            throw new InvalidOperationException("The costing of a trade of instrument " + symbol + " failed: " + applied.Error.Code + ": " + applied.Error.Message);
+        }
+
+        switch (applied.Value.Skip)
+        {
+            case TradeSkip.QuantityBelowOne:
+                skippedQuantity++;
+                break;
+            case TradeSkip.CostAboveMax:
+                skippedCost++;
+                break;
+        }
+
+        return applied.Value.Trade;
     }
 
     /// <summary>

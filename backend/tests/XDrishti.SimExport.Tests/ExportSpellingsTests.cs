@@ -12,7 +12,7 @@ public sealed class ExportSpellingsTests
 {
     private static readonly Type[] Named =
     [
-        typeof(CorporateActionKind), typeof(Side), typeof(ExitReason), typeof(FillBasis), typeof(CostBasis), typeof(EntryFill), typeof(Timeframe), typeof(SkipReason), typeof(NoTradeReason), typeof(UniverseKind), typeof(SessionExclusion),
+        typeof(CorporateActionKind), typeof(Side), typeof(ExitReason), typeof(FillBasis), typeof(CostBasis), typeof(CostSegment), typeof(EntryFill), typeof(Timeframe), typeof(SkipReason), typeof(NoTradeReason), typeof(UniverseKind), typeof(SessionExclusion),
     ];
 
     private static string Spell(Type type, object member) =>
@@ -63,6 +63,9 @@ public sealed class ExportSpellingsTests
         ExportSpellings.Of(FillBasis.Modelled).ShouldBe("modelled");
         ExportSpellings.Of(FillBasis.Exact).ShouldBe("no_slippage");
         ExportSpellings.Of(CostBasis.None).ShouldBe("none");
+        ExportSpellings.Of(CostBasis.Charged).ShouldBe("charged");
+        ExportSpellings.Of(CostSegment.IntradayEquity).ShouldBe("intraday_equity");
+        ExportSpellings.Of(CostSegment.Delivery).ShouldBe("delivery_equity");
         ExportSpellings.Of(EntryFill.AtOpen).ShouldBe("at_open");
         ExportSpellings.Of(EntryFill.AtLimit).ShouldBe("at_limit");
         ExportSpellings.Of(Timeframe.M15).ShouldBe("15m");
@@ -83,6 +86,7 @@ public sealed class ExportSpellingsTests
         Should.Throw<ArgumentOutOfRangeException>(() => ExportSpellings.Of((ExitReason)99));
         Should.Throw<ArgumentOutOfRangeException>(() => ExportSpellings.Of((FillBasis)99));
         Should.Throw<ArgumentOutOfRangeException>(() => ExportSpellings.Of((CostBasis)99));
+        Should.Throw<ArgumentOutOfRangeException>(() => ExportSpellings.Of((CostSegment)99));
         Should.Throw<ArgumentOutOfRangeException>(() => ExportSpellings.Of((EntryFill)99));
         Should.Throw<ArgumentOutOfRangeException>(() => ExportSpellings.Of((Timeframe)99));
         Should.Throw<ArgumentOutOfRangeException>(() => ExportSpellings.Of((SkipReason)99));

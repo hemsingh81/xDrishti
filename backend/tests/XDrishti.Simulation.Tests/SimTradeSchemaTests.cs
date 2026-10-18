@@ -5,7 +5,7 @@ using XDrishti.Simulation.Tests.Support;
 namespace XDrishti.Simulation.Tests;
 
 /// <summary>
-/// AC1 and criterion 16: the trade record is frozen. Changing any of the 32 fields, their order or their types, or a member of the enums, fails here until the schema version is raised and an ADR says why (schema 2 is ADR 0038, schema 3 is ADR 0040).
+/// AC1 and criterion 16: the trade record is frozen. Changing any of the 33 fields, their order or their types, or a member of the enums, fails here until the schema version is raised and an ADR says why (schema 2 is ADR 0038, schema 3 is ADR 0040, schema 4 is ADR 0042).
 /// </summary>
 public sealed class SimTradeSchemaTests
 {
@@ -43,20 +43,23 @@ public sealed class SimTradeSchemaTests
         ("TickFallback", typeof(bool)),
         ("SessionsHeld", typeof(int)),
         ("SessionsUnseen", typeof(int)),
+        ("Costing", typeof(TradeCosting)),
     ];
 
     [Fact]
-    public void The_positional_properties_are_exactly_the_30_fields_of_schema_2_in_order_followed_by_the_two_of_schema_3()
+    public void The_positional_properties_are_exactly_the_30_fields_of_schema_2_in_order_followed_by_the_two_of_schema_3_and_costing_of_schema_4()
     {
         var constructor = typeof(SimTrade).GetConstructors().Single();
 
         var parameters = constructor.GetParameters().Select(p => (p.Name!, p.ParameterType)).ToArray();
 
         parameters.ShouldBe(Fields);
-        Fields.Length.ShouldBe(32);
+        Fields.Length.ShouldBe(33);
         Fields.Take(30).Select(f => f.Name).Last().ShouldBe("TickFallback");
         Fields[30].Name.ShouldBe("SessionsHeld");
         Fields[31].Name.ShouldBe("SessionsUnseen");
+        Fields[32].Name.ShouldBe("Costing");
+        constructor.GetParameters()[32].HasDefaultValue.ShouldBeTrue("the walker builds the trade without it");
     }
 
     [Fact]
@@ -70,19 +73,22 @@ public sealed class SimTradeSchemaTests
     }
 
     [Fact]
-    public void The_schema_version_is_3_and_the_enums_have_exactly_their_members()
+    public void The_schema_version_is_4_and_the_enums_have_exactly_their_members()
     {
-        SimTrade.CurrentSchemaVersion.ShouldBe(3);
+        SimTrade.CurrentSchemaVersion.ShouldBe(4);
         Enum.GetNames<ExitReason>().ShouldBe(["Stop", "Target", "SquareOff", "EndOfData", "MaxHold"]);
         Enum.GetNames<FillBasis>().ShouldBe(["Exact", "Modelled"]);
         Enum.GetNames<EntryFill>().ShouldBe(["AtOpen", "AtLimit"]);
-        Enum.GetNames<CostBasis>().ShouldBe(["None"]);
+        Enum.GetNames<CostBasis>().ShouldBe(["None", "Charged"]);
+        Enum.GetNames<CostSegment>().ShouldBe(["IntradayEquity", "Delivery"]);
+        Enum.GetNames<ChargeRounding>().ShouldBe(["HalfAwayFromZero", "HalfEven", "Down"]);
+        Enum.GetNames<TradeSkip>().ShouldBe(["QuantityBelowOne", "CostAboveMax"]);
         Enum.GetNames<Side>().ShouldBe(["Buy", "Sell"]);
         Enum.GetNames<NoTradeReason>().ShouldBe(["NoFillBar", "AfterSquareOff", "EntryThroughStop", "LimitNotReached", "PositionOpen"]);
     }
 
     [Fact]
-    public void Every_trade_the_walker_makes_with_no_slippage_says_exact_fills_no_costs_and_no_snapshot()
+    public void Every_trade_the_walker_makes_with_no_slippage_says_exact_fills_no_costs_no_costing_and_no_snapshot()
     {
         foreach (var walkCase in Cases.All)
         {
@@ -93,6 +99,7 @@ public sealed class SimTradeSchemaTests
                     trade.SchemaVersion.ShouldBe(SimTrade.CurrentSchemaVersion);
                     trade.Fills.ShouldBe(FillBasis.Exact);
                     trade.Costs.ShouldBe(CostBasis.None);
+                    trade.Costing.ShouldBeNull();
                     trade.EntrySnapshotJson.ShouldBeNull();
                 }
             }
@@ -136,7 +143,7 @@ public sealed class SimTradeSchemaTests
         }
 
         var fateProperties = typeof(RunFates).GetProperties().Where(p => p.PropertyType == typeof(long) && p.DeclaringType == typeof(RunFates) && p.Name is not ("Total" or "NoTrade")).ToList();
-        fateProperties.Count.ShouldBe(10);
+        fateProperties.Count.ShouldBe(12);
         var fates = (RunFates)ConstructWithDistinctValues(typeof(RunFates));
         var fateSum = fates.Add(fates);
         foreach (var property in fateProperties)
@@ -146,14 +153,15 @@ public sealed class SimTradeSchemaTests
     }
 
     [Fact]
-    public void The_two_fates_of_schema_3_are_appended_and_the_total_counts_every_fate_once()
+    public void The_two_fates_of_schema_3_and_the_two_of_schema_4_are_appended_and_the_total_counts_every_fate_once()
     {
         var parameters = typeof(RunFates).GetConstructors().Single().GetParameters();
 
-        parameters.Select(p => p.Name).ShouldBe(["EntriesSuppressed", "TradesBeforeWindow", "OpenAtEnd", "Trades", "NoFillBar", "AfterSquareOff", "EntryThroughStop", "LimitNotReached", "ExcludedAcrossDiscontinuity", "PositionOpen"]);
-        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).Total.ShouldBe(55);
-        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10).NoTrade.ShouldBe(5 + 6 + 7 + 8 + 10);
-        RunFates.Empty.ShouldBe(new RunFates(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        parameters.Select(p => p.Name).ShouldBe(["EntriesSuppressed", "TradesBeforeWindow", "OpenAtEnd", "Trades", "NoFillBar", "AfterSquareOff", "EntryThroughStop", "LimitNotReached", "ExcludedAcrossDiscontinuity", "PositionOpen", "SkippedQuantity", "SkippedCost"]);
+        parameters.Skip(8).ShouldAllBe(p => p.HasDefaultValue && Equals(p.DefaultValue, 0L), "appended with default 0, so that no positional use moves");
+        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).Total.ShouldBe(78, "every one of the 12 fates once: PositionOpen is inside the no-trades and is not counted twice");
+        new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12).NoTrade.ShouldBe(5 + 6 + 7 + 8 + 10);
+        RunFates.Empty.ShouldBe(new RunFates(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
     [Fact]

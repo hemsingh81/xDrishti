@@ -11,15 +11,21 @@ namespace XDrishti.Simulation.Running;
 /// <param name="StrategyId">The strategy that decided.</param>
 /// <param name="FillRules">The entry limit and the slippage the walks applied (ADR 0038).</param>
 /// <param name="Fills">How the prices were obtained: <see cref="XDrishti.Domain.Research.FillRules.Basis"/> of <paramref name="FillRules"/>.</param>
-/// <param name="Costs">Whether charges were taken off.</param>
+/// <param name="Costs">Whether charges were taken off: always <see cref="CostBasis.None"/> here. The replay applies costs after the walk, and a run's labels come from the run record (ADR 0042, D1).</param>
 /// <param name="Labels">The five labels, in order: fills, entry limit (both from <see cref="FillDescription.Labels"/>), costs, portfolio limits, sample.</param>
 public sealed record SimulationHeader(string EngineVersion, int SchemaVersion, string StrategyId, FillRules FillRules, FillBasis Fills, CostBasis Costs, IReadOnlyList<string> Labels)
 {
     /// <summary>The last three labels of this engine (D11), which do not depend on the fill rules.</summary>
     public static IReadOnlyList<string> FixedLabels => RunLabels.FixedLabels;
 
-    /// <summary>The five labels for these fill rules: the two of <see cref="FillDescription.Labels"/>, then <see cref="FixedLabels"/>.</summary>
-    public static IReadOnlyList<string> LabelsOf(FillRules rules) => Array.AsReadOnly([.. FillDescription.Labels(rules), .. FixedLabels]);
+    /// <summary>The five labels for these fill rules of a gross result: the two of <see cref="FillDescription.Labels"/>, then <see cref="FixedLabels"/>. Equal to <see cref="LabelsOf(FillRules, CostRecord?)"/> with no costs.</summary>
+    public static IReadOnlyList<string> LabelsOf(FillRules rules) => LabelsOf(rules, null);
+
+    /// <summary>
+    /// The five labels in the same order (fills, entry limit, costs, portfolio limits, sample), the third from <see cref="CostDescription.Label"/> of what the run charged with (ADR 0042, D15): <c>costs: none</c> for a gross run. A run's labels
+    /// come from the run record; this header describes the gross result of <see cref="Simulator.Run"/>.
+    /// </summary>
+    public static IReadOnlyList<string> LabelsOf(FillRules rules, CostRecord? costs) => Array.AsReadOnly([.. FillDescription.Labels(rules), CostDescription.Label(costs), FixedLabels[1], FixedLabels[2]]);
 
     /// <summary>Value equality: every field, and the labels in order.</summary>
     public bool Equals(SimulationHeader? other) =>

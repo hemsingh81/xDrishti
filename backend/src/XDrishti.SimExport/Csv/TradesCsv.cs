@@ -10,14 +10,18 @@ namespace XDrishti.SimExport.Csv;
 /// </summary>
 public static class TradesCsv
 {
-    /// <summary>The columns, in order. A reflection test requires every positional property of <see cref="SimTrade"/> but the reserved snapshot to be one of them or to feed some.</summary>
+    /// <summary>The columns, in order. A reflection test requires every positional property of <see cref="SimTrade"/> but the reserved snapshot to be one of them or to feed some. <c>Costing</c> feeds the 17 columns <c>costing_*</c>, <c>cost_r</c> and <c>r_net</c>, empty for a gross trade; a line column is the sum of the two legs, the 16 lines of each leg are in <c>run.json</c>.</summary>
     public static IReadOnlyList<string> Columns { get; } = Array.AsReadOnly(
     [
         "run_key", "schema_version", "strategy_id", "instrument_id", "symbol", "side", "trade_date", "decision_epoch", "decision_ist",
         "trigger_timeframe", "trigger_bar_epoch", "trigger_bar_open", "trigger_bar_high", "trigger_bar_low", "trigger_bar_close", "trigger_bar_volume", "trigger_bar_minutes", "trigger_bar_complete",
         "entry_epoch", "entry_ist", "entry_price", "stop_price", "target_price", "exit_epoch", "exit_ist", "exit_price", "exit_reason",
-        "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "sessions_held", "sessions_unseen", "basket_ids", "key",
+        "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "sessions_held", "sessions_unseen",
+        "costing_segment", "costing_sheet", "costing_quantity", "costing_risk_taken", "costing_entry_turnover", "costing_exit_turnover", "costing_brokerage", "costing_stt", "costing_exchange_txn", "costing_sebi_fee", "costing_stamp_duty",
+        "costing_other", "costing_dp_charge", "costing_gst", "costing_total_cost", "cost_r", "r_net", "basket_ids", "key",
     ]);
+
+    private const int CostingColumns = 17;
 
     /// <summary>Writes the header and one row per trade.</summary>
     /// <param name="sink">Where the UTF-8 bytes go; the host owns it.</param>
@@ -98,9 +102,44 @@ public static class TradesCsv
         row.Bool(trade.TickFallback);
         row.Number(trade.SessionsHeld);
         row.Number(trade.SessionsUnseen);
+        Costing(row, trade.Costing);
         BasketIds(row, runTrade.BasketIds);
         Key(row, trade);
         row.End(sink);
+    }
+
+    /// <summary>The 17 cells of the costing: all empty for a gross trade; for a costed one the segment, the sheet, the quantity, the risk taken, the two turnovers, the seven line groups plus GST summed over the two legs, the cost and net R.</summary>
+    private static void Costing(CsvRow row, TradeCosting? costing)
+    {
+        if (costing is null)
+        {
+            for (var i = 0; i < CostingColumns; i++)
+            {
+                row.Empty();
+            }
+
+            return;
+        }
+
+        var entry = costing.EntryLeg;
+        var exit = costing.ExitLeg;
+        row.Raw(ExportSpellings.Of(costing.Segment));
+        row.Text(costing.SheetId);
+        row.Number(costing.Quantity);
+        row.Number(costing.RiskTaken);
+        row.Number(costing.EntryTurnover);
+        row.Number(costing.ExitTurnover);
+        row.Number(entry.Brokerage + exit.Brokerage);
+        row.Number(entry.Stt + exit.Stt);
+        row.Number(entry.ExchangeTxn + exit.ExchangeTxn);
+        row.Number(entry.SebiFee + exit.SebiFee);
+        row.Number(entry.StampDuty + exit.StampDuty);
+        row.Number(entry.OtherCharges + exit.OtherCharges);
+        row.Number(entry.DpCharge + exit.DpCharge);
+        row.Number(entry.Gst + exit.Gst);
+        row.Number(costing.TotalCost);
+        row.Number(costing.CostR);
+        row.Number(costing.RNet);
     }
 
     /// <summary>The instrument id cell: composed in the scratch buffer (a GUID in the D form) so that no string is made for it.</summary>

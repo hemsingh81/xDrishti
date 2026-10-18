@@ -38,6 +38,12 @@ internal sealed class CsvRow
         _row.Append(value);
     }
 
+    public void Number(decimal value)
+    {
+        Separate();
+        _row.Append(value);
+    }
+
     public void Number(long value)
     {
         Separate();

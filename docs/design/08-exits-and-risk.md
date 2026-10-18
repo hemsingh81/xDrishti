@@ -82,6 +82,8 @@ qty         = min(risk_amount / |entry − stop|, max_capital_per_trade / entry,
 qty         = round_down_to_lot(qty)        # futures
 skip if qty < 1 lot, or cost_R > max_cost_R
 ```
+The simulator's version of this block (built in P3-03c, [ADR 0042](../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.md)): `qty = floor(min(risk_amount / |entry − stop|, max_capital_per_trade / entry))` from the **exact** entry, whole shares, on a fixed simulated capital with the `standard` profile; below 1 share, or a charge above `max_cost_R` of the risk taken, the trade is skipped and **counted** (`SkippedQuantity`, `SkippedCost`); the lot rounding and the liquidity cap are not applied (named limits).
+
 Optional confidence scaling (capped fractional Kelly, 0.5×–1.25×) — off until calibration is proven in paper trading.
 
 Learned multipliers on top ([doc 09](09-learning-engine.md) §14): **meta-labelling** size × 0.5–1.5,
@@ -107,5 +109,7 @@ day** × 0.75. The multipliers never raise risk above the profile's maximum per 
 Brokerage, exchange charges, STT/CTT, GST, stamp duty, SEBI fees — **from your broker's current charge
 sheet in config** (rates change with budgets). Slippage: ticks + fraction of bar range; extra for stop exits
 and gaps. Every simulation includes costs.
+
+The simulator charges every simulated order from an effective-dated **charge sheet** (ten rates per segment, intraday and delivery) on the rates in force on the date of that order, on the filled price, each line rounded to the paisa once; it reports `RFilled` (R from the filled prices) and `RNet = RFilled − CostR` side by side with `RExact`, with the 16 lines of the charge visible per trade. A run with no sheet is gross and says `costs: none`; the choice of a sheet by a request, the stored sheet and the check against the owner's bills are P3-03f. The model, the rounding and what is not modelled are in [ADR 0042](../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.md).
 
 The simulator's slippage is `SlippageConfig` with these defaults (`costs.slippage` in [doc 16](16-configuration.md)): market-type fills pay `(ticks + extra) × tick + bar_range_frac × (high − low)` against the trade, rounded to the instrument's tick, with the extra ticks on stop exits; a resting limit (a target, an entry at the limit) does not slip. The rules and what is not modelled are in [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md).

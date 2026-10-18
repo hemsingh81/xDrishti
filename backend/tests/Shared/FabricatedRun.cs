@@ -65,22 +65,23 @@ internal static class FabricatedRun
         double rExact = 2,
         double rFilled = 1.95,
         FillBasis fills = FillBasis.Modelled,
-        string strategy = "ORB")
+        string strategy = "ORB",
+        TradeCosting? costing = null)
     {
         var entryEpoch = Day.Epoch(date, entryMinute);
         return new SimTrade(
             SimTrade.CurrentSchemaVersion, strategy, instrument, symbol, side, date, entryEpoch - 60, Timeframe.M15, new Bar(entryEpoch - 960, 99, 100.5, 99, 100.5, 15000), 15, true,
-            entryEpoch, entry, stop, target, entryEpoch + 600, exitPrice, exit, rExact, 0.4, 2.1, fills, CostBasis.None, null,
-            rFilled, rFilled - rExact, entry + 0.05, exitPrice - 0.05, EntryFill.AtOpen, false, 1, 0);
+            entryEpoch, entry, stop, target, entryEpoch + 600, exitPrice, exit, rExact, 0.4, 2.1, fills, costing is null ? CostBasis.None : CostBasis.Charged, null,
+            rFilled, rFilled - rExact, entry + 0.05, exitPrice - 0.05, EntryFill.AtOpen, false, 1, 0, costing);
     }
 
     /// <summary>Puts the instruments and trades together with the real assembler. <paramref name="instruments"/> are in universe order.</summary>
-    public static SimulationRun Assemble(UniverseRecord universe, IReadOnlyList<InstrumentRun> instruments, IReadOnlyList<SimTrade>? trades = null, IReadOnlyList<SimTrade>? openAtEnd = null, string? fills = null, DateOnly? from = null, DateOnly? to = null, string strategy = "ORB")
+    public static SimulationRun Assemble(UniverseRecord universe, IReadOnlyList<InstrumentRun> instruments, IReadOnlyList<SimTrade>? trades = null, IReadOnlyList<SimTrade>? openAtEnd = null, string? fills = null, DateOnly? from = null, DateOnly? to = null, string strategy = "ORB", CostRecord? costs = null)
     {
         var tradeList = trades ?? [];
         var openList = openAtEnd ?? [];
         var replays = instruments.Select(i => new InstrumentReplay(i, [.. tradeList.Where(t => t.InstrumentId == i.InstrumentId)], [.. openList.Where(t => t.InstrumentId == i.InstrumentId)])).ToList();
-        var header = new RunHeader(Strategy(strategy), "sim-3", from ?? Monday, to ?? new DateOnly(2026, 4, 30), ReplayOptions.Default, false, fills ?? DefaultFills, universe, new TradingCalendar());
+        var header = new RunHeader(Strategy(strategy), "sim-4", from ?? Monday, to ?? new DateOnly(2026, 4, 30), ReplayOptions.Default, false, fills ?? DefaultFills, universe, new TradingCalendar(), costs);
         return RunAssembler.Assemble(header, replays);
     }
 
@@ -118,6 +119,29 @@ internal static class FabricatedRun
             Trade(IdA, "NSE:AAA", Side.Buy, Monday.AddDays(2), ExitReason.EndOfData, entryMinute: 900, target: null, exitPrice: 101, rExact: 0.2, rFilled: 0.15),
         };
         return Assemble(List((IdA, "NSE:AAA"), (IdB, "NSE:M&M"), (IdC, "NSE:CCC")), [a, b, c], trades, open, from: new DateOnly(2024, 4, 1));
+    }
+
+    /// <summary>
+    /// <see cref="Standard"/> costed: the same instruments and trades, each trade sized and charged by the real <see cref="TradeCostApplier"/> with the TEST sheet (standard profile, capital 10,00,000, <c>max_cost_R</c> 0.10), and the
+    /// header carrying the <see cref="CostRecord"/>. The golden files of the export for a costed run are made from it.
+    /// </summary>
+    public static SimulationRun CostedStandard()
+    {
+        var gross = Standard();
+        var context = TestCostSheet.Context();
+        SimTrade Cost(SimTrade trade)
+        {
+            var applied = TradeCostApplier.Apply(trade, context, CostSegment.IntradayEquity);
+            return applied.Value.Trade ?? throw new InvalidOperationException("The fabricated trade was skipped by costing: " + applied.Value.Skip);
+        }
+
+        return Assemble(
+            gross.Universe,
+            gross.Instruments,
+            [.. gross.Trades.Select(t => Cost(t.Trade))],
+            [.. gross.OpenAtEnd.Select(t => Cost(t.Trade))],
+            from: gross.From,
+            costs: CostRecord.Of(context));
     }
 
     /// <summary>A run with <paramref name="trades"/> trades of one instrument, a minute apart on each of the sessions: for the size and the memory tests (no instrument counters).</summary>

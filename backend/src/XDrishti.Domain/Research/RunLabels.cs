@@ -30,11 +30,12 @@ public static class RunLabels
 
     private const double DaysPerYear = 365.25;
 
-    /// <summary>The three labels of this engine that do not depend on the fill rules, in order: costs, portfolio limits, sample (the engine's header, <c>SimulationHeader.FixedLabels</c>, delegates here).</summary>
-    public static IReadOnlyList<string> FixedLabels { get; } = Array.AsReadOnly(["costs: none", "portfolio limits: not simulated", "sample: in-sample"]);
+    /// <summary>The three labels of the engine's own gross result, in order: costs, portfolio limits, sample (the engine's header, <c>SimulationHeader.FixedLabels</c>, delegates here). A run record takes the first from <see cref="CostDescription.Label"/>.</summary>
+    public static IReadOnlyList<string> FixedLabels { get; } = Array.AsReadOnly([CostDescription.None, "portfolio limits: not simulated", "sample: in-sample"]);
 
     /// <summary>
-    /// The labels of a run, in this order: exploration; fills; entry limit; costs; portfolio limits; sample; universe; data; engine verification; tick; opening bar. The not-modelled list is <see cref="FillLimits.NotModelled"/> as it is.
+    /// The labels of a run, in this order: exploration; fills; entry limit; costs (<see cref="CostDescription.Label"/> of the run's <see cref="SimulationRun.Costs"/>: <c>costs: none</c> for a gross run); the sizing line (a costed run only);
+    /// portfolio limits; sample; universe; data; engine verification; tick; opening bar. The not-modelled list is <see cref="FillLimits.NotModelled"/> as it is for a gross run, followed by <see cref="CostLimits.NotModelled"/> for a costed one.
     /// </summary>
     /// <exception cref="ArgumentNullException">An argument is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="rules"/> are not the rules the run recorded (<see cref="SimulationRun.Fills"/>).</exception>
@@ -53,7 +54,10 @@ public static class RunLabels
             Exploration,
             rules.Slippage.IsNone ? FillsWithoutSlippage : Fills,
             entryLimit,
-            .. FixedLabels,
+            CostDescription.Label(run.Costs),
+            .. (run.Costs is null ? Array.Empty<string>() : [CostDescription.SizingLabel(run.Costs)]),
+            FixedLabels[1],
+            FixedLabels[2],
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
             EngineVerification,
@@ -61,7 +65,7 @@ public static class RunLabels
             OpeningBarLabel,
         ];
 
-        return new RunLabelSet(Array.AsReadOnly(lines), FillLimits.NotModelled);
+        return new RunLabelSet(Array.AsReadOnly(lines), run.Costs is null ? FillLimits.NotModelled : Array.AsReadOnly([.. FillLimits.NotModelled, .. CostLimits.NotModelled]));
     }
 
     /// <summary>The data line from the instruments that ran: how many, the range of their first and of their last bars, and the shortest and longest length in years; <c>data: none</c> when none ran.</summary>

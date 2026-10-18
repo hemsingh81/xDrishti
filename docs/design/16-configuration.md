@@ -182,13 +182,27 @@ exits:                             # the strategy model (P3-02b) checks the para
   per_trade_fit: { scale_by_atr: true, snap_to_structure: true, obstacle_check: true,
                    late_entry_target_reduction: { after: "13:30", factor: 0.7 } }
 
-costs:                             # fill from your broker's current charge sheet
-  brokerage: { intraday_pct: 0.03, intraday_max: 20, delivery: 0 }
-  stt_ctt: { eq_intraday_sell_pct: null, eq_delivery_pct: null, fut_sell_pct: null }
-  exchange_txn_pct: null
-  gst_pct: 18
-  stamp_duty_buy_pct: null
-  sebi_fee_per_cr: null
+costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042), stored and chosen by a request in P3-03f
+  id: "?"                          # lower case [a-z0-9][a-z0-9._-]{0,39}; an id starting "test-" is a synthetic sheet for tests and is never stored
+  label: "?"
+  source: "? where you read the figures, and when"
+  checked: "?"                     # leave out until the sheet has been checked against your bills; a run says "not checked against bills" while it is absent
+  schedules:                       # 1 to 12, strictly ascending by effective_from; the rates of a date are those of the last schedule on or before it
+    - effective_from: "?"          # yyyy-MM-dd, 2000 to 2099
+      gst_pct: 18                  # percent of brokerage + exchange + SEBI of the leg
+      rounding: half_away_from_zero  # half_away_from_zero | half_even | down; each line is rounded to the paisa once
+      intraday_equity:             # the same ten fields for delivery_equity; percents are percents (0.03 is 0.03 %)
+        brokerage_pct: 0.03        # doc 16 value (intraday_pct); current? UNVERIFIED
+        brokerage_cap: 20          # rupees per order (intraday_max); 0 means no brokerage and then the percent and the minimum must be 0
+        brokerage_min: 0           # rupees per order; 0 means none
+        stt_buy_pct: "?"           # was stt_ctt.eq_*: which side pays is the sheet's
+        stt_sell_pct: "?"
+        exchange_txn_pct: "?"
+        sebi_per_crore: "?"        # rupees per 1,00,00,000 of turnover
+        stamp_buy_pct: "?"
+        other_pct: 0               # the "Oth. Charges" column of a bill
+        dp_charge_per_sell: 0      # rupees per delivery sale (a flat figure; the depository's own lines vary)
+      delivery_equity: { brokerage_pct: 0, brokerage_cap: 0, brokerage_min: 0, stt_buy_pct: "?", stt_sell_pct: "?", exchange_txn_pct: "?", sebi_per_crore: "?", stamp_buy_pct: "?", other_pct: 0, dp_charge_per_sell: "?" }   # delivery brokerage 0 is the doc 16 value
   slippage: { ticks: 1, bar_range_frac: 0.05, stop_exit_extra_ticks: 2, gap_fill: at_open }   # built in P3-03b (ADR 0038): the code defaults of SlippageConfig, stored with every run as canonical JSON; reading them from the configuration store is later
 
 learning:
