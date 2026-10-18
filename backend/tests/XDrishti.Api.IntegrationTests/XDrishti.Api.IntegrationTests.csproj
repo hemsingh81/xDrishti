@@ -8,6 +8,10 @@
     <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The invented days of P3-03 (F1, F2, flat), shared with the simulation tests: one source file, compiled into each project that needs it (P3-04a). -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- The same fixtures as the unit tests: real rows of Dhan's scrip master and NSE's sector list. -->
     <EmbeddedResource Include="..\XDrishti.Application.Tests\Fixtures\*.csv" LogicalName="Fixtures/%(Filename)%(Extension)" />
     <!-- The synthetic depository-charges sheets of the spreadsheet reader tests (docs/specs/P2-17): invented rows in a BIFF8 .xls and an .xlsx. -->

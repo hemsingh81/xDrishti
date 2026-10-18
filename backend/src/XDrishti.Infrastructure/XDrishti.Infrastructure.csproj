@@ -2,6 +2,7 @@
   <!-- Adapters: EF Core / Npgsql persistence and other I/O. Implements Application ports. -->
   <ItemGroup>
     <ProjectReference Include="..\XDrishti.Application\XDrishti.Application.csproj" />
+    <ProjectReference Include="..\XDrishti.Simulation\XDrishti.Simulation.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />

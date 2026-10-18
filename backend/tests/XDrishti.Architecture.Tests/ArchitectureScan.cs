@@ -3,6 +3,7 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
+using Mono.Cecil;
 
 namespace XDrishti.Architecture.Tests;
 
@@ -61,6 +62,44 @@ internal static class AssemblyScan
         }
 
         return found;
+    }
+
+    /// <summary>
+    /// The methods and fields that the code of one type (its methods, its closures and the state machines of its async methods) calls or reads, as (declaring type, member name), read from the IL. Unlike
+    /// <see cref="MemberReferences"/>, which lists what a whole assembly references, this one can say that <c>this</c> type reads the clock.
+    /// </summary>
+    public static List<(string Type, string Member)> MembersUsedBy(Assembly assembly, string typeFullName)
+    {
+        using var module = Mono.Cecil.ModuleDefinition.ReadModule(assembly.Location);
+        var root = module.GetType(typeFullName.Replace('+', '/')) ?? throw new InvalidOperationException("The type " + typeFullName + " is not in " + assembly.GetName().Name);
+        var used = new List<(string Type, string Member)>();
+        var pending = new Stack<Mono.Cecil.TypeDefinition>([root]);
+        while (pending.Count > 0)
+        {
+            var type = pending.Pop();
+            foreach (var nested in type.NestedTypes)
+            {
+                pending.Push(nested);
+            }
+
+            foreach (var method in type.Methods.Where(m => m.HasBody))
+            {
+                foreach (var instruction in method.Body.Instructions)
+                {
+                    switch (instruction.Operand)
+                    {
+                        case MethodReference call:
+                            used.Add((call.DeclaringType.FullName, call.Name));
+                            break;
+                        case FieldReference field:
+                            used.Add((field.DeclaringType.FullName, field.Name));
+                            break;
+                    }
+                }
+            }
+        }
+
+        return used;
     }
 
     /// <summary>The names of the members of <c>FeatureFrame</c> the assembly references (properties as their accessors, <c>get_Steps</c>), each once.</summary>

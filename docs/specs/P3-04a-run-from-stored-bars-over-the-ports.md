@@ -159,10 +159,10 @@ None needs the owner: the design was settled in the review of P3-04 and the choi
 6. **The size is 2.5 agent-days, not 1.5** (Size): the roadmap total of the exit path rises by one day.
 
 ## Done when
-- [ ] All acceptance criteria have evidence
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] No API contract or migration change (`scripts/gen-api.sh` not needed); the build changes are the new Application and Infrastructure files, the `BarsInstrument` parameter and column, the Infrastructure reference to `XDrishti.Simulation` (verify that the `Dockerfile` line P3-03 adds covers the build of Infrastructure), the shared test source, and the registrations
-- [ ] Architecture tests green (AC12), `LayerDependencyTests` and `LogEventIdTests` green
-- [ ] Layering ADR and the simulation-ADR amendment written and linked; doc 03 §4, doc 05 §4.2, doc 06 §3.3 and the roadmap updated as in AC14; `scripts/build-docs.sh`
-- [ ] *Order with P3-03b* done by whichever slice merges second (`SimulationRequest.Fills`, the tick, `tick_size_invalid`, the two `*_invalid` codes); *Changes to P3-04* applied to the P3-04 spec and its criteria 12 and 13; the roadmap row of P3-04 no longer names `ISimulationRunner`
-- [ ] The names shared with P3-04, P3-03a and P3-03b are equal in the code: `SimulationRun`, `InstrumentReplay`, `InstrumentReplayInput`, `RunHeader`, `RunAssembler`, `SkipReason` (with `tick_size_invalid`), `ReplayOptions`, `FillRules`, `TickSpec`, `Simulator.Create`/`Run`
+- [x] All acceptance criteria have evidence (built 2026-10-18: criteria 1 to 5, 7, 9 and 10 are tests in `XDrishti.Application.Tests` (`Research/`), 6, 8 and 13 in `XDrishti.Api.IntegrationTests` (`Research/`), 11 in `XDrishti.Infrastructure.Tests`, 12 in `XDrishti.Architecture.Tests` (`ResearchLayeringArchitectureTests`); criterion 14 is ADR 0039, Amendment 3 of ADR 0037 and the docs; the differences from this spec are listed in Amendment 3)
+- [x] `scripts/check.sh` green (2026-10-18: 21,559 backend tests, 21,535 passed, 24 skipped explicit benchmarks, 0 failed; 3,415 frontend tests) - [ ] reviewer agent: no blockers/majors
+- [x] No API contract or migration change (`scripts/gen-api.sh` not needed); the build changes are the new Application and Infrastructure files, the `BarsInstrument` parameter and column, the Infrastructure reference to `XDrishti.Simulation` (verify that the `Dockerfile` line P3-03 adds covers the build of Infrastructure), the shared test source, and the registrations
+- [x] Architecture tests green (AC12), `LayerDependencyTests` and `LogEventIdTests` green
+- [x] Layering ADR and the simulation-ADR amendment written and linked; doc 03 §4, doc 05 §4.2, doc 06 §3.3 and the roadmap updated as in AC14; `scripts/build-docs.sh`
+- [x] *Order with P3-03b* done (P3-03b was already merged: `Fills`, the tick, `tick_size_invalid` and the two `*_invalid` codes are built here) by whichever slice merges second (`SimulationRequest.Fills`, the tick, `tick_size_invalid`, the two `*_invalid` codes); *Changes to P3-04* applied to the P3-04 spec and its criteria 12 and 13; the roadmap row of P3-04 no longer names `ISimulationRunner`
+- [x] The names shared with P3-04, P3-03a and P3-03b are equal in the code: `SimulationRun`, `InstrumentReplay`, `InstrumentReplayInput`, `RunHeader`, `RunAssembler`, `SkipReason` (with `tick_size_invalid`), `ReplayOptions`, `FillRules`, `TickSpec`, `Simulator.Create`/`Run`

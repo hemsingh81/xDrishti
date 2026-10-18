@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Research;
 using XDrishti.Strategies;
 using XDrishti.Strategies.BuiltIn;
 using XDrishti.Strategies.Compilation;
@@ -32,7 +34,7 @@ public static class BuiltInStrategies
         if (!string.Equals(strategyId, OrbV1.Id, StringComparison.Ordinal))
         {
             var known = string.Join(", ", Ids.Select(i => "`" + i + "`"));
-            return Refused("strategy_id", ReplayCodes.UnknownStrategy, "The strategy `" + strategyId + "` is not a built-in one; the built-in ids are " + known + ".");
+            return Refused("strategy_id", SimulationErrors.UnknownStrategyCode, "The strategy `" + strategyId + "` is not a built-in one; the built-in ids are " + known + ".");
         }
 
         var given = parameters ?? new Dictionary<string, double>();
@@ -43,7 +45,7 @@ public static class BuiltInStrategies
             {
                 problems.Add(new LocatedProblem(
                     "parameters." + name,
-                    new Problem(ReplayCodes.UnknownParameter, "The strategy `ORB` has no parameter `" + name + "`; its parameters are `" + OrbV1.OrMinutesParam + "` and `" + RewardRiskParam + "`.", NoText)));
+                    new Problem(SimulationErrors.UnknownParameterCode, "The strategy `ORB` has no parameter `" + name + "`; its parameters are `" + OrbV1.OrMinutesParam + "` and `" + RewardRiskParam + "`.", NoText)));
             }
         }
 
@@ -56,6 +58,20 @@ public static class BuiltInStrategies
         var rewardRisk = given.TryGetValue(RewardRiskParam, out var rr) ? rr : DefaultRewardRisk;
         var effective = new SortedDictionary<string, double>(StringComparer.Ordinal) { [OrbV1.OrMinutesParam] = orMinutes, [RewardRiskParam] = rewardRisk };
         return new BuiltInBuild(OrbV1.Create(orMinutes, rewardRisk), new ReadOnlyDictionary<string, double>(effective), []);
+    }
+
+    /// <summary>
+    /// Builds the definition of a built-in strategy and prepares it in one step (<see cref="Build"/>, then <see cref="StrategyPreparation.Prepare"/>), so that a caller that only knows ids and numbers (the engine adapter of P3-04a) names no type of the strategy model.
+    /// The problems are those of the factory when it refused the id or a parameter name, otherwise those of the compile. The parameters recorded are the effective ones (the defaults filled in).
+    /// </summary>
+    /// <exception cref="ArgumentNullException"><paramref name="strategyId"/> is null.</exception>
+    /// <exception cref="ArgumentException">A parameter value is not a finite number.</exception>
+    public static PreparedBuild Prepare(string strategyId, IReadOnlyDictionary<string, double>? parameters, Timeframe evaluationTimeframe, FillRules? fills = null)
+    {
+        var built = Build(strategyId, parameters);
+        return built.Definition is { } definition
+            ? StrategyPreparation.Prepare(definition, built.Parameters, evaluationTimeframe, fills)
+            : new PreparedBuild(null, built.Problems);
     }
 
     private static BuiltInBuild Refused(string path, string code, string message) =>

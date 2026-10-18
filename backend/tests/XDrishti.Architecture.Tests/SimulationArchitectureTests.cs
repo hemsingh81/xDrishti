@@ -162,10 +162,10 @@ public sealed class SimulationArchitectureTests
     public void The_replay_namespace_holds_the_documented_types_and_the_canonical_json_writer_is_internal()
     {
         TypeNamesIn("XDrishti.Simulation.Replay").Where(n => !n.Contains('+', StringComparison.Ordinal) && !n.Contains('<', StringComparison.Ordinal)).Select(n => n["XDrishti.Simulation.Replay.".Length..]).Order().ShouldBe(
-            ["BarSegment", "BuiltInBuild", "BuiltInStrategies", "DefinitionJson", "Discontinuity", "InstrumentReplayer", "PreparedBuild", "PreparedStrategy", "RanSession", "ReplayBars", "ReplayCodes", "SessionScan", "StrategyPreparation"]);
+            ["BarSegment", "BuiltInBuild", "BuiltInStrategies", "DefinitionJson", "Discontinuity", "InstrumentReplayer", "PreparedBuild", "PreparedStrategy", "RanSession", "ReplayBars", "SessionScan", "StrategyPreparation"]);
         Simulation.GetType("XDrishti.Simulation.Replay.DefinitionJson")!.IsPublic.ShouldBeFalse();
         Simulation.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Simulation.Replay").Select(t => t.Name).Order().ShouldBe(
-            ["BuiltInBuild", "BuiltInStrategies", "InstrumentReplayer", "PreparedBuild", "PreparedStrategy", "ReplayCodes", "StrategyPreparation"]);
+            ["BuiltInBuild", "BuiltInStrategies", "InstrumentReplayer", "PreparedBuild", "PreparedStrategy", "StrategyPreparation"]);
     }
 
     [Fact]

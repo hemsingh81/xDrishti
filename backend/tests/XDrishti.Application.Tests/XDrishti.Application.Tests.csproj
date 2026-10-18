@@ -7,6 +7,10 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The invented days of P3-03 (F1, F2, flat), shared with the simulation tests: one source file, compiled into each project that needs it (P3-04a). -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- Real rows of Dhan's scrip master and NSE's sector list (see docs/specs/P1-03), embedded so unit tests never touch the disk. -->
     <EmbeddedResource Include="Fixtures\*.csv" LogicalName="Fixtures/%(Filename)%(Extension)" />
     <!-- Made-up tradebook files for the trade CSV reader (docs/specs/P2-03). -->

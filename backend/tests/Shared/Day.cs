@@ -1,7 +1,7 @@
 using System.Globalization;
 using XDrishti.Domain.Market.Bars;
 
-namespace XDrishti.Simulation.Tests.Support;
+namespace XDrishti.Tests.Shared;
 
 /// <summary>
 /// Builds the invented days of the fixtures (spec P3-03a, D12, and P3-03, D9) from rows written the way the spec writes them: <c>"09:44 99.00/100.50/99.00/100.50"</c> is a minute with its open, high, low and close.

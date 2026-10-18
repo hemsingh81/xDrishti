@@ -24,7 +24,7 @@ public static class InstrumentReplayer
 {
     /// <summary>Replays the strategy over the instrument.</summary>
     /// <exception cref="ArgumentNullException">An argument is null.</exception>
-    /// <exception cref="ArgumentException">The options are out of range, <c>From</c> is after <c>To</c>, the preset skip is not one the runner may decide, the tick is missing without a tick-size skip, or a bar is dated after <c>To</c>.</exception>
+    /// <exception cref="ArgumentException">The options are out of range, <c>From</c> is after <c>To</c>, the preset skip is not one the runner may decide, the tick is missing without a preset skip, or a bar is dated after <c>To</c>.</exception>
     /// <exception cref="InvalidOperationException">The bars are not strictly ascending (two equal epochs or a descending pair); the message names the instrument.</exception>
     public static InstrumentReplay Replay(PreparedStrategy strategy, InstrumentReplayInput input) => ReplayCore(strategy, input, null);
 
@@ -97,9 +97,9 @@ public static class InstrumentReplayer
             throw new ArgumentException("A preset skip is one the runner decides, `csv_adjusted_twice` or `tick_size_invalid`, not `" + preset.ToCode() + "`.", nameof(input));
         }
 
-        if (input.Tick is null && input.PresetSkip != SkipReason.TickSizeInvalid)
+        if (input.Tick is null && input.PresetSkip is null)
         {
-            throw new ArgumentException("The tick is absent only with the preset skip `tick_size_invalid`.", nameof(input));
+            throw new ArgumentException("The tick is absent only with a preset skip (nothing is scanned then, so no fill needs it).", nameof(input));
         }
 
         var raw = input.RawBars;

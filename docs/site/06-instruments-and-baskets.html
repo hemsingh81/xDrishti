@@ -339,7 +339,7 @@ Dhan historical API (1-minute up to ~5 years, daily since listing), and builds a
 </tr>
 <tr>
 <td><strong>Strategy Lab universe</strong></td>
-<td>&quot;Test VWAP_RSI_TREND on MyChoice, 2022–today&quot;</td>
+<td>&quot;Test VWAP_RSI_TREND on MyChoice, 2022–today&quot; (in P3 the run takes the members <strong>now</strong> and says so in its label, <code>members as of today</code>; see below)</td>
 </tr>
 <tr>
 <td><strong>Reports lens</strong></td>
@@ -354,6 +354,7 @@ Dhan historical API (1-minute up to ~5 years, daily since listing), and builds a
 <td>Pin a basket to the live price panel (counts toward the live-feed budget, <a href="05-data-and-brokers.html">doc 05</a> §5)</td>
 </tr>
 </tbody></table>
+<p><strong>A basket as the universe of a simulation run (P3-04a).</strong> The research run takes a <strong>manual, not archived</strong> basket and runs its members <strong>now</strong> (<code>MembersAsync(basketId, null, null)</code>), in the basket&#39;s order, retired members and members without stored bars included (a retired instrument that has bars is replayed: leaving it out would add survivorship bias; one without bars is a skip with a reason in the record). A basket is dated only from the day the owner built it (§3.4) and the system has no historical index membership (ISS-22), so the record&#39;s universe label is <strong><code>members as of today</code></strong>: a run over &quot;Nifty 50 in 2022&quot; replays today&#39;s members over 2022 and says so. The id of the basket goes into every trade (<code>RunTrade.BasketIds</code>). A portfolio basket (a system basket maintained from holdings), an archived one and an unknown id are refused with <code>simulation.basket_not_found</code>. An explicit list of instruments is the other universe (label <code>instruments as listed</code>).</p>
 <h3 id="34-manual-baskets-what-is-built-p1-15-and-portfolio-system-baskets-p1-15a">3.4 Manual baskets: what is built (P1-15) and portfolio system baskets (P1-15a)<a class="hash" href="#34-manual-baskets-what-is-built-p1-15-and-portfolio-system-baskets-p1-15a" aria-label="Link to this section">#</a></h3>
 <p><strong>Manual</strong> baskets and the <strong>portfolio</strong> system baskets exist so far (rule-based baskets, the other system baskets, allowed styles/sides, strategies in scope, risk override and target weights come with their stories). Tables live in the <code>market</code> schema (not <code>catalog</code>, which was never created),
 next to the instruments they point to; the runtime role has plain DML on both and no DDL. Every route needs a session (changes also the CSRF token), none needs a step-up.</p>
@@ -562,7 +563,7 @@ basket detail (members, performance by lens, benchmark, open positions).</li>
     <a class="prev" href="05-data-and-brokers.html"><small>← Previous  [</small>05 · Data &amp; brokers</a>
     <a class="next" href="07-strategies.html"><small>Next  ] →</small>07 · Strategies</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-18 14:46</footer>
+  <footer class="foot">Generated from <code>docs/06-instruments-and-baskets.md</code> · 2026-10-18 15:43</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-concepts" class="d2">1. Concepts</a>
 <a href="#2-master-list-tracked-instruments" class="d2">2. Master list &amp;amp; tracked instruments</a>

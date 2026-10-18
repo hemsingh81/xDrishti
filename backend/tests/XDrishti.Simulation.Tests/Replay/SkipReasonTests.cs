@@ -173,13 +173,28 @@ public sealed class SkipReasonTests
     }
 
     [Fact]
-    public void A_preset_that_the_runner_does_not_decide_is_a_caller_error_and_so_is_a_missing_tick_without_the_tick_size_skip()
+    public void A_preset_that_the_runner_does_not_decide_is_a_caller_error_and_so_is_a_missing_tick_without_any_preset_skip()
     {
         var bare = Rep.Prepare(OrbV1.Create());
         var bars = ReplayDays.Flat(ReplayDays.D1, 99.00);
 
         Should.Throw<ArgumentException>(() => InstrumentReplayer.Replay(bare, Rep.Input(bars, ReplayDays.D1, ReplayDays.D1) with { PresetSkip = SkipReason.NoRunnableSessions }));
         Should.Throw<ArgumentException>(() => InstrumentReplayer.Replay(bare, Rep.Input(bars, ReplayDays.D1, ReplayDays.D1) with { Tick = null }));
-        Should.Throw<ArgumentException>(() => InstrumentReplayer.Replay(bare, Rep.Input(bars, ReplayDays.D1, ReplayDays.D1) with { PresetSkip = SkipReason.CsvAdjustedTwice, Tick = null }));
+    }
+
+    [Fact]
+    public void A_double_adjustment_with_a_refused_master_tick_is_skipped_as_the_double_adjustment_and_the_record_has_no_tick()
+    {
+        var bare = Rep.Prepare(OrbV1.Create());
+        var bars = ReplayDays.Flat(ReplayDays.D1, 99.00);
+        var input = Rep.Input(bars, ReplayDays.D1, ReplayDays.D1) with { PresetSkip = SkipReason.CsvAdjustedTwice, Tick = null, SkipDetail = "csv adjusted twice; the tick size is invalid" };
+
+        var record = InstrumentReplayer.Replay(bare, input).Record;
+
+        record.Skipped.ShouldBe(SkipReason.CsvAdjustedTwice);
+        record.TickSize.ShouldBeNull();
+        record.TickFromFallback.ShouldBeFalse();
+        record.SkipDetail.ShouldNotBeNull().ShouldContain("tick");
+        record.Sessions.Ran.ShouldBe(1);
     }
 }
