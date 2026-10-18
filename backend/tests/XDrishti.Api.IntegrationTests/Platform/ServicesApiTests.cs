@@ -36,7 +36,8 @@ public sealed class ServicesApiTests(ApiFactory factory) : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         factory.Clock.Pin(Now);
-        await factory.ResetInstrumentsAsync();
+        await factory.ResetAllAsync();
+        await factory.AssertCleanAsync();
         _host = factory.WithWebHostBuilder(b => b.ConfigureTestServices(services => services.AddSingleton<IScheduledService>(_fake)));
         _client = await SignInAsync(_host);
     }

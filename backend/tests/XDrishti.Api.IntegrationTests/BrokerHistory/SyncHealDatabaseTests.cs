@@ -14,8 +14,13 @@ namespace XDrishti.Api.IntegrationTests.BrokerHistory;
 /// in India time, the runs that are failed as interrupted and noted in the same statement, the mapper version, the earlier-history state, the noted windows, the memory of the attention items, and the migration up and down over a database that holds data.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
-public sealed class SyncHealDatabaseTests(ApiFactory factory)
+public sealed class SyncHealDatabaseTests(ApiFactory factory) : IAsyncLifetime
 {
+    // These tests write accounts straight into the tables and reset at the start of the test that needs it; the rows must not outlive the class.
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
+
     private const string MigrationDatabase = "xd_sync_heal_migration_probe";
 
     private const string GrantMigrationDatabase = "xd_attention_grant_migration_probe";

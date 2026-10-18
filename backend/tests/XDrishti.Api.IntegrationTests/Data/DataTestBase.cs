@@ -35,7 +35,8 @@ public abstract class DataTestBase(ApiFactory factory) : IAsyncLifetime
     public virtual async ValueTask InitializeAsync()
     {
         Factory.Clock.Pin(Now);
-        await Factory.ResetInstrumentsAsync();
+        await Factory.ResetAllAsync();
+        await Factory.AssertCleanAsync();
         Owner = await Factory.SignInAsync(Ct);
     }
 
@@ -123,7 +124,7 @@ public abstract class DataTestBase(ApiFactory factory) : IAsyncLifetime
     protected async Task<Dictionary<(string Timeframe, long Start), ExpectedBar>> StoredAggregatesAsync(Guid instrumentId)
     {
         await using var connection = await OpenAsync();
-        await using var command = new NpgsqlCommand("SELECT timeframe, extract(epoch FROM ts)::bigint, open, high, low, close, volume, bars, complete FROM market.bars_agg WHERE instrument_id = @id", connection);
+        await using var command = new NpgsqlCommand("SELECT timeframe, extract(epoch FROM ts)::bigint, open, high, low, close, volume, bars, complete FROM market.bars_agg WHERE instrument_id = @id ORDER BY timeframe, ts", connection);
         command.Parameters.AddWithValue("id", instrumentId);
         var rows = new Dictionary<(string, long), ExpectedBar>();
         await using var reader = await command.ExecuteReaderAsync(Ct);

@@ -18,7 +18,7 @@ public sealed class AccountsApiTests(ApiFactory factory) : IAsyncLifetime
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     [Fact]
     public async Task A_complete_wizard_request_creates_the_account_and_everything_reads_back()

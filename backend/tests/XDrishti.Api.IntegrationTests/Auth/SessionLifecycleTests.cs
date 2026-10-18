@@ -100,7 +100,7 @@ public sealed class SessionLifecycleTests(ApiFactory factory)
         }
         finally
         {
-            factory.Clock.Reset();
+            await factory.ResetClockAsync();
         }
     }
 
@@ -125,7 +125,7 @@ public sealed class SessionLifecycleTests(ApiFactory factory)
         }
         finally
         {
-            factory.Clock.Reset();
+            await factory.ResetClockAsync();
         }
     }
 
@@ -151,7 +151,7 @@ public sealed class SessionLifecycleTests(ApiFactory factory)
         }
         finally
         {
-            factory.Clock.Reset();
+            await factory.ResetClockAsync();
         }
     }
 }

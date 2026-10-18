@@ -22,10 +22,10 @@ public sealed class BrokerDisconnectTests(ApiFactory factory) : IAsyncLifetime
         factory.Brokers.Reset();
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         factory.Brokers.Reset();
-        return ValueTask.CompletedTask;
+        await factory.ResetAccountsAsync();
     }
 
     private List<FakeBrokers.RecordedRequest> Sent(string path) => [.. factory.Brokers.Requests.Where(r => r.Uri.AbsolutePath == path)];

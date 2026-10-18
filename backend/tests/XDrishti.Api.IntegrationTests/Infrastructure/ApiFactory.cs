@@ -237,6 +237,46 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         Services.GetRequiredService<IPortfolioHistoryCache>().Invalidate();
     }
 
+    /// <summary>Resets the accounts side and the instrument side (which also removes the stored service schedules), so a test starts from the seeded state whatever ran before it.</summary>
+    public async Task ResetAllAsync()
+    {
+        await ResetAccountsAsync();
+        await ResetInstrumentsAsync();
+    }
+
+    /// <summary>
+    /// Throws when a table that a reset leaves empty holds rows, naming the table: a class that ran earlier leaked data, and the failure of the test that finds it would
+    /// otherwise point at the wrong place.
+    /// </summary>
+    public async Task AssertCleanAsync()
+    {
+        string[] tables = ["accounts.broker_accounts", "portfolio.holdings", "portfolio.attention_items", "platform.service_schedules"];
+        foreach (var table in tables)
+        {
+            var count = await this.WithDbAsync(async db =>
+            {
+                var connection = db.Database.GetDbConnection();
+                await connection.OpenAsync();
+                try
+                {
+                    await using var command = connection.CreateCommand();
+#pragma warning disable CA2100 // the table names are the constants above
+                    command.CommandText = $"SELECT count(*) FROM {table}";
+#pragma warning restore CA2100
+                    return Convert.ToInt64(await command.ExecuteScalarAsync(), System.Globalization.CultureInfo.InvariantCulture);
+                }
+                finally
+                {
+                    await connection.CloseAsync();
+                }
+            });
+            if (count != 0)
+            {
+                throw new InvalidOperationException($"{table} holds {count} row(s) after a reset: an earlier test class leaked data.");
+            }
+        }
+    }
+
     /// <summary>
     /// Puts the clock back to real time and removes the sign-in audit events that a test wrote while the clock was ahead of real time: they would otherwise
     /// count as the "latest" events for every test that reads the audit trail afterwards.

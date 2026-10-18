@@ -58,7 +58,7 @@ public sealed class LockoutAndRateLimitTests(ApiFactory factory)
         }
         finally
         {
-            factory.Clock.Reset();
+            await factory.ResetClockAsync();
             await factory.RestoreOwnerAsync();
         }
     }
