@@ -75,7 +75,7 @@ public sealed class RunSimulationBenchmarks(ApiFactory factory) : DataTestBase(f
         }
 
         var last = new DateOnly(2025, 12, 31);
-        var request = new SimulationRequest("ORB", null, "15m", Start, last, ids, null);
+        var request = new SimulationRequest("ORB", null, "15m", Start, last, ids, null, CostChoice.Gross);
         using var run = Factory.Services.CreateScope();
         var handler = run.ServiceProvider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
         var clock = Stopwatch.StartNew();

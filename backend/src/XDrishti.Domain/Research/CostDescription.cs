@@ -25,6 +25,16 @@ public static class CostDescription
             + (costs.Checked is null ? UncheckedNote : string.Empty);
     }
 
+    /// <summary>The label of a stored sheet as <c>cost-sheet show</c> prints it: the same words as a run's, from the sheet itself.</summary>
+    /// <exception cref="ArgumentNullException">The sheet is null.</exception>
+    public static string SheetLabel(CostSheet sheet)
+    {
+        ArgumentNullException.ThrowIfNull(sheet);
+        return "costs: sheet " + sheet.Id
+            + (sheet.IsTest ? TestNote : string.Empty)
+            + (sheet.Checked is null ? UncheckedNote : string.Empty);
+    }
+
     /// <summary>The sizing line of a costed run: the capital, the profile and what is skipped and counted.</summary>
     /// <exception cref="ArgumentNullException">The record is null.</exception>
     public static string SizingLabel(CostRecord costs)

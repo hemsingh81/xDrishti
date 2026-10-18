@@ -18,6 +18,12 @@ public static class SimulationErrors
     /// <summary>The basket of a run does not exist, is a portfolio basket or is archived (P3-04a D2).</summary>
     public const string BasketNotFoundCode = "simulation.basket_not_found";
 
+    /// <summary>The charge sheet a request names is not stored, or its id is a <c>test-</c> one (P3-03f F2).</summary>
+    public const string CostSheetNotFoundCode = "simulation.cost_sheet_not_found";
+
+    /// <summary>The first schedule of the charge sheet starts after the first day of the window (P3-03f F2).</summary>
+    public const string CostSheetNotEffectiveCode = "simulation.cost_sheet_not_effective";
+
     /// <summary>The strategy id is not a built-in one (a located problem of the strategy factory, path <c>strategy_id</c>).</summary>
     public const string UnknownStrategyCode = "simulation.unknown_strategy";
 
@@ -89,6 +95,17 @@ public static class SimulationErrors
             : "The strategy cannot be run.";
         return Error.Validation(StrategyInvalidCode, message) with { Fields = [.. problems.Take(MaxStrategyProblems)] };
     }
+
+    /// <summary>The sheet is not stored (or is a <c>test-</c> id).</summary>
+    public static Error CostSheetNotFound(string sheetId) =>
+        Error.NotFound(CostSheetNotFoundCode, $"No charge sheet '{sheetId}' is stored; load one with scripts/cost-sheet.sh, or run gross.");
+
+    /// <summary>The window begins before the first date the sheet vouches for: refused, never extrapolated.</summary>
+    public static Error CostSheetNotEffective(string sheetId, DateOnly firstEffective, DateOnly from) =>
+        Error.Validation(CostSheetNotEffectiveCode, $"The charge sheet '{sheetId}' starts on {firstEffective:yyyy-MM-dd}, after the first day of the window ({from:yyyy-MM-dd}).") with
+        {
+            Fields = [new FieldError("costs.sheet_id", $"has no rates before {firstEffective:yyyy-MM-dd}.", null, CostSheetNotEffectiveCode)],
+        };
 
     public static readonly Error BasketNotFound = Error.NotFound(BasketNotFoundCode, "The basket does not exist, is a portfolio basket or is archived; a simulation runs over a manual basket that is not archived.");
 }

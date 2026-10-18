@@ -44,6 +44,8 @@ internal sealed class RunFixture
 
     public FakeSimulationEngine Engine { get; } = new();
 
+    public FakeCostSheetStore CostSheets { get; } = new();
+
     public FakeTimeProvider Time { get; } = new();
 
     public StructuredLogger<RunSimulationHandler> Log { get; } = new();
@@ -59,7 +61,7 @@ internal sealed class RunFixture
         Store.ForbidMerge = true;
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Time, Log);
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, CostSheets, Time, Log);
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)
@@ -77,11 +79,11 @@ internal sealed class RunFixture
     public ValueTask<Result<SimulationRun>> RunAsync(SimulationRequest request, CancellationToken cancellationToken = default) =>
         Handler.HandleAsync(new RunSimulationQuery(request), cancellationToken);
 
-    public static SimulationRequest List(IReadOnlyList<Guid> ids, DateOnly? from = null, DateOnly? to = null) =>
-        new("ORB", null, "15m", from ?? D1, to ?? D3, ids, null);
+    public static SimulationRequest List(IReadOnlyList<Guid> ids, DateOnly? from = null, DateOnly? to = null, CostChoice? costs = null) =>
+        new("ORB", null, "15m", from ?? D1, to ?? D3, ids, null, costs ?? CostChoice.Gross);
 
-    public static SimulationRequest Basket(Guid basketId, DateOnly? from = null, DateOnly? to = null) =>
-        new("ORB", null, "15m", from ?? D1, to ?? D3, null, basketId);
+    public static SimulationRequest Basket(Guid basketId, DateOnly? from = null, DateOnly? to = null, CostChoice? costs = null) =>
+        new("ORB", null, "15m", from ?? D1, to ?? D3, null, basketId, costs ?? CostChoice.Gross);
 
     /// <summary>A manual basket of the instruments, in the order of the positions given.</summary>
     public void SetBasket(Guid basketId, string name, DateTimeOffset? archivedAt, params (Guid Id, string Symbol, int Position, decimal? TickPaise, bool Retired)[] members)

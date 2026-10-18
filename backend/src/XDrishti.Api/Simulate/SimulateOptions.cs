@@ -1,5 +1,7 @@
 using System.Globalization;
+using XDrishti.Application.Research;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Research;
 using XDrishti.SimExport.Cards;
 
 namespace XDrishti.Api.Simulate;
@@ -21,6 +23,7 @@ internal sealed record SimulateOptions(
     FillsMode Fills,
     bool AcknowledgeCsvAdjusted,
     bool Force,
+    CostChoice Costs,
     int Cards = SimulateOptions.DefaultCards)
 {
     /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
@@ -32,6 +35,7 @@ internal sealed record SimulateOptions(
         + "  simulate --strategy <id> (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
         + "           [--timeframe <5m|15m>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
         + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
+        + "           (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required, P3-03f)\n"
         + "  simulate --list-strategies\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
 
@@ -39,9 +43,9 @@ internal sealed record SimulateOptions(
 
     private const int MaxText = 60;
 
-    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--fills", "--cards"];
+    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r"];
 
-    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies"];
+    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross"];
 
     /// <summary>Parses the arguments after the verb name.</summary>
     /// <param name="args">The arguments.</param>
@@ -121,7 +125,7 @@ internal sealed record SimulateOptions(
             return errors.Count > 0
                 ? Invalid(errors)
                 : new SimulateParse(
-                    new SimulateOptions(true, string.Empty, [], null, default, default, null, new Dictionary<string, double>(), FillsMode.Modelled, false, false), []);
+                    new SimulateOptions(true, string.Empty, [], null, default, default, null, new Dictionary<string, double>(), FillsMode.Modelled, false, false, CostChoice.Gross), []);
         }
 
         var strategy = Strategy(values, knownStrategyIds, errors);
@@ -137,6 +141,7 @@ internal sealed record SimulateOptions(
         var timeframe = ReadTimeframe(values, errors);
         var fills = ReadFills(values, errors);
         var cards = ReadCards(values, errors);
+        var costs = ReadCosts(values, switches, errors);
         var named = ReadParameters(parameters, errors);
         if (errors.Count > 0)
         {
@@ -144,7 +149,7 @@ internal sealed record SimulateOptions(
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), cards), []);
+            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards), []);
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());
@@ -280,6 +285,65 @@ internal sealed record SimulateOptions(
 
         errors.Add("'--cards' must be a whole number from 0 to " + CardSelection.MaxCap.ToString(CultureInfo.InvariantCulture) + ", '" + Show(text) + "' is not");
         return DefaultCards;
+    }
+
+    /// <summary>
+    /// The cost choice (spec P3-03f, F1): exactly one of <c>--gross</c> and <c>--costs &lt;id&gt;</c>; <c>--capital</c>, <c>--profile</c> and <c>--max-cost-r</c> need <c>--costs</c>. The same bounds as the request validation, so that a typo is a usage
+    /// error (exit 2) and not a refusal.
+    /// </summary>
+    private static CostChoice ReadCosts(Dictionary<string, string> values, HashSet<string> switches, List<string> errors)
+    {
+        var gross = switches.Contains("--gross");
+        var named = values.TryGetValue("--costs", out var id);
+        if (gross == named)
+        {
+            errors.Add(gross ? "give --gross or --costs, not both" : "give --gross (no charges, labelled 'costs: none') or --costs <sheet-id>: a run is never costed or gross by omission");
+            return CostChoice.Gross;
+        }
+
+        string[] sheetOnly = ["--capital", "--profile", "--max-cost-r"];
+        if (gross)
+        {
+            foreach (var flag in sheetOnly.Where(values.ContainsKey))
+            {
+                errors.Add("'" + flag + "' needs --costs <sheet-id>");
+            }
+
+            return CostChoice.Gross;
+        }
+
+        if (!CostSheet.IsValidId(id!))
+        {
+            errors.Add("'--costs' must be a sheet id of lower case letters, digits, '.', '_' or '-' (at most 40), '" + Show(id!) + "' is not");
+        }
+
+        var capital = CostChoice.DefaultCapital;
+        if (values.TryGetValue("--capital", out var capitalText))
+        {
+            if (!decimal.TryParse(capitalText, NumberStyles.Number, CultureInfo.InvariantCulture, out capital) || !(capital > 0 && capital <= CostContext.MaxCapital))
+            {
+                errors.Add("'--capital' must be a number of rupees above 0 and at most " + CostContext.MaxCapital.ToString("0", CultureInfo.InvariantCulture) + ", '" + Show(capitalText) + "' is not");
+            }
+        }
+
+        var profile = CostChoice.DefaultProfile;
+        if (values.TryGetValue("--profile", out var profileText))
+        {
+            profile = profileText;
+            if (profile is not ("standard" or "conservative"))
+            {
+                errors.Add("'--profile' must be standard or conservative, '" + Show(profileText) + "' is not");
+            }
+        }
+
+        var maxCostR = CostChoice.DefaultMaxCostR;
+        if (values.TryGetValue("--max-cost-r", out var maxText)
+            && (!decimal.TryParse(maxText, NumberStyles.Number, CultureInfo.InvariantCulture, out maxCostR) || !(maxCostR > 0 && maxCostR <= CostContext.MaxCostRLimit)))
+        {
+            errors.Add("'--max-cost-r' must be a number above 0 and at most " + CostContext.MaxCostRLimit.ToString("0", CultureInfo.InvariantCulture) + ", '" + Show(maxText) + "' is not");
+        }
+
+        return CostChoice.Sheet(id!, capital, profile, maxCostR);
     }
 
     private static Dictionary<string, double> ReadParameters(List<string> parameters, List<string> errors)

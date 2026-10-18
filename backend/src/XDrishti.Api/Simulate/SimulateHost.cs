@@ -21,7 +21,8 @@ internal static class SimulateHost
     /// <summary>Builds the host.</summary>
     /// <param name="overrides">Configuration values that win over every other source (tests give the connection string here).</param>
     /// <param name="configure">Replaces or adds services after the registrations (tests give a fake bar store or a hook).</param>
-    public static IHost Create(IReadOnlyDictionary<string, string?>? overrides = null, Action<IServiceCollection>? configure = null)
+    /// <param name="serviceName">The name the host logs under; the <c>cost-sheet</c> verb (spec P3-03f) shares this host and gives its own.</param>
+    public static IHost Create(IReadOnlyDictionary<string, string?>? overrides = null, Action<IServiceCollection>? configure = null, string serviceName = "xd-simulate")
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { Args = null, ContentRootPath = AppContext.BaseDirectory });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [StandardErrorKey] = "Verbose", [EntityFrameworkLevelKey] = "Fatal" });
@@ -30,7 +31,7 @@ internal static class SimulateHost
             builder.Configuration.AddInMemoryCollection(overrides);
         }
 
-        builder.AddXDrishtiDefaults("xd-simulate");
+        builder.AddXDrishtiDefaults(serviceName);
         builder.Services.AddApplication().AddInfrastructure(builder.Configuration);
         configure?.Invoke(builder.Services);
         builder.ConfigureContainer(new DefaultServiceProviderFactory(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true }));

@@ -182,7 +182,7 @@ exits:                             # the strategy model (P3-02b) checks the para
   per_trade_fit: { scale_by_atr: true, snap_to_structure: true, obstacle_check: true,
                    late_entry_target_reduction: { after: "13:30", factor: 0.7 } }
 
-costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042), stored and chosen by a request in P3-03f
+costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042); stored since P3-03f (ADR 0044) as one row of `platform.app_settings`, key `research.cost_sheet.<id>` (a new set of rates is a new id), loaded with `scripts/cost-sheet.sh load <file.json>` (`show`, `check` against your original report files; `--replace` overwrites an id), and chosen by every run: `--gross` or `--costs <id> [--capital] [--profile] [--max-cost-r]`
   id: "?"                          # lower case [a-z0-9][a-z0-9._-]{0,39}; an id starting "test-" is a synthetic sheet for tests and is never stored
   label: "?"
   source: "? where you read the figures, and when"

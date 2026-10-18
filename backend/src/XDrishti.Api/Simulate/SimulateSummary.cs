@@ -28,6 +28,7 @@ internal static class SimulateSummary
         Line(text, "folder: " + outcome.Folder);
         Line(text, "export: " + Status(outcome));
         Line(text, "database: " + Database(connectionString));
+        Line(text, Costs(run));
         Instruments(text, run);
         Line(text, "candidates: " + Number(run.Totals.CandidatesInWindow));
         Line(text, "trades: " + Number(run.Trades.Count));
@@ -39,6 +40,12 @@ internal static class SimulateSummary
         Line(text, Phases(run, phases));
         return text.ToString();
     }
+
+    /// <summary>The cost line (spec P3-03f): the label of the run, and for a costed run the sheet's rates hash and the sizing numbers. No rate of the sheet.</summary>
+    private static string Costs(SimulationRun run) =>
+        run.Costs is not { } costs
+            ? CostDescription.None
+            : CostDescription.Label(costs) + ", rates " + costs.RatesSha256 + ", capital " + CanonicalText.Number(costs.Capital) + ", profile " + costs.Profile.Name + ", max cost in R " + CanonicalText.Number(costs.MaxCostR);
 
     /// <summary>The host, port and name of the connection string; never the user or the password (the password is not in the string).</summary>
     public static string Database(string? connectionString)

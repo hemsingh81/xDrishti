@@ -8,7 +8,7 @@ public sealed class SimulateOptionsTests
 {
     private static readonly string[] Known = ["ORB"];
 
-    private const string Window = "--from 2026-03-02 --to 2026-03-04";
+    private const string Window = "--from 2026-03-02 --to 2026-03-04 --gross";
 
     private static string[] Line(string text) => text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
 
@@ -17,7 +17,7 @@ public sealed class SimulateOptionsTests
     public static TheoryData<string> Valid => new()
     {
         "--strategy ORB --symbols RELIANCE,TCS " + Window,
-        "--strategy=ORB --symbols=RELIANCE,TCS --from=2026-03-02 --to=2026-03-04",
+        "--strategy=ORB --symbols=RELIANCE,TCS --from=2026-03-02 --to=2026-03-04 --gross",
         "--strategy ORB --basket Banks " + Window,
         "--strategy ORB --basket 3f2504e0-4f89-41d3-9a0c-0305e82c3301 " + Window,
         "--strategy ORB --symbols M&M,BAJAJ-AUTO,NSE:TCS,INE002A01018 " + Window,
@@ -96,7 +96,7 @@ public sealed class SimulateOptionsTests
     [Fact]
     public void The_values_are_read_into_the_options_with_the_defaults_of_the_spec()
     {
-        var options = Parse("--strategy ORB --symbols RELIANCE,nse:tcs,M&M --from 2026-03-02 --to=2026-03-04 --param or_min=30 --param rr=2.5").Options.ShouldNotBeNull();
+        var options = Parse("--strategy ORB --symbols RELIANCE,nse:tcs,M&M --from 2026-03-02 --to=2026-03-04 --gross --param or_min=30 --param rr=2.5").Options.ShouldNotBeNull();
 
         options.StrategyId.ShouldBe("ORB");
         options.Symbols.ShouldBe(["RELIANCE", "nse:tcs", "M&M"]);
@@ -111,7 +111,7 @@ public sealed class SimulateOptionsTests
     [Fact]
     public void A_symbol_list_may_be_separated_by_spaces_inside_one_quoted_argument()
     {
-        var options = SimulateOptions.Parse(["--strategy", "ORB", "--symbols", "RELIANCE TCS,SBIN", "--from", "2026-03-02", "--to", "2026-03-04"], Known).Options.ShouldNotBeNull();
+        var options = SimulateOptions.Parse(["--strategy", "ORB", "--symbols", "RELIANCE TCS,SBIN", "--from", "2026-03-02", "--to", "2026-03-04", "--gross"], Known).Options.ShouldNotBeNull();
 
         options.Symbols.ShouldBe(["RELIANCE", "TCS", "SBIN"]);
     }

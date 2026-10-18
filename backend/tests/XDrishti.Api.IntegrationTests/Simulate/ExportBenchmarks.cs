@@ -121,7 +121,7 @@ public sealed class ExportBenchmarks(ApiFactory factory) : DataTestBase(factory)
         using var run = Factory.Services.CreateScope();
         var handler = run.ServiceProvider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
         var clock = Stopwatch.StartNew();
-        var result = await handler.HandleAsync(new RunSimulationQuery(new SimulationRequest("ORB", null, "15m", Start, new DateOnly(2025, 12, 31), ids, null)), Ct);
+        var result = await handler.HandleAsync(new RunSimulationQuery(new SimulationRequest("ORB", null, "15m", Start, new DateOnly(2025, 12, 31), ids, null, CostChoice.Gross)), Ct);
         var simulate = clock.Elapsed;
         result.IsSuccess.ShouldBeTrue();
 

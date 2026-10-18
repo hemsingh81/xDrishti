@@ -17,6 +17,18 @@ public static class CostErrors
     /// <summary>A capital, entry or risk that is not above 0.</summary>
     public const string SizingInputInvalidCode = "costs.sizing_input_invalid";
 
+    /// <summary>No sheet is stored under the id (P3-03f), or the id is a <c>test-</c> one, which is never stored.</summary>
+    public const string SheetNotFoundCode = "costs.sheet_not_found";
+
+    /// <summary>A <c>test-</c> sheet is synthetic and is never stored (P3-03f).</summary>
+    public const string TestSheetNotStoredCode = "costs.test_sheet_not_stored";
+
+    /// <summary>A stored sheet has other rates and the load was not told to replace them (P3-03f).</summary>
+    public const string ReplaceRequiredCode = "costs.replace_required";
+
+    /// <summary>Another write to the same sheet landed first (P3-03f).</summary>
+    public const string ConcurrentWriteCode = "costs.concurrent_write";
+
     /// <summary>The most field errors an invalid sheet lists.</summary>
     public const int MaxFieldErrors = 20;
 
@@ -80,6 +92,10 @@ public static class CostErrors
 
     /// <summary>The sheet is invalid for one problem.</summary>
     public static Error SheetInvalid(string path, string code, string message) => SheetInvalid([new FieldError(path, message, null, code)]);
+
+    /// <summary>No sheet with the id is stored.</summary>
+    public static Error SheetNotFound(string sheetId) =>
+        Error.NotFound(SheetNotFoundCode, $"No charge sheet '{sheetId}' is stored.");
 
     /// <summary>A text over its bound.</summary>
     public static Error SheetTooLong(string what, int length, int maximum) =>

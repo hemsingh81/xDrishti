@@ -265,7 +265,7 @@ exits:                             # the strategy model (P3-02b) checks the para
   per_trade_fit: { scale_by_atr: true, snap_to_structure: true, obstacle_check: true,
                    late_entry_target_reduction: { after: &quot;13:30&quot;, factor: 0.7 } }
 
-costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042), stored and chosen by a request in P3-03f
+costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042); stored since P3-03f (ADR 0044) as one row of `platform.app_settings`, key `research.cost_sheet.&lt;id&gt;` (a new set of rates is a new id), loaded with `scripts/cost-sheet.sh load &lt;file.json&gt;` (`show`, `check` against your original report files; `--replace` overwrites an id), and chosen by every run: `--gross` or `--costs &lt;id&gt; [--capital] [--profile] [--max-cost-r]`
   id: &quot;?&quot;                          # lower case [a-z0-9][a-z0-9._-]{0,39}; an id starting &quot;test-&quot; is a synthetic sheet for tests and is never stored
   label: &quot;?&quot;
   source: &quot;? where you read the figures, and when&quot;
@@ -616,7 +616,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-18 22:37</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-18 23:18</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

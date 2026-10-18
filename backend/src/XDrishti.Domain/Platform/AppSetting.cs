@@ -10,7 +10,7 @@ public sealed class AppSetting : Entity<string>
 {
     public const int MaxKeyLength = 100;
 
-    public const int MaxValueLength = 500;
+    public const int MaxValueLength = 8000;
 
     public const int MaxUpdatedByLength = 256;
 

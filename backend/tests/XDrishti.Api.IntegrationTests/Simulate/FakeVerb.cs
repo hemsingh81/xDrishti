@@ -200,9 +200,19 @@ internal sealed class FakeVerb : IDisposable
     /// <summary>Runs the verb with the arguments (split on spaces) and the export root of this fake.</summary>
     public Task<int> RunAsync(string args, CancellationToken cancellationToken) => RunInRootAsync(args, ExportRoot, cancellationToken);
 
-    /// <summary>Runs the verb with the given export root (null, relative or missing included).</summary>
+    /// <summary>
+    /// Runs the verb with the given export root (null, relative or missing included). The cost choice is required since P3-03f: a command line that names neither <c>--gross</c> nor <c>--costs</c> gets <c>--gross</c> here, because these tests are
+    /// about the other flags; <see cref="RunRawAsync"/> sends the line as it is.
+    /// </summary>
     public async Task<int> RunInRootAsync(string args, string? root, CancellationToken cancellationToken) =>
+        await RunRawAsync(WithCosts(args), root, cancellationToken);
+
+    /// <summary>Runs the verb with exactly these arguments.</summary>
+    public async Task<int> RunRawAsync(string args, string? root, CancellationToken cancellationToken) =>
         await SimulateCommand.RunAsync(args.Split(' ', StringSplitOptions.RemoveEmptyEntries), Services(), new SimulateConsole(Out, Error), root, cancellationToken);
+
+    private static string WithCosts(string args) =>
+        args.Contains("--gross", StringComparison.Ordinal) || args.Contains("--costs", StringComparison.Ordinal) || args.Contains("--list-strategies", StringComparison.Ordinal) ? args : args + " --gross";
 
     public void Dispose() => Root.Dispose();
 

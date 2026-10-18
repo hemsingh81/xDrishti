@@ -14,7 +14,7 @@ namespace XDrishti.Api.IntegrationTests.Simulate;
 /// </summary>
 public sealed class SimulateCardsTests : IDisposable
 {
-    private const string Common = "--strategy ORB --symbols AAA --from 2024-04-01 --to 2026-04-30";
+    private const string Common = "--strategy ORB --symbols AAA --from 2024-04-01 --to 2026-04-30 --gross";
 
     private readonly FakeVerb _verb = new();
 

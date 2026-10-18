@@ -55,6 +55,19 @@ public sealed partial class CostLabelsTests
     }
 
     [Fact]
+    public void The_label_of_a_stored_sheet_is_the_label_of_a_run_that_used_it()
+    {
+        var sheet = FixtureSheet.Sheet;
+        var checkedSheet = FixtureSheet.Build(FixtureSheet.Id, "check 2026-10-15: ok");
+
+        CostDescription.SheetLabel(sheet).ShouldBe("costs: sheet fixture-a (not checked against bills)");
+        CostDescription.SheetLabel(checkedSheet).ShouldBe("costs: sheet fixture-a");
+        CostDescription.SheetLabel(TestCostSheet.Sheet).ShouldBe(CostDescription.Label(CostRecord.Of(TestCostSheet.Context())));
+        CostDescription.SheetLabel(sheet).ShouldBe(CostDescription.Label(CostRecord.Of(TestCostSheet.Context(sheet: sheet))));
+        Should.Throw<ArgumentNullException>(() => CostDescription.SheetLabel(null!));
+    }
+
+    [Fact]
     public void The_sizing_line_gives_the_capital_the_profile_the_caps_and_what_is_skipped()
     {
         var line = CostDescription.SizingLabel(Record());

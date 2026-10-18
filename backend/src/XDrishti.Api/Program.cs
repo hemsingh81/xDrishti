@@ -1,4 +1,5 @@
 using XDrishti.Api.Auth;
+using XDrishti.Api.CostSheets;
 using XDrishti.Api.Infrastructure;
 using XDrishti.Api.Simulate;
 using XDrishti.Application;
@@ -11,6 +12,12 @@ var verb = VerbDispatch.Of(args);
 if (verb == Verb.Simulate)
 {
     return await SimulateProgram.RunProcessAsync(args[1..]);
+}
+
+// The cost-sheet verb (spec P3-03f) is chosen the same way: `cost-sheet load migrate` or a file named owner-reset never selects another step.
+if (verb == Verb.CostSheet)
+{
+    return await CostSheetProgram.RunProcessAsync(args[1..]);
 }
 
 // Container health probe: `dotnet XDrishti.Api.dll --healthcheck` (chiseled images have no curl).

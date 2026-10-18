@@ -9,6 +9,9 @@ internal enum Verb
     /// <summary>The <c>simulate</c> verb: first argument <c>simulate</c>, nothing else selects it.</summary>
     Simulate,
 
+    /// <summary>The <c>cost-sheet</c> verb (spec P3-03f): first argument <c>cost-sheet</c>, nothing else selects it.</summary>
+    CostSheet,
+
     /// <summary>The container health probe (<c>--healthcheck</c>).</summary>
     HealthCheck,
 

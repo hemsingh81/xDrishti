@@ -190,7 +190,7 @@ internal static class SimulateCommand
             ?? engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, options.StrategyId, StringComparison.Ordinal))?.DefaultTimeframe.ToCode()
             ?? Timeframe.M15.ToCode();
         var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
-        return new SimulationRequest(options.StrategyId, options.Parameters, timeframe, options.From, options.To, universe.InstrumentIds, universe.BasketId, options.AcknowledgeCsvAdjusted, null, fills);
+        return new SimulationRequest(options.StrategyId, options.Parameters, timeframe, options.From, options.To, universe.InstrumentIds, universe.BasketId, options.Costs, options.AcknowledgeCsvAdjusted, null, fills);
     }
 
     /// <summary>The second read for the chosen trades (spec P3-04c, C2); nothing is read when no card is wanted.</summary>
@@ -309,7 +309,7 @@ internal static class SimulateCommand
     }
 
     /// <summary>The exception type and its message cut to <see cref="MaxFailureMessage"/> characters, with control characters replaced; the stack goes to the log only. The verb reads no secret, so it has none to hide.</summary>
-    private static string Describe(Exception failure)
+    internal static string Describe(Exception failure)
     {
         var message = string.Concat(failure.Message.Select(c => char.IsControl(c) ? ' ' : c));
         return failure.GetType().Name + ": " + (message.Length > MaxFailureMessage ? message[..MaxFailureMessage] + "..." : message);

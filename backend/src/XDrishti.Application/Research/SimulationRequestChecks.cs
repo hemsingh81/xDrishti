@@ -36,6 +36,7 @@ internal static class SimulationRequestChecks
         CheckDates(request, errors);
         CheckUniverse(request, errors);
         CheckNumbers(request, errors);
+        CheckCosts(request, errors);
         return errors;
     }
 
@@ -112,6 +113,38 @@ internal static class SimulationRequestChecks
             Finite(errors, "fills.ticks", fills.Ticks);
             Finite(errors, "fills.barRangeFrac", fills.BarRangeFrac);
             Finite(errors, "fills.stopExitExtraTicks", fills.StopExitExtraTicks);
+        }
+    }
+
+    private static void CheckCosts(SimulationRequest request, FieldErrors errors)
+    {
+        switch (request.Costs)
+        {
+            case null:
+                errors.Add("costs", "required: name a stored charge sheet, or gross.");
+                break;
+            case CostChoice.SheetChoice sheet:
+                if (string.IsNullOrEmpty(sheet.SheetId) || !CostSheet.IsValidId(sheet.SheetId))
+                {
+                    errors.Add("costs.sheet_id", "Use a sheet id of lower case letters, digits, '.', '_' or '-', starting with a letter or digit, at most 40 characters.");
+                }
+
+                if (!(sheet.Capital > 0 && sheet.Capital <= CostContext.MaxCapital))
+                {
+                    errors.Add("costs.capital", $"Use a capital above 0 and at most {CostContext.MaxCapital:0}.");
+                }
+
+                if (!string.Equals(sheet.Profile, SizingProfile.Standard.Name, StringComparison.Ordinal) && !string.Equals(sheet.Profile, SizingProfile.Conservative.Name, StringComparison.Ordinal))
+                {
+                    errors.Add("costs.profile", "Use the profile 'standard' or 'conservative'.");
+                }
+
+                if (!(sheet.MaxCostR > 0 && sheet.MaxCostR <= CostContext.MaxCostRLimit))
+                {
+                    errors.Add("costs.max_cost_r", $"Use a largest charge in R above 0 and at most {CostContext.MaxCostRLimit:0}.");
+                }
+
+                break;
         }
     }
 

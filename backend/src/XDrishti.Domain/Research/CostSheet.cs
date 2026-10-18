@@ -160,7 +160,7 @@ public sealed record CostSheet : IEquatable<CostSheet>
     };
 
     /// <summary>Whether the id matches <c>[a-z0-9][a-z0-9._-]{0,39}</c>.</summary>
-    internal static bool IsValidId(string id)
+    public static bool IsValidId(string id)
     {
         if (id.Length is 0 or > MaxId)
         {

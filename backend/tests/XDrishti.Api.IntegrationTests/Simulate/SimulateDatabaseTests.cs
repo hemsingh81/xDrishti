@@ -37,7 +37,7 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
 
     private static readonly DateOnly D4 = ReplayDays.D4;
 
-    private const string Window = "--from 2026-03-02 --to 2026-03-04";
+    private const string Window = "--from 2026-03-02 --to 2026-03-04 --gross";
 
     [GeneratedRegex(@"^[^:\s]+: [a-z_.]+: .+$", RegexOptions.CultureInvariant)]
     private static partial Regex ProblemLine();
@@ -49,7 +49,7 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
     private sealed record Outcome(int Exit, string Out, string Error, IReadOnlyCollection<string> Logs);
 
     /// <summary>A bar store and bar queries that record every call and answer nothing: a refusal must not reach them.</summary>
-    private sealed class NoReads : IBarStore, IBarQueries
+    internal sealed class NoReads : IBarStore, IBarQueries
     {
         public List<string> Calls { get; } = [];
 
@@ -150,7 +150,7 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
     {
         using var scope = Factory.Services.CreateScope();
         var handler = scope.ServiceProvider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
-        var result = await handler.HandleAsync(new RunSimulationQuery(new SimulationRequest("ORB", null, "15m", D1, D3, ids, basket, false, null, fills)), Ct);
+        var result = await handler.HandleAsync(new RunSimulationQuery(new SimulationRequest("ORB", null, "15m", D1, D3, ids, basket, CostChoice.Gross, false, null, fills)), Ct);
         return result.Value;
     }
 
@@ -269,8 +269,8 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
             ("--strategy MACD --symbols ABB " + Window, "strategy_id: simulation.unknown_strategy: "),
             ("--strategy ORB --symbols ABB " + Window + " --param bogus=1", "parameters.bogus: simulation.unknown_parameter: "),
             ("--strategy ORB --symbols ABB " + Window + " --param or_min=20", ": "),
-            ("--strategy ORB --symbols ABB --from 2026-03-04 --to 2026-03-02", "from: "),
-            ("--strategy ORB --symbols ABB --from 1999-01-01 --to 2026-03-02", "from: "),
+            ("--strategy ORB --symbols ABB --from 2026-03-04 --to 2026-03-02 --gross", "from: "),
+            ("--strategy ORB --symbols ABB --from 1999-01-01 --to 2026-03-02 --gross", "from: "),
         };
 
         foreach (var (args, expected) in cases)

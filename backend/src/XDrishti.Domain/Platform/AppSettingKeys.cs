@@ -8,4 +8,7 @@ public static class AppSettingKeys
 
     /// <summary>The thresholds of the Action-center rules as a small JSON object (ADR 0022); without the row the documented defaults apply.</summary>
     public const string PortfolioActionThresholds = "portfolio.action_thresholds";
+
+    /// <summary>The prefix of the keys of the charge sheets (P3-03f, ADR 0044): <c>research.cost_sheet.&lt;id&gt;</c>, the value the canonical JSON of the sheet. The research module checks the value; the id is lower case.</summary>
+    public const string CostSheetPrefix = "research.cost_sheet.";
 }

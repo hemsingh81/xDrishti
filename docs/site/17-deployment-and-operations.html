@@ -362,7 +362,11 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 </tr>
 <tr>
 <td>Simulation runs (P3-04b2)</td>
-<td>The <code>simulate</code> verb is not a container service: <code>scripts/simulate.sh</code> runs it on the host (<code>dotnet run</code> of the API project with the argument <code>simulate</code>) against the developer database port (<code>xd-db</code> on 127.0.0.1:5433, <code>compose.dev.yaml</code>). The one secret is the database password, read from the Keychain item <code>xdrishti/db/app</code>; no vault key and no owner secret. Files go to <code>data/exports/sim/&lt;run-id&gt;/</code> (<code>Export__Directory</code>, git-ignored, owner-only) and, since P3-04c, include <code>index.html</code> and <code>cards/</code> (static trade cards, <code>--cards</code>, default 200: the verb reads the bars of the instruments that have a card a second time, so a wide run takes longer; <code>--cards 5</code> for an early look, <code>--cards 0</code> for none); nothing is written to the database. The Lab (P5) and the scanner (P7) reuse the handlers, not the verb</td>
+<td>The <code>simulate</code> verb is not a container service: <code>scripts/simulate.sh</code> runs it on the host (<code>dotnet run</code> of the API project with the argument <code>simulate</code>; since P3-03f every run names its cost choice, <code>--gross</code> or <code>--costs &lt;sheet-id&gt;</code>) against the developer database port (<code>xd-db</code> on 127.0.0.1:5433, <code>compose.dev.yaml</code>). The one secret is the database password, read from the Keychain item <code>xdrishti/db/app</code>; no vault key and no owner secret. Files go to <code>data/exports/sim/&lt;run-id&gt;/</code> (<code>Export__Directory</code>, git-ignored, owner-only) and, since P3-04c, include <code>index.html</code> and <code>cards/</code> (static trade cards, <code>--cards</code>, default 200: the verb reads the bars of the instruments that have a card a second time, so a wide run takes longer; <code>--cards 5</code> for an early look, <code>--cards 0</code> for none); nothing is written to the database. The Lab (P5) and the scanner (P7) reuse the handlers, not the verb</td>
+</tr>
+<tr>
+<td>Charge sheet (P3-03f)</td>
+<td>The <code>cost-sheet</code> verb (<code>load</code>, <code>show</code>, <code>check</code>) is not a container service either: <code>scripts/cost-sheet.sh</code> runs it on the host exactly like <code>simulate.sh</code> (the same generic host, the same Keychain item <code>xdrishti/db/app</code>, no vault key and no owner secret; a file argument may be relative, the script makes it absolute before it changes directory). The sheet is one row of <code>platform.app_settings</code>; <code>check</code> reads your original global transaction report files from the host (a container verb such as <code>owner-reset</code> mounts secrets and could not read them) and writes nothing. Since P3-03f every <code>simulate</code> run names <code>--gross</code> or <code>--costs &lt;id&gt;</code>. The migration <code>WidenAppSettingValue</code> (value column 500 to 8,000) is applied by <code>xd-migrate</code> on the next <code>deploy/xd-up.sh</code></td>
 </tr>
 <tr>
 <td>Dev loop</td>
@@ -408,7 +412,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-18 22:37</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-18 23:18</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>
