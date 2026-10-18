@@ -27,7 +27,7 @@ export xd-sim-export-2
 <details>
 <summary>what the fills do not model</summary>
 <ul>
-<li>not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.</li>
+<li>not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.</li>
 <li>not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.</li>
 <li>not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.</li>
 <li>not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.</li>
@@ -905,7 +905,7 @@ time rules: first entry 09:30, last entry 11:30, square off 15:15</pre>
 </ul>
 <h2>run</h2>
 <ul>
-<li>run key: 5d2d7f0c1c440803eaa3675c6edea05c0fd864ce19f2a4ab9b322ddc2ed84cd0</li>
+<li>run key: 35f8f8316af43e64ad8331ea87255a5758ee942316721d25250423bc6fe0ddb8</li>
 <li>strategy: ORB, engine sim-4</li>
 <li>trade key: ORB|NSE:HERON|Sell|2026-03-03</li>
 </ul>
