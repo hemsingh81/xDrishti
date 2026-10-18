@@ -130,10 +130,12 @@ Each basket carries a `kind` in the API: `manual` or `portfolio` today; rule-bas
 | Use | Example |
 |-----|---------|
 | **Scan scope** | Nightly plan scans "Best stocks" and "MyChoice" for intraday; "MyLongTerm" only for swing BUY |
-| **Strategy Lab universe** | "Test VWAP_RSI_TREND on MyChoice, 2022–today" |
+| **Strategy Lab universe** | "Test VWAP_RSI_TREND on MyChoice, 2022–today" (in P3 the run takes the members **now** and says so in its label, `members as of today`; see below) |
 | **Reports lens** | Compare results of all baskets side by side |
 | **Portfolio grouping** | Value, return and XIRR per basket ([doc 12](12-portfolio-monitoring.md)) |
 | **Live watch** | Pin a basket to the live price panel (counts toward the live-feed budget, [doc 05](05-data-and-brokers.md) §5) |
+
+**A basket as the universe of a simulation run (P3-04a).** The research run takes a **manual, not archived** basket and runs its members **now** (`MembersAsync(basketId, null, null)`), in the basket's order, retired members and members without stored bars included (a retired instrument that has bars is replayed: leaving it out would add survivorship bias; one without bars is a skip with a reason in the record). A basket is dated only from the day the owner built it (§3.4) and the system has no historical index membership (ISS-22), so the record's universe label is **`members as of today`**: a run over "Nifty 50 in 2022" replays today's members over 2022 and says so. The id of the basket goes into every trade (`RunTrade.BasketIds`). A portfolio basket (a system basket maintained from holdings), an archived one and an unknown id are refused with `simulation.basket_not_found`. An explicit list of instruments is the other universe (label `instruments as listed`).
 
 ### 3.4 Manual baskets: what is built (P1-15) and portfolio system baskets (P1-15a)
 

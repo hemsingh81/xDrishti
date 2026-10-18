@@ -1,10 +1,10 @@
 using XDrishti.Domain.Market.Bars;
 
-namespace XDrishti.Simulation.Tests.Support;
+namespace XDrishti.Tests.Shared;
 
 /// <summary>
 /// The days of the replay tests (spec P3-04, criteria): the fixture days of P3-03's table, dense, with the date shifted to the one given (D9), and the flat days, the short days and the evening sessions of the session table.
-/// Volume is 1,000 per minute as everywhere. The rows are those of <see cref="Fixtures"/>; they are written again here so that this file does not change the fixtures of the other stages.
+/// Volume is 1,000 per minute as everywhere. The rows are those of the fixtures of the walker tests (<c>Fixtures</c>); they are written again here so that this file does not change the fixtures of the other stages.
 /// </summary>
 internal static class ReplayDays
 {

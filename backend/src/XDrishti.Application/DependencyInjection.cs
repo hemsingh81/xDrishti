@@ -3,6 +3,7 @@ using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
@@ -39,7 +40,9 @@ using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
+using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Application;
 
@@ -70,6 +73,7 @@ public static class DependencyInjection
         services.AddAccounts();
         services.AddMarket();
         services.AddPortfolio();
+        services.AddResearch();
 
         return services;
     }
@@ -379,5 +383,11 @@ public static class DependencyInjection
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();
+    }
+
+    /// <summary>Research (P3-04a): running a strategy over the stored bars. The engine behind <see cref="ISimulationEngine"/> is an adapter in Infrastructure (ADR 0039).</summary>
+    private static void AddResearch(this IServiceCollection services)
+    {
+        services.AddScoped<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, RunSimulationHandler>();
     }
 }

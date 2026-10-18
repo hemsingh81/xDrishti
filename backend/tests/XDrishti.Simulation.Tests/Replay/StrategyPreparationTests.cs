@@ -127,7 +127,7 @@ public sealed class StrategyPreparationTests
         build.Definition.ShouldBeNull();
         var problem = build.Problems.ShouldHaveSingleItem();
         problem.Path.ShouldBe("strategy_id");
-        problem.Problem.Code.ShouldBe(ReplayCodes.UnknownStrategy);
+        problem.Problem.Code.ShouldBe(SimulationErrors.UnknownStrategyCode);
         problem.Problem.Message.ShouldContain("`ORB`");
     }
 
@@ -138,7 +138,7 @@ public sealed class StrategyPreparationTests
 
         build.Definition.ShouldBeNull();
         build.Parameters.ShouldBeEmpty();
-        build.Problems.Select(p => (p.Path, p.Problem.Code)).ShouldBe([("parameters.aa", ReplayCodes.UnknownParameter), ("parameters.zz", ReplayCodes.UnknownParameter)]);
+        build.Problems.Select(p => (p.Path, p.Problem.Code)).ShouldBe([("parameters.aa", SimulationErrors.UnknownParameterCode), ("parameters.zz", SimulationErrors.UnknownParameterCode)]);
     }
 
     [Fact]
@@ -160,5 +160,21 @@ public sealed class StrategyPreparationTests
 
         build.Problems.ShouldBeEmpty();
         prepared.Strategy.ShouldBeNull("an opening range of 7 minutes is not a multiple of the 15m bar: the compile refuses it, not the factory");
+    }
+
+    [Fact]
+    public void The_factory_prepares_in_one_step_with_the_effective_parameters_and_the_problems_of_the_factory_or_the_compile()
+    {
+        var prepared = BuiltInStrategies.Prepare("ORB", Params(("or_min", 30)), Timeframe.M15);
+        var unknown = BuiltInStrategies.Prepare("MACD", null, Timeframe.M15);
+        var refused = BuiltInStrategies.Prepare("ORB", Params(("or_min", 7)), Timeframe.M15);
+
+        prepared.Strategy.ShouldNotBeNull().Record.Parameters.ShouldBe(new Dictionary<string, double> { ["or_min"] = 30, ["rr"] = 2.0 });
+        prepared.Strategy.Record.DefinitionSha256.ShouldBe(StrategyPreparation.Prepare(OrbV1.Create(30), prepared.Strategy.Record.Parameters, Timeframe.M15).Strategy!.Record.DefinitionSha256);
+        unknown.Strategy.ShouldBeNull();
+        unknown.Problems.Single().Problem.Code.ShouldBe(SimulationErrors.UnknownStrategyCode);
+        refused.Strategy.ShouldBeNull();
+        refused.Problems.ShouldNotBeEmpty();
+        Should.Throw<ArgumentException>(() => BuiltInStrategies.Prepare("ORB", Params(("rr", double.NaN)), Timeframe.M15));
     }
 }

@@ -6,6 +6,10 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The invented days of P3-03 (F1, F2, flat), shared with the simulation tests: one source file, compiled into each project that needs it (P3-04a). -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- The constructed packets of docs/research/dhan-samples (hex text, UNVERIFIED), so the parser tests and the documentation cannot drift apart. -->
     <EmbeddedResource Include="..\..\..\docs\research\dhan-samples\feed-*.hex" LogicalName="DhanFeed/%(Filename)%(Extension)" />
   </ItemGroup>

@@ -14,6 +14,7 @@ using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Quality;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
@@ -27,6 +28,7 @@ using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
+using XDrishti.Infrastructure.Research;
 
 namespace XDrishti.Infrastructure;
 
@@ -107,6 +109,7 @@ public static class DependencyInjection
         services.AddInstrumentMaster(configuration);
         services.AddMarketData(configuration);
         services.AddPortfolio(configuration);
+        services.AddSingleton<ISimulationEngine, SimulationEngineAdapter>(); // the simulation library behind its port (ADR 0039): stateless, no I/O
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", HealthStatus.Unhealthy, ["ready"]);
