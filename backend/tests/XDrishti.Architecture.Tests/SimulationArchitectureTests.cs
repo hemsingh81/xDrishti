@@ -115,10 +115,41 @@ public sealed class SimulationArchitectureTests
         TypeNamesIn("XDrishti.Simulation").ShouldNotBeEmpty();
         TypeNamesIn("XDrishti.Simulation.Walking").ShouldNotBeEmpty();
         TypeNamesIn("XDrishti.Simulation.Scanning").ShouldNotBeEmpty();
+        TypeNamesIn("XDrishti.Simulation.Running").ShouldNotBeEmpty();
 
         ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespaceMatching("^XDrishti\\.Simulation$").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Simulation.Walking", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running").GetResult());
         ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Walking").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Simulation.Scanning", "XDrishti.Simulation.Running").GetResult());
         ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Scanning").ShouldNot().HaveDependencyOnAny("XDrishti.Simulation.Walking", "XDrishti.Simulation.Running").GetResult());
+    }
+
+    private static readonly string[] RunningTypes = ["Simulator", "SimulatorBuild", "SimulationResult", "SimulationHeader", "CandidateOutcome", "SimulatorCodes"];
+
+    [Fact]
+    public void The_running_stage_may_use_the_walker_and_the_scanner_and_holds_the_result_types_no_stage_below_it_could_name()
+    {
+        // Running composes the two stages (and so depends on both); the rules above forbid the reverse. The result types hold a type of Walking, so the root namespace cannot be their home (spec P3-03a, scope 2).
+        ShouldHaveNone(Types.InAssembly(Simulation).That().HaveName("Simulator").Should().HaveDependencyOnAll("XDrishti.Simulation.Walking", "XDrishti.Simulation.Scanning").GetResult());
+        ShouldHaveNone(Types.InAssembly(Simulation).That().HaveName(nameof(XDrishti.Simulation.Running.CandidateOutcome)).Should().HaveDependencyOn("XDrishti.Simulation.Walking").GetResult());
+        foreach (var name in RunningTypes)
+        {
+            Simulation.GetTypes().Where(t => t.Name == name).Select(t => t.Namespace).ShouldBe(["XDrishti.Simulation.Running"], name);
+        }
+
+        Simulation.GetTypes().Where(t => t.Namespace != "XDrishti.Simulation.Running").Select(t => t.Name).Intersect(RunningTypes).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void The_running_stage_does_not_reach_the_frame_the_indicators_or_the_bound_side()
+    {
+        ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Running").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators").GetResult());
+    }
+
+    [Fact]
+    public void The_running_rules_do_catch_a_stage_that_reads_another_or_the_indicators()
+    {
+        // Running does use Walking and Scanning, and the scanning stage does use Indicators: the rules that forbid those dependencies to other places fail on them
+        Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Running").ShouldNot().HaveDependencyOnAny("XDrishti.Simulation.Walking").GetResult().IsSuccessful.ShouldBeFalse();
+        Types.InAssembly(Simulation).That().ResideInNamespace("XDrishti.Simulation.Scanning").ShouldNot().HaveDependencyOnAny("XDrishti.Indicators").GetResult().IsSuccessful.ShouldBeFalse();
     }
 
     [Fact]
@@ -217,6 +248,8 @@ public sealed class SimulationArchitectureTests
 
         namespaces.ShouldBeSubsetOf(DocumentedNamespaces);
         namespaces.ShouldContain("XDrishti.Simulation.Scanning");
+        namespaces.ShouldContain("XDrishti.Simulation.Running");
+        namespaces.ShouldContain("XDrishti.Simulation.Walking");
         Assembly.GetAssembly(typeof(XDrishti.Strategies.Problem))!.GetExportedTypes().Select(t => t.Namespace ?? string.Empty).Distinct().Except(DocumentedNamespaces).ShouldNotBeEmpty("the rule can fail");
     }
 

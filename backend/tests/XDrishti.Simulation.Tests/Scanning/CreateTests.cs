@@ -34,22 +34,10 @@ public sealed class CreateTests
         created.Error.Message.ShouldNotBeNullOrWhiteSpace();
     }
 
-    private static StrategyDefinition Swing(Timeframe timeframe) => new(
-        StrategyDefinition.CurrentSchema,
-        "SWING_TEST",
-        Style.Swing,
-        [timeframe],
-        [Side.Buy],
-        [],
-        new SideRules(null, TestStrategies.All("close > 0"), null, new EntrySpec(EntryKind.AtClose), new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(10)), [TestStrategies.Rr(3.0)], null),
-        null,
-        new TimeRules(null, null, null, 5),
-        []);
-
     [Fact]
     public void A_daily_evaluation_is_refused_by_name()
     {
-        var created = EntryScanner.Create(Scan.Compile(Swing(Timeframe.D1), Side.Buy, Timeframe.D1), Scan.Instrument);
+        var created = EntryScanner.Create(Scan.Compile(TestStrategies.Swing(Timeframe.D1), Side.Buy, Timeframe.D1), Scan.Instrument);
 
         created.Error.Code.ShouldBe("simulation.scanner_timeframe_unsupported");
     }
@@ -60,7 +48,7 @@ public sealed class CreateTests
     [InlineData(Timeframe.Mo1)]
     public void A_weekly_or_monthly_evaluation_never_reaches_the_scanner_because_the_compiler_refuses_it(Timeframe timeframe)
     {
-        var compiled = StrategyCompiler.Compile(Swing(timeframe), timeframe, Side.Buy);
+        var compiled = StrategyCompiler.Compile(TestStrategies.Swing(timeframe), timeframe, Side.Buy);
 
         compiled.IsSuccess.ShouldBeFalse();
         compiled.Problems.ShouldContain(p => p.Problem.Code == "strategy.model.bad_timeframe");

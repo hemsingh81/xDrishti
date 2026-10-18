@@ -1,0 +1,348 @@
+engine sim-1
+== F1 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772430000@105.5 reason=Target R=2 mae=0.4 mfe=2 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=86 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=86
+== F2 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772428800@98 reason=Stop R=-1 mae=1 mfe=0.4 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=66 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=66
+== F3 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772427000@98 reason=Stop R=-1 mae=1 mfe=0 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=36 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=36
+== F4 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772424900@98 reason=Stop R=-1 mae=1 mfe=0 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=1 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1
+== F5 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772444700@103 reason=SquareOff R=1 mae=0.6 mfe=1.6 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=331 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=331
+== F6 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772444340@103 reason=EndOfData R=1 mae=0.6 mfe=1.6 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=325 delayed=False stopGap=False targetGap=False
+trades 
+openAtEnd ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+counters Buy bars=355 ignored=0 incomplete=0 decisions=23 lost=0 stale=0 outOfWindow=14 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=355 ignored=0 incomplete=0 decisions=23 lost=0 stale=0 outOfWindow=14 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=325
+== F7 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772444760@103.5 reason=SquareOff R=1.2 mae=0.6 mfe=1.6 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=326 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=369 ignored=0 incomplete=2 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=369 ignored=0 incomplete=2 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=326
+== F8 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+trades 
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=9 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0
+== F9 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=134 decision=2026-03-02 11:30 tf=M15 stop=98 bar=2026-03-02 11:15 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772431200 trigger=M15/1772430300/99/100.5/99/100.5/15000/15/True entry=1772431200@100.5 stop=98 target=105.5 exit=1772444700@100.5 reason=SquareOff R=0 mae=0 mfe=0 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=226 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 11:30
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=226
+== F10 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+trades 
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=9 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0
+== F11 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772428800@98 reason=Stop R=-1 mae=1 mfe=0.4 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=66 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=1 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=2 F=7 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=66
+== F12 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Sell index=29 decision=2026-03-02 09:45 tf=M15 stop=100 bar=2026-03-02 09:30 O=99 H=99 L=97.5 C=97.5 V=15000 minutes=15 complete=True
+  sell.trigger[0] `close < or_low(or_min) and close[1] >= or_low(or_min)` True
+    close@15m [97.5, 99]
+    or_low(15)@15m [98, 98]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Sell date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/99/97.5/97.5/15000/15/True entry=1772424900@97.5 stop=100 target=92.5 exit=1772433000@92.5 reason=Target R=2 mae=0.4 mfe=2 fills=Exact costs=None snapshot=null key=ORB|TEST|Sell|2026-03-02 | examined=136 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Sell|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=9 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=1 F=8 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=136
+== F13 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772426100@98 reason=Stop R=-1 mae=1 mfe=0 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=21 delayed=False stopGap=False targetGap=False
+candidate ORB TEST Sell index=59 decision=2026-03-02 10:15 tf=M15 stop=100 bar=2026-03-02 10:00 O=100.5 H=100.5 L=97.5 C=97.5 V=15000 minutes=15 complete=True
+  sell.trigger[0] `close < or_low(or_min) and close[1] >= or_low(or_min)` True
+    close@15m [97.5, 100.5]
+    or_low(15)@15m [98, 98]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Sell date=2026-03-02 decision=1772426700 trigger=M15/1772425800/100.5/100.5/97.5/97.5/15000/15/True entry=1772426700@97.5 stop=100 target=92.5 exit=1772444700@97.5 reason=SquareOff R=0 mae=0 mfe=0 fills=Exact costs=None snapshot=null key=ORB|TEST|Sell|2026-03-02 | examined=301 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45 ORB|TEST|Sell|2026-03-02@2026-03-02 10:15
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=1 F=8 U=0 N=0
+walk candidates=2 trades=2 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=322
+== F14 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> no-trade EntryThroughStop | examined=1 delayed=False stopGap=False targetGap=False
+trades 
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=1 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1
+== F15 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:46 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=14000 minutes=14 complete=False
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424960 trigger=M15/1772424000/99/100.5/99/100.5/14000/14/False entry=1772424960@100.5 stop=98 target=105.5 exit=1772444700@100.5 reason=SquareOff R=0 mae=0 mfe=0 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=330 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:46
+openAtEnd 
+counters Buy bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=330
+== F16 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=14 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=1000 minutes=1 complete=False
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/1000/1/False entry=1772424900@100.5 stop=98 target=105.5 exit=1772444700@100.5 reason=SquareOff R=0 mae=0 mfe=0 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=331 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=360 ignored=0 incomplete=2 decisions=24 lost=1 stale=0 outOfWindow=16 window=8 fullyReady=8 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=7 U=0 N=0
+counters Sell bars=360 ignored=0 incomplete=2 decisions=24 lost=1 stale=0 outOfWindow=16 window=8 fullyReady=8 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=8 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=1 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=331
+== F17 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424960@100.5 stop=98 target=105.5 exit=1772430000@105.5 reason=Target R=2 mae=0.4 mfe=2 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=85 delayed=True stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:46
+openAtEnd 
+counters Buy bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=1 barsExamined=85
+== F17b-first ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772425200@100.5 stop=98 target=105.5 exit=1772430000@105.5 reason=Target R=2 mae=0.4 mfe=2 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=81 delayed=True stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:50
+openAtEnd 
+counters Buy bars=370 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=370 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=1 barsExamined=81
+== F17b-second ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  -> no-trade NoFillBar | examined=0 delayed=False stopGap=False targetGap=False
+trades 
+openAtEnd 
+counters Buy bars=369 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=369 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=0 noFillBar=1 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0
+== F18 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+trades 
+openAtEnd 
+counters Buy bars=389 ignored=0 incomplete=1 decisions=26 lost=0 stale=1 outOfWindow=15 window=10 fullyReady=10 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=10 U=0 N=0
+counters Sell bars=389 ignored=0 incomplete=1 decisions=26 lost=0 stale=1 outOfWindow=15 window=10 fullyReady=10 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=10 U=0 N=0
+walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0
+== F18b ==
+header engine=sim-1 schema=1 strategy=STALE_TEST fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate STALE_TEST TEST Buy index=14 decision=2026-03-02 09:30 tf=M15 stop=99 bar=2026-03-02 09:15 O=99 H=99 L=99 C=99 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > 0` True
+    close@15m [99]
+  -> no-trade EntryThroughStop | examined=1 delayed=False stopGap=False targetGap=False
+candidate STALE_TEST TEST Buy index=388 decision=2026-03-04 09:30 tf=M15 stop=99 bar=2026-03-04 09:15 O=99 H=99 L=99 C=99 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > 0` True
+    close@15m [99]
+  -> no-trade NoFillBar | examined=0 delayed=False stopGap=False targetGap=False
+trades 
+openAtEnd 
+counters Buy bars=389 ignored=0 incomplete=1 decisions=26 lost=0 stale=1 outOfWindow=0 window=25 fullyReady=25 candidates=2 later=23 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=25 F=0 U=0 N=0
+walk candidates=2 trades=0 noFillBar=1 afterSquareOff=0 entryThroughStop=1 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1
+== F19 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+trades 
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=1 invalidatedDays=1 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+  buy.invalidate[0] T=1 F=24 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0
+== F19b ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  buy.invalidate[0] `low < or_low(or_min)` False
+    low@15m [99]
+    or_low(15)@15m [98]
+  -> trade schema=1 strategy=ORB instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-02 decision=1772424900 trigger=M15/1772424000/99/100.5/99/100.5/15000/15/True entry=1772424900@100.5 stop=98 target=105.5 exit=1772428800@98 reason=Stop R=-1 mae=1 mfe=0.4 fills=Exact costs=None snapshot=null key=ORB|TEST|Buy|2026-03-02 | examined=66 delayed=False stopGap=False targetGap=False
+trades ORB|TEST|Buy|2026-03-02@2026-03-02 09:45
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=1 blocked=0 invalidatedDays=1 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=2 F=7 U=0 N=0
+  buy.invalidate[0] T=1 F=24 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=1 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=66
+== F20 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+trades 
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.setup[0] T=7 F=2 U=0 N=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0
+== F21 ==
+header engine=sim-1 schema=1 strategy=CROSS_VWAP_TEST fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+candidate CROSS_VWAP_TEST TEST Buy index=74 decision=2026-03-05 09:45 tf=M15 stop=99 bar=2026-03-05 09:30 O=99 H=101 L=99 C=101 V=15000 minutes=15 complete=True
+  buy.trigger[0] `crosses_above(close, vwap)` True
+    close@15m [101, 99]
+    vwap@15m [99.66666666666667, 99]
+  -> trade schema=1 strategy=CROSS_VWAP_TEST instrument=00000000-0000-0000-0000-000000000001 symbol=TEST side=Buy date=2026-03-05 decision=1772684100 trigger=M15/1772683200/99/101/99/101/15000/15/True entry=1772684100@101 stop=99 target=105 exit=1772684100@101 reason=EndOfData R=0 mae=0 mfe=0 fills=Exact costs=None snapshot=null key=CROSS_VWAP_TEST|TEST|Buy|2026-03-05 | examined=1 delayed=False stopGap=False targetGap=False
+trades 
+openAtEnd CROSS_VWAP_TEST|TEST|Buy|2026-03-05@2026-03-05 09:45
+counters Buy bars=76 ignored=0 incomplete=0 decisions=5 lost=0 stale=0 outOfWindow=0 window=5 fullyReady=5 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=1 U=3 N=0
+walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=1 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=1
+== F22 ==
+refused simulation.unsupported_stop at buy.stop
+== F23 ==
+header engine=sim-1 schema=1 strategy=ORB fills=Exact costs=None labels=[fills: exact | entry limit: not applied | costs: none | portfolio limits: not simulated | sample: in-sample]
+trades 
+openAtEnd 
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=1 stopNotReady=0 unknownInvalidation=1
+  buy.trigger[0] T=1 F=8 U=0 N=0
+  buy.invalidate[0] T=1 F=22 U=2 N=0
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+walk candidates=0 trades=0 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=0 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=0
