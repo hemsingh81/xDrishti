@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Globalization;
-using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.Indicators;
 using XDrishti.Simulation.Tests.Support;
@@ -16,18 +15,6 @@ namespace XDrishti.Simulation.Tests.Scanning;
 [Collection(ExclusiveRun.Name)]
 public sealed class ScanBenchmarks
 {
-    private const int Sessions = 250;
-
-    /// <summary>250 seeded sessions on consecutive calendar days (the frame does not mind weekends).</summary>
-    private static Bar[] Minutes() =>
-    [
-        .. Enumerable.Range(0, Sessions).SelectMany(i =>
-        {
-            var date = new DateOnly(2026, 1, 5).AddDays(i);
-            return SeededSeries.Of((ulong)(1000 + i)).Take(375).Select((b, m) => b with { EpochSeconds = Day.Epoch(date, SessionClock.OpenMinute + m) });
-        }),
-    ];
-
     private static double MinutesPerSecond(int minutes, Action run)
     {
         run();
@@ -39,7 +26,7 @@ public sealed class ScanBenchmarks
     [Fact(Explicit = true)]
     public void Report_minutes_per_second_for_the_frame_the_scan_of_one_side_and_both_sides()
     {
-        var bars = Minutes();
+        var bars = BenchmarkSessions.Minutes();
         var buy = Scan.Compile(OrbV1.Create(), Side.Buy);
         var sell = Scan.Compile(OrbV1.Create(), Side.Sell);
 

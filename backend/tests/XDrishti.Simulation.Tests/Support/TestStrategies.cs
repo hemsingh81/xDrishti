@@ -68,4 +68,17 @@ internal static class TestStrategies
         null,
         OrbWindow,
         []);
+
+    /// <summary>A swing strategy on the timeframe (a level stop, a fixed reward-risk, held up to five sessions): what the daily evaluation and the swing style refusals are tested with.</summary>
+    public static StrategyDefinition Swing(Timeframe timeframe) => new(
+        StrategyDefinition.CurrentSchema,
+        "SWING_TEST",
+        Style.Swing,
+        [timeframe],
+        [Side.Buy],
+        [],
+        new SideRules(null, All("close > 0"), null, new EntrySpec(EntryKind.AtClose), new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(10)), [Rr(3.0)], null),
+        null,
+        new TimeRules(null, null, null, 5),
+        []);
 }

@@ -59,6 +59,12 @@ and says so on every trade (`fills: exact`, `entry limit: not applied`, `costs: 
 - *Result.* R, MAE and MFE in units of the risk; the minute in which the position leaves counts as ADR 0037 decision D5 says (stop first is assumed because the path inside a minute is unknown). The partial exit, the break-even
   move and the trail of the ticket above are P4 (the entry and the exit are separate stages so that exit policies can be compared on the same entries).
 
+**As the scanner realises the trigger (P3-03a, [ADR 0037](../adr/0037-simulation-conventions-and-the-two-stage-seam.md) Amendment 1).** The entry scanner is the first stage: it asks the sections only at a step where a bar of the evaluation timeframe closed, so "the trigger is true at 09:45" means the 09:30 bar closed at 09:45
+and the order can only be placed in the minute that follows. It makes **at most one candidate per instrument, side and day: the first**; a stop-out does not arm the pattern again, and BUY and SELL are independent (both can have
+a candidate on one day). An `invalidate` that turns true cancels the day's entries not yet taken, and one that turns true after the entry changes nothing. A bar closed late by the first minute of the next date is never traded.
+The scanner makes a candidate with the stop level and the reason (the conditions and the values they read), nothing about the exit; the counters say why a rule did not fire (the day was outside the window, the setup was false,
+the trigger came twice, the invalidation was unknown, the stop had no value yet). The simulator runs `at_close` entries and the stop at the opposite end of the opening range only; the other entry kinds and stops are refused by name (doc 11 §3).
+
 ## 3. Starter library
 
 Each mirrored for SELL where sensible. Most cells will fail qualification — expected and healthy.
@@ -72,6 +78,19 @@ high/low) · `VWAP_PULLBACK` · `VWAP_RECLAIM` · `EMA_PULLBACK` (9/21 EMA with 
 `RS_ROTATION` (strongest stocks in strongest sectors).
 
 **Per-session levels in the rules language.** The intraday cells are built on levels of the session (`ORB`: `or_high` / `or_low`; `PDH_PDL_*` and `GAP_*`: `prev_day.*`, `gap_pct`; `VWAP_*`: `vwap`). These features keep the history of the session only ([ADR 0035](../adr/0035-per-session-features-keep-the-history-of-the-session-only.md), [doc 11](11-strategy-lab.md) §2 *Lags*), so a crossing of one of them (`crosses_above(close, vwap)`) is unknown at the first evaluation of a session and can first be true at the second bar of the timeframe, and unknown never fires an entry; a break through yesterday's high or low is written in the level form (`close > prev_day.high and close[1] <= prev_day.high`), which is known from the first bar and also catches a gap through the level. A valid window such as the `ORB` 09:30–11:30 (a `time` comparison) is a trading rule, not a guard the language needs to stay correct. On 1D (the swing cells) nothing restarts and a lag is by position; on 1h the intraday rule holds.
+
+**`ORB` v1 as built (P3-03a, `OrbV1.Create(orMinutes = 15, rewardRisk = 2.0)` in `XDrishti.Strategies.BuiltIn`).** The first rule set the simulator runs, approved by the owner on 2026-10-18 as a **bare breakout**: the filters of the ticket above (NR7 yesterday, relative volume, trend) are added one at a time after the first hand check of its trades. Id `ORB`, intraday, evaluated on 5m or 15m (the 10m and 30m cells do not compile with a 15-minute opening range: not applicable), BUY and SELL, one parameter `or_min = 15`, entry at the close of the trigger bar (realised as above: the open of the next minute), no setup, no invalidate, no filters, the stop on the opposite end of the opening range (`or_opposite`, no buffer), exactly one `FIXED_RR` exit with `rr = 2.0` (the square-off at 15:15 is always on), entries accepted from 09:30 to 11:30.
+
+| Side | Trigger (one condition) | Stop |
+|------|-------------------------|------|
+| BUY | `close > or_high(or_min) and close[1] <= or_high(or_min)` | `or_low(or_min)` |
+| SELL (written out by hand, the automatic mirror is P3-02e) | `close < or_low(or_min) and close[1] >= or_low(or_min)` | `or_high(or_min)` |
+
+A 15-minute bar closes above the high of the first 15 minutes while the bar before it did not (SELL: below the low). The level form is used because `or_high` keeps the history of the session only (above): the level is read at lag 0 and
+the lagged series is the close, so the condition is known from the first bar of the day, and a trigger that is false on the first bar is False, not unknown. On 15m the opening range is the first bar; `or_min = 30` is two bars, and
+`or_min = 20` is refused on 15m (not a whole number of bars). The target is two times the risk by default and the walker takes the entry at the open of the minute after the decision, so a breakout that gaps through the opposite
+end of the range at that open is no trade (`EntryThroughStop`, counted). A figure from the simulator for this strategy is a signal-level result per instrument, in-sample, with exact fills, no entry limit and no costs.
+The builder is the interim source of the built-in `ORB` until P3-02d seeds it as stored text (ADR 0002); the stored text and its hash then replace it as the version.
 
 ## 4. Multi-timeframe mapping
 

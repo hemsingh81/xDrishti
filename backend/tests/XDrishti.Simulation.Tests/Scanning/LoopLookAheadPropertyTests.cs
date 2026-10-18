@@ -50,38 +50,6 @@ public sealed class LoopLookAheadPropertyTests
         return snapshot ?? throw new InvalidOperationException("The cut is outside the list.");
     }
 
-    /// <summary>The bars after <paramref name="k"/> replaced by zero and huge prices and volumes, the epochs unchanged.</summary>
-    private static Bar[] Replaced(Bar[] bars, int k, ulong seed)
-    {
-        var rng = new SeededSeries(seed ^ 0xABCDEF);
-        var copy = (Bar[])bars.Clone();
-        for (var i = k + 1; i < copy.Length; i++)
-        {
-            copy[i] = rng.Int(4) switch
-            {
-                0 => new Bar(copy[i].EpochSeconds, 0, 0, 0, 0, 0),
-                1 => new Bar(copy[i].EpochSeconds, 1e12, 1e12, 1e12, 1e12, long.MaxValue / 4),
-                2 => new Bar(copy[i].EpochSeconds, 1e12, 1e12, 0, 0.25, 0),
-                _ => new Bar(copy[i].EpochSeconds, 0.25, 1e9, 0.25, 1e9, 1),
-            };
-        }
-
-        return copy;
-    }
-
-    /// <summary>The peeking feed: bar <i>i</i> gets the open, high, low, close and volume of bar <i>i</i>+1 with its own epoch; the last bar keeps its own.</summary>
-    private static Bar[] Peeking(Bar[] bars)
-    {
-        var result = new Bar[bars.Length];
-        for (var i = 0; i < result.Length; i++)
-        {
-            var source = i + 1 < bars.Length ? bars[i + 1] : bars[i];
-            result[i] = new Bar(bars[i].EpochSeconds, source.Open, source.High, source.Low, source.Close, source.Volume);
-        }
-
-        return result;
-    }
-
     /// <summary>The cuts of a seed: a random one, and for the first candidate of the full run its own bar and the bar before it.</summary>
     private static List<int> Cuts(ulong seed, int length, IReadOnlyList<EntryCandidate> candidates)
     {
@@ -109,7 +77,7 @@ public sealed class LoopLookAheadPropertyTests
         {
             var expected = RunTo(side, fullFeed, k);
             var removed = RunTo(side, feed([.. bars.Take(k + 1)]), k);
-            var replaced = RunTo(side, feed(Replaced(bars, k, seed)), k);
+            var replaced = RunTo(side, feed(Feeds.Replaced(bars, k, seed)), k);
 
             violated |= !Same(expected, removed) || !Same(expected, replaced);
         }
@@ -187,7 +155,7 @@ public sealed class LoopLookAheadPropertyTests
             var compiled = CompiledOrb(side);
             foreach (var seed in Seeds)
             {
-                reported += Violated(compiled, seed, Peeking, out _) ? 1 : 0;
+                reported += Violated(compiled, seed, Feeds.Peeking, out _) ? 1 : 0;
                 honest += Violated(compiled, seed, bars => bars, out _) ? 1 : 0;
             }
         }
