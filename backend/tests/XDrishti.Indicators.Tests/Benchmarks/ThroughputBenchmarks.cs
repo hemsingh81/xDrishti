@@ -8,7 +8,7 @@ namespace XDrishti.Indicators.Tests.Benchmarks;
 /// A small benchmark harness without BenchmarkDotNet. The tests are <b>explicit</b>: <c>dotnet test</c> and <c>scripts/check.sh</c> skip them. Run them in Release:
 /// <c>dotnet test --project tests/XDrishti.Indicators.Tests -c Release -- --explicit only --filter-class "*ThroughputBenchmarks*"</c>.
 /// They print updates per second per indicator (through <see cref="IIndicator"/>, the P3-01 ones and the P3-01b ones), the bars per second of every timeframe builder (the weekly and monthly ones included) and the microseconds of
-/// one step of a 12-feature, of a 20-feature, of a 20-feature frame with six calendar and market-context features and of a 28-feature (1m, 1h, 1D, 1W, 1M lanes) <see cref="FeatureFrame"/> with history depth 8, and
+/// one step of a 12-feature, of a 20-feature, of a 20-feature frame with six calendar and market-context features, of a 28-feature (1m, 1h, 1D, 1W, 1M lanes) and of an 81-handle (the twelve per-session names on every intraday lane, ADR 0035) <see cref="FeatureFrame"/> with history depth 8, and
 /// assert only the floors of the specs (10 million updates per second per core for each indicator, 1 microsecond per 1-minute step of the frames).
 /// </summary>
 [Collection(ExclusiveRun.Name)]
@@ -139,6 +139,26 @@ public sealed class ThroughputBenchmarks
         var microseconds = 1e6 / rate;
         Report("FeatureFrame, 12 features on 1m/5m/15m/1h (best of " + Repeats + ")", [$"{rate / 1e6,8:F2} M steps/s   {microseconds,6:F3} µs per 1-minute step"]);
         microseconds.ShouldBeLessThan(1.0, "target: a frame of 12 features in at most 1 microsecond per step");
+    }
+
+    [Fact(Explicit = true)]
+    public void Frame_with_the_twelve_restarting_names_on_every_intraday_lane_step_in_microseconds()
+    {
+        var frame = AllocationTests.TwelveRestartingNamesFrame();
+        var rate = BestRate(() =>
+        {
+            frame.Reset();
+            for (var i = 0; i < Steps; i++)
+            {
+                frame.Step(Bars[i]);
+            }
+
+            return frame.Count;
+        });
+
+        var microseconds = 1e6 / rate;
+        Report("FeatureFrame, the 12 restarting names on 1m/5m/10m/15m/30m/1h and 9 on 1D (81 handles), history depth 8 (best of " + Repeats + ")", [$"{rate / 1e6,8:F2} M steps/s   {microseconds,6:F3} µs per 1-minute step"]);
+        microseconds.ShouldBeLessThan(1.0, "target: a frame of 81 handles in at most 1 microsecond per step");
     }
 
     [Fact(Explicit = true)]

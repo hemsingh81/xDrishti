@@ -21,7 +21,7 @@ public sealed class MultiFaultOrderTests
             result.Problems,
             new Expected(LintCodes.UnknownName, "closee", "close"),
             new Expected(LintCodes.BadArguments, "0"),
-            new Expected(LintCodes.NegativeOrZeroLag, "0", "close", Nth: 1),
+            new Expected(LintCodes.NegativeOrZeroLag, "close[0]", "close"),
             new Expected(LintCodes.MixedTimeframesInLag, "crosses_above(close, tf(\"1D\").ema(20))", "close > tf(\"1D\").ema(20) and close[1] <= tf(\"1D\").ema(20)"),
             new Expected(LintCodes.BadTimeLiteral, "\"9:45\"", "\"09:45\""),
             new Expected(LintCodes.LagTooDeep, "rising(close, 300)"),

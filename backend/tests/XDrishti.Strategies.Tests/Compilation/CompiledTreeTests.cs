@@ -10,9 +10,10 @@ namespace XDrishti.Strategies.Tests.Compilation;
 
 /// <summary>
 /// The structural guarantee behind "a compiled condition cannot look ahead", tested on the expression trees themselves: the truncation property (<see cref="Evaluation.LookAheadPropertyTests"/>) shows that the feed of the
-/// frame is honest, but it cannot fail for a wrong compiler, because a compiled condition is a pure function of the frame as it is at the step. What keeps the compiler honest is that a tree can only call the
-/// kernel, only reach the frame through the three doors (value, value some bars ago, clock), hold nothing but numbers, and never read a feature nearer than written (<see cref="ExpressionAudit"/>). Checked on hand-written
-/// conditions that use every construct and on thousands of generated ones, with negative controls that show each rule can fail.
+/// frame is honest, but it cannot fail for a wrong compiler, because a compiled condition is a pure function of the frame as it is at the step. What keeps the compiler from reading the future is that a tree can only call the
+/// kernel, only reach the frame through the three doors (value, value some bars ago, clock), hold nothing but numbers, and read no negative lag (<see cref="ExpressionAudit"/>). That a lag is <i>exactly</i> the one written
+/// is not what the audit proves: it is held by the interpreter oracle and the hand examples (the mutant control in <see cref="Evaluation.InterpreterOracleTests"/> shows they notice a lag or a clock that is wrong).
+/// Checked on hand-written conditions that use every construct and on thousands of generated ones, with negative controls that show each rule can fail.
 /// </summary>
 public sealed class CompiledTreeTests
 {
@@ -24,7 +25,8 @@ public sealed class CompiledTreeTests
 
     public static TheoryData<Timeframe> Evaluations { get; } = [.. Timeframes.All];
 
-    private static readonly string[] Written =
+    /// <summary>Conditions that use every construct of the language; also the conditions the run-cost gate (<see cref="RunCostTests"/>) counts the loops of.</summary>
+    internal static readonly string[] Written =
     [
         "close > 100", "close[2] > close", "rsi(14) > 55 and close > ema(20)", "not (rsi(14) > 55) or close < open", "crosses_above(close, vwap)", "crosses_below(tf(\"1h\").close[3], tf(\"1h\").ema(20))",
         "rising(close, 4)", "falling(close[3] + open, 6)", "between(close, 100, 200)", "abs(close - open) > min(high - low, 10) * max(1, 2)", "close / (high - low) > 1", "-close < -100 or (close > 1) == (open > 1)",
@@ -34,7 +36,7 @@ public sealed class CompiledTreeTests
 
     [Theory]
     [MemberData(nameof(Evaluations))]
-    public void The_written_conditions_call_only_the_kernel_reach_the_frame_through_its_three_doors_and_never_read_nearer_than_written(Timeframe evaluation)
+    public void The_written_conditions_call_only_the_kernel_reach_the_frame_through_its_three_doors_and_read_no_negative_lag(Timeframe evaluation)
     {
         var audited = 0;
         foreach (var source in Written)
@@ -71,7 +73,7 @@ public sealed class CompiledTreeTests
 
     [Theory]
     [MemberData(nameof(Evaluations))]
-    public void The_generated_conditions_call_only_the_kernel_reach_the_frame_through_its_three_doors_and_never_read_nearer_than_written(Timeframe evaluation)
+    public void The_generated_conditions_call_only_the_kernel_reach_the_frame_through_its_three_doors_and_read_no_negative_lag(Timeframe evaluation)
     {
         var violations = new List<string>();
         var methods = new HashSet<string>();
@@ -132,7 +134,7 @@ public sealed class CompiledTreeTests
 
         foreach (var tree in new[] { negative, subtracted, negated })
         {
-            ExpressionAudit.Of(tree).Violations.ShouldContain(v => v.Contains("nearer than the one written", StringComparison.Ordinal));
+            ExpressionAudit.Of(tree).Violations.ShouldContain(v => v.Contains("below zero", StringComparison.Ordinal));
         }
     }
 

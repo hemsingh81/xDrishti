@@ -1,0 +1,250 @@
+engine sim-3
+== F1 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F1 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F2 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F2 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F3 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F3 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F4 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F4 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F5 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F5 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F6 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=355 ignored=0 incomplete=0 decisions=23 lost=0 stale=0 outOfWindow=14 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F6 Sell ==
+counters Sell bars=355 ignored=0 incomplete=0 decisions=23 lost=0 stale=0 outOfWindow=14 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F7 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=369 ignored=0 incomplete=2 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F7 Sell ==
+counters Sell bars=369 ignored=0 incomplete=2 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F8 Buy ==
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=9 U=0 N=0
+== F8 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F9 Buy ==
+candidate ORB TEST Buy index=134 decision=2026-03-02 11:30 tf=M15 stop=98 bar=2026-03-02 11:15 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F9 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F10 Buy ==
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=9 U=0 N=0
+== F10 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F11 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=1 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=2 F=7 U=0 N=0
+== F11 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F12 Buy ==
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=9 U=0 N=0
+== F12 Sell ==
+candidate ORB TEST Sell index=29 decision=2026-03-02 09:45 tf=M15 stop=100 bar=2026-03-02 09:30 O=99 H=99 L=97.5 C=97.5 V=15000 minutes=15 complete=True
+  sell.trigger[0] `close < or_low(or_min) and close[1] >= or_low(or_min)` True
+    close@15m [97.5, 99]
+    or_low(15)@15m [98, 98]
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=1 F=8 U=0 N=0
+== F13 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F13 Sell ==
+candidate ORB TEST Sell index=59 decision=2026-03-02 10:15 tf=M15 stop=100 bar=2026-03-02 10:00 O=100.5 H=100.5 L=97.5 C=97.5 V=15000 minutes=15 complete=True
+  sell.trigger[0] `close < or_low(or_min) and close[1] >= or_low(or_min)` True
+    close@15m [97.5, 100.5]
+    or_low(15)@15m [98, 98]
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=1 F=8 U=0 N=0
+== F14 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F14 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F15 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:46 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=14000 minutes=14 complete=False
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F15 Sell ==
+counters Sell bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F16 Buy ==
+candidate ORB TEST Buy index=14 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=1000 minutes=1 complete=False
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=360 ignored=0 incomplete=2 decisions=24 lost=1 stale=0 outOfWindow=16 window=8 fullyReady=8 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=7 U=0 N=0
+== F16 Sell ==
+counters Sell bars=360 ignored=0 incomplete=2 decisions=24 lost=1 stale=0 outOfWindow=16 window=8 fullyReady=8 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=8 U=0 N=0
+== F17 Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F17 Sell ==
+counters Sell bars=374 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F17b-first Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=370 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F17b-first Sell ==
+counters Sell bars=370 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F17b-second Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+counters Buy bars=369 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F17b-second Sell ==
+counters Sell bars=369 ignored=0 incomplete=1 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F18 Buy ==
+counters Buy bars=389 ignored=0 incomplete=1 decisions=26 lost=0 stale=1 outOfWindow=15 window=10 fullyReady=10 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=0 F=10 U=0 N=0
+== F18 Sell ==
+counters Sell bars=389 ignored=0 incomplete=1 decisions=26 lost=0 stale=1 outOfWindow=15 window=10 fullyReady=10 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=10 U=0 N=0
+== F18b Buy ==
+candidate STALE_TEST TEST Buy index=14 decision=2026-03-02 09:30 tf=M15 stop=99 bar=2026-03-02 09:15 O=99 H=99 L=99 C=99 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > 0` True
+    close@15m [99]
+candidate STALE_TEST TEST Buy index=388 decision=2026-03-04 09:30 tf=M15 stop=99 bar=2026-03-04 09:15 O=99 H=99 L=99 C=99 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > 0` True
+    close@15m [99]
+counters Buy bars=389 ignored=0 incomplete=1 decisions=26 lost=0 stale=1 outOfWindow=0 window=25 fullyReady=25 candidates=2 later=23 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=25 F=0 U=0 N=0
+== F19 Buy ==
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=1 invalidatedDays=1 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+  buy.invalidate[0] T=1 F=24 U=0 N=0
+== F19 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F19b Buy ==
+candidate ORB TEST Buy index=29 decision=2026-03-02 09:45 tf=M15 stop=98 bar=2026-03-02 09:30 O=99 H=100.5 L=99 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > or_high(or_min) and close[1] <= or_high(or_min)` True
+    close@15m [100.5, 99]
+    or_high(15)@15m [100, 100]
+  buy.invalidate[0] `low < or_low(or_min)` False
+    low@15m [99]
+    or_low(15)@15m [98]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=1 blocked=0 invalidatedDays=1 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=2 F=7 U=0 N=0
+  buy.invalidate[0] T=1 F=24 U=0 N=0
+== F19b Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F20 Buy ==
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.setup[0] T=7 F=2 U=0 N=0
+  buy.trigger[0] T=1 F=8 U=0 N=0
+== F20 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0
+== F21 Buy ==
+candidate CROSS_VWAP_TEST TEST Buy index=74 decision=2026-03-05 09:45 tf=M15 stop=99 bar=2026-03-05 09:30 O=99 H=101 L=99 C=101 V=15000 minutes=15 complete=True
+  buy.trigger[0] `crosses_above(close, vwap)` True
+    close@15m [101, 99]
+    vwap@15m [99.66666666666667, 99]
+counters Buy bars=76 ignored=0 incomplete=0 decisions=5 lost=0 stale=0 outOfWindow=0 window=5 fullyReady=5 candidates=1 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  buy.trigger[0] T=1 F=1 U=3 N=0
+== F22 Buy ==
+candidate STOP_NOT_READY_TEST TEST Buy index=44 decision=2026-03-02 10:00 tf=M15 stop=98 bar=2026-03-02 09:45 O=100.5 H=100.5 L=100.5 C=100.5 V=15000 minutes=15 complete=True
+  buy.trigger[0] `close > 0` True
+    close@15m [100.5]
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=1 later=6 blocked=0 invalidatedDays=0 stopNotReady=2 unknownInvalidation=0
+  buy.trigger[0] T=9 F=0 U=0 N=0
+== F23 Buy ==
+counters Buy bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=1 stopNotReady=0 unknownInvalidation=1
+  buy.trigger[0] T=1 F=8 U=0 N=0
+  buy.invalidate[0] T=1 F=22 U=2 N=0
+== F23 Sell ==
+counters Sell bars=375 ignored=0 incomplete=0 decisions=25 lost=0 stale=0 outOfWindow=16 window=9 fullyReady=9 candidates=0 later=0 blocked=0 invalidatedDays=0 stopNotReady=0 unknownInvalidation=0
+  sell.trigger[0] T=0 F=9 U=0 N=0

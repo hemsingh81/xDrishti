@@ -159,24 +159,16 @@ internal sealed partial class Binder
         return UnknownName(name, true, call.Span, BindForDiagnostics(call.Arguments));
     }
 
-    /// <summary><c>close[1]</c>: the feature some closed bars of its own timeframe ago, 1 or more.</summary>
+    /// <summary>
+    /// <c>close[1]</c>: the feature some closed bars of its own timeframe ago, 1 or more. The target is bound first, so that its own problems come first; a lag that is not usable is reported after them (see
+    /// <see cref="ReportUnusableLag"/>).
+    /// </summary>
     private IBoundExpression BindSubscript(Subscript subscript)
     {
-        var lagOk = subscript.Lag > 0;
-        if (!lagOk)
-        {
-            scope.Error(
-                LintCodes.NegativeOrZeroLag,
-                subscript.Lag == 0
-                    ? "A subscript counts closed bars back and must be a whole number from 1 up; " + scope.Quoted(subscript.Span) + " is just " + scope.Quoted(subscript.Target.Span) + "."
-                    : "A subscript counts closed bars back and must be a whole number from 1 up; " + scope.Quoted(subscript.LagSpan) + " would read the future.",
-                subscript.LagSpan,
-                subscript.Lag == 0 ? scope.Text(subscript.Target.Span) : null);
-        }
-
         var target = BindReference(subscript.Target);
         if (target.Type == BoundType.Invalid)
         {
+            ReportUnusableLag(subscript, false);
             return new BoundInvalid(subscript.Span);
         }
 
@@ -189,10 +181,34 @@ internal sealed partial class Binder
                 "A subscript reads a feature some closed bars ago, but " + scope.Quoted(subscript.Target.Span) + " is " + kind
                     + ", not a feature. Use crosses_above, crosses_below, rising or falling to compare with an earlier value, or write the feature twice.",
                 subscript.Target.Span);
+            ReportUnusableLag(subscript, true);
             return new BoundInvalid(subscript.Span, [target]);
         }
 
-        return lagOk ? Lagged(feature, subscript) : new BoundInvalid(subscript.Span, [feature]);
+        ReportUnusableLag(subscript, true);
+        return subscript.Lag > 0 ? Lagged(feature, subscript) : new BoundInvalid(subscript.Span, [feature]);
+    }
+
+    /// <summary>
+    /// Reports a subscript that is not a whole number from 1 up. A subscript of zero (<c>close[0]</c>, <c>close[-0]</c>, <c>close[00]</c>) is the target itself: the span is the whole subscript and the suggestion is the target as
+    /// written, so that replacing the span with the suggestion is the fix, and the target gives no suggestion when it could not be bound (<c>closee[0]</c> has the problem of <c>closee</c> to fix first, and its text
+    /// would overlap that problem). A negative lag would read the future: the span is the number, and there is nothing to suggest.
+    /// </summary>
+    private void ReportUnusableLag(Subscript subscript, bool targetBound)
+    {
+        if (subscript.Lag > 0)
+        {
+            return;
+        }
+
+        var zero = subscript.Lag == 0;
+        scope.Error(
+            LintCodes.NegativeOrZeroLag,
+            zero
+                ? "A subscript counts closed bars back and must be a whole number from 1 up; " + scope.Quoted(subscript.Span) + " is just " + scope.Quoted(subscript.Target.Span) + "."
+                : "A subscript counts closed bars back and must be a whole number from 1 up; " + scope.Quoted(subscript.LagSpan) + " would read the future.",
+            zero ? subscript.Span : subscript.LagSpan,
+            zero && targetBound ? scope.Text(subscript.Target.Span) : null);
     }
 
     private static BoundFeature Lagged(BoundFeature feature, Subscript subscript) => feature with { Lag = subscript.Lag, Span = subscript.Span };

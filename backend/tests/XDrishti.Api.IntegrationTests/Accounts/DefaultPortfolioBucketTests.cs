@@ -14,7 +14,7 @@ public sealed class DefaultPortfolioBucketTests(ApiFactory factory) : IAsyncLife
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     private static readonly object PortfolioOn = new { portfolio = new { enabled = true } };
 

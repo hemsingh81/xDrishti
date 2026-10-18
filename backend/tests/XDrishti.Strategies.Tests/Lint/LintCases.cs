@@ -95,7 +95,19 @@ internal static class LintCases
         ["unsupported_timeframe: a date feature on 1h"] = C("tf(\"1h\").vix > 0", E(UnsupportedTimeframe, "\"1h\"")),
 
         // negative_or_zero_lag
-        ["negative_or_zero_lag: a subscript of zero"] = C("close[0] > 1", E(NegativeOrZeroLag, "0", "close")),
+        // a subscript of zero is refused as a whole: the span is `close[0]` and the suggestion `close` replaces it (a negative lag keeps the number as its span and has no suggestion)
+        ["negative_or_zero_lag: a subscript of zero"] = C("close[0] > 1", E(NegativeOrZeroLag, "close[0]", "close")),
+        ["negative_or_zero_lag: a subscript of minus zero"] = C("close[-0] > 1", E(NegativeOrZeroLag, "close[-0]", "close")),
+        ["negative_or_zero_lag: a subscript of two zeros"] = C("close[00] > 1", E(NegativeOrZeroLag, "close[00]", "close")),
+        ["negative_or_zero_lag: a subscript of zero on a dotted feature"] = C("prev_day.high[0] > 1", E(NegativeOrZeroLag, "prev_day.high[0]", "prev_day.high")),
+        ["negative_or_zero_lag: a subscript of zero on a qualified feature"] = C("tf(\"1h\").close[0] > 1", E(NegativeOrZeroLag, "tf(\"1h\").close[0]", "tf(\"1h\").close")),
+
+        // the problem of the target comes first (it is found first and starts where the subscript starts), and a target that could not be bound has no suggestion to offer: `closee` would overlap its own problem
+        ["negative_or_zero_lag: a subscript of zero on an unknown name has no suggestion"] = C("closee[0] > 1", E(UnknownName, "closee", "close"), E(NegativeOrZeroLag, "closee[0]")),
+        ["negative_or_zero_lag: a subscript of zero on a feature of a timeframe that does not exist"] = C(
+            "tf(\"2h\").close[0] > 1", E(NegativeOrZeroLag, "tf(\"2h\").close[0]"), E(UnsupportedTimeframe, "\"2h\"", "\"1h\"")),
+        ["negative_or_zero_lag: a subscript of zero on a name that is not a feature"] = P(
+            "rsi_len[0] > 1", Params(("rsi_len", 14)), E(LagOnNonFeature, "rsi_len"), E(NegativeOrZeroLag, "rsi_len[0]", "rsi_len")),
         ["negative_or_zero_lag: a negative subscript"] = C("close[-1] > 1", E(NegativeOrZeroLag, "-1")),
         ["negative_or_zero_lag: a rising count of zero"] = C("rising(close, 0)", E(NegativeOrZeroLag, "0")),
         ["negative_or_zero_lag: a rising count that is not whole"] = C("rising(close, 1.5)", E(NegativeOrZeroLag, "1.5")),
@@ -107,14 +119,15 @@ internal static class LintCases
         ["lag_too_deep: a huge subscript"] = C("close[100000] > 1", E(LagTooDeep, "close[100000]")),
         ["lag_too_deep: a rising count of 256"] = C("rising(close, 256)", E(LagTooDeep, "rising(close, 256)")),
         ["lag_too_deep: lags that add up inside rising"] = C("rising(close[200], 100)", E(LagTooDeep, "rising(close[200], 100)")),
+        // the vwap of the first crossing is read one bar back (15 minutes): no warning; the second reads it 255 + 1 bars of 15m back, far more than a session holds (25 bars)
         ["lag_too_deep: the extra lag of a crossing"] = C(
-            "crosses_above(close[255], vwap)", E(LagTooDeep, "crosses_above(close[255], vwap)"), W(LagAcrossSession, "crosses_above(close[255], vwap)")),
+            "crosses_above(close[255], vwap)", E(LagTooDeep, "crosses_above(close[255], vwap)")),
         ["lag_too_deep: the extra lag of a downward crossing"] = C(
             "crosses_below(close, vwap[255])", E(LagTooDeep, "crosses_below(close, vwap[255])"), W(LagAcrossSession, "crosses_below(close, vwap[255])")),
         ["lag_too_deep: two places"] = C("close[300] > 1 and close[400] > 1", E(LagTooDeep, "close[300]"), E(LagTooDeep, "close[400]")),
 
         ["lag_too_deep: a type error in a side does not hide the depth of a crossing"] = C(
-            "crosses_above(close[255] + true, vwap)", E(LagTooDeep, "crosses_above(close[255] + true, vwap)"), W(LagAcrossSession, "crosses_above(close[255] + true, vwap)"), E(TypeMismatch, "true")),
+            "crosses_above(close[255] + true, vwap)", E(LagTooDeep, "crosses_above(close[255] + true, vwap)"), E(TypeMismatch, "true")),
         ["lag_too_deep: a type error in the operand does not hide the depth of rising"] = C(
             "rising(close[250] + true, 10)", E(LagTooDeep, "rising(close[250] + true, 10)"), E(TypeMismatch, "true")),
 
@@ -152,7 +165,6 @@ internal static class LintCases
             "rising(close + tf(\"1h\").close - vix, 2)", E(MixedTimeframesInLag, "rising(close + tf(\"1h\").close - vix, 2)")),
         ["mixed_timeframes_in_lag: only the second crossing mixes"] = C(
             "crosses_above(close, vwap) and crosses_above(close, tf(\"1W\").close)",
-            W(LagAcrossSession, "crosses_above(close, vwap)"),
             E(MixedTimeframesInLag, "crosses_above(close, tf(\"1W\").close)", "close > tf(\"1W\").close and close[1] <= tf(\"1W\").close")),
 
         // a fault in one part of a call does not hide the clock rules for the rest of it: both are reported together, whichever is fixed first
@@ -169,33 +181,24 @@ internal static class LintCases
         ["mixed_timeframes_in_lag: a type error in the operand does not hide the mix in rising"] = C(
             "rising(close + true + tf(\"1h\").close, 2)", E(MixedTimeframesInLag, "rising(close + true + tf(\"1h\").close, 2)"), E(TypeMismatch, "true")),
 
-        // lag_across_session (warning)
-        ["lag_across_session: the crossing of the close and the vwap"] = C("crosses_above(close, vwap)", W(LagAcrossSession, "crosses_above(close, vwap)")),
-        ["lag_across_session: a downward crossing on a 1m strategy"] = On(Timeframe.M1, "crosses_below(close, vwap)", W(LagAcrossSession, "crosses_below(close, vwap)")),
-        ["lag_across_session: the crossing written out lags the vwap by hand"] = C("close > vwap and close[1] <= vwap[1]", W(LagAcrossSession, "vwap[1]")),
-        ["lag_across_session: a lone subscript of two bars"] = C("close > vwap[2]", W(LagAcrossSession, "vwap[2]")),
-        ["lag_across_session: three bars of rising on a 5m strategy"] = On(Timeframe.M5, "rising(vwap, 3)", W(LagAcrossSession, "rising(vwap, 3)")),
-        ["lag_across_session: the open of the day on an hourly strategy"] = On(Timeframe.H1, "crosses_above(close, today_open)", W(LagAcrossSession, "crosses_above(close, today_open)")),
-        ["lag_across_session: the high of the previous day"] = C("crosses_above(close, prev_day.high)", W(LagAcrossSession, "crosses_above(close, prev_day.high)")),
-        ["lag_across_session: two features in one call give one warning"] = C("rising(vwap - today_open, 2)", W(LagAcrossSession, "rising(vwap - today_open, 2)")),
+        // lag_across_session (warning): a read from further back than a session holds (k bars of T minutes with k · T at least 375), whatever the strategy's timeframe; 25 bars of 15m, 75 of 5m, 7 of 1h
+        ["lag_across_session: the first subscript that a 5m session cannot hold"] = On(Timeframe.M5, "close > vwap[75]", W(LagAcrossSession, "vwap[75]")),
+        ["lag_across_session: the first count that an hourly session cannot hold"] = On(Timeframe.H1, "rising(vwap, 7)", W(LagAcrossSession, "rising(vwap, 7)")),
+        ["lag_across_session: the first count that a 5m session cannot hold"] = On(Timeframe.M5, "rising(vwap, 75)", W(LagAcrossSession, "rising(vwap, 75)")),
+        ["lag_across_session: the first count that a 15m session cannot hold"] = C("falling(today_low, 25)", W(LagAcrossSession, "falling(today_low, 25)")),
+        ["lag_across_session: a subscript on 1m at the whole session"] = On(Timeframe.M1, "close > vwap[375]", E(LagTooDeep, "vwap[375]"), W(LagAcrossSession, "vwap[375]")),
+        ["lag_across_session: a 5m feature read on a daily strategy"] = On(Timeframe.D1, "tf(\"5m\").vwap[80] > 0", W(LagAcrossSession, "tf(\"5m\").vwap[80]")),
+        ["lag_across_session: a time check does not clear a read that is never known"] = C(
+            "rising(vwap, 25) and time >= \"10:00\"", W(LagAcrossSession, "rising(vwap, 25)")),
+        ["lag_across_session: the extra lag of a crossing counts"] = On(Timeframe.M5, "crosses_above(close, vwap[74])", W(LagAcrossSession, "crosses_above(close, vwap[74])")),
+        ["lag_across_session: the lags of a subscript and of rising add up"] = C("rising(vwap[20], 5)", W(LagAcrossSession, "rising(vwap[20], 5)")),
+        ["lag_across_session: two features in one call give one warning"] = C("rising(vwap - today_open, 25)", W(LagAcrossSession, "rising(vwap - today_open, 25)")),
         ["lag_across_session: two calls give two warnings"] = C(
-            "crosses_above(close, vwap) and rising(today_low, 2)", W(LagAcrossSession, "crosses_above(close, vwap)"), W(LagAcrossSession, "rising(today_low, 2)")),
-        ["lag_across_session: a feature of another timeframe"] = C("crosses_above(tf(\"1h\").close, tf(\"1h\").vwap)", W(LagAcrossSession, "crosses_above(tf(\"1h\").close, tf(\"1h\").vwap)")),
-        ["lag_across_session: an opening range of a single bar"] = C("crosses_above(close, or_high(15))", W(LagAcrossSession, "crosses_above(close, or_high(15))")),
-        ["lag_across_session: a 1m feature read as far back as the first evaluation of a 15m strategy"] = C("rising(tf(\"1m\").vwap, 15)", W(LagAcrossSession, "rising(tf(\"1m\").vwap, 15)")),
-        ["lag_across_session: the last bar of an hourly session is the first that clears six bars"] = On(Timeframe.H1, "rising(vwap, 6)", W(LagAcrossSession, "rising(vwap, 6)")),
-        ["lag_across_session: no bar of an hourly session is far enough from its open for seven bars"] = On(Timeframe.H1, "rising(vwap, 7)", W(LagAcrossSession, "rising(vwap, 7)")),
-        ["lag_across_session: a type error in an operand does not hide it"] = C("crosses_above(close + true, vwap)", W(LagAcrossSession, "crosses_above(close + true, vwap)"), E(TypeMismatch, "true")),
-        ["lag_across_session: a check of the time that comes too early does not clear it"] = C(
-            "crosses_above(close, vwap) and time >= \"09:30\"", W(LagAcrossSession, "crosses_above(close, vwap)")),
-        ["lag_across_session: a check of the time under or does not clear it"] = C(
-            "crosses_above(close, vwap) or time >= \"09:45\"", W(LagAcrossSession, "crosses_above(close, vwap)")),
-        ["lag_across_session: a check of the time under not does not clear it"] = C(
-            "crosses_above(close, vwap) and not time >= \"09:45\"", W(LagAcrossSession, "crosses_above(close, vwap)")),
-        ["lag_across_session: a check of the time that is an upper bound does not clear it"] = C(
-            "crosses_above(close, vwap) and time <= \"14:00\"", W(LagAcrossSession, "crosses_above(close, vwap)")),
-        ["lag_across_session: a check that clears one call and not the other"] = C(
-            "crosses_above(close, vwap) and rising(today_low, 8) and time >= \"10:00\"", W(LagAcrossSession, "rising(today_low, 8)")),
+            "rising(vwap, 25) and rising(today_low, 30)", W(LagAcrossSession, "rising(vwap, 25)"), W(LagAcrossSession, "rising(today_low, 30)")),
+        ["lag_across_session: a feature of another timeframe"] = C("rising(tf(\"1h\").vwap, 7)", W(LagAcrossSession, "rising(tf(\"1h\").vwap, 7)")),
+        ["lag_across_session: an opening range"] = C("rising(or_high(15), 25)", W(LagAcrossSession, "rising(or_high(15), 25)")),
+        ["lag_across_session: the previous day's value"] = C("rising(prev_day.high, 30)", W(LagAcrossSession, "rising(prev_day.high, 30)")),
+        ["lag_across_session: a type error in an operand does not hide it"] = C("rising(vwap + true, 25)", W(LagAcrossSession, "rising(vwap + true, 25)"), E(TypeMismatch, "true")),
 
         // time_on_daily
         ["time_on_daily: a daily strategy"] = On(Timeframe.D1, "time >= \"09:45\"", E(TimeOnDaily, "time")),
@@ -220,6 +223,9 @@ internal static class LintCases
         // type_mismatch
         ["type_mismatch: a condition that is a number"] = C("rsi(14)", E(TypeMismatch, "rsi(14)")),
         ["type_mismatch: and of a number"] = C("rsi(14) and close > 1", E(TypeMismatch, "rsi(14)")),
+        ["type_mismatch: or of a number on the right"] = C("close > 1 or rsi(14)", E(TypeMismatch, "rsi(14)")),
+        ["type_mismatch: and of the time"] = C("time and close > 1", E(TypeMismatch, "time")),
+        ["type_mismatch: not of a regime"] = C("not regime()", E(TypeMismatch, "regime()")),
         ["type_mismatch: the time against a number"] = C("time > 5", E(TypeMismatch, "time > 5")),
         ["type_mismatch: a number against a true/false value"] = C("close > true", E(TypeMismatch, "close > true")),
         ["type_mismatch: ordering a regime"] = C("regime() < 3", E(TypeMismatch, "regime() < 3")),
@@ -315,22 +321,28 @@ internal static class LintCases
         ["mixed_timeframes_in_lag: a run of the bars and a run of the context in two calls"] = Ok(MixedTimeframesInLag, "rising(close, 3) and rising(vix, 3)", Timeframe.M1),
         ["mixed_timeframes_in_lag: a bar feature of the strategy and the same feature written with tf on 1m"] = Ok(MixedTimeframesInLag, "crosses_above(close, tf(\"1m\").close)", Timeframe.M1),
         ["lag_across_session: no lag"] = Ok(LagAcrossSession, "close > vwap"),
-        ["lag_across_session: a continuous feature runs on across sessions"] = Ok(LagAcrossSession, "crosses_above(close, ema(20))"),
+        ["lag_across_session: a continuous feature runs on across sessions"] = Ok(LagAcrossSession, "rising(ema(20), 200)"),
         ["lag_across_session: the context is read once a date"] = Ok(LagAcrossSession, "rising(vix, 2)"),
-        ["lag_across_session: a daily strategy evaluates at the end of the session"] = Ok(LagAcrossSession, "crosses_above(close, prev_day.high)", Timeframe.D1),
-        ["lag_across_session: a daily feature read on a daily strategy"] = Ok(LagAcrossSession, "rising(today_open, 3)", Timeframe.D1),
-        ["lag_across_session: an opening range of several bars is not ready at the open"] = Ok(LagAcrossSession, "crosses_above(close, or_high(30))"),
-        ["lag_across_session: an opening range on 1m is not ready at the open"] = Ok(LagAcrossSession, "crosses_above(close, or_low())", Timeframe.M1),
-        ["lag_across_session: a 1m feature read less far back than the first evaluation"] = Ok(LagAcrossSession, "rising(tf(\"1m\").vwap, 14)"),
-        ["lag_across_session: a check of the time that clears it"] = Ok(LagAcrossSession, "crosses_above(close, vwap) and time >= \"09:45\""),
-        ["lag_across_session: a check of the time written first"] = Ok(LagAcrossSession, "time >= \"09:45\" and crosses_above(close, vwap)"),
-        ["lag_across_session: a check of the time among others"] = Ok(LagAcrossSession, "rsi(14) > 55 and time >= \"10:00\" and crosses_above(close, vwap)"),
-        ["lag_across_session: a later check clears it"] = Ok(LagAcrossSession, "crosses_above(close, vwap) and time >= \"13:00\""),
-        ["lag_across_session: a strict check that lets through the second bar only"] = Ok(LagAcrossSession, "crosses_above(close, vwap) and time > \"09:30\""),
-        ["lag_across_session: a check on a 1m strategy"] = Ok(LagAcrossSession, "crosses_above(close, vwap) and time >= \"09:17\"", Timeframe.M1),
-        ["lag_across_session: a check on a 5m strategy for a longer read"] = Ok(LagAcrossSession, "rising(vwap, 3) and time >= \"09:35\"", Timeframe.M5),
-        ["lag_across_session: a check that clears the written-out form"] = Ok(LagAcrossSession, "close > vwap and close[1] <= vwap[1] and time >= \"09:45\""),
-        ["lag_across_session: two checks, the later one counts"] = Ok(LagAcrossSession, "time >= \"09:30\" and crosses_above(close, vwap) and time >= \"09:45\""),
+        ["lag_across_session: the headline crossing needs no check on 1m"] = Ok(LagAcrossSession, "crosses_above(close, vwap)", Timeframe.M1),
+        ["lag_across_session: the headline crossing needs no check on 5m"] = Ok(LagAcrossSession, "crosses_above(close, vwap)", Timeframe.M5),
+        ["lag_across_session: the headline crossing needs no check on 15m"] = Ok(LagAcrossSession, "crosses_above(close, vwap)"),
+        ["lag_across_session: the headline crossing needs no check on 1h"] = Ok(LagAcrossSession, "crosses_above(close, vwap)", Timeframe.H1),
+        ["lag_across_session: the headline crossing with a check of the time is not warned either"] = Ok(LagAcrossSession, "crosses_above(close, vwap) and time >= \"09:45\""),
+        ["lag_across_session: the crossing written out lags the vwap by hand"] = Ok(LagAcrossSession, "close > vwap and close[1] <= vwap[1]"),
+        ["lag_across_session: a daily strategy reads the daily value by position"] = Ok(LagAcrossSession, "crosses_above(close, prev_day.high)", Timeframe.D1),
+        ["lag_across_session: a daily feature read on a daily strategy"] = Ok(LagAcrossSession, "rising(today_open, 200)", Timeframe.D1),
+        ["lag_across_session: a daily gap read far back"] = Ok(LagAcrossSession, "tf(\"1D\").gap_pct[200] > 0"),
+        ["lag_across_session: an opening range of several bars crossing"] = Ok(LagAcrossSession, "crosses_above(close, or_high(30))"),
+        ["lag_across_session: an opening range on 1m crossing"] = Ok(LagAcrossSession, "crosses_above(close, or_low())", Timeframe.M1),
+        ["lag_across_session: a 1m feature read as far back as the frame keeps"] = Ok(LagAcrossSession, "rising(tf(\"1m\").vwap, 255)"),
+        ["lag_across_session: one bar short of a 5m session"] = Ok(LagAcrossSession, "close > vwap[74]", Timeframe.M5),
+        ["lag_across_session: one bar short of a 10m session"] = Ok(LagAcrossSession, "close > vwap[37]", Timeframe.M10),
+        ["lag_across_session: one bar short of a 15m session"] = Ok(LagAcrossSession, "close > vwap[24]"),
+        ["lag_across_session: one bar short of a 30m session"] = Ok(LagAcrossSession, "close > vwap[12]", Timeframe.M30),
+        ["lag_across_session: one bar short of an hourly session"] = Ok(LagAcrossSession, "rising(vwap, 6)", Timeframe.H1),
+        ["lag_across_session: the extra lag of a crossing stays short of a 5m session"] = Ok(LagAcrossSession, "crosses_above(close, vwap[73])", Timeframe.M5),
+        ["lag_across_session: a long read that a session holds"] = Ok(LagAcrossSession, "rising(vwap, 24) and time >= \"10:00\""),
+        ["lag_across_session: a 5m feature read short of a session on a daily strategy"] = Ok(LagAcrossSession, "tf(\"5m\").vwap[74] > 0", Timeframe.D1),
         ["time_on_daily: 15m"] = Ok(TimeOnDaily, "time >= \"09:45\""),
         ["time_on_daily: 1h"] = Ok(TimeOnDaily, "time >= \"09:45\"", Timeframe.H1),
         ["time_on_daily: 1m"] = Ok(TimeOnDaily, "time >= \"09:45\"", Timeframe.M1),
@@ -362,4 +374,7 @@ internal static class LintCases
     public static TheoryData<string> FailingLabels { get; } = [.. Failing.Keys];
 
     public static TheoryData<string> PassingLabels { get; } = [.. Passing.Keys];
+
+    /// <summary>The failing examples that have a problem with a suggestion.</summary>
+    public static TheoryData<string> SuggestingLabels { get; } = [.. Failing.Where(c => c.Value.Problems.Any(p => p.Suggestion is not null)).Select(c => c.Key)];
 }

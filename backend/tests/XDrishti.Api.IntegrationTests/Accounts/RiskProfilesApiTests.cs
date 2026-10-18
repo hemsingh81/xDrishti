@@ -14,7 +14,7 @@ public sealed class RiskProfilesApiTests(ApiFactory factory) : IAsyncLifetime
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     private static async Task<RiskProfileView> CreateProfileAsync(HttpClient client, string name = "Aggressive") =>
         await (await client.PostJsonAsync("/api/risk-profiles", AccountsApi.RiskProfile(name), Ct)).ReadAsCreatedAsync<RiskProfileView>(Ct);

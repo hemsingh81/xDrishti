@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Simulation\XDrishti.Simulation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The invented days of P3-03 (F1, F2, F6, the flat day), shared with the tests of the use case that reads the stored bars (P3-04a): one source file, compiled into each project that needs it. -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <Using Include="XDrishti.Tests.Shared" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The golden files (walker, scanner; see GoldenFile): the tests find them next to the binaries. -->
+    <Content Include="Golden\*.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

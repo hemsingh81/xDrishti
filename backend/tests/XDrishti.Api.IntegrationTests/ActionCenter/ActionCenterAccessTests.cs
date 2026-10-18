@@ -18,7 +18,7 @@ public sealed class ActionCenterAccessTests(ApiFactory factory) : IAsyncLifetime
         await factory.ResetInstrumentsAsync();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     public static TheoryData<string, string> Reads => new()
     {

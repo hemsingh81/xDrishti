@@ -4,7 +4,12 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The invented days of P3-03 (F1, F2, flat), shared with the simulation tests: one source file, compiled into each project that needs it (P3-04a). -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <!-- The same fixtures as the unit tests: real rows of Dhan's scrip master and NSE's sector list. -->

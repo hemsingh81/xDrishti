@@ -56,10 +56,7 @@ public sealed class SubscriptionSyncTests
         await clock.WhenWaitingForAsync(TimeSpan.FromMilliseconds(250));
         connection.Subscribed.Count.ShouldBe(1);
         clock.Advance(TimeSpan.FromMilliseconds(250));
-        while (connection.Subscribed.Count < 2)
-        {
-            await Task.Yield();
-        }
+        await FeedWorld.UntilAsync(() => connection.Subscribed.Count >= 2 && clock.TimersCreated >= 2); // the second wait exists: a clock moved before it is made would never wake it
 
         clock.Advance(TimeSpan.FromMilliseconds(250));
         await applying;

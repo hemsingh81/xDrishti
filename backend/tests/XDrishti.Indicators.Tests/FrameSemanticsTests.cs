@@ -39,14 +39,18 @@ public sealed class FrameSemanticsTests
             var expected = specs.Select(s => ReferenceIndicators.Compute(s, closedBars)).ToList();
 
             var closedSoFar = 0;
+            var sessionBars = new SessionBars();
             for (var t = 0; t < bars.Count; t++)
             {
                 frame.Step(bars[t]);
                 var before = closedSoFar;
                 while (closedSoFar < closed.Count && closed[closedSoFar].CloseIndex <= t)
                 {
+                    sessionBars.Closed(closed[closedSoFar]);
                     closedSoFar++;
                 }
+
+                var minuteDate = SessionClock.DateOf(bars[t].EpochSeconds);
 
                 if (frame.HasTimeframe(timeframe) && (frame.BarClosed(timeframe) != closedSoFar > before || frame.ClosedBarsAt(timeframe) != closedSoFar - before))
                 {
@@ -55,13 +59,15 @@ public sealed class FrameSemanticsTests
 
                 for (var h = 0; h < specs.Count; h++)
                 {
-                    var want = closedSoFar == 0 ? double.NaN : expected[h][closedSoFar - 1];
+                    // ADR 0035: of the twelve per-session features on an intraday timeframe only the bars closed in the date of the minute just fed are known (S of them); the reference runs over all the closed bars
+                    var known = SessionBars.Restarts(specs[h]) ? sessionBars.Known(minuteDate) : int.MaxValue;
+                    var want = closedSoFar == 0 || known < 1 ? double.NaN : expected[h][closedSoFar - 1];
                     if (!Tolerance.Same(want, frame[h]) || frame.IsReady(h) == double.IsNaN(want))
                     {
                         Assert.Fail($"seed {seed}, {TestSpecs.Describe(specs[h])}, step {t}: expected {want:R}, frame has {frame[h]:R} (ready {frame.IsReady(h)})");
                     }
 
-                    var wantPrevious = closedSoFar < 2 ? double.NaN : expected[h][closedSoFar - 2];
+                    var wantPrevious = closedSoFar < 2 || known < 2 ? double.NaN : expected[h][closedSoFar - 2];
                     if (!Tolerance.Same(wantPrevious, frame.At(h, 1)))
                     {
                         Assert.Fail($"seed {seed}, {TestSpecs.Describe(specs[h])}, step {t}: At(h, 1) expected {wantPrevious:R}, frame has {frame.At(h, 1):R}");
@@ -88,17 +94,21 @@ public sealed class FrameSemanticsTests
             var expected = specs.Select(s => ReferenceIndicators.Compute(s, [.. closed.Select(b => b.AsBar)])).ToList();
 
             var closedSoFar = 0;
+            var sessionBars = new SessionBars();
             for (var t = 0; t < bars.Count; t++)
             {
                 frame.Step(bars[t]);
                 while (closedSoFar < closed.Count && closedAt[closedSoFar] <= t)
                 {
+                    sessionBars.Closed(closed[closedSoFar]);
                     closedSoFar++;
                 }
 
+                var minuteDate = SessionClock.DateOf(bars[t].EpochSeconds);
                 for (var h = 0; h < specs.Count; h++)
                 {
-                    var want = closedSoFar == 0 ? double.NaN : expected[h][closedSoFar - 1];
+                    var known = SessionBars.Restarts(specs[h]) ? sessionBars.Known(minuteDate) : int.MaxValue;
+                    var want = closedSoFar == 0 || known < 1 ? double.NaN : expected[h][closedSoFar - 1];
                     if (!Tolerance.Same(want, frame[h]) || frame.IsReady(h) == double.IsNaN(want))
                     {
                         Assert.Fail($"seed {seed}, with calendar, {TestSpecs.Describe(specs[h])}, step {t}: expected {want:R}, frame has {frame[h]:R}");

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The simulator (P3-03, P3-03a; ADR 0037): the two stages that turn a strategy and 1-minute bars into hand-checkable trades, the entry scanner and the trade walker. Pure calculation, no I/O:
+       depends on Domain, Indicators and Strategies and on no package (enforced by architecture tests). -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+    <ProjectReference Include="..\XDrishti.Indicators\XDrishti.Indicators.csproj" />
+    <ProjectReference Include="..\XDrishti.Strategies\XDrishti.Strategies.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Simulation.Tests" />
+  </ItemGroup>
+</Project>

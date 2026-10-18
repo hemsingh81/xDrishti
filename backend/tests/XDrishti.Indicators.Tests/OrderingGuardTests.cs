@@ -22,6 +22,12 @@ public sealed class OrderingGuardTests
         new("volume", Timeframe.M15),
         new("pivot_high", Timeframe.M5, PriceSource.Close, 2),
         new("gap_pct"),
+
+        // the per-session features on coarser lanes: pending at the start of every date, restarted by the first bar of the date (ADR 0035)
+        new("vwap", Timeframe.M15),
+        new("today_open", Timeframe.M15),
+        new("prev_day_close", Timeframe.M5),
+        new("or_high", Timeframe.M15, PriceSource.Close, 30),
     ];
 
     private static readonly Timeframe[] SnapshotFrames = [Timeframe.M1, Timeframe.M5, Timeframe.M15, Timeframe.D1];
@@ -57,7 +63,7 @@ public sealed class OrderingGuardTests
         var row = new List<double>();
         for (var h = 0; h < frame.Count; h++)
         {
-            for (var lag = 0; lag < 3; lag++)
+            for (var lag = 0; lag < 4; lag++)
             {
                 row.Add(frame.At(h, lag));
             }

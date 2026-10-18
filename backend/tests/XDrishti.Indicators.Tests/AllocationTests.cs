@@ -282,6 +282,53 @@ public sealed class AllocationTests
     }
 
     [Fact]
+    public void A_frame_with_the_twelve_restarting_names_on_every_intraday_lane_allocates_nothing_across_date_changes_and_pending_lanes()
+    {
+        // ADR 0035: the date changes clear the rings and mark the coarser lanes pending; none of it may allocate. 81 handles: the twelve names on 1m, 5m, 10m, 15m, 30m and 1h and the nine that 1D supports.
+        DatesIn(Bars).ShouldBeGreaterThanOrEqualTo(250, "the measured window of the gap-free series changes the date at least 250 times");
+        DatesIn(GappyBars).ShouldBeGreaterThanOrEqualTo(250, "and so does the window of the gappy one");
+        AssertFrameAllocatesNothing(() => TwelveRestartingNamesFrame(), Bars);
+        AssertFrameAllocatesNothing(() => TwelveRestartingNamesFrame(new TradingCalendar()), Bars);
+        AssertFrameAllocatesNothing(() => TwelveRestartingNamesFrame(), GappyBars);
+        AssertFrameAllocatesNothing(() => TwelveRestartingNamesFrame(GappyCalendar), GappyBars);
+    }
+
+    [Fact]
+    public void The_twelve_restarting_names_stay_allocation_free_when_the_ordering_guard_skips_bars_and_after_a_reset()
+    {
+        AllocationProbe.ShouldAllocateNothing(window =>
+        {
+            var frame = TwelveRestartingNamesFrame(GappyCalendar);
+            for (var i = 0; i < WarmUpSteps; i++)
+            {
+                frame.Step(GappyBars[i]);
+            }
+
+            frame.Reset();
+            for (var i = 0; i < WarmUpSteps; i++)
+            {
+                frame.Step(GappyBars[i]);
+            }
+
+            var sink = 0.0;
+            window.Begin();
+            for (var i = WarmUpSteps; i < WarmUpSteps + MeasuredSteps; i++)
+            {
+                frame.Step(GappyBars[i]);
+                frame.Step(GappyBars[i - 1]);
+                for (var h = 0; h < frame.Count; h++)
+                {
+                    sink += frame.IsReadyAt(h, 1) ? frame.At(h, 1) : 0;
+                }
+            }
+
+            window.End();
+            frame.IgnoredBars.ShouldBe(MeasuredSteps);
+            double.IsNaN(sink).ShouldBeFalse();
+        });
+    }
+
+    [Fact]
     public void A_frame_with_the_one_minute_hour_day_week_and_month_lanes_allocates_nothing_while_weeks_and_months_close()
     {
         var closes = AssertFrameAllocatesNothing(() => PeriodLaneFrame(), Bars);
@@ -679,6 +726,31 @@ public sealed class AllocationTests
         new FeatureSpec("open", Timeframe.Mo1),
     ],
     new FrameOptions(calendar)).Value;
+
+    /// <summary>
+    /// The twelve names that restart each session (<c>vwap</c>, <c>or_high</c>, <c>or_low</c>, <c>today_*</c>, <c>prev_day_*</c>, <c>gap_pct</c>) on each of 1m, 5m, 10m, 15m, 30m and 1h, and the nine of them that 1D supports:
+    /// 81 handles, history depth 8. Every date change clears rings and puts the coarser lanes into the pending state (ADR 0035). Also the benchmark frame of that rule.
+    /// </summary>
+    internal static FeatureFrame TwelveRestartingNamesFrame(TradingCalendar? calendar = null)
+    {
+        var specs = new List<FeatureSpec>();
+        foreach (var timeframe in IntradayTimeframes)
+        {
+            var range = Math.Max(timeframe.Minutes(), 30);
+            specs.Add(new FeatureSpec("vwap", timeframe));
+            specs.Add(new FeatureSpec("or_high", timeframe, PriceSource.Close, range));
+            specs.Add(new FeatureSpec("or_low", timeframe, PriceSource.Close, range));
+            specs.AddRange(SessionValueNames.Select(name => new FeatureSpec(name, timeframe)));
+        }
+
+        specs.AddRange(SessionValueNames.Select(name => new FeatureSpec(name, Timeframe.D1)));
+        return FeatureFrame.Create(specs, new FrameOptions(calendar)).Value;
+    }
+
+    private static readonly Timeframe[] IntradayTimeframes = [Timeframe.M1, Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1];
+
+    /// <summary>The nine session values (everything restarting but <c>vwap</c> and the opening range, which 1D refuses).</summary>
+    private static readonly string[] SessionValueNames = ["today_open", "today_high", "today_low", "prev_day_open", "prev_day_high", "prev_day_low", "prev_day_close", "prev_day_volume", "gap_pct"];
 
     /// <summary>Twelve features over four timeframes, the mix a strategy would use.</summary>
     internal static FeatureFrame TwelveFeatureFrame() => FeatureFrame.Create(

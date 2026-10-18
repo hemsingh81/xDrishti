@@ -75,6 +75,30 @@ public sealed class LintTableTests
         result.Problems.Select(p => p.Span.Start).ShouldBeInOrder();
     }
 
+    /// <summary>
+    /// The convention behind every suggestion of the table: it is the text that replaces the span of its own problem. A tool (the editor's quick fix, the assistant) can apply it mechanically, and the condition then still
+    /// reads (a suggestion that breaks the syntax would only trade the problem for another) and has one problem of that code less. Another problem may show up (<c>closee[0]</c> becomes <c>close[0]</c>), which is the
+    /// next round of fixes.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(LintCases.SuggestingLabels), MemberType = typeof(LintCases))]
+    public void Replacing_the_span_of_a_problem_with_its_suggestion_removes_that_problem(string label)
+    {
+        var lintCase = LintCases.Failing[label];
+        var context = new CompileContext(lintCase.Evaluation, lintCase.Parameters);
+        var before = ConditionCompiler.Compile(lintCase.Source, context).Problems;
+
+        foreach (var problem in before.Where(p => p.Suggestion is not null))
+        {
+            var fixedSource = string.Concat(lintCase.Source.AsSpan(0, problem.Span.Start), problem.Suggestion, lintCase.Source.AsSpan(problem.Span.End));
+            var after = ConditionCompiler.Compile(fixedSource, context);
+
+            var where = label + ": " + lintCase.Source + " -> " + fixedSource + " -> " + Compiling.Describe(after);
+            after.Problems.ShouldNotContain(p => p.Code.StartsWith("strategy.syntax.", StringComparison.Ordinal), where);
+            after.Problems.Count(p => p.Code == problem.Code).ShouldBe(before.Count(p => p.Code == problem.Code) - 1, where);
+        }
+    }
+
     [Theory]
     [MemberData(nameof(LintCases.PassingLabels), MemberType = typeof(LintCases))]
     public void A_near_miss_compiles_and_does_not_produce_the_problem_of_its_row(string label)

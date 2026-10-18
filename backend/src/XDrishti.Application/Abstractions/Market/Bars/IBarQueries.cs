@@ -10,8 +10,8 @@ public sealed record BarTotals(int Instruments, long Bars, DateTimeOffset? First
 /// <summary>What the aggregates hold.</summary>
 public sealed record AggregateTotals(IReadOnlyList<TimeframeStat> Timeframes, DateTimeOffset? LastBuiltAt, int InstrumentsPending);
 
-/// <summary>An instrument as the bars endpoint needs it.</summary>
-public sealed record BarsInstrument(Guid Id, string Symbol, string Name);
+/// <summary>An instrument as the bars endpoint and the simulation need it. <paramref name="TickSize"/> is the master's tick in paise (null when the master has none); a run turns it into rupees with <c>TickSpec.FromMasterPaise</c>.</summary>
+public sealed record BarsInstrument(Guid Id, string Symbol, string Name, decimal? TickSize = null);
 
 /// <summary>Reads of the stored bars and their coverage (all reads, no tracking).</summary>
 public interface IBarQueries

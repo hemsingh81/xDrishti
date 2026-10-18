@@ -2,7 +2,6 @@ using System.Globalization;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Indicators;
 using XDrishti.Strategies.Binding;
-using XDrishti.Strategies.Syntax;
 
 namespace XDrishti.Strategies.Lint;
 
@@ -13,9 +12,11 @@ namespace XDrishti.Strategies.Lint;
 /// clock; if the features of one <c>crosses_*</c>, <c>rising</c> or <c>falling</c> run on different clocks the previous values would be different moments, so it is <c>mixed_timeframes_in_lag</c>. A clock is a bar
 /// timeframe (<c>close</c> on 15m: the previous 15-minute bar) or <b>the date</b>: the calendar and context features (<see cref="IndicatorInfo.DateDriven"/>) are read on 1m whatever the strategy runs on, but change
 /// once a date and their previous value is the previous <i>date</i>, never the previous minute. So they are a clock of their own on every evaluation timeframe, 1m included: they may be lagged among themselves and
-/// against constants, never against a bar feature (ADR 0034, Amendment 4). <b>Sessions.</b> A lagged read is by position, not by session: the frame's history runs on across sessions, so on the first bars of a
-/// session <c>vwap[1]</c> is the last value of the previous session. Not an error — a rolling average is meant to run on — but for a feature that starts again at the session open and has a value at once
-/// (<see cref="IndicatorInfo.HasValueAtSessionOpen"/>) it compares two sessions, so it is the warning <c>lag_across_session</c> with the <c>time</c> guard that clears it (ADR 0034, Amendment 19).
+/// against constants, never against a bar feature (ADR 0034, Amendment 4). <b>Sessions.</b> The twelve features that start again at each India date (<see cref="IndicatorInfo.RestartsEachSession"/>) keep the history of
+/// the current session only in the frame (ADR 0035), so a lagged read of one of them never compares two sessions: on the first bar of a session <c>vwap[1]</c> is unknown, and a crossing against it is unknown, not a cross of
+/// the last bar of yesterday with the first of today. That is a rule of the frame and needs no help from the condition. What is still worth a word is a read that can <i>never</i> be known: <c>k</c> bars of timeframe <c>T</c> back
+/// when a whole session holds no more than <c>k</c> of them (<c>k · T</c> is at least the 375 minutes of a session), because every bar that far back is in an earlier session, where the feature has no value. That is the warning
+/// <c>lag_across_session</c>, whatever the strategy's own timeframe is; a read of a restarting feature on the 1D lane is by position and is not warned (ADR 0035).
 /// </summary>
 internal static class LagRules
 {
@@ -24,37 +25,21 @@ internal static class LagRules
     {
         var walk = new Walk(scope);
         walk.Visit(root, 0, null);
-        walk.ReportSessionReads(TimeGuard(root));
+        walk.ReportSessionReads();
         return (int)Math.Min(Math.Max(walk.Deepest + 1, 1), int.MaxValue);
     }
 
-    /// <summary>
-    /// The first minute of the day from which a condition lets anything through because of a <c>time</c> check it must pass: the largest first-true minute among the conjuncts <c>time &gt;= "HH:MM"</c> and
-    /// <c>time &gt; "HH:MM"</c> of its top-level <c>and</c> chain (the check may stand anywhere in the chain, but not under an <c>or</c> or a <c>not</c>, where it need not hold); null when there is none.
-    /// </summary>
-    private static int? TimeGuard(IBoundExpression node) => node switch
-    {
-        BoundLogical { Operator: BinaryOperator.And } both => Later(TimeGuard(both.Left), TimeGuard(both.Right)),
-        BoundTimeCompare { Operator: BinaryOperator.GreaterOrEqual } compare => compare.MinuteOfDay,
-        BoundTimeCompare { Operator: BinaryOperator.Greater } compare => compare.MinuteOfDay + 1,
-        _ => null,
-    };
-
-    private static int? Later(int? a, int? b) => a is null ? b : b is null ? a : Math.Max(a.Value, b.Value);
-
-    /// <summary>What one call (or lone subscripted feature) reads of per-session features: which, how far back, and from which minute after the open the reads stay in the session.</summary>
-    private sealed class SessionRead(IBoundExpression owner)
+    /// <summary>What one call (or lone subscripted feature) reads of restarting features from further back than a session holds: which, how far back, and how many bars of their timeframe a session holds.</summary>
+    private sealed class SessionRead(IBoundExpression owner, Timeframe timeframe)
     {
         public IBoundExpression Owner { get; } = owner;
+
+        /// <summary>The timeframe of the first feature recorded (the features of one call share a clock, or the call is already an error).</summary>
+        public Timeframe Timeframe { get; } = timeframe;
 
         public List<string> Names { get; } = [];
 
         public long Deepest { get; set; }
-
-        /// <summary>Minutes after the open from which every read stays inside the session; null when some read cannot.</summary>
-        public int? CleanFrom { get; set; }
-
-        public int Reads { get; set; }
     }
 
     private sealed class Walk(BindingScope scope)
@@ -136,23 +121,20 @@ internal static class LagRules
         }
 
         /// <summary>
-        /// Remembers a read <paramref name="lag"/> closed bars back of a feature that starts again at the session open and has a value on the first bar, when some evaluation can fall in the first bars of a session:
-        /// the strategy runs on an intraday timeframe, and its first evaluation (at the close of its first bar, <c>E</c> minutes after the open) comes before the bar <c>(lag + 1) · T</c> minutes after the open from which
-        /// a read <c>lag</c> bars of the feature's own timeframe <c>T</c> back stays inside the session. A strategy on 1D or longer evaluates at the end of a session and is not affected.
+        /// Remembers a read <paramref name="lag"/> closed bars back of a feature that restarts each session (<see cref="IndicatorInfo.RestartsEachSession"/>) when it reaches back further than a whole session holds:
+        /// <c>lag · T</c> minutes, with <c>T</c> the minutes of the feature's own timeframe, is at least the 375 minutes of a session, so every bar that far back is in an earlier session and the frame has no value for it.
+        /// The strategy's own timeframe does not matter: the read is of the feature's lane.
         /// </summary>
         private void NoteSessionRead(BoundFeature feature, long lag, IBoundExpression owner)
         {
-            var barMinutes = feature.Spec.Timeframe.Minutes();
-            var evaluationMinutes = scope.EvaluationTimeframe.Minutes();
-            if (lag < 1 || barMinutes == 0 || evaluationMinutes == 0 || evaluationMinutes >= (lag + 1) * barMinutes
-                || !IndicatorCatalog.TryGet(feature.Spec.Name, out var info) || !info.HasValueAtSessionOpen(feature.Spec))
+            if (lag < 1 || !IndicatorCatalog.TryGet(feature.Spec.Name, out var info) || !info.RestartsEachSession(feature.Spec) || lag * feature.Spec.Timeframe.Minutes() < SessionClock.RegularBars)
             {
                 return;
             }
 
             if (!_sessionReadOf.TryGetValue(owner, out var read))
             {
-                read = new SessionRead(owner);
+                read = new SessionRead(owner, feature.Spec.Timeframe);
                 _sessionReadOf.Add(owner, read);
                 _sessionReads.Add(read);
             }
@@ -167,46 +149,24 @@ internal static class LagRules
             }
 
             read.Deepest = Math.Max(read.Deepest, lag);
-
-            // the minutes after the open from which this read stays inside the session: none when no bar of the session is lag bars from its open (the last bar, which may be a short one, is the farthest)
-            var cleanFrom = lag * barMinutes >= SessionClock.RegularBars ? (int?)null : (int)Math.Min((lag + 1) * barMinutes, SessionClock.RegularBars);
-            read.CleanFrom = read.Reads == 0 ? cleanFrom : read.CleanFrom is { } known && cleanFrom is { } other ? Math.Max(known, other) : null;
-            read.Reads++;
         }
 
-        /// <summary>
-        /// Warns about every call (or lone subscripted feature) that reads a per-session feature across a session open, unless the condition has a <c>time</c> check (<paramref name="guard"/>, the first minute of the
-        /// day it lets through) that keeps every evaluation of the strategy out of the bars concerned: the first evaluation the check lets through, a close of the strategy's timeframe, is at or after the minute from
-        /// which the reads stay inside the session.
-        /// </summary>
-        public void ReportSessionReads(int? guard)
+        /// <summary>Warns about every call (or lone subscripted feature) that reads a restarting feature from further back than a session holds: that part of the condition is never known.</summary>
+        public void ReportSessionReads()
         {
-            var evaluationMinutes = scope.EvaluationTimeframe.Minutes();
             foreach (var read in _sessionReads)
             {
-                if (guard is { } from && read.CleanFrom is { } clean)
-                {
-                    var sinceOpen = Math.Max(from - SessionClock.OpenMinute, 1);
-                    if ((sinceOpen + evaluationMinutes - 1) / evaluationMinutes * evaluationMinutes >= clean)
-                    {
-                        continue;
-                    }
-                }
-
+                var minutes = read.Timeframe.Minutes();
+                var barsInSession = (SessionClock.RegularBars + minutes - 1) / minutes;
                 var names = string.Join(", ", read.Names.Select(BindingScope.Quote));
-                var back = read.Deepest == 1 ? "one closed bar back" : "up to " + read.Deepest.ToString(CultureInfo.InvariantCulture) + " closed bars back";
-                var cure = read.CleanFrom is { } minutes
-                    ? "Wait until the session has bars of its own, for example with `and time >= \"" + Clock(SessionClock.OpenMinute + minutes) + "\"`."
-                    : "No bar of a session is far enough from its open for a read that far back; read fewer bars back.";
                 scope.Warning(
                     LintCodes.LagAcrossSession,
-                    scope.Quoted(read.Owner.Span) + " reads " + names + " " + back + ", and on the first bars of every session that is a value of the previous session: a lagged read does not stop at the session open, "
-                        + "where the feature starts again. " + cure,
+                    scope.Quoted(read.Owner.Span) + " reads " + names + " up to " + read.Deepest.ToString(CultureInfo.InvariantCulture) + " closed bars back, but a session holds at most " + barsInSession.ToString(CultureInfo.InvariantCulture) + " bars of " + read.Timeframe.ToCode()
+                        + " and a per-session feature has no value from an earlier session: that part of the condition is never known, and unknown is not true. Read at most "
+                        + (barsInSession - 1).ToString(CultureInfo.InvariantCulture) + " bars back.",
                     read.Owner.Span);
             }
         }
-
-        private static string Clock(int minuteOfDay) => string.Create(CultureInfo.InvariantCulture, $"{minuteOfDay / 60:00}:{minuteOfDay % 60:00}");
 
         private void ReportCall(IBoundExpression call, long lag) =>
             scope.Error(
@@ -235,11 +195,19 @@ internal static class LagRules
             scope.Error(
                 LintCodes.MixedTimeframesInLag,
                 scope.Quoted(call.Span) + " mixes the timeframes " + string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1]
-                    + ": the previous value of each side would be a different moment. Compare on one timeframe"
-                    + (explicitForm is null ? "." : ", or say what you mean: `" + explicitForm + "`."),
+                    + ": the previous value of each side would be a different moment. " + Advice(explicitForm, clocks.Contains(null)),
                 call.Span,
                 explicitForm);
         }
+
+        /// <summary>
+        /// What to do instead. With an explicit form, it is offered as the second way out. Without one, "compare on one timeframe" cannot be followed when the date is one of the clocks (a feature of the date has no other
+        /// timeframe: it changes once a date), so the advice names the date.
+        /// </summary>
+        private static string Advice(string? explicitForm, bool dateIsAClock) =>
+            explicitForm is not null ? "Compare on one timeframe, or say what you mean: `" + explicitForm + "`."
+            : dateIsAClock ? "A calendar or context feature changes once a date, so compare it without a lag, or lag only the bar side by hand."
+            : "Compare on one timeframe.";
 
         /// <summary>A calendar or context feature: it changes once a date, so its previous value is the previous date, whatever the timeframe it is read on.</summary>
         private static bool IsDateDriven(BoundFeature feature) => IndicatorCatalog.TryGet(feature.Spec.Name, out var info) && info.DateDriven;

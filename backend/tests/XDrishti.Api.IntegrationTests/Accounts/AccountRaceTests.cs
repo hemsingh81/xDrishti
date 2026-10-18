@@ -16,7 +16,7 @@ public sealed class AccountRaceTests(ApiFactory factory) : IAsyncLifetime
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     private async Task<HttpClient[]> ClientsAsync(int count)
     {

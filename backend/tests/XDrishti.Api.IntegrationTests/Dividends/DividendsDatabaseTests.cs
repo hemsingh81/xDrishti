@@ -12,8 +12,13 @@ namespace XDrishti.Api.IntegrationTests.Dividends;
 /// holds a ledger when the migration runs.
 /// </summary>
 [Collection(ApiTestSuite.Name)]
-public sealed class DividendsDatabaseTests(ApiFactory factory)
+public sealed class DividendsDatabaseTests(ApiFactory factory) : IAsyncLifetime
 {
+    // These tests write accounts straight into the tables and reset at the start of the test that needs it; the rows must not outlive the class.
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
+
     private const string MigrationDatabase = "xd_dividends_migration_probe";
 
     private const string BeforeMigration = "20261014132439_AddDhanTradeAndLedgerSync";

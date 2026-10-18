@@ -48,12 +48,14 @@ public sealed class OracleSharingTests
         created.IsSuccess.ShouldBeTrue(created.IsFailure ? created.Error.Message : string.Empty);
         var frame = created.Value;
         var bound = plan.BindAll(frame);
-        var interpreter = new Interpreter(frame);
+        var sessions = SessionReference.For(frame);
+        var interpreter = new Interpreter(frame, sessions);
         var counts = new Dictionary<Tri, int> { [Tri.True] = 0, [Tri.False] = 0, [Tri.Unknown] = 0 };
 
         foreach (var bar in bars)
         {
             frame.Step(bar);
+            sessions.Feed(bar);
             for (var k = 0; k < models.Count; k++)
             {
                 var expected = interpreter.Evaluate(models[k]);
@@ -84,13 +86,17 @@ public sealed class OracleSharingTests
         var frameA = FeatureFrame.Create(specs, options).Value;
         var frameB = FeatureFrame.Create(specs, options).Value;
         var bound = plan.BindAll(frameA);
-        var interpreterA = new Interpreter(frameA);
-        var interpreterB = new Interpreter(frameB);
+        var sessionsA = SessionReference.For(frameA);
+        var sessionsB = SessionReference.For(frameB);
+        var interpreterA = new Interpreter(frameA, sessionsA);
+        var interpreterB = new Interpreter(frameB, sessionsB);
 
         for (var i = 0; i < Math.Min(barsA.Length, barsB.Length); i++)
         {
             frameA.Step(barsA[i]);
+            sessionsA.Feed(barsA[i]);
             frameB.Step(barsB[i]);
+            sessionsB.Feed(barsB[i]);
             for (var k = 0; k < models.Count; k++)
             {
                 Of(bound[k].EvaluateTruth(frameA)).ShouldBe(interpreterA.Evaluate(models[k]), $"frame A, `{sources[k]}` at step {i + 1}");

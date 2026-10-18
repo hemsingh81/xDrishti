@@ -63,8 +63,9 @@ public static class SyntaxCodes
     public const string BadSubscript = "strategy.syntax.bad_subscript";
 
     /// <summary>
-    /// The text has more problems than are listed: the first 100 (<see cref="ConditionParser.MaxProblems"/>) are returned, in source order, and this one stands in place of the rest; its span is the text after the last problem
-    /// listed. Fix the listed ones and parse again to see the rest.
+    /// The text has more problems than are listed: the first 100 found (<see cref="ConditionParser.MaxProblems"/>) are returned, in source order, and this one stands in place of the rest; its span is the text after the last problem
+    /// listed. "Found" is not the order of the text: the lexical problems are found before the syntax ones, and an unclosed bracket after the problems inside it, so with enough problems an earlier one may not be listed.
+    /// The recovery also stops when it has parsed the tokens as often as it is allowed (<see cref="Recovery.MaxAttempts"/>), with only a problem or two listed. Fix the listed ones and parse again to see the rest.
     /// </summary>
     public const string TooManyProblems = "strategy.syntax.too_many_problems";
 

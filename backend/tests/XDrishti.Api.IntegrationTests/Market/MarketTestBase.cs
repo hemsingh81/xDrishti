@@ -26,7 +26,8 @@ public abstract class MarketTestBase(ApiFactory factory) : IAsyncLifetime
     public virtual async ValueTask InitializeAsync()
     {
         Factory.Clock.Pin(Now);
-        await Factory.ResetInstrumentsAsync();
+        await Factory.ResetAllAsync();
+        await Factory.AssertCleanAsync();
         Owner = await Factory.SignInAsync(Ct);
     }
 

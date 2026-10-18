@@ -104,15 +104,54 @@ internal sealed class FakeBarStore : IBarStore
 
     public Dictionary<Guid, List<Bar>> Stored { get; } = [];
 
+    /// <summary>Every <see cref="ReadAsync"/> in the order it was called (the simulation tests assert the order, the window and the offset of the bounds).</summary>
+    public List<(Guid InstrumentId, DateTimeOffset From, DateTimeOffset To)> Reads { get; } = [];
+
+    /// <summary>When set, a read really awaits (a yield) between its start and its end, so that two reads in flight at once can be observed.</summary>
+    public bool AwaitReads { get; set; }
+
+    /// <summary>The most reads that were in flight at the same time.</summary>
+    public int MaxConcurrentReads { get; private set; }
+
+    /// <summary>Runs at the start of every read, with the instrument: what a caller does meanwhile (a test cancels its token).</summary>
+    public Action<Guid>? OnRead { get; set; }
+
+    /// <summary>When set, <see cref="BeginMergeAsync"/> throws: a reader of the bars must never merge.</summary>
+    public bool ForbidMerge { get; set; }
+
+    private int _inFlight;
+
     public ValueTask<IBarMergeSession> BeginMergeAsync(Guid instrumentId, BarSource source, CancellationToken cancellationToken)
     {
+        if (ForbidMerge)
+        {
+            throw new InvalidOperationException("A merge was begun, and this test forbids it.");
+        }
+
         var session = new FakeSession(this, instrumentId, source);
         Sessions.Add(session);
         return ValueTask.FromResult<IBarMergeSession>(session);
     }
 
-    public ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken) =>
-        ValueTask.FromResult<IReadOnlyList<Bar>>([.. Stored.GetValueOrDefault(instrumentId, []).Where(b => b.Start >= from && b.Start <= to).OrderBy(b => b.EpochSeconds)]);
+    public async ValueTask<IReadOnlyList<Bar>> ReadAsync(Guid instrumentId, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken)
+    {
+        Reads.Add((instrumentId, from, to));
+        MaxConcurrentReads = Math.Max(MaxConcurrentReads, Interlocked.Increment(ref _inFlight));
+        try
+        {
+            OnRead?.Invoke(instrumentId);
+            if (AwaitReads)
+            {
+                await Task.Yield();
+            }
+
+            return [.. Stored.GetValueOrDefault(instrumentId, []).Where(b => b.Start >= from && b.Start <= to).OrderBy(b => b.EpochSeconds)];
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _inFlight);
+        }
+    }
 
     internal sealed class FakeSession(FakeBarStore store, Guid instrumentId, BarSource source) : IBarMergeSession
     {

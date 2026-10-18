@@ -21,10 +21,12 @@ internal enum Tri
 /// <item>an operand of a lagged call is evaluated <i>at lag k</i>: every feature leaf is read with <c>At(handle, own subscript + k)</c>, constants stay constants;
 /// <c>crosses_above(a, b)</c> is <c>a[0] &gt; b[0] and a[1] &lt;= b[1]</c>, <c>rising(x, n)</c> is <c>x[0] &gt; x[1] &gt; … &gt; x[n]</c>; <c>between</c> includes both ends;</item>
 /// <item><c>time</c> is the India clock time at which the evaluated bar closed: the start of the last accepted 1-minute bar plus one minute, in whole minutes; unknown while the frame has taken no bar;</item>
-/// <item><c>regime()</c> is the feature <c>regime</c> (1 to 9) and a name is resolved by the oracle's own table of the nine names.</item>
+/// <item><c>regime()</c> is the feature <c>regime</c> (1 to 9) and a name is resolved by the oracle's own table of the nine names;</item>
+/// <item>the twelve features that restart each session, on a timeframe from 1m to 1h, are not read from the frame at all but from the <see cref="SessionReference"/> (ADR 0035): the interpreter throws when it meets one
+/// and was given none.</item>
 /// </list>
 /// </summary>
-internal sealed class Interpreter(FeatureFrame frame)
+internal sealed class Interpreter(FeatureFrame frame, SessionReference? sessions = null)
 {
     /// <summary>India time is UTC+05:30: 19,800 seconds.</summary>
     private const long IndiaOffsetSeconds = 5 * 3600 + 30 * 60;
@@ -55,6 +57,11 @@ internal sealed class Interpreter(FeatureFrame frame)
     {
         var handle = Handle(leaf.Spec);
         var lag = leaf.Lag + extra;
+        if (SessionReference.Covers(leaf.Spec))
+        {
+            return (sessions ?? throw new InvalidOperationException("The condition reads " + leaf.Spec + ", a per-session feature: the interpreter needs a SessionReference.")).Read(frame.SpecOf(handle), lag);
+        }
+
         if (!frame.IsReadyAt(handle, lag))
         {
             return double.NaN;

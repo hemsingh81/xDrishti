@@ -17,8 +17,8 @@ namespace XDrishti.Strategies.Tests.Evaluation;
 /// </para>
 /// <para>
 /// <b>Limits.</b> The property guards the feed of the frame, the frame itself and the determinism of the chain; it cannot fail for a wrong compiler, because a compiled condition is a pure function of the frame as it
-/// is at the step. The compiler is guarded by the oracle (<see cref="InterpreterOracleTests"/>), the hand examples, <c>CompiledTreeTests</c> (a tree can only call the kernel, reach the frame through three doors and never
-/// read nearer than written) and the architecture test on the members of the frame the library may use.
+/// is at the step. The compiler is guarded by the oracle (<see cref="InterpreterOracleTests"/>, which holds the lag and the clock exactly, and whose mutant control shows that it notices a wrong one), the hand examples,
+/// <c>CompiledTreeTests</c> (a tree can only call the kernel, reach the frame through three doors and read no negative lag) and the architecture test on the members of the frame the library may use.
 /// </para>
 /// </summary>
 public sealed class LookAheadPropertyTests

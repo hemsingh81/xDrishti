@@ -14,7 +14,7 @@ public sealed class BrokerHistoryAccessTests(ApiFactory factory) : IAsyncLifetim
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     public static TheoryData<string, string> Reads => new()
     {

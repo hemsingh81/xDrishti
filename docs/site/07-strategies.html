@@ -96,33 +96,33 @@
 </tr>
 <tr>
 <td><code>setup</code></td>
-<td>Conditions known before the trigger (evaluated tonight)</td>
-<td>High relative volume yesterday, NR7, trend filter</td>
+<td>Conditions that must hold when the trigger fires. Evaluated <strong>together with the trigger</strong> at every closed bar of the evaluation timeframe and ANDed with it (the nightly shortlist of P7 classifies which parts of a setup are knowable at the previous close; the model does not)</td>
+<td>High relative volume yesterday, NR7, trend filter, <code>time &gt;= &quot;09:45&quot;</code></td>
 </tr>
 <tr>
 <td><code>trigger</code></td>
-<td>What must happen to enter (evaluated tomorrow)</td>
+<td>What must happen to enter, evaluated at every closed bar</td>
 <td>Candle closes above OR-high (BUY)</td>
 </tr>
 <tr>
-<td><code>valid_window</code></td>
-<td>When the trigger may fire</td>
-<td>09:30–11:30</td>
+<td><code>time_rules</code></td>
+<td>The one place for windows: <code>first_entry</code> and <code>last_entry</code> (the bar that closes at those times is still allowed, both ends inclusive), <code>square_off</code> (intraday, required) or <code>max_hold_sessions</code> (swing, 1 to 5, required). Replaces the former <code>valid_window</code>; a <code>time &gt;= &quot;09:45&quot;</code> inside a condition stays legal</td>
+<td>09:30–11:30, square-off 15:15</td>
 </tr>
 <tr>
 <td><code>initial_stop</code></td>
-<td>Where the idea is wrong</td>
+<td>Where the idea is wrong: <code>fixed_pct</code>, <code>atr_mult</code>, <code>swing_low</code> / <code>swing_high</code> (the lowest low / highest high of the last N closed bars of the stop timeframe, trigger bar included), <code>bar_low</code> / <code>bar_high</code>, <code>or_opposite</code>; read on the evaluation timeframe or on an optional timeframe of its own</td>
 <td>OR opposite side / trigger-candle extreme / k × ATR</td>
 </tr>
 <tr>
 <td><code>filters</code></td>
-<td>Context gates</td>
+<td>Context gates, by name: <code>not_event_day</code>, <code>min_turnover</code> (accepted and not evaluated until the results calendar and the liquidity data exist)</td>
 <td>Higher-TF trend agrees; not results day</td>
 </tr>
 <tr>
 <td><code>invalidation</code></td>
-<td>Cancel if…</td>
-<td>Gap beyond trigger; stop level hit before trigger</td>
+<td>The <code>invalidate</code> list: cancel if any of it is true. Covers &quot;gap beyond trigger&quot; (a condition on <code>today.open</code> against a level); &quot;stop level hit before trigger&quot; cannot be written as a condition and is not covered</td>
+<td>Gap beyond trigger</td>
 </tr>
 <tr>
 <td><code>params</code></td>
@@ -132,6 +132,11 @@
 </tbody></table>
 <p>Built-in strategies are written in the same rules language users use in the Strategy Lab
 (<a href="11-strategy-lab.html">doc 11</a>), so there is one way to define a strategy.</p>
+<p><strong>As built (P3-02b, <a href="../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.html">ADR 0036</a>).</strong> The anatomy is a typed model (<code>XDrishti.Strategies.Model</code>, schema 1) that <code>StrategyCompiler.Compile</code> checks and compiles side by side. <strong>How the
+sections combine:</strong> at every closed bar of the evaluation timeframe the sections are evaluated together, and an entry is possible when <code>setup</code> is true, <code>trigger</code> is true and <code>invalidate</code> is not true (unknown counts as
+not true, and an unknown invalidation does not fire either; <code>SideEvaluation.Fires</code> is the one definition). A stored strategy is <strong>self-contained</strong>: a missing time rule is not filled from the <code>styles</code> block of
+<a href="16-configuration.html">doc 16</a>, so the same stored text always means the same behaviour. Each condition of a list is compiled and evaluated as its own condition; the lists are never joined into one text. An intraday
+strategy lists 5m to 1h, a swing strategy 30m, 1h and 1D, and swing SELL is refused (futures only, §7). The simulator runs a swing strategy evaluated on 30m or 1h (P3-03d, <a href="../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.html">ADR 0040</a>): the position is held up to <code>max_hold_sessions</code> sessions with at most one open position per instrument and side, so a signal that fires while a position is open is counted and not entered, and it still spends that day&#39;s one candidate; the daily (1D) evaluation is P3-03e.</p>
 <h2 id="2-conditional-trade-plans">2. Conditional trade plans<a class="hash" href="#2-conditional-trade-plans" aria-label="Link to this section">#</a></h2>
 <p>Intraday entries can&#39;t be fixed the night before, so each plan item is a <strong>conditional ticket</strong> — and the
 simulator tests exactly this ticket on history:</p>
@@ -146,6 +151,23 @@ simulator tests exactly this ticket on history:</p>
   Why     : NR7 yesterday, rel-volume 1.8×, 1h &amp; 1D uptrend, sector strongest</code></pre></div>
 <p>Swing tickets from daily bars: signal known at close; trigger typically &quot;buy-stop above today&#39;s high
 tomorrow&quot; or &quot;enter at open if gap within limits&quot;.</p>
+<p>The ticket is what the planner (P7) shows; the model above evaluates the same conditions at every closed bar. What an <code>at_close</code> entry fills at (&quot;at trigger-candle close, limit +0.1 %&quot;) is the simulator&#39;s
+decision (P3-03), not the model&#39;s.</p>
+<p><strong>As the simulator realises the ticket (P3-03b, <a href="../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.html">ADR 0038</a>; the first stage of P3-03, <a href="../adr/0037-simulation-conventions-and-the-two-stage-seam.html">ADR 0037</a> decisions D3, D4, D5 and D7, filled the entry at the open with exact prices and is superseded by it).</strong> The simulator walks the entry and the exit of an intraday ticket on 1-minute bars with <strong>modelled fills</strong>, and says so on every trade and in the header of a run (<code>fills: modelled</code>, or <code>fills: exact</code> when the slippage is switched off; <code>entry limit: +0.1 %</code>; <code>costs: none</code>). Costs are P3-03c.</p>
+<ul>
+<li><em>Entry.</em> &quot;At trigger-candle close, limit +0.1 % max&quot; cannot be filled at the close: the bar has closed. The entry is a <strong>limit order</strong> placed when the trigger bar has closed, at the trigger close +0.1 % rounded down to the instrument&#39;s tick (a sell: −0.1 %, up). It lives for the first minute that holds a trade at or after the decision instant (at most five minutes after it, on the same day, before the square-off) and fills at that minute&#39;s <strong>open</strong> when the open is within the limit, at the <strong>limit</strong> when the minute trades back to it, and otherwise is a counted miss (<code>LimitNotReached</code>), never filled later; a miss spends the day&#39;s ticket. No such minute, or one at or after the square-off, is no trade (<code>NoFillBar</code>, <code>AfterSquareOff</code>). A fill at or through the stop is no trade (<code>EntryThroughStop</code>). A minute with volume 0 holds no trade. All are counted.</li>
+<li><em>Stop and target.</em> Risk per unit is <code>|entry − stop|</code> of the exact entry; with <code>FIXED_RR</code> the target is the entry plus <code>rr</code> times that risk (minus for a sell). Touching a level counts. <strong>Stop first:</strong> a minute that holds both is a stop, unless its open is already beyond the target (the first print decides for the target). A stop that the market gapped through fills at that minute&#39;s <strong>open</strong>; a target fills at the target and never better. After an entry at the limit only the stop is checked in the fill minute.</li>
+<li><em>Slippage and the tick.</em> Market-type fills (the entry at the open, stop, square-off and end-of-data exits) pay <code>(1 + extra) ticks + 5 % of the minute&#39;s range</code> against the trade (2 extra ticks on stops: doc 16), rounded on the instrument&#39;s tick grid; a resting limit (the entry at the limit, the target) does not slip. Every trade carries the exact result (<code>RExact</code>) beside the modelled one (<code>RFilled</code>) and their difference (<code>SlippageR</code>).</li>
+<li><em>Square-off.</em> The always-on <code>SESSION_EXIT</code>: the first minute that holds a trade and starts at or after the square-off time (15:15) leaves at its open; if that open is already beyond the stop or the target, that level is what fills. A position still open when the day&#39;s data ends leaves at the last close and is
+reported apart (<code>EndOfData</code>), never among the trades that statistics count.</li>
+<li><em>Result.</em> R, MAE and MFE in units of the risk; the minute in which the position leaves counts as ADR 0038 decision D5b says (stop first is assumed because the path inside a minute is unknown). The partial exit, the break-even
+move and the trail of the ticket above are P4 (the entry and the exit are separate stages so that exit policies can be compared on the same entries).</li>
+</ul>
+<p><strong>As the scanner realises the trigger (P3-03a, <a href="../adr/0037-simulation-conventions-and-the-two-stage-seam.html">ADR 0037</a> Amendment 1).</strong> The entry scanner is the first stage: it asks the sections only at a step where a bar of the evaluation timeframe closed, so &quot;the trigger is true at 09:45&quot; means the 09:30 bar closed at 09:45
+and the order can only be placed in the minute that follows. It makes <strong>at most one candidate per instrument, side and day: the first</strong>; a stop-out does not arm the pattern again, and BUY and SELL are independent (both can have
+a candidate on one day). An <code>invalidate</code> that turns true cancels the day&#39;s entries not yet taken, and one that turns true after the entry changes nothing. A bar closed late by the first minute of the next date is never traded.
+The scanner makes a candidate with the stop level and the reason (the conditions and the values they read), nothing about the exit; the counters say why a rule did not fire (the day was outside the window, the setup was false,
+the trigger came twice, the invalidation was unknown, the stop had no value yet). The simulator runs <code>at_close</code> entries and the stop at the opposite end of the opening range only; the other entry kinds and stops are refused by name (doc 11 §3).</p>
 <h2 id="3-starter-library">3. Starter library<a class="hash" href="#3-starter-library" aria-label="Link to this section">#</a></h2>
 <p>Each mirrored for SELL where sensible. Most cells will fail qualification — expected and healthy.</p>
 <p><strong>Intraday (5m–1h):</strong> <code>ORB</code> (opening-range breakout) · <code>PDH_PDL_BREAK</code> / <code>PDH_PDL_REJECT</code> (previous-day
@@ -154,6 +176,32 @@ high/low) · <code>VWAP_PULLBACK</code> · <code>VWAP_RECLAIM</code> · <code>EM
 <p><strong>Swing (1h/1D, ≤ 5 sessions):</strong> <code>BASE_BREAKOUT</code> · <code>TREND_PULLBACK</code> (20 EMA / 50 DMA) · <code>NR7_ID_BO</code> ·
 <code>RSI2_REVERSION</code> (above/below 200 DMA) · <code>BB_SQUEEZE</code> · <code>HIGH_52W_MOMENTUM</code> · <code>FAILED_BREAKOUT</code> ·
 <code>RS_ROTATION</code> (strongest stocks in strongest sectors).</p>
+<p><strong>Per-session levels in the rules language.</strong> The intraday cells are built on levels of the session (<code>ORB</code>: <code>or_high</code> / <code>or_low</code>; <code>PDH_PDL_*</code> and <code>GAP_*</code>: <code>prev_day.*</code>, <code>gap_pct</code>; <code>VWAP_*</code>: <code>vwap</code>). These features keep the history of the session only (<a href="../adr/0035-per-session-features-keep-the-history-of-the-session-only.html">ADR 0035</a>, <a href="11-strategy-lab.html">doc 11</a> §2 <em>Lags</em>), so a crossing of one of them (<code>crosses_above(close, vwap)</code>) is unknown at the first evaluation of a session and can first be true at the second bar of the timeframe, and unknown never fires an entry; a break through yesterday&#39;s high or low is written in the level form (<code>close &gt; prev_day.high and close[1] &lt;= prev_day.high</code>), which is known from the first bar and also catches a gap through the level. A valid window such as the <code>ORB</code> 09:30–11:30 (a <code>time</code> comparison) is a trading rule, not a guard the language needs to stay correct. On 1D (the swing cells) nothing restarts and a lag is by position; on 1h the intraday rule holds.</p>
+<p><strong><code>ORB</code> v1 as built (P3-03a, <code>OrbV1.Create(orMinutes = 15, rewardRisk = 2.0)</code> in <code>XDrishti.Strategies.BuiltIn</code>).</strong> The first rule set the simulator runs, approved by the owner on 2026-10-18 as a <strong>bare breakout</strong>: the filters of the ticket above (NR7 yesterday, relative volume, trend) are added one at a time after the first hand check of its trades. Id <code>ORB</code>, intraday, evaluated on 5m or 15m (the 10m and 30m cells do not compile with a 15-minute opening range: not applicable), BUY and SELL, one parameter <code>or_min = 15</code>, entry at the close of the trigger bar (realised as above: a limit order at +0.1 %, filled in the next minute), no setup, no invalidate, no filters, the stop on the opposite end of the opening range (<code>or_opposite</code>, no buffer), exactly one <code>FIXED_RR</code> exit with <code>rr = 2.0</code> (the square-off at 15:15 is always on), entries accepted from 09:30 to 11:30.</p>
+<table>
+<thead>
+<tr>
+<th>Side</th>
+<th>Trigger (one condition)</th>
+<th>Stop</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>BUY</td>
+<td><code>close &gt; or_high(or_min) and close[1] &lt;= or_high(or_min)</code></td>
+<td><code>or_low(or_min)</code></td>
+</tr>
+<tr>
+<td>SELL (written out by hand, the automatic mirror is P3-02e)</td>
+<td><code>close &lt; or_low(or_min) and close[1] &gt;= or_low(or_min)</code></td>
+<td><code>or_high(or_min)</code></td>
+</tr>
+</tbody></table>
+<p>A 15-minute bar closes above the high of the first 15 minutes while the bar before it did not (SELL: below the low). The level form is used because <code>or_high</code> keeps the history of the session only (above): the level is read at lag 0 and
+the lagged series is the close, so the condition is known from the first bar of the day, and a trigger that is false on the first bar is False, not unknown. On 15m the opening range is the first bar; <code>or_min = 30</code> is two bars, and
+<code>or_min = 20</code> is refused on 15m (not a whole number of bars). The target is two times the risk by default and the walker fills the entry in the minute after the decision (at the open or at the +0.1 % limit), so a breakout that gaps through the opposite
+end of the range at that open is no trade (<code>EntryThroughStop</code>, counted) and one that opens above the limit and does not trade back to it is a miss (<code>LimitNotReached</code>, counted). A figure from the simulator for this strategy is a signal-level result per instrument, in-sample, with modelled fills (the entry limit of +0.1 %, slippage on the tick grid; ADR 0038) and no costs.
+The builder is the interim source of the built-in <code>ORB</code> until P3-02d seeds it as stored text (ADR 0002); the stored text and its hash then replace it as the version.</p>
 <h2 id="4-multi-timeframe-mapping">4. Multi-timeframe mapping<a class="hash" href="#4-multi-timeframe-mapping" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -229,7 +277,7 @@ high/low) · <code>VWAP_PULLBACK</code> · <code>VWAP_RECLAIM</code> · <code>EM
 </tr>
 <tr>
 <td>Market context</td>
-<td>Index trend/ADX, VIX level/percentile/change, breadth — <strong>built in P3-01c</strong> as the features <code>index_trend</code>, <code>index_adx</code>, <code>index_vol_pct</code>, <code>vix</code>, <code>vix_pct</code>, <code>vix_chg</code>, <code>breadth</code>, <code>regime_trend</code>, <code>regime_vol</code>, <code>regime</code>: daily, as of the previous session (<a href="11-strategy-lab.html">doc 11</a> §2, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>); the computation of breadth and <code>sector_rs</code> follow in P3-01d</td>
+<td>Index trend/ADX, VIX level/percentile/change, breadth — <strong>built in P3-01c</strong> as the features <code>index_trend</code>, <code>index_adx</code>, <code>index_vol_pct</code>, <code>vix</code>, <code>vix_pct</code>, <code>vix_chg</code>, <code>breadth</code>, <code>regime_trend</code>, <code>regime_vol</code>, <code>regime</code>: daily, as of the previous session (<a href="11-strategy-lab.html">doc 11</a> §2, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>); the computation of breadth follows in P3-01e and the index and VIX series in P3-01d (both after the P3 exit check, see the <a href="18-roadmap.html">roadmap</a>); <code>sector_rs</code> is not planned until a strategy needs it</td>
 </tr>
 <tr>
 <td>Calendar</td>
@@ -308,7 +356,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-16 16:11</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 19:52</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

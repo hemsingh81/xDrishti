@@ -319,6 +319,26 @@ public sealed class KernelTests
         double.IsNaN(Kernel.Divide(2, double.NaN)).ShouldBeTrue();
     }
 
+    // ---- values ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    [Fact]
+    public void The_value_is_the_one_after_the_last_closed_bar_and_the_value_at_a_lag_is_the_one_after_the_bar_that_many_bars_back()
+    {
+        var spec = Specs.Close(XDrishti.Domain.Market.Bars.Timeframe.M1);
+        var frame = Frames.Of(new XDrishti.Indicators.FrameOptions { HistoryDepth = 4 }, spec);
+        var handle = frame.HandleOf(spec);
+        foreach (var close in new double[] { 10, 20, 30 })
+        {
+            frame.Step(Clock.Close(Clock.Mon, Clock.Open + (int)close, close));
+        }
+
+        Kernel.Value(frame, handle).ShouldBe(30);
+        Kernel.ValueAt(frame, handle, 0).ShouldBe(30, "a lag of 0 is the value itself");
+        Kernel.ValueAt(frame, handle, 1).ShouldBe(20);
+        Kernel.ValueAt(frame, handle, 2).ShouldBe(10);
+        double.IsNaN(Kernel.ValueAt(frame, handle, 3)).ShouldBeTrue("only three bars have closed");
+    }
+
     // ---- time ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
     private static double CloseMinuteAfter(params long[] epochs)

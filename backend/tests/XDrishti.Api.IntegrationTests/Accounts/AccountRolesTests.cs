@@ -13,7 +13,7 @@ public sealed class AccountRolesTests(ApiFactory factory) : IAsyncLifetime
 
     public async ValueTask InitializeAsync() => await factory.ResetAccountsAsync();
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync() => await factory.ResetAccountsAsync();
 
     private static async Task<AccountDetail> RolesAsync(HttpClient client, Guid id, object roles) =>
         await (await client.PutJsonAsync($"/api/accounts/{id}/roles", roles, Ct)).ReadAsync<AccountDetail>(Ct);

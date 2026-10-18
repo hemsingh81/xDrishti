@@ -38,20 +38,30 @@ public sealed class FrameHistoryTests
         var closedByStep = IndicatorCatalog.SupportedTimeframes.ToDictionary(t => t, t => FrameReference.ClosedByStep(bars, t));
         var expected = specs.Select(s => ReferenceIndicators.Compute(s, [.. closedByStep[s.Timeframe].SelectMany(x => x).Select(b => b.AsBar)])).ToList();
         var closedSoFar = specs.Select(_ => 0).ToArray();
+        var sessionBars = specs.Select(_ => new SessionBars()).ToArray();
         frame.HistoryDepth.ShouldBe(depth);
 
         for (var t = 0; t < bars.Count; t++)
         {
             frame.Step(bars[t]);
             var everyLag = t % 61 == 0 || t == bars.Count - 1;
+            var minuteDate = SessionClock.DateOf(bars[t].EpochSeconds);
             for (var h = 0; h < specs.Count; h++)
             {
                 closedSoFar[h] += closedByStep[specs[h].Timeframe][t].Count;
+                foreach (var bucket in closedByStep[specs[h].Timeframe][t])
+                {
+                    sessionBars[h].Closed(bucket);
+                }
+
+                // ADR 0035: the twelve per-session features on an intraday timeframe keep the history of the date of the minute just fed only (S bars); before it the history ran on by position, which is what
+                // this test pinned (P3-01b criterion 2, "including across session boundaries") for every feature, and still does for the others
+                var known = SessionBars.Restarts(specs[h]) ? sessionBars[h].Known(minuteDate) : int.MaxValue;
                 var lags = everyLag ? Enumerable.Range(0, depth) : new[] { 0, 1, depth - 1 }.Where(l => l < depth).Distinct();
                 foreach (var lag in lags)
                 {
                     var index = closedSoFar[h] - 1 - lag;
-                    var want = index < 0 ? double.NaN : expected[h][index];
+                    var want = index < 0 || lag >= known ? double.NaN : expected[h][index];
                     var got = frame.At(h, lag);
                     if (!Tolerance.Same(want, got) || frame.IsReadyAt(h, lag) == double.IsNaN(want))
                     {
@@ -211,6 +221,9 @@ public sealed class FrameHistoryTests
         for (var t = 0; t < bars.Count; t++)
         {
             frame.Step(bars[t]);
+
+            // ADR 0035: at the first minute of a new India date the history of a per-session feature on an intraday timeframe is forgotten, so the shift invariant is for the other steps (and for every other feature)
+            var newDate = t > 0 && SessionClock.DateOf(bars[t].EpochSeconds) != SessionClock.DateOf(bars[t - 1].EpochSeconds);
             foreach (var timeframe in timeframes)
             {
                 var closed = frame.ClosedBarsAt(timeframe);
@@ -225,7 +238,7 @@ public sealed class FrameHistoryTests
                     {
                         var got = frame.At(h, lag);
                         // after c closes, the value at lag k + c is the one that was at lag k before the step (a recorded value is never rewritten)
-                        if (closed == 0 || lag >= closed)
+                        if ((closed == 0 || lag >= closed) && !(newDate && SessionBars.Restarts(specs[h])))
                         {
                             var want = lag - closed >= 0 ? before[h][lag - closed] : double.NaN;
                             if (!Tolerance.Identical(want, got))
@@ -340,6 +353,41 @@ public sealed class FrameHistoryTests
         }
 
         frame.At(0, 2).ShouldBe(BarFixtures.Walk(BarFixtures.Mon, Minutes.Open, 375)[^1].Close);
+    }
+
+    [Fact]
+    public void The_session_values_on_a_daily_lane_run_across_the_days_without_a_break_nothing_restarts_on_1D()
+    {
+        // ADR 0035 restarts the twelve per-session names on 1m to 1h only: a daily bar is a whole session, so a lag on 1D is by position. today_open of a day is its first bar's open, gap_pct is
+        // (that open - the last close of the day before) / that close · 100, both read from the fixture's own bars
+        var frame = FeatureFrame.Create([new FeatureSpec("today_open", Timeframe.D1), new FeatureSpec("gap_pct", Timeframe.D1), new FeatureSpec("prev_day_close", Timeframe.D1)]).Value;
+        var days = new[] { BarFixtures.Mon, BarFixtures.Tue, BarFixtures.Wed };
+        var series = days.Select(d => BarFixtures.Walk(d, Minutes.Open, 375)).ToList();
+        double Gap(int day) => (series[day][0].Open - series[day - 1][^1].Close) / series[day - 1][^1].Close * 100;
+
+        foreach (var (bars, index) in series.Select((b, i) => (b, i)))
+        {
+            foreach (var bar in bars)
+            {
+                frame.Step(bar);
+            }
+
+            frame.At(0, 0).ShouldBe(bars[0].Open);
+            if (index > 0)
+            {
+                frame.At(0, 1).ShouldBe(series[index - 1][0].Open, "yesterday's open one daily bar back");
+                frame.At(2, 0).ShouldBe(series[index - 1][^1].Close, "the previous day's close");
+                frame.At(1, 0).ShouldBe(Gap(index), 1e-9);
+            }
+
+            if (index > 1)
+            {
+                frame.At(1, 1).ShouldBe(Gap(index - 1), 1e-9, "gap_pct one daily bar back is yesterday's gap");
+                frame.At(2, 1).ShouldBe(series[index - 2][^1].Close, "prev_day_close one back is the close of the day before yesterday");
+            }
+        }
+
+        frame.At(0, 2).ShouldBe(series[0][0].Open);
     }
 
     [Fact]

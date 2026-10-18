@@ -158,7 +158,8 @@ public sealed class DividendImportApiTests(ApiFactory factory) : BrokerHistoryTe
         (await CountAsync("SELECT count(*) FROM portfolio.dividend_aliases WHERE name_key = 'example co' AND holding_id IS NOT NULL")).ShouldBe(1);
         (await EventsAsync("DividendAliasSaved")).ShouldBe(1);
         (await EventsAsync("DividendsImported")).ShouldBe(1);
-        (await CountAsync("SELECT count(*) FROM accounts.account_events WHERE detail LIKE '%Example Co%' OR detail LIKE '%dividend-payout%' OR detail LIKE '%300%'")).ShouldBe(0);
+        // The amount 300 as a number of its own: a bare LIKE '%300%' also matched the random batch id in the audit text ("batch <guid>") about one run in a hundred.
+        (await CountAsync("SELECT count(*) FROM accounts.account_events WHERE detail LIKE '%Example Co%' OR detail LIKE '%dividend-payout%' OR detail ~ '(^|[^0-9a-fA-F-])300([^0-9a-fA-F-]|$)'")).ShouldBe(0);
     }
 
     [Fact]

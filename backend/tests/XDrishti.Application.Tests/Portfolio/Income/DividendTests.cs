@@ -37,7 +37,7 @@ public sealed class DividendTests
         s.Fx.Dividends.Dividends.ShouldHaveSingleItem().CreatedBy.ShouldBe(Actor);
         var audit = s.Fx.Events(AccountEventType.DividendAdded).ShouldHaveSingleItem();
         audit.Detail.ShouldBe($"Dividend {view.Id} added");
-        audit.Detail!.ShouldNotContain("1234");
+        audit.Detail!.Replace(view.Id.ToString(), string.Empty, StringComparison.Ordinal).ShouldNotContain("1234"); // without the id: a random id can contain any short run of digits
         audit.AccountId.ShouldBe(s.Account.Id);
     }
 
@@ -163,7 +163,7 @@ public sealed class DividendTests
         s.Fx.Dividends.Dividends.ShouldHaveSingleItem().IsVoided.ShouldBeTrue();
         var audit = s.Fx.Events(AccountEventType.DividendVoided).ShouldHaveSingleItem();
         audit.Detail.ShouldBe($"Dividend {added.Id} voided");
-        audit.Detail!.ShouldNotContain("98765");
+        audit.Detail!.Replace(added.Id.ToString(), string.Empty, StringComparison.Ordinal).ShouldNotContain("98765");
     }
 
     [Fact]

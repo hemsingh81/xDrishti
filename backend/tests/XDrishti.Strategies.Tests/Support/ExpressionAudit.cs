@@ -9,10 +9,12 @@ namespace XDrishti.Strategies.Tests.Support;
 internal sealed record AuditReport(IReadOnlyList<string> Violations, IReadOnlySet<string> Methods);
 
 /// <summary>
-/// Reads an expression tree the compiler made and says what it can do — the structural half of "a compiled condition cannot look ahead", which no property test over the feed can see. A condition may call only the
-/// public functions of <see cref="Kernel"/> and <c>Math.Abs/Min/Max</c> on doubles; may touch the frame only through <c>Kernel.Value</c>, <c>ValueAt</c> and <c>CloseMinute</c>, handing them the frame it was given;
-/// may hold no object but numbers (no closure over a frame, a bar or a list); may use no member access, construction, invocation or indexing other than the handle array; and the lag it hands to
-/// <c>ValueAt</c> is a sum of non-negative whole numbers and the loop counter of a run, never a subtraction, a negation or a negative constant: a feature is read at the lag written or further back, never nearer.
+/// Reads an expression tree the compiler made and says what it can do — the structural half of "a compiled condition cannot look ahead", which no property test over the feed can see. It proves three things: <b>no negative
+/// lag</b> (the lag handed to <c>Kernel.ValueAt</c> is a sum of non-negative whole numbers and the loop counter of a run, never a subtraction, a negation or a negative constant, so the future cannot be read at all: the
+/// frame throws for a lag below 0), an <b>additive shape</b>, and <b>kernel-only access</b> (a condition may call only the public functions of <see cref="Kernel"/> and <c>Math.Abs/Min/Max</c> on doubles; may touch the
+/// frame only through <c>Kernel.Value</c>, <c>ValueAt</c> and <c>CloseMinute</c>, handing them the frame it was given; may hold no object but numbers; and may use no member access, construction, invocation or indexing other
+/// than the handle array). It does <b>not</b> prove that a lag is exactly the one written, or that the clock is the right one: a tree that reads a feature one bar closer than written, or <c>time</c> a minute ahead, passes
+/// it. That is held by the interpreter oracle and the hand examples, and <c>InterpreterOracleTests</c> carries a mutant control that shows the oracle corpus notices such a tree.
 /// </summary>
 internal static class ExpressionAudit
 {
@@ -86,20 +88,20 @@ internal static class ExpressionAudit
                 Violations.Add("Kernel." + node.Method.Name + " is not given the frame the condition was given");
             }
 
-            if (node.Method.Name == nameof(Kernel.ValueAt) && node.Method.DeclaringType == typeof(Kernel) && !IsNeverNearer(node.Arguments[2]))
+            if (node.Method.Name == nameof(Kernel.ValueAt) && node.Method.DeclaringType == typeof(Kernel) && !IsNeverNegative(node.Arguments[2]))
             {
-                Violations.Add("a lag that can be nearer than the one written: " + node.Arguments[2]);
+                Violations.Add("a lag that can be below zero: " + node.Arguments[2]);
             }
 
             return base.VisitMethodCall(node);
         }
 
-        /// <summary>A sum of whole numbers that are not negative and of the counter of a run (which starts at 1 and only counts up): the one shape of a lag the compiler builds.</summary>
-        private static bool IsNeverNearer(Expression lag) => lag switch
+        /// <summary>A sum of whole numbers that are not negative and of the counter of a run (which starts at 1 and only counts up): the one shape of a lag the compiler builds, and one that is never below zero.</summary>
+        private static bool IsNeverNegative(Expression lag) => lag switch
         {
             ConstantExpression { Value: int value } => value >= 0,
             ParameterExpression { Type: var type } => type == typeof(int),
-            BinaryExpression { NodeType: ExpressionType.Add } sum => IsNeverNearer(sum.Left) && IsNeverNearer(sum.Right),
+            BinaryExpression { NodeType: ExpressionType.Add } sum => IsNeverNegative(sum.Left) && IsNeverNegative(sum.Right),
             _ => false,
         };
     }

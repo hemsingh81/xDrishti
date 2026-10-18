@@ -141,10 +141,10 @@ internal sealed class BarQueries(NpgsqlDataSource dataSource) : IBarQueries
 
     public async ValueTask<BarsInstrument?> FindInstrumentAsync(Guid id, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand("SELECT id, canonical_symbol, name FROM market.instruments WHERE id = @id");
+        await using var command = dataSource.CreateCommand("SELECT id, canonical_symbol, name, tick_size FROM market.instruments WHERE id = @id");
         command.Parameters.AddWithValue("id", id);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? new BarsInstrument(reader.GetGuid(0), reader.GetString(1), reader.GetString(2)) : null;
+        return await reader.ReadAsync(cancellationToken) ? new BarsInstrument(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), await reader.IsDBNullAsync(3, cancellationToken) ? null : reader.GetDecimal(3)) : null;
     }
 
     public async ValueTask<IReadOnlyList<BarRow>> ReadBarsAsync(Guid instrumentId, Timeframe timeframe, int take, CancellationToken cancellationToken)

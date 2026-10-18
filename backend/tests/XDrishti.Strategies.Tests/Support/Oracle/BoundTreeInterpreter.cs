@@ -7,9 +7,10 @@ namespace XDrishti.Strategies.Tests.Support.Oracle;
 /// <summary>
 /// The same oracle as <see cref="Interpreter"/>, over the <i>bound</i> tree the compiler is built from (<c>CompiledCondition.Tree</c>) instead of over the model: a tree-walking interpreter written from the spec's
 /// Definitions that reads the frame through its public members and calls nothing of <c>XDrishti.Strategies.Compilation</c>. It exists to tell where a difference comes from: when the model interpreter and this one
-/// agree and the compiled delegate differs, the compiler is wrong; when the two interpreters differ, the binder (or the printer's text) is.
+/// agree and the compiled delegate differs, the compiler is wrong; when the two interpreters differ, the binder (or the printer's text) is. The per-session features are read from the
+/// <see cref="SessionReference"/>, as in <see cref="Interpreter"/>.
 /// </summary>
-internal sealed class BoundTreeInterpreter(FeatureFrame frame)
+internal sealed class BoundTreeInterpreter(FeatureFrame frame, SessionReference? sessions = null)
 {
     private const long IndiaOffsetSeconds = 19_800;
 
@@ -31,6 +32,11 @@ internal sealed class BoundTreeInterpreter(FeatureFrame frame)
         }
 
         var lag = feature.Lag + extra;
+        if (SessionReference.Covers(feature.Spec))
+        {
+            return (sessions ?? throw new InvalidOperationException("The condition reads " + feature.Spec + ", a per-session feature: the interpreter needs a SessionReference.")).Read(frame.SpecOf(handle), lag);
+        }
+
         if (!frame.IsReadyAt(handle, lag))
         {
             return double.NaN;

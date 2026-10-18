@@ -204,7 +204,7 @@ internal sealed partial class Binder
         var problems = scope.CatalogAnswer(spec);
         foreach (var problem in problems)
         {
-            var field = problem.Field[(problem.Field.IndexOf('.', StringComparison.Ordinal) + 1)..];
+            var field = CatalogCheck.FieldOf(problem);
             if (field == "timeframe")
             {
                 scope.Error(

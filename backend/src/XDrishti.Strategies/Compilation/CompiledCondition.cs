@@ -101,7 +101,7 @@ public sealed class CompiledCondition
     }
 
     /// <summary>The feature as it is written in a call, <c>rsi(14)</c>, <c>close</c>.</summary>
-    private static string Describe(in FeatureSpec spec)
+    internal static string Describe(in FeatureSpec spec)
     {
         if (!IndicatorCatalog.TryGet(spec.Name, out var info) || info.Parameters.Count == 0)
         {

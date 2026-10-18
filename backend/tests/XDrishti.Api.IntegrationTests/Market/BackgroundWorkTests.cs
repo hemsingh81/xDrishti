@@ -10,6 +10,7 @@ using XDrishti.Api.Platform;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Refresh;
+using XDrishti.Application.Platform.Services;
 
 namespace XDrishti.Api.IntegrationTests.Market;
 
@@ -72,12 +73,9 @@ public sealed class BackgroundWorkTests(ApiFactory factory) : MarketTestBase(fac
     [Fact]
     public async Task The_service_stays_off_when_the_configuration_seeds_it_switched_off()
     {
-        await using var off = Factory.WithWebHostBuilder(b =>
-        {
-            b.UseSetting("Instruments:AutoRefresh:Enabled", "false");
-            b.ConfigureTestServices(services => services.AddHostedService<ServiceSchedulerHost>());
-        });
+        await using var off = Factory.WithWebHostBuilder(b => b.UseSetting("Instruments:AutoRefresh:Enabled", "false"));
         var client = await SignInAsync(off);
+        await off.Services.GetRequiredService<ServiceScheduler>().StartUpAsync(Ct); // what the hosted scheduler does at start, called here so the seeding is finished before the request
 
         using var response = await client.GetAsync("/api/services/instrument-master", Ct);
         var service = await response.ReadAsync<XDrishti.Application.Platform.Services.ServiceView>(Ct);

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.SimExport\XDrishti.SimExport.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The fabricated runs (FabricatedRun), the word list (ForbiddenWords) and the golden-file helper, shared with the other test projects: one source file, compiled into each project that needs it. -->
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <Using Include="XDrishti.Tests.Shared" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The golden files of the export (see GoldenFile): the tests find them next to the binaries. -->
+    <Content Include="Golden\*.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

@@ -58,7 +58,8 @@ public static class ConditionParser
             {
                 problems.Add(new Problem(
                     SyntaxCodes.TooDeep,
-                    "The condition is nested too deeply: its structure is more than " + MaxNesting + " levels deep (a chain of operators adds one level per operator). Split it into simpler conditions.",
+                    "The condition is nested too deeply: its structure is more than " + MaxNesting + " levels deep. Every function call, `not`, minus sign and subscript, and every operator in a row (`and`, `or`, `+`, `-`, `*`, `/`), adds one level,"
+                        + " so about 60 conditions joined by `and` is the most one condition can hold. Split it into several conditions.",
                     tree.Span));
                 return Failed(problems, source);
             }
@@ -89,12 +90,13 @@ public static class ConditionParser
             return new ParseResult(null, ordered);
         }
 
-        // More than can be listed: the first MaxProblems in the order of the text, and one problem that says so, for the text after them.
+        // More than can be listed: the first MaxProblems found, in the order of the text (the lexical problems are found before the syntax ones, an unclosed bracket after the problems inside it), and one problem that says
+        // so, for the text after them. The note does not quote a limit: the recovery may also stop because it ran out of parses, with only a problem or two listed.
         var listed = ordered.Length > MaxProblems ? ordered[..MaxProblems] : ordered;
         var rest = SourceText.SpanOf(source, Math.Min(listed[^1].Span.End, source.Length), source.Length);
         var more = new Problem(
             SyntaxCodes.TooManyProblems,
-            "There are more problems than are listed: the first " + listed.Length + " are shown (the limit is " + MaxProblems + "). Fix them and read the condition again to see the rest.",
+            "There are more problems than are listed: the first " + listed.Length + " are shown. Fix them and read the condition again to see the rest.",
             rest);
         return new ParseResult(null, [.. listed, more]);
     }
