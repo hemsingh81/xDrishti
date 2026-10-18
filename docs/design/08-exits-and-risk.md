@@ -10,19 +10,25 @@
 
 | Policy | Description | Key parameters |
 |--------|-------------|----------------|
-| `FIXED_RR` | Full exit at k×R or stop | k ∈ {1.5, 2, 2.5, 3} |
+| `FIXED_RR` | Full exit at k×R or stop | `rr`: a list of candidate k, each in (0, 10], e.g. {1.5, 2, 2.5, 3} |
 | `PARTIAL_BE` | Book x% at T1, stop → breakeven, rest at T2 | x, T1, T2 |
-| `PARTIAL_TRAIL` | Book x% at T1, trail remainder | x, T1, trail |
+| `PARTIAL_TRAIL` | Book x% at T1, trail remainder | `book_pct` in (0, 100), `t1_rr` in (0, 10], `trail_atr_mult` in (0, 20], optional whole `atr_period` (14) — the trail is the ATR in schema 1 |
 | `ATR_TRAIL` | Chandelier/ATR trail after activation | period, multiple, activate_at |
 | `STRUCTURE_TRAIL` | Trail beyond prior swing / previous candle | lookback |
 | `EMA_TRAIL` | Exit on close beyond EMA | length |
 | `PYRAMID` | Add at progress levels, trail combined position | see §4 |
-| `TIME_STOP` | Exit if not ≥ +x R after N bars/sessions | x, N |
+| `TIME_STOP` | Exit if not ≥ +x R after N bars/sessions — an **overlay**, not a candidate | x, N |
 | `SESSION_EXIT` | Intraday square-off | time |
 | `MAX_HOLD` | Swing exit at end of session N | N ≤ 5 |
-| `EVENT_EXIT` | Exit before results | days before |
+| `EVENT_EXIT` | Exit before results — an **overlay**, not a candidate | days before |
 
-`SESSION_EXIT` (intraday) and `MAX_HOLD` (swing) are always on.
+`SESSION_EXIT` (intraday) and `MAX_HOLD` (swing) are always on: they come from the time rules of §5, not from the list of candidates.
+
+**As built (P3-02b, [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md)).** The strategy model (`XDrishti.Strategies.Model`) lists the **candidate** policies in `exits` (the seven above the line, each once; the Lab
+compares them on the same entries, §3) and the **overlays** `time_stop` and `event_exit` in `overlays` (at most one of each, applied to every candidate, the doc 16 `exits.overlays`). The compile checks the
+parameters of `FIXED_RR` and `PARTIAL_TRAIL` (names, scalar or list, ranges) and, for the other five candidates and the overlays, only their shape (a name, one to ten values, each a finite number or a parameter of the
+strategy). **Every parameter of a policy that P3 does not run is provisional until P4 runs it**: its name or range may change in P3-02b2 (the full tables, written together with P4 so that the names are not
+guessed) without a new schema version, as long as no stored strategy uses it. `FIXED_RR` is the one policy the P3 simulator runs; the others are accepted by the model and refused by name by the simulator.
 
 ## 3. How the exit is chosen
 
@@ -55,10 +61,14 @@ Used only where the cell shows trend persistence (fat MFE tail), mostly 30m+ and
 
 | Rule | Intraday | Swing |
 |------|----------|-------|
-| Latest entry | e.g. 14:30 | Signal valid N sessions (default 1) |
-| Forced exit | Square-off (e.g. 15:15) | Close of session ≤ 5 |
-| Time stop | e.g. < +0.5R after 6 bars | e.g. < +0.5R after 2 sessions |
+| Earliest and latest entry | `first_entry` (e.g. 09:30) and `last_entry` (e.g. 14:30); both inclusive: the bar that closes at those times is still allowed | Signal valid N sessions (default 1) — not in the model of P3-02b |
+| Forced exit | `square_off` (e.g. 15:15), required | `max_hold_sessions`, 1 to 5, required: close of session ≤ 5 |
+| Time stop | e.g. < +0.5R after 6 bars (the `time_stop` overlay) | e.g. < +0.5R after 2 sessions (the `time_stop` overlay) |
 | Overnight gap | — | Gap through stop ⇒ filled at open (simulated realistically) |
+
+The four time rules of a strategy are `first_entry`, `last_entry`, `square_off` and `max_hold_sessions` (the `time_rules` of [doc 11](11-strategy-lab.md) §2); [doc 16](16-configuration.md) spells the same four
+`first_entry_time`, `last_entry_time`, `square_off_time` and `max_holding_sessions` in its `styles` block. A stored strategy carries its own: the numbers of the configuration are not defaults for a missing
+time rule, so that the same stored text (and hash) always means the same behaviour.
 
 ## 6. Position sizing (per account)
 

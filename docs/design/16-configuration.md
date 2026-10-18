@@ -160,14 +160,14 @@ timeframes:
   enabled: [5m, 10m, 15m, 30m, 1h, 1D]
   bias_map: { 5m: [15m, 1h], 10m: [30m, 1h], 15m: [1h, 1D], 30m: [1h, 1D], 1h: [1D], 1D: [1W] }
 
-styles:
+styles:                            # first_entry_time, last_entry_time, square_off_time and max_holding_sessions are the configuration spelling of the four time rules of a strategy (first_entry, last_entry, square_off, max_hold_sessions: doc 08 §5, doc 11 §2); a stored strategy carries its own, these numbers are not defaults for one that lacks a rule
   intraday: { enabled: true, first_entry_time: "09:30", last_entry_time: "14:30", square_off_time: "15:15" }
   swing:    { enabled: true, max_holding_sessions: 5, signal_valid_sessions: 1 }
 
 strategies:                        # built-ins enabled by id; your own strategies live in the Strategy Lab library (database)
   enabled: [ORB, VWAP_PULLBACK, EMA_PULLBACK, PDH_PDL_BREAK, BASE_BREAKOUT, TREND_PULLBACK, RSI2_REVERSION, NR7_ID_BO]
 
-exits:
+exits:                             # the strategy model (P3-02b) checks the parameters of FIXED_RR and PARTIAL_TRAIL; the names below of the other policies and of the overlays are provisional until P3-02b2/P4 settle them (PARTIAL_TRAIL and EMA_TRAIL are in doc 08 §2 only, not in this list)
   candidate_policies:
     - { id: FIXED_RR, rr: [1.5, 2.0, 2.5, 3.0] }
     - { id: PARTIAL_BE, book_pct: 50, t1_rr: 1.0, t2_rr: [2.0, 3.0] }

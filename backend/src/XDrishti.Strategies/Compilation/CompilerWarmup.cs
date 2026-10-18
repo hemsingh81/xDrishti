@@ -16,6 +16,10 @@ namespace XDrishti.Strategies.Compilation;
 /// second call does the work again). It does not catch an exception: a source that stopped compiling is a defect that the tests of this library find, and the host that calls it logs and ignores any failure.
 /// </para>
 /// <para>
+/// Since P3-02b it also compiles the strategy definitions of <see cref="WarmupStrategies"/> (valid ones on both sides, then invalid ones) through <see cref="StrategyCompiler.Compile"/>, and binds the sides that compiled to
+/// a frame and evaluates them once, so that the model checks, the stop and exit compile, the side compile and the list-level evaluation are compiled to machine code too (about 30 ms of one core more: 60 to 63 ms became 92 to 95 ms, ADR 0036).
+/// </para>
+/// <para>
 /// The sets are only as good as their coverage: a language element the sets never use is compiled by the first real request, and that costs (a set without the time of day, the timeframes, the market context, most of the catalog and most error paths made the first request take 16 ms instead of 4). So the unit
 /// tests of the library prove that the sets use every builtin, operator, bound node, catalog feature, timeframe and kind of problem, and a new element of the language fails them until it is added here.
 /// </para>
@@ -166,7 +170,51 @@ public static class CompilerWarmup
             }
         }
 
-        return new Outcome(compiled.Count, bound, refused);
+        var (strategiesCompiled, strategiesBound, strategiesRefused) = WarmStrategies();
+        return new Outcome(compiled.Count, bound, refused, strategiesCompiled, strategiesBound, strategiesRefused);
+    }
+
+    /// <summary>What a host does with a strategy: compile the side, make the frame from its features, bind it and evaluate it once; then the definitions that are refused.</summary>
+    private static (int Compiled, int Bound, int Refused) WarmStrategies()
+    {
+        var compiled = 0;
+        var bound = 0;
+        var context = MarketContext.Create([]);
+        foreach (var item in WarmupStrategies.Valid)
+        {
+            if (StrategyCompiler.Compile(item.Definition, item.Timeframe, item.Side).Compiled is not { } side)
+            {
+                continue;
+            }
+
+            compiled++;
+            if (!context.IsSuccess)
+            {
+                continue;
+            }
+
+            var options = new FrameOptions { HistoryDepth = side.HistoryDepth, Context = context.Value, ExpiryDays = new HashSet<DateOnly>() };
+            var frame = FeatureFrame.Create(side.Features, options);
+            if (frame.IsSuccess)
+            {
+                var sideBound = side.Bind(frame.Value);
+                var truths = new Truth[side.Items.Count];
+                _ = sideBound.Evaluate(frame.Value, truths);
+                _ = sideBound.InEntryWindow(frame.Value);
+                bound++;
+            }
+        }
+
+        var refused = 0;
+        foreach (var item in WarmupStrategies.Invalid)
+        {
+            if (!StrategyCompiler.Compile(item.Definition, item.Timeframe, item.Side).IsSuccess)
+            {
+                refused++;
+            }
+        }
+
+        return (compiled, bound, refused);
     }
 
     /// <summary>One condition of a set: the text, and the timeframe of the strategy it is compiled for (5m, the one most strategies run on, unless the case is about another).</summary>
@@ -176,6 +224,9 @@ public static class CompilerWarmup
         public CompileContext Context => new(Timeframe, Parameters);
     }
 
-    /// <summary>What a pass did: the conditions of <see cref="Valid"/> that compiled, how many of them were bound to a frame (which builds the delegate), and the conditions of <see cref="Invalid"/> that were refused, as they should be.</summary>
-    internal readonly record struct Outcome(int Compiled, int Bound, int Refused);
+    /// <summary>
+    /// What a pass did: the conditions of <see cref="Valid"/> that compiled, how many of them were bound to a frame (which builds the delegate), and the conditions of <see cref="Invalid"/> that were refused, as they should be;
+    /// and the same three counts for the strategy definitions of <see cref="WarmupStrategies"/>: the valid ones that compiled, the sides bound to a frame and evaluated, and the invalid ones that were refused.
+    /// </summary>
+    internal readonly record struct Outcome(int Compiled, int Bound, int Refused, int StrategiesCompiled, int StrategiesBound, int StrategiesRefused);
 }

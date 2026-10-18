@@ -83,7 +83,7 @@
 <tbody><tr>
 <td><code>FIXED_RR</code></td>
 <td>Full exit at k×R or stop</td>
-<td>k ∈ {1.5, 2, 2.5, 3}</td>
+<td><code>rr</code>: a list of candidate k, each in (0, 10], e.g. {1.5, 2, 2.5, 3}</td>
 </tr>
 <tr>
 <td><code>PARTIAL_BE</code></td>
@@ -93,7 +93,7 @@
 <tr>
 <td><code>PARTIAL_TRAIL</code></td>
 <td>Book x% at T1, trail remainder</td>
-<td>x, T1, trail</td>
+<td><code>book_pct</code> in (0, 100), <code>t1_rr</code> in (0, 10], <code>trail_atr_mult</code> in (0, 20], optional whole <code>atr_period</code> (14) — the trail is the ATR in schema 1</td>
 </tr>
 <tr>
 <td><code>ATR_TRAIL</code></td>
@@ -117,7 +117,7 @@
 </tr>
 <tr>
 <td><code>TIME_STOP</code></td>
-<td>Exit if not ≥ +x R after N bars/sessions</td>
+<td>Exit if not ≥ +x R after N bars/sessions — an <strong>overlay</strong>, not a candidate</td>
 <td>x, N</td>
 </tr>
 <tr>
@@ -132,11 +132,16 @@
 </tr>
 <tr>
 <td><code>EVENT_EXIT</code></td>
-<td>Exit before results</td>
+<td>Exit before results — an <strong>overlay</strong>, not a candidate</td>
 <td>days before</td>
 </tr>
 </tbody></table>
-<p><code>SESSION_EXIT</code> (intraday) and <code>MAX_HOLD</code> (swing) are always on.</p>
+<p><code>SESSION_EXIT</code> (intraday) and <code>MAX_HOLD</code> (swing) are always on: they come from the time rules of §5, not from the list of candidates.</p>
+<p><strong>As built (P3-02b, <a href="../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.html">ADR 0036</a>).</strong> The strategy model (<code>XDrishti.Strategies.Model</code>) lists the <strong>candidate</strong> policies in <code>exits</code> (the seven above the line, each once; the Lab
+compares them on the same entries, §3) and the <strong>overlays</strong> <code>time_stop</code> and <code>event_exit</code> in <code>overlays</code> (at most one of each, applied to every candidate, the doc 16 <code>exits.overlays</code>). The compile checks the
+parameters of <code>FIXED_RR</code> and <code>PARTIAL_TRAIL</code> (names, scalar or list, ranges) and, for the other five candidates and the overlays, only their shape (a name, one to ten values, each a finite number or a parameter of the
+strategy). <strong>Every parameter of a policy that P3 does not run is provisional until P4 runs it</strong>: its name or range may change in P3-02b2 (the full tables, written together with P4 so that the names are not
+guessed) without a new schema version, as long as no stored strategy uses it. <code>FIXED_RR</code> is the one policy the P3 simulator runs; the others are accepted by the model and refused by name by the simulator.</p>
 <h2 id="3-how-the-exit-is-chosen">3. How the exit is chosen<a class="hash" href="#3-how-the-exit-is-chosen" aria-label="Link to this section">#</a></h2>
 <p><strong>Per cell (weekly):</strong> replay the same historical entries under every candidate policy; choose by
 out-of-sample risk-adjusted expectancy (<code>mean_R − λ·downside_dev_R</code>), requiring minimum samples and stability
@@ -190,19 +195,19 @@ target for late intraday triggers (learned).</p>
 </tr>
 </thead>
 <tbody><tr>
-<td>Latest entry</td>
-<td>e.g. 14:30</td>
-<td>Signal valid N sessions (default 1)</td>
+<td>Earliest and latest entry</td>
+<td><code>first_entry</code> (e.g. 09:30) and <code>last_entry</code> (e.g. 14:30); both inclusive: the bar that closes at those times is still allowed</td>
+<td>Signal valid N sessions (default 1) — not in the model of P3-02b</td>
 </tr>
 <tr>
 <td>Forced exit</td>
-<td>Square-off (e.g. 15:15)</td>
-<td>Close of session ≤ 5</td>
+<td><code>square_off</code> (e.g. 15:15), required</td>
+<td><code>max_hold_sessions</code>, 1 to 5, required: close of session ≤ 5</td>
 </tr>
 <tr>
 <td>Time stop</td>
-<td>e.g. &lt; +0.5R after 6 bars</td>
-<td>e.g. &lt; +0.5R after 2 sessions</td>
+<td>e.g. &lt; +0.5R after 6 bars (the <code>time_stop</code> overlay)</td>
+<td>e.g. &lt; +0.5R after 2 sessions (the <code>time_stop</code> overlay)</td>
 </tr>
 <tr>
 <td>Overnight gap</td>
@@ -210,6 +215,9 @@ target for late intraday triggers (learned).</p>
 <td>Gap through stop ⇒ filled at open (simulated realistically)</td>
 </tr>
 </tbody></table>
+<p>The four time rules of a strategy are <code>first_entry</code>, <code>last_entry</code>, <code>square_off</code> and <code>max_hold_sessions</code> (the <code>time_rules</code> of <a href="11-strategy-lab.html">doc 11</a> §2); <a href="16-configuration.html">doc 16</a> spells the same four
+<code>first_entry_time</code>, <code>last_entry_time</code>, <code>square_off_time</code> and <code>max_holding_sessions</code> in its <code>styles</code> block. A stored strategy carries its own: the numbers of the configuration are not defaults for a missing
+time rule, so that the same stored text (and hash) always means the same behaviour.</p>
 <h2 id="6-position-sizing-per-account">6. Position sizing (per account)<a class="hash" href="#6-position-sizing-per-account" aria-label="Link to this section">#</a></h2>
 <div class="code"><pre><code class="nohighlight">risk_amount = account_capital × risk_per_trade_pct
 qty         = min(risk_amount / |entry − stop|, max_capital_per_trade / entry, liquidity_cap)
@@ -274,7 +282,7 @@ and gaps. Every simulation includes costs.</p>
     <a class="prev" href="07-strategies.html"><small>← Previous  [</small>07 · Strategies</a>
     <a class="next" href="09-learning-engine.html"><small>Next  ] →</small>09 · Learning engine</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 09:35</footer>
+  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 10:58</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-r-multiples" class="d2">1. R-multiples</a>
 <a href="#2-exit-policy-library" class="d2">2. Exit policy library</a>

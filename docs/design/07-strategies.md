@@ -8,16 +8,22 @@
 | `styles` | intraday / swing | intraday |
 | `timeframes` | Allowed entry timeframes | 5m, 15m, 30m |
 | `sides` | BUY / SELL | both |
-| `setup` | Conditions known before the trigger (evaluated tonight) | High relative volume yesterday, NR7, trend filter |
-| `trigger` | What must happen to enter (evaluated tomorrow) | Candle closes above OR-high (BUY) |
-| `valid_window` | When the trigger may fire | 09:30–11:30 |
-| `initial_stop` | Where the idea is wrong | OR opposite side / trigger-candle extreme / k × ATR |
-| `filters` | Context gates | Higher-TF trend agrees; not results day |
-| `invalidation` | Cancel if… | Gap beyond trigger; stop level hit before trigger |
+| `setup` | Conditions that must hold when the trigger fires. Evaluated **together with the trigger** at every closed bar of the evaluation timeframe and ANDed with it (the nightly shortlist of P7 classifies which parts of a setup are knowable at the previous close; the model does not) | High relative volume yesterday, NR7, trend filter, `time >= "09:45"` |
+| `trigger` | What must happen to enter, evaluated at every closed bar | Candle closes above OR-high (BUY) |
+| `time_rules` | The one place for windows: `first_entry` and `last_entry` (the bar that closes at those times is still allowed, both ends inclusive), `square_off` (intraday, required) or `max_hold_sessions` (swing, 1 to 5, required). Replaces the former `valid_window`; a `time >= "09:45"` inside a condition stays legal | 09:30–11:30, square-off 15:15 |
+| `initial_stop` | Where the idea is wrong: `fixed_pct`, `atr_mult`, `swing_low` / `swing_high` (the lowest low / highest high of the last N closed bars of the stop timeframe, trigger bar included), `bar_low` / `bar_high`, `or_opposite`; read on the evaluation timeframe or on an optional timeframe of its own | OR opposite side / trigger-candle extreme / k × ATR |
+| `filters` | Context gates, by name: `not_event_day`, `min_turnover` (accepted and not evaluated until the results calendar and the liquidity data exist) | Higher-TF trend agrees; not results day |
+| `invalidation` | The `invalidate` list: cancel if any of it is true. Covers "gap beyond trigger" (a condition on `today.open` against a level); "stop level hit before trigger" cannot be written as a condition and is not covered | Gap beyond trigger |
 | `params` | ≤ 4 tunable values | OR length, ATR multiple |
 
 Built-in strategies are written in the same rules language users use in the Strategy Lab
 ([doc 11](11-strategy-lab.md)), so there is one way to define a strategy.
+
+**As built (P3-02b, [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md)).** The anatomy is a typed model (`XDrishti.Strategies.Model`, schema 1) that `StrategyCompiler.Compile` checks and compiles side by side. **How the
+sections combine:** at every closed bar of the evaluation timeframe the sections are evaluated together, and an entry is possible when `setup` is true, `trigger` is true and `invalidate` is not true (unknown counts as
+not true, and an unknown invalidation does not fire either; `SideEvaluation.Fires` is the one definition). A stored strategy is **self-contained**: a missing time rule is not filled from the `styles` block of
+[doc 16](16-configuration.md), so the same stored text always means the same behaviour. Each condition of a list is compiled and evaluated as its own condition; the lists are never joined into one text. An intraday
+strategy lists 5m to 1h, a swing strategy 30m, 1h and 1D, and swing SELL is refused (futures only, §7).
 
 ## 2. Conditional trade plans
 
@@ -38,6 +44,9 @@ BUY RELIANCE | INTRADAY | 15m | ORB         basket: Best stocks   account: dhan_
 
 Swing tickets from daily bars: signal known at close; trigger typically "buy-stop above today's high
 tomorrow" or "enter at open if gap within limits".
+
+The ticket is what the planner (P7) shows; the model above evaluates the same conditions at every closed bar. What an `at_close` entry fills at ("at trigger-candle close, limit +0.1 %") is the simulator's
+decision (P3-03), not the model's.
 
 ## 3. Starter library
 

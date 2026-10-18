@@ -33,6 +33,15 @@ public sealed class CompilerWarmupTests
 
     private static readonly BinaryOperator[] Arithmetic = [BinaryOperator.Add, BinaryOperator.Subtract, BinaryOperator.Multiply, BinaryOperator.Divide];
 
+    /// <summary>What a pass must report: every condition compiled and bound, every invalid one refused, and the same for the strategy definitions.</summary>
+    private static CompilerWarmup.Outcome Expected() => new(
+        CompilerWarmup.Valid.Count,
+        CompilerWarmup.Valid.Count,
+        CompilerWarmup.Invalid.Count,
+        WarmupStrategies.Valid.Count,
+        WarmupStrategies.Valid.Count,
+        WarmupStrategies.Invalid.Count);
+
     /// <summary>The conditions of the valid set that compiled (a source that does not is reported by its own test).</summary>
     private static List<CompiledCondition> Compiled() => [.. CompilerWarmup.Valid.Select(c => Compile(c).Condition).OfType<CompiledCondition>()];
 
@@ -127,7 +136,7 @@ public sealed class CompilerWarmupTests
     {
         var outcome = CompilerWarmup.Warm();
 
-        outcome.ShouldBe(new CompilerWarmup.Outcome(CompilerWarmup.Valid.Count, CompilerWarmup.Valid.Count, CompilerWarmup.Invalid.Count));
+        outcome.ShouldBe(Expected());
     }
 
     [Fact]
@@ -139,7 +148,7 @@ public sealed class CompilerWarmupTests
         var threads = Enumerable.Range(0, 4).Select(_ => Task.Run(CompilerWarmup.Run, TestContext.Current.CancellationToken)).ToArray();
 
         Should.NotThrow(() => Task.WaitAll(threads, TestContext.Current.CancellationToken));
-        CompilerWarmup.Warm().ShouldBe(new CompilerWarmup.Outcome(CompilerWarmup.Valid.Count, CompilerWarmup.Valid.Count, CompilerWarmup.Invalid.Count), "the sets are fixed: another pass does the same work");
+        CompilerWarmup.Warm().ShouldBe(Expected(), "the sets are fixed: another pass does the same work");
     }
 
     [Fact]

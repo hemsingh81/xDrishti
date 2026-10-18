@@ -96,33 +96,33 @@
 </tr>
 <tr>
 <td><code>setup</code></td>
-<td>Conditions known before the trigger (evaluated tonight)</td>
-<td>High relative volume yesterday, NR7, trend filter</td>
+<td>Conditions that must hold when the trigger fires. Evaluated <strong>together with the trigger</strong> at every closed bar of the evaluation timeframe and ANDed with it (the nightly shortlist of P7 classifies which parts of a setup are knowable at the previous close; the model does not)</td>
+<td>High relative volume yesterday, NR7, trend filter, <code>time &gt;= &quot;09:45&quot;</code></td>
 </tr>
 <tr>
 <td><code>trigger</code></td>
-<td>What must happen to enter (evaluated tomorrow)</td>
+<td>What must happen to enter, evaluated at every closed bar</td>
 <td>Candle closes above OR-high (BUY)</td>
 </tr>
 <tr>
-<td><code>valid_window</code></td>
-<td>When the trigger may fire</td>
-<td>09:30–11:30</td>
+<td><code>time_rules</code></td>
+<td>The one place for windows: <code>first_entry</code> and <code>last_entry</code> (the bar that closes at those times is still allowed, both ends inclusive), <code>square_off</code> (intraday, required) or <code>max_hold_sessions</code> (swing, 1 to 5, required). Replaces the former <code>valid_window</code>; a <code>time &gt;= &quot;09:45&quot;</code> inside a condition stays legal</td>
+<td>09:30–11:30, square-off 15:15</td>
 </tr>
 <tr>
 <td><code>initial_stop</code></td>
-<td>Where the idea is wrong</td>
+<td>Where the idea is wrong: <code>fixed_pct</code>, <code>atr_mult</code>, <code>swing_low</code> / <code>swing_high</code> (the lowest low / highest high of the last N closed bars of the stop timeframe, trigger bar included), <code>bar_low</code> / <code>bar_high</code>, <code>or_opposite</code>; read on the evaluation timeframe or on an optional timeframe of its own</td>
 <td>OR opposite side / trigger-candle extreme / k × ATR</td>
 </tr>
 <tr>
 <td><code>filters</code></td>
-<td>Context gates</td>
+<td>Context gates, by name: <code>not_event_day</code>, <code>min_turnover</code> (accepted and not evaluated until the results calendar and the liquidity data exist)</td>
 <td>Higher-TF trend agrees; not results day</td>
 </tr>
 <tr>
 <td><code>invalidation</code></td>
-<td>Cancel if…</td>
-<td>Gap beyond trigger; stop level hit before trigger</td>
+<td>The <code>invalidate</code> list: cancel if any of it is true. Covers &quot;gap beyond trigger&quot; (a condition on <code>today.open</code> against a level); &quot;stop level hit before trigger&quot; cannot be written as a condition and is not covered</td>
+<td>Gap beyond trigger</td>
 </tr>
 <tr>
 <td><code>params</code></td>
@@ -132,6 +132,11 @@
 </tbody></table>
 <p>Built-in strategies are written in the same rules language users use in the Strategy Lab
 (<a href="11-strategy-lab.html">doc 11</a>), so there is one way to define a strategy.</p>
+<p><strong>As built (P3-02b, <a href="../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.html">ADR 0036</a>).</strong> The anatomy is a typed model (<code>XDrishti.Strategies.Model</code>, schema 1) that <code>StrategyCompiler.Compile</code> checks and compiles side by side. <strong>How the
+sections combine:</strong> at every closed bar of the evaluation timeframe the sections are evaluated together, and an entry is possible when <code>setup</code> is true, <code>trigger</code> is true and <code>invalidate</code> is not true (unknown counts as
+not true, and an unknown invalidation does not fire either; <code>SideEvaluation.Fires</code> is the one definition). A stored strategy is <strong>self-contained</strong>: a missing time rule is not filled from the <code>styles</code> block of
+<a href="16-configuration.html">doc 16</a>, so the same stored text always means the same behaviour. Each condition of a list is compiled and evaluated as its own condition; the lists are never joined into one text. An intraday
+strategy lists 5m to 1h, a swing strategy 30m, 1h and 1D, and swing SELL is refused (futures only, §7).</p>
 <h2 id="2-conditional-trade-plans">2. Conditional trade plans<a class="hash" href="#2-conditional-trade-plans" aria-label="Link to this section">#</a></h2>
 <p>Intraday entries can&#39;t be fixed the night before, so each plan item is a <strong>conditional ticket</strong> — and the
 simulator tests exactly this ticket on history:</p>
@@ -146,6 +151,8 @@ simulator tests exactly this ticket on history:</p>
   Why     : NR7 yesterday, rel-volume 1.8×, 1h &amp; 1D uptrend, sector strongest</code></pre></div>
 <p>Swing tickets from daily bars: signal known at close; trigger typically &quot;buy-stop above today&#39;s high
 tomorrow&quot; or &quot;enter at open if gap within limits&quot;.</p>
+<p>The ticket is what the planner (P7) shows; the model above evaluates the same conditions at every closed bar. What an <code>at_close</code> entry fills at (&quot;at trigger-candle close, limit +0.1 %&quot;) is the simulator&#39;s
+decision (P3-03), not the model&#39;s.</p>
 <h2 id="3-starter-library">3. Starter library<a class="hash" href="#3-starter-library" aria-label="Link to this section">#</a></h2>
 <p>Each mirrored for SELL where sensible. Most cells will fail qualification — expected and healthy.</p>
 <p><strong>Intraday (5m–1h):</strong> <code>ORB</code> (opening-range breakout) · <code>PDH_PDL_BREAK</code> / <code>PDH_PDL_REJECT</code> (previous-day
@@ -309,7 +316,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 09:35</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 10:58</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

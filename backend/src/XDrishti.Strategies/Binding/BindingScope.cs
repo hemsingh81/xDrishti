@@ -63,10 +63,7 @@ internal sealed class BindingScope(string source, Timeframe evaluationTimeframe,
             }
         }
 
-        var created = FeatureFrame.Create([spec]);
-        IReadOnlyList<FieldError> answer = created.IsSuccess
-            ? []
-            : [.. (created.Error.Fields ?? []).Where(f => !f.Field.StartsWith("options.", StringComparison.Ordinal))];
+        var answer = CatalogCheck.Answer(spec);
         _catalogAnswers.Add(new CatalogAnswerEntry(spec, answer));
         return answer;
     }

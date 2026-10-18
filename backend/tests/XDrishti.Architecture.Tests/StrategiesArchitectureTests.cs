@@ -1,6 +1,4 @@
 using System.Reflection;
-using System.Reflection.Metadata;
-using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using NetArchTest.Rules;
@@ -55,9 +53,9 @@ public sealed class StrategiesArchitectureTests
     [Fact]
     public void The_project_file_references_only_the_domain_and_indicators_projects_and_the_superpower_package()
     {
-        var project = XDocument.Load(RepositoryFile("backend", "src", "XDrishti.Strategies", "XDrishti.Strategies.csproj"));
+        var project = XDocument.Load(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Strategies", "XDrishti.Strategies.csproj"));
 
-        ProjectReferences(project).ShouldBe(["XDrishti.Domain", "XDrishti.Indicators"], "the compiled references can hide a reference the compiler never used; the project file cannot");
+        RepositoryFiles.ProjectReferences(project).ShouldBe(["XDrishti.Domain", "XDrishti.Indicators"], "the compiled references can hide a reference the compiler never used; the project file cannot");
         project.Descendants("PackageReference").Select(r => (string?)r.Attribute("Include")).ShouldBe(["Superpower"]);
         project.Descendants("PackageReference").ShouldAllBe(r => r.Attribute("Version") == null, "versions are set once, in Directory.Packages.props");
         project.Descendants("Reference").ShouldBeEmpty();
@@ -66,7 +64,7 @@ public sealed class StrategiesArchitectureTests
     [Fact]
     public void Superpower_is_pinned_to_one_exact_version_in_the_central_package_file()
     {
-        var packages = XDocument.Load(RepositoryFile("backend", "Directory.Packages.props"));
+        var packages = XDocument.Load(RepositoryFiles.RepositoryFile("backend", "Directory.Packages.props"));
 
         var version = packages.Descendants("PackageVersion").Where(p => (string?)p.Attribute("Include") == "Superpower").Select(p => (string?)p.Attribute("Version")).ShouldHaveSingleItem();
 
@@ -76,8 +74,8 @@ public sealed class StrategiesArchitectureTests
     [Fact]
     public void The_projects_are_in_the_solution_and_the_dockerfile_copies_the_library()
     {
-        var solution = File.ReadAllText(RepositoryFile("backend", "XDrishti.slnx"));
-        var dockerfile = File.ReadAllText(RepositoryFile("backend", "Dockerfile"));
+        var solution = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "XDrishti.slnx"));
+        var dockerfile = File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "Dockerfile"));
 
         solution.ShouldContain("src/XDrishti.Strategies/XDrishti.Strategies.csproj");
         solution.ShouldContain("tests/XDrishti.Strategies.Tests/XDrishti.Strategies.Tests.csproj");
@@ -87,10 +85,10 @@ public sealed class StrategiesArchitectureTests
     [Fact]
     public void The_test_project_references_the_library_and_the_architecture_tests_can_see_it()
     {
-        var tests = XDocument.Load(RepositoryFile("backend", "tests", "XDrishti.Strategies.Tests", "XDrishti.Strategies.Tests.csproj"));
+        var tests = XDocument.Load(RepositoryFiles.RepositoryFile("backend", "tests", "XDrishti.Strategies.Tests", "XDrishti.Strategies.Tests.csproj"));
 
-        ProjectReferences(tests).ShouldBe(["XDrishti.Strategies"]);
-        ProjectReferences(XDocument.Load(RepositoryFile("backend", "tests", "XDrishti.Architecture.Tests", "XDrishti.Architecture.Tests.csproj"))).ShouldContain("XDrishti.Strategies");
+        RepositoryFiles.ProjectReferences(tests).ShouldBe(["XDrishti.Strategies"]);
+        RepositoryFiles.ProjectReferences(XDocument.Load(RepositoryFiles.RepositoryFile("backend", "tests", "XDrishti.Architecture.Tests", "XDrishti.Architecture.Tests.csproj"))).ShouldContain("XDrishti.Strategies");
     }
 
     [Fact]
@@ -108,13 +106,13 @@ public sealed class StrategiesArchitectureTests
     {
         // ISS-12, ADR 0034 amendment 2: the first compile of a process takes about 40 ms (the JIT compiling the compiler), 4 ms after CompilerWarmup.Run. No project outside the library references it yet; the first that does must
         // call the warm-up (from a hosted service, on a thread-pool thread), or its first Lab request pays the 40 ms.
-        var sourceRoot = Path.Combine(Path.GetDirectoryName(RepositoryFile("backend", "Directory.Packages.props"))!, "src");
+        var sourceRoot = Path.Combine(Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "Directory.Packages.props"))!, "src");
         var users = Directory.GetFiles(sourceRoot, "*.csproj", SearchOption.AllDirectories)
-            .Where(file => Path.GetFileNameWithoutExtension(file) != "XDrishti.Strategies" && ProjectReferences(XDocument.Load(file)).Contains("XDrishti.Strategies"))
+            .Where(file => Path.GetFileNameWithoutExtension(file) != "XDrishti.Strategies" && RepositoryFiles.ProjectReferences(XDocument.Load(file)).Contains("XDrishti.Strategies"))
             .Select(Path.GetFileNameWithoutExtension)
             .ToList();
         var callers = Directory.GetFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-            .Where(file => !IsBuildOutput(file) && !IsUnder(file, Path.Combine(sourceRoot, "XDrishti.Strategies")) && CallsTheWarmUp(File.ReadAllText(file)))
+            .Where(file => !RepositoryFiles.IsBuildOutput(file) && !RepositoryFiles.IsUnder(file, Path.Combine(sourceRoot, "XDrishti.Strategies")) && RepositoryFiles.CallsTheWarmUp(File.ReadAllText(file)))
             .ToList();
 
         if (users.Count > 0)
@@ -126,34 +124,10 @@ public sealed class StrategiesArchitectureTests
     [Fact]
     public void The_warm_up_rule_does_see_a_call_and_a_reference()
     {
-        CallsTheWarmUp("_ = Task.Run(CompilerWarmup.Run, cancellationToken);").ShouldBeTrue();
-        CallsTheWarmUp("CompilerWarmup.Run();").ShouldBeTrue();
-        CallsTheWarmUp("// the compiler is warmed up at start").ShouldBeFalse();
-        ProjectReferences(XDocument.Parse("<Project><ItemGroup><ProjectReference Include=\"..\\XDrishti.Strategies\\XDrishti.Strategies.csproj\" /></ItemGroup></Project>")).ShouldBe(["XDrishti.Strategies"]);
-    }
-
-    private static bool CallsTheWarmUp(string source) => source.Contains("CompilerWarmup.Run", StringComparison.Ordinal);
-
-    private static bool IsBuildOutput(string file) => file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal) || file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal);
-
-    private static bool IsUnder(string file, string directory) => file.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.Ordinal);
-
-    private static List<string> ProjectReferences(XDocument project) =>
-        [.. project.Descendants("ProjectReference").Select(r => Path.GetFileNameWithoutExtension(((string?)r.Attribute("Include") ?? string.Empty).Replace('\\', '/')))];
-
-    /// <summary>Finds a file of the repository by walking up from the test binaries (the tests run from a checkout, never from a published image).</summary>
-    private static string RepositoryFile(params string[] parts)
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var candidate = Path.Combine([directory.FullName, .. parts]);
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        throw new FileNotFoundException("The file " + string.Join('/', parts) + " was not found above " + AppContext.BaseDirectory);
+        RepositoryFiles.CallsTheWarmUp("_ = Task.Run(CompilerWarmup.Run, cancellationToken);").ShouldBeTrue();
+        RepositoryFiles.CallsTheWarmUp("CompilerWarmup.Run();").ShouldBeTrue();
+        RepositoryFiles.CallsTheWarmUp("// the compiler is warmed up at start").ShouldBeFalse();
+        RepositoryFiles.ProjectReferences(XDocument.Parse("<Project><ItemGroup><ProjectReference Include=\"..\\XDrishti.Strategies\\XDrishti.Strategies.csproj\" /></ItemGroup></Project>")).ShouldBe(["XDrishti.Strategies"]);
     }
 
     [Fact]
@@ -172,7 +146,7 @@ public sealed class StrategiesArchitectureTests
     [Fact]
     public void Nothing_reads_the_clock_or_touches_files_or_the_network_or_loads_code()
     {
-        var calls = StrategiesScan.MemberReferences(Strategies);
+        var calls = AssemblyScan.MemberReferences(Strategies);
 
         calls.Where(c => c.Type is "System.DateTime" or "System.DateTimeOffset" && c.Member is "get_Now" or "get_UtcNow" or "get_Today").ShouldBeEmpty("DateTime.Now / UtcNow / Today");
         calls.Where(c => c.Type is "System.IO.File" or "System.IO.Directory" or "System.Net.Http.HttpClient" or "System.TimeProvider").ShouldBeEmpty("File, Directory, HttpClient, TimeProvider");
@@ -186,7 +160,7 @@ public sealed class StrategiesArchitectureTests
     public void The_scan_does_find_a_clock_read_and_the_code_from_text_rule_does_catch_a_violation()
     {
         // ClockSentinel (in this test project) reads DateTime.UtcNow and File.Exists on purpose: the scan used above must see both in an assembly.
-        var calls = StrategiesScan.MemberReferences(typeof(ClockSentinel).Assembly);
+        var calls = AssemblyScan.MemberReferences(typeof(ClockSentinel).Assembly);
 
         calls.ShouldContain(c => c.Type == "System.DateTime" && c.Member == "get_UtcNow");
         calls.ShouldContain(c => c.Type == "System.IO.File");
@@ -204,7 +178,7 @@ public sealed class StrategiesArchitectureTests
     [Fact]
     public void The_library_reaches_the_feature_frame_only_through_the_members_of_a_compiled_condition_and_its_binding()
     {
-        var used = StrategiesScan.FrameMembersUsed(Strategies);
+        var used = AssemblyScan.FrameMembersUsed(Strategies);
 
         used.Except(FrameMembers).ShouldBeEmpty("a member of the frame that is not one of the doors of a condition: 'a condition cannot look ahead' rests on the library using only " + string.Join(", ", FrameMembers));
         FrameMembers.Except(used).ShouldBeEmpty("the scan sees every door the library uses; a rule that finds nothing would pass for the wrong reason");
@@ -214,7 +188,7 @@ public sealed class StrategiesArchitectureTests
     public void The_frame_member_rule_does_catch_a_library_that_feeds_or_peeks_at_the_frame()
     {
         // FrameFeedSentinel (in this test project) calls Step, BarClosed and TryLastClosed on a frame on purpose: the scan used above must see them in an assembly and the rule must refuse them.
-        var used = StrategiesScan.FrameMembersUsed(typeof(FrameFeedSentinel).Assembly);
+        var used = AssemblyScan.FrameMembersUsed(typeof(FrameFeedSentinel).Assembly);
 
         used.ShouldContain("Step");
         used.ShouldContain("BarClosed");
@@ -238,12 +212,12 @@ public sealed class StrategiesArchitectureTests
     }
 
     [Fact]
-    public void No_class_has_mutable_static_state() => StrategiesScan.MutableStatics(Strategies).ShouldBeEmpty("static fields must be const or readonly");
+    public void No_class_has_mutable_static_state() => AssemblyScan.MutableStatics(Strategies).ShouldBeEmpty("static fields must be const or readonly");
 
     [Fact]
     public void The_static_state_rule_does_catch_a_violation()
     {
-        StrategiesScan.MutableStatics(typeof(ClockSentinel).Assembly).ShouldContain(name => name.EndsWith("ClockSentinel.Counter", StringComparison.Ordinal));
+        AssemblyScan.MutableStatics(typeof(ClockSentinel).Assembly).ShouldContain(name => name.EndsWith("ClockSentinel.Counter", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -363,57 +337,34 @@ public sealed class StrategiesArchitectureTests
     {
         var namespaces = Strategies.GetExportedTypes().Select(t => t.Namespace).Distinct().ToList();
 
-        namespaces.ShouldBeSubsetOf(["XDrishti.Strategies", "XDrishti.Strategies.Syntax", "XDrishti.Strategies.Binding", "XDrishti.Strategies.Lint", "XDrishti.Strategies.Compilation"]);
+        namespaces.ShouldBeSubsetOf(["XDrishti.Strategies", "XDrishti.Strategies.Syntax", "XDrishti.Strategies.Binding", "XDrishti.Strategies.Lint", "XDrishti.Strategies.Compilation", "XDrishti.Strategies.Model", "XDrishti.Strategies.BuiltIn"]);
+        namespaces.ShouldContain("XDrishti.Strategies.Model", "the typed strategy model of P3-02b (ADR 0036) is a documented public namespace");
+        namespaces.ShouldContain("XDrishti.Strategies.BuiltIn", "the built-in strategies (ORB v1, P3-03a) are a documented public namespace");
     }
 
-    /// <summary>Reads the member and type references recorded in an assembly's metadata, and finds static fields that can change.</summary>
-    private static class StrategiesScan
+    [Fact]
+    public void The_strategy_model_is_plain_data_that_depends_on_no_other_stage_of_the_library()
     {
-        public static List<(string Type, string Member)> MemberReferences(Assembly assembly)
-        {
-            using var stream = File.OpenRead(assembly.Location);
-            using var pe = new PEReader(stream);
-            var reader = pe.GetMetadataReader();
-            var found = new List<(string Type, string Member)>();
-            foreach (var handle in reader.MemberReferences)
-            {
-                var member = reader.GetMemberReference(handle);
-                if (member.Parent.Kind == HandleKind.TypeReference)
-                {
-                    var type = reader.GetTypeReference((TypeReferenceHandle)member.Parent);
-                    found.Add((reader.GetString(type.Namespace) + "." + reader.GetString(type.Name), reader.GetString(member.Name)));
-                }
-            }
+        // P3-02b, criterion 30: sealed records, readonly record structs and enums; the compile reads the model, the model reads nothing of the compile (the cref of a comment is not a dependency)
+        ShouldHaveNone(Types.InAssembly(Strategies).That().ResideInNamespace("XDrishti.Strategies.Model").ShouldNot().HaveDependencyOnAny("XDrishti.Strategies.Compilation", "XDrishti.Strategies.Binding", "XDrishti.Strategies.Syntax", "XDrishti.Strategies.Lint").GetResult());
+        var model = Strategies.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Strategies.Model").ToList();
 
-            foreach (var handle in reader.TypeReferences)
-            {
-                var type = reader.GetTypeReference(handle);
-                found.Add((reader.GetString(type.Namespace) + "." + reader.GetString(type.Name), string.Empty));
-            }
+        model.ShouldNotBeEmpty();
+        model.ShouldAllBe(t => t.IsEnum || t.IsValueType || t.IsSealed, "a model class is a sealed record");
+        model.Where(t => t.IsClass).ShouldAllBe(t => t.GetMethod("<Clone>$") != null, "a class of the model is a record, so that it compares by value");
+    }
 
-            return found;
-        }
+    [Fact]
+    public void The_research_side_is_a_domain_enum_in_its_own_namespace_and_the_strategy_model_does_not_use_the_ledger_trade_side()
+    {
+        var domain = typeof(XDrishti.Domain.Common.Result).Assembly;
 
-        /// <summary>The names of the members of <c>FeatureFrame</c> the assembly references (properties as their accessors, <c>get_Steps</c>), each once.</summary>
-        public static List<string> FrameMembersUsed(Assembly assembly) =>
-            [.. MemberReferences(assembly).Where(c => c.Type == "XDrishti.Indicators.FeatureFrame" && c.Member.Length > 0).Select(c => c.Member).Distinct()];
+        var side = domain.GetType("XDrishti.Domain.Research.Side");
 
-        public static List<string> MutableStatics(Assembly assembly)
-        {
-            var offenders = new List<string>();
-            foreach (var type in assembly.GetTypes().Where(t => t.GetCustomAttribute<CompilerGeneratedAttribute>() is null))
-            {
-                foreach (var field in type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
-                {
-                    if (!field.IsInitOnly && !field.IsLiteral)
-                    {
-                        offenders.Add(type.FullName + "." + field.Name);
-                    }
-                }
-            }
-
-            return offenders;
-        }
+        side.ShouldNotBeNull();
+        side.IsEnum.ShouldBeTrue();
+        side.IsPublic.ShouldBeTrue();
+        ShouldHaveNone(Types.InAssembly(Strategies).ShouldNot().HaveDependencyOn("XDrishti.Domain.Portfolio").GetResult());
     }
 }
 
