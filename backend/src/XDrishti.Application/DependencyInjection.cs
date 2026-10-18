@@ -389,5 +389,6 @@ public static class DependencyInjection
     private static void AddResearch(this IServiceCollection services)
     {
         services.AddScoped<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, RunSimulationHandler>();
+        services.AddScoped<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>, BuildTradeCardsHandler>();
     }
 }

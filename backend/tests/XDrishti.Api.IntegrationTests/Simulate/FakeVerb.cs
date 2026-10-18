@@ -113,11 +113,31 @@ internal sealed class FakeVerb : IDisposable
 
     public FuncHandler<RunSimulationQuery, Result<SimulationRun>> RunHandler { get; private set; } = null!;
 
+    /// <summary>What the second read for the trade cards answers; by default a dense flat day for each key (the run is fabricated, so there are no stored bars to read).</summary>
+    public Func<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>> Cards { get; set; } = FlatDays;
+
+    public FuncHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>> CardsHandler { get; private set; } = null!;
+
     public FuncHandler<GetInstrumentQuery, Result<InstrumentDetail>> InstrumentHandler { get; private set; } = null!;
 
     public Dictionary<string, string?> Configuration { get; }
 
     public string ExportRoot => Root.Root;
+
+    /// <summary>A flat dense day (09:15 to 15:29) at the entry price of each chosen trade, with the 09:15 bar as the opening bar.</summary>
+    public static Result<IReadOnlyList<TradeCardData>> FlatDays(BuildTradeCardsQuery query)
+    {
+        IReadOnlyList<TradeCardData> cards =
+        [
+            .. query.TradeKeys.Select(key =>
+            {
+                var trade = query.Run.Trades.Single(t => t.Trade.Key == key);
+                var bars = Day.Dense(trade.Trade.TradeDate).Start(trade.Trade.EntryPrice).Bars();
+                return new TradeCardData(trade, query.Run.Instruments.Single(i => i.InstrumentId == trade.Trade.InstrumentId), bars, bars[0], null);
+            }),
+        ];
+        return Result.Success(cards);
+    }
 
     public static InstrumentDetail Detail(Guid id, string symbol, string type = "share", decimal? tick = 5m) =>
         new(id, symbol, "NSE", "NSE_EQ", type, symbol, symbol, null, "EQ", 1, tick, null, symbol, null, null, false, false, null, null, null, null, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, null, [], TrackedInfo.Never);
@@ -167,6 +187,8 @@ internal sealed class FakeVerb : IDisposable
                 q => Members.TryGetValue(q.BasketId, out var m) ? Result.Success(m) : Result.Failure<BasketMembers>(XDrishti.Domain.Common.Error.NotFound("baskets.not_found", "no such basket"))));
         RunHandler = new FuncHandler<RunSimulationQuery, Result<SimulationRun>>(q => RunThrows() is { } failure ? throw failure : Run(q));
         services.AddSingleton<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>(RunHandler);
+        CardsHandler = new FuncHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>(q => Cards(q));
+        services.AddSingleton<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>>(CardsHandler);
         if (Writer is not null)
         {
             services.AddSingleton(Writer);

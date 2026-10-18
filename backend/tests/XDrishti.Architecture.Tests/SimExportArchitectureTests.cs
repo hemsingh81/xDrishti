@@ -15,7 +15,7 @@ public sealed class SimExportArchitectureTests
 {
     private static readonly Assembly SimExport = typeof(XDrishti.SimExport.ExportSpellings).Assembly;
 
-    private static readonly string[] DocumentedNamespaces = ["XDrishti.SimExport", "XDrishti.SimExport.Csv", "XDrishti.SimExport.Json", "XDrishti.SimExport.Manifest", "XDrishti.SimExport.Text"];
+    private static readonly string[] DocumentedNamespaces = ["XDrishti.SimExport", "XDrishti.SimExport.Cards", "XDrishti.SimExport.Csv", "XDrishti.SimExport.Json", "XDrishti.SimExport.Manifest", "XDrishti.SimExport.Text"];
 
     private static readonly string[] ForbiddenNamespaces =
     [
@@ -189,6 +189,15 @@ public sealed class SimExportArchitectureTests
         exported.Select(t => t.Namespace ?? string.Empty).Distinct().ShouldBeSubsetOf(DocumentedNamespaces);
         exported.Select(t => t.FullName!["XDrishti.SimExport.".Length..]).Order(StringComparer.Ordinal).ShouldBe(
         [
+            "Cards.CandleSvg",
+            "Cards.CardChoice",
+            "Cards.CardNames",
+            "Cards.CardSelection",
+            "Cards.Html",
+            "Cards.IndexHtml",
+            "Cards.RuleView",
+            "Cards.SeededRank",
+            "Cards.TradeCardHtml",
             "Csv.TradesCsv",
             "ExportSpellings",
             "Json.SimExportJson",

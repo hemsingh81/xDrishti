@@ -15,7 +15,7 @@ internal static class SimulateSummary
     /// <summary>The most skipped instruments listed one per line.</summary>
     public const int MaxSkippedListed = 50;
 
-    public static string Text(SimulationRun run, ExportOutcome outcome, SimulateUniverse universe, SimulatePhases phases, string? connectionString)
+    public static string Text(SimulationRun run, ExportOutcome outcome, SimulateUniverse universe, SimulatePhases phases, int cards, int cap, string? connectionString)
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(outcome);
@@ -32,6 +32,7 @@ internal static class SimulateSummary
         Line(text, "candidates: " + Number(run.Totals.CandidatesInWindow));
         Line(text, "trades: " + Number(run.Trades.Count));
         Line(text, "open at end (the data cut them short): " + Number(run.OpenAtEnd.Count));
+        Line(text, cap == 0 ? "trade cards: none (--cards 0)" : "trade cards: " + Number(cards) + " written (up to " + Number(cap) + " asked for), with index.html");
         Line(text, "entries a flagged day suppressed: " + Number(run.Totals.EntriesSuppressed));
         Ticks(text, run);
         Notes(text, universe, outcome);

@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.SimExport.Cards;
 
 namespace XDrishti.Api.Simulate;
 
@@ -19,13 +20,18 @@ internal sealed record SimulateOptions(
     IReadOnlyDictionary<string, double> Parameters,
     FillsMode Fills,
     bool AcknowledgeCsvAdjusted,
-    bool Force)
+    bool Force,
+    int Cards = SimulateOptions.DefaultCards)
 {
+    /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
+    public const int DefaultCards = 200;
+
     /// <summary>The usage text (stderr on a usage error).</summary>
     public const string Usage =
         "usage:\n"
         + "  simulate --strategy <id> (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
         + "           [--timeframe <5m|15m>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
+        + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
         + "  simulate --list-strategies\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
 
@@ -33,7 +39,7 @@ internal sealed record SimulateOptions(
 
     private const int MaxText = 60;
 
-    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--fills"];
+    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--fills", "--cards"];
 
     private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies"];
 
@@ -130,6 +136,7 @@ internal sealed record SimulateOptions(
         var to = Date(values, "--to", errors);
         var timeframe = ReadTimeframe(values, errors);
         var fills = ReadFills(values, errors);
+        var cards = ReadCards(values, errors);
         var named = ReadParameters(parameters, errors);
         if (errors.Count > 0)
         {
@@ -137,7 +144,7 @@ internal sealed record SimulateOptions(
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force")), []);
+            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), cards), []);
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());
@@ -257,6 +264,22 @@ internal sealed record SimulateOptions(
                 errors.Add("'--fills' must be modelled or no-slippage, '" + Show(mode) + "' is not");
                 return FillsMode.Modelled;
         }
+    }
+
+    private static int ReadCards(Dictionary<string, string> values, List<string> errors)
+    {
+        if (!values.TryGetValue("--cards", out var text))
+        {
+            return DefaultCards;
+        }
+
+        if (text.Length is >= 1 and <= 3 && text.All(char.IsAsciiDigit) && (text.Length == 1 || text[0] != '0') && int.Parse(text, NumberStyles.None, CultureInfo.InvariantCulture) <= CardSelection.MaxCap)
+        {
+            return int.Parse(text, NumberStyles.None, CultureInfo.InvariantCulture);
+        }
+
+        errors.Add("'--cards' must be a whole number from 0 to " + CardSelection.MaxCap.ToString(CultureInfo.InvariantCulture) + ", '" + Show(text) + "' is not");
+        return DefaultCards;
     }
 
     private static Dictionary<string, double> ReadParameters(List<string> parameters, List<string> errors)

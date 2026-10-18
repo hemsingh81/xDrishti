@@ -3,6 +3,7 @@
 # Writes the files of the run under data/exports/sim/<run-id>/ and prints the banner and a summary. It writes nothing to the database.
 #   scripts/simulate.sh --strategy ORB --symbols 'RELIANCE,TCS' --from 2025-01-01 --to 2025-12-31
 #   scripts/simulate.sh --strategy ORB --basket Banks --from 2025-01-01 --to 2025-12-31 --param rr=2
+#   scripts/simulate.sh --strategy ORB --symbols 'RELIANCE,TCS' --from 2025-01-01 --to 2025-12-31 --cards 5   # trade cards: default 200, 0 for none (P3-04c)
 #   scripts/simulate.sh --list-strategies
 # Exit codes: 0 done, 1 refused (nothing written), 2 wrong command line or configuration, 3 failure, 130 cancelled.
 # Start the stack first with deploy/xd-up.sh and the developer database port (compose.dev.yaml, 127.0.0.1:5433). The one secret is the

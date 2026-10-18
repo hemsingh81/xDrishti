@@ -6,6 +6,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
+using XDrishti.SimExport.Cards;
 using XDrishti.SimExport.Csv;
 using XDrishti.SimExport.Json;
 using XDrishti.SimExport.Manifest;
@@ -30,8 +31,8 @@ internal static class SimulateCommand
 
     public const int Cancelled = 130;
 
-    /// <summary>The format string of the files this verb writes; the cards of P3-04c change it to <c>xd-sim-export-2</c>.</summary>
-    public const string ExportFormat = "xd-sim-export-1";
+    /// <summary>The format string of the files this verb writes: <c>xd-sim-export-1</c> was the five files of P3-04b2; the cards and the extra manifest lines of P3-04c make it <c>xd-sim-export-2</c>, with or without cards.</summary>
+    public const string ExportFormat = "xd-sim-export-2";
 
     /// <summary>The longest exception message printed on an unexpected failure.</summary>
     public const int MaxFailureMessage = 300;
@@ -125,8 +126,23 @@ internal static class SimulateCommand
         var run = ran.Value;
         var labels = RunLabels.Of(run, rules);
         var runId = RunId.Of(run.Strategy.Id, run.From, run.To, run.RunKey);
+
+        // selection, then the second read (a stale read refuses with nothing written), then render and write
+        var choices = CardSelection.Choose(run, options.Cards);
+        var cards = await CardsAsync(provider, run, choices, cancellationToken);
+        if (cards.IsFailure)
+        {
+            if (cards.Error.Fields is [{ } field, ..] && cards.Error.Code == SimulationErrors.CardsStaleCode)
+            {
+                SimulateLog.CardsStale(logger, field.Field, field.Code ?? string.Empty);
+            }
+
+            return await RefuseAsync(console, logger, cards.Error.Code, Problems(cards.Error));
+        }
+
         var writer = provider.GetService<ExportFolderWriter>() ?? new ExportFolderWriter();
-        var written = await writer.WriteAsync(root, runId, Files(run, labels, runId), entries => Manifest(run, entries), options.Force, cancellationToken);
+        var extra = ExtraLines(run, options.Cards, choices);
+        var written = await writer.WriteAsync(root, runId, Files(run, labels, runId, options.Cards, choices, cards.Value), entries => Manifest(run, entries, extra), options.Force, cancellationToken);
         if (written.IsFailure)
         {
             return await RefuseAsync(console, logger, written.Error.Code, [written.Error.Message]);
@@ -142,10 +158,15 @@ internal static class SimulateCommand
         {
             var bytes = outcome.Entries.Sum(e => e.Bytes);
             SimulateLog.Written(logger, runId, outcome.Entries.Count + 1, bytes);
+            if (choices.Count > 0)
+            {
+                var cardBytes = outcome.Entries.Where(e => e.Name.StartsWith(CardNames.Folder + "/", StringComparison.Ordinal) || e.Name == CardNames.IndexName).Sum(e => e.Bytes);
+                SimulateLog.CardsWritten(logger, choices.Count, cardBytes);
+            }
         }
 
         await console.Out.WriteAsync(RunBanner.Text(labels));
-        await console.Out.WriteAsync(SimulateSummary.Text(run, outcome, universe, phases, services.GetRequiredService<IConfiguration>()["Database:ConnectionString"]));
+        await console.Out.WriteAsync(SimulateSummary.Text(run, outcome, universe, phases, choices.Count, options.Cards, services.GetRequiredService<IConfiguration>()["Database:ConnectionString"]));
         if (run.Instruments.Count > 0 && run.Instruments.All(i => i.Skipped is not null))
         {
             await console.Error.WriteLineAsync("warning: every instrument was skipped; the skipped list above says why");
@@ -172,16 +193,57 @@ internal static class SimulateCommand
         return new SimulationRequest(options.StrategyId, options.Parameters, timeframe, options.From, options.To, universe.InstrumentIds, universe.BasketId, options.AcknowledgeCsvAdjusted, null, fills);
     }
 
-    private static List<ExportFile> Files(SimulationRun run, RunLabelSet labels, string runId) =>
-    [
-        new("trades.csv", sink => TradesCsv.Write(sink, run.RunKey, run.Trades)),
-        new("open_at_end.csv", sink => TradesCsv.Write(sink, run.RunKey, run.OpenAtEnd)),
-        new("run.json", sink => SimExportJson.Write(sink, run, labels, ExportFormat)),
-        new("README.txt", sink => sink.Write(Encoding.UTF8.GetBytes(RunReadme.Text(labels, runId)))),
-    ];
+    /// <summary>The second read for the chosen trades (spec P3-04c, C2); nothing is read when no card is wanted.</summary>
+    private static async Task<Result<IReadOnlyList<TradeCardData>>> CardsAsync(IServiceProvider provider, SimulationRun run, IReadOnlyList<CardChoice> choices, CancellationToken cancellationToken)
+    {
+        if (choices.Count == 0)
+        {
+            return Result.Success<IReadOnlyList<TradeCardData>>([]);
+        }
 
-    private static (byte[] Manifest, string ExportKey) Manifest(SimulationRun run, IReadOnlyList<ManifestEntry> entries) =>
-        (ExportManifest.Build(ExportFormat, run.RunKey, run.Universe.BasketId, entries, []), ExportKey.Of(ExportFormat, run.RunKey, run.Universe.BasketId, entries, []));
+        var handler = provider.GetRequiredService<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>>();
+        return await handler.HandleAsync(new BuildTradeCardsQuery(run, [.. choices.Select(c => c.Trade.Trade.Key)]), cancellationToken);
+    }
+
+    private static List<ExportFile> Files(SimulationRun run, RunLabelSet labels, string runId, int cap, IReadOnlyList<CardChoice> choices, IReadOnlyList<TradeCardData> cards)
+    {
+        var files = new List<ExportFile>
+        {
+            new("trades.csv", sink => TradesCsv.Write(sink, run.RunKey, run.Trades)),
+            new("open_at_end.csv", sink => TradesCsv.Write(sink, run.RunKey, run.OpenAtEnd)),
+            new("run.json", sink => SimExportJson.Write(sink, run, labels, ExportFormat)),
+            new("README.txt", sink => sink.Write(Encoding.UTF8.GetBytes(RunReadme.Text(labels, runId)))),
+        };
+        if (cap == 0)
+        {
+            return files;
+        }
+
+        files.Add(new ExportFile(CardNames.IndexName, sink => IndexHtml.Write(sink, run, labels, cap, choices)));
+        for (var i = 0; i < choices.Count; i++)
+        {
+            var choice = choices[i];
+            var data = cards[i];
+            files.Add(new ExportFile(CardNames.Of(choice.Number, run.Trades.Count, choice.Trade.Trade), sink => TradeCardHtml.Write(sink, data, run, labels)));
+        }
+
+        return files;
+    }
+
+    /// <summary>The extra lines of the manifest (spec P3-04c, C6): the cap, the number of trades and each chosen trade with its stratum; with no cards only the first two.</summary>
+    private static List<string> ExtraLines(SimulationRun run, int cap, IReadOnlyList<CardChoice> choices)
+    {
+        var lines = new List<string>
+        {
+            "cards.cap=" + cap.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "cards.trades=" + run.Trades.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
+        lines.AddRange(choices.Select(c => "cards.selected=" + c.Trade.Trade.Key + "|" + c.Stratum));
+        return lines;
+    }
+
+    private static (byte[] Manifest, string ExportKey) Manifest(SimulationRun run, IReadOnlyList<ManifestEntry> entries, IReadOnlyList<string> extra) =>
+        (ExportManifest.Build(ExportFormat, run.RunKey, run.Universe.BasketId, entries, extra), ExportKey.Of(ExportFormat, run.RunKey, run.Universe.BasketId, entries, extra));
 
     private static int Usage(SimulateConsole console, IReadOnlyList<string> errors)
     {

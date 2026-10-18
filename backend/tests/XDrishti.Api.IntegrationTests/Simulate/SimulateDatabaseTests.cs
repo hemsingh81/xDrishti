@@ -231,7 +231,7 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
         byBasket.Out.ShouldContain("universe: members as of today");
         byBasket.Out.ShouldContain("database: " + new Uri("tcp://" + HostOf(Factory.AdminConnectionString)).Host);
         ExportManifest.ParseBytes(File.ReadAllBytes(Path.Combine(Path.Combine(temp.Root, "sim", RunId.Of("ORB", D1, D3, basketRun.RunKey)), "manifest.json"))).Value.BasketId.ShouldBe(basket);
-        Directory.EnumerateFiles(symbolsFolder).Select(Path.GetFileName).Order(StringComparer.Ordinal).ShouldBe(["README.txt", "manifest.json", "open_at_end.csv", "run.json", "trades.csv"]);
+        Directory.EnumerateFiles(symbolsFolder).Select(Path.GetFileName).Order(StringComparer.Ordinal).ShouldBe(["README.txt", "index.html", "manifest.json", "open_at_end.csv", "run.json", "trades.csv"]);
     }
 
     private static string HostOf(string connectionString) =>

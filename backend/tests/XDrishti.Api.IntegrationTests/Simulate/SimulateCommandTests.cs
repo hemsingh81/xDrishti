@@ -319,7 +319,7 @@ public sealed partial class SimulateCommandTests : IDisposable
     {
         _verb.AddInstrument("AAA");
 
-        var exit = await _verb.RunAsync(Common, Ct);
+        var exit = await _verb.RunAsync(Common + " --cards 0", Ct);
 
         exit.ShouldBe(0, _verb.Error.ToString());
         var run = FabricatedRun.Standard();
@@ -447,7 +447,9 @@ public sealed partial class SimulateCommandTests : IDisposable
         _verb.Error.ToString().ShouldContain("warning: every instrument was skipped");
         _verb.Out.ToString().ShouldContain("skipped by reason: no_bars 1, tick_size_invalid 1");
         File.ReadAllText(Path.Combine(RunFolder(), "trades.csv")).Split('\n', StringSplitOptions.RemoveEmptyEntries).Length.ShouldBe(1, "a header only");
-        Directory.EnumerateFiles(RunFolder()).Count().ShouldBe(5);
+        Directory.EnumerateFiles(RunFolder()).Count().ShouldBe(6, "the five files and the index, whose table is empty");
+        File.ReadAllText(Path.Combine(RunFolder(), "index.html")).ShouldContain("the run has 0 trades; cards written: 0");
+        Directory.Exists(Path.Combine(RunFolder(), "cards")).ShouldBeFalse();
     }
 
     [Fact]
@@ -616,7 +618,7 @@ public sealed partial class SimulateCommandTests : IDisposable
         exit.ShouldBe(130);
         _verb.Error.ToString().ShouldContain("cancelled after the export was written; it is complete in ");
         var folder = RunFolder();
-        Directory.EnumerateFiles(folder).Count().ShouldBe(5);
+        Directory.EnumerateFiles(folder).Count().ShouldBe(6, "the five files and the index");
         ExportManifest.ParseBytes(File.ReadAllBytes(Path.Combine(folder, "manifest.json"))).IsSuccess.ShouldBeTrue();
         Folders().ShouldNotContain(".staging-");
     }
@@ -649,7 +651,7 @@ public sealed partial class SimulateCommandTests : IDisposable
     // the log lines and the secrets
 
     [Fact]
-    public async Task The_verb_logs_its_own_lines_with_ids_4405_to_4409_and_only_ids_codes_counts_and_the_run_id()
+    public async Task The_verb_logs_its_own_lines_with_ids_4405_to_4410_here_and_only_ids_codes_counts_and_the_run_id()
     {
         _verb.AddInstrument("AAA");
 
@@ -662,10 +664,11 @@ public sealed partial class SimulateCommandTests : IDisposable
         await _verb.RunAsync(Common, Ct);
 
         var lines = _verb.Logs.Lines.ToList();
-        lines.Select(l => l.EventId).Distinct().Order().ShouldBe([4405, 4406, 4407, 4408, 4409]);
+        lines.Select(l => l.EventId).Distinct().Order().ShouldBe([4405, 4406, 4407, 4408, 4409, 4410]);
         lines.Count(l => l.EventId == 4405).ShouldBe(4);
         lines.Single(l => l.EventId == 4406).Arguments.Where(a => a.Key == "Code").Select(a => a.Value).ShouldBe(["simulation.basket_not_found"]);
-        lines.Single(l => l.EventId == 4407).Text.ShouldContain("5 files");
+        lines.Single(l => l.EventId == 4407).Text.ShouldContain("8 files");
+        lines.Single(l => l.EventId == 4410).Arguments.Select(a => a.Key).ShouldBe(["Cards", "Bytes", "{OriginalFormat}"]);
         foreach (var argument in lines.SelectMany(l => l.Arguments).Where(a => a.Key != "{OriginalFormat}"))
         {
             (argument.Value is string or int or long or DateOnly).ShouldBeTrue(argument.Key + " is " + argument.Value?.GetType().Name);

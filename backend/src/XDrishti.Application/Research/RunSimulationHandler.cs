@@ -34,11 +34,6 @@ internal sealed class RunSimulationHandler(
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>
 {
-    private static readonly DateOnly FirstDay = new(SimulationRequestChecks.FirstYear, 1, 1);
-
-    /// <summary>The last minute of the India day (bars start on whole minutes, so 23:59 is the last minute that can hold one).</summary>
-    private static readonly TimeSpan LastMinuteOfDay = new(23, 59, 0);
-
     public async ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -177,7 +172,7 @@ internal sealed class RunSimulationHandler(
         }
 
         var request = context.Request;
-        var raw = await bars.ReadAsync(id, IndiaInstant(FirstDay, TimeSpan.Zero), IndiaInstant(request.To, LastMinuteOfDay), cancellationToken);
+        var raw = await bars.ReadAsync(id, SimulationBounds.From, SimulationBounds.Until(request.To), cancellationToken);
         var factors = await adjustments.GetAsync(id, cancellationToken);
 
         var tick = TickSpec.FromMasterPaise(instrument.TickSize);
@@ -209,10 +204,6 @@ internal sealed class RunSimulationHandler(
         raw.Count > 0
         && through.ContainsKey(id)
         && factors.ActionsAfter(SessionClock.DateOf(raw[0].EpochSeconds)).Any(a => CsvAdjustment.AdjustsTwice(a.ExDate, through, id));
-
-    /// <summary>An India wall-clock time as an instant with offset 0: Npgsql writes a <c>DateTimeOffset</c> to <c>timestamptz</c> only with offset 0 and throws for +05:30.</summary>
-    private static DateTimeOffset IndiaInstant(DateOnly date, TimeSpan timeOfDay) =>
-        new DateTimeOffset(date.Year, date.Month, date.Day, timeOfDay.Hours, timeOfDay.Minutes, 0, IndiaTime.Offset).ToUniversalTime();
 
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
 

@@ -1,0 +1,57 @@
+export xd-sim-export-2
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trade cards of ORB 2024-04-01 to 2026-04-30</title>
+<style>:root{color-scheme:light dark}body{font:14px/1.45 system-ui,sans-serif;margin:0 auto;max-width:1040px;padding:1rem;background:#fff;color:#111}header.banner{border:1px solid currentColor;padding:.5rem 1rem;margin-bottom:1rem}header.banner ul{margin:.25rem 0;padding-left:1.25rem}h1{font-size:1.25rem;margin:.5rem 0}h2{font-size:1rem;margin:1.25rem 0 .25rem;border-bottom:1px solid currentColor}table{border-collapse:collapse;margin:.25rem 0}th,td{border:1px solid #888;padding:.15rem .5rem;text-align:left;vertical-align:top}td.n{text-align:right;font-variant-numeric:tabular-nums}pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:.25rem 0}svg{width:100%;height:auto;font:11px sans-serif}p.note{margin:.25rem 0}@media (prefers-color-scheme:dark){body{background:#111;color:#eee}th,td{border-color:#666}}</style>
+</head>
+<body>
+<header class="banner">
+<ul>
+<li>exploration: signal-level mechanics on past data, not evidence of an edge</li>
+<li>fills: modelled</li>
+<li>entry limit: +0.1 %</li>
+<li>costs: none</li>
+<li>portfolio limits: not simulated</li>
+<li>sample: in-sample</li>
+<li>universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)</li>
+<li>data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)</li>
+<li>engine: not yet verified (P3-08)</li>
+<li>tick: today&#39;s master tick; rounding to the grid is approximate</li>
+<li>opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)</li>
+</ul>
+<details>
+<summary>what the fills do not model</summary>
+<ul>
+<li>not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.</li>
+<li>not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.</li>
+<li>not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.</li>
+<li>not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.</li>
+<li>not modelled: grid_approximate: The tick is today&#39;s tick from the instrument master; old prices can lie on a finer grid or off the grid, so rounding to the tick is approximate.</li>
+<li>not modelled: minute_path: Inside one minute only the open, high, low and close are known; a minute that reaches both stop and target is taken as the stop.</li>
+<li>not modelled: hole_is_no_trade: An absent minute and a minute with no volume are read as a minute without a trade; the order rests through it, up to the 5-minute bound.</li>
+<li>not modelled: one_minute_entry: The entry order lives for one minute; a miss is never retried.</li>
+<li>not modelled: no_latency: The order is live at the instant the trigger bar closes and fills at the first print of the next minute; decision and network latency are zero.</li>
+<li>not modelled: dividends_not_modelled: Cash dividends are neither adjusted in the prices nor received: a position held over an ex-date shows the price drop without the dividend.</li>
+</ul>
+</details>
+</header>
+<main>
+<h1>trade cards of ORB 2024-04-01 to 2026-04-30</h1>
+<p>cards asked for: up to 5; the run has 2 trades; cards written: 2</p>
+<p class="note">The cards are an early look at what the rule does, one trade each. They are chosen by a seeded order (the run key) so that every kind of outcome is shown, which is not a picture of how often each happens. Run key 86e31e4592e6587485599950c50e9a95090ffa79fb130ca035c3761dc1969ce3</p>
+<table>
+<thead><tr><th>number</th><th>symbol</th><th>side</th><th>date</th><th>exit reason</th><th>exact result R</th><th>card</th></tr>
+</thead>
+<tbody>
+<tr><td class="n">1</td><td>NSE:AAA</td><td>BUY</td><td>2026-03-02</td><td>target</td><td class="n">+2.000</td><td><a href="cards/0001-AAA-buy-2026-03-02-target.html">cards/0001-AAA-buy-2026-03-02-target.html</a></td></tr>
+<tr><td class="n">2</td><td>NSE:M&amp;M</td><td>SELL</td><td>2026-03-03</td><td>stop</td><td class="n">-1.000</td><td><a href="cards/0002-M_M-sell-2026-03-03-stop.html">cards/0002-M_M-sell-2026-03-03-stop.html</a></td></tr>
+</tbody>
+</table>
+</main>
+</body>
+</html>
