@@ -25,66 +25,10 @@ public sealed class SimulationArchitectureTests
         "System.TimeProvider", "System.Environment", "System.Random",
     ];
 
-    /// <summary>The frame and the compiler belong to P3-03a: nothing in this slice mentions them.</summary>
+    /// <summary>The frame and the compiler belong to the scanner stage (P3-03a): the walker and the root never mention them (SimulationScannerArchitectureTests holds the library-wide rules).</summary>
     private static readonly string[] NotYet = ["XDrishti.Indicators", "XDrishti.Strategies"];
 
-    private static readonly string[] DocumentedNamespaces = ["XDrishti.Simulation", "XDrishti.Simulation.Walking"];
-
     private static void ShouldHaveNone(ArchResult result) => result.IsSuccessful.ShouldBeTrue("Violations: " + string.Join(", ", result.FailingTypeNames ?? []));
-
-    [Fact]
-    public void The_library_references_only_domain_among_the_projects_and_no_package()
-    {
-        UnexpectedReferences(Simulation).ShouldBeEmpty();
-    }
-
-    [Fact]
-    public void The_reference_rule_does_catch_an_assembly_that_references_other_projects_and_packages()
-    {
-        // This test project references Api, Worker, Feed, Indicators, Strategies and NetArchTest: the rule must see all of them.
-        var violations = UnexpectedReferences(typeof(ClockSentinel).Assembly);
-
-        violations.ShouldContain("XDrishti.Api");
-        violations.ShouldContain("XDrishti.Indicators");
-        violations.ShouldContain(v => v.Contains("NetArchTest", StringComparison.Ordinal));
-    }
-
-    private static List<string> UnexpectedReferences(Assembly assembly)
-    {
-        var referenced = assembly.GetReferencedAssemblies().Select(a => a.Name ?? string.Empty).ToList();
-        var violations = new List<string>();
-        violations.AddRange(referenced.Where(n => n.StartsWith("XDrishti.", StringComparison.Ordinal) && n != "XDrishti.Domain"));
-        violations.AddRange(referenced.Where(n => !n.StartsWith("System.", StringComparison.Ordinal) && !n.StartsWith("XDrishti.", StringComparison.Ordinal) && n is not ("netstandard" or "mscorlib" or "Microsoft.CSharp")));
-        violations.AddRange(referenced.Where(n => n is "System.Net.Http" or "System.Net.Primitives"));
-        return violations;
-    }
-
-    [Fact]
-    public void The_project_file_references_only_the_domain_project_and_no_package()
-    {
-        ProjectFileViolations(XDocument.Load(RepositoryFile("backend", "src", "XDrishti.Simulation", "XDrishti.Simulation.csproj"))).ShouldBeEmpty("the compiled references can hide a reference the compiler never used; the project file cannot");
-    }
-
-    [Fact]
-    public void The_project_file_rule_does_catch_a_project_with_a_package_or_another_project()
-    {
-        const string wrong = "<Project><ItemGroup><ProjectReference Include=\"..\\XDrishti.Domain\\XDrishti.Domain.csproj\" /><ProjectReference Include=\"..\\XDrishti.Indicators\\XDrishti.Indicators.csproj\" /><PackageReference Include=\"Superpower\" /><Reference Include=\"X\" /></ItemGroup></Project>";
-
-        var violations = ProjectFileViolations(XDocument.Parse(wrong));
-
-        violations.ShouldContain("project XDrishti.Indicators");
-        violations.ShouldContain("package Superpower");
-        violations.ShouldContain("reference X");
-    }
-
-    private static List<string> ProjectFileViolations(XDocument project)
-    {
-        var violations = new List<string>();
-        violations.AddRange(ProjectReferences(project).Where(p => p != "XDrishti.Domain").Select(p => "project " + p));
-        violations.AddRange(project.Descendants("PackageReference").Select(r => "package " + (string?)r.Attribute("Include")));
-        violations.AddRange(project.Descendants("Reference").Select(r => "reference " + (string?)r.Attribute("Include")));
-        return violations;
-    }
 
     [Fact]
     public void The_projects_are_in_the_solution_and_the_dockerfile_copies_the_library()
@@ -183,13 +127,6 @@ public sealed class SimulationArchitectureTests
         [.. assembly.GetTypes().Where(t => t.GetCustomAttribute<CompilerGeneratedAttribute>() is null && t.IsClass && !t.IsSealed).Select(t => t.FullName)];
 
     [Fact]
-    public void Public_types_are_only_in_the_documented_namespaces()
-    {
-        Simulation.GetExportedTypes().Select(t => t.Namespace).Distinct().ShouldBeSubsetOf(DocumentedNamespaces);
-        Simulation.GetExportedTypes().Select(t => t.Namespace).Distinct().Count().ShouldBe(DocumentedNamespaces.Length, "both namespaces hold public types");
-    }
-
-    [Fact]
     public void The_walking_namespace_depends_on_the_root_and_the_root_on_nothing_in_walking()
     {
         ShouldHaveNone(Types.InAssembly(Simulation).That().ResideInNamespaceMatching(@"^XDrishti\.Simulation$").ShouldNot().HaveDependencyOn("XDrishti.Simulation.Walking").GetResult());
@@ -201,13 +138,6 @@ public sealed class SimulationArchitectureTests
     {
         // WalkerUserSentinel (this test project) calls TradeWalker: the dependency the root of the library must never have.
         Types.InAssembly(typeof(WalkerUserSentinel).Assembly).That().HaveName(nameof(WalkerUserSentinel)).ShouldNot().HaveDependencyOn("XDrishti.Simulation.Walking").GetResult().IsSuccessful.ShouldBeFalse();
-    }
-
-    [Fact]
-    public void Nothing_in_the_library_mentions_the_indicators_the_strategies_or_the_feature_frame()
-    {
-        ShouldHaveNone(Types.InAssembly(Simulation).That().DoNotHaveNameStartingWith("<>f__AnonymousType").ShouldNot().HaveDependencyOnAny(NotYet).GetResult());
-        SimulationScan.MemberReferences(Simulation).Where(c => c.Type.EndsWith("FeatureFrame", StringComparison.Ordinal)).ShouldBeEmpty();
     }
 
     [Fact]
