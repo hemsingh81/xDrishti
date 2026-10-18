@@ -266,7 +266,7 @@ public sealed class TradeWalkerRuleTests
     public void The_fill_delay_bound_is_read_from_the_engine()
     {
         SimulationEngine.MaxFillDelayMinutes.ShouldBe(5);
-        SimulationEngine.Version.ShouldBe("sim-2");
+        SimulationEngine.Version.ShouldBe("sim-3");
     }
 
     [Theory]

@@ -14,8 +14,9 @@ namespace XDrishti.Simulation.Running;
 /// The two-stage simulator (spec P3-03a, ADR 0037): compiles every listed side of a strategy once, and for each instrument scans the 1-minute bars side by side with an <see cref="EntryScanner"/> and walks every candidate with
 /// the <see cref="TradeWalker"/>. The two stages share nothing but the entry candidate, which carries no exit, so the same entries can be replayed under every exit policy (P4).
 /// <para>
-/// <b>What it runs.</b> An intraday strategy on an evaluation timeframe below one day, entered at the close of the trigger bar, with the stop on the opposite end of the opening range (<c>or_opposite</c>, no buffer), exactly
-/// one <c>FIXED_RR</c> exit with one <c>rr</c> value, no overlay, no filter, no market context and no expiry dates. <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
+/// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe below one day, entered at the close of the trigger bar, with the stop on the
+/// opposite end of the opening range (<c>or_opposite</c>, no buffer), exactly one <c>FIXED_RR</c> exit with one <c>rr</c> value, no overlay, no filter, no market context and no expiry dates. A swing side is held up to its
+/// <c>max_hold_sessions</c> (the entry session counts as the first) and is gated to one open position per instrument and side (<see cref="PositionGate"/>). <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
 /// ignoring it: a result must be what it says it is. A side that does not compile makes <see cref="Create"/> return no simulator; a half strategy is never run.
 /// </para>
 /// <para>
@@ -35,12 +36,16 @@ public sealed class Simulator
     private readonly SideRun[] _sides;
     private readonly FillRules _fills;
 
-    private Simulator(string strategyId, SideRun[] sides, FillRules fills)
+    private Simulator(string strategyId, SideRun[] sides, FillRules fills, bool holdsOvernight)
     {
         _strategyId = strategyId;
         _sides = sides;
         _fills = fills;
+        HoldsOvernight = holdsOvernight;
     }
+
+    /// <summary>The strategy is a swing one: its positions are held across sessions (ADR 0040). The replay excludes such a position at a flagged day, and the cost segment of P3-03c is chosen from it.</summary>
+    public bool HoldsOvernight { get; }
 
     /// <summary>The fill rules every walk of this simulator applies (the default ones when <see cref="Create"/> was given none).</summary>
     public FillRules Fills => _fills;
@@ -82,23 +87,36 @@ public sealed class Simulator
 
         if (evaluationTimeframe >= Timeframe.D1)
         {
-            problems.Add(Refusal("timeframes", SimulatorCodes.ScannerTimeframeUnsupported, "The simulator does not evaluate on " + evaluationTimeframe.ToCode() + ": a bar of a day or longer is always stale at the first minute of the next date (the daily evaluation is P3-03d)."));
+            problems.Add(Refusal("timeframes", SimulatorCodes.ScannerTimeframeUnsupported, "The simulator does not evaluate on " + evaluationTimeframe.ToCode() + ": a bar of a day or longer is always stale at the first minute of the next date (the daily evaluation is P3-03e)."));
         }
 
-        if (definition.Style != Style.Intraday)
-        {
-            problems.Add(Refusal("style", SimulatorCodes.UnsupportedStyle, "The style `" + definition.Style.ToString().ToLowerInvariant() + "` holds positions over sessions; the simulator runs intraday strategies only (swing positions are P3-03d)."));
-        }
-
+        var swing = definition.Style == Style.Swing;
         var runs = new List<SideRun>(compiled.Count);
         foreach (var side in compiled)
         {
             var before = problems.Count;
             RefuseWhatItCannotRun(definition, side, problems);
-            var square = side.TimeRules.SquareOffMinute;
-            if (problems.Count == before && square is { } minute && side.Exits.Count == 1 && side.Exits[0].Values["rr"] is [var rr])
+            if (problems.Count != before)
             {
-                runs.Add(new SideRun(side, rr, minute));
+                continue;
+            }
+
+            // A side that cannot be built always gives a problem: a result must be what it says it is, and a side that is dropped silently would make a half strategy look whole.
+            var hold = side.TimeRules.MaxHoldSessions;
+            var square = side.TimeRules.SquareOffMinute;
+            var name = side.Side == Side.Buy ? "buy" : "sell";
+            var rr = side.Exits[0].Values["rr"][0];   // exactly one FIXED_RR with one rr value: RefuseWhatItCannotRun refused every other shape above
+            if (swing && hold is { } sessions)
+            {
+                runs.Add(new SideRun(side, rr, WalkRules.NoSquareOff, sessions));
+            }
+            else if (!swing && square is { } minute)
+            {
+                runs.Add(new SideRun(side, rr, minute, null));
+            }
+            else
+            {
+                problems.Add(Refusal("time_rules", SimulationErrors.RulesInvalidCode, swing ? "A swing side needs `max_hold_sessions` (1 to 5)." : "An intraday side needs a `square_off` time."));
             }
         }
 
@@ -108,7 +126,7 @@ public sealed class Simulator
             return new SimulatorBuild(null, distinct.AsReadOnly());
         }
 
-        return new SimulatorBuild(new Simulator(definition.Id, [.. runs], fills ?? FillRules.Default), distinct.AsReadOnly());
+        return new SimulatorBuild(new Simulator(definition.Id, [.. runs], fills ?? FillRules.Default, swing), distinct.AsReadOnly());
     }
 
     /// <summary>
@@ -151,17 +169,26 @@ public sealed class Simulator
             }
 
             scans.Add(scanner.Counters);
-            var rules = RulesOf(side, _fills, tick);
-            foreach (var candidate in scanner.Candidates)
+            var rules = RulesOf(side, _fills, tick, calendar);
+            if (rules.IsFailure)
             {
-                var walked = TradeWalker.Walk(candidate, bars, rules);
-                if (walked.IsFailure)
-                {
-                    return Result.Failure<SimulationResult>(walked.Error);
-                }
+                return Result.Failure<SimulationResult>(rules.Error);
+            }
 
-                outcomes.Add(new CandidateOutcome(candidate, walked.Value));
-                walk = walk.Add(walked.Value.ToCounters());
+            // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
+            var sideRules = rules.Value;
+            var walked = HoldsOvernight
+                ? PositionGate.Apply(scanner.Candidates, candidate => TradeWalker.Walk(candidate, bars, sideRules))
+                : WalkAll(scanner.Candidates, bars, sideRules);
+            if (walked.IsFailure)
+            {
+                return Result.Failure<SimulationResult>(walked.Error);
+            }
+
+            foreach (var outcome in walked.Value)
+            {
+                outcomes.Add(outcome);
+                walk = walk.Add(outcome.Walk.ToCounters());
             }
         }
 
@@ -169,8 +196,36 @@ public sealed class Simulator
         return Result.Success(new SimulationResult(HeaderOf(), ordered, scans.AsReadOnly(), walk));
     }
 
-    /// <summary>The one place the rules of a walk are built: the exit rules of the side, the fill rules and the tick of the instrument.</summary>
-    private static WalkRules RulesOf(SideRun side, FillRules fills, TickSpec tick) => new(side.RewardRisk, side.SquareOffMinute, fills, tick);
+    /// <summary>The one place the rules of a walk are built: the exit rules of the side, the fill rules, the tick of the instrument and, for a swing side, the hold counted with the calendar.</summary>
+    private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar)
+    {
+        if (side.MaxHoldSessions is not { } sessions)
+        {
+            return Result.Success(new WalkRules(side.RewardRisk, side.SquareOffMinute, fills, tick));
+        }
+
+        var hold = SwingHold.Create(sessions, calendar);
+        return hold.IsFailure
+            ? Result.Failure<WalkRules>(hold.Error)
+            : Result.Success(new WalkRules(side.RewardRisk, WalkRules.NoSquareOff, fills, tick, hold.Value));
+    }
+
+    private static Result<IReadOnlyList<CandidateOutcome>> WalkAll(IReadOnlyList<EntryCandidate> candidates, IReadOnlyList<Bar> bars, WalkRules rules)
+    {
+        var outcomes = new List<CandidateOutcome>(candidates.Count);
+        foreach (var candidate in candidates)
+        {
+            var walked = TradeWalker.Walk(candidate, bars, rules);
+            if (walked.IsFailure)
+            {
+                return Result.Failure<IReadOnlyList<CandidateOutcome>>(walked.Error);
+            }
+
+            outcomes.Add(new CandidateOutcome(candidate, walked.Value));
+        }
+
+        return Result.Success<IReadOnlyList<CandidateOutcome>>(outcomes);
+    }
 
     /// <summary>The one place the header is built: the first two labels come from the description of the fill rules, the other three are fixed.</summary>
     private SimulationHeader HeaderOf() =>
@@ -247,6 +302,6 @@ public sealed class Simulator
         _ => kind.ToString(),
     };
 
-    /// <summary>A compiled side with what its walks need: the reward-to-risk of its one <c>FIXED_RR</c> and its square-off minute.</summary>
-    private sealed record SideRun(CompiledSide Compiled, double RewardRisk, int SquareOffMinute);
+    /// <summary>A compiled side with what its walks need: the reward-to-risk of its one <c>FIXED_RR</c>, its square-off minute (<see cref="WalkRules.NoSquareOff"/> for a swing side) and, for a swing side, its longest hold in sessions.</summary>
+    private sealed record SideRun(CompiledSide Compiled, double RewardRisk, int SquareOffMinute, int? MaxHoldSessions);
 }

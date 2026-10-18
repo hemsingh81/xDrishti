@@ -31,7 +31,7 @@ internal static class RunText
             + $"bar={t.TriggerBar.EpochSeconds}/{N(t.TriggerBar.Open)}/{N(t.TriggerBar.High)}/{N(t.TriggerBar.Low)}/{N(t.TriggerBar.Close)}/{t.TriggerBar.Volume}/{t.TriggerBarMinutes}/{t.TriggerBarComplete} "
             + $"entry={t.EntryEpochSeconds}@{N(t.EntryPrice)} stop={N(t.StopPrice)} target={N(t.TargetPrice)} exit={t.ExitEpochSeconds}@{N(t.ExitPrice)} reason={t.ExitReason} "
             + $"rExact={N(t.RExact)} mae={N(t.MaeR)} mfe={N(t.MfeR)} fills={t.Fills} costs={t.Costs} snapshot={t.EntrySnapshotJson ?? "null"} rFilled={N(t.RFilled)} slippageR={N(t.SlippageR)} "
-            + $"entryFilled={N(t.EntryFilledPrice)} exitFilled={N(t.ExitFilledPrice)} entryFill={t.EntryFill} tickFallback={t.TickFallback}");
+            + $"entryFilled={N(t.EntryFilledPrice)} exitFilled={N(t.ExitFilledPrice)} entryFill={t.EntryFill} tickFallback={t.TickFallback} sessionsHeld={t.SessionsHeld} sessionsUnseen={t.SessionsUnseen}");
 
     public static string Instrument(InstrumentRun r)
     {
@@ -55,7 +55,7 @@ internal static class RunText
         text.Append(CultureInfo.InvariantCulture, $"  notesTruncated={r.NotesTruncated}\n");
         foreach (var d in r.Discontinuities)
         {
-            text.Append(CultureInfo.InvariantCulture, $"  flagged {D(d.Date)} ratio={N(d.Ratio)}\n");
+            text.Append(CultureInfo.InvariantCulture, $"  flagged {D(d.Date)} ratio={N(d.Ratio)} excludedPositions={d.ExcludedPositions}\n");
         }
 
         foreach (var scan in r.Scans)
@@ -70,7 +70,7 @@ internal static class RunText
     }
 
     public static string Fates(RunFates f) =>
-        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached}");
+        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached} excludedAcrossDiscontinuity={f.ExcludedAcrossDiscontinuity} positionOpen={f.PositionOpen}");
 
     public static string Replay(InstrumentReplay replay)
     {

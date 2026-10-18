@@ -19,6 +19,10 @@ namespace XDrishti.Simulation.Walking;
 /// <b>R, MAE, MFE.</b> In units of the initial risk <c>|entry − stop|</c> of the exact entry; <c>RFilled</c> uses the same unit. Everything is computed in decimal.
 /// </para>
 /// <para>
+/// <b>A swing walk</b> (<see cref="WalkRules.Hold"/> set; ADR 0040) has the same entry (on the decision's date) and the same per-minute rows X2 to X5 and S1 to S4 (<see cref="MinuteRule"/>, one routine for both loops), but no square-off (X7), goes
+/// on over the dates of the position (<see cref="SwingWalk"/>), leaves with <see cref="ExitReason.MaxHold"/> at the close of the due session (X8) and ends with <see cref="ExitReason.EndOfData"/> only when the list of bars ends (X9).
+/// </para>
+/// <para>
 /// Failures that are not an outcome are data: <c>simulation.fill_rules_invalid</c> and <c>simulation.tick_size_invalid</c> (a <see cref="WalkRules"/> that bypassed the factories), <c>simulation.rules_invalid</c> (a stop level or
 /// trigger close that is not a finite number, a reward-to-risk that is not above 0, a square-off minute outside 1 to 1439), <c>simulation.candidate_not_in_bars</c>, <c>simulation.bars_not_ascending</c> (two equal epochs or a
 /// descending pair among the minutes the walk visits; the whole list is checked once by the caller, never per candidate) and <c>simulation.bar_price_invalid</c> (a visited minute whose price is not a finite number).
@@ -72,15 +76,33 @@ public static class TradeWalker
             multiple = converted;
         }
 
-        if (rules.SquareOffMinute is < 1 or > 1439)
+        if (rules.Hold is null && rules.SquareOffMinute is < 1 or > 1439)
         {
             return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.RulesInvalidCode, "The square-off minute must be a minute of the India day, from 1 to 1439 (915 is 15:15)."));
+        }
+
+        if (rules.Hold is not null && rules.SquareOffMinute != WalkRules.NoSquareOff)
+        {
+            return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.RulesInvalidCode, "A swing walk has no square-off: the square-off minute must be WalkRules.NoSquareOff (0)."));
         }
 
         var index = candidate.DecisionBarIndex;
         if ((uint)index >= (uint)bars.Count || bars[index].EpochSeconds != candidate.DecisionEpochSeconds - SecondsPerMinute)
         {
             return Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.CandidateNotInBarsCode, "The candidate's minute is not at its index in the list of bars, or does not end at the decision instant."));
+        }
+
+        // X8: the due session of a swing walk comes from the calendar alone, before any minute is read.
+        var due = default(DateOnly);
+        if (rules.Hold is { } hold)
+        {
+            var found = hold.DueSession(SessionClock.DateOf(bars[index].EpochSeconds));
+            if (found.IsFailure)
+            {
+                return Result.Failure<WalkOutcome>(found.Error);
+            }
+
+            due = found.Value;
         }
 
         // E1: the fill minute is the first minute after the candidate's own that holds a trade (E0), on its date and at most five minutes after the decision instant.
@@ -93,7 +115,7 @@ public static class TradeWalker
             var bar = bars[j];
             if (bar.EpochSeconds <= previousEpoch)
             {
-                return NotAscending();
+                return WalkResults.NotAscending();
             }
 
             previousEpoch = bar.EpochSeconds;
@@ -114,18 +136,18 @@ public static class TradeWalker
 
         if (fillIndex < 0)
         {
-            return NoTrade(NoTradeReason.NoFillBar, 0, zeroMinutes);
+            return WalkResults.NoTrade(NoTradeReason.NoFillBar, 0, zeroMinutes);
         }
 
         var fillBar = bars[fillIndex];
-        if (SessionClock.MinuteOfDay(fillBar.EpochSeconds) >= rules.SquareOffMinute)
+        if (rules.Hold is null && SessionClock.MinuteOfDay(fillBar.EpochSeconds) >= rules.SquareOffMinute)
         {
-            return NoTrade(NoTradeReason.AfterSquareOff, 0, zeroMinutes);
+            return WalkResults.NoTrade(NoTradeReason.AfterSquareOff, 0, zeroMinutes);
         }
 
-        if (!TryRead(fillBar, out var fill))
+        if (!WalkResults.TryRead(fillBar, out var fill))
         {
-            return PriceInvalid();
+            return WalkResults.PriceInvalid();
         }
 
         // E2: the limit is an order price, rounded on the grid in both fill modes so that it never exceeds the limit percent.
@@ -150,13 +172,13 @@ public static class TradeWalker
         }
         else
         {
-            return NoTrade(NoTradeReason.LimitNotReached, 1, zeroMinutes);
+            return WalkResults.NoTrade(NoTradeReason.LimitNotReached, 1, zeroMinutes);
         }
 
         // E6: a fill at or through the stop is no trade.
-        if (Beyond(isBuy, entry, stop))
+        if (MinuteRule.Beyond(isBuy, entry, stop))
         {
-            return NoTrade(NoTradeReason.EntryThroughStop, 1, zeroMinutes);
+            return WalkResults.NoTrade(NoTradeReason.EntryThroughStop, 1, zeroMinutes);
         }
 
         var risk = Math.Abs(entry - stop);
@@ -167,10 +189,12 @@ public static class TradeWalker
             candidate, fillBar.EpochSeconds, isBuy, entry, entryFilled, kind, stop, target, risk, slip,
             fillBar.EpochSeconds > candidate.DecisionEpochSeconds, risk < RiskFloorTicks * tick, rules.Fills.Basis, rules.Tick.FromFallback);
 
-        return Follow(position, bars, fillIndex, rules.SquareOffMinute, entryDate, zeroMinutes);
+        return rules.Hold is { } swing
+            ? SwingWalk.Follow(position, bars, fillIndex, swing, entryDate, due, zeroMinutes)
+            : Follow(position, bars, fillIndex, rules.SquareOffMinute, entryDate, zeroMinutes);
     }
 
-    /// <summary>Visits the minutes from the fill minute on until the position leaves.</summary>
+    /// <summary>Visits the minutes from the fill minute on until the position leaves (the intraday walk of ADR 0038: the entry date only, the square-off at <paramref name="squareOffMinute"/>).</summary>
     private static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, int squareOffMinute, DateOnly entryDate, int zeroBefore)
     {
         var isBuy = position.IsBuy;
@@ -193,7 +217,7 @@ public static class TradeWalker
             {
                 if (bar.EpochSeconds <= previousEpoch)
                 {
-                    return NotAscending();
+                    return WalkResults.NotAscending();
                 }
 
                 previousEpoch = bar.EpochSeconds;
@@ -210,9 +234,9 @@ public static class TradeWalker
             }
 
             examined++;
-            if (!TryRead(bar, out var minute))
+            if (!WalkResults.TryRead(bar, out var minute))
             {
-                return PriceInvalid();
+                return WalkResults.PriceInvalid();
             }
 
             var minuteOfDay = SessionClock.MinuteOfDay(bar.EpochSeconds);
@@ -221,215 +245,46 @@ public static class TradeWalker
             // X1: the first minute that holds a trade at or after the square-off closes the position at its open; its range is not used.
             if (!isFill && minuteOfDay >= squareOffMinute)
             {
-                if (Beyond(isBuy, minute.Open, stop))
+                if (MinuteRule.Beyond(isBuy, minute.Open, stop))
                 {
-                    var (stopLow, stopHigh) = Worsen(isBuy, low, high, minute.Open);
-                    return Close(position, ExitReason.Stop, bar.EpochSeconds, minute.Open, minute, stopLow, stopHigh, examined, zero, new Flags(StopGap: isBuy ? minute.Open < stop : minute.Open > stop));
+                    var (stopLow, stopHigh) = MinuteRule.Worsen(isBuy, low, high, minute.Open);
+                    return Leave(position, ExitReason.Stop, bar.EpochSeconds, minute.Open, minute, stopLow, stopHigh, examined, zero, new ExitFlags(StopGap: isBuy ? minute.Open < stop : minute.Open > stop));
                 }
 
-                if (hasTarget && Reaches(isBuy, minute.Open, target))
+                if (hasTarget && MinuteRule.Reaches(isBuy, minute.Open, target))
                 {
-                    var (targetLow, targetHigh) = Raise(isBuy, low, high, target);
-                    return Close(position, ExitReason.Target, bar.EpochSeconds, target, minute, targetLow, targetHigh, examined, zero, new Flags(TargetGap: isBuy ? minute.Open > target : minute.Open < target));
+                    var (targetLow, targetHigh) = MinuteRule.Raise(isBuy, low, high, target);
+                    return Leave(position, ExitReason.Target, bar.EpochSeconds, target, minute, targetLow, targetHigh, examined, zero, new ExitFlags(TargetGap: isBuy ? minute.Open > target : minute.Open < target));
                 }
 
-                return Close(
-                    position, ExitReason.SquareOff, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, new Flags(LateSquareOff: minuteOfDay > squareOffMinute));
+                return Leave(
+                    position, ExitReason.SquareOff, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, new ExitFlags(LateSquareOff: minuteOfDay > squareOffMinute));
             }
 
-            // X5: in the fill minute of an entry at the limit only the stop is checked; the favourable extreme of that minute may have come before the fill.
-            var atLimitFill = isFill && position.EntryFill == EntryFill.AtLimit;
-            var stopHit = Beyond(isBuy, isBuy ? minute.Low : minute.High, stop);
-            var targetHit = hasTarget && !atLimitFill && Reaches(isBuy, isBuy ? minute.High : minute.Low, target);
-            var openBeyondTarget = hasTarget && Reaches(isBuy, minute.Open, target);
-            var targetGap = hasTarget && (isBuy ? minute.Open > target : minute.Open < target);
-
-            if (targetHit && openBeyondTarget)
+            // X2 to X5: the rows of the exit table, written once (MinuteRule) and shared with the swing loop.
+            var verdict = MinuteRule.Decide(position, minute, isFill, low, high);
+            if (verdict.Exits)
             {
-                // X3 and the exception of X4: the first print is beyond the target, so the target fills there, whatever the minute did next; the minute contributes no range.
-                var (targetLow, targetHigh) = Raise(isBuy, low, high, target);
-                return Close(position, ExitReason.Target, bar.EpochSeconds, target, minute, targetLow, targetHigh, examined, zero, new Flags(TargetGap: targetGap));
+                return Leave(position, verdict.Reason, bar.EpochSeconds, verdict.Exit, minute, verdict.Low, verdict.High, examined, zero, verdict.Flags);
             }
 
-            if (stopHit)
-            {
-                // X2 and X4: the stop, or the open when the market gapped through it; a minute that reaches both is this row, and ambiguous when the open lies strictly between them.
-                var exit = isBuy ? Math.Min(stop, minute.Open) : Math.Max(stop, minute.Open);
-                var (stopLow, stopHigh) = Worsen(isBuy, low, high, exit);
-                var flags = new Flags(StopGap: isBuy ? minute.Open < stop : minute.Open > stop, Ambiguous: targetHit && !Beyond(isBuy, minute.Open, stop));
-                return Close(position, ExitReason.Stop, bar.EpochSeconds, exit, minute, stopLow, stopHigh, examined, zero, flags);
-            }
-
-            if (targetHit)
-            {
-                // X3: the target, never a better price; the adverse side of the minute counts in full.
-                var (targetLow, targetHigh) = Raise(isBuy, low, high, target);
-                var (adverseLow, adverseHigh) = Worsen(isBuy, targetLow, targetHigh, isBuy ? minute.Low : minute.High);
-                return Close(position, ExitReason.Target, bar.EpochSeconds, target, minute, adverseLow, adverseHigh, examined, zero, new Flags(TargetGap: targetGap));
-            }
-
-            (low, high) = atLimitFill ? Worsen(isBuy, low, high, isBuy ? minute.Low : minute.High) : (Math.Min(low, minute.Low), Math.Max(high, minute.High));
+            low = verdict.Low;
+            high = verdict.High;
             last = i;
             zeroAtLast = zero;
         }
 
         // X6: no minute that holds a trade at or after the square-off: the close of the last minute of the date that does.
         var lastBar = bars[last];
-        if (!TryRead(lastBar, out var lastMinute) || !TickGrid.TryConvert(lastBar.Close, out var close))
+        if (!WalkResults.TryRead(lastBar, out var lastMinute) || !TickGrid.TryConvert(lastBar.Close, out var close))
         {
-            return PriceInvalid();
+            return WalkResults.PriceInvalid();
         }
 
-        return Close(position, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, low, high, examined, zeroAtLast, default);
+        return Leave(position, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, low, high, examined, zeroAtLast, default);
     }
 
-    /// <summary>
-    /// Builds the trade. <paramref name="low"/> and <paramref name="high"/> are the extreme prices that count for the excursions, already restricted to what the exit minute may contribute.
-    /// </summary>
-    private static Result<WalkOutcome> Close(in Position position, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, Flags flags)
-    {
-        var candidate = position.Candidate;
-        var isBuy = position.IsBuy;
-        var entry = position.Entry;
-        var risk = position.Risk;
-        var exitFilled = position.Slip.Exit(isBuy, reason, exit, minute.High - minute.Low);
-        var sign = isBuy ? 1m : -1m;
-        var rExact = sign * (exit - entry) / risk;
-        var rFilled = sign * (exitFilled - position.EntryFilled) / risk;
-        var adverse = isBuy ? (entry - low) / risk : (high - entry) / risk;
-        var favourable = isBuy ? (high - entry) / risk : (entry - low) / risk;
-        var trade = new SimTrade(
-            SimTrade.CurrentSchemaVersion,
-            candidate.StrategyId,
-            candidate.Instrument.Id,
-            candidate.Instrument.Symbol,
-            candidate.Side,
-            SessionClock.DateOf(position.FillEpoch),
-            candidate.DecisionEpochSeconds,
-            candidate.TriggerTimeframe,
-            candidate.TriggerBar,
-            candidate.TriggerBarMinutes,
-            candidate.TriggerBarComplete,
-            position.FillEpoch,
-            (double)entry,
-            (double)position.Stop,
-            position.Target is { } target ? (double)target : null,
-            exitEpoch,
-            (double)exit,
-            reason,
-            D(rExact),
-            D(adverse),
-            D(favourable),
-            position.Basis,
-            CostBasis.None,
-            EntrySnapshotJson: null,
-            D(rFilled),
-            D(rFilled - rExact),
-            (double)position.EntryFilled,
-            (double)exitFilled,
-            position.EntryFill,
-            position.TickFallback);
-
-        return Result.Success(new WalkOutcome(trade, null, examined, position.AfterMissingMinutes, flags.StopGap, flags.TargetGap, flags.Ambiguous, flags.LateSquareOff, position.RiskUnderFourTicks, zero));
-    }
-
-    /// <summary>A decimal figure as the double of a <see cref="SimTrade"/> field. A decimal zero can carry a sign (<c>-1m * 0m</c>), and a double <c>-0</c> is printed as "-0" in a golden file or in JSON: zero is always +0.</summary>
-    private static double D(decimal value) => value == 0m ? 0d : (double)value;
-
-    /// <summary>The extremes after the adverse side reaches <paramref name="price"/>: the low of a buy, the high of a sell.</summary>
-    private static (decimal Low, decimal High) Worsen(bool isBuy, decimal low, decimal high, decimal price) =>
-        isBuy ? (Math.Min(low, price), high) : (low, Math.Max(high, price));
-
-    /// <summary>The extremes after the favourable side reaches <paramref name="price"/>: the high of a buy, the low of a sell.</summary>
-    private static (decimal Low, decimal High) Raise(bool isBuy, decimal low, decimal high, decimal price) =>
-        isBuy ? (low, Math.Max(high, price)) : (Math.Min(low, price), high);
-
-    /// <summary>A price at or beyond the stop (a buy: at or below it).</summary>
-    private static bool Beyond(bool isBuy, decimal price, decimal stop) => isBuy ? price <= stop : price >= stop;
-
-    /// <summary>A price at or beyond the target (a buy: at or above it).</summary>
-    private static bool Reaches(bool isBuy, decimal price, decimal target) => isBuy ? price >= target : price <= target;
-
-    private static bool TryRead(Bar bar, out Minute minute)
-    {
-        if (TickGrid.TryConvert(bar.Open, out var open) && TickGrid.TryConvert(bar.High, out var high) && TickGrid.TryConvert(bar.Low, out var low))
-        {
-            minute = new Minute(open, high, low);
-            return true;
-        }
-
-        minute = default;
-        return false;
-    }
-
-    private static Result<WalkOutcome> NoTrade(NoTradeReason reason, int examined, int zeroMinutes) =>
-        Result.Success(new WalkOutcome(null, reason, examined, EntryAfterMissingMinutes: false, StopGapExit: false, TargetGapExit: false, AmbiguousMinute: false, LateSquareOff: false, RiskUnderFourTicks: false, zeroMinutes));
-
-    private static Result<WalkOutcome> NotAscending() =>
-        Result.Failure<WalkOutcome>(Error.Validation(SimulationErrors.BarsNotAscendingCode, "The minutes of the walk are not strictly ascending: two have the same start or one is earlier than the one before."));
-
-    private static Result<WalkOutcome> PriceInvalid() =>
-        Result.Failure<WalkOutcome>(Error.Validation("simulation.bar_price_invalid", "A minute the walk visits has a price that is not a finite number."));
-
-    /// <summary>The open, high and low of a visited minute as decimals.</summary>
-    private readonly record struct Minute(decimal Open, decimal High, decimal Low);
-
-    /// <summary>The facts about the exit that the counters sum.</summary>
-    private readonly record struct Flags(bool StopGap = false, bool TargetGap = false, bool Ambiguous = false, bool LateSquareOff = false);
-
-    /// <summary>What the loop needs to know about the entered position; a stack value, nothing per minute.</summary>
-    private readonly record struct Position(
-        EntryCandidate Candidate,
-        long FillEpoch,
-        bool IsBuy,
-        decimal Entry,
-        decimal EntryFilled,
-        EntryFill EntryFill,
-        decimal Stop,
-        decimal? Target,
-        decimal Risk,
-        Slip Slip,
-        bool AfterMissingMinutes,
-        bool RiskUnderFourTicks,
-        FillBasis Basis,
-        bool TickFallback);
-
-    /// <summary>S1 to S3: the slippage of market-type fills on the price grid of the instrument, in decimal.</summary>
-    private readonly record struct Slip(bool Modelled, decimal Ticks, decimal Extra, decimal Fraction, decimal Tick)
-    {
-        public static Slip Of(SlippageConfig config, decimal tick)
-        {
-            _ = TickGrid.TryConvert(config.Ticks, out var ticks);
-            _ = TickGrid.TryConvert(config.StopExitExtraTicks, out var extra);
-            _ = TickGrid.TryConvert(config.BarRangeFrac, out var fraction);
-            return new Slip(!config.IsNone, ticks, extra, fraction, tick);
-        }
-
-        /// <summary>S2: <c>(Ticks + extra) × tick + BarRangeFrac × range</c> of the minute the fill happens in; the extra ticks are for stop exits.</summary>
-        private decimal Amount(decimal range, bool stopExit) => ((Ticks + (stopExit ? Extra : 0m)) * Tick) + (Fraction * range);
-
-        /// <summary>S3 for an entry at the open: against the trade, on the grid, never past the limit. With no slippage the entry does not move.</summary>
-        public decimal Entry(bool isBuy, decimal entry, decimal limit, decimal range)
-        {
-            if (!Modelled)
-            {
-                return entry;
-            }
-
-            var amount = Amount(range, stopExit: false);
-            return isBuy ? Math.Min(TickGrid.Up(entry + amount, Tick), limit) : Math.Max(TickGrid.Down(entry - amount, Tick), limit);
-        }
-
-        /// <summary>S1 and S3 for an exit: a target is a resting limit and only goes on the grid; every other exit slips against the trade, a stop with the extra ticks. With no slippage nothing moves.</summary>
-        public decimal Exit(bool isBuy, ExitReason reason, decimal exit, decimal range)
-        {
-            if (!Modelled)
-            {
-                return exit;
-            }
-
-            var amount = reason == ExitReason.Target ? 0m : Amount(range, stopExit: reason == ExitReason.Stop);
-            return isBuy ? TickGrid.Down(exit - amount, Tick) : TickGrid.Up(exit + amount, Tick);
-        }
-    }
+    /// <summary>An intraday exit: one session held, none unseen, the position open until the exit instant.</summary>
+    private static Result<WalkOutcome> Leave(in Position position, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, ExitFlags flags) =>
+        WalkResults.Close(position, reason, exitEpoch, exit, minute, low, high, examined, zero, flags, sessionsHeld: 1, sessionsUnseen: 0, holdEnd: exitEpoch);
 }

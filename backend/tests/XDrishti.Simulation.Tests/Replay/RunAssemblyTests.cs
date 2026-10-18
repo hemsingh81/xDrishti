@@ -22,6 +22,7 @@ public sealed class RunAssemblyTests
     private static readonly Dictionary<string, string> GoldenHashes = new()
     {
         ["sim-2"] = "a042eae5c959d0d4cb380d85aeb28ddab4607e39ba5dc71f37f1a2204f51b2f3",
+        ["sim-3"] = "c9aeca544c585699e455e754eef42cb3b63e8cb374910b540b0b56557be61df0",
     };
 
     private static UniverseRecord Universe(params (Guid Id, string Symbol)[] members) =>
@@ -78,7 +79,7 @@ public sealed class RunAssemblyTests
         run.Totals.TradesInWindow.ShouldBe(6);
         run.Totals.Instruments.ShouldBe(2);
         run.Totals.Skipped.ShouldBeEmpty();
-        run.SchemaVersion.ShouldBe(2);
+        run.SchemaVersion.ShouldBe(3);
         run.EngineVersion.ShouldBe(SimulationEngine.Version);
         run.Fills.ShouldBe(strategy.Fills.ToCanonicalJson());
     }

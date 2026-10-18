@@ -15,6 +15,9 @@ namespace XDrishti.Simulation.Replay;
 /// <item><b>Prices</b> are adjusted on a copy (<see cref="ReplayBars"/>); the raw list and the hash of it are never touched.</item>
 /// <item><b>Discontinuities</b>: on the adjusted series a day whose first open differs from the last close of the previous session that ran by more than the threshold (compared in <c>decimal</c>; exactly the threshold is not flagged) is
 /// flagged, gets no entry (the outcomes of its candidates are dropped and counted) and starts a new segment: <see cref="Simulator.Run"/> is called once per segment with fresh frames, so the old price level cannot sit in an average for weeks.</item>
+/// <item><b>Swing positions</b> (ADR 0040, Amendment 4 of ADR 0037): the read ends at <c>To</c>, so a position still open there is <c>EndOfData</c> and goes to <c>OpenAtEnd</c>; a swing position that is open at the end of a segment that a
+/// flagged day follows cannot be followed across it and is excluded and counted (<c>ExcludedAcrossDiscontinuity</c>, and <c>ExcludedPositions</c> of the day's note), by the style of the strategy; every other candidate outcome keeps its one fate,
+/// <c>PositionOpen</c> included.</item>
 /// <item><b>One list.</b> The segments are windows (<see cref="BarSegment"/>) onto one list of fed bars. The scanner of a call steps the list it is given from element 0 and the walker reads that same list, so a candidate's decision
 /// index is its index in it; the replay never feeds the scanner a sub-list it did not also give the walker.</item>
 /// </list>
@@ -148,7 +151,10 @@ public static class InstrumentReplayer
         var walk = WalkCounters.Empty;
         var trades = new List<SimTrade>();
         var openAtEnd = new List<SimTrade>();
-        long suppressed = 0, beforeWindow = 0, noFillBar = 0, afterSquareOff = 0, throughStop = 0, limitNotReached = 0, candidatesInWindow = 0;
+        long suppressed = 0, beforeWindow = 0, excludedAcross = 0, candidatesInWindow = 0;
+        var noTrades = RunFates.Empty;
+        var holdsOvernight = strategy.Simulator.HoldsOvernight;
+        var excludedAtDay = new Dictionary<DateOnly, int>();
         for (var s = 0; s < segmentStarts.Count; s++)
         {
             var firstSession = segmentStarts[s];
@@ -183,6 +189,13 @@ public static class InstrumentReplayer
                     {
                         beforeWindow++;
                     }
+                    else if (trade.ExitReason == ExitReason.EndOfData && holdsOvernight && s + 1 < segmentStarts.Count)
+                    {
+                        // D13: a swing position that was still open when the segment ended, and a flagged day follows, cannot be followed across the discontinuity: excluded and counted (not open at the end, not a trade).
+                        excludedAcross++;
+                        var nextDay = ran[segmentStarts[s + 1]].Date;
+                        excludedAtDay[nextDay] = excludedAtDay.GetValueOrDefault(nextDay) + 1;
+                    }
                     else if (trade.ExitReason == ExitReason.EndOfData)
                     {
                         openAtEnd.Add(trade);
@@ -194,23 +207,7 @@ public static class InstrumentReplayer
                 }
                 else
                 {
-                    switch (outcome.Walk.NoTrade)
-                    {
-                        case NoTradeReason.NoFillBar:
-                            noFillBar++;
-                            break;
-                        case NoTradeReason.AfterSquareOff:
-                            afterSquareOff++;
-                            break;
-                        case NoTradeReason.EntryThroughStop:
-                            throughStop++;
-                            break;
-                        case NoTradeReason.LimitNotReached:
-                            limitNotReached++;
-                            break;
-                        default:
-                            throw new InvalidOperationException("A candidate outcome of instrument " + input.Symbol + " is neither a trade nor a known no-trade reason.");
-                    }
+                    noTrades = noTrades.Add(NoTradeFate(outcome.Walk.NoTrade, input.Symbol));
                 }
             }
 
@@ -229,12 +226,27 @@ public static class InstrumentReplayer
             walk = walk.Add(result.Walk);
         }
 
-        var fates = new RunFates(suppressed, beforeWindow, openAtEnd.Count, trades.Count, noFillBar, afterSquareOff, throughStop, limitNotReached);
-        var scanned = new Scanned(ran[0].Date, new DateSpan(ran[0].Date, ran[^1].Date), scans.AsReadOnly(), walk, fates, flagged.AsReadOnly(), candidatesInWindow, trades.Count + openAtEnd.Count);
+        var fates = noTrades with { EntriesSuppressed = suppressed, TradesBeforeWindow = beforeWindow, OpenAtEnd = openAtEnd.Count, Trades = trades.Count, ExcludedAcrossDiscontinuity = excludedAcross };
+        var notes = flagged.Select(n => excludedAtDay.TryGetValue(n.Date, out var count) ? n with { ExcludedPositions = count } : n).ToList();
+        var scanned = new Scanned(ran[0].Date, new DateSpan(ran[0].Date, ran[^1].Date), scans.AsReadOnly(), walk, fates, notes.AsReadOnly(), candidatesInWindow, trades.Count + openAtEnd.Count);
         trades = [.. trades.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
         openAtEnd = [.. openAtEnd.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
         return (scanned, trades, openAtEnd);
     }
+
+    /// <summary>
+    /// The fate of a candidate that the walker (or the position gate) left without a trade: a <see cref="RunFates"/> with the one field of its reason set to 1. Every member of <see cref="NoTradeReason"/> has a case, and a value that is
+    /// none of them throws, so that a reason added later cannot be dropped silently (a reflection test enumerates the enum).
+    /// </summary>
+    internal static RunFates NoTradeFate(NoTradeReason? reason, string symbol) => reason switch
+    {
+        NoTradeReason.NoFillBar => RunFates.Empty with { NoFillBar = 1 },
+        NoTradeReason.AfterSquareOff => RunFates.Empty with { AfterSquareOff = 1 },
+        NoTradeReason.EntryThroughStop => RunFates.Empty with { EntryThroughStop = 1 },
+        NoTradeReason.LimitNotReached => RunFates.Empty with { LimitNotReached = 1 },
+        NoTradeReason.PositionOpen => RunFates.Empty with { PositionOpen = 1 },
+        _ => throw new InvalidOperationException("A candidate outcome of instrument " + symbol + " is neither a trade nor a known no-trade reason."),
+    };
 
     private static InstrumentRun Record(InstrumentReplayInput input, Facts facts, SkipReason? skip, string? detail, Scanned scanned) => new(
         input.InstrumentId,

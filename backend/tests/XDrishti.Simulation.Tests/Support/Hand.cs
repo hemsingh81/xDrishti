@@ -27,6 +27,12 @@ internal sealed class Hand
 
     public string Name { get; }
 
+    /// <summary>The listed minutes, as written (the shifted copies of the overnight invariance are built from them).</summary>
+    public IReadOnlyList<string> ListedRows => _rows;
+
+    /// <summary>The absent ranges, as written.</summary>
+    public IReadOnlyList<(string From, string To)> AbsentRanges => _absent;
+
     public Side Side { get; }
 
     public double TriggerClose { get; }
