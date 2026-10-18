@@ -1,12 +1,20 @@
 using XDrishti.Api.Auth;
 using XDrishti.Api.Infrastructure;
+using XDrishti.Api.Simulate;
 using XDrishti.Application;
 using XDrishti.Hosting;
 using XDrishti.Infrastructure;
 using XDrishti.Infrastructure.Persistence;
 
+// The verb is chosen by the first argument alone and tested first, so that a symbol list (`simulate --symbols migrate`) never selects another step (spec P3-04b2, D2, ADR 0041).
+var verb = VerbDispatch.Of(args);
+if (verb == Verb.Simulate)
+{
+    return await SimulateProgram.RunProcessAsync(args[1..]);
+}
+
 // Container health probe: `dotnet XDrishti.Api.dll --healthcheck` (chiseled images have no curl).
-if (args.Contains("--healthcheck", StringComparer.Ordinal))
+if (verb == Verb.HealthCheck)
 {
     return await HealthProbe.RunAsync();
 }
@@ -28,14 +36,14 @@ if (!OpenApiGeneration.IsRunning)
 var app = builder.Build();
 
 // One-shot deployment step: `dotnet XDrishti.Api.dll migrate` (also provisions the owner account when none exists).
-if (args.Contains("migrate", StringComparer.Ordinal))
+if (verb == Verb.Migrate)
 {
     await DatabaseMigrator.MigrateAsync(app.Services);
     return await OwnerBootstrap.ProvisionAsync(app.Services);
 }
 
 // One-shot: `dotnet XDrishti.Api.dll owner-reset` replaces the owner's password from the secrets and ends all sessions.
-if (args.Contains("owner-reset", StringComparer.Ordinal))
+if (verb == Verb.OwnerReset)
 {
     return await OwnerBootstrap.ResetAsync(app.Services);
 }

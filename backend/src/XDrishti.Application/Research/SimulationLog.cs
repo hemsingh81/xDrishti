@@ -8,7 +8,7 @@ namespace XDrishti.Application.Research;
 /// </summary>
 internal static partial class SimulationLog
 {
-    [LoggerMessage(EventId = 4402, Level = LogLevel.Information, Message = "Simulation run started: strategy {StrategyId}, universe '{Universe}' of {Instruments} instruments, {From} to {To}, {Warnings} compile warnings")]
+    [LoggerMessage(EventId = 4402, Level = LogLevel.Information, Message = "Simulation run started: strategy {StrategyId}, universe '{Universe}' of {Instruments} instruments, {From:yyyy-MM-dd} to {To:yyyy-MM-dd}, {Warnings} compile warnings")]
     public static partial void RunStarted(ILogger logger, string strategyId, string universe, int instruments, DateOnly from, DateOnly to, int warnings);
 
     [LoggerMessage(EventId = 4403, Level = LogLevel.Information, Message = "Simulation run: instrument {Symbol} ({InstrumentId}) skipped, {Reason}")]

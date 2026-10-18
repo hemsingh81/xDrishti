@@ -8,9 +8,9 @@ using XDrishti.Strategies.Compilation;
 namespace XDrishti.Simulation.Replay;
 
 /// <summary>
-/// The built-in strategies a run can name by id (spec P3-04 Scope 2, Hand-over): until stored strategies exist (P3-02c, P3-02d) there is no text to give, so a request names <c>ORB</c> and its parameters and gets the definition of
-/// <see cref="OrbV1"/>. The factory knows a closed list of ids and, per id, a closed list of parameter names with their defaults; a name it does not know is refused with a located problem, never ignored. The values are not judged
-/// here: the compile of <see cref="Running.Simulator.Create"/> checks their ranges.
+/// The built-in strategies a run can name by id (spec P3-04 Scope 2, Hand-over; table-driven since P3-04b2, D3): until stored strategies exist (P3-02c, P3-02d) there is no text to give, so a request names an id and its parameters and gets the
+/// definition of the table's builder (<c>ORB</c>: <see cref="OrbV1"/>). The factory knows a closed list of ids and, per id, a closed list of parameter names with their defaults; a name it does not know is refused with a located problem, never
+/// ignored. The values are not judged here: the compile of <see cref="Running.Simulator.Create"/> checks their ranges. A later strategy is one more row of <see cref="Table"/>.
 /// </summary>
 public static class BuiltInStrategies
 {
@@ -23,29 +23,48 @@ public static class BuiltInStrategies
 
     private static readonly SourceSpan NoText = new(0, 0, 1, 1);
 
-    /// <summary>The ids of the built-in strategies.</summary>
-    public static IReadOnlyList<string> Ids { get; } = Array.AsReadOnly([OrbV1.Id]);
+    private static readonly BuiltInEntry[] Table =
+    [
+        new BuiltInEntry(
+            OrbV1.Id,
+            "Opening range breakout: a close beyond the opening range, stop at the opposite end, target a multiple of the risk",
+            [Timeframe.M5, Timeframe.M15],
+            Timeframe.M15,
+            [
+                new BuiltInParameterInfo(OrbV1.OrMinutesParam, DefaultOrMinutes, "minutes of the opening range"),
+                new BuiltInParameterInfo(RewardRiskParam, DefaultRewardRisk, "target as a multiple of the risk"),
+            ],
+            values => OrbV1.Create(values[OrbV1.OrMinutesParam], values[RewardRiskParam])),
+    ];
+
+    /// <summary>The ids of the built-in strategies, in the order of the table.</summary>
+    public static IReadOnlyList<string> Ids { get; } = Array.AsReadOnly([.. Table.Select(e => e.Id)]);
+
+    /// <summary>The built-in strategies with their timeframes and parameters (the table as values).</summary>
+    public static IReadOnlyList<BuiltInStrategyInfo> Catalog { get; } = Array.AsReadOnly([.. Table.Select(e => e.ToInfo())]);
 
     /// <summary>Builds the definition of a built-in strategy from its id and parameters (null or empty: the defaults).</summary>
     /// <exception cref="ArgumentNullException"><paramref name="strategyId"/> is null.</exception>
     public static BuiltInBuild Build(string strategyId, IReadOnlyDictionary<string, double>? parameters)
     {
         ArgumentNullException.ThrowIfNull(strategyId);
-        if (!string.Equals(strategyId, OrbV1.Id, StringComparison.Ordinal))
+        var entry = Table.FirstOrDefault(e => string.Equals(e.Id, strategyId, StringComparison.Ordinal));
+        if (entry is null)
         {
             var known = string.Join(", ", Ids.Select(i => "`" + i + "`"));
             return Refused("strategy_id", SimulationErrors.UnknownStrategyCode, "The strategy `" + strategyId + "` is not a built-in one; the built-in ids are " + known + ".");
         }
 
         var given = parameters ?? new Dictionary<string, double>();
+        var names = entry.Parameters.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
         var problems = new List<LocatedProblem>();
         foreach (var name in given.Keys.Order(StringComparer.Ordinal))
         {
-            if (name is not (OrbV1.OrMinutesParam or RewardRiskParam))
+            if (!names.Contains(name))
             {
                 problems.Add(new LocatedProblem(
                     "parameters." + name,
-                    new Problem(SimulationErrors.UnknownParameterCode, "The strategy `ORB` has no parameter `" + name + "`; its parameters are `" + OrbV1.OrMinutesParam + "` and `" + RewardRiskParam + "`.", NoText)));
+                    new Problem(SimulationErrors.UnknownParameterCode, "The strategy `" + entry.Id + "` has no parameter `" + name + "`; its parameters are " + NameList(entry) + ".", NoText)));
             }
         }
 
@@ -54,10 +73,13 @@ public static class BuiltInStrategies
             return new BuiltInBuild(null, new ReadOnlyDictionary<string, double>(new Dictionary<string, double>()), problems.AsReadOnly());
         }
 
-        var orMinutes = given.TryGetValue(OrbV1.OrMinutesParam, out var minutes) ? minutes : DefaultOrMinutes;
-        var rewardRisk = given.TryGetValue(RewardRiskParam, out var rr) ? rr : DefaultRewardRisk;
-        var effective = new SortedDictionary<string, double>(StringComparer.Ordinal) { [OrbV1.OrMinutesParam] = orMinutes, [RewardRiskParam] = rewardRisk };
-        return new BuiltInBuild(OrbV1.Create(orMinutes, rewardRisk), new ReadOnlyDictionary<string, double>(effective), []);
+        var effective = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach (var parameter in entry.Parameters)
+        {
+            effective[parameter.Name] = given.TryGetValue(parameter.Name, out var value) ? value : parameter.Default;
+        }
+
+        return new BuiltInBuild(entry.Build(effective), new ReadOnlyDictionary<string, double>(effective), []);
     }
 
     /// <summary>
@@ -72,6 +94,13 @@ public static class BuiltInStrategies
         return built.Definition is { } definition
             ? StrategyPreparation.Prepare(definition, built.Parameters, evaluationTimeframe, fills)
             : new PreparedBuild(null, built.Problems);
+    }
+
+    /// <summary>The parameter names as prose: <c>`a` and `b`</c>, <c>`a`, `b` and `c`</c>.</summary>
+    private static string NameList(BuiltInEntry entry)
+    {
+        var quoted = entry.Parameters.Select(p => "`" + p.Name + "`").ToList();
+        return quoted.Count == 1 ? quoted[0] : string.Join(", ", quoted.Take(quoted.Count - 1)) + " and " + quoted[^1];
     }
 
     private static BuiltInBuild Refused(string path, string code, string message) =>
