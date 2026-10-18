@@ -8,6 +8,7 @@
 | Multiple-testing luck | Test ledger, deflated thresholds, consistency across folds/years |
 | Look-ahead bias | Closed-bar-only DSL, point-in-time features, single code path, automated tests |
 | Survivorship bias | Bounded and disclosed, not avoided: a basket is tested with today's members and every run says so (ISS-22 in the [roadmap](18-roadmap.md)); point-in-time membership, with delisted stocks, is not built |
+| Bad or unadjusted data (price breaks, short and special sessions) | The data is never repaired: closed days, special sessions and sessions with under 90 % of their minutes are excluded, counted and noted; a day that opens more than 20 % from the previous close is flagged, gets no entry and restarts the indicators; every run records a SHA-256 of the bars it read and the exceptions of the calendar (P3-04, [ADR 0037](../adr/0037-simulation-conventions-and-the-two-stage-seam.md) Amendment 2) |
 | Intrabar ambiguity | Resolve on 1-minute path; if still ambiguous assume the worse outcome: a minute that holds the stop and the target is a stop, unless its open is already beyond the target (the first print decides; [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md)) |
 | Unrealistic fills | Gap fills at open, slippage model, no fills at locked circuits (rules in ADR 0038; the circuit effect is not modelled and every run says so: ISS-18) |
 | Cost blindness | Costs in every simulation from P3-03c on (earlier runs are gross and say so); `max_cost_R` filter |
