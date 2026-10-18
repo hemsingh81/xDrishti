@@ -19,7 +19,9 @@ internal sealed record ExpectedTrade(
     int Minutes,
     bool Delayed = false,
     bool StopGap = false,
-    bool TargetGap = false);
+    bool TargetGap = false,
+    bool Ambiguous = false,
+    bool Late = false);
 
 /// <summary>One hand-made candidate of a fixture and what the spec says it gives: a trade or the reason there is none.</summary>
 internal sealed record WalkItem(EntryCandidate Candidate, ExpectedTrade? Trade, NoTradeReason? NoTrade, int Minutes)

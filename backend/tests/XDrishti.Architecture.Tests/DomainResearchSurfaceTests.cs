@@ -20,7 +20,11 @@ public sealed class DomainResearchSurfaceTests
     {
         var research = Domain.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Domain.Research").Select(t => t.Name).Order().ToList();
 
-        research.ShouldBe(["ConditionCounter", "CostBasis", "ExitReason", "FillBasis", "NoTradeReason", "ScanCounters", "Side", "SimTrade", "WalkCounters"]);
+        research.ShouldBe(
+        [
+            "ConditionCounter", "CostBasis", "EntryFill", "ExitReason", "FillBasis", "FillDescription", "FillLimit", "FillLimits", "FillRules", "GapFillRule", "NoTradeReason", "ScanCounters", "Side", "SimTrade",
+            "SimulationErrors", "SlippageConfig", "TickSpec", "WalkCounters",
+        ]);
     }
 
     [Fact]

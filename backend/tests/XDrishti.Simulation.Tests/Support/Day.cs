@@ -20,6 +20,8 @@ internal sealed class Day
 
     private readonly HashSet<int> _absent = [];
 
+    private readonly HashSet<int> _empty = [];
+
     private readonly int _first;
 
     private readonly int _last;
@@ -63,6 +65,14 @@ internal sealed class Day
         var prices = row[(space + 1)..].Split('/').Select(p => double.Parse(p, CultureInfo.InvariantCulture)).ToArray();
         _listed[minute] = (prices[0], prices[1], prices[2], prices[3]);
         _absent.Remove(minute);
+        return this;
+    }
+
+    /// <summary>Lists a minute with volume 0 (<c>(v0)</c> in the specs): it is in the list but holds no trade.</summary>
+    public Day SetEmpty(string row)
+    {
+        Set(row);
+        _empty.Add(Minute(row[..row.IndexOf(' ', StringComparison.Ordinal)]));
         return this;
     }
 
@@ -119,7 +129,7 @@ internal sealed class Day
                 throw new InvalidOperationException("The first minute of the day is not listed and the day has no start price.");
             }
 
-            bars.Add(new Bar(Epoch(Date, minute), open, high, low, close, MinuteVolume));
+            bars.Add(new Bar(Epoch(Date, minute), open, high, low, close, _empty.Contains(minute) ? 0 : MinuteVolume));
             previous = close;
         }
 

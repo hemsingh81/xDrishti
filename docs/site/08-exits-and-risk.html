@@ -215,6 +215,7 @@ target for late intraday triggers (learned).</p>
 <td>Gap through stop ⇒ filled at open (simulated realistically)</td>
 </tr>
 </tbody></table>
+<p>How the simulator fills a stop that was gapped through, a target, a minute that holds both, the square-off minute and an entry limit order is the rule table of <a href="../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.html">ADR 0038</a> (P3-03b): a gapped stop fills at that minute&#39;s open, a target at the target and never better, stop first unless the minute&#39;s open is already beyond the target, and a square-off waits for the next minute that holds a trade.</p>
 <p>The four time rules of a strategy are <code>first_entry</code>, <code>last_entry</code>, <code>square_off</code> and <code>max_hold_sessions</code> (the <code>time_rules</code> of <a href="11-strategy-lab.html">doc 11</a> §2); <a href="16-configuration.html">doc 16</a> spells the same four
 <code>first_entry_time</code>, <code>last_entry_time</code>, <code>square_off_time</code> and <code>max_holding_sessions</code> in its <code>styles</code> block. A stored strategy carries its own: the numbers of the configuration are not defaults for a missing
 time rule, so that the same stored text (and hash) always means the same behaviour.</p>
@@ -276,13 +277,14 @@ day</strong> × 0.75. The multipliers never raise risk above the profile&#39;s m
 <p>Brokerage, exchange charges, STT/CTT, GST, stamp duty, SEBI fees — <strong>from your broker&#39;s current charge
 sheet in config</strong> (rates change with budgets). Slippage: ticks + fraction of bar range; extra for stop exits
 and gaps. Every simulation includes costs.</p>
+<p>The simulator&#39;s slippage is <code>SlippageConfig</code> with these defaults (<code>costs.slippage</code> in <a href="16-configuration.html">doc 16</a>): market-type fills pay <code>(ticks + extra) × tick + bar_range_frac × (high − low)</code> against the trade, rounded to the instrument&#39;s tick, with the extra ticks on stop exits; a resting limit (a target, an entry at the limit) does not slip. The rules and what is not modelled are in <a href="../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.html">ADR 0038</a>.</p>
 
   </article>
   <nav class="pager" aria-label="Previous and next document">
     <a class="prev" href="07-strategies.html"><small>← Previous  [</small>07 · Strategies</a>
     <a class="next" href="09-learning-engine.html"><small>Next  ] →</small>09 · Learning engine</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 11:17</footer>
+  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 12:57</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-r-multiples" class="d2">1. R-multiples</a>
 <a href="#2-exit-policy-library" class="d2">2. Exit policy library</a>

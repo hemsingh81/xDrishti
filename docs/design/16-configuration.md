@@ -189,7 +189,7 @@ costs:                             # fill from your broker's current charge shee
   gst_pct: 18
   stamp_duty_buy_pct: null
   sebi_fee_per_cr: null
-  slippage: { ticks: 1, bar_range_frac: 0.05, stop_exit_extra_ticks: 2, gap_fill: at_open }
+  slippage: { ticks: 1, bar_range_frac: 0.05, stop_exit_extra_ticks: 2, gap_fill: at_open }   # built in P3-03b (ADR 0038): the code defaults of SlippageConfig, stored with every run as canonical JSON; reading them from the configuration store is later
 
 learning:
   walk_forward: { train_years: 3, test_months: 3, embargo_sessions: 5 }

@@ -66,6 +66,8 @@ Used only where the cell shows trend persistence (fat MFE tail), mostly 30m+ and
 | Time stop | e.g. < +0.5R after 6 bars (the `time_stop` overlay) | e.g. < +0.5R after 2 sessions (the `time_stop` overlay) |
 | Overnight gap | — | Gap through stop ⇒ filled at open (simulated realistically) |
 
+How the simulator fills a stop that was gapped through, a target, a minute that holds both, the square-off minute and an entry limit order is the rule table of [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) (P3-03b): a gapped stop fills at that minute's open, a target at the target and never better, stop first unless the minute's open is already beyond the target, and a square-off waits for the next minute that holds a trade.
+
 The four time rules of a strategy are `first_entry`, `last_entry`, `square_off` and `max_hold_sessions` (the `time_rules` of [doc 11](11-strategy-lab.md) §2); [doc 16](16-configuration.md) spells the same four
 `first_entry_time`, `last_entry_time`, `square_off_time` and `max_holding_sessions` in its `styles` block. A stored strategy carries its own: the numbers of the configuration are not defaults for a missing
 time rule, so that the same stored text (and hash) always means the same behaviour.
@@ -103,3 +105,5 @@ day** × 0.75. The multipliers never raise risk above the profile's maximum per 
 Brokerage, exchange charges, STT/CTT, GST, stamp duty, SEBI fees — **from your broker's current charge
 sheet in config** (rates change with budgets). Slippage: ticks + fraction of bar range; extra for stop exits
 and gaps. Every simulation includes costs.
+
+The simulator's slippage is `SlippageConfig` with these defaults (`costs.slippage` in [doc 16](16-configuration.md)): market-type fills pay `(ticks + extra) × tick + bar_range_frac × (high − low)` against the trade, rounded to the instrument's tick, with the extra ticks on stop exits; a resting limit (a target, an entry at the limit) does not slip. The rules and what is not modelled are in [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md).

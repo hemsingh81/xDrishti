@@ -16,21 +16,30 @@ public sealed class WalkAllocationTests
     [Fact]
     public void A_walk_of_a_position_that_lives_16_minutes_allocates_as_much_as_one_that_lives_331_minutes()
     {
-        var shortLived = Cases.W("W5");
-        var longLived = Cases.F("F5");
-        Result<WalkOutcome>? sink = null;
-        sink = WalkAssert.Walk(shortLived, shortLived.Items[0]);
-        sink = WalkAssert.Walk(longLived, longLived.Items[0]);
+        AssertSameBytes(Cases.W("W5"), Cases.F("F5"), Cand.Standard);
+    }
 
-        var (shortBytes, shortDisturbed, _) = Measure(shortLived);
-        var (longBytes, longDisturbed, _) = Measure(longLived);
+    [Fact]
+    public void The_same_holds_with_the_doc_16_slippage_on_the_tick_grid()
+    {
+        AssertSameBytes(Cases.W("W5"), Cases.F("F5"), Cand.Modelled);
+    }
+
+    private static void AssertSameBytes(WalkCase shortLived, WalkCase longLived, WalkRules rules)
+    {
+        Result<WalkOutcome>? sink = null;
+        sink = TradeWalker.Walk(shortLived.Items[0].Candidate, shortLived.Bars, rules);
+        sink = TradeWalker.Walk(longLived.Items[0].Candidate, longLived.Bars, rules);
+
+        var (shortBytes, shortDisturbed, _) = Measure(shortLived, rules);
+        var (longBytes, longDisturbed, _) = Measure(longLived, rules);
 
         sink.IsSuccess.ShouldBeTrue();
         shortBytes.ShouldBeGreaterThan(0, "the result objects are allocated");
         longBytes.ShouldBe(shortBytes, shortDisturbed || longDisturbed ? "a garbage collection disturbed a measurement" : "nothing is allocated per visited minute");
     }
 
-    private static (long Allocated, bool Disturbed, int Attempts) Measure(WalkCase walkCase)
+    private static (long Allocated, bool Disturbed, int Attempts) Measure(WalkCase walkCase, WalkRules rules)
     {
         var item = walkCase.Items[0];
         return AllocationProbe.Measure(window =>
@@ -39,7 +48,7 @@ public sealed class WalkAllocationTests
             window.Begin();
             for (var i = 0; i < Walks; i++)
             {
-                last = TradeWalker.Walk(item.Candidate, walkCase.Bars, walkCase.Rules);
+                last = TradeWalker.Walk(item.Candidate, walkCase.Bars, rules);
             }
 
             window.End();
