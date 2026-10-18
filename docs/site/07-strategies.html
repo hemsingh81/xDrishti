@@ -154,6 +154,7 @@ high/low) · <code>VWAP_PULLBACK</code> · <code>VWAP_RECLAIM</code> · <code>EM
 <p><strong>Swing (1h/1D, ≤ 5 sessions):</strong> <code>BASE_BREAKOUT</code> · <code>TREND_PULLBACK</code> (20 EMA / 50 DMA) · <code>NR7_ID_BO</code> ·
 <code>RSI2_REVERSION</code> (above/below 200 DMA) · <code>BB_SQUEEZE</code> · <code>HIGH_52W_MOMENTUM</code> · <code>FAILED_BREAKOUT</code> ·
 <code>RS_ROTATION</code> (strongest stocks in strongest sectors).</p>
+<p><strong>Per-session levels in the rules language.</strong> The intraday cells are built on levels of the session (<code>ORB</code>: <code>or_high</code> / <code>or_low</code>; <code>PDH_PDL_*</code> and <code>GAP_*</code>: <code>prev_day.*</code>, <code>gap_pct</code>; <code>VWAP_*</code>: <code>vwap</code>). These features keep the history of the session only (<a href="../adr/0035-per-session-features-keep-the-history-of-the-session-only.html">ADR 0035</a>, <a href="11-strategy-lab.html">doc 11</a> §2 <em>Lags</em>), so a crossing of one of them (<code>crosses_above(close, vwap)</code>) is unknown at the first evaluation of a session and can first be true at the second bar of the timeframe, and unknown never fires an entry; a break through yesterday&#39;s high or low is written in the level form (<code>close &gt; prev_day.high and close[1] &lt;= prev_day.high</code>), which is known from the first bar and also catches a gap through the level. A valid window such as the <code>ORB</code> 09:30–11:30 (a <code>time</code> comparison) is a trading rule, not a guard the language needs to stay correct. On 1D (the swing cells) nothing restarts and a lag is by position; on 1h the intraday rule holds.</p>
 <h2 id="4-multi-timeframe-mapping">4. Multi-timeframe mapping<a class="hash" href="#4-multi-timeframe-mapping" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -229,7 +230,7 @@ high/low) · <code>VWAP_PULLBACK</code> · <code>VWAP_RECLAIM</code> · <code>EM
 </tr>
 <tr>
 <td>Market context</td>
-<td>Index trend/ADX, VIX level/percentile/change, breadth — <strong>built in P3-01c</strong> as the features <code>index_trend</code>, <code>index_adx</code>, <code>index_vol_pct</code>, <code>vix</code>, <code>vix_pct</code>, <code>vix_chg</code>, <code>breadth</code>, <code>regime_trend</code>, <code>regime_vol</code>, <code>regime</code>: daily, as of the previous session (<a href="11-strategy-lab.html">doc 11</a> §2, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>); the computation of breadth and <code>sector_rs</code> follow in P3-01d</td>
+<td>Index trend/ADX, VIX level/percentile/change, breadth — <strong>built in P3-01c</strong> as the features <code>index_trend</code>, <code>index_adx</code>, <code>index_vol_pct</code>, <code>vix</code>, <code>vix_pct</code>, <code>vix_chg</code>, <code>breadth</code>, <code>regime_trend</code>, <code>regime_vol</code>, <code>regime</code>: daily, as of the previous session (<a href="11-strategy-lab.html">doc 11</a> §2, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>); the computation of breadth follows in P3-01e and the index and VIX series in P3-01d (both after the P3 exit check, see the <a href="18-roadmap.html">roadmap</a>); <code>sector_rs</code> is not planned until a strategy needs it</td>
 </tr>
 <tr>
 <td>Calendar</td>
@@ -308,7 +309,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-16 16:11</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 09:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

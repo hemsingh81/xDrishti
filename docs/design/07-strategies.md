@@ -51,6 +51,8 @@ high/low) · `VWAP_PULLBACK` · `VWAP_RECLAIM` · `EMA_PULLBACK` (9/21 EMA with 
 `RSI2_REVERSION` (above/below 200 DMA) · `BB_SQUEEZE` · `HIGH_52W_MOMENTUM` · `FAILED_BREAKOUT` ·
 `RS_ROTATION` (strongest stocks in strongest sectors).
 
+**Per-session levels in the rules language.** The intraday cells are built on levels of the session (`ORB`: `or_high` / `or_low`; `PDH_PDL_*` and `GAP_*`: `prev_day.*`, `gap_pct`; `VWAP_*`: `vwap`). These features keep the history of the session only ([ADR 0035](../adr/0035-per-session-features-keep-the-history-of-the-session-only.md), [doc 11](11-strategy-lab.md) §2 *Lags*), so a crossing of one of them (`crosses_above(close, vwap)`) is unknown at the first evaluation of a session and can first be true at the second bar of the timeframe, and unknown never fires an entry; a break through yesterday's high or low is written in the level form (`close > prev_day.high and close[1] <= prev_day.high`), which is known from the first bar and also catches a gap through the level. A valid window such as the `ORB` 09:30–11:30 (a `time` comparison) is a trading rule, not a guard the language needs to stay correct. On 1D (the swing cells) nothing restarts and a lag is by position; on 1h the intraday rule holds.
+
 ## 4. Multi-timeframe mapping
 
 | Entry TF | Bias TFs | Typical style |
@@ -74,7 +76,7 @@ Confluence (same symbol & side on several timeframes/strategies) is a feature an
 | Volume | Relative volume (same time-of-day), delivery %, OI change |
 | Levels | Distance to previous-day H/L/C, CPR width, VWAP distance, 52-week high/low, round numbers |
 | Relative strength | Stock vs index, stock vs sector, sector vs index (5/20/60 days) |
-| Market context | Index trend/ADX, VIX level/percentile/change, breadth — **built in P3-01c** as the features `index_trend`, `index_adx`, `index_vol_pct`, `vix`, `vix_pct`, `vix_chg`, `breadth`, `regime_trend`, `regime_vol`, `regime`: daily, as of the previous session ([doc 11](11-strategy-lab.md) §2, [ADR 0033](../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md)); the computation of breadth and `sector_rs` follow in P3-01d |
+| Market context | Index trend/ADX, VIX level/percentile/change, breadth — **built in P3-01c** as the features `index_trend`, `index_adx`, `index_vol_pct`, `vix`, `vix_pct`, `vix_chg`, `breadth`, `regime_trend`, `regime_vol`, `regime`: daily, as of the previous session ([doc 11](11-strategy-lab.md) §2, [ADR 0033](../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md)); the computation of breadth follows in P3-01e and the index and VIX series in P3-01d (both after the P3 exit check, see the [roadmap](18-roadmap.md)); `sector_rs` is not planned until a strategy needs it |
 | Calendar | Weekday, time of day, expiry day/week, pre/post holiday, days to results — `day_of_week` and `is_expiry_day` (the dates are passed in by the caller) are built; the rest follow |
 | Plan geometry | Stop distance in ATR, room to next obstacle in R, achievable R:R |
 

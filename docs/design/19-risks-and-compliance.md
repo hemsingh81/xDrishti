@@ -7,10 +7,10 @@
 | Overfitting | Walk-forward OOS only, ≤ 4 params, plateaus, min samples, paper stage |
 | Multiple-testing luck | Test ledger, deflated thresholds, consistency across folds/years |
 | Look-ahead bias | Closed-bar-only DSL, point-in-time features, single code path, automated tests |
-| Survivorship bias | Historical constituents incl. delisted stocks |
+| Survivorship bias | Bounded and disclosed, not avoided: a basket is tested with today's members and every run says so (ISS-22 in the [roadmap](18-roadmap.md)); point-in-time membership, with delisted stocks, is not built |
 | Intrabar ambiguity | Resolve on 1-minute path; if still ambiguous assume the worse outcome |
 | Unrealistic fills | Gap fills at open, slippage model, no fills at locked circuits |
-| Cost blindness | Costs in every simulation; `max_cost_R` filter |
+| Cost blindness | Costs in every simulation from P3-03c on (earlier runs are gross and say so); `max_cost_R` filter |
 | Regime dependence | Regime-conditioned stats, drift monitor, auto-pause |
 | ML leakage | Purged & embargoed walk-forward |
 

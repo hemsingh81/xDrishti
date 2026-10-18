@@ -35,8 +35,18 @@ Most rules are **enforced by tooling** — a rule that can be automated should b
 | Unit | Domain & Application (xUnit v3, Shouldly, NSubstitute, `FakeTimeProvider`) | hooks, utils, components (Vitest, Testing Library) |
 | Contract / integration | API + real TimescaleDB via Testcontainers (Podman) | API mocked at network level with MSW |
 | Architecture | NetArchTest layer rules | ESLint import boundaries |
+| Benchmarks (explicit) | Tests marked `[Fact(Explicit = true)]`, skipped by `scripts/check.sh` and run by hand in Release on a quiet machine (`dotnet test --project tests/<Project> -c Release -- --explicit only --filter-class "*Benchmarks*"`). Before a release also `scripts/bench-coldstart.sh`: the cold start of the rules compiler in fresh processes, exit 1 when a median is over its target | — |
 
 Rules: test behaviour, not implementation; one reason to fail per test; no sleeps; tests run in parallel.
+
+Rules learnt from flaky tests (ISS-14):
+- **A fake clock that a test moves must not outrun the code under test.** Move it to the next due timer, wait for a sign of
+  life (a flush, an attempt, a timer created), then move again. Never a fixed step with a fixed number of yields: in a cold
+  process the first turns of the code take milliseconds, the clock runs ahead, timers fold into one tick and a watchdog fires.
+- **A wait is bounded by time, not by a count of turns.** `Task.Yield` times N, or a million iterations, is a different time on
+  a loaded machine; bound the wait by real time (30 s in the feed tests) so a hang fails with a message.
+- **Never assert that a short digit string is absent from text that holds a random id.** `ShouldNotContain("1234")` on text with
+  a GUID fails about once in a few thousand runs; remove the ids first, or assert on structure.
 
 ## 4. Definition of done
 

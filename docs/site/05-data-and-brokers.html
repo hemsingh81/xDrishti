@@ -806,7 +806,7 @@ raw answer is logged or returned.</p>
 <tr>
 <td><code>market.context_daily</code></td>
 <td>Table (<strong>not built yet</strong>)</td>
-<td>Indices, VIX, breadth, regime. The engine&#39;s <code>MarketContext</code> (P3-01c, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>) is built from daily <code>ContextDay</code> records the caller supplies and does not read this table; the data job that writes it — index and VIX bars, breadth and the sector composites of <code>sector_rs(n)</code> from the tracked stocks&#39; daily bars — and the reader that builds the <code>MarketContext</code> from it are the story <strong>P3-01d</strong></td>
+<td>Indices, VIX, breadth, regime. The engine&#39;s <code>MarketContext</code> (P3-01c, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>) is built from daily <code>ContextDay</code> records the caller supplies and does not read this table; the data job that writes it (the index and VIX inputs) and the reader that builds the <code>MarketContext</code> from it are the story <strong>P3-01d</strong>; breadth from the tracked stocks&#39; daily bars is <strong>P3-01e</strong>; <code>sector_rs(n)</code> is not planned until a strategy needs it; all three come after the P3 exit check (<a href="18-roadmap.html">roadmap</a>)</td>
 </tr>
 <tr>
 <td><code>data.import_profiles</code>, <code>data.import_jobs</code>, <code>data.import_issues</code></td>
@@ -1000,7 +1000,7 @@ Monday and the 1st of the month of the window&#39;s first session (the week and 
 <p>Errors are RFC 7807 problems with the <code>data.*</code> codes above, <code>400 data.invalid</code> (with the field) for a bad <code>status</code>, <code>sort</code>, <code>page</code>, <code>pageSize</code>, <code>q</code> or <code>timeframe</code>. Every route needs a session; the three POSTs also the CSRF token; none needs a step-up.</p>
 </blockquote>
 <h2 id="11-biases-avoided">11. Biases avoided<a class="hash" href="#11-biases-avoided" aria-label="Link to this section">#</a></h2>
-<p>Survivorship (historical index membership incl. delisted stocks), look-ahead (closed bars only; higher-TF from
+<p>Survivorship (bounded and disclosed, not avoided: no table of historical index membership is built, a basket is tested with today&#39;s members and says so, ISS-22 in the <a href="18-roadmap.html">roadmap</a>), look-ahead (closed bars only; higher-TF from
 last closed bar; point-in-time regime), selection (basket rules are dated; point-in-time membership available). The regime and the other market-context features are read <strong>as of the previous session</strong> (the latest day strictly before the date being traded, <a href="../adr/0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.html">ADR 0033</a>), so the close of the day being traded is never in them; the daily records written by the context data job must themselves be point-in-time (no restated closes, breadth from that day&#39;s closes only).
 The closed-bar rule is built into <code>XDrishti.Indicators</code> (P3-01, <a href="../adr/0031-streaming-indicators-and-the-feature-frame.html">ADR 0031</a>) and checked from two sides: the frame never shows the bar still forming (a test builds a forming bar worth 200 against a closed bar worth 100 and asserts 100), and a <em>prefix property</em> (the outputs for the first <em>k</em> bars do not change when more bars are fed) guards against hidden state and any dependence on later input. The prefix property alone cannot detect a forming-bar leak in a push-only API, which is why the frame-semantics tests exist.</p>
 
@@ -1009,7 +1009,7 @@ The closed-bar rule is built into <code>XDrishti.Indicators</code> (P3-01, <a hr
     <a class="prev" href="04-accounts-access-and-operations.html"><small>← Previous  [</small>04 · Accounts, access &amp; operations</a>
     <a class="next" href="06-instruments-and-baskets.html"><small>Next  ] →</small>06 · Instruments &amp; baskets</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-16 16:11</footer>
+  <footer class="foot">Generated from <code>docs/05-data-and-brokers.md</code> · 2026-10-18 09:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-data-sources-v1" class="d2">1. Data sources (v1)</a>
 <a href="#2-three-data-tiers" class="d2">2. Three data tiers</a>
