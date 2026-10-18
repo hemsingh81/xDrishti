@@ -138,9 +138,9 @@ public sealed class EntryScanner
     public static Result<EntryScanner> Create(CompiledSide side, InstrumentRef instrument, TradingCalendar? calendar = null)
     {
         ArgumentNullException.ThrowIfNull(side);
-        if (side.EvaluationTimeframe == Timeframe.D1)
+        if (side.EvaluationTimeframe >= Timeframe.D1)
         {
-            return Result.Failure<EntryScanner>(Error.Validation(ScannerCodes.TimeframeUnsupported, "The scanner does not evaluate on 1D: a daily bar is always stale at the first minute of the next date (the daily evaluation is P3-03d)."));
+            return Result.Failure<EntryScanner>(Error.Validation(ScannerCodes.TimeframeUnsupported, "The scanner does not evaluate on " + side.EvaluationTimeframe.ToCode() + ": a bar of a day or longer is always stale at the first minute of the next date (the daily evaluation is P3-03d)."));
         }
 
         if (StopProblem(side.Stop, side.EvaluationTimeframe) is { } problem)

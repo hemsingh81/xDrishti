@@ -14,7 +14,7 @@ public sealed class WalkAllocationTests
     private const int Walks = 200;
 
     [Fact]
-    public void A_walk_of_a_position_that_lives_11_minutes_allocates_as_much_as_one_that_lives_331_minutes()
+    public void A_walk_of_a_position_that_lives_16_minutes_allocates_as_much_as_one_that_lives_331_minutes()
     {
         var shortLived = Cases.W("W5");
         var longLived = Cases.F("F5");

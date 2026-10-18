@@ -6,7 +6,7 @@ using XDrishti.Strategies.Model;
 namespace XDrishti.Simulation.Tests.Scanning;
 
 /// <summary>Criterion 13 of P3-03a (the scanner's part): the scanner knows nothing of exits, so the candidates, traces included, are equal whatever the exit policy of the strategy.</summary>
-public sealed class SeamTests
+public sealed class ScannerSeamTests
 {
     private static readonly string[] Days = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13"];
 

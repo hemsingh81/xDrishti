@@ -71,6 +71,25 @@ public sealed class OrderOfDecisionTests
         (c.StopNotReady, c.Candidates, c.LaterTriggers).ShouldBe((2, 1, 6));
     }
 
+    /// <summary>
+    /// An eligible step is a window step where the setup and the trigger are both true, counted by hand from the fixture and not from the counters of the fates:
+    /// F1 one break (trigger True 1, no setup list); F11 two breaks (trigger True 2); F19 one break, the invalidation true at that step (1); F19b the bars of F11, two breaks (2);
+    /// F20 the setup (time at or after 10:00) is true on 7 of 9 window steps and the trigger on the one at 09:45, never together (0); F22 the trigger `close > 0` is true on all 9 window steps
+    /// of the table of F1 (WindowSteps 9: StopNotReady 2 + candidate 1 + later 6 is the same 9 seen from the fates, which is why it is not asserted from them); F23 one break (1).
+    /// </summary>
+    [Theory]
+    [InlineData("F1", 1)]
+    [InlineData("F11", 2)]
+    [InlineData("F19", 1)]
+    [InlineData("F19b", 2)]
+    [InlineData("F20", 0)]
+    [InlineData("F22", 9)]
+    [InlineData("F23", 1)]
+    public void The_eligible_steps_are_the_window_steps_where_setup_and_trigger_are_both_true_counted_by_hand(string name, int eligible)
+    {
+        Buy(name).Counters.EligibleSteps.ShouldBe(eligible);
+    }
+
     [Fact]
     public void Each_condition_path_of_the_fixture_strategies_is_true_at_least_once_in_some_fixture()
     {

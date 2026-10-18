@@ -16,7 +16,7 @@ namespace XDrishti.Simulation.Walking;
 /// <b>R, MAE, MFE (D5).</b> In units of the initial risk <c>|entry − stop|</c>; the exit minute's range is counted as D5 says.
 /// </para>
 /// <para>
-/// Failures that are not an outcome are data: <c>simulation.rules_invalid</c>, <c>simulation.candidate_not_in_bars</c> and <c>simulation.bars_not_ascending</c> (two equal epochs or a descending pair among the minutes the walk
+/// Failures that are not an outcome are data: <c>simulation.rules_invalid</c> (a stop level that is not finite, a reward-to-risk that is not above 0, a square-off minute outside 1 to 1439), <c>simulation.candidate_not_in_bars</c> and <c>simulation.bars_not_ascending</c> (two equal epochs or a descending pair among the minutes the walk
 /// visits; the whole list is checked once by the caller, never per candidate).
 /// </para>
 /// </summary>
@@ -41,6 +41,11 @@ public static class TradeWalker
         if (rules.RewardRisk is { } rewardRisk && !(double.IsFinite(rewardRisk) && rewardRisk > 0))
         {
             return Result.Failure<WalkOutcome>(Error.Validation("simulation.rules_invalid", "The reward-to-risk must be a finite number above 0."));
+        }
+
+        if (rules.SquareOffMinute is < 1 or > 1439)
+        {
+            return Result.Failure<WalkOutcome>(Error.Validation("simulation.rules_invalid", "The square-off minute must be a minute of the India day, from 1 to 1439 (915 is 15:15)."));
         }
 
         var index = candidate.DecisionBarIndex;

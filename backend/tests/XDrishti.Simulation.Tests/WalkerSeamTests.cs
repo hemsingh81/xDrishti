@@ -6,7 +6,7 @@ using XDrishti.Simulation.Walking;
 namespace XDrishti.Simulation.Tests;
 
 /// <summary>AC6: the candidate knows nothing of exits, so the same entries can be walked under several exit rules (how P4 compares exit policies).</summary>
-public sealed class SeamTests
+public sealed class WalkerSeamTests
 {
     [Fact]
     public void An_entry_candidate_has_no_member_about_exits()

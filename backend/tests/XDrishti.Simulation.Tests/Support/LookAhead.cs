@@ -82,6 +82,14 @@ internal static class LookAhead
         return exits.Count > 0 && random.NextDouble() < 0.5 ? exits[random.Next(exits.Count)].Settled - 1 : CutPoint(run);
     }
 
+    /// <summary>The cuts of the honest property for a run: <see cref="CutPoint"/>, <see cref="PeekCutPoint"/> and, for every trade of the run, the minute before its exit (where a walker that looked ahead would have exited earlier).</summary>
+    public static List<int> HonestCuts(SeededRun run)
+    {
+        var cuts = new List<int> { CutPoint(run), PeekCutPoint(run) };
+        cuts.AddRange(FullRun(run, Identity).Where(h => h.Outcome.Trade is not null && h.Settled > 0).Select(h => h.Settled - 1));
+        return [.. cuts.Distinct()];
+    }
+
     /// <summary>The bars after the cut point <paramref name="k"/> replaced by zero, huge and mixed extreme prices and volumes; the epochs stay.</summary>
     public static IReadOnlyList<Bar> ReplaceAfter(IReadOnlyList<Bar> bars, int k)
     {

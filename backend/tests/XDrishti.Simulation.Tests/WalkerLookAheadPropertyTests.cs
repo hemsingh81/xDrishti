@@ -5,7 +5,7 @@ using XDrishti.Simulation.Tests.Support;
 namespace XDrishti.Simulation.Tests;
 
 /// <summary>
-/// AC8: no look-ahead through the walker. 100 seeded series; for a random cut <c>k</c> every outcome settled at an index at most <c>k</c> is the same when the minutes after <c>k</c> are removed and when they are replaced
+/// AC8: no look-ahead through the walker. 100 seeded series; for a random cut <c>k</c> (and at the cut of the negative control, and at the minute before the exit of every trade) every outcome settled at an index at most <c>k</c> is the same when the minutes after <c>k</c> are removed and when they are replaced
 /// by extreme values. The negative control runs the very same property on a doctored input that peeks one minute ahead and must report violations on at least 10 seeds.
 /// </summary>
 public sealed class WalkerLookAheadPropertyTests
@@ -47,9 +47,12 @@ public sealed class WalkerLookAheadPropertyTests
         var compared = 0;
         foreach (var run in Runs)
         {
-            var (found, count) = LookAhead.Check(run, LookAhead.CutPoint(run), LookAhead.Identity);
-            violations.AddRange(found);
-            compared += count;
+            foreach (var cut in LookAhead.HonestCuts(run))
+            {
+                var (found, count) = LookAhead.Check(run, cut, LookAhead.Identity);
+                violations.AddRange(found);
+                compared += count;
+            }
         }
 
         violations.ShouldBeEmpty();

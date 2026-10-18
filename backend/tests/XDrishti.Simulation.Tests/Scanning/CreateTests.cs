@@ -3,6 +3,7 @@ using XDrishti.Domain.Research;
 using XDrishti.Simulation.Scanning;
 using XDrishti.Simulation.Tests.Support;
 using XDrishti.Strategies.BuiltIn;
+using XDrishti.Strategies.Compilation;
 using XDrishti.Strategies.Model;
 
 namespace XDrishti.Simulation.Tests.Scanning;
@@ -33,24 +34,36 @@ public sealed class CreateTests
         created.Error.Message.ShouldNotBeNullOrWhiteSpace();
     }
 
+    private static StrategyDefinition Swing(Timeframe timeframe) => new(
+        StrategyDefinition.CurrentSchema,
+        "SWING_TEST",
+        Style.Swing,
+        [timeframe],
+        [Side.Buy],
+        [],
+        new SideRules(null, TestStrategies.All("close > 0"), null, new EntrySpec(EntryKind.AtClose), new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(10)), [TestStrategies.Rr(3.0)], null),
+        null,
+        new TimeRules(null, null, null, 5),
+        []);
+
     [Fact]
     public void A_daily_evaluation_is_refused_by_name()
     {
-        var swing = new StrategyDefinition(
-            StrategyDefinition.CurrentSchema,
-            "SWING_TEST",
-            Style.Swing,
-            [Timeframe.D1],
-            [Side.Buy],
-            [],
-            new SideRules(null, TestStrategies.All("close > 0"), null, new EntrySpec(EntryKind.AtClose), new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(10)), [TestStrategies.Rr(3.0)], null),
-            null,
-            new TimeRules(null, null, null, 5),
-            []);
-
-        var created = EntryScanner.Create(Scan.Compile(swing, Side.Buy, Timeframe.D1), Scan.Instrument);
+        var created = EntryScanner.Create(Scan.Compile(Swing(Timeframe.D1), Side.Buy, Timeframe.D1), Scan.Instrument);
 
         created.Error.Code.ShouldBe("simulation.scanner_timeframe_unsupported");
+    }
+
+    /// <summary>The guard of the scanner refuses every timeframe of a day or longer (<c>&gt;= D1</c>); the compiler already refuses a weekly or monthly evaluation before a side exists, so the guard is defence in depth and this is the proof of the first line.</summary>
+    [Theory]
+    [InlineData(Timeframe.W1)]
+    [InlineData(Timeframe.Mo1)]
+    public void A_weekly_or_monthly_evaluation_never_reaches_the_scanner_because_the_compiler_refuses_it(Timeframe timeframe)
+    {
+        var compiled = StrategyCompiler.Compile(Swing(timeframe), timeframe, Side.Buy);
+
+        compiled.IsSuccess.ShouldBeFalse();
+        compiled.Problems.ShouldContain(p => p.Problem.Code == "strategy.model.bad_timeframe");
     }
 
     [Theory]
