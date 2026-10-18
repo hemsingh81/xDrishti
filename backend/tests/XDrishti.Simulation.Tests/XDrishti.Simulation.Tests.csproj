@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Simulation\XDrishti.Simulation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The golden file of the scanner column: what the scanner says on every fixture. Regenerated on purpose when a rule changes (a changed rule needs a new SimulationEngine.Version). -->
+    <EmbeddedResource Include="Determinism\scanner.golden.txt" LogicalName="Golden/scanner.golden.txt" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

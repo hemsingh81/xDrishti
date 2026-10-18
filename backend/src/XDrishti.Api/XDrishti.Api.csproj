@@ -10,6 +10,8 @@
   <ItemGroup>
     <ProjectReference Include="..\XDrishti.Infrastructure\XDrishti.Infrastructure.csproj" />
     <ProjectReference Include="..\XDrishti.Hosting\XDrishti.Hosting.csproj" />
+    <!-- The rules compiler is warmed up when the host starts (StrategyWarmupService, ADR 0034 amendment 2). -->
+    <ProjectReference Include="..\XDrishti.Strategies\XDrishti.Strategies.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

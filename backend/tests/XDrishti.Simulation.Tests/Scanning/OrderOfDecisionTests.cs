@@ -1,0 +1,102 @@
+using XDrishti.Simulation.Scanning;
+using XDrishti.Simulation.Tests.Support;
+
+namespace XDrishti.Simulation.Tests.Scanning;
+
+/// <summary>Criterion 5 of P3-03a: setup, invalidate and the order of D2 (the latch, the window, eligibility, the fate of an eligible step), with the counts of the tables.</summary>
+public sealed class OrderOfDecisionTests
+{
+    private static EntryScanner Buy(string name)
+    {
+        var fixture = Fixtures.All.Single(f => f.Name == name);
+        var scanner = Scan.Both(fixture.Definition, fixture.Bars, fixture.Timeframe)[0];
+        Identities.ShouldHold(scanner);
+        return scanner;
+    }
+
+    [Fact]
+    public void A_false_setup_gates_the_trigger_f20()
+    {
+        var scanner = Buy("F20");
+
+        scanner.Candidates.ShouldBeEmpty();
+        var c = scanner.Counters;
+        Identities.Of(c, "buy.setup[0]").ShouldBe((7, 2, 0, 0));
+        Identities.Of(c, "buy.trigger[0]").ShouldBe((1, 8, 0, 0));
+        c.EligibleSteps.ShouldBe(0);
+    }
+
+    [Fact]
+    public void An_invalidation_that_is_true_at_the_step_of_the_trigger_blocks_the_entry_at_that_step_f19()
+    {
+        var scanner = Buy("F19");
+
+        scanner.Candidates.ShouldBeEmpty();
+        var c = scanner.Counters;
+        (c.BlockedByInvalidation, c.InvalidatedDays, c.LaterTriggers, c.Candidates).ShouldBe((1, 1, 0, 0));
+        Identities.Of(c, "buy.invalidate[0]").ShouldBe((1, 24, 0, 0));
+        Identities.Of(c, "buy.trigger[0]").ShouldBe((1, 8, 0, 0));
+    }
+
+    [Fact]
+    public void An_invalidation_after_the_entry_makes_a_later_trigger_a_later_trigger_not_a_blocked_one_f19b()
+    {
+        var scanner = Buy("F19b");
+
+        scanner.Candidates.Select(c => c.DecisionBarIndex).ShouldBe([29]);
+        var c = scanner.Counters;
+        (c.LaterTriggers, c.BlockedByInvalidation, c.InvalidatedDays).ShouldBe((1, 0, 1));
+        Identities.Of(c, "buy.invalidate[0]").ShouldBe((1, 24, 0, 0));
+    }
+
+    [Fact]
+    public void An_unknown_invalidation_is_no_entry_and_the_latch_is_set_by_the_later_true_f23()
+    {
+        var scanner = Buy("F23");
+
+        scanner.Candidates.ShouldBeEmpty();
+        var c = scanner.Counters;
+        (c.UnknownInvalidation, c.InvalidatedDays, c.BlockedByInvalidation).ShouldBe((1, 1, 0));
+        Identities.Of(c, "buy.invalidate[0]").ShouldBe((1, 22, 2, 0));
+        Identities.Of(c, "buy.trigger[0]").ShouldBe((1, 8, 0, 0));
+    }
+
+    [Fact]
+    public void A_stop_without_a_value_keeps_the_date_open_and_the_candidate_comes_at_the_first_step_with_one_f22()
+    {
+        var scanner = Buy("F22");
+
+        scanner.Candidates.Select(c => Render.Instant(c.DecisionEpochSeconds)).ShouldBe(["2026-03-02 10:00"]);
+        var c = scanner.Counters;
+        (c.StopNotReady, c.Candidates, c.LaterTriggers).ShouldBe((2, 1, 6));
+    }
+
+    [Fact]
+    public void Each_condition_path_of_the_fixture_strategies_is_true_at_least_once_in_some_fixture()
+    {
+        var shown = new HashSet<string>();
+        foreach (var fixture in Fixtures.All)
+        {
+            foreach (var scanner in Scan.Both(fixture.Definition, fixture.Bars, fixture.Timeframe))
+            {
+                foreach (var condition in scanner.Counters.Conditions.Where(x => x.True > 0))
+                {
+                    shown.Add(fixture.Definition.Id + ":" + condition.Path);
+                }
+            }
+        }
+
+        foreach (var path in new[] { "ORB:buy.trigger[0]", "ORB:sell.trigger[0]", "STALE_TEST:buy.trigger[0]", "CROSS_VWAP_TEST:buy.trigger[0]", "STOP_NOT_READY_TEST:buy.trigger[0]" })
+        {
+            shown.ShouldContain(path);
+        }
+    }
+
+    [Fact]
+    public void The_conditions_of_the_variants_that_add_a_list_show_true_in_their_fixtures()
+    {
+        Identities.Of(Buy("F19").Counters, "buy.invalidate[0]").True.ShouldBeGreaterThan(0);
+        Identities.Of(Buy("F20").Counters, "buy.setup[0]").True.ShouldBeGreaterThan(0);
+        Identities.Of(Buy("F23").Counters, "buy.invalidate[0]").True.ShouldBeGreaterThan(0);
+    }
+}

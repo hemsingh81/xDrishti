@@ -15,6 +15,7 @@ using XDrishti.Api.Portfolio;
 using XDrishti.Application;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Live.Push;
+using XDrishti.Strategies.Compilation;
 
 namespace XDrishti.Api.Infrastructure;
 
@@ -90,6 +91,9 @@ internal static class ApiSetup
 
         // Trades and ledger read from Dhan (ADR 0025): the worker that carries out the runs "Sync now" registered; the nightly read is a service of the scheduler above.
         services.AddHostedService<BrokerHistoryWorker>();
+
+        // The rules compiler is warmed up on a thread-pool thread when the host starts, so that the first compile of a person does not pay for the JIT (ISS-12, ADR 0034 amendment 2). Readiness is not delayed.
+        services.AddHostedService(sp => new StrategyWarmupService(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<StrategyWarmupService>>(), CompilerWarmup.Run));
 
         services.AddLiveHub();
         return services;
