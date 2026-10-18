@@ -69,7 +69,7 @@ public sealed class SeededDaysTests
             trades.Count(t => t.Day.Tick == tick).ShouldBeGreaterThanOrEqualTo(AtLeast, "tick " + tick);
         }
 
-        foreach (var reason in Enum.GetValues<ExitReason>())
+        foreach (var reason in Enum.GetValues<ExitReason>().Where(r => r != ExitReason.MaxHold))
         {
             trades.Count(t => t.Trade!.ExitReason == reason && t.Trade.Side == Side.Buy).ShouldBeGreaterThanOrEqualTo(AtLeast / 2, reason + " buy");
             trades.Count(t => t.Trade!.ExitReason == reason && t.Trade.Side == Side.Sell).ShouldBeGreaterThanOrEqualTo(AtLeast / 2, reason + " sell");
@@ -83,9 +83,9 @@ public sealed class SeededDaysTests
         {
             var c = walk.Outcome.ToCounters();
 
-            c.Candidates.ShouldBe(c.Trades + c.NoFillBar + c.AfterSquareOff + c.EntryThroughStop + c.LimitNotReached, "seed " + walk.Day.Seed);
+            c.Candidates.ShouldBe(c.Trades + c.NoFillBar + c.AfterSquareOff + c.EntryThroughStop + c.LimitNotReached + c.PositionOpen, "seed " + walk.Day.Seed);
             c.Trades.ShouldBe(c.EntriesAtOpen + c.EntriesAtLimit, "seed " + walk.Day.Seed);
-            c.Trades.ShouldBe(c.ExitsStop + c.ExitsTarget + c.ExitsSquareOff + c.ExitsEndOfData, "seed " + walk.Day.Seed);
+            c.Trades.ShouldBe(c.ExitsStop + c.ExitsTarget + c.ExitsSquareOff + c.ExitsMaxHold + c.ExitsEndOfData, "seed " + walk.Day.Seed);
             (walk.Outcome.NoTrade == NoTradeReason.LimitNotReached ? walk.Outcome.BarsExamined : 1).ShouldBe(1, "seed " + walk.Day.Seed);
         }
     }

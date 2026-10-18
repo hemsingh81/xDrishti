@@ -14,9 +14,9 @@ public sealed class RunRecordSchemaTests
     private static string Members(Type type) => type.Name + ": " + string.Join(", ", Enum.GetNames(type));
 
     [Fact]
-    public void The_schema_version_is_two_since_the_fill_rules_of_p3_03b()
+    public void The_schema_version_is_three_since_the_swing_positions_of_p3_03d()
     {
-        SimulationRun.CurrentSchemaVersion.ShouldBe(2);
+        SimulationRun.CurrentSchemaVersion.ShouldBe(3);
     }
 
     [Fact]
@@ -60,8 +60,8 @@ public sealed class RunRecordSchemaTests
             "DateSpan: First, Last",
             "SessionCounts: Ran, ClosedDay, SpecialSession, ShortSession, MissingSession, Excluded",
             "SessionNote: Date, Reason, BarsInWindow, ExpectedMinutes",
-            "DiscontinuityNote: Date, Ratio",
-            "RunFates: EntriesSuppressed, TradesBeforeWindow, OpenAtEnd, Trades, NoFillBar, AfterSquareOff, EntryThroughStop, LimitNotReached, Total, NoTrade",
+            "DiscontinuityNote: Date, Ratio, ExcludedPositions",
+            "RunFates: EntriesSuppressed, TradesBeforeWindow, OpenAtEnd, Trades, NoFillBar, AfterSquareOff, EntryThroughStop, LimitNotReached, ExcludedAcrossDiscontinuity, PositionOpen, Total, NoTrade",
             "RunCounters: Instruments, InstrumentsRun, Skipped, BarsRead, BarsFed, BarsExcluded, BarsOutsideSession, Sessions, DiscontinuitiesFlagged, Scans, Walk, Fates, CandidatesInWindow, TradesInWindow, OpenAtEnd, EntriesSuppressed",
             "SkipCount: Reason, Instruments",
             "RunTrade: Trade, BasketIds",

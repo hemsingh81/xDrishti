@@ -17,7 +17,7 @@ internal sealed class ExportFolderWriter
 
     private const UnixFileMode FilePermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite;
 
-    private const long MaxManifestBytes = 64L * 1024 * 1024;
+    private const long MaxManifestBytes = 4L * 1024 * 1024;
 
     private readonly Action<string, string> _moveDirectory;
 
@@ -282,7 +282,7 @@ internal sealed class ExportFolderWriter
                 return Result.Failure<ParsedManifest>(Error.Validation(ExportManifest.MalformedCode, "manifest.json is too large"));
             }
 
-            return ExportManifest.Parse(File.ReadAllBytes(path));
+            return ExportManifest.ParseBytes(File.ReadAllBytes(path));
         }
         catch (Exception unreadable) when (unreadable is IOException or UnauthorizedAccessException)
         {
@@ -351,7 +351,14 @@ internal sealed class ExportFolderWriter
             && Path.GetFileName(staging).StartsWith(ExportPaths.StagingPrefix, StringComparison.Ordinal)
             && !ExportPaths.IsLink(staging))
         {
-            Directory.Delete(staging, recursive: true);
+            try
+            {
+                Directory.Delete(staging, recursive: true);
+            }
+            catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
+            {
+                // the cleanup must not hide the failure that brought us here; the folder is reported as stale by the next run
+            }
         }
     }
 }

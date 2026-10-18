@@ -131,6 +131,7 @@ public sealed class RunLabelsTests
     public void The_word_scan_does_find_a_word_a_figure_and_does_not_trip_on_a_longer_word()
     {
         ForbiddenWords.In("about 0.1 R off every Winner").ShouldBe(["winner", "<digit> R"], ignoreOrder: true);
+        ForbiddenWords.In("a gain of 2R, +1R or 0.5 R").ShouldBe(["<digit> R"]);
         ForbiddenWords.In("the window, a summary and TATACONSUM").ShouldBeEmpty();
         ForbiddenWords.List.Count.ShouldBe(25);
     }

@@ -168,6 +168,25 @@ public sealed class ExportManifestTests
         ExportManifest.Parse(Encoding.UTF8.GetBytes(edited)).Error.Code.ShouldBe("manifest.malformed");
     }
 
+    [Fact]
+    public void A_hand_edited_manifest_with_a_line_break_or_a_lone_surrogate_in_a_string_is_malformed_and_never_throws()
+    {
+        var good = Encoding.UTF8.GetString(ExportManifest.Build(Format, RunKey, null, Four, ["x"]));
+
+        foreach (var broken in new[]
+        {
+            good.Replace("xd-sim-export-1", "a\\nb", StringComparison.Ordinal),
+            good.Replace("xd-sim-export-1", "a\\ud800", StringComparison.Ordinal),
+            good.Replace("\"x\"", "\"a\\ud800\"", StringComparison.Ordinal),
+            good.Replace("\"x\"", "\"a\\nb\"", StringComparison.Ordinal),
+            good.Replace("trades.csv", "a\\ud800", StringComparison.Ordinal),
+            good.Replace(RunKey, "\\ud800", StringComparison.Ordinal),
+        })
+        {
+            ExportManifest.Parse(Encoding.UTF8.GetBytes(broken)).Error.Code.ShouldBeOneOf("manifest.malformed", "manifest.names_invalid");
+        }
+    }
+
     [Theory]
     [InlineData("../evil.csv")]
     [InlineData("a/../b")]
@@ -230,6 +249,14 @@ public sealed class ExportManifestTests
     public void The_run_id_is_the_strategy_the_window_and_the_start_of_the_run_key(string strategy, string expected)
     {
         RunId.Of(strategy, new DateOnly(2024, 4, 1), new DateOnly(2026, 4, 30), RunKey).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("_x")]
+    [InlineData("_")]
+    public void A_strategy_id_that_starts_with_an_underscore_is_refused_because_the_run_id_would_start_with_a_hyphen(string strategy)
+    {
+        Should.Throw<ArgumentException>(() => RunId.Of(strategy, new DateOnly(2024, 4, 1), new DateOnly(2026, 4, 30), RunKey));
     }
 
     [Theory]

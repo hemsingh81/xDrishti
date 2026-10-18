@@ -15,6 +15,9 @@ public enum ExitReason
     /// <summary>The square-off minute began: the position left at its open.</summary>
     SquareOff,
 
-    /// <summary>The bars of the entry date ended first: the position left at the close of the last minute.</summary>
+    /// <summary>The bars ended first: the position left at the close of the last minute that holds a trade (an intraday trade: the bars of the entry date; a swing trade: the list of bars).</summary>
     EndOfData,
+
+    /// <summary>A swing position reached the close of the last session it may be held (ADR 0040, X8): the close of the due session's last 1-minute bar, or of the last minute that holds a trade when the due minute is missing.</summary>
+    MaxHold,
 }

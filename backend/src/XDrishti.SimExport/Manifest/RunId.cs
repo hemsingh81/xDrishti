@@ -24,6 +24,11 @@ public static class RunId
             throw new ArgumentException("The strategy id must be made of letters, digits and underscores.", nameof(strategyId));
         }
 
+        if (strategyId[0] == '_')
+        {
+            throw new ArgumentException("The strategy id must not start with an underscore: the run id would start with a hyphen.", nameof(strategyId));
+        }
+
         var id = string.Create(
             CultureInfo.InvariantCulture,
             $"{strategyId.ToLowerInvariant().Replace('_', '-')}-{from:yyyyMMdd}-{to:yyyyMMdd}-{runKey[..KeyChars]}");

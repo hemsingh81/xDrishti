@@ -13,7 +13,7 @@ public sealed class TradesCsvTests
     [
         "run_key", "schema_version", "strategy_id", "instrument_id", "symbol", "side", "trade_date", "decision_epoch", "decision_ist", "trigger_timeframe", "trigger_bar_epoch", "trigger_bar_open", "trigger_bar_high",
         "trigger_bar_low", "trigger_bar_close", "trigger_bar_volume", "trigger_bar_minutes", "trigger_bar_complete", "entry_epoch", "entry_ist", "entry_price", "stop_price", "target_price", "exit_epoch", "exit_ist",
-        "exit_price", "exit_reason", "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "basket_ids", "key",
+        "exit_price", "exit_reason", "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "sessions_held", "sessions_unseen", "basket_ids", "key",
     ];
 
     /// <summary>For each positional property of <see cref="SimTrade"/>, the columns it feeds.</summary>
@@ -48,6 +48,8 @@ public sealed class TradesCsvTests
         ["ExitFilledPrice"] = ["exit_filled_price"],
         ["EntryFill"] = ["entry_fill"],
         ["TickFallback"] = ["tick_fallback"],
+        ["SessionsHeld"] = ["sessions_held"],
+        ["SessionsUnseen"] = ["sessions_unseen"],
     };
 
     private static string Csv(SimulationRun run, IReadOnlyList<RunTrade> trades) => Sinks.Render(s => TradesCsv.Write(s, run.RunKey, trades));
@@ -115,7 +117,7 @@ public sealed class TradesCsvTests
             Cell("trigger_bar_close").ShouldBe(trade.TriggerBar.Close);
             long.Parse(row[header.IndexOf("entry_epoch")], CultureInfo.InvariantCulture).ShouldBe(trade.EntryEpochSeconds);
             row[header.IndexOf("key")].ShouldBe(trade.Key);
-            row[header.IndexOf("schema_version")].ShouldBe("2");
+            row[header.IndexOf("schema_version")].ShouldBe("3");
         }
     }
 

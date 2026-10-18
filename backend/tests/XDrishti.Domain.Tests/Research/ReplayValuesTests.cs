@@ -73,11 +73,11 @@ public sealed class ReplayValuesTests
     [Fact]
     public void Fates_add_field_by_field_and_total_every_fate()
     {
-        var a = new RunFates(1, 2, 3, 4, 5, 6, 7, 8);
+        var a = new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
-        a.Total.ShouldBe(36);
-        a.NoTrade.ShouldBe(26);
-        a.Add(a).ShouldBe(new RunFates(2, 4, 6, 8, 10, 12, 14, 16));
+        a.Total.ShouldBe(55);
+        a.NoTrade.ShouldBe(36);
+        a.Add(a).ShouldBe(new RunFates(2, 4, 6, 8, 10, 12, 14, 16, 18, 20));
         RunFates.Empty.Add(a).ShouldBe(a);
         Should.Throw<ArgumentNullException>(() => a.Add(null!));
     }

@@ -16,7 +16,7 @@ public static class TradesCsv
         "run_key", "schema_version", "strategy_id", "instrument_id", "symbol", "side", "trade_date", "decision_epoch", "decision_ist",
         "trigger_timeframe", "trigger_bar_epoch", "trigger_bar_open", "trigger_bar_high", "trigger_bar_low", "trigger_bar_close", "trigger_bar_volume", "trigger_bar_minutes", "trigger_bar_complete",
         "entry_epoch", "entry_ist", "entry_price", "stop_price", "target_price", "exit_epoch", "exit_ist", "exit_price", "exit_reason",
-        "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "basket_ids", "key",
+        "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "sessions_held", "sessions_unseen", "basket_ids", "key",
     ]);
 
     /// <summary>Writes the header and one row per trade.</summary>
@@ -96,6 +96,8 @@ public static class TradesCsv
         row.Number(trade.ExitFilledPrice);
         row.Raw(ExportSpellings.Of(trade.EntryFill));
         row.Bool(trade.TickFallback);
+        row.Number(trade.SessionsHeld);
+        row.Number(trade.SessionsUnseen);
         BasketIds(row, runTrade.BasketIds);
         Key(row, trade);
         row.End(sink);

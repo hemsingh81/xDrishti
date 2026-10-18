@@ -136,7 +136,7 @@
 sections combine:</strong> at every closed bar of the evaluation timeframe the sections are evaluated together, and an entry is possible when <code>setup</code> is true, <code>trigger</code> is true and <code>invalidate</code> is not true (unknown counts as
 not true, and an unknown invalidation does not fire either; <code>SideEvaluation.Fires</code> is the one definition). A stored strategy is <strong>self-contained</strong>: a missing time rule is not filled from the <code>styles</code> block of
 <a href="16-configuration.html">doc 16</a>, so the same stored text always means the same behaviour. Each condition of a list is compiled and evaluated as its own condition; the lists are never joined into one text. An intraday
-strategy lists 5m to 1h, a swing strategy 30m, 1h and 1D, and swing SELL is refused (futures only, §7).</p>
+strategy lists 5m to 1h, a swing strategy 30m, 1h and 1D, and swing SELL is refused (futures only, §7). The simulator runs a swing strategy evaluated on 30m or 1h (P3-03d, <a href="../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.html">ADR 0040</a>): the position is held up to <code>max_hold_sessions</code> sessions with at most one open position per instrument and side, so a signal that fires while a position is open is counted and not entered, and it still spends that day&#39;s one candidate; the daily (1D) evaluation is P3-03e.</p>
 <h2 id="2-conditional-trade-plans">2. Conditional trade plans<a class="hash" href="#2-conditional-trade-plans" aria-label="Link to this section">#</a></h2>
 <p>Intraday entries can&#39;t be fixed the night before, so each plan item is a <strong>conditional ticket</strong> — and the
 simulator tests exactly this ticket on history:</p>
@@ -356,7 +356,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 17:20</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-18 18:34</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

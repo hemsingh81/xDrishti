@@ -5,7 +5,7 @@ namespace XDrishti.Domain.Research;
 /// fills, the options) and the calendar for the run to be checked again. It reads no clock and no random source, so equal inputs give an equal record; when and how long belong to the caller. The names of its public properties are pinned by a
 /// test: changing one needs <see cref="CurrentSchemaVersion"/> raised (and the run key with it).
 /// </summary>
-/// <param name="SchemaVersion">2 (1 was the record before the fill rules of P3-03b).</param>
+/// <param name="SchemaVersion">3 (2 was the record of P3-03b and P3-04; 1 the one before the fill rules).</param>
 /// <param name="RunKey">The lower-case hex SHA-256 of the key text (<see cref="RunAssembler.KeyText"/>): equal for equal inputs, different when anything that can change a trade changes.</param>
 /// <param name="EngineVersion"><c>SimulationEngine.Version</c> of the engine that ran.</param>
 /// <param name="Strategy">The strategy as recorded.</param>
@@ -38,5 +38,5 @@ public sealed record SimulationRun(
     RunCounters Totals)
 {
     /// <summary>The schema of the record and of the run key this code writes.</summary>
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 }

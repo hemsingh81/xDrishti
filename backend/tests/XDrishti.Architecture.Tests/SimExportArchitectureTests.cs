@@ -7,7 +7,7 @@ using ArchResult = NetArchTest.Rules.TestResult;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// The export library (P3-04b1; ADR 0040) is pure: it references only Domain, does no I/O (it writes UTF-8 to an <c>IBufferWriter</c> that the host owns), reads no clock, no random source, no machine fact and no environment,
+/// The export library (P3-04b1; the ADR comes with P3-04b2) is pure: it references only Domain, does no I/O (it writes UTF-8 to an <c>IBufferWriter</c> that the host owns), reads no clock, no random source, no machine fact and no environment,
 /// builds no copy of a whole file, keeps no mutable static state, and every class is sealed or static. Only <c>XDrishti.Api</c> references it (its folder writer is the one place that touches the file system for the export), and Application
 /// never does (ADR 0039: a renderer is not a port). Each rule has a sentinel, a case in this test project that the same code must reject, so that a rule that finds nothing cannot pass for the wrong reason.
 /// </summary>

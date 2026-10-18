@@ -36,17 +36,35 @@ internal static class OutcomeFormatter
                 .Append(CultureInfo.InvariantCulture,
                 $"R={Number(t.RExact)} mae={Number(t.MaeR)} mfe={Number(t.MfeR)} fills={t.Fills} costs={t.Costs} snapshot={t.EntrySnapshotJson ?? "null"} key={t.Key} ")
                 .Append(CultureInfo.InvariantCulture,
-                $"rFilled={Number(t.RFilled)} slippageR={Number(t.SlippageR)} entryFilled={Number(t.EntryFilledPrice)} exitFilled={Number(t.ExitFilledPrice)} entryFill={t.EntryFill} tickFallback={t.TickFallback}");
+                $"rFilled={Number(t.RFilled)} slippageR={Number(t.SlippageR)} entryFilled={Number(t.EntryFilledPrice)} exitFilled={Number(t.ExitFilledPrice)} entryFill={t.EntryFill} tickFallback={t.TickFallback} sessionsHeld={t.SessionsHeld} sessionsUnseen={t.SessionsUnseen}");
         }
         else
         {
             text.Append(CultureInfo.InvariantCulture, $"no-trade {outcome.NoTrade}");
         }
 
-        return text.Append(CultureInfo.InvariantCulture, $" | examined={outcome.BarsExamined} delayed={outcome.EntryAfterMissingMinutes} stopGap={outcome.StopGapExit} targetGap={outcome.TargetGapExit} ambiguous={outcome.AmbiguousMinute} late={outcome.LateSquareOff} under4={outcome.RiskUnderFourTicks} zero={outcome.ZeroVolumeMinutes}").ToString();
+        text.Append(CultureInfo.InvariantCulture, $" | examined={outcome.BarsExamined} delayed={outcome.EntryAfterMissingMinutes} stopGap={outcome.StopGapExit} targetGap={outcome.TargetGapExit} ambiguous={outcome.AmbiguousMinute} late={outcome.LateSquareOff} under4={outcome.RiskUnderFourTicks} zero={outcome.ZeroVolumeMinutes}");
+
+        // The facts of a swing walk are printed only when they are set, so that an intraday line carries nothing of them (the golden files hold none).
+        if (outcome.MaxHoldAtLastClose)
+        {
+            text.Append(CultureInfo.InvariantCulture, $" maxHoldAtLastClose=True holdEnd={outcome.HoldEndEpochSeconds}");
+        }
+
+        if (outcome.OvernightStopGap)
+        {
+            text.Append(" overnightStopGap=True");
+        }
+
+        if (outcome.OvernightTargetGap)
+        {
+            text.Append(" overnightTargetGap=True");
+        }
+
+        return text.ToString();
     }
 
     public static string Render(WalkCounters c) =>
         string.Create(CultureInfo.InvariantCulture,
-            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined} limitNotReached={c.LimitNotReached} entriesAtOpen={c.EntriesAtOpen} entriesAtLimit={c.EntriesAtLimit} ambiguousMinutes={c.AmbiguousMinutes} lateSquareOffs={c.LateSquareOffs} zeroVolumeMinutes={c.ZeroVolumeMinutes} riskUnderFourTicks={c.RiskUnderFourTicks}");
+            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined} limitNotReached={c.LimitNotReached} entriesAtOpen={c.EntriesAtOpen} entriesAtLimit={c.EntriesAtLimit} ambiguousMinutes={c.AmbiguousMinutes} lateSquareOffs={c.LateSquareOffs} zeroVolumeMinutes={c.ZeroVolumeMinutes} riskUnderFourTicks={c.RiskUnderFourTicks} positionOpen={c.PositionOpen} exitsMaxHold={c.ExitsMaxHold} maxHoldAtLastClose={c.MaxHoldAtLastClose} overnightStopGaps={c.OvernightStopGaps} overnightTargetGaps={c.OvernightTargetGaps} sessionsHeld={c.SessionsHeld} sessionsUnseen={c.SessionsUnseen}");
 }

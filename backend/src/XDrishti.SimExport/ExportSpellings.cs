@@ -37,13 +37,14 @@ public static class ExportSpellings
         _ => throw Unknown(side),
     };
 
-    /// <summary><c>stop</c> · <c>target</c> · <c>square_off</c> · <c>end_of_data</c>.</summary>
+    /// <summary><c>stop</c> · <c>target</c> · <c>square_off</c> · <c>end_of_data</c> · <c>max_hold</c>.</summary>
     public static string Of(ExitReason reason) => reason switch
     {
         ExitReason.Stop => "stop",
         ExitReason.Target => "target",
         ExitReason.SquareOff => "square_off",
         ExitReason.EndOfData => "end_of_data",
+        ExitReason.MaxHold => "max_hold",
         _ => throw Unknown(reason),
     };
 
@@ -76,13 +77,14 @@ public static class ExportSpellings
     /// <summary>The code of the skip reason (<see cref="SkipReasons.ToCode"/>).</summary>
     public static string Of(SkipReason reason) => reason.ToCode();
 
-    /// <summary><c>no_fill_bar</c> · <c>after_square_off</c> · <c>entry_through_stop</c> · <c>limit_not_reached</c>.</summary>
+    /// <summary><c>no_fill_bar</c> · <c>after_square_off</c> · <c>entry_through_stop</c> · <c>limit_not_reached</c> · <c>position_open</c>.</summary>
     public static string Of(NoTradeReason reason) => reason switch
     {
         NoTradeReason.NoFillBar => "no_fill_bar",
         NoTradeReason.AfterSquareOff => "after_square_off",
         NoTradeReason.EntryThroughStop => "entry_through_stop",
         NoTradeReason.LimitNotReached => "limit_not_reached",
+        NoTradeReason.PositionOpen => "position_open",
         _ => throw Unknown(reason),
     };
 

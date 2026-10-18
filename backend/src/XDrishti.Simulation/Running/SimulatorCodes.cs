@@ -18,9 +18,6 @@ public static class SimulatorCodes
     /// <summary>Exits other than exactly one <c>FIXED_RR</c> with exactly one <c>rr</c> value, or any overlay. Path <c>buy.exits</c> or <c>buy.overlays[i]</c>.</summary>
     public const string UnsupportedExit = "simulation.unsupported_exit";
 
-    /// <summary>A swing strategy. Path <c>style</c>.</summary>
-    public const string UnsupportedStyle = "simulation.unsupported_style";
-
     /// <summary>A filter the strategy names (nothing evaluates them yet). Path <c>filters[i]</c>.</summary>
     public const string FilterNotAvailable = "simulation.filter_not_available";
 
@@ -30,7 +27,7 @@ public static class SimulatorCodes
     /// <summary>A side that reads the expiry dates. Path <c>buy</c>.</summary>
     public const string NeedsExpiryDays = "simulation.needs_expiry_days";
 
-    /// <summary>The evaluation timeframe is 1D: the daily evaluation is not built yet. Path <c>timeframes</c>. The scanner returns the same code.</summary>
+    /// <summary>The evaluation timeframe is 1D or longer: the daily evaluation is not built yet (P3-03e). Path <c>timeframes</c>. The scanner returns the same code.</summary>
     public const string ScannerTimeframeUnsupported = ScannerCodes.TimeframeUnsupported;
 
     /// <summary>Two equal epochs or a descending pair among the minutes of a run. Returned by <c>Run</c> before any step.</summary>

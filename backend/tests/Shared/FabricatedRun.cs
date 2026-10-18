@@ -71,7 +71,7 @@ internal static class FabricatedRun
         return new SimTrade(
             SimTrade.CurrentSchemaVersion, strategy, instrument, symbol, side, date, entryEpoch - 60, Timeframe.M15, new Bar(entryEpoch - 960, 99, 100.5, 99, 100.5, 15000), 15, true,
             entryEpoch, entry, stop, target, entryEpoch + 600, exitPrice, exit, rExact, 0.4, 2.1, fills, CostBasis.None, null,
-            rFilled, rFilled - rExact, entry + 0.05, exitPrice - 0.05, EntryFill.AtOpen, false);
+            rFilled, rFilled - rExact, entry + 0.05, exitPrice - 0.05, EntryFill.AtOpen, false, 1, 0);
     }
 
     /// <summary>Puts the instruments and trades together with the real assembler. <paramref name="instruments"/> are in universe order.</summary>
@@ -80,7 +80,7 @@ internal static class FabricatedRun
         var tradeList = trades ?? [];
         var openList = openAtEnd ?? [];
         var replays = instruments.Select(i => new InstrumentReplay(i, [.. tradeList.Where(t => t.InstrumentId == i.InstrumentId)], [.. openList.Where(t => t.InstrumentId == i.InstrumentId)])).ToList();
-        var header = new RunHeader(Strategy(strategy), "sim-2", from ?? Monday, to ?? new DateOnly(2026, 4, 30), ReplayOptions.Default, false, fills ?? DefaultFills, universe, new TradingCalendar());
+        var header = new RunHeader(Strategy(strategy), "sim-3", from ?? Monday, to ?? new DateOnly(2026, 4, 30), ReplayOptions.Default, false, fills ?? DefaultFills, universe, new TradingCalendar());
         return RunAssembler.Assemble(header, replays);
     }
 

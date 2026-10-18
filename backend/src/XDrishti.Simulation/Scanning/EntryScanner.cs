@@ -132,7 +132,7 @@ public sealed class EntryScanner
     /// <summary>
     /// Makes the scanner of a compiled side for one instrument: its own frame, created from the features of the side with the calendar (a special session then closes its last buckets at its own last minute), and the side
     /// bound to it. The stop the scanner reads is the level feature of <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c>, <c>bar_high</c> and <c>or_opposite</c> on the evaluation timeframe with no buffer; the rest, and a
-    /// daily evaluation, are refused by name (P3-05 adds buffers and the other kinds, P3-03d the daily evaluation).
+    /// daily evaluation, are refused by name (P3-05 adds buffers and the other kinds, P3-03e the daily evaluation).
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="side"/> is null.</exception>
     public static Result<EntryScanner> Create(CompiledSide side, InstrumentRef instrument, TradingCalendar? calendar = null)
@@ -140,7 +140,7 @@ public sealed class EntryScanner
         ArgumentNullException.ThrowIfNull(side);
         if (side.EvaluationTimeframe >= Timeframe.D1)
         {
-            return Result.Failure<EntryScanner>(Error.Validation(ScannerCodes.TimeframeUnsupported, "The scanner does not evaluate on " + side.EvaluationTimeframe.ToCode() + ": a bar of a day or longer is always stale at the first minute of the next date (the daily evaluation is P3-03d)."));
+            return Result.Failure<EntryScanner>(Error.Validation(ScannerCodes.TimeframeUnsupported, "The scanner does not evaluate on " + side.EvaluationTimeframe.ToCode() + ": a bar of a day or longer is always stale at the first minute of the next date (the daily evaluation is P3-03e)."));
         }
 
         if (StopProblem(side.Stop, side.EvaluationTimeframe) is { } problem)

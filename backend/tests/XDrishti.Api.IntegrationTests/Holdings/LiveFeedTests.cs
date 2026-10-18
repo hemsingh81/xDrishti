@@ -385,7 +385,7 @@ public sealed class LiveFeedTests(ApiFactory factory) : HoldingsTestBase(factory
             await listen.ExecuteNonQueryAsync(Ct);
         }
 
-        // The connection comes from the pool and can carry a live_prices notification that an earlier test left unread: read what is pending and count from zero, so that only this flush is counted.
+        // A live_prices notification sent by something else before this flush (the cause was not established; a pooled connection or another flush on the shared database are candidates) would be counted too: read what is already pending and count from zero. This narrows the race, it does not remove it: a notification that arrives after this read can still be counted.
         await using (var ping = new NpgsqlCommand("SELECT 1", listener))
         {
             await ping.ExecuteScalarAsync(Ct);

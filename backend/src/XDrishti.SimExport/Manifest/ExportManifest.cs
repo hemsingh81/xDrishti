@@ -67,16 +67,20 @@ public static class ExportManifest
     }
 
     /// <summary>Reads a manifest. Strict: exactly the members above, no other, with values of the right kind, and the stated export key must be the key of the content.</summary>
-    public static Result<ParsedManifest> Parse(ReadOnlySpan<byte> manifest)
+    public static Result<ParsedManifest> Parse(ReadOnlySpan<byte> manifest) => ParseBytes(manifest.ToArray());
+
+    /// <summary>The same as <see cref="Parse"/> for bytes already in memory, without a further copy. Any text that is not a manifest, a hand-edited one included, is <see cref="MalformedCode"/>, never an exception.</summary>
+    public static Result<ParsedManifest> ParseBytes(ReadOnlyMemory<byte> manifest)
     {
         try
         {
-            using var document = JsonDocument.Parse(manifest.ToArray(), new JsonDocumentOptions { MaxDepth = 8 });
+            using var document = JsonDocument.Parse(manifest, new JsonDocumentOptions { MaxDepth = 8 });
             return ParseRoot(document.RootElement);
         }
-        catch (JsonException)
+        catch (Exception bad) when (bad is JsonException or ArgumentException or InvalidOperationException)
         {
-            return Malformed("The manifest is not valid JSON.");
+            // JsonException: not JSON; InvalidOperationException: a string with a lone surrogate cannot be read; ArgumentException: a value the key refuses
+            return Malformed("The manifest is not valid JSON of the shape of a manifest.");
         }
     }
 
@@ -93,7 +97,7 @@ public static class ExportManifest
             return Malformed("The manifest does not have exactly format, run_key, basket_id, export_key, files and extra.");
         }
 
-        if (string.IsNullOrEmpty(format.GetString()) || !ExportText.IsLowerHex(runKey.GetString(), ExportText.Sha256HexLength) || !ExportText.IsLowerHex(exportKey.GetString(), ExportText.Sha256HexLength))
+        if (string.IsNullOrEmpty(format.GetString()) || ExportKey.HasLineBreak(format.GetString()!) || !ExportText.IsLowerHex(runKey.GetString(), ExportText.Sha256HexLength) || !ExportText.IsLowerHex(exportKey.GetString(), ExportText.Sha256HexLength))
         {
             return Malformed("The format, the run key or the export key is not valid.");
         }

@@ -59,6 +59,7 @@ public sealed class ExportSpellingsTests
         ExportSpellings.Of(ExitReason.Target).ShouldBe("target");
         ExportSpellings.Of(ExitReason.SquareOff).ShouldBe("square_off");
         ExportSpellings.Of(ExitReason.EndOfData).ShouldBe("end_of_data");
+        ExportSpellings.Of(ExitReason.MaxHold).ShouldBe("max_hold");
         ExportSpellings.Of(FillBasis.Modelled).ShouldBe("modelled");
         ExportSpellings.Of(FillBasis.Exact).ShouldBe("no_slippage");
         ExportSpellings.Of(CostBasis.None).ShouldBe("none");
@@ -68,6 +69,7 @@ public sealed class ExportSpellingsTests
         ExportSpellings.Of(Timeframe.D1).ShouldBe("1D");
         ExportSpellings.Of(SkipReason.TickSizeInvalid).ShouldBe("tick_size_invalid");
         ExportSpellings.Of(NoTradeReason.LimitNotReached).ShouldBe("limit_not_reached");
+        ExportSpellings.Of(NoTradeReason.PositionOpen).ShouldBe("position_open");
         ExportSpellings.Of(UniverseKind.InstrumentList).ShouldBe("instrument_list");
         ExportSpellings.Of(UniverseKind.Basket).ShouldBe("basket");
         ExportSpellings.Of(SessionExclusion.ShortSession).ShouldBe("short_session");

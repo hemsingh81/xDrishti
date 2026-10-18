@@ -11,6 +11,9 @@ public static class RunLabels
     /// <summary>The label that the engine is not yet verified against a hand recomputation (P3-08). P3-08 changes it, with its ADR.</summary>
     public const string EngineVerification = "engine: not yet verified (P3-08)";
 
+    /// <summary>Whether the engine has been verified; <c>run.json</c> writes it as <c>engine_verified</c>. False while <see cref="EngineVerification"/> says "not yet verified"; P3-08 changes both together.</summary>
+    public const bool EngineVerified = false;
+
     /// <summary>The first label: a run is an exploration.</summary>
     public const string Exploration = "exploration: signal-level mechanics on past data, not evidence of an edge";
 

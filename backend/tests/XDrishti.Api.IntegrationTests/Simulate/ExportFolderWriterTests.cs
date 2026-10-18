@@ -270,6 +270,7 @@ public sealed class ExportFolderWriterTests
     [Fact]
     public async Task A_manifest_that_cannot_be_read_is_a_refusal()
     {
+        Assert.SkipWhen(Environment.UserName == "root", "root can read a file with no permissions, so the refusal cannot be shown");
         using var temp = new TempFolder();
         await ExportFixture.WriteAsync(temp.Root);
         var manifest = Path.Combine(Run(temp.Root), "manifest.json");
@@ -277,11 +278,6 @@ public sealed class ExportFolderWriterTests
         try
         {
             var result = await ExportFixture.WriteAsync(temp.Root, force: true);
-
-            if (!File.Exists(manifest) || Environment.UserName == "root")
-            {
-                return;
-            }
 
             result.IsFailure.ShouldBeTrue();
             result.Error.Code.ShouldBe(ExportErrors.NoValidManifestCode);

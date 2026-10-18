@@ -69,6 +69,29 @@ internal static class TestStrategies
         OrbWindow,
         []);
 
+    /// <summary>
+    /// <c>SWING_1H_TEST</c> (P3-03d, fixture R): a swing BUY on the 1h bar, trigger <c>close &gt; or_high(60)</c>, the stop on the low of the first hour (<c>or_opposite</c>, 60 minutes), one <c>FIXED_RR 2.0</c>, first entry 10:15, last entry 14:15,
+    /// held up to <paramref name="maxHoldSessions"/> sessions (3 in the fixture).
+    /// </summary>
+    public static StrategyDefinition Swing1h(int maxHoldSessions = 3) => new(
+        StrategyDefinition.CurrentSchema,
+        "SWING_1H_TEST",
+        Style.Swing,
+        [Timeframe.H1],
+        [Side.Buy],
+        [],
+        new SideRules(null, All("close > or_high(60)"), null, new EntrySpec(EntryKind.AtClose), new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Of(60)), [Rr(2.0)], null),
+        null,
+        new TimeRules(new TimeOnly(10, 15), new TimeOnly(14, 15), null, maxHoldSessions),
+        []);
+
+    /// <summary><c>SWING_1H_EMA_TEST</c> (criterion 18): history-dependent, trigger <c>close &gt; ema(10)</c> on the 1h bar, the stop and the hold of fixture R; it reads the history, so a scanner started at <c>From</c> sees other candidates.</summary>
+    public static StrategyDefinition Swing1hEma() => Swing1h() with
+    {
+        Id = "SWING_1H_EMA_TEST",
+        Buy = Swing1h().Buy! with { Trigger = All("close > ema(10)") },
+    };
+
     /// <summary>A swing strategy on the timeframe (a level stop, a fixed reward-risk, held up to five sessions): what the daily evaluation and the swing style refusals are tested with.</summary>
     public static StrategyDefinition Swing(Timeframe timeframe) => new(
         StrategyDefinition.CurrentSchema,

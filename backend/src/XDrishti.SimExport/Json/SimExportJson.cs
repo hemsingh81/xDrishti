@@ -35,7 +35,7 @@ public static class SimExportJson
         ArgumentNullException.ThrowIfNull(labels);
         ArgumentException.ThrowIfNullOrWhiteSpace(format);
 
-        var envelope = new RunEnvelope(new ExportHeader(format, Schema), new LabelsView(labels.Lines, labels.NotModelled, EngineVerified: false), run);
+        var envelope = new RunEnvelope(new ExportHeader(format, Schema), new LabelsView(labels.Lines, labels.NotModelled, RunLabels.EngineVerified), run);
         using var writer = new Utf8JsonWriter(sink, WriterOptions);
         JsonSerializer.Serialize(writer, envelope, SimExportJsonContext.Default.RunEnvelope);
         writer.Flush();

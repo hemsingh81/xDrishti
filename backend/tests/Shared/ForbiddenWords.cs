@@ -33,6 +33,6 @@ internal static partial class ForbiddenWords
     [GeneratedRegex(@"\b\w+\b", RegexOptions.CultureInvariant)]
     private static partial Regex WordPattern();
 
-    [GeneratedRegex(@"\d R\b", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\d\s*R\b", RegexOptions.CultureInvariant)]
     private static partial Regex DigitRPattern();
 }

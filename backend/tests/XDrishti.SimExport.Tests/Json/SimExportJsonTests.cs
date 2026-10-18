@@ -45,7 +45,9 @@ public sealed partial class SimExportJsonTests
         labels.EnumerateObject().Select(p => p.Name).ShouldBe(["lines", "not_modelled", "engine_verified"]);
         labels.GetProperty("lines").EnumerateArray().Select(e => e.GetString()).ShouldBe(expected.Lines);
         labels.GetProperty("not_modelled").EnumerateArray().Select(e => (e.GetProperty("code").GetString()!, e.GetProperty("text").GetString()!)).ShouldBe(expected.NotModelled.Select(l => (l.Code, l.Text)));
-        labels.GetProperty("engine_verified").GetBoolean().ShouldBeFalse();
+        labels.GetProperty("engine_verified").GetBoolean().ShouldBe(RunLabels.EngineVerified);
+        expected.Lines.Contains(RunLabels.EngineVerification).ShouldBeTrue();
+        RunLabels.EngineVerification.Contains("not yet verified", StringComparison.Ordinal).ShouldBe(!RunLabels.EngineVerified, "the flag and the label say the same");
     }
 
     [Fact]

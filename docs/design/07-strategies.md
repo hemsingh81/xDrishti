@@ -23,7 +23,7 @@ Built-in strategies are written in the same rules language users use in the Stra
 sections combine:** at every closed bar of the evaluation timeframe the sections are evaluated together, and an entry is possible when `setup` is true, `trigger` is true and `invalidate` is not true (unknown counts as
 not true, and an unknown invalidation does not fire either; `SideEvaluation.Fires` is the one definition). A stored strategy is **self-contained**: a missing time rule is not filled from the `styles` block of
 [doc 16](16-configuration.md), so the same stored text always means the same behaviour. Each condition of a list is compiled and evaluated as its own condition; the lists are never joined into one text. An intraday
-strategy lists 5m to 1h, a swing strategy 30m, 1h and 1D, and swing SELL is refused (futures only, §7).
+strategy lists 5m to 1h, a swing strategy 30m, 1h and 1D, and swing SELL is refused (futures only, §7). The simulator runs a swing strategy evaluated on 30m or 1h (P3-03d, [ADR 0040](../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.md)): the position is held up to `max_hold_sessions` sessions with at most one open position per instrument and side, so a signal that fires while a position is open is counted and not entered, and it still spends that day's one candidate; the daily (1D) evaluation is P3-03e.
 
 ## 2. Conditional trade plans
 
