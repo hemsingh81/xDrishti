@@ -77,7 +77,7 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
         return new SimTrade(
             SimTrade.CurrentSchemaVersion, "ORB", input.InstrumentId, input.Symbol, side, date, entry, Timeframe.M15, bar, 15, true,
             entry, 100.5, 98, 105.5, entry + 3600, 105.5, ExitReason.Target, 2.0, 0.1, 2.0, FillBasis.Exact, CostBasis.None, null,
-            2.0, 0, 100.5, 105.5, EntryFill.AtLimit, false);
+            2.0, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0);
     }
 
     private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings) : IPreparedStrategy

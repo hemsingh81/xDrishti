@@ -17,11 +17,11 @@ public sealed class RunAssemblerTests
     private const string Fills = "{\"entry_limit_percent\":0.1,\"slippage\":{\"ticks\":1,\"bar_range_frac\":0.05,\"stop_exit_extra_ticks\":2,\"gap_fill\":\"at_open\"}}";
 
     /// <summary>The SHA-256 of <see cref="PinnedKeyText"/> (UTF-8, as written, each line ending in a line feed).</summary>
-    private const string PinnedKey = "3f49ea3503a64ddb0202669279a39c0a5b3881df55a452a33bf1c980806a38d8";
+    private const string PinnedKey = "ffb7c227dbc113bf16a5a8d94b205de820c26b6671d1167268defed6951be252";
 
     private const string PinnedKeyText =
-        "xd-run 2\n"
-        + "engine=sim-2\n"
+        "xd-run 3\n"
+        + "engine=sim-3\n"
         + "strategy=1111111111111111111111111111111111111111111111111111111111111111\n"
         + "params=or_min=15,rr=2\n"
         + "timeframe=15m\n"
@@ -60,15 +60,15 @@ public sealed class RunAssemblerTests
     private static InstrumentReplay Replay(InstrumentRun run, IReadOnlyList<SimTrade>? trades = null, IReadOnlyList<SimTrade>? openAtEnd = null) => new(run, trades ?? [], openAtEnd ?? []);
 
     private static SimTrade Trade(Guid instrument, Side side, long entryEpoch, ExitReason exit = ExitReason.Target) => new(
-        2, "ORB", instrument, "X", side, Monday, entryEpoch - 60, Timeframe.M15, new Bar(entryEpoch - 960, 99, 100.5, 99, 100.5, 15000), 15, true,
+        3, "ORB", instrument, "X", side, Monday, entryEpoch - 60, Timeframe.M15, new Bar(entryEpoch - 960, 99, 100.5, 99, 100.5, 15000), 15, true,
         entryEpoch, 100.5, 98, 105.5, entryEpoch + 600, 105.5, exit, 2, 0, 2, FillBasis.Exact, CostBasis.None, null,
-        2, 0, 100.5, 105.5, EntryFill.AtOpen, false);
+        2, 0, 100.5, 105.5, EntryFill.AtOpen, false, 1, 0);
 
     private static UniverseRecord List(params Guid[] ids) =>
         new(UniverseKind.InstrumentList, null, null, UniverseLabels.InstrumentsAsListed, [.. ids.Select((id, i) => new UniverseMember(id, "S" + i))]);
 
     private static RunHeader Header(UniverseRecord universe, TradingCalendar? calendar = null, DateOnly? to = null) => new(
-        Strategy(), "sim-2", Monday, to ?? new DateOnly(2026, 3, 4), ReplayOptions.Default, false, Fills, universe, calendar ?? Calendar());
+        Strategy(), "sim-3", Monday, to ?? new DateOnly(2026, 3, 4), ReplayOptions.Default, false, Fills, universe, calendar ?? Calendar());
 
     private static (RunHeader Header, InstrumentReplay[] Replays) PinnedFixture()
     {
@@ -88,7 +88,7 @@ public sealed class RunAssemblerTests
         RunAssembler.KeyText(header, run.Instruments, run.CalendarExceptions).ShouldBe(PinnedKeyText);
         run.RunKey.ShouldBe(PinnedKey);
         run.RunKey.ShouldBe(CanonicalText.Sha256Hex(PinnedKeyText));
-        run.SchemaVersion.ShouldBe(2);
+        run.SchemaVersion.ShouldBe(3);
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public sealed class RunAssemblerTests
             "fills" => (header with { Fills = Fills.Replace("0.1", "0.2", StringComparison.Ordinal) }, replays),
             "tick" => (header, new[] { replays[0], Replay(b with { TickSize = 0.01m }) }),
             "fallback" => (header, new[] { replays[0], Replay(b with { TickFromFallback = false }) }),
-            "engine" => (header with { EngineVersion = "sim-3" }, replays),
+            "engine" => (header with { EngineVersion = "sim-4" }, replays),
             "strategy hash" => (header with { Strategy = header.Strategy with { DefinitionSha256 = new string('2', 64) } }, replays),
             "skip" => (header, new[] { replays[0], Replay(b with { Skipped = SkipReason.FeaturesNotReady }) }),
             "timeframe" => (header with { Strategy = header.Strategy with { EvaluationTimeframe = Timeframe.M5 } }, replays),
@@ -237,7 +237,7 @@ public sealed class RunAssemblerTests
             Discontinuities = [new DiscontinuityNote(Monday, 2.0)],
             Scans = [scanA, sell],
             Walk = WalkCounters.Empty with { Candidates = 1, Trades = 1, LimitNotReached = 3 },
-            Fates = new RunFates(1, 2, 3, 4, 5, 6, 7, 8),
+            Fates = new RunFates(1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
             CandidatesInWindow = 5,
             TradesInWindow = 6,
         };
@@ -248,7 +248,7 @@ public sealed class RunAssemblerTests
             BarsExcluded = 20,
             Scans = [scanB],
             Walk = WalkCounters.Empty with { Candidates = 2, LimitNotReached = 1 },
-            Fates = new RunFates(10, 10, 10, 10, 10, 10, 10, 10),
+            Fates = new RunFates(10, 10, 10, 10, 10, 10, 10, 10, 10, 10),
             CandidatesInWindow = 1,
             TradesInWindow = 2,
             Sessions = new SessionCounts(1, 0, 0, 0, 1),
@@ -266,7 +266,7 @@ public sealed class RunAssemblerTests
         totals.DiscontinuitiesFlagged.ShouldBe(1);
         totals.Walk.Candidates.ShouldBe(3);
         totals.Walk.LimitNotReached.ShouldBe(4);
-        totals.Fates.ShouldBe(new RunFates(11, 12, 13, 14, 15, 16, 17, 18));
+        totals.Fates.ShouldBe(new RunFates(11, 12, 13, 14, 15, 16, 17, 18, 19, 20));
         totals.OpenAtEnd.ShouldBe(13);
         totals.EntriesSuppressed.ShouldBe(11);
         (totals.CandidatesInWindow, totals.TradesInWindow).ShouldBe((6, 8));
@@ -331,7 +331,7 @@ public sealed class RunAssemblerTests
 
         var run = RunAssembler.Assemble(header, replays);
 
-        run.EngineVersion.ShouldBe("sim-2");
+        run.EngineVersion.ShouldBe("sim-3");
         run.Strategy.ShouldBe(header.Strategy);
         (run.From, run.To, run.Options, run.AcknowledgeCsvAdjusted, run.Fills, run.Universe).ShouldBe((header.From, header.To, header.Options, false, Fills, header.Universe));
         run.Instruments.Select(i => i.InstrumentId).ShouldBe([IdA, IdB]);

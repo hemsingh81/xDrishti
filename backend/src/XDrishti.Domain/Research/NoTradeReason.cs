@@ -17,4 +17,7 @@ public enum NoTradeReason
 
     /// <summary>The entry limit order was not reached in the one minute it lives (ADR 0038, E5): the minute opened beyond the limit and did not trade back to it.</summary>
     LimitNotReached,
+
+    /// <summary>The instrument already had an open position on this side (ADR 0040, D11): the candidate was not walked. Produced by the simulator's position gate, never by the walker.</summary>
+    PositionOpen,
 }

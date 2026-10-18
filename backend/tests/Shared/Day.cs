@@ -40,6 +40,9 @@ internal sealed class Day
     /// <summary>A dense day on the date from <paramref name="first"/> to <paramref name="last"/> (both included), 09:15 to 15:29 when not given.</summary>
     public static Day Dense(DateOnly? date = null, string first = "09:15", string last = "15:29") => new(date ?? Monday, Minute(first), Minute(last));
 
+    /// <summary>A dense day on <paramref name="date"/> that starts at the last close of <paramref name="previous"/> (the first minute of a later day repeats the close before it, P3-03d).</summary>
+    public static Day After(Day previous, DateOnly date) => Dense(date).Start(previous.Bars()[^1].Close);
+
     /// <summary>The prefix P of P3-03 D9: 09:15 flat 99.00, the 09:20 minute high 100.00, the 09:25 minute low 98.00, so that the first 15-minute bar is O 99 H 100 L 98 C 99.</summary>
     public static Day P(DateOnly? date = null) => Dense(date).Start(99.00).Set("09:20 99.00/100.00/99.00/99.00").Set("09:25 99.00/99.00/98.00/99.00");
 

@@ -2,7 +2,7 @@ namespace XDrishti.Domain.Research;
 
 /// <summary>
 /// What the trade walker did, as plain sums (ADR 0037, decision D6; ADR 0038). A rule that never fires gives zero trades and zero losses and looks safe; these counters are how it is seen.
-/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the four exit counts.
+/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the five exit counts (<c>ExitsStop + ExitsTarget + ExitsSquareOff + ExitsMaxHold + ExitsEndOfData</c>); ADR 0040, D10.
 /// <c>WalkOutcome.ToCounters()</c> (in <c>XDrishti.Simulation.Walking</c>) makes the counts of one walk; this type lives in Domain because the run record of P3-04 holds it.
 /// </summary>
 /// <param name="Candidates">Walks.</param>
@@ -25,6 +25,13 @@ namespace XDrishti.Domain.Research;
 /// <param name="LateSquareOffs">Square-off exits at a minute after the square-off minute (the minutes in between were absent or empty).</param>
 /// <param name="ZeroVolumeMinutes">Minutes with volume 0 passed over between the decision instant and the exit (or the deciding minute of a no-trade).</param>
 /// <param name="RiskUnderFourTicks">Trades whose risk is under four ticks.</param>
+/// <param name="PositionOpen">No-trade: see <see cref="NoTradeReason.PositionOpen"/>; candidates the position gate did not walk.</param>
+/// <param name="ExitsMaxHold">Trades that ended at the close of the last session they may be held.</param>
+/// <param name="MaxHoldAtLastClose"><c>MaxHold</c> exits whose due minute held no trade, so the position left at the close of the last minute that did (a subset of <see cref="ExitsMaxHold"/>).</param>
+/// <param name="OvernightStopGaps">Stop exits whose minute is the first that holds a trade on a date later than the entry date (a subset of <see cref="StopGapExits"/>).</param>
+/// <param name="OvernightTargetGaps">Target exits whose minute is the first that holds a trade on a date later than the entry date (a subset of <see cref="TargetGapExits"/>).</param>
+/// <param name="SessionsHeld">The sum of <see cref="SimTrade.SessionsHeld"/> over the trades.</param>
+/// <param name="SessionsUnseen">The sum of <see cref="SimTrade.SessionsUnseen"/> over the trades.</param>
 public sealed record WalkCounters(
     long Candidates,
     long Trades,
@@ -45,10 +52,17 @@ public sealed record WalkCounters(
     long AmbiguousMinutes,
     long LateSquareOffs,
     long ZeroVolumeMinutes,
-    long RiskUnderFourTicks)
+    long RiskUnderFourTicks,
+    long PositionOpen = 0,
+    long ExitsMaxHold = 0,
+    long MaxHoldAtLastClose = 0,
+    long OvernightStopGaps = 0,
+    long OvernightTargetGaps = 0,
+    long SessionsHeld = 0,
+    long SessionsUnseen = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
-    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>The field-by-field sum.</summary>
     public WalkCounters Add(WalkCounters other)
@@ -74,6 +88,13 @@ public sealed record WalkCounters(
             AmbiguousMinutes + other.AmbiguousMinutes,
             LateSquareOffs + other.LateSquareOffs,
             ZeroVolumeMinutes + other.ZeroVolumeMinutes,
-            RiskUnderFourTicks + other.RiskUnderFourTicks);
+            RiskUnderFourTicks + other.RiskUnderFourTicks,
+            PositionOpen + other.PositionOpen,
+            ExitsMaxHold + other.ExitsMaxHold,
+            MaxHoldAtLastClose + other.MaxHoldAtLastClose,
+            OvernightStopGaps + other.OvernightStopGaps,
+            OvernightTargetGaps + other.OvernightTargetGaps,
+            SessionsHeld + other.SessionsHeld,
+            SessionsUnseen + other.SessionsUnseen);
     }
 }

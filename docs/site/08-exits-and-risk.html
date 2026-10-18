@@ -202,7 +202,7 @@ target for late intraday triggers (learned).</p>
 <tr>
 <td>Forced exit</td>
 <td><code>square_off</code> (e.g. 15:15), required</td>
-<td><code>max_hold_sessions</code>, 1 to 5, required: close of session ≤ 5</td>
+<td><code>max_hold_sessions</code>, 1 to 5, required: the close of session N, counting the entry session as the first and sessions by the trading calendar</td>
 </tr>
 <tr>
 <td>Time stop</td>
@@ -212,9 +212,10 @@ target for late intraday triggers (learned).</p>
 <tr>
 <td>Overnight gap</td>
 <td>—</td>
-<td>Gap through stop ⇒ filled at open (simulated realistically)</td>
+<td>Gap through stop ⇒ filled at the open (simulated, and counted); a target is never filled better than the target (<a href="../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.html">ADR 0040</a>)</td>
 </tr>
 </tbody></table>
+<p><strong>Swing positions in the simulator (P3-03d, <a href="../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.html">ADR 0040</a>).</strong> A swing position stays open across sessions with its stop and target unchanged; the rows of ADR 0038 apply to every minute that holds a trade on every date, and there is no square-off. <code>MAX_HOLD</code> N leaves at the <strong>close of the last 1-minute bar of session N</strong> (the entry session is session 1; sessions are counted with the trading calendar, a special session counts and a holiday does not; with no calendar every weekday counts), with the base slippage and no extra ticks; a stop or target reached in that minute comes first. When the due minute holds no trade the position leaves at the close of the last minute that does (counted as <code>MaxHoldAtLastClose</code>), and when the data ends first it is reported open (<code>EndOfData</code>, never in a statistic). A session on which the walker read no trade is counted (<code>SessionsUnseen</code>), not excluded. There is at most one open position per instrument and side: a candidate decided while one is open is not walked and is counted (<code>PositionOpen</code>). A swing position that is open when a flagged day (an unadjusted jump above 20 %) starts a new segment of the series is excluded and counted. Dividends are neither adjusted nor received, and the closing auction and the circuit limit of a stock held overnight are not modelled (ISS-18, ISS-27).</p>
 <p>How the simulator fills a stop that was gapped through, a target, a minute that holds both, the square-off minute and an entry limit order is the rule table of <a href="../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.html">ADR 0038</a> (P3-03b): a gapped stop fills at that minute&#39;s open, a target at the target and never better, stop first unless the minute&#39;s open is already beyond the target, and a square-off waits for the next minute that holds a trade.</p>
 <p>The four time rules of a strategy are <code>first_entry</code>, <code>last_entry</code>, <code>square_off</code> and <code>max_hold_sessions</code> (the <code>time_rules</code> of <a href="11-strategy-lab.html">doc 11</a> §2); <a href="16-configuration.html">doc 16</a> spells the same four
 <code>first_entry_time</code>, <code>last_entry_time</code>, <code>square_off_time</code> and <code>max_holding_sessions</code> in its <code>styles</code> block. A stored strategy carries its own: the numbers of the configuration are not defaults for a missing
@@ -284,7 +285,7 @@ and gaps. Every simulation includes costs.</p>
     <a class="prev" href="07-strategies.html"><small>← Previous  [</small>07 · Strategies</a>
     <a class="next" href="09-learning-engine.html"><small>Next  ] →</small>09 · Learning engine</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 17:20</footer>
+  <footer class="foot">Generated from <code>docs/08-exits-and-risk.md</code> · 2026-10-18 18:34</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-r-multiples" class="d2">1. R-multiples</a>
 <a href="#2-exit-policy-library" class="d2">2. Exit policy library</a>

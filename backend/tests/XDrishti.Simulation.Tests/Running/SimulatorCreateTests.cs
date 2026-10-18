@@ -41,7 +41,6 @@ public sealed class SimulatorCreateTests
         { "a filter", OrbV1.Create() with { Filters = ["min_turnover"] }, "simulation.filter_not_available", "filters[0]", "min_turnover" },
         { "a market context", WithTrigger("close > or_high(or_min) and close[1] <= or_high(or_min) and vix < 20"), "simulation.needs_context", "buy", "market context" },
         { "expiry dates", WithTrigger("close > or_high(or_min) and close[1] <= or_high(or_min) and is_expiry_day == 0"), "simulation.needs_expiry_days", "buy", "expiry" },
-        { "a swing style", TestStrategies.Swing(Timeframe.H1), "simulation.unsupported_style", "style", "swing" },
     };
 
     [Theory]
@@ -79,7 +78,7 @@ public sealed class SimulatorCreateTests
 
         build.Simulator.ShouldBeNull();
         build.Problems.ShouldContain(p => p.Problem.Code == "simulation.scanner_timeframe_unsupported" && p.Path == "timeframes");
-        build.Problems.ShouldContain(p => p.Problem.Code == "simulation.unsupported_style");
+        build.Problems.ShouldNotContain(p => p.Problem.Code == "simulation.unsupported_style");
     }
 
     [Fact]
