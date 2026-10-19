@@ -4,6 +4,8 @@ The exit criterion of P3 is the owner's: about 20 trades drawn at random, balanc
 
 **Status of the values below.** They are the recommendations of the spec (the owner's Q6, protocol, and Q7, data). They are not final until the owner confirms them in chat before the first draw. **The record holds no price, no R value and no count of any group** (roadmap, *What a P3 number means*: no number from a real-data run is quoted outside its run folder); the trade keys name the owner's symbols, so whether this repository may hold them is the owner's call.
 
+**Confirmed by the owner in chat (2026-10-19, "yes to all recommendations").** Seed `p3-check-1`. Hold-out: the last months are kept out, so `--to 2025-10-31` (`--from 2024-04-01`). Round A first (ORB v1, modelled fills, `--gross`); Round B (`VWAP_PULLBACK`, `BASE_BREAKOUT`) is a second pack with another seed; closing P3 on ORB alone is not taken. External chart: TradingView 1-minute, bar-start labels in India time, at least 5 rows. Instruments: the whole stored set (basket name still to be given by the owner, otherwise a `--symbols` list).
+
 Nothing in a pack is evidence of an edge. The check says that the mechanics checked match a chart. It does not say that the engine is free of defects, and it says nothing about whether a strategy works.
 
 ## 1. Before the draw
@@ -115,11 +117,11 @@ One block per pack. **No price, no R value and no count of a group.** The trade 
 
 | Field | Pack 1 |
 |---|---|
-| Seed (written before the draw) | |
-| Date of the draw | |
-| Pack id | |
-| Window (`--from`, `--to`), hold-out decision | |
-| Strategies, cost choice (`--gross` or the sheet id) | |
+| Seed (written before the draw) | `p3-check-1` |
+| Date of the draw | 2026-10-19 |
+| Pack id | `p3-check-1-ea89b084629b` |
+| Window (`--from`, `--to`), hold-out decision | 2024-04-01 to 2025-10-31; later months held out |
+| Strategies, cost choice (`--gross` or the sheet id) | ORB, `--gross`; all 214 stored symbols given, 4 skipped as `tick_size_invalid` (BOSCHLTD, PAGEIND, POWERINDIA, SHREECEM) |
 | Run key per strategy | |
 | Engine version | |
 | Data range (first and last bar) | |
@@ -132,4 +134,4 @@ One block per pack. **No price, no R value and no count of a group.** The trade 
 | Open model or implementation defects | |
 | Owner's statement and date | |
 
-Seeds used so far (all of them, including abandoned ones): none.
+Seeds used so far (all of them, including abandoned ones): `p3-check-1`.
