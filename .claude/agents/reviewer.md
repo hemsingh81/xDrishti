@@ -20,6 +20,10 @@ Check, in this order:
    missing `CancellationToken`, per-row inserts instead of `COPY`, unbounded lists, bundle growth, missing lazy routes.
 6. **Security** — secrets, SQL built from strings, missing validation, logged sensitive data, ports/containers weakened.
 7. **Contracts & data** — OpenAPI + `schema.d.ts` regenerated; migration present, never edits an applied one; docs/ADR updated.
+8. **Ponytail (what to cut)** — code the spec did not ask for: unused options/config/abstractions, wrappers or
+   conversions with one caller, a new helper or dependency where an existing one or the standard library works, code
+   that could be deleted. Never flag tests, validation, error handling, security or accessibility as cuttable.
+   Unrecorded known limits should carry a `shortcut: <limit>, <when to upgrade>` comment.
 
 Output: a short verdict (**approve** / **changes requested**), then findings as `severity (blocker|major|minor) —
 file:line — problem — suggested fix`. Report only real problems you verified in the code; no style nitpicks that

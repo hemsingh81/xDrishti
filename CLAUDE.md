@@ -18,6 +18,8 @@ the roadmap phases in `docs/design/18-roadmap.md`. Engineering standards: `docs/
   `/new-feature`, `/add-endpoint`, `/new-migration`, `/phase-done`.
 - Finish every code change with `scripts/check.sh` green and an independent `reviewer` pass. Do not commit or push
   unless the user asks.
+- Apply the `ponytail` skill (level `full`) on every coding task: smallest complete change, never at the cost of
+  tests, validation, security or the spec's acceptance criteria.
 
 ## Non-negotiables
 - SOLID, modular, reusable, testable, fast — see `docs/engineering/README.md`. Prefer extending over modifying.
