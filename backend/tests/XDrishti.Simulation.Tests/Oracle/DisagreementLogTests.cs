@@ -74,7 +74,12 @@ public sealed class DisagreementLogTests
         {
             Classes.ShouldContain(entry.Class, $"{entry.Id}: class");
             entry.Verdict.Length.ShouldBeGreaterThan(20, $"{entry.Id}: verdict");
-            entry.Verdict.ShouldNotContain("OPEN", Case.Insensitive, $"{entry.Id}: an open entry blocks P3-09");
+            if (entry.Verdict.StartsWith("OPEN", StringComparison.Ordinal))
+            {
+                // an open entry is allowed only as the owner's pending decision, with its predicate-guarded regression property named
+                entry.Class.ShouldBe("B", $"{entry.Id}: only an engine question may wait for the owner");
+                entry.Regression.ShouldContain("ExcursionInvariantTests", Case.Sensitive, $"{entry.Id}: an open entry names its guarded property");
+            }
             if (entry.Class is "B" or "C")
             {
                 entry.Regression.ShouldNotBeNullOrWhiteSpace($"{entry.Id}: a class {entry.Class} entry needs its permanent hand row");

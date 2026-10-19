@@ -21,7 +21,7 @@ public sealed class CoverageTests(ITestOutputHelper output)
         ("7 holes before the fill minute", OracleRows.E1Hole),
         ("8 holes inside the position", OracleRows.XHole),
         ("9a a hole at the square-off minute", OracleRows.X1Late),
-        ("9b a hole at the due minute", OracleRows.X8Last),
+        ("9b/15b a hole at the due minute (MaxHold at the last close, due minute absent; one trace row, one floor)", OracleRows.X8Last),
         ("10a a price equal to the limit", OracleRows.TieLimit),
         ("10b a price equal to the stop", OracleRows.TieStop),
         ("10c a price equal to the target", OracleRows.TieTarget),
@@ -39,7 +39,6 @@ public sealed class CoverageTests(ITestOutputHelper output)
         ("14d the 09:21 minute (no fill)", OracleRows.E9Past),
         ("14e the 09:15 minute with a widened range", OracleRows.E9Wide),
         ("15a MaxHold at the close of session N, the due minute present", OracleRows.X8Due),
-        ("15b MaxHold at the close of session N, the due minute absent", OracleRows.X8Last),
         ("16a a candidate at 15:30 on the day a position leaves at the close", OracleRows.D11Close),
         ("16b a position ended by the data blocks", OracleRows.D11EndOfData),
     ];

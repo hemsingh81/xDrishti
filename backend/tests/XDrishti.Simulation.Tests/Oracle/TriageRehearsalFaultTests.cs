@@ -11,8 +11,8 @@ public sealed class TriageRehearsalFaultTests(ITestOutputHelper output)
 
     private const int SweepSeeds = 120;
 
-    /// <summary>The faults of the rehearsal in the default check: one that changes the entry (the signal minute) and one that changes an exit (a gap filled at the stop price).</summary>
-    public static TheoryData<OracleFaults> Rehearsed() => [OracleFaults.FillOnSignalMinute, OracleFaults.GapFilledAtStopPrice];
+    /// <summary>The faults of the rehearsal in the default check: entry, exit, order inside a minute, MaxHold and MAE faults (five of the sixteen; the sweep has all).</summary>
+    public static TheoryData<OracleFaults> Rehearsed() => [OracleFaults.FillOnSignalMinute, OracleFaults.GapFilledAtStopPrice, OracleFaults.StopCheckedAfterTarget, OracleFaults.ExtraStopTicksOnMaxHold, OracleFaults.MaeFromFilledEntry];
 
     /// <summary>The series (of the given count in each of the 16 categories, in the modelled mode) on which the faulted oracle and the engine disagree, with the first few disagreements.</summary>
     private static (int Series, int Disagreeing, List<string> First) Compare(OracleFaults fault, int seedsPerCategory)
