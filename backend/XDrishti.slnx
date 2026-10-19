@@ -24,6 +24,7 @@
     <Project Path="tests/XDrishti.Indicators.Tests/XDrishti.Indicators.Tests.csproj" />
     <Project Path="tests/XDrishti.Strategies.Tests/XDrishti.Strategies.Tests.csproj" />
     <Project Path="tests/XDrishti.Simulation.Tests/XDrishti.Simulation.Tests.csproj" />
+    <Project Path="tests/XDrishti.SimOracle/XDrishti.SimOracle.csproj" />
     <Project Path="tests/XDrishti.SimExport.Tests/XDrishti.SimExport.Tests.csproj" />
     <Project Path="tests/XDrishti.Infrastructure.Tests/XDrishti.Infrastructure.Tests.csproj" />
     <Project Path="tests/XDrishti.Feed.Tests/XDrishti.Feed.Tests.csproj" />

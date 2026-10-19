@@ -8,7 +8,7 @@ portfolio limits: not simulated
 sample: in-sample
 universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)
 data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)
-engine: not yet verified (P3-08)
+engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
 not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
@@ -30,7 +30,7 @@ portfolio limits: not simulated
 sample: in-sample
 universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)
 data: 1 instruments; first bars 2024-04-01 to 2024-04-01, last bars 2026-04-30 to 2026-04-30; length from about 2.1 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)
-engine: not yet verified (P3-08)
+engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
 not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
@@ -52,7 +52,7 @@ portfolio limits: not simulated
 sample: in-sample
 universe: members as of today; survivorship is bounded and disclosed, not avoided (ISS-22)
 data: 1 instruments; first bars 2024-04-01 to 2024-04-01, last bars 2026-04-30 to 2026-04-30; length from about 2.1 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)
-engine: not yet verified (P3-08)
+engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
 not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
@@ -74,7 +74,7 @@ portfolio limits: not simulated
 sample: in-sample
 universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)
 data: none
-engine: not yet verified (P3-08)
+engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
 not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
@@ -96,7 +96,7 @@ portfolio limits: not simulated
 sample: in-sample
 universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)
 data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)
-engine: not yet verified (P3-08)
+engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
 not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
@@ -119,7 +119,7 @@ portfolio limits: not simulated
 sample: in-sample
 universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)
 data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)
-engine: not yet verified (P3-08)
+engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
 not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.

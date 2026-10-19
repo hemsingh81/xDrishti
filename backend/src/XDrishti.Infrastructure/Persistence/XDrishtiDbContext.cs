@@ -14,6 +14,7 @@ using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Live;
+using XDrishti.Infrastructure.Research;
 
 namespace XDrishti.Infrastructure.Persistence;
 
@@ -121,6 +122,11 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<LiveQuoteRecord> LiveQuotes => Set<LiveQuoteRecord>();
 
     internal DbSet<CsvFileRecord> CsvFiles => Set<CsvFileRecord>();
+
+    /// <summary>Stored simulation runs (spec P3-10); read by projection, written by the adapter's SQL.</summary>
+    internal DbSet<SimRunRow> SimRuns => Set<SimRunRow>();
+
+    internal DbSet<SimTradeRow> SimTrades => Set<SimTradeRow>();
 
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();

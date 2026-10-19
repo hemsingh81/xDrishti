@@ -55,7 +55,7 @@ public sealed class SimulateVerbArchitectureTests
     [Fact]
     public void The_verb_and_its_script_read_no_vault_key_no_owner_secret_and_no_password_and_the_script_has_no_trace_flag()
     {
-        string[] sources = ["Verb.cs", "VerbDispatch.cs", "SimulateCommand.cs", "SimulateHost.cs", "SimulateProgram.cs", "SimulateOptions.cs", "UniverseResolver.cs", "SimulateSummary.cs", "SimulateLog.cs"];
+        string[] sources = ["Verb.cs", "VerbDispatch.cs", "SimulateCommand.cs", "SimulateHost.cs", "SimulateProgram.cs", "SimulateOptions.cs", "UniverseResolver.cs", "SimulateSummary.cs", "SimulateLog.cs", "SimulatePipeline.cs", "VerifyPackCommand.cs", "VerifyPackOptions.cs"];
         var text = string.Join("\n", sources.Select(s => File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Simulate", s))));
 
         foreach (var secret in new[] { "BrokerVault", "Auth:Owner", "Auth__Owner", "Database:Password", "Database__Password", "vault-key" })
@@ -81,11 +81,33 @@ public sealed class SimulateVerbArchitectureTests
     }
 
     [Fact]
-    public void The_verb_logs_with_the_ids_4405_to_4411_and_no_other()
+    public void The_verb_logs_with_the_ids_4405_to_4411_and_4419_to_4422_and_no_other()
     {
         var ids = Verb("SimulateLog").GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
             .SelectMany(m => m.GetCustomAttributes<LoggerMessageAttribute>().Select(a => a.EventId)).Order().ToList();
 
-        ids.ShouldBe([4405, 4406, 4407, 4408, 4409, 4410, 4411]);
+        ids.ShouldBe([4405, 4406, 4407, 4408, 4409, 4410, 4411, 4419, 4420, 4421, 4422]);
+    }
+
+    [Fact]
+    public void The_verify_pack_verb_pools_and_writes_in_the_host_does_not_use_the_result_store_and_the_extraction_keeps_the_shared_steps_in_one_place()
+    {
+        var folder = (string name) => File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Simulate", name));
+        var pack = folder("VerifyPackCommand.cs") + folder("VerifyPackOptions.cs");
+
+        foreach (var store in new[] { "IRunStore", "StoreRunCommand", "SimulateStore", "--store" })
+        {
+            pack.ShouldNotContain(store, Case.Sensitive);
+        }
+
+        folder("SimulateCommand.cs").ShouldContain("SimulateStore", Case.Sensitive, "the scan does see a use of the store where there is one");
+        foreach (var shared in new[] { "TickUnitCheck", "RunSimulationQuery", "BuildTradeCardsQuery" })
+        {
+            folder("SimulatePipeline.cs").ShouldContain(shared, Case.Sensitive);
+            (folder("SimulateCommand.cs") + pack).ShouldNotContain(shared, Case.Sensitive, "the verbs call the shared pipeline and do not fork it");
+        }
+
+        Verb("VerifyPackCommand").IsSealed.ShouldBeTrue("a static class: not a handler");
+        Verb("VerifyPackCommand").GetInterfaces().ShouldBeEmpty();
     }
 }

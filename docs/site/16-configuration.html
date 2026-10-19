@@ -250,17 +250,19 @@ styles:                            # first_entry_time, last_entry_time, square_o
 strategies:                        # built-ins enabled by id; your own strategies live in the Strategy Lab library (database)
   enabled: [ORB, VWAP_PULLBACK, EMA_PULLBACK, PDH_PDL_BREAK, BASE_BREAKOUT, TREND_PULLBACK, RSI2_REVERSION, NR7_ID_BO]
 
-exits:                             # the strategy model (P3-02b) checks the parameters of FIXED_RR and PARTIAL_TRAIL; the names below of the other policies and of the overlays are provisional until P3-02b2/P4 settle them (PARTIAL_TRAIL and EMA_TRAIL are in doc 08 §2 only, not in this list)
+exits:                             # the strategy model (P3-02b, P3-02b2) checks every parameter below; the tables are ACCEPTED but PROVISIONAL until P4's spec (ADR 0036 Amendment 1) and only FIXED_RR is run by a simulator (PARTIAL_TRAIL is in doc 08 §2 only, not in this list)
   candidate_policies:
     - { id: FIXED_RR, rr: [1.5, 2.0, 2.5, 3.0] }
-    - { id: PARTIAL_BE, book_pct: 50, t1_rr: 1.0, t2_rr: [2.0, 3.0] }
-    - { id: ATR_TRAIL, atr_period: 14, mult: [2.0, 3.0], activate_at_rr: 1.0 }
+    - { id: PARTIAL_BE, book_pct: 50, t1_rr: 1.0, t2_rr: [2.0, 3.0] }              # every t2_rr above t1_rr
+    - { id: ATR_TRAIL, atr_period: 14, mult: [2.0, 3.0], activate_at_rr: 1.0 }    # activate_at_rr is required (0: trailing from the entry); atr_period is the one default
     - { id: STRUCTURE_TRAIL, lookback_bars: 3 }
+    - { id: EMA_TRAIL, length: 20 }                                                 # a scalar (doc 08 §2)
     - { id: PYRAMID, initial_pct: 50, add_at_rr: [1.0, 2.0], add_pct: [30, 20], max_adds: 2,
-        cap_total_risk_to_initial: true, trail: ATR_TRAIL }
-  overlays:
-    time_stop: { enabled: true, min_progress_rr: 0.5, intraday_bars: 6, swing_sessions: 2 }
-    event_exit: { enabled: true, days_before_results: 1 }
+        trail_atr_mult: 2.0 }      # the cap of the total open risk at the initial 1R is always on and the trail is the ATR (atr_period optional, 14): cap_total_risk_to_initial and trail are not parameters
+  overlays:                        # a listed overlay is on: `enabled` is not a parameter
+    time_stop: { min_progress_rr: 0.5, intraday_bars: 6 }       # an intraday strategy gives intraday_bars (1 to the bars of a 375-minute session) ...
+    # time_stop: { min_progress_rr: 0.5, swing_sessions: 2 }    # ... a swing strategy gives swing_sessions (1 to 5, below max_hold_sessions); never both
+    event_exit: { days_before_results: 1 }                      # whole, 1 to 10
   selection_objective: { metric: mean_R_minus_downside, lambda: 0.5, prefer_plateau: true }
   per_trade_fit: { scale_by_atr: true, snap_to_structure: true, obstacle_check: true,
                    late_entry_target_reduction: { after: &quot;13:30&quot;, factor: 0.7 } }
@@ -616,7 +618,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-18 23:30</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-19 12:37</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

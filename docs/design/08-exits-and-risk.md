@@ -11,24 +11,27 @@
 | Policy | Description | Key parameters |
 |--------|-------------|----------------|
 | `FIXED_RR` | Full exit at k×R or stop | `rr`: a list of candidate k, each in (0, 10], e.g. {1.5, 2, 2.5, 3} |
-| `PARTIAL_BE` | Book x% at T1, stop → breakeven, rest at T2 | x, T1, T2 |
+| `PARTIAL_BE` | Book x% at T1, stop → breakeven, rest at T2 | `book_pct` in (0, 100), `t1_rr` in (0, 10], `t2_rr`: a list of candidate T2, each in (0, 10] and above `t1_rr` |
 | `PARTIAL_TRAIL` | Book x% at T1, trail remainder | `book_pct` in (0, 100), `t1_rr` in (0, 10], `trail_atr_mult` in (0, 20], optional whole `atr_period` (14) — the trail is the ATR in schema 1 |
-| `ATR_TRAIL` | Chandelier/ATR trail after activation | period, multiple, activate_at |
-| `STRUCTURE_TRAIL` | Trail beyond prior swing / previous candle | lookback |
-| `EMA_TRAIL` | Exit on close beyond EMA | length |
-| `PYRAMID` | Add at progress levels, trail combined position | see §4 |
-| `TIME_STOP` | Exit if not ≥ +x R after N bars/sessions — an **overlay**, not a candidate | x, N |
+| `ATR_TRAIL` | Chandelier/ATR trail after activation | `mult`: a list in (0, 20], `activate_at_rr` in [0, 10] (0: trailing from the entry), optional whole `atr_period` (14) |
+| `STRUCTURE_TRAIL` | Trail beyond prior swing / previous candle | `lookback_bars` (whole, the catalog's range): the N-bar extreme (`lowest` for BUY, `highest` for SELL); "previous candle" is 1 |
+| `EMA_TRAIL` | Exit on close beyond EMA | `length` (whole, the catalog's range) |
+| `PYRAMID` | Add at progress levels, trail combined position | `initial_pct`, `add_at_rr`, `add_pct`, `max_adds`, `trail_atr_mult`, optional `atr_period`: see §4 |
+| `TIME_STOP` | Exit if not ≥ +x R after N bars/sessions — an **overlay**, not a candidate | `min_progress_rr` in [0, 10]; an intraday strategy gives `intraday_bars`, a swing strategy `swing_sessions` (below `max_hold_sessions`) |
 | `SESSION_EXIT` | Intraday square-off | time |
 | `MAX_HOLD` | Swing exit at end of session N | N ≤ 5 |
-| `EVENT_EXIT` | Exit before results — an **overlay**, not a candidate | days before |
+| `EVENT_EXIT` | Exit before results — an **overlay**, not a candidate | `days_before_results`, whole, 1 to 10 |
 
 `SESSION_EXIT` (intraday) and `MAX_HOLD` (swing) are always on: they come from the time rules of §5, not from the list of candidates.
 
 **As built (P3-02b, [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md)).** The strategy model (`XDrishti.Strategies.Model`) lists the **candidate** policies in `exits` (the seven above the line, each once; the Lab
 compares them on the same entries, §3) and the **overlays** `time_stop` and `event_exit` in `overlays` (at most one of each, applied to every candidate, the doc 16 `exits.overlays`). The compile checks the
-parameters of `FIXED_RR` and `PARTIAL_TRAIL` (names, scalar or list, ranges) and, for the other five candidates and the overlays, only their shape (a name, one to ten values, each a finite number or a parameter of the
-strategy). **Every parameter of a policy that P3 does not run is provisional until P4 runs it**: its name or range may change in P3-02b2 (the full tables, written together with P4 so that the names are not
-guessed) without a new schema version, as long as no stored strategy uses it. `FIXED_RR` is the one policy the P3 simulator runs; the others are accepted by the model and refused by name by the simulator.
+parameters of every candidate and of both overlays (names, required or optional, scalar or list, whole numbers, ranges, the relations between values: `t2_rr` above `t1_rr`; `add_at_rr` strictly increasing; `add_pct` as long as
+`add_at_rr` and `initial_pct` plus its sum at most 100; `max_adds` at most the number of levels; `swing_sessions` below `max_hold_sessions`; `intraday_bars` at most the bars of a session). The tables of P3-02b2
+([ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md) Amendment 1) are **accepted but provisional until P4's spec**: the break-even offset, whether a trail may move down, what activation means and
+a pyramid trail other than the ATR are the walker's rules, not parameters, and P4 may rename or add an optional name (by Amendment 2) as long as no stored strategy uses it. The features a trail reads (the ATR, the N-bar extreme, the
+EMA) are plain features on the evaluation timeframe, **as of the closed bar**: a value computed at the close of bar *k* may move a stop or signal an exit only from the first minute after that close, never inside bar *k* (P4's spec carries this
+as a property: truncating the data after bar *k* changes no decision at or before *k*). `FIXED_RR` is the one policy the P3 simulator runs; the others are accepted by the model, given the warning `exit_not_evaluated` and refused by name by the simulator.
 
 ## 3. How the exit is chosen
 
@@ -49,13 +52,16 @@ target for late intraday triggers (learned).
 
 Used only where the cell shows trend persistence (fat MFE tail), mostly 30m+ and swing.
 
-| Parameter | Default |
-|-----------|---------|
-| Initial position | 50% of full size |
-| Add triggers | +1R, +2R (on trigger-TF close) |
-| Add sizes | 30%, 20% |
-| Max adds | 2 |
-| Risk rule | Before each add, move stops so **total open risk ≤ initial 1R** |
+| Parameter | Name in the model | Default |
+|-----------|-------------------|---------|
+| Initial position | `initial_pct` | 50% of full size |
+| Add triggers | `add_at_rr` (strictly increasing) | +1R, +2R (on trigger-TF close) |
+| Add sizes | `add_pct` (as many as `add_at_rr`; with `initial_pct` at most 100) | 30%, 20% |
+| Max adds | `max_adds` (1 to the number of levels) | 2 |
+| Trail of the combined position | `trail_atr_mult`, optional `atr_period` | the ATR (the only trail in schema 1) |
+| Risk rule | not a parameter: **always on** | Before each add, move stops so **total open risk ≤ initial 1R** |
+
+The defaults are the example the model accepts (they sum to exactly 100). The names are provisional until P4's spec (§2).
 
 ## 5. Time rules
 
@@ -115,3 +121,5 @@ and gaps. Every simulation includes costs.
 The simulator charges every simulated order from an effective-dated **charge sheet** (ten rates per segment, intraday and delivery) on the rates in force on the date of that order, on the filled price, each line rounded to the paisa once; it reports `RFilled` (R from the filled prices) and `RNet = RFilled − CostR` side by side with `RExact`, with the 16 lines of the charge visible per trade. A run with no sheet is gross and says `costs: none`; the choice of a sheet by a request, the stored sheet and the check against the owner's bills are P3-03f. The model, the rounding and what is not modelled are in [ADR 0042](../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.md).
 
 The simulator's slippage is `SlippageConfig` with these defaults (`costs.slippage` in [doc 16](16-configuration.md)): market-type fills pay `(ticks + extra) × tick + bar_range_frac × (high − low)` against the trade, rounded to the instrument's tick, with the extra ticks on stop exits; a resting limit (a target, an entry at the limit) does not slip. The rules and what is not modelled are in [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md).
+
+The exit rules of §§1, 5 and 8 as the simulator walks them (the order inside a minute, gaps, the square-off, the maximum hold, slippage on the filled price, `MAE`, `MFE` and `R`) are checked against an independent second implementation written from the written rule tables only ([ADR 0047](../adr/0047-the-oracle-and-the-rule-table-gaps.md), P3-08): over 18,500 seeded series and 100 hand rows the two agree on every field of every trade; the disagreement log holds three class A reading decisions of the dry read and one open class B entry for the owner (Q3-MFE: in one corner, an entry at the limit filled in the last minute of the data or of the hold, MFE can be below R). That is agreement with the rules as a second reader understands them, not a comparison with charts (P3-09) and not evidence that any strategy has an edge. The costing that follows the walk (the quantity from the exact entry, the sixteen charge lines of the two legs on the schedule of each leg's date, `CostR`, `RNet`, the two skips) is compared the same way against the same author's reference costing (P3-08c) and agrees on every field; the engine line of the exports says so, with the engine version, and says that charts were not checked.

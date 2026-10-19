@@ -132,7 +132,7 @@ public sealed class EntryScanner
     /// <summary>
     /// Makes the scanner of a compiled side for one instrument: its own frame, created from the features of the side with the calendar (a special session then closes its last buckets at its own last minute), and the side
     /// bound to it. The stop the scanner reads is the level feature of <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c>, <c>bar_high</c> and <c>or_opposite</c> on the evaluation timeframe with no buffer; the rest, and an
-    /// evaluation on a week or a month, are refused by name (P3-05 adds buffers and the other kinds). A 1D evaluation is accepted (ADR 0043): its decision is taken at the step of the 15:29 minute.
+    /// evaluation on a week or a month, are refused by name. A 1D evaluation is accepted (ADR 0043): its decision is taken at the step of the 15:29 minute.
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="side"/> is null.</exception>
     public static Result<EntryScanner> Create(CompiledSide side, InstrumentRef instrument, TradingCalendar? calendar = null)
@@ -263,7 +263,7 @@ public sealed class EntryScanner
 
         if (stop.BufferAtr > 0)
         {
-            return "The scanner does not apply a buffer of ATRs to the stop (`buffer_atr` " + stop.BufferAtr.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + " on `" + name + "`; P3-05).";
+            return "The scanner does not apply a buffer of ATRs to the stop (`buffer_atr` " + stop.BufferAtr.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + " on `" + name + "`).";
         }
 
         if (stop.Timeframe != evaluation)

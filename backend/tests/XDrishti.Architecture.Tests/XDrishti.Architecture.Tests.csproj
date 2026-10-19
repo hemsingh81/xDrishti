@@ -7,6 +7,8 @@
     <ProjectReference Include="..\..\src\XDrishti.Strategies\XDrishti.Strategies.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Simulation\XDrishti.Simulation.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.SimExport\XDrishti.SimExport.csproj" />
+    <!-- The independent oracle (ADR 0047): loaded here only to inspect it; the exception to "only Simulation.Tests references it" is asserted in OracleArchitectureTests. -->
+    <ProjectReference Include="..\XDrishti.SimOracle\XDrishti.SimOracle.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />

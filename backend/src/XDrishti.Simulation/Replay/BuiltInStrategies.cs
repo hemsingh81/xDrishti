@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.Strategies;
@@ -21,6 +22,18 @@ public static class BuiltInStrategies
 
     private const double DefaultRewardRisk = 2.0;
 
+    private const double DefaultPullAtr = 0.5;
+
+    private const double MaxPullAtr = 3;
+
+    private const double DefaultBaseLen = 20;
+
+    private const double DefaultBasePct = 8;
+
+    private const double DefaultVolX = 1.5;
+
+    private const double MaxRewardRisk = 10;
+
     private static readonly SourceSpan NoText = new(0, 0, 1, 1);
 
     private static readonly BuiltInEntry[] Table =
@@ -35,6 +48,28 @@ public static class BuiltInStrategies
                 new BuiltInParameterInfo(RewardRiskParam, DefaultRewardRisk, "target as a multiple of the risk"),
             ],
             values => OrbV1.Create(values[OrbV1.OrMinutesParam], values[RewardRiskParam])),
+        new BuiltInEntry(
+            VwapPullback.Id,
+            "VWAP pullback: after two closes beyond VWAP, a dip to within pull_atr ATRs of it and a close back through VWAP and the open; stop at the pullback extreme, target a multiple of the risk",
+            [Timeframe.M15],
+            Timeframe.M15,
+            [
+                new BuiltInParameterInfo(VwapPullback.PullAtrParam, DefaultPullAtr, "distance of the dip's extreme from VWAP, in ATRs", Min: 0, Max: MaxPullAtr, MinExclusive: true),
+                new BuiltInParameterInfo(RewardRiskParam, DefaultRewardRisk, "target as a multiple of the risk"),
+            ],
+            values => VwapPullback.Create(values[VwapPullback.PullAtrParam], values[RewardRiskParam])),
+        new BuiltInEntry(
+            BaseBreakoutV1.Id,
+            "Base breakout: a new closing high out of a tight base, in an uptrend, on rising volume; entered at the next open, held at most five sessions",
+            [Timeframe.D1],
+            Timeframe.D1,
+            [
+                new BuiltInParameterInfo(BaseBreakoutV1.BaseLenParam, DefaultBaseLen, "sessions in the base window, also the lookback of the stop", Min: 10, Max: 60),
+                new BuiltInParameterInfo(BaseBreakoutV1.BasePctParam, DefaultBasePct, "the widest span of the closes of the window, as % of the lowest", Min: 2, Max: 20),
+                new BuiltInParameterInfo(BaseBreakoutV1.VolXParam, DefaultVolX, "the least multiple of the volume of the 20 sessions before", Min: 1, Max: 5),
+                new BuiltInParameterInfo(RewardRiskParam, DefaultRewardRisk, "target as a multiple of the risk", Min: 0, Max: MaxRewardRisk, MinExclusive: true),
+            ],
+            values => BaseBreakoutV1.Create(values[BaseBreakoutV1.BaseLenParam], values[BaseBreakoutV1.BasePctParam], values[BaseBreakoutV1.VolXParam], values[RewardRiskParam])),
     ];
 
     /// <summary>The ids of the built-in strategies, in the order of the table.</summary>
@@ -65,6 +100,20 @@ public static class BuiltInStrategies
                 problems.Add(new LocatedProblem(
                     "parameters." + name,
                     new Problem(SimulationErrors.UnknownParameterCode, "The strategy `" + entry.Id + "` has no parameter `" + name + "`; its parameters are " + NameList(entry) + ".", NoText)));
+            }
+        }
+
+        if (problems.Count == 0)
+        {
+            // a declared range judges finite values only: a NaN or an infinity is neither in nor out of it and keeps the existing refusal of StrategyPreparation (ADR 0041 Amendment 2)
+            foreach (var parameter in entry.Parameters.Where(p => p.HasRange))
+            {
+                if (given.TryGetValue(parameter.Name, out var value) && double.IsFinite(value) && !parameter.Contains(value))
+                {
+                    problems.Add(new LocatedProblem(
+                        "parameters." + parameter.Name,
+                        new Problem(SimulationErrors.ParameterOutOfRangeCode, "The parameter `" + parameter.Name + "` of `" + entry.Id + "` must satisfy `" + parameter.RangeText() + "`; " + value.ToString("R", CultureInfo.InvariantCulture) + " does not.", NoText)));
+                }
             }
         }
 

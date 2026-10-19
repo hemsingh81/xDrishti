@@ -27,7 +27,10 @@ internal static class CardPage
         + "@media (prefers-color-scheme:dark){body{background:#111;color:#eee}th,td{border-color:#666}}";
 
     /// <summary>The head and the opening of the body, with the banner.</summary>
-    public static StringBuilder Begin(string title, RunLabelSet labels)
+    public static StringBuilder Begin(string title, RunLabelSet labels) => Begin(title, [labels]);
+
+    /// <summary>The head and the opening of the body with the banner of every run of a pooled page (the verification pack's index), one after another.</summary>
+    public static StringBuilder Begin(string title, IReadOnlyList<RunLabelSet> labels)
     {
         var page = new StringBuilder(32 * 1024);
         page.Append("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n");
@@ -35,7 +38,11 @@ internal static class CardPage
         page.Append("<meta name=\"referrer\" content=\"no-referrer\">\n");
         page.Append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
         page.Append("<title>").Append(Html.Text(title)).Append("</title>\n<style>").Append(Style).Append("</style>\n</head>\n<body>\n");
-        Banner(page, labels);
+        foreach (var set in labels)
+        {
+            Banner(page, set);
+        }
+
         return page;
     }
 

@@ -1,0 +1,8 @@
+export xd-verify-pack-1
+seq,trade_key,kind,chart,seen_entry_time,seen_entry_price,seen_stop,seen_target,seen_exit_time,seen_exit_price,seen_exit_reason,seen_r,ext_open,ext_high,ext_low,ext_close,verdict,finding,notes,signed_on
+1,ORB|NSE:M&M|Sell|2026-03-03,trade,,,,,,,,,,,,,,,,,
+2,ORB|NSE:AAA|Buy|2026-03-02,trade,,,,,,,,,,,,,,,,,
+3,spot|excluded_session:special_session|NSE:AAA|2025-11-01,spot,,,,,,,,,,,,,,,,,
+4,spot|excluded_session:short_session|NSE:AAA|2025-09-03,spot,,,,,,,,,,,,,,,,,
+5,spot|flagged_day|NSE:AAA|2025-06-02,spot,,,,,,,,,,,,,,,,,
+6,spot|open_at_end|NSE:AAA|2026-03-04,spot,,,,,,,,,,,,,,,,,

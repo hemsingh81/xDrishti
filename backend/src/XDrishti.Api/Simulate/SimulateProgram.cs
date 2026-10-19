@@ -11,8 +11,8 @@ internal static class SimulateProgram
     /// <summary>The configuration key of the export root (<c>Export__Directory</c> in the environment); a setting, never a flag.</summary>
     public const string ExportDirectoryKey = "Export:Directory";
 
-    /// <summary>Runs the verb for the process: <paramref name="args"/> are the arguments after <c>simulate</c>.</summary>
-    public static async Task<int> RunProcessAsync(IReadOnlyList<string> args)
+    /// <summary>Runs the verb for the process: <paramref name="args"/> are the arguments after <c>simulate</c> (or after <c>verify-pack</c> when <paramref name="verifyPack"/>).</summary>
+    public static async Task<int> RunProcessAsync(IReadOnlyList<string> args, bool verifyPack = false)
     {
         using var cancel = new CancellationTokenSource();
         var interrupt = new InterruptCounter(cancel);
@@ -20,7 +20,7 @@ internal static class SimulateProgram
         Console.CancelKeyPress += handler;
         try
         {
-            return await RunAsync(args, SimulateConsole.Process(), null, null, cancel.Token);
+            return await RunAsync(args, SimulateConsole.Process(), null, null, cancel.Token, verifyPack);
         }
         finally
         {
@@ -34,7 +34,8 @@ internal static class SimulateProgram
         SimulateConsole console,
         IReadOnlyDictionary<string, string?>? overrides,
         Action<IServiceCollection>? configure,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool verifyPack = false)
     {
         ArgumentNullException.ThrowIfNull(args);
         ArgumentNullException.ThrowIfNull(console);
@@ -47,14 +48,16 @@ internal static class SimulateProgram
         catch (Exception failure) when (failure is InvalidOperationException or OptionsValidationException or ArgumentException or AggregateException)
         {
             await console.Error.WriteLineAsync("the configuration is wrong: " + failure.GetType().Name + ": " + Cut(failure.Message));
-            await console.Error.WriteAsync(SimulateOptions.Usage);
+            await console.Error.WriteAsync(verifyPack ? VerifyPackOptions.Usage : SimulateOptions.Usage);
             return SimulateCommand.UsageError;
         }
 
         using (host)
         {
             var exportRoot = host.Services.GetRequiredService<IConfiguration>()[ExportDirectoryKey];
-            return await SimulateCommand.RunAsync(args, host.Services, console, exportRoot, cancellationToken);
+            return verifyPack
+                ? await VerifyPackCommand.RunAsync(args, host.Services, console, exportRoot, cancellationToken)
+                : await SimulateCommand.RunAsync(args, host.Services, console, exportRoot, cancellationToken);
         }
     }
 

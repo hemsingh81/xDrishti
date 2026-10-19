@@ -20,6 +20,12 @@ if (verb == Verb.CostSheet)
     return await CostSheetProgram.RunProcessAsync(args[1..]);
 }
 
+// The verify-pack verb (spec P3-09) is chosen the same way, by the first argument alone.
+if (verb == Verb.VerifyPack)
+{
+    return await SimulateProgram.RunProcessAsync(args[1..], verifyPack: true);
+}
+
 // Container health probe: `dotnet XDrishti.Api.dll --healthcheck` (chiseled images have no curl).
 if (verb == Verb.HealthCheck)
 {

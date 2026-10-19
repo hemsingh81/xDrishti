@@ -31,6 +31,7 @@ internal sealed class ExportFolderWriter
     /// <param name="buildManifest">Gets the entries the writer produced (name, length, SHA-256 of each file) and returns the bytes of <c>manifest.json</c> and the export key they state.</param>
     /// <param name="force">Replace a different or modified export, keeping the old one once as <c>&lt;run-id&gt;.previous</c>.</param>
     /// <param name="cancellationToken">Checked between files; a cancelled write removes its staging folder.</param>
+    /// <param name="folderName">The folder below the root that holds the run folders: <c>sim</c> for a run (the default), <c>verify</c> for a verification pack (spec P3-09, V5); 1 to 20 letters.</param>
     /// <returns>The outcome, or a refusal (<see cref="ExportErrors"/>).</returns>
     /// <exception cref="IOException">The file system failed; the staging folder is removed first.</exception>
     public Task<Result<ExportOutcome>> WriteAsync(
@@ -39,12 +40,13 @@ internal sealed class ExportFolderWriter
         IReadOnlyList<ExportFile> files,
         Func<IReadOnlyList<ManifestEntry>, (byte[] Manifest, string ExportKey)> buildManifest,
         bool force,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string folderName = ExportPaths.SimFolder)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(buildManifest);
 
-        return Task.Run(() => Write(root, runId, files, buildManifest, force, cancellationToken), cancellationToken);
+        return Task.Run(() => Write(root, runId, files, buildManifest, force, folderName, cancellationToken), cancellationToken);
     }
 
     private static bool Exists(string path) => Directory.Exists(path) || File.Exists(path) || ExportPaths.IsLink(path);
@@ -81,6 +83,7 @@ internal sealed class ExportFolderWriter
         IReadOnlyList<ExportFile> files,
         Func<IReadOnlyList<ManifestEntry>, (byte[] Manifest, string ExportKey)> buildManifest,
         bool force,
+        string folderName,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -90,12 +93,12 @@ internal sealed class ExportFolderWriter
             return Result.Failure<ExportOutcome>(rooted.Error);
         }
 
-        if (Prepare(runId, files) is { } problem)
+        if ((ExportPaths.FolderNameProblem(folderName) ?? Prepare(runId, files)) is { } problem)
         {
             return Result.Failure<ExportOutcome>(problem);
         }
 
-        var simFolder = Path.Combine(rooted.Value, ExportPaths.SimFolder);
+        var simFolder = Path.Combine(rooted.Value, folderName);
         if (!Directory.Exists(rooted.Value))
         {
             CreateDirectory(rooted.Value);

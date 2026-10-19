@@ -5,8 +5,8 @@ using XDrishti.Strategies.Tests.Support;
 namespace XDrishti.Strategies.Tests.Compilation.Strategy;
 
 /// <summary>
-/// Criterion 11: the exit candidates and the overlays. <c>FIXED_RR</c> and <c>PARTIAL_TRAIL</c> have their tables checked (a valid example, a failing row and a near miss per parameter); the other five candidates and the two
-/// overlays pass the shape check only, which is provisional until P3-02b2 (ADR 0036). The tables of the tests are literals written from the spec.
+/// Criterion 11 of P3-02b: the exit candidates and the overlays. <c>FIXED_RR</c> and <c>PARTIAL_TRAIL</c> have their tables checked here (a valid example, a failing row and a near miss per parameter) and the shape check that
+/// every table shares; the tables of the other five candidates and of the two overlays (P3-02b2) are in <see cref="ExitTablesTests"/>. The tables of the tests are literals written from the specs.
 /// </summary>
 public sealed class ExitTests
 {
@@ -143,58 +143,43 @@ public sealed class ExitTests
         Located.Compile(With([null!])).ErrorList().ShouldBe(["model.field_missing@buy.exits[0]"]);
     }
 
-    // ---- the policies and overlays with the shape check only ----------------------------------------------------------------------------------------------------------------------------
+    // ---- the shape check, which every policy and overlay shares (the tables of the other policies are in ExitTablesTests) ------------------------------------------------------------------------
 
-    public static TheoryData<ExitPolicy> ShapeOnlyPolicies { get; } = [ExitPolicy.PartialBe, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail, ExitPolicy.Pyramid];
-
-    [Theory]
-    [MemberData(nameof(ShapeOnlyPolicies))]
-    public void The_other_five_candidates_compile_when_their_parameters_pass_the_shape_check_and_read_no_feature(ExitPolicy policy)
-    {
-        var exit = new ExitSpec(policy, [P("any_name", 1, 2, 3), new ExitParameter("other", [Quantity.Named("aa")]), P("big", 5_000)]);
-
-        var side = Located.Ok(With(exit));
-
-        var plan = side.Exits.ShouldHaveSingleItem();
-        plan.Policy.ShouldBe(policy);
-        plan.Values["any_name"].ShouldBe([1, 2, 3]);
-        plan.Values["other"].ShouldBe([3]);
-        plan.Values["big"].ShouldBe([5_000], "no name, range or relation is checked in this slice (provisional until P3-02b2)");
-        plan.Reads.ShouldBeEmpty();
-    }
-
-    [Theory]
-    [MemberData(nameof(ShapeOnlyPolicies))]
-    public void A_policy_without_a_table_may_have_no_parameters_at_all(ExitPolicy policy)
-    {
-        Located.Compile(With(new ExitSpec(policy, []))).IsSuccess.ShouldBeTrue();
-        Located.Compile(With(new ExitSpec(policy, null!))).IsSuccess.ShouldBeTrue();
-    }
+    private static ExitSpec Be(params ExitParameter[] rest) => new(ExitPolicy.PartialBe, [P("book_pct", 50), P("t1_rr", 1), .. rest]);
 
     [Fact]
     public void The_shape_check_refuses_a_bad_name_a_name_twice_no_value_eleven_values_and_a_value_that_is_neither_a_finite_number_nor_a_declared_parameter()
     {
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [P("Add", 1)]))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0]"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [P(new string('a', 33), 1)]))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0]"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [P("add", 1), P("add", 2)]))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0].add"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [new ExitParameter("add", [])]))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0].add"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [P("add", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)]))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0].add"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [new ExitParameter("add", [Quantity.Named("zzz")])]))).ErrorList().ShouldBe(["model.unknown_param@buy.exits[0].add"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [new ExitParameter("add", [new Quantity(null, null)])]))).ErrorList().ShouldBe(["model.bad_quantity@buy.exits[0].add"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [P("add", double.PositiveInfinity)]))).ErrorList().ShouldBe(["model.bad_quantity@buy.exits[0].add"]);
-        Located.Compile(With(new ExitSpec(ExitPolicy.Pyramid, [null!]))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0]"]);
+        Located.Compile(With(Be(P("T2", 2)))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0]", "model.field_missing@buy.exits[0].t2_rr"]);
+        Located.Compile(With(Be(P(new string('a', 33), 2)))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0]", "model.field_missing@buy.exits[0].t2_rr"]);
+        Located.Compile(With(Be(P("t2_rr", 2), P("t2_rr", 3)))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0].t2_rr"]);
+        Located.Compile(With(Be(new ExitParameter("t2_rr", [])))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0].t2_rr"]);
+        Located.Compile(With(Be(P("t2_rr", 2, 3, 4, 5, 6, 7, 8, 9, 9.5, 10, 10)))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0].t2_rr"]);
+        Located.Compile(With(Be(new ExitParameter("t2_rr", [Quantity.Named("zzz")])))).ErrorList().ShouldBe(["model.unknown_param@buy.exits[0].t2_rr[0]"]);
+        Located.Compile(With(Be(new ExitParameter("t2_rr", [new Quantity(null, null)])))).ErrorList().ShouldBe(["model.bad_quantity@buy.exits[0].t2_rr[0]"]);
+        Located.Compile(With(Be(P("t2_rr", double.PositiveInfinity)))).ErrorList().ShouldBe(["model.bad_quantity@buy.exits[0].t2_rr[0]"]);
+        Located.Compile(With(Be([null!]))).ErrorList().ShouldBe(["model.field_shape@buy.exits[0]", "model.field_missing@buy.exits[0].t2_rr"]);
     }
 
     [Fact]
-    public void A_candidate_policy_listed_twice_is_duplicate_exit_whether_or_not_it_has_a_table()
+    public void An_exit_with_no_parameters_at_all_or_a_null_list_reports_every_required_field_in_the_order_of_the_table()
     {
-        var pyramid = new ExitSpec(ExitPolicy.Pyramid, [P("add", 1)]);
+        string[] expected = ["model.field_missing@buy.exits[0].book_pct", "model.field_missing@buy.exits[0].t1_rr", "model.field_missing@buy.exits[0].t2_rr"];
+
+        Located.Compile(With(new ExitSpec(ExitPolicy.PartialBe, []))).ErrorList().ShouldBe(expected);
+        Located.Compile(With(new ExitSpec(ExitPolicy.PartialBe, null!))).ErrorList().ShouldBe(expected);
+    }
+
+    [Fact]
+    public void A_candidate_policy_listed_twice_is_duplicate_exit_at_the_second_for_a_policy_with_a_complete_table()
+    {
+        var pyramid = new ExitSpec(ExitPolicy.Pyramid, [P("initial_pct", 50), P("add_at_rr", 1, 2), P("add_pct", 30, 20), P("max_adds", 2), P("trail_atr_mult", 2)]);
 
         Located.Compile(With(pyramid, pyramid)).ErrorList().ShouldBe(["model.duplicate_exit@buy.exits[1]"]);
     }
 
     [Fact]
-    public void Both_overlays_compile_by_shape_and_become_overlay_plans()
+    public void Both_overlays_compile_to_overlay_plans_with_their_numbers_and_a_named_parameter_gives_its_number()
     {
         var side = Located.Ok(WithOverlays(
             new OverlaySpec(OverlayKind.TimeStop, [P("min_progress_rr", 0.5), P("intraday_bars", 12)]),
@@ -202,16 +187,17 @@ public sealed class ExitTests
 
         side.Overlays.Select(o => o.Kind).ShouldBe([OverlayKind.TimeStop, OverlayKind.EventExit]);
         side.Overlays[0].Values["intraday_bars"].ShouldBe([12]);
+        side.Overlays[0].Values["min_progress_rr"].ShouldBe([0.5]);
         side.Overlays[1].Values["days_before_results"].ShouldBe([3]);
     }
 
     [Fact]
     public void An_overlay_listed_twice_is_duplicate_exit_at_the_second_and_an_overlay_shape_fault_is_reported_at_the_overlay()
     {
-        var timeStop = new OverlaySpec(OverlayKind.TimeStop, [P("intraday_bars", 12)]);
+        var timeStop = new OverlaySpec(OverlayKind.TimeStop, [P("min_progress_rr", 0.5), P("intraday_bars", 12)]);
 
         Located.Compile(WithOverlays(timeStop, timeStop)).ErrorList().ShouldBe(["model.duplicate_exit@buy.overlays[1]"]);
-        Located.Compile(WithOverlays(new OverlaySpec(OverlayKind.TimeStop, [P("Bars", 12)]))).ErrorList().ShouldBe(["model.field_shape@buy.overlays[0]"]);
+        Located.Compile(WithOverlays(new OverlaySpec(OverlayKind.TimeStop, [P("min_progress_rr", 0.5), P("intraday_bars", 12), P("Bars", 12)]))).ErrorList().ShouldBe(["model.field_shape@buy.overlays[0]"]);
         Located.Compile(WithOverlays([null!])).ErrorList().ShouldBe(["model.field_missing@buy.overlays[0]"]);
     }
 

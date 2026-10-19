@@ -11,11 +11,11 @@ public sealed class ModelCodeTests
     public static TheoryData<ModelCodeExample> Examples { get; } = [.. ModelCodeExample.All];
 
     [Fact]
-    public void Every_code_of_the_model_has_exactly_one_failing_example_and_there_are_46_of_them()
+    public void Every_code_of_the_model_has_exactly_one_failing_example_and_there_are_47_of_them()
     {
         var codes = typeof(ModelCodes).GetFields(BindingFlags.Public | BindingFlags.Static).Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!).ToList();
 
-        codes.Count.ShouldBe(46);
+        codes.Count.ShouldBe(47);
         codes.ShouldAllBe(c => c.StartsWith("strategy.model.", StringComparison.Ordinal));
         codes.ShouldBeUnique();
         ModelCodeExample.All.Select(e => e.Code).Order().ShouldBe(codes.Order(), "a code without a failing example, or an example for a code that does not exist");

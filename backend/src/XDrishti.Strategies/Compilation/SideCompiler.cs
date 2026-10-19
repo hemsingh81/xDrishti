@@ -26,7 +26,11 @@ internal sealed class SideCompiler(ProblemSink sink, DeclaredParams declared)
         bool NeedsContext,
         bool NeedsExpiryDays);
 
-    public Parts Compile(SideRules rules, Side side, Timeframe evaluationTimeframe)
+    /// <summary>
+    /// Compiles the side. <paramref name="style"/> and <paramref name="maxHoldSessions"/> (as written, not yet checked: the time rules are checked after the side so that the order of the problems does not change) are
+    /// the facts from outside the side that the exit tables need.
+    /// </summary>
+    public Parts Compile(SideRules rules, Side side, Timeframe evaluationTimeframe, Style style, int? maxHoldSessions)
     {
         var prefix = side == Side.Buy ? "buy" : "sell";
         var context = new CompileContext(evaluationTimeframe, declared.Values);
@@ -47,8 +51,9 @@ internal sealed class SideCompiler(ProblemSink sink, DeclaredParams declared)
         }
 
         var exitCompiler = new ExitCompiler(sink, quantities);
-        var exits = exitCompiler.CompileExits(rules.Exits, evaluationTimeframe, prefix + ".exits");
-        var overlays = exitCompiler.CompileOverlays(rules.Overlays, prefix + ".overlays");
+        var exitContext = new ExitContext(side, style, evaluationTimeframe, maxHoldSessions);
+        var exits = exitCompiler.CompileExits(rules.Exits, exitContext, prefix + ".exits");
+        var overlays = exitCompiler.CompileOverlays(rules.Overlays, exitContext, prefix + ".overlays");
 
         var conditions = new List<CompiledCondition>();
         foreach (var list in new[] { setup, trigger, invalidate })

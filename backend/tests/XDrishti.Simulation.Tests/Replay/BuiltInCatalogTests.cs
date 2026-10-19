@@ -26,6 +26,62 @@ public sealed class BuiltInCatalogTests
     }
 
     [Fact]
+    public void Vwap_pullback_is_the_second_row_with_15m_only_and_its_two_parameters()
+    {
+        var entry = BuiltInStrategies.Catalog.Single(c => c.Id == "VWAP_PULLBACK");
+
+        entry.Timeframes.ShouldBe([Timeframe.M15]);
+        entry.DefaultTimeframe.ShouldBe(Timeframe.M15);
+        entry.Parameters.Select(p => (p.Name, p.Default)).ShouldBe([("pull_atr", 0.5), ("rr", 2.0)]);
+        entry.Description.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void The_ids_are_pinned_in_the_order_of_the_table_orb_then_vwap_pullback_then_base_breakout()
+    {
+        BuiltInStrategies.Ids.ShouldBe(["ORB", "VWAP_PULLBACK", "BASE_BREAKOUT"]);
+    }
+
+    [Fact]
+    public void Base_breakout_is_the_third_row_with_1D_only_and_its_four_parameters_in_order()
+    {
+        var entry = BuiltInStrategies.Catalog.Single(c => c.Id == "BASE_BREAKOUT");
+
+        entry.Timeframes.ShouldBe([Timeframe.D1]);
+        entry.DefaultTimeframe.ShouldBe(Timeframe.D1);
+        entry.Parameters.Select(p => (p.Name, p.Default)).ShouldBe([("base_len", 20.0), ("base_pct", 8.0), ("vol_x", 1.5), ("rr", 2.0)]);
+        entry.Description.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void Only_pull_atr_and_the_four_base_breakout_parameters_declare_a_range()
+    {
+        var declared = BuiltInStrategies.Catalog.SelectMany(c => c.Parameters.Where(p => p.HasRange).Select(p => (c.Id, p.Name, p.Min, p.Max, p.MinExclusive)));
+
+        declared.ShouldBe(
+        [
+            ("VWAP_PULLBACK", "pull_atr", (double?)0.0, (double?)3.0, true),
+            ("BASE_BREAKOUT", "base_len", (double?)10.0, (double?)60.0, false),
+            ("BASE_BREAKOUT", "base_pct", (double?)2.0, (double?)20.0, false),
+            ("BASE_BREAKOUT", "vol_x", (double?)1.0, (double?)5.0, false),
+            ("BASE_BREAKOUT", "rr", (double?)0.0, (double?)10.0, true),
+        ]);
+    }
+
+    [Fact]
+    public void Every_default_satisfies_its_own_range_and_a_range_is_not_empty()
+    {
+        foreach (var parameter in BuiltInStrategies.Catalog.SelectMany(c => c.Parameters))
+        {
+            parameter.Contains(parameter.Default).ShouldBeTrue(parameter.Name + " default " + parameter.Default);
+            if (parameter is { Min: { } min, Max: { } max })
+            {
+                min.ShouldBeLessThanOrEqualTo(max, parameter.Name);
+            }
+        }
+    }
+
+    [Fact]
     public void Every_entry_prepares_with_its_own_defaults_on_each_timeframe_it_allows_and_records_the_defaults()
     {
         foreach (var entry in BuiltInStrategies.Catalog)

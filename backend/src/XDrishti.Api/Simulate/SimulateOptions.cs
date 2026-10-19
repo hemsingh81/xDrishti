@@ -24,7 +24,8 @@ internal sealed record SimulateOptions(
     bool AcknowledgeCsvAdjusted,
     bool Force,
     CostChoice Costs,
-    int Cards = SimulateOptions.DefaultCards)
+    int Cards = SimulateOptions.DefaultCards,
+    bool Store = false)
 {
     /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
     public const int DefaultCards = 200;
@@ -33,8 +34,9 @@ internal sealed record SimulateOptions(
     public const string Usage =
         "usage:\n"
         + "  simulate --strategy <id> (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
-        + "           [--timeframe <5m|15m>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
+        + "           [--timeframe <5m|10m|15m|30m|1h|1D>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
         + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
+        + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
         + "           (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required, P3-03f)\n"
         + "  simulate --list-strategies\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
@@ -45,7 +47,7 @@ internal sealed record SimulateOptions(
 
     private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r"];
 
-    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross"];
+    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross", "--store"];
 
     /// <summary>Parses the arguments after the verb name.</summary>
     /// <param name="args">The arguments.</param>
@@ -55,6 +57,16 @@ internal sealed record SimulateOptions(
         ArgumentNullException.ThrowIfNull(args);
 
         var errors = new List<string>();
+        var (values, switches, parameters) = Tokenize(args, ValueFlags, SwitchFlags, errors);
+        return Build(values, switches, parameters, knownStrategyIds, errors);
+    }
+
+    /// <summary>
+    /// The shared reading of <c>--flag value</c> and <c>--flag=value</c> (the verbs <c>simulate</c> and <c>verify-pack</c> use it): a flag at most once except <c>--param</c>, an unknown flag, a missing value and a stray argument are errors.
+    /// </summary>
+    internal static (Dictionary<string, string> Values, HashSet<string> Switches, List<string> Parameters) Tokenize(
+        IReadOnlyList<string> args, IReadOnlyList<string> valueFlags, IReadOnlyList<string> switchFlags, List<string> errors)
+    {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         var switches = new HashSet<string>(StringComparer.Ordinal);
         var parameters = new List<string>();
@@ -70,7 +82,7 @@ internal sealed record SimulateOptions(
             var equals = token.IndexOf('=', StringComparison.Ordinal);
             var flag = equals < 0 ? token : token[..equals];
             var inline = equals < 0 ? null : token[(equals + 1)..];
-            if (SwitchFlags.Contains(flag, StringComparer.Ordinal))
+            if (switchFlags.Contains(flag, StringComparer.Ordinal))
             {
                 if (inline is not null)
                 {
@@ -84,7 +96,7 @@ internal sealed record SimulateOptions(
                 continue;
             }
 
-            var known = ValueFlags.Contains(flag, StringComparer.Ordinal);
+            var known = valueFlags.Contains(flag, StringComparer.Ordinal);
             string? value = inline;
             if (value is null && i + 1 < args.Count && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
             {
@@ -109,7 +121,7 @@ internal sealed record SimulateOptions(
             }
         }
 
-        return Build(values, switches, parameters, knownStrategyIds, errors);
+        return (values, switches, parameters);
     }
 
     private static SimulateParse Build(
@@ -149,7 +161,7 @@ internal sealed record SimulateOptions(
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards), []);
+            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store")), []);
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());
@@ -177,7 +189,7 @@ internal sealed record SimulateOptions(
         return id;
     }
 
-    private static List<string> ReadSymbols(Dictionary<string, string> values, List<string> errors)
+    internal static List<string> ReadSymbols(Dictionary<string, string> values, List<string> errors)
     {
         var symbols = new List<string>();
         if (!values.TryGetValue("--symbols", out var list))
@@ -205,7 +217,7 @@ internal sealed record SimulateOptions(
         return symbols;
     }
 
-    private static string? ReadBasket(Dictionary<string, string> values, List<string> errors)
+    internal static string? ReadBasket(Dictionary<string, string> values, List<string> errors)
     {
         if (!values.TryGetValue("--basket", out var basket))
         {
@@ -221,7 +233,7 @@ internal sealed record SimulateOptions(
         return basket.Trim();
     }
 
-    private static DateOnly? Date(Dictionary<string, string> values, string flag, List<string> errors)
+    internal static DateOnly? Date(Dictionary<string, string> values, string flag, List<string> errors)
     {
         if (!values.TryGetValue(flag, out var text))
         {
@@ -245,12 +257,12 @@ internal sealed record SimulateOptions(
             return null;
         }
 
-        if (Timeframes.TryParse(code, out var timeframe) && Timeframes.Intraday.Contains(timeframe))
+        if (Timeframes.TryParse(code, out var timeframe) && Timeframes.Aggregated.Contains(timeframe))
         {
             return timeframe.ToCode();
         }
 
-        errors.Add("'--timeframe' must be an intraday timeframe such as 5m or 15m, '" + Show(code) + "' is not");
+        errors.Add("'--timeframe' must be a derived timeframe (5m, 10m, 15m, 30m, 1h, 1D, 1W or 1M), '" + Show(code) + "' is not");
         return null;
     }
 
@@ -291,7 +303,7 @@ internal sealed record SimulateOptions(
     /// The cost choice (spec P3-03f, F1): exactly one of <c>--gross</c> and <c>--costs &lt;id&gt;</c>; <c>--capital</c>, <c>--profile</c> and <c>--max-cost-r</c> need <c>--costs</c>. The same bounds as the request validation, so that a typo is a usage
     /// error (exit 2) and not a refusal.
     /// </summary>
-    private static CostChoice ReadCosts(Dictionary<string, string> values, HashSet<string> switches, List<string> errors)
+    internal static CostChoice ReadCosts(Dictionary<string, string> values, HashSet<string> switches, List<string> errors)
     {
         var gross = switches.Contains("--gross");
         var named = values.TryGetValue("--costs", out var id);

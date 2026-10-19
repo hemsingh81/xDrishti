@@ -28,6 +28,8 @@ internal sealed class Day
 
     private double _startPrice = double.NaN;
 
+    private long _volume = MinuteVolume;
+
     private Day(DateOnly date, int first, int last)
     {
         Date = date;
@@ -57,6 +59,13 @@ internal sealed class Day
     public Day Start(double price)
     {
         _startPrice = price;
+        return this;
+    }
+
+    /// <summary>The volume of every non-empty minute of the day (P3-06, D10); <see cref="MinuteVolume"/> when not given.</summary>
+    public Day Volume(long perMinute)
+    {
+        _volume = perMinute;
         return this;
     }
 
@@ -132,7 +141,7 @@ internal sealed class Day
                 throw new InvalidOperationException("The first minute of the day is not listed and the day has no start price.");
             }
 
-            bars.Add(new Bar(Epoch(Date, minute), open, high, low, close, _empty.Contains(minute) ? 0 : MinuteVolume));
+            bars.Add(new Bar(Epoch(Date, minute), open, high, low, close, _empty.Contains(minute) ? 0 : _volume));
             previous = close;
         }
 

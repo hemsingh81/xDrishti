@@ -66,6 +66,10 @@ internal static partial class ExportPaths
             : Result.Success(full);
     }
 
+    /// <summary>A refusal when the folder below the root is not 1 to 20 lower-case letters (the writer's own names, <c>sim</c> and <c>verify</c>, never a caller's free text); otherwise null.</summary>
+    public static Error? FolderNameProblem(string? folderName) =>
+        folderName is { Length: >= 1 and <= 20 } && folderName.All(c => c is >= 'a' and <= 'z') ? null : ExportErrors.PathInvalid("the export folder name must be 1 to 20 lower-case letters");
+
     /// <summary>A refusal when the run id is not 1 to 80 characters of <c>a-z 0-9 -</c> starting with a letter or digit (what <see cref="RunId"/> gives); otherwise null.</summary>
     public static Error? RunIdProblem(string? runId) =>
         runId is not null && RunIdPattern().IsMatch(runId) ? null : ExportErrors.PathInvalid("the run id must be 1 to 80 characters of a-z, 0-9 and -");

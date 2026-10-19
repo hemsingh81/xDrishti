@@ -245,15 +245,15 @@ public sealed class Simulator
         var stop = side.Stop;
         if (stop.Kind is not (StopKind.OrOpposite or StopKind.SwingLow or StopKind.SwingHigh or StopKind.BarLow or StopKind.BarHigh))
         {
-            problems.Add(Refusal(name + ".stop", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is not run yet: the simulator runs a level (`or_opposite`, `swing_low`, `swing_high`, `bar_low`, `bar_high`) with no buffer (the other kinds come with P3-05)."));
+            problems.Add(Refusal(name + ".stop", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is not run yet: the simulator runs a level (`or_opposite`, `swing_low`, `swing_high`, `bar_low`, `bar_high`) with no buffer."));
         }
         else if (stop.BufferAtr > 0)
         {
-            problems.Add(Refusal(name + ".stop.buffer_atr", SimulatorCodes.UnsupportedStop, "A `buffer_atr` on the stop `" + StopName(stop.Kind) + "` is not run yet (P3-05)."));
+            problems.Add(Refusal(name + ".stop.buffer_atr", SimulatorCodes.UnsupportedStop, "A `buffer_atr` on the stop `" + StopName(stop.Kind) + "` is not run yet."));
         }
         else if (stop.Timeframe != side.EvaluationTimeframe)
         {
-            problems.Add(Refusal(name + ".stop.timeframe", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is read on " + stop.Timeframe.ToCode() + ", not on the evaluation timeframe " + side.EvaluationTimeframe.ToCode() + "; the simulator reads it on the evaluation timeframe (P3-05)."));
+            problems.Add(Refusal(name + ".stop.timeframe", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is read on " + stop.Timeframe.ToCode() + ", not on the evaluation timeframe " + side.EvaluationTimeframe.ToCode() + "; the simulator reads it on the evaluation timeframe."));
         }
 
         if (side.Exits.Count != 1 || side.Exits[0].Policy != ExitPolicy.FixedRr || !side.Exits[0].Values.TryGetValue("rr", out var rr) || rr.Count != 1)

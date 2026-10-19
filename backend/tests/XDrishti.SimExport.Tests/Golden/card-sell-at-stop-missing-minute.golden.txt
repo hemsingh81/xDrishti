@@ -20,7 +20,7 @@ export xd-sim-export-2
 <li>sample: in-sample</li>
 <li>universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)</li>
 <li>data: 1 instruments; first bars 2026-02-01 to 2026-02-01, last bars 2026-05-02 to 2026-05-02; length from about 0.2 to about 0.2 years (days / 365.25, one decimal); no hold-out (ISS-19)</li>
-<li>engine: not yet verified (P3-08)</li>
+<li>engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner&#39;s charge sheet</li>
 <li>tick: today&#39;s master tick; rounding to the grid is approximate</li>
 <li>opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)</li>
 </ul>
@@ -905,8 +905,8 @@ time rules: first entry 09:30, last entry 11:30, square off 15:15</pre>
 </ul>
 <h2>run</h2>
 <ul>
-<li>run key: 35f8f8316af43e64ad8331ea87255a5758ee942316721d25250423bc6fe0ddb8</li>
-<li>strategy: ORB, engine sim-4</li>
+<li>run key: 7a2cf93ca82ad6f6f1e4cf5f28cb2d3d50c3cf4dfad8cee7f15391e5bb0edf75</li>
+<li>strategy: ORB, engine sim-5</li>
 <li>trade key: ORB|NSE:HERON|Sell|2026-03-03</li>
 </ul>
 </main>

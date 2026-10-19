@@ -1,0 +1,30 @@
+namespace XDrishti.Application.Abstractions.Research;
+
+/// <summary>The typed columns of a stored run (spec P3-10, D2) and the length of its record text; not the text.</summary>
+public sealed record StoredRunHeader(
+    long Id,
+    string RunKey,
+    string EngineVersion,
+    int RecordSchemaVersion,
+    int TradeSchemaVersion,
+    string StrategyId,
+    string DefinitionSha256,
+    DateOnly From,
+    DateOnly To,
+    string UniverseKind,
+    string UniverseLabel,
+    int Instruments,
+    int InstrumentsRun,
+    long TradesInWindow,
+    long CandidatesInWindow,
+    int TradeCount,
+    int OpenAtEndCount,
+    bool AcknowledgeCsvAdjusted,
+    string Fills,
+    string? CostsSheetId,
+    string? CostsRatesSha256,
+    int RecordJsonLength,
+    string RecordSha256,
+    string TradesSha256,
+    DateTimeOffset CreatedAt,
+    string CreatedBy);

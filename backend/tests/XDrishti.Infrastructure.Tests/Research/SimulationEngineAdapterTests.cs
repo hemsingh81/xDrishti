@@ -42,6 +42,15 @@ public sealed class SimulationEngineAdapterTests
     }
 
     [Fact]
+    public void The_base_breakout_id_on_1D_records_its_four_effective_parameters()
+    {
+        var result = Engine.Prepare("BASE_BREAKOUT", Params(), Timeframe.D1, null);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Record.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => (p.Key, p.Value)).ShouldBe([("base_len", 20.0), ("base_pct", 8.0), ("rr", 2.0), ("vol_x", 1.5)]);
+    }
+
+    [Fact]
     public void A_built_in_id_and_its_parameters_give_the_record_and_the_canonical_json_of_the_replay()
     {
         var result = Engine.Prepare("ORB", Params(("or_min", 30), ("rr", 3.0)), Timeframe.M15, null);

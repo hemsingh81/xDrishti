@@ -1,9 +1,6 @@
 using System.Buffers;
 using System.Text;
-using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
-using XDrishti.Application.Research;
-using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.SimExport.Cards;
@@ -97,27 +94,22 @@ internal static class SimulateCommand
         var provider = scope.ServiceProvider;
 
         var phaseStart = time.GetTimestamp();
-        var universe = await UniverseResolver.ResolveAsync(options, provider, cancellationToken);
-        if (universe.IsRefused)
+        var gate = await SimulatePipeline.ResolveAsync(options.Basket, options.Symbols, provider, cancellationToken);
+        if (gate.RefusalCode is { } refusal)
         {
-            return await RefuseAsync(console, logger, "simulate.universe", universe.Problems);
+            return await SimulatePipeline.RefuseAsync(console, logger, refusal, gate.Problems);
         }
 
-        if (TickUnitCheck.Suspect(universe.Probes) is { Count: > 0 } suspects)
-        {
-            return await RefuseAsync(console, logger, "simulate.tick_unit", TickProblems(suspects));
-        }
-
+        var universe = gate.Universe;
         var resolveTime = time.GetElapsedTime(phaseStart);
 
         phaseStart = time.GetTimestamp();
-        var rules = Rules(options.Fills);
-        var request = Request(options, universe, engine, rules);
-        var handler = provider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
-        var ran = await handler.HandleAsync(new RunSimulationQuery(request), cancellationToken);
+        var rules = SimulatePipeline.Rules(options.Fills);
+        var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted);
+        var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken);
         if (ran.IsFailure)
         {
-            return await RefuseAsync(console, logger, ran.Error.Code, Problems(ran.Error));
+            return await SimulatePipeline.RefuseAsync(console, logger, ran.Error.Code, SimulatePipeline.Problems(ran.Error));
         }
 
         var runTime = time.GetElapsedTime(phaseStart);
@@ -129,15 +121,11 @@ internal static class SimulateCommand
 
         // selection, then the second read (a stale read refuses with nothing written), then render and write
         var choices = CardSelection.Choose(run, options.Cards);
-        var cards = await CardsAsync(provider, run, choices, cancellationToken);
+        var cards = await SimulatePipeline.CardsAsync(provider, run, [.. choices.Select(c => c.Trade.Trade.Key)], cancellationToken);
         if (cards.IsFailure)
         {
-            if (cards.Error.Fields is [{ } field, ..] && cards.Error.Code == SimulationErrors.CardsStaleCode)
-            {
-                SimulateLog.CardsStale(logger, field.Field, field.Code ?? string.Empty);
-            }
-
-            return await RefuseAsync(console, logger, cards.Error.Code, Problems(cards.Error));
+            SimulatePipeline.LogStale(logger, cards.Error);
+            return await SimulatePipeline.RefuseAsync(console, logger, cards.Error.Code, SimulatePipeline.Problems(cards.Error));
         }
 
         var writer = provider.GetService<ExportFolderWriter>() ?? new ExportFolderWriter();
@@ -145,7 +133,7 @@ internal static class SimulateCommand
         var written = await writer.WriteAsync(root, runId, Files(run, labels, runId, options.Cards, choices, cards.Value), entries => Manifest(run, entries, extra), options.Force, cancellationToken);
         if (written.IsFailure)
         {
-            return await RefuseAsync(console, logger, written.Error.Code, [written.Error.Message]);
+            return await SimulatePipeline.RefuseAsync(console, logger, written.Error.Code, [written.Error.Message]);
         }
 
         var outcome = written.Value;
@@ -178,31 +166,8 @@ internal static class SimulateCommand
             return Cancelled;
         }
 
-        return Done;
-    }
-
-    private static FillRules Rules(FillsMode mode) =>
-        mode == FillsMode.NoSlippage ? FillRules.Create(FillRules.Default.EntryLimitPercent, SlippageConfig.None).Value : FillRules.Default;
-
-    private static SimulationRequest Request(SimulateOptions options, SimulateUniverse universe, ISimulationEngine engine, FillRules rules)
-    {
-        var timeframe = options.Timeframe
-            ?? engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, options.StrategyId, StringComparison.Ordinal))?.DefaultTimeframe.ToCode()
-            ?? Timeframe.M15.ToCode();
-        var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
-        return new SimulationRequest(options.StrategyId, options.Parameters, timeframe, options.From, options.To, universe.InstrumentIds, universe.BasketId, options.Costs, options.AcknowledgeCsvAdjusted, null, fills);
-    }
-
-    /// <summary>The second read for the chosen trades (spec P3-04c, C2); nothing is read when no card is wanted.</summary>
-    private static async Task<Result<IReadOnlyList<TradeCardData>>> CardsAsync(IServiceProvider provider, SimulationRun run, IReadOnlyList<CardChoice> choices, CancellationToken cancellationToken)
-    {
-        if (choices.Count == 0)
-        {
-            return Result.Success<IReadOnlyList<TradeCardData>>([]);
-        }
-
-        var handler = provider.GetRequiredService<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>>();
-        return await handler.HandleAsync(new BuildTradeCardsQuery(run, [.. choices.Select(c => c.Trade.Trade.Key)]), cancellationToken);
+        // the files are the audit copy and are already there; the store comes second, and its failure leaves them in place (spec P3-10, D12)
+        return options.Store ? await SimulateStore.StoreAsync(run, outcome, provider, console, logger, cancellationToken) : Done;
     }
 
     private static List<ExportFile> Files(SimulationRun run, RunLabelSet labels, string runId, int cap, IReadOnlyList<CardChoice> choices, IReadOnlyList<TradeCardData> cards)
@@ -245,51 +210,7 @@ internal static class SimulateCommand
     private static (byte[] Manifest, string ExportKey) Manifest(SimulationRun run, IReadOnlyList<ManifestEntry> entries, IReadOnlyList<string> extra) =>
         (ExportManifest.Build(ExportFormat, run.RunKey, run.Universe.BasketId, entries, extra), ExportKey.Of(ExportFormat, run.RunKey, run.Universe.BasketId, entries, extra));
 
-    private static int Usage(SimulateConsole console, IReadOnlyList<string> errors)
-    {
-        foreach (var error in errors)
-        {
-            console.Error.WriteLine(error);
-        }
-
-        console.Error.Write(SimulateOptions.Usage);
-        return UsageError;
-    }
-
-    private static async Task<int> RefuseAsync(SimulateConsole console, ILogger logger, string code, IReadOnlyList<string> problems)
-    {
-        SimulateLog.Refused(logger, code, problems.Count);
-        foreach (var line in problems.Take(MaxProblems))
-        {
-            await console.Error.WriteLineAsync(line);
-        }
-
-        if (problems.Count > MaxProblems)
-        {
-            await console.Error.WriteLineAsync("and " + (problems.Count - MaxProblems).ToString(System.Globalization.CultureInfo.InvariantCulture) + " more problems");
-        }
-
-        return Refused;
-    }
-
-    /// <summary>One <c>path: code: message</c> per problem of a refused run, at most <see cref="MaxProblems"/>; a refusal without fields is one <c>code: message</c> line.</summary>
-    private static List<string> Problems(Error error) =>
-        error.Fields is { Count: > 0 } fields
-            ? [.. fields.Select(f => f.Field + ": " + (f.Code ?? error.Code) + ": " + f.Message)]
-            : [error.Code + ": " + error.Message];
-
-    private static List<string> TickProblems(IReadOnlyList<(TickProbe Probe, decimal ConvertedRupees)> suspects)
-    {
-        var lines = new List<string>
-        {
-            "simulate.tick_unit: " + suspects.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)
-                + " share or ETF rows have a stored tick that reads as less than one paisa after the paise conversion; the master table may hold rupees (ADR 0038 item 6). Nothing was read.",
-        };
-        lines.AddRange(suspects.Take(3).Select(s =>
-            "  " + SimulateOptions.Show(s.Probe.Symbol) + ": stored " + SimulateSummary.Rupees(s.Probe.StoredTick!.Value)
-            + ", converted " + SimulateSummary.Rupees(s.ConvertedRupees) + " rupee"));
-        return lines;
-    }
+    private static int Usage(SimulateConsole console, IReadOnlyList<string> errors) => SimulatePipeline.Usage(console, errors, SimulateOptions.Usage);
 
     private static string Catalog(IReadOnlyList<BuiltInStrategyInfo> catalog)
     {
@@ -301,7 +222,7 @@ internal static class SimulateCommand
             foreach (var parameter in entry.Parameters)
             {
                 text.Append("  --param ").Append(parameter.Name).Append("=<number>  default ")
-                    .Append(parameter.Default.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(": ").Append(parameter.Note).Append('\n');
+                    .Append(parameter.Default.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(parameter.HasRange ? ", range " + parameter.RangeText() : string.Empty).Append(": ").Append(parameter.Note).Append('\n');
             }
         }
 

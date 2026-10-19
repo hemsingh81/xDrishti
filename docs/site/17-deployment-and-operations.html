@@ -362,7 +362,15 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
 </tr>
 <tr>
 <td>Simulation runs (P3-04b2)</td>
-<td>The <code>simulate</code> verb is not a container service: <code>scripts/simulate.sh</code> runs it on the host (<code>dotnet run</code> of the API project with the argument <code>simulate</code>; since P3-03f every run names its cost choice, <code>--gross</code> or <code>--costs &lt;sheet-id&gt;</code>) against the developer database port (<code>xd-db</code> on 127.0.0.1:5433, <code>compose.dev.yaml</code>). The one secret is the database password, read from the Keychain item <code>xdrishti/db/app</code>; no vault key and no owner secret. Files go to <code>data/exports/sim/&lt;run-id&gt;/</code> (<code>Export__Directory</code>, git-ignored, owner-only) and, since P3-04c, include <code>index.html</code> and <code>cards/</code> (static trade cards, <code>--cards</code>, default 200: the verb reads the bars of the instruments that have a card a second time, so a wide run takes longer; <code>--cards 5</code> for an early look, <code>--cards 0</code> for none); nothing is written to the database. The Lab (P5) and the scanner (P7) reuse the handlers, not the verb</td>
+<td>The <code>simulate</code> verb is not a container service: <code>scripts/simulate.sh</code> runs it on the host (<code>dotnet run</code> of the API project with the argument <code>simulate</code>; since P3-03f every run names its cost choice, <code>--gross</code> or <code>--costs &lt;sheet-id&gt;</code>) against the developer database port (<code>xd-db</code> on 127.0.0.1:5433, <code>compose.dev.yaml</code>). The one secret is the database password, read from the Keychain item <code>xdrishti/db/app</code>; no vault key and no owner secret. Files go to <code>data/exports/sim/&lt;run-id&gt;/</code> (<code>Export__Directory</code>, git-ignored, owner-only) and, since P3-04c, include <code>index.html</code> and <code>cards/</code> (static trade cards, <code>--cards</code>, default 200: the verb reads the bars of the instruments that have a card a second time, so a wide run takes longer; <code>--cards 5</code> for an early look, <code>--cards 0</code> for none); nothing is written to the database unless <code>--store</code> is given (P3-10, next row). The Lab (P5) and the scanner (P7) reuse the handlers, not the verb</td>
+</tr>
+<tr>
+<td>Result store (P3-10)</td>
+<td><code>scripts/simulate.sh … --store</code> keeps the run in <code>research.sim_runs</code> and <code>research.sim_trades</code> after the export files are written (files first; a database failure keeps them): <code>stored: run &lt;12&gt;</code> or <code>already stored</code>; exit 1 refused by validation, 3 a conflict (<code>store.run_conflict</code>: the same run key with another record, a corruption signal, nothing written) or a database failure. Default off. The runtime role can read and insert but not update or delete, so a stored run is removed by hand, connected as <code>xd_owner</code> (not <code>xd_app</code>), in one transaction with the trades first: <code>BEGIN; DELETE FROM research.sim_trades WHERE run_id = (SELECT id FROM research.sim_runs WHERE run_key = &#39;&lt;key&gt;&#39;); DELETE FROM research.sim_runs WHERE run_key = &#39;&lt;key&gt;&#39;; COMMIT;</code>. About 0.7 KB a trade (a 200,000-trade run is about 130 MB); revisit the plain tables (a hypertable with compression) when <code>pg_total_relation_size(&#39;research.sim_trades&#39;)</code> passes 2 GB. The migration <code>AddResearchResultStore</code> is applied by <code>xd-migrate</code> on the next <code>deploy/xd-up.sh</code>; until then <code>--store</code> exits 3 and names it</td>
+</tr>
+<tr>
+<td>Verification pack (P3-09)</td>
+<td>The <code>verify-pack</code> verb is not a container service: <code>scripts/verify-pack.sh</code> runs it on the host exactly like <code>simulate.sh</code> (the same generic host, the same Keychain item <code>xdrishti/db/app</code>, <code>Export__Directory</code> set by the script) and writes <code>data/exports/verify/&lt;pack-id&gt;/</code> (git-ignored, <code>0700</code>/<code>0600</code>); <code>verify-pack --check &lt;log&gt;</code> reads files only and needs no password. It writes nothing to the database and never uses the result store. See <a href="../adr/0046-the-verification-pack-and-the-20-trade-check.html">ADR 0046</a>.</td>
 </tr>
 <tr>
 <td>Charge sheet (P3-03f)</td>
@@ -412,7 +420,7 @@ HKDF-SHA256). Back it up with the database. The former <code>scripts/broker-secr
     <a class="prev" href="16-configuration.html"><small>← Previous  [</small>16 · Configuration</a>
     <a class="next" href="18-roadmap.html"><small>Next  ] →</small>18 · Roadmap</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-18 23:30</footer>
+  <footer class="foot">Generated from <code>docs/17-deployment-and-operations.md</code> · 2026-10-19 12:37</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-podman-machine" class="d2">1. Podman machine</a>
 <a href="#2-containers" class="d2">2. Containers</a>

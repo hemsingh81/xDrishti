@@ -233,3 +233,14 @@ R7 (extended). **The request names its costs.** `SimulationRequest.Costs` is req
 
 ### Consequences from the build (Amendment 8)
 - The engine port, `Prepare` and the engine version do not change: `sim-5` and run-record schema 5 stand. A costed run's key already carried the sheet id, its rates hash, the capital, the profile numbers and `max_cost_R` (ADR 0042); what is new is that a run can now be asked for them.
+
+## Amendment 9 — the record is stored; the run key is the idempotency key (P3-10, 2026-10-19)
+
+New decisions; nothing above is superseded. They are decisions of [P3-10](../specs/P3-10-the-result-store-sim-runs-and-sim-trades.md); the tables, the write, the grants and the measurements are [ADR 0045](0045-the-result-store-sim-runs-and-sim-trades.md).
+
+Amendment 2 (the run record). **The run record is kept.** "The Lab will store it" is now done by the `simulate … --store` flag and, later, the Lab through the same handler: the record without its trades as canonical text (the run object of `run.json`, byte for byte) and every trade as typed columns, in `research.sim_runs` and `research.sim_trades`.
+
+R1 (the run key). **The run key is the idempotency key of the store.** Storing the same run again is a no-op. Another record under a stored key (a different record digest, trades digest, trade count, engine version or schema) means the same inputs gave another result — a nondeterministic engine, a changed engine under an unchanged version string, or a damaged row — and is `store.run_conflict`: refused, nothing written, logged at error. A new engine version string gives a new key and a new row, never a conflict.
+
+### Consequences from the build (Amendment 9)
+- The engine port, `Prepare`, the engine version, the run record (schema 5) and `SimTrade` (schema 4) do not change: `sim-5` stands. A store of another schema is refused; a new schema is a new migration and an ADR.

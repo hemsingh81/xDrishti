@@ -73,7 +73,7 @@ public sealed class SimulationArchitectureTests
         solution.ShouldContain("src/XDrishti.Simulation/XDrishti.Simulation.csproj");
         solution.ShouldContain("tests/XDrishti.Simulation.Tests/XDrishti.Simulation.Tests.csproj");
         dockerfile.ShouldContain("COPY src/XDrishti.Simulation/XDrishti.Simulation.csproj src/XDrishti.Simulation/");
-        RepositoryFiles.ProjectReferences(tests).ShouldBe(["XDrishti.Simulation"], "the walker is walked from a unit test with no database, file, YAML or market context");
+        RepositoryFiles.ProjectReferences(tests).Order(StringComparer.Ordinal).ToList().ShouldBe(["XDrishti.SimOracle", "XDrishti.Simulation"], "the walker is walked from a unit test with no database, file, YAML or market context; the independent oracle (ADR 0047) is the second reference");
         RepositoryFiles.ProjectReferences(architecture).ShouldContain("XDrishti.Simulation");
     }
 

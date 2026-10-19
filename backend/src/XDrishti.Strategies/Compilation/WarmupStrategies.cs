@@ -59,8 +59,8 @@ internal static class WarmupStrategies
             [
                 Rr(2.0),
                 PartialTrail(),
-                new ExitSpec(ExitPolicy.PartialBe, [P("book_pct", 50), P("t1_rr", 1)]),
-                new ExitSpec(ExitPolicy.AtrTrail, [P("atr_mult", 2)]),
+                new ExitSpec(ExitPolicy.PartialBe, [P("book_pct", 50), P("t1_rr", 1), P("t2_rr", 2, 3)]),
+                new ExitSpec(ExitPolicy.AtrTrail, [P("mult", 2, 3), P("activate_at_rr", 1)]),
             ],
             [new OverlaySpec(OverlayKind.TimeStop, [P("min_progress_rr", 0.5), P("intraday_bars", 12)])]),
         new SideRules(
@@ -71,9 +71,9 @@ internal static class WarmupStrategies
             new StopSpec(StopKind.SwingHigh, Lookback: Quantity.Named("swing_lookback"), BufferAtr: Quantity.Of(0.1)),
             [
                 Rr(2.0, 3.0),
-                new ExitSpec(ExitPolicy.StructureTrail, [P("lookback", 5)]),
-                new ExitSpec(ExitPolicy.EmaTrail, [P("ema_len", 20)]),
-                new ExitSpec(ExitPolicy.Pyramid, [P("add_at_rr", 1, 2), P("max_adds", 2)]),
+                new ExitSpec(ExitPolicy.StructureTrail, [P("lookback_bars", 5)]),
+                new ExitSpec(ExitPolicy.EmaTrail, [P("length", 20)]),
+                new ExitSpec(ExitPolicy.Pyramid, [P("initial_pct", 50), P("add_at_rr", 1, 2), P("add_pct", 30, 20), P("max_adds", 2), P("trail_atr_mult", 2)]),
             ],
             [new OverlaySpec(OverlayKind.EventExit, [P("days_before_results", 1)])]),
         new TimeRules(null, new TimeOnly(14, 30), new TimeOnly(15, 15), null),
@@ -107,7 +107,7 @@ internal static class WarmupStrategies
             new EntrySpec(EntryKind.AtClose),
             new StopSpec(StopKind.AtrMult, Mult: Quantity.Of(2), AtrPeriod: Quantity.Of(14)),
             [Rr(3.0)],
-            null),
+            [new OverlaySpec(OverlayKind.TimeStop, [P("min_progress_rr", 0.5), P("swing_sessions", 2)])]),
         null,
         new TimeRules(null, null, null, 5),
         []);
@@ -152,6 +152,10 @@ internal static class WarmupStrategies
 
         // the exits and the overlays
         new(Orb() with { Buy = Orb().Buy! with { Exits = [Rr(2), Rr(3), new ExitSpec(ExitPolicy.PartialTrail, [P("book_pct", 100), P("book_pct", 5), P("trail", 1)]), new ExitSpec(ExitPolicy.Pyramid, [P("Add", 1), new ExitParameter("x", [Quantity.Named("zz")])]), new ExitSpec(ExitPolicy.FixedRr, [P("rr", 0)])], Overlays = [new OverlaySpec(OverlayKind.TimeStop, []), new OverlaySpec(OverlayKind.TimeStop, [])] } }, Timeframe.M15, Side.Buy),
+
+        // one failing row per group of the exit tables: a relation, a whole number, the style rule of the time stop, a name the table does not have, a doc 16 field schema 1 dropped
+        new(Orb() with { Buy = Orb().Buy! with { Exits = [Rr(2), new ExitSpec(ExitPolicy.PartialBe, [P("book_pct", 50), P("t1_rr", 2), P("t2_rr", 1.5)]), new ExitSpec(ExitPolicy.Pyramid, [P("initial_pct", 50), P("add_at_rr", 1, 2), P("add_pct", 30, 21), P("max_adds", 1.5), P("trail_atr_mult", 2), P("trail", 1)])] } }, Timeframe.M15, Side.Buy),
+        new(Orb() with { Buy = Orb().Buy! with { Exits = [Rr(2), new ExitSpec(ExitPolicy.AtrTrail, [P("atr_mult", 2), P("activate_at_rr", 1)])], Overlays = [new OverlaySpec(OverlayKind.TimeStop, [P("min_progress_rr", 0.5), P("swing_sessions", 2)]), new OverlaySpec(OverlayKind.EventExit, [P("days_before_results", 1), P("enabled", 1)])] } }, Timeframe.M15, Side.Buy),
 
         // time rules and filters
         new(Orb() with { TimeRules = new TimeRules(new TimeOnly(11, 30), new TimeOnly(9, 30), new TimeOnly(15, 45), 3), Filters = ["not_event_dy", FilterNames.MinTurnover, FilterNames.MinTurnover] }, Timeframe.M15, Side.Buy),
