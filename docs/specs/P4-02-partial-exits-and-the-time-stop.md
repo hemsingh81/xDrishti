@@ -1,6 +1,6 @@
 # P4-02 — `PARTIAL_BE`, `PARTIAL_TRAIL` and the `time_stop` overlay
 
-- **Status:** Draft (written 2026-10-19 from `main` at bf3cb70; nothing here is Approved until the owner says so). The tables and the rules were read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D3, D8, D10 to D14), doc 08 §2 and §5 and [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md); P4-01 is Approved and **not built**, so every name of the tape, the legs and `IExitRule` below is the one that spec gives and is UNVERIFIED against code until it is built. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
+- **Status:** Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 8 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at bf3cb70. The tables and the rules were read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D3, D8, D10 to D14), doc 08 §2 and §5 and [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md); P4-01 is Approved and **not built**, so every name of the tape, the legs and `IExitRule` below is the one that spec gives and is UNVERIFIED against code until it is built. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 2 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md).
 - **Design refs:** docs/design/08-exits-and-risk.md §1, §2, §5, §8 · 16-configuration.md §2 (`exits`) · [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md) Amendment 1 · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) · [ADR 0040](../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.md) · ADR 0048 (P4-01, to be written) · [ADR 0047](../adr/0047-the-oracle-and-the-rule-table-gaps.md).
 
@@ -81,6 +81,8 @@ As P4-01 (allocation-free `FIXED_RR`, deterministic bytes). The tape is built on
 Unit: each rule's rows as hand tables, the order inside the T1 minute, the trail's anchor and tightening, the overlay's counting of bars and sessions, refusals. Property: leak, break-even order, trail never loosens, legs invariants (P4-01 AC 6) on the new rules. Oracle: D12. Integration: verbs, export, store, cards. Edge cases listed in D12 and criteria 2, 4 and 5; additionally a T1 with `book_pct` rounding a leg to 0 shares; a strategy whose `atr_period` differs from another strategy's (separate tapes); a swing position with a partial leg overnight; a session with a special close.
 
 ## Open questions
+All eight answered "yes to all recommendations" by the owner on 2026-10-19: each stands as the recommendation written in it.
+
 1. **One candidate at a time (D10).** Accept that this slice runs exactly one exit set and refuses lists of more than one value until P4-05? Recommended: yes.
 2. **`PARTIAL_TRAIL` has no break-even move (D4).** After T1 the remainder keeps the initial stop until the trail is tighter. Recommended: yes (doc 08 says "trail remainder"); the alternative is a break-even stop at T1 as in `PARTIAL_BE`.
 3. **The trail's anchor and activation (D5):** highest high since the T1 fill, activation by T1. Recommended: yes, and let P4-03 decide separately for `ATR_TRAIL` (it has its own `activate_at_rr`); the two may end up sharing a helper but not a rule.
@@ -91,7 +93,7 @@ Unit: each rule's rows as hand tables, the order inside the T1 minute, the trail
 8. **Hand check.** The partial and overlay rules are checked by hand like P3's, but later, once, for P4's policies together (P4-00 question 4), not per slice. Recommended: yes.
 
 ## Done when
-- [ ] The owner has answered questions 1 to 8 and the status is Approved
+- [x] The owner has answered questions 1 to 8 and the status is Approved (2026-10-19)
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Migration added only if the store needs it (Contract); no API change
