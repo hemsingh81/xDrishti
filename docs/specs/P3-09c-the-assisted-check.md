@@ -1,6 +1,6 @@
 # P3-09c — The assisted check: an automatic second read of the pack
 
-- **Status:** Draft (written 2026-10-19 from `main` at 2c2963b; nothing here is Approved until the owner says so). Written at the owner's request to automate the hand check of [P3-09](P3-09-verification-pack-and-the-20-trade-check.md) after the first pack (`p3-check-1`, 27 rows) was drawn. Facts read: the protocol `docs/research/p3-hand-check.md` (sections 4 to 7), the `check-log.csv` header and rows, doc 05 §§ on the Dhan `charts/intraday` endpoint and the allow-list; what was not read (the code of the `verify-pack` verb, the oracle's API, the Dhan connector's classes) is marked UNVERIFIED.
+- **Status:** Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 6 stand as recommended, incl. building it now). Written 2026-10-19 from `main` at 2c2963b. Written at the owner's request to automate the hand check of [P3-09](P3-09-verification-pack-and-the-20-trade-check.md) after the first pack (`p3-check-1`, 27 rows) was drawn. Facts read: the protocol `docs/research/p3-hand-check.md` (sections 4 to 7), the `check-log.csv` header and rows, doc 05 §§ on the Dhan `charts/intraday` endpoint and the allow-list; what was not read (the code of the `verify-pack` verb, the oracle's API, the Dhan connector's classes) is marked UNVERIFIED.
 - **Phase / roadmap row:** P3 — Simulator, DSL & first strategies; an addition to P3-09 (parts A and B are built; this is part C). It changes how the exit check is carried out, so it needs the owner's decision on the exit rule (D8) and an amendment of ADR 0046.
 - **Design refs:** docs/research/p3-hand-check.md · docs/design/05-data-and-brokers.md (Dhan historical API, the allow-list) · [ADR 0046](../adr/0046-the-verification-pack-and-the-20-trade-check.md) · [ADR 0047](../adr/0047-the-oracle-and-the-rule-table-gaps.md) · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md).
 
@@ -76,6 +76,8 @@ About 24 requests with the connector's spacing (UNVERIFIED seconds each; a few m
 Unit: the reader on the hand days, the comparison words, the order of reads, the cache. Property: the reader against the engine on the oracle series (AC 3). Architecture: independence (AC 2). Integration: the verb on a pack fixture with a stub endpoint and with a folder source. Manual: the real run on `p3-check-1` and the owner's reading of the exceptions and 5 rows.
 
 ## Open questions
+All six answered "yes to all recommendations" by the owner on 2026-10-19: each stands as the recommendation written in it.
+
 1. **Do you accept the amended exit rule (D8)?** The machine reads all rows on a second source; you read the exceptions and at least 5 rows on a real chart (TradingView), and sign. Recommended: yes, with the honest limit that an auto-read row is not one of the 5 external ones. If you want the original protocol unchanged (every row read by you), this slice is not needed.
 2. **The second source.** Recommended: Dhan `charts/intraday` (already allow-listed) **and** a folder input for a TradingView export you make yourself, which is the only truly independent chart source. Alternative: Dhan only (then the stored-bar comparison is weak for any minute the backfill supplied).
 3. **Who reads which rows on a real chart (D7b).** Recommended: a fixed seeded rule picks them from the `agree_all` rows, plus every `bars_differ` row, so that the easy rows are not the ones checked by eye.
@@ -84,7 +86,7 @@ Unit: the reader on the hand days, the comparison words, the order of reads, the
 6. **Build now or after P4 specs?** This slice only touches the verify tooling, not the walker; it can be built before P3 closes (it is a part of closing it). Recommended: build it now, as the fastest way to close P3.
 
 ## Done when
-- [ ] The owner has answered questions 1 to 6 and the status is Approved
+- [x] The owner has answered questions 1 to 6 and the status is Approved (2026-10-19)
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] No migration; no API change
