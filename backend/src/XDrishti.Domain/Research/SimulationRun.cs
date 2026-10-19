@@ -5,7 +5,7 @@ namespace XDrishti.Domain.Research;
 /// fills, the options) and the calendar for the run to be checked again. It reads no clock and no random source, so equal inputs give an equal record; when and how long belong to the caller. The names of its public properties are pinned by a
 /// test: changing one needs <see cref="CurrentSchemaVersion"/> raised (and the run key with it).
 /// </summary>
-/// <param name="SchemaVersion">3 (2 was the record of P3-03b and P3-04; 1 the one before the fill rules).</param>
+/// <param name="SchemaVersion">4 (3 was the record with swing positions, P3-03d; 2 was the record of P3-03b and P3-04; 1 the one before the fill rules).</param>
 /// <param name="RunKey">The lower-case hex SHA-256 of the key text (<see cref="RunAssembler.KeyText"/>): equal for equal inputs, different when anything that can change a trade changes.</param>
 /// <param name="EngineVersion"><c>SimulationEngine.Version</c> of the engine that ran.</param>
 /// <param name="Strategy">The strategy as recorded.</param>
@@ -20,6 +20,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="Trades">The trades of all instruments, by entry instant, then place in the universe, then Buy before Sell.</param>
 /// <param name="OpenAtEnd">The <c>EndOfData</c> trades, in the same order, apart because statistics must not count them.</param>
 /// <param name="Totals">The figures summed over the instruments.</param>
+/// <param name="Costs">What the run charged with (ADR 0042, D14); null for a gross run.</param>
 public sealed record SimulationRun(
     int SchemaVersion,
     string RunKey,
@@ -35,8 +36,9 @@ public sealed record SimulationRun(
     IReadOnlyList<InstrumentRun> Instruments,
     IReadOnlyList<RunTrade> Trades,
     IReadOnlyList<RunTrade> OpenAtEnd,
-    RunCounters Totals)
+    RunCounters Totals,
+    CostRecord? Costs = null)
 {
     /// <summary>The schema of the record and of the run key this code writes.</summary>
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 5;
 }

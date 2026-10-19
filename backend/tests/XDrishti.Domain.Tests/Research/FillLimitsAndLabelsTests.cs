@@ -34,10 +34,12 @@ public class FillLimitsAndLabelsTests
     }
 
     [Fact]
-    public void The_auction_open_text_names_the_gap_exit_of_a_position_held_overnight_and_no_longer_says_that_no_strategy_fills_there()
+    public void The_auction_open_text_names_the_daily_strategy_and_the_gap_exit_of_a_position_held_overnight_and_no_longer_says_that_no_strategy_fills_there()
     {
         var text = FillLimits.NotModelled.Single(l => l.Code == "auction_open").Text;
 
+        text.ShouldBe("The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.");
+        text.ShouldContain("A daily strategy enters there");
         text.ShouldContain("held overnight");
         text.ShouldContain("a stop at the open, a target at its level");
         text.ShouldNotContain("no P3 strategy");

@@ -92,6 +92,22 @@ internal static class TestStrategies
         Buy = Swing1h().Buy! with { Trigger = All("close > ema(10)") },
     };
 
+    /// <summary>
+    /// <c>SWING_DAILY_TEST</c> (P3-03e, DF1 and DF2): evaluated on the 1D bar, a trigger that is always true, the stop on the low of the daily bar (<c>bar_low</c>), one <c>FIXED_RR 2.0</c>, held up to five sessions, no entry window (a daily bar cannot
+    /// have one). <paramref name="trigger"/> is the trigger condition (<c>close &gt; 0</c> unless a test needs candidates on some days only).
+    /// </summary>
+    public static StrategyDefinition SwingDaily(string trigger = "close > 0", int maxHoldSessions = 5) => new(
+        StrategyDefinition.CurrentSchema,
+        "SWING_DAILY_TEST",
+        Style.Swing,
+        [Timeframe.D1],
+        [Side.Buy],
+        [],
+        new SideRules(null, All(trigger), null, new EntrySpec(EntryKind.AtClose), new StopSpec(StopKind.BarLow), [Rr(2.0)], null),
+        null,
+        new TimeRules(null, null, null, maxHoldSessions),
+        []);
+
     /// <summary>A swing strategy on the timeframe (a level stop, a fixed reward-risk, held up to five sessions): what the daily evaluation and the swing style refusals are tested with.</summary>
     public static StrategyDefinition Swing(Timeframe timeframe) => new(
         StrategyDefinition.CurrentSchema,

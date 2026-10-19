@@ -31,7 +31,20 @@ internal static class RunText
             + $"bar={t.TriggerBar.EpochSeconds}/{N(t.TriggerBar.Open)}/{N(t.TriggerBar.High)}/{N(t.TriggerBar.Low)}/{N(t.TriggerBar.Close)}/{t.TriggerBar.Volume}/{t.TriggerBarMinutes}/{t.TriggerBarComplete} "
             + $"entry={t.EntryEpochSeconds}@{N(t.EntryPrice)} stop={N(t.StopPrice)} target={N(t.TargetPrice)} exit={t.ExitEpochSeconds}@{N(t.ExitPrice)} reason={t.ExitReason} "
             + $"rExact={N(t.RExact)} mae={N(t.MaeR)} mfe={N(t.MfeR)} fills={t.Fills} costs={t.Costs} snapshot={t.EntrySnapshotJson ?? "null"} rFilled={N(t.RFilled)} slippageR={N(t.SlippageR)} "
-            + $"entryFilled={N(t.EntryFilledPrice)} exitFilled={N(t.ExitFilledPrice)} entryFill={t.EntryFill} tickFallback={t.TickFallback} sessionsHeld={t.SessionsHeld} sessionsUnseen={t.SessionsUnseen}");
+            + $"entryFilled={N(t.EntryFilledPrice)} exitFilled={N(t.ExitFilledPrice)} entryFill={t.EntryFill} tickFallback={t.TickFallback} sessionsHeld={t.SessionsHeld} sessionsUnseen={t.SessionsUnseen}")
+        + (t.Costing is { } costing ? " costing=" + Costing(costing) : string.Empty);
+
+    /// <summary>The costing of a trade, every figure and every line of both legs (money by <see cref="CanonicalText.Number(decimal)"/>).</summary>
+    public static string Costing(TradeCosting c) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"segment={c.Segment} sheet={c.SheetId} qty={c.Quantity} riskTaken={M(c.RiskTaken)} entryTurnover={M(c.EntryTurnover)} exitTurnover={M(c.ExitTurnover)} entryLeg[{Leg(c.EntryLeg)}] exitLeg[{Leg(c.ExitLeg)}] total={M(c.TotalCost)} costR={N(c.CostR)} rNet={N(c.RNet)}");
+
+    /// <summary>The eight lines of a leg.</summary>
+    public static string Leg(LegCharges l) =>
+        string.Create(CultureInfo.InvariantCulture, $"brokerage={M(l.Brokerage)} stt={M(l.Stt)} exchange={M(l.ExchangeTxn)} sebi={M(l.SebiFee)} stamp={M(l.StampDuty)} other={M(l.OtherCharges)} dp={M(l.DpCharge)} gst={M(l.Gst)}");
+
+    private static string M(decimal value) => CanonicalText.Number(value);
 
     public static string Instrument(InstrumentRun r)
     {
@@ -70,7 +83,7 @@ internal static class RunText
     }
 
     public static string Fates(RunFates f) =>
-        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached} excludedAcrossDiscontinuity={f.ExcludedAcrossDiscontinuity} positionOpen={f.PositionOpen}");
+        string.Create(CultureInfo.InvariantCulture, $"fates suppressed={f.EntriesSuppressed} beforeWindow={f.TradesBeforeWindow} openAtEnd={f.OpenAtEnd} trades={f.Trades} noFillBar={f.NoFillBar} afterSquareOff={f.AfterSquareOff} entryThroughStop={f.EntryThroughStop} limitNotReached={f.LimitNotReached} excludedAcrossDiscontinuity={f.ExcludedAcrossDiscontinuity} positionOpen={f.PositionOpen} skippedQuantity={f.SkippedQuantity} skippedCost={f.SkippedCost} orderPendingAtEnd={f.OrderPendingAtEnd}");
 
     public static string Replay(InstrumentReplay replay)
     {
@@ -114,6 +127,12 @@ internal static class RunText
         text.Append(CultureInfo.InvariantCulture, $"json {s.DefinitionJson}\n");
         text.Append(CultureInfo.InvariantCulture, $"window {D(run.From)}..{D(run.To)} options={CanonicalText.Number(run.Options.MinSessionCompleteness)},{CanonicalText.Number(run.Options.DiscontinuityThreshold)} ack={run.AcknowledgeCsvAdjusted}\n");
         text.Append(CultureInfo.InvariantCulture, $"fills {run.Fills}\n");
+        if (run.Costs is { } costs)
+        {
+            text.Append(CultureInfo.InvariantCulture, $"costs sheet={costs.SheetId} ratesSha256={costs.RatesSha256} checked={costs.Checked ?? "-"} capital={M(costs.Capital)} profile={costs.Profile.Name}/{M(costs.Profile.RiskPerTradePct)}/{M(costs.Profile.MaxCapitalPerTradePct)} maxCostR={M(costs.MaxCostR)}\n");
+            text.Append(CultureInfo.InvariantCulture, $"sheetJson {costs.SheetJson}\n");
+        }
+
         var u = run.Universe;
         text.Append(CultureInfo.InvariantCulture, $"universe kind={u.Kind} basket={(u.BasketId is { } b ? b.ToString("D") : "-")} name={u.BasketName ?? "-"} label={u.Label} members=[{string.Join(",", u.Members.Select(m => m.Id.ToString("D") + ":" + m.Symbol))}]\n");
         foreach (var e in run.CalendarExceptions)

@@ -11,7 +11,7 @@ data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 t
 engine: not yet verified (P3-08)
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
-not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.
+not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
 not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.
 not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.
 not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.
@@ -33,7 +33,7 @@ data: 1 instruments; first bars 2024-04-01 to 2024-04-01, last bars 2026-04-30 t
 engine: not yet verified (P3-08)
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
-not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.
+not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
 not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.
 not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.
 not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.
@@ -55,7 +55,7 @@ data: 1 instruments; first bars 2024-04-01 to 2024-04-01, last bars 2026-04-30 t
 engine: not yet verified (P3-08)
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
-not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.
+not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
 not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.
 not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.
 not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.
@@ -77,7 +77,7 @@ data: none
 engine: not yet verified (P3-08)
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
-not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.
+not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
 not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.
 not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.
 not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.
@@ -99,7 +99,7 @@ data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 t
 engine: not yet verified (P3-08)
 tick: today's master tick; rounding to the grid is approximate
 opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
-not modelled: auction_open: The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller.
+not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
 not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.
 not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.
 not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.
@@ -109,3 +109,36 @@ not modelled: hole_is_no_trade: An absent minute and a minute with no volume are
 not modelled: one_minute_entry: The entry order lives for one minute; a miss is never retried.
 not modelled: no_latency: The order is live at the instant the trigger bar closes and fills at the first print of the next minute; decision and network latency are zero.
 not modelled: dividends_not_modelled: Cash dividends are neither adjusted in the prices nor received: a position held over an ex-date shows the price drop without the dividend.
+== costed run, TEST sheet
+exploration: signal-level mechanics on past data, not evidence of an edge
+fills: modelled
+entry limit: +0.1 %
+costs: sheet test-synthetic-1 (TEST sheet: synthetic rates, not the broker's) (not checked against bills)
+sizing: fixed simulated capital 1000000, profile standard (risk 0.5 %, cap 25 % of capital per trade); a trade under 1 share or whose charge is above 0.1 of its risk taken is skipped and counted
+portfolio limits: not simulated
+sample: in-sample
+universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)
+data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)
+engine: not yet verified (P3-08)
+tick: today's master tick; rounding to the grid is approximate
+opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)
+not modelled: auction_open: The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller.
+not modelled: circuit_locks: Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused.
+not modelled: touch_is_fill: A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs.
+not modelled: no_queue_or_impact: There is no queue position, partial fill, market impact of the order size or liquidity cap.
+not modelled: grid_approximate: The tick is today's tick from the instrument master; old prices can lie on a finer grid or off the grid, so rounding to the tick is approximate.
+not modelled: minute_path: Inside one minute only the open, high, low and close are known; a minute that reaches both stop and target is taken as the stop.
+not modelled: hole_is_no_trade: An absent minute and a minute with no volume are read as a minute without a trade; the order rests through it, up to the 5-minute bound.
+not modelled: one_minute_entry: The entry order lives for one minute; a miss is never retried.
+not modelled: no_latency: The order is live at the instant the trigger bar closes and fills at the first print of the next minute; decision and network latency are zero.
+not modelled: dividends_not_modelled: Cash dividends are neither adjusted in the prices nor received: a position held over an ex-date shows the price drop without the dividend.
+not modelled: fixed_capital: Every trade is sized from the same starting capital: there is no compounding and no equity curve; trades of different instruments overlap and their combined exposure is not capped.
+not modelled: no_margin_or_leverage: Intraday margin, leverage, funding and interest are not modelled; the cap per trade is a cap on notional, which the filled entry may exceed by a few ticks.
+not modelled: no_liquidity_cap: The liquidity cap of doc 08 is not applied: the quantity does not depend on the volume traded.
+not modelled: one_order_per_leg: Each leg is one order for the brokerage cap; partial fills and order splitting are not modelled.
+not modelled: cash_equity_only: Every instrument is charged at the sheet's NSE cash-equity figures; ETFs, other series, BSE, futures and options are not told apart.
+not modelled: no_trading_tax: Tax on trading income and account-level fees such as annual maintenance are outside the charge.
+not modelled: rates_as_sheet: The figures are the sheet's and exactly as right as the sheet; an unchecked sheet is labelled so.
+not modelled: dp_charge_is_flat: The depository charge is one flat figure per delivery sale; the depository's own lines vary and some are 0.
+not modelled: no_flat_order_fees: A flat fee per order other than the brokerage, such as an auto square-off fee, cannot be expressed; 'other' is a share of turnover.
+not modelled: swing_gate_before_costing: A swing position that costing skipped still blocks the later candidates that the position gate refused: the gate runs before costing.

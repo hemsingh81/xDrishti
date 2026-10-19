@@ -47,4 +47,15 @@ public sealed class AppSettingTests
         Should.Throw<ArgumentException>(() => AppSetting.Create("k", new string('v', AppSetting.MaxValueLength + 1), "a", Now));
         Should.Throw<ArgumentException>(() => AppSetting.Create("k", "v", "a", Now).Change(new string('v', AppSetting.MaxValueLength + 1), "a", Now));
     }
+
+    [Fact]
+    public void The_value_holds_8000_characters_for_a_charge_sheet_and_the_key_prefix_is_the_research_one()
+    {
+        AppSetting.MaxValueLength.ShouldBe(8000);
+        AppSetting.Create("k", new string('v', 7_999), "a", Now).Value.Length.ShouldBe(7_999);
+        AppSetting.Create("k", new string('v', 8_000), "a", Now).Value.Length.ShouldBe(8_000);
+        Should.Throw<ArgumentException>(() => AppSetting.Create("k", new string('v', 8_001), "a", Now));
+        AppSettingKeys.CostSheetPrefix.ShouldBe("research.cost_sheet.");
+        (AppSettingKeys.CostSheetPrefix + new string('a', 40)).Length.ShouldBeLessThanOrEqualTo(AppSetting.MaxKeyLength);
+    }
 }

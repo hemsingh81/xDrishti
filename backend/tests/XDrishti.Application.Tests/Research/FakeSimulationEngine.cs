@@ -13,6 +13,8 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
 {
     public string EngineVersion => "fake-1";
 
+    public IReadOnlyList<BuiltInStrategyInfo> BuiltIns { get; set; } = [];
+
     /// <summary>What <see cref="Prepare"/> was asked, in order.</summary>
     public List<(string StrategyId, IReadOnlyDictionary<string, double> Parameters, Timeframe Timeframe, FillRules? Fills)> Prepared { get; } = [];
 

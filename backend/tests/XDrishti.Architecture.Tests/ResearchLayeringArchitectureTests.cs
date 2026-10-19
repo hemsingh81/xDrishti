@@ -50,7 +50,7 @@ public sealed class ResearchLayeringArchitectureTests
     {
         var port = Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Abstractions.Research").GetTypes().Select(t => t.Name).Order().ToList();
 
-        port.ShouldBe(["IPreparedStrategy", "ISimulationEngine"]);
+        port.ShouldBe(["ICostSheetStore", "IPreparedStrategy", "ISimulationEngine"], "the store of the charge sheet (P3-03f) is the third port of the research family");
         ShouldHaveNone(Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Abstractions.Research").ShouldNot().HaveDependencyOnAny(EngineModules).GetResult());
         foreach (var type in typeof(XDrishti.Application.Abstractions.Research.ISimulationEngine).Assembly.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Application.Abstractions.Research"))
         {
@@ -165,7 +165,8 @@ public sealed class ResearchLayeringArchitectureTests
         adapter.IsSealed.ShouldBeTrue();
         adapter.GetInterfaces().ShouldContain(typeof(XDrishti.Application.Abstractions.Research.ISimulationEngine));
         adapter.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single().GetParameters().ShouldBeEmpty("stateless: nothing is injected, least of all a scoped service");
-        ShouldHaveNone(Types.InAssembly(Infrastructure).That().ResideInNamespace("XDrishti.Infrastructure.Research").ShouldNot().HaveDependencyOnAny(IoAndClock).GetResult());
+        // the namespace now also holds the database store of the charge sheet (P3-03f), which is I/O by design; the rule stays for everything else in it (CostSheetArchitectureTests pins the store itself)
+        ShouldHaveNone(Types.InAssembly(Infrastructure).That().ResideInNamespace("XDrishti.Infrastructure.Research").And().DoNotHaveName("CostSheetStore").ShouldNot().HaveDependencyOnAny(IoAndClock).GetResult());
         ClockAndAmbientUses(Infrastructure, adapter.FullName!).ShouldBeEmpty();
         AssemblyScan.MembersUsedBy(Infrastructure, adapter.FullName!).ShouldNotContain(c => c.Type == "System.TimeProvider");
         adapter.GetFields(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly).ShouldBeEmpty("no state");

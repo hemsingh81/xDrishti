@@ -14,8 +14,8 @@ namespace XDrishti.Simulation.Running;
 /// The two-stage simulator (spec P3-03a, ADR 0037): compiles every listed side of a strategy once, and for each instrument scans the 1-minute bars side by side with an <see cref="EntryScanner"/> and walks every candidate with
 /// the <see cref="TradeWalker"/>. The two stages share nothing but the entry candidate, which carries no exit, so the same entries can be replayed under every exit policy (P4).
 /// <para>
-/// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe below one day, entered at the close of the trigger bar, with the stop on the
-/// opposite end of the opening range (<c>or_opposite</c>, no buffer), exactly one <c>FIXED_RR</c> exit with one <c>rr</c> value, no overlay, no filter, no market context and no expiry dates. A swing side is held up to its
+/// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe up to one day, entered at the close of the trigger bar, with a stop that is a level
+/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one <c>FIXED_RR</c> exit with one <c>rr</c> value, no overlay, no filter, no market context and no expiry dates. A swing side is held up to its
 /// <c>max_hold_sessions</c> (the entry session counts as the first) and is gated to one open position per instrument and side (<see cref="PositionGate"/>). <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
 /// ignoring it: a result must be what it says it is. A side that does not compile makes <see cref="Create"/> return no simulator; a half strategy is never run.
 /// </para>
@@ -85,9 +85,9 @@ public sealed class Simulator
             }
         }
 
-        if (evaluationTimeframe >= Timeframe.D1)
+        if (evaluationTimeframe >= Timeframe.W1)
         {
-            problems.Add(Refusal("timeframes", SimulatorCodes.ScannerTimeframeUnsupported, "The simulator does not evaluate on " + evaluationTimeframe.ToCode() + ": a bar of a day or longer is always stale at the first minute of the next date (the daily evaluation is P3-03e)."));
+            problems.Add(Refusal("timeframes", SimulatorCodes.ScannerTimeframeUnsupported, "The simulator does not evaluate on " + evaluationTimeframe.ToCode() + ": the frame closes a 1D bar at the step of the 15:29 minute (a bar closed late by the first minute of the next date is stale and not evaluated), but a bar of a week or a month is not evaluated (ADR 0043)."));
         }
 
         var swing = definition.Style == Style.Swing;
@@ -243,17 +243,17 @@ public sealed class Simulator
         }
 
         var stop = side.Stop;
-        if (stop.Kind != StopKind.OrOpposite)
+        if (stop.Kind is not (StopKind.OrOpposite or StopKind.SwingLow or StopKind.SwingHigh or StopKind.BarLow or StopKind.BarHigh))
         {
-            problems.Add(Refusal(name + ".stop", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is not run yet: the simulator runs `or_opposite` with no buffer (the other kinds come with P3-05)."));
+            problems.Add(Refusal(name + ".stop", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is not run yet: the simulator runs a level (`or_opposite`, `swing_low`, `swing_high`, `bar_low`, `bar_high`) with no buffer (the other kinds come with P3-05)."));
         }
         else if (stop.BufferAtr > 0)
         {
-            problems.Add(Refusal(name + ".stop.buffer_atr", SimulatorCodes.UnsupportedStop, "A `buffer_atr` on the stop `or_opposite` is not run yet (P3-05)."));
+            problems.Add(Refusal(name + ".stop.buffer_atr", SimulatorCodes.UnsupportedStop, "A `buffer_atr` on the stop `" + StopName(stop.Kind) + "` is not run yet (P3-05)."));
         }
         else if (stop.Timeframe != side.EvaluationTimeframe)
         {
-            problems.Add(Refusal(name + ".stop.timeframe", SimulatorCodes.UnsupportedStop, "The stop `or_opposite` is read on " + stop.Timeframe.ToCode() + ", not on the evaluation timeframe " + side.EvaluationTimeframe.ToCode() + "; the simulator reads it on the evaluation timeframe (P3-05)."));
+            problems.Add(Refusal(name + ".stop.timeframe", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is read on " + stop.Timeframe.ToCode() + ", not on the evaluation timeframe " + side.EvaluationTimeframe.ToCode() + "; the simulator reads it on the evaluation timeframe (P3-05)."));
         }
 
         if (side.Exits.Count != 1 || side.Exits[0].Policy != ExitPolicy.FixedRr || !side.Exits[0].Values.TryGetValue("rr", out var rr) || rr.Count != 1)

@@ -41,6 +41,7 @@ using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Research;
+using XDrishti.Application.Research.CostSheets;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Research;
 
@@ -389,5 +390,9 @@ public static class DependencyInjection
     private static void AddResearch(this IServiceCollection services)
     {
         services.AddScoped<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, RunSimulationHandler>();
+        services.AddScoped<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>, BuildTradeCardsHandler>();
+        services.AddScoped<ICommandHandler<LoadCostSheetCommand, LoadedCostSheet>, LoadCostSheetHandler>();
+        services.AddScoped<IQueryHandler<ShowCostSheetQuery, Result<ShownCostSheet>>, ShowCostSheetHandler>();
+        services.AddScoped<IQueryHandler<CheckCostSheetQuery, Result<CostCheckReport>>, CheckCostSheetHandler>();
     }
 }

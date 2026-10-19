@@ -47,8 +47,8 @@ public sealed class RunSimulationDatabaseTests(ApiFactory factory) : DataTestBas
         return await handler.HandleAsync(new RunSimulationQuery(request), Ct);
     }
 
-    private static SimulationRequest Request(IReadOnlyList<Guid> ids, bool acknowledge = false, DateOnly? from = null, DateOnly? to = null) =>
-        new("ORB", null, "15m", from ?? D1, to ?? D3, ids, null, acknowledge, null, Exact);
+    private static SimulationRequest Request(IReadOnlyList<Guid> ids, bool acknowledge = false, DateOnly? from = null, DateOnly? to = null, CostChoice? costs = null) =>
+        new("ORB", null, "15m", from ?? D1, to ?? D3, ids, null, costs ?? CostChoice.Gross, acknowledge, null, Exact);
 
     /// <summary>Stores the bars through the real bar store; a file name records them as a loaded CSV file (what <c>ListCsvAdjustedThroughAsync</c> reads).</summary>
     private async Task LoadAsync(Guid id, IEnumerable<Bar> bars, BarSource source = BarSource.Dhan, string? csvFile = null)
@@ -282,7 +282,7 @@ public sealed class RunSimulationDatabaseTests(ApiFactory factory) : DataTestBas
         var c = await InstrumentAsync("SPLITCO", ReplayDays.Scaled(A(), 2.0, 1), tickPaise: null);
         await AddSplitAsync(c, D4);
         var basket = await CreateBasketAsync("Lab", a, b, c);
-        var request = new SimulationRequest("ORB", null, "15m", D1, D3, null, basket, false, null, Exact);
+        var request = new SimulationRequest("ORB", null, "15m", D1, D3, null, basket, CostChoice.Gross, false, null, Exact);
 
         var first = await RunAsync(request);
         var second = await RunAsync(request);
@@ -371,7 +371,7 @@ public sealed class RunSimulationDatabaseTests(ApiFactory factory) : DataTestBas
 
         foreach (var unreachable in new[] { archived, portfolio, Guid.CreateVersion7() })
         {
-            var result = await RunAsync(new SimulationRequest("ORB", null, "15m", D1, D3, null, unreachable, false, null, Exact));
+            var result = await RunAsync(new SimulationRequest("ORB", null, "15m", D1, D3, null, unreachable, CostChoice.Gross, false, null, Exact));
 
             result.Error.Code.ShouldBe(SimulationErrors.BasketNotFoundCode);
         }

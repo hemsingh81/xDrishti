@@ -38,8 +38,9 @@ internal static class Rep
         ReplayOptions? options = null,
         TickSpec? tick = null,
         SkipReason? preset = null,
-        string? detail = null) =>
-        new(id ?? Id, symbol, bars, factors ?? AdjustmentFactors.None, csvAdjustedThrough, calendar ?? DefaultCalendar, options ?? ReplayOptions.Default, from, to, preset == SkipReason.TickSizeInvalid ? null : tick ?? Sim.Tick, preset, detail);
+        string? detail = null,
+        CostContext? costs = null) =>
+        new(id ?? Id, symbol, bars, factors ?? AdjustmentFactors.None, csvAdjustedThrough, calendar ?? DefaultCalendar, options ?? ReplayOptions.Default, from, to, preset == SkipReason.TickSizeInvalid ? null : tick ?? Sim.Tick, preset, detail, costs);
 
     public static InstrumentReplay Replay(
         PreparedStrategy strategy,
@@ -53,9 +54,10 @@ internal static class Rep
         TickSpec? tick = null,
         SkipReason? preset = null,
         Guid? id = null,
-        string symbol = "TEST")
+        string symbol = "TEST",
+        CostContext? costs = null)
     {
-        var replay = InstrumentReplayer.Replay(strategy, Input(bars, from, to, id, symbol, factors, csvAdjustedThrough, calendar, options, tick, preset));
+        var replay = InstrumentReplayer.Replay(strategy, Input(bars, from, to, id, symbol, factors, csvAdjustedThrough, calendar, options, tick, preset, costs: costs));
         ReplayIdentities.ShouldHold(replay);   // the identities of criterion 12 hold on every replay of every fixture
         return replay;
     }

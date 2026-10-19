@@ -2,7 +2,7 @@ namespace XDrishti.Domain.Research;
 
 /// <summary>
 /// What the trade walker did, as plain sums (ADR 0037, decision D6; ADR 0038). A rule that never fires gives zero trades and zero losses and looks safe; these counters are how it is seen.
-/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the five exit counts (<c>ExitsStop + ExitsTarget + ExitsSquareOff + ExitsMaxHold + ExitsEndOfData</c>); ADR 0040, D10.
+/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the five exit counts (<c>ExitsStop + ExitsTarget + ExitsSquareOff + ExitsMaxHold + ExitsEndOfData</c>); ADR 0040, D10.
 /// <c>WalkOutcome.ToCounters()</c> (in <c>XDrishti.Simulation.Walking</c>) makes the counts of one walk; this type lives in Domain because the run record of P3-04 holds it.
 /// </summary>
 /// <param name="Candidates">Walks.</param>
@@ -32,6 +32,8 @@ namespace XDrishti.Domain.Research;
 /// <param name="OvernightTargetGaps">Target exits whose minute is the first that holds a trade on a date later than the entry date (a subset of <see cref="TargetGapExits"/>).</param>
 /// <param name="SessionsHeld">The sum of <see cref="SimTrade.SessionsHeld"/> over the trades.</param>
 /// <param name="SessionsUnseen">The sum of <see cref="SimTrade.SessionsUnseen"/> over the trades.</param>
+/// <param name="OvernightEntries">Trades filled on a later date than the one on which they were decided (ADR 0043, E8 and E9): at most <see cref="Trades"/>.</param>
+/// <param name="OrderPendingAtEnd">No-trade: see <see cref="NoTradeReason.OrderPendingAtEnd"/>; candidates whose order rests overnight when the list ends.</param>
 public sealed record WalkCounters(
     long Candidates,
     long Trades,
@@ -59,10 +61,12 @@ public sealed record WalkCounters(
     long OvernightStopGaps = 0,
     long OvernightTargetGaps = 0,
     long SessionsHeld = 0,
-    long SessionsUnseen = 0)
+    long SessionsUnseen = 0,
+    long OvernightEntries = 0,
+    long OrderPendingAtEnd = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
-    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>The field-by-field sum.</summary>
     public WalkCounters Add(WalkCounters other)
@@ -95,6 +99,8 @@ public sealed record WalkCounters(
             OvernightStopGaps + other.OvernightStopGaps,
             OvernightTargetGaps + other.OvernightTargetGaps,
             SessionsHeld + other.SessionsHeld,
-            SessionsUnseen + other.SessionsUnseen);
+            SessionsUnseen + other.SessionsUnseen,
+            OvernightEntries + other.OvernightEntries,
+            OrderPendingAtEnd + other.OrderPendingAtEnd);
     }
 }

@@ -31,14 +31,10 @@ internal sealed class RunSimulationHandler(
     ICorporateActionQueries actions,
     ITradingCalendar calendars,
     ISimulationEngine engine,
+    ICostSheetStore costSheets,
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>
 {
-    private static readonly DateOnly FirstDay = new(SimulationRequestChecks.FirstYear, 1, 1);
-
-    /// <summary>The last minute of the India day (bars start on whole minutes, so 23:59 is the last minute that can hold one).</summary>
-    private static readonly TimeSpan LastMinuteOfDay = new(23, 59, 0);
-
     public async ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -64,8 +60,15 @@ internal sealed class RunSimulationHandler(
             return Result.Failure<SimulationRun>(prepared.Error.Fields is { Count: > SimulationErrors.MaxStrategyProblems } fields ? SimulationErrors.StrategyInvalid(fields) : prepared.Error);
         }
 
-        // (4) only then the ports.
+        // (4) only then the ports: the charge sheet first (a gross choice reads nothing), then the rest.
         var started = time.GetTimestamp();
+        var costs = await ResolveCostsAsync(request, cancellationToken);
+        if (costs.IsFailure)
+        {
+            return Result.Failure<SimulationRun>(costs.Error);
+        }
+
+        var costContext = costs.Value;
         var universe = await ResolveUniverseAsync(request, cancellationToken);
         if (universe.IsFailure)
         {
@@ -73,11 +76,11 @@ internal sealed class RunSimulationHandler(
         }
 
         var targets = universe.Value;
-        SimulationLog.RunStarted(logger, request.StrategyId, targets.Label, targets.Ids.Count, request.From, request.To, prepared.Value.Warnings.Count);
+        SimulationLog.RunStarted(logger, request.StrategyId, targets.Label, targets.Ids.Count, request.From, request.To, prepared.Value.Warnings.Count, request.Costs is CostChoice.SheetChoice named ? named.SheetId : "gross");
         var calendar = await calendars.GetAsync(cancellationToken);
         var csvThrough = targets.Ids.Count == 0 ? new Dictionary<Guid, DateOnly>() : await actions.ListCsvAdjustedThroughAsync(targets.Ids, cancellationToken);
 
-        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default);
+        var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
         var replays = new List<InstrumentReplay>(targets.Ids.Count);
@@ -111,7 +114,8 @@ internal sealed class RunSimulationHandler(
             request.AcknowledgeCsvAdjusted,
             (fills.Value ?? FillRules.Default).ToCanonicalJson(),
             new UniverseRecord(targets.Kind, targets.BasketId, targets.BasketName, targets.Label, members),
-            calendar);
+            calendar,
+            costContext is null ? null : CostRecord.Of(costContext));
         var run = RunAssembler.Assemble(header, replays);
         var skipped = replays.Count(r => r.Record.Skipped is not null);
         var readMs = (long)readTime.TotalMilliseconds;
@@ -137,6 +141,42 @@ internal sealed class RunSimulationHandler(
 
         var rules = FillRules.Create(input.EntryLimitPercent, slippage.Value);
         return rules.IsFailure ? Result.Failure<FillRules?>(rules.Error) : Result.Success<FillRules?>(rules.Value);
+    }
+
+    /// <summary>
+    /// The cost context of a sheet choice (spec P3-03f, F2): one read of the store; absent is <c>simulation.cost_sheet_not_found</c>, a stored text that no longer parses passes through, a first schedule after the first day of the window is
+    /// <c>simulation.cost_sheet_not_effective</c>. A gross choice reads nothing and gives null.
+    /// </summary>
+    private async ValueTask<Result<CostContext?>> ResolveCostsAsync(SimulationRequest request, CancellationToken cancellationToken)
+    {
+        if (request.Costs is not CostChoice.SheetChoice choice)
+        {
+            return Result.Success<CostContext?>(null);
+        }
+
+        if (choice.SheetId.StartsWith(CostSheet.TestPrefix, StringComparison.Ordinal))
+        {
+            // a synthetic sheet is never stored, so it is never found, and the store is not asked
+            return Result.Failure<CostContext?>(SimulationErrors.CostSheetNotFound(choice.SheetId));
+        }
+
+        var sheet = await costSheets.FindAsync(choice.SheetId, cancellationToken);
+        if (sheet.IsFailure)
+        {
+            return Result.Failure<CostContext?>(sheet.Error.Kind == ErrorKind.NotFound ? SimulationErrors.CostSheetNotFound(choice.SheetId) : sheet.Error);
+        }
+
+        var first = sheet.Value.Schedules[0].EffectiveFrom;
+        if (first > request.From)
+        {
+            return Result.Failure<CostContext?>(SimulationErrors.CostSheetNotEffective(choice.SheetId, first, request.From));
+        }
+
+        var profile = string.Equals(choice.Profile, SizingProfile.Conservative.Name, StringComparison.Ordinal) ? SizingProfile.Conservative : SizingProfile.Standard;
+        var context = CostContext.Create(sheet.Value, profile, choice.Capital, choice.MaxCostR);
+        return context.IsFailure
+            ? Result.Failure<CostContext?>(SimulationErrors.Invalid([new FieldError("costs", context.Error.Message, null, context.Error.Code)]))
+            : Result.Success<CostContext?>(context.Value);
     }
 
     private async ValueTask<Result<Universe>> ResolveUniverseAsync(SimulationRequest request, CancellationToken cancellationToken)
@@ -177,7 +217,7 @@ internal sealed class RunSimulationHandler(
         }
 
         var request = context.Request;
-        var raw = await bars.ReadAsync(id, IndiaInstant(FirstDay, TimeSpan.Zero), IndiaInstant(request.To, LastMinuteOfDay), cancellationToken);
+        var raw = await bars.ReadAsync(id, SimulationBounds.From, SimulationBounds.Until(request.To), cancellationToken);
         var factors = await adjustments.GetAsync(id, cancellationToken);
 
         var tick = TickSpec.FromMasterPaise(instrument.TickSize);
@@ -201,7 +241,8 @@ internal sealed class RunSimulationHandler(
             request.To,
             tick.IsSuccess ? tick.Value : null,
             preset,
-            detail);
+            detail,
+            context.Costs);
     }
 
     /// <summary>The guard of ADR 0017 §5 in the run: an applied action that changes the bars read and falls on or before the date the loaded CSV files reach would adjust their prices a second time.</summary>
@@ -210,10 +251,6 @@ internal sealed class RunSimulationHandler(
         && through.ContainsKey(id)
         && factors.ActionsAfter(SessionClock.DateOf(raw[0].EpochSeconds)).Any(a => CsvAdjustment.AdjustsTwice(a.ExDate, through, id));
 
-    /// <summary>An India wall-clock time as an instant with offset 0: Npgsql writes a <c>DateTimeOffset</c> to <c>timestamptz</c> only with offset 0 and throws for +05:30.</summary>
-    private static DateTimeOffset IndiaInstant(DateOnly date, TimeSpan timeOfDay) =>
-        new DateTimeOffset(date.Year, date.Month, date.Day, timeOfDay.Hours, timeOfDay.Minutes, 0, IndiaTime.Offset).ToUniversalTime();
-
     private sealed record Universe(UniverseKind Kind, Guid? BasketId, string? BasketName, string Label, IReadOnlyList<Guid> Ids, IReadOnlyDictionary<Guid, BarsInstrument>? Known);
 
     private sealed record RunContext(
@@ -221,5 +258,6 @@ internal sealed class RunSimulationHandler(
         TradingCalendar Calendar,
         IReadOnlyDictionary<Guid, DateOnly> CsvThrough,
         Universe Targets,
-        ReplayOptions Options);
+        ReplayOptions Options,
+        CostContext? Costs);
 }

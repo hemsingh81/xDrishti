@@ -12,7 +12,7 @@ public static class SimulatorCodes
     /// <summary>An entry kind that needs an order across bars (<c>stop_above_high</c>, <c>limit_pullback</c>). Path <c>buy.entry</c>.</summary>
     public const string UnsupportedEntry = "simulation.unsupported_entry";
 
-    /// <summary>A stop kind other than <c>or_opposite</c>, an <c>or_opposite</c> with a buffer, or one read on another timeframe. Path <c>buy.stop</c> (or a field of it).</summary>
+    /// <summary>A stop kind that is not a level (<c>fixed_pct</c>, <c>atr_mult</c>), a level stop with a buffer, or one read on another timeframe. Path <c>buy.stop</c> (or a field of it).</summary>
     public const string UnsupportedStop = "simulation.unsupported_stop";
 
     /// <summary>Exits other than exactly one <c>FIXED_RR</c> with exactly one <c>rr</c> value, or any overlay. Path <c>buy.exits</c> or <c>buy.overlays[i]</c>.</summary>
@@ -27,7 +27,7 @@ public static class SimulatorCodes
     /// <summary>A side that reads the expiry dates. Path <c>buy</c>.</summary>
     public const string NeedsExpiryDays = "simulation.needs_expiry_days";
 
-    /// <summary>The evaluation timeframe is 1D or longer: the daily evaluation is not built yet (P3-03e). Path <c>timeframes</c>. The scanner returns the same code.</summary>
+    /// <summary>The evaluation timeframe is 1W or 1M: only 1D is evaluated from the daily bar (ADR 0043). Path <c>timeframes</c>. The scanner returns the same code.</summary>
     public const string ScannerTimeframeUnsupported = ScannerCodes.TimeframeUnsupported;
 
     /// <summary>Two equal epochs or a descending pair among the minutes of a run. Returned by <c>Run</c> before any step.</summary>

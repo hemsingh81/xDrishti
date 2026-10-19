@@ -70,8 +70,32 @@ public sealed record SwingHold
     /// <summary>The due minute of the session: the one that starts one minute before its end (15:29 for a regular session; a special session has its own end).</summary>
     internal int DueMinute(DateOnly session) => (Calendar ?? DefaultWeek).SessionOf(session)?.ToMinute - 1 ?? SessionClock.CloseMinute - 1;
 
+    /// <summary>The minute of the day at which the session ends (<c>ToMinute</c>: 15:30 for a regular session and for a date the calendar does not know).</summary>
+    internal int SessionEndMinute(DateOnly session) => (Calendar ?? DefaultWeek).SessionOf(session)?.ToMinute ?? SessionClock.CloseMinute;
+
+    /// <summary>The instant the session opens (<c>FromMinute</c>, 09:15 for a regular session): the origin of the five minutes in which an order resting overnight may fill (E9).</summary>
+    internal long SessionOpen(DateOnly session) => EpochOf(session) + (((Calendar ?? DefaultWeek).SessionOf(session)?.FromMinute ?? SessionClock.OpenMinute) * 60L);
+
+    /// <summary>The fill session of an order placed on <paramref name="decisionDate"/> that rests overnight (E9): the next trading day after it by the calendar (the next weekday without one). No trading day within 30 days is <c>simulation.rules_invalid</c>.</summary>
+    internal Result<DateOnly> NextSession(DateOnly decisionDate)
+    {
+        var calendar = Calendar ?? DefaultWeek;
+        for (var ahead = 1; ahead <= SearchDays; ahead++)
+        {
+            var candidate = decisionDate.AddDays(ahead);
+            if (calendar.IsTradingDay(candidate))
+            {
+                return Result.Success(candidate);
+            }
+        }
+
+        return Result.Failure<DateOnly>(Error.Validation(SimulationErrors.RulesInvalidCode, "No trading day was found within " + SearchDays + " days after " + decisionDate.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + " in the calendar."));
+    }
+
+    private static long EpochOf(DateOnly date) => new DateTimeOffset(date.Year, date.Month, date.Day, 0, 0, 0, IndiaOffset).ToUnixTimeSeconds();
+
     /// <summary>The instant the session ends (15:30 India time for a regular session): the hold end of a position that was due in it but whose due minute held no trade (D11).</summary>
-    internal long SessionEnd(DateOnly session) => new DateTimeOffset(session.Year, session.Month, session.Day, 0, 0, 0, IndiaOffset).ToUnixTimeSeconds() + ((DueMinute(session) + 1) * 60L);
+    internal long SessionEnd(DateOnly session) => EpochOf(session) + ((DueMinute(session) + 1) * 60L);
 
     /// <summary><c>1 + trading days after the entry date up to the exit date</c>: the sessions from the entry session to the session of the exit, both included.</summary>
     internal int SessionsBetween(DateOnly entryDate, DateOnly exitDate) => 1 + (Calendar ?? DefaultWeek).TradingDaysBetween(entryDate, exitDate);

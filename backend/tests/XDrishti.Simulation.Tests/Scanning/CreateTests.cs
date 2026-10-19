@@ -35,14 +35,14 @@ public sealed class CreateTests
     }
 
     [Fact]
-    public void A_daily_evaluation_is_refused_by_name()
+    public void A_daily_evaluation_is_accepted()
     {
         var created = EntryScanner.Create(Scan.Compile(TestStrategies.Swing(Timeframe.D1), Side.Buy, Timeframe.D1), Scan.Instrument);
 
-        created.Error.Code.ShouldBe("simulation.scanner_timeframe_unsupported");
+        created.IsSuccess.ShouldBeTrue(created.IsFailure ? created.Error.Code : string.Empty);
     }
 
-    /// <summary>The guard of the scanner refuses every timeframe of a day or longer (<c>&gt;= D1</c>); the compiler already refuses a weekly or monthly evaluation before a side exists, so the guard is defence in depth and this is the proof of the first line.</summary>
+    /// <summary>The guard of the scanner refuses every timeframe of a week or longer (<c>&gt;= W1</c>); the compiler already refuses a weekly or monthly evaluation before a side exists, so the guard is defence in depth and this is the proof of the first line.</summary>
     [Theory]
     [InlineData(Timeframe.W1)]
     [InlineData(Timeframe.Mo1)]

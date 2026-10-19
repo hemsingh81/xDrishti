@@ -109,6 +109,7 @@ public static class DependencyInjection
         services.AddInstrumentMaster(configuration);
         services.AddMarketData(configuration);
         services.AddPortfolio(configuration);
+        services.AddScoped<ICostSheetStore, CostSheetStore>(); // the owner's charge sheets over platform.app_settings (spec P3-03f)
         services.AddSingleton<ISimulationEngine, SimulationEngineAdapter>(); // the simulation library behind its port (ADR 0039): stateless, no I/O
 
         services.AddHealthChecks()

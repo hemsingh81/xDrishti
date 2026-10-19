@@ -35,6 +35,13 @@ public sealed class SimulationEngineAdapterTests
     }
 
     [Fact]
+    public void The_built_ins_are_the_catalog_of_the_library()
+    {
+        Engine.BuiltIns.ShouldBeSameAs(BuiltInStrategies.Catalog);
+        Engine.BuiltIns.Select(b => b.Id).ShouldBe(BuiltInStrategies.Ids);
+    }
+
+    [Fact]
     public void A_built_in_id_and_its_parameters_give_the_record_and_the_canonical_json_of_the_replay()
     {
         var result = Engine.Prepare("ORB", Params(("or_min", 30), ("rr", 3.0)), Timeframe.M15, null);

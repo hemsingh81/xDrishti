@@ -17,6 +17,8 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
 {
     public string EngineVersion => SimulationEngine.Version;
 
+    public IReadOnlyList<BuiltInStrategyInfo> BuiltIns => BuiltInStrategies.Catalog;
+
     public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills)
     {
         ArgumentNullException.ThrowIfNull(strategyId);

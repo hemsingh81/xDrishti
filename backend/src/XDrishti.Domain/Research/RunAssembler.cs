@@ -38,6 +38,7 @@ public static class RunAssembler
             }
         }
 
+        RequireConsistentCosts(header.Costs, instruments);
         var records = instruments.Select(i => i.Record).ToList().AsReadOnly();
         var exceptions = CalendarExceptionsOf(header, records);
         var key = CanonicalText.Sha256Hex(KeyText(header, records, exceptions));
@@ -57,12 +58,13 @@ public static class RunAssembler
             records,
             Merge(instruments, r => r.Trades, baskets),
             Merge(instruments, r => r.OpenAtEnd, baskets),
-            TotalsOf(records));
+            TotalsOf(records),
+            header.Costs);
     }
 
     /// <summary>
     /// The text whose SHA-256 is the run key: UTF-8 lines, each ending in <c>\n</c>: <c>xd-run &lt;schema&gt;</c>, <c>engine=</c>, <c>strategy=</c> (the definition hash), <c>params=</c>, <c>timeframe=</c>, <c>window=</c>, <c>options=</c>, <c>ack=</c>,
-    /// <c>fills=</c> (the canonical JSON), <c>universe=</c> (the label), one <c>i=</c> per instrument in run order, and <c>cal=</c>. An <c>i=</c> line is <c>id|bars hash or -|skip reason or -|ex-date:kind:numerator:denominator,…|tick or -|1 if the tick is the fallback else 0</c>.
+    /// <c>fills=</c> (the canonical JSON), <c>costs=</c> (<c>none</c>, or <c>sheet id|rates sha256|capital|profile name|risk %|max capital %|max cost R</c>), <c>universe=</c> (the label), one <c>i=</c> per instrument in run order, and <c>cal=</c>. An <c>i=</c> line is <c>id|bars hash or -|skip reason or -|ex-date:kind:numerator:denominator,…|tick or -|1 if the tick is the fallback else 0</c>.
     /// Numbers are written by <see cref="CanonicalText"/>, so the text does not depend on the culture, on the scale of the tick or on the sign of a zero.
     /// </summary>
     public static string KeyText(RunHeader header, IReadOnlyList<InstrumentRun> instruments, IReadOnlyList<CalendarExceptionDay> calendarExceptions)
@@ -80,6 +82,7 @@ public static class RunAssembler
         Line(text, "options", CanonicalText.Number(header.Options.MinSessionCompleteness) + "," + CanonicalText.Number(header.Options.DiscontinuityThreshold));
         Line(text, "ack", header.AcknowledgeCsvAdjusted ? "1" : "0");
         Line(text, "fills", header.Fills);
+        Line(text, "costs", CostsLine(header.Costs));
         Line(text, "universe", header.Universe.Label);
         foreach (var instrument in instruments)
         {
@@ -93,6 +96,43 @@ public static class RunAssembler
 
         Line(text, "cal", string.Join(',', calendarExceptions.Select(e => Date(e.Date) + ":" + (e.IsHoliday ? "holiday" : CanonicalText.Number(e.FromMinute) + "-" + CanonicalText.Number(e.ToMinute)))));
         return text.ToString();
+    }
+
+    /// <summary>
+    /// The two places that say what a run was costed with, the replay input and the header, must agree: with no cost record every trade is gross; with one every trade carries a costing of that sheet. A run record that says both
+    /// would have a key that does not describe its trades.
+    /// </summary>
+    private static void RequireConsistentCosts(CostRecord? costs, IReadOnlyList<InstrumentReplay> instruments)
+    {
+        foreach (var trade in instruments.SelectMany(i => i.Trades.Concat(i.OpenAtEnd)))
+        {
+            var costed = trade.Costing is not null || trade.Costs == CostBasis.Charged;
+            if (costs is null && costed)
+            {
+                throw new ArgumentException("A trade is costed but the header has no cost record.", nameof(instruments));
+            }
+
+            if (costs is not null && (trade.Costing is null || trade.Costs != CostBasis.Charged || trade.Costing.SheetId != costs.SheetId))
+            {
+                throw new ArgumentException("A trade is not costed with the sheet of the header's cost record.", nameof(instruments));
+            }
+        }
+    }
+
+    private static string CostsLine(CostRecord? costs) => costs is null
+        ? "none"
+        : Checked(costs).SheetId + "|" + costs.RatesSha256 + "|" + CanonicalText.Number(costs.Capital) + "|" + costs.Profile.Name + "|" + CanonicalText.Number(costs.Profile.RiskPerTradePct) + "|"
+        + CanonicalText.Number(costs.Profile.MaxCapitalPerTradePct) + "|" + CanonicalText.Number(costs.MaxCostR);
+
+    /// <summary>The record as the key writes it: an id that is not of the pattern or a hash that is not 64 hex characters would put a separator or a line feed into the key text.</summary>
+    private static CostRecord Checked(CostRecord costs)
+    {
+        if (!CostSheet.IsValidId(costs.SheetId) || costs.RatesSha256.Length != 64 || !costs.RatesSha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f') || costs.Profile is null)
+        {
+            throw new ArgumentException("The cost record has a sheet id or a rates hash that cannot be written into the run key.", nameof(costs));
+        }
+
+        return costs;
     }
 
     private static void Line(StringBuilder text, string name, string value) => text.Append(name).Append('=').Append(value).Append('\n');

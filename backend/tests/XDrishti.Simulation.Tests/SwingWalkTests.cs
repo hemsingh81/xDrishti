@@ -35,7 +35,7 @@ public sealed class SwingWalkTests
         Q(trade.MfeR).ShouldBe(want.Mfe, name + " MFE");
         (trade.SessionsHeld, trade.SessionsUnseen).ShouldBe((want.Held, want.Unseen), name);
         outcome.BarsExamined.ShouldBe(want.Examined, name + " BarsExamined");
-        trade.SchemaVersion.ShouldBe(3, name);
+        trade.SchemaVersion.ShouldBe(4, name);
         trade.Fills.ShouldBe(FillBasis.Modelled, name);
         Q(trade.EntryPrice).ShouldBe(100.00m, name);
         Q(trade.EntryFilledPrice).ShouldBe(100.10m, name);
@@ -269,9 +269,9 @@ public sealed class SwingWalkTests
     }
 
     [Fact]
-    public void A_decision_at_the_close_of_the_session_is_a_no_fill_bar_in_a_swing_walk_too()
+    public void A_decision_at_the_close_of_the_session_places_an_order_for_the_next_session_in_a_swing_walk()
     {
-        // 15:30: the next minute is on another date (D1, P3-03e's overnight entry order is not built here).
+        // 15:30: the order rests overnight and fills at the next session's open (E8, E9 of ADR 0043; the rows O are in OvernightEntryTests).
         var hand = SwingHand.A("close-decision", 3).Flat(Tue);
         var bars = hand.Bars;
         var own = Array.FindIndex([.. bars], b => b.EpochSeconds == Day.Epoch(Mon, Day.Minute("15:29")));
@@ -279,8 +279,10 @@ public sealed class SwingWalkTests
 
         var outcome = TradeWalker.Walk(candidate, bars, hand.Rules(FillRules.Default)).Value;
 
+        // Tuesday opens at Monday's close 100.20, above the limit 100.10 of the trigger close 100.00 and never back to it: the order was for Tuesday's open (a counted miss), not a NoFillBar.
         outcome.Trade.ShouldBeNull();
-        outcome.NoTrade.ShouldBe(NoTradeReason.NoFillBar);
+        outcome.NoTrade.ShouldBe(NoTradeReason.LimitNotReached);
+        outcome.BarsExamined.ShouldBe(1);
     }
 
     [Fact]

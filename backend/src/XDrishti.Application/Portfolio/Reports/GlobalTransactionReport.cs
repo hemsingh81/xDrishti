@@ -8,7 +8,11 @@ namespace XDrishti.Application.Portfolio.Reports;
 /// A row of the global transaction report: the bill's number, day and scrip, and what was bought and sold in it with the sum of the seven charges (brokerage, GST, STT, SEBI fees, stamp duty, transaction charges, other charges; a refund is a negative part).
 /// A row can have both a buy and a sell quantity (a same-day round trip).
 /// </summary>
-internal sealed record GtrRow(int Line, DateOnly Date, string Name, string Exchange, string BillNo, long BuyQty, decimal BuyValue, long SellQty, decimal SellValue, decimal Charges);
+/// <remarks>The last member <c>Lines</c> holds the seven charge cells by column as read (spec P3-03f, F5; a blank cell is 0), null for a row built by hand; <c>Charges</c> stays the rounded sum.</remarks>
+internal sealed record GtrRow(int Line, DateOnly Date, string Name, string Exchange, string BillNo, long BuyQty, decimal BuyValue, long SellQty, decimal SellValue, decimal Charges, GtrLines? Lines = null);
+
+/// <summary>The seven charge cells of a bill row as the report shows them (a refund is negative, a blank cell is 0), in the report's column order (spec P3-03f, F5). The bill check of the charge sheet reads them line by line.</summary>
+internal sealed record GtrLines(decimal Brokerage, decimal Gst, decimal Stt, decimal SebiFees, decimal StampDuty, decimal TxnCharges, decimal OtherCharges);
 
 /// <summary>What the reader made of a global transaction report: the data rows, the rows repeated in the file, the bad rows, the client code (only to be compared, never stored), the period and the report's own total charges.</summary>
 internal sealed record GtrFile(
@@ -204,9 +208,10 @@ internal static class GlobalTransactionReader
         }
 
         var total = 0m;
-        foreach (var index in charges)
+        var cells = new decimal[charges.Length];
+        for (var c = 0; c < charges.Length; c++)
         {
-            var text = row.At(index);
+            var text = row.At(charges[c]);
             if (string.IsNullOrWhiteSpace(text))
             {
                 continue;
@@ -218,6 +223,7 @@ internal static class GlobalTransactionReader
                 return null;
             }
 
+            cells[c] = part;
             total += part;
         }
 
@@ -228,7 +234,8 @@ internal static class GlobalTransactionReader
             return null;
         }
 
-        return new GtrRow(row.Line, day, scrip, ReportText.Clean(row.At(exchange), 16).ToUpperInvariant(), billNo, bought, buy, sold, sell, total);
+        return new GtrRow(row.Line, day, scrip, ReportText.Clean(row.At(exchange), 16).ToUpperInvariant(), billNo, bought, buy, sold, sell, total,
+            new GtrLines(cells[0], cells[1], cells[2], cells[3], cells[4], cells[5], cells[6]));
     }
 
     /// <summary>The problem with a leg (a side of the bill): a quantity needs a value above 0 whose price can be kept, a value needs a quantity. Null when it is fine.</summary>

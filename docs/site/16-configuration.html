@@ -265,13 +265,27 @@ exits:                             # the strategy model (P3-02b) checks the para
   per_trade_fit: { scale_by_atr: true, snap_to_structure: true, obstacle_check: true,
                    late_entry_target_reduction: { after: &quot;13:30&quot;, factor: 0.7 } }
 
-costs:                             # fill from your broker's current charge sheet
-  brokerage: { intraday_pct: 0.03, intraday_max: 20, delivery: 0 }
-  stt_ctt: { eq_intraday_sell_pct: null, eq_delivery_pct: null, fut_sell_pct: null }
-  exchange_txn_pct: null
-  gst_pct: 18
-  stamp_duty_buy_pct: null
-  sebi_fee_per_cr: null
+costs:                             # the broker's charge sheet: effective-dated schedules, every rate present (a zero is written 0, never null); built in P3-03c (ADR 0042); stored since P3-03f (ADR 0044) as one row of `platform.app_settings`, key `research.cost_sheet.&lt;id&gt;` (a new set of rates is a new id), loaded with `scripts/cost-sheet.sh load &lt;file.json&gt;` (`show`, `check` against your original report files; `--replace` overwrites an id), and chosen by every run: `--gross` or `--costs &lt;id&gt; [--capital] [--profile] [--max-cost-r]`
+  id: &quot;?&quot;                          # lower case [a-z0-9][a-z0-9._-]{0,39}; an id starting &quot;test-&quot; is a synthetic sheet for tests and is never stored
+  label: &quot;?&quot;
+  source: &quot;? where you read the figures, and when&quot;
+  checked: &quot;?&quot;                     # leave out until the sheet has been checked against your bills; a run says &quot;not checked against bills&quot; while it is absent
+  schedules:                       # 1 to 12, strictly ascending by effective_from; the rates of a date are those of the last schedule on or before it
+    - effective_from: &quot;?&quot;          # yyyy-MM-dd, 2000 to 2099
+      gst_pct: 18                  # percent of brokerage + exchange + SEBI of the leg
+      rounding: half_away_from_zero  # half_away_from_zero | half_even | down; each line is rounded to the paisa once
+      intraday_equity:             # the same ten fields for delivery_equity; percents are percents (0.03 is 0.03 %)
+        brokerage_pct: 0.03        # doc 16 value (intraday_pct); current? UNVERIFIED
+        brokerage_cap: 20          # rupees per order (intraday_max); 0 means no brokerage and then the percent and the minimum must be 0
+        brokerage_min: 0           # rupees per order; 0 means none
+        stt_buy_pct: &quot;?&quot;           # was stt_ctt.eq_*: which side pays is the sheet's
+        stt_sell_pct: &quot;?&quot;
+        exchange_txn_pct: &quot;?&quot;
+        sebi_per_crore: &quot;?&quot;        # rupees per 1,00,00,000 of turnover
+        stamp_buy_pct: &quot;?&quot;
+        other_pct: 0               # the &quot;Oth. Charges&quot; column of a bill
+        dp_charge_per_sell: 0      # rupees per delivery sale (a flat figure; the depository's own lines vary)
+      delivery_equity: { brokerage_pct: 0, brokerage_cap: 0, brokerage_min: 0, stt_buy_pct: &quot;?&quot;, stt_sell_pct: &quot;?&quot;, exchange_txn_pct: &quot;?&quot;, sebi_per_crore: &quot;?&quot;, stamp_buy_pct: &quot;?&quot;, other_pct: 0, dp_charge_per_sell: &quot;?&quot; }   # delivery brokerage 0 is the doc 16 value
   slippage: { ticks: 1, bar_range_frac: 0.05, stop_exit_extra_ticks: 2, gap_fill: at_open }   # built in P3-03b (ADR 0038): the code defaults of SlippageConfig, stored with every run as canonical JSON; reading them from the configuration store is later
 
 learning:
@@ -602,7 +616,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-18 19:52</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-18 23:30</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

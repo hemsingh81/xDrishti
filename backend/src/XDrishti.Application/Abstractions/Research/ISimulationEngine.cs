@@ -17,6 +17,9 @@ public interface ISimulationEngine
     /// <summary>The version of the replay rules (<c>SimulationEngine.Version</c>), written in every run record and run key.</summary>
     string EngineVersion { get; }
 
+    /// <summary>The built-in strategies a run can name, with their timeframes and parameters (spec P3-04b2, D3). When stored strategies exist (P3-02d) this list becomes their seed.</summary>
+    IReadOnlyList<BuiltInStrategyInfo> BuiltIns { get; }
+
     /// <summary>
     /// Builds and compiles the strategy. A failure is <c>simulation.strategy_invalid</c> whose fields carry the path (<see cref="FieldError.Field"/>) and the code (<see cref="FieldError.Code"/>) of each problem: an unknown id or parameter,
     /// a definition the compiler refuses, a plan that reads a market context or the expiry days, what the simulator refuses by name.

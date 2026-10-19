@@ -10,6 +10,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
+using XDrishti.SimExport.Cards;
 using XDrishti.Tests.Shared;
 
 namespace XDrishti.Api.IntegrationTests.Simulate;
@@ -51,6 +52,47 @@ public sealed class ExportBenchmarks(ApiFactory factory) : DataTestBase(factory)
         }
     }
 
+    /// <summary>The cards pass of P3-04c (<c>--cards 200</c>): the selection, the second read of the instruments that have a card, and the rendering of every card; prints the figures, asserts nothing.</summary>
+    private static async Task CardsPassAsync(IServiceProvider provider, SimulationRun record, StringBuilder report)
+    {
+        var watch = Stopwatch.StartNew();
+        var choices = CardSelection.Choose(record, 200);
+        var select = watch.Elapsed;
+
+        watch.Restart();
+        var handler = provider.GetRequiredService<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>>();
+        var cards = await handler.HandleAsync(new BuildTradeCardsQuery(record, [.. choices.Select(c => c.Trade.Trade.Key)]), Ct);
+        var read = watch.Elapsed;
+        cards.IsSuccess.ShouldBeTrue();
+
+        watch.Restart();
+        var labels = RunLabels.Of(record, FillRules.Default);
+        long bytes = 0;
+        long largest = 0;
+        foreach (var card in cards.Value)
+        {
+            var sink = new System.Buffers.ArrayBufferWriter<byte>();
+            TradeCardHtml.Write(sink, card, record, labels);
+            bytes += sink.WrittenCount;
+            largest = Math.Max(largest, sink.WrittenCount);
+        }
+
+        var index = new System.Buffers.ArrayBufferWriter<byte>();
+        IndexHtml.Write(index, record, labels, 200, choices);
+        report.AppendLine(string.Format(
+            CultureInfo.InvariantCulture,
+            "cards pass (--cards 200): {0} cards of {1} trades from {2} instruments; select {3:F3} s, second read {4:F2} s, render {5:F2} s; {6:N0} bytes of cards (largest {7:N0}) and {8:N0} bytes of index",
+            choices.Count,
+            record.Trades.Count,
+            choices.Select(c => c.Trade.Trade.InstrumentId).Distinct().Count(),
+            select.TotalSeconds,
+            read.TotalSeconds,
+            watch.Elapsed.TotalSeconds,
+            bytes,
+            largest,
+            index.WrittenCount));
+    }
+
     [Fact(Explicit = true)]
     public async Task Export_phases_for_seeded_universe()
     {
@@ -79,13 +121,14 @@ public sealed class ExportBenchmarks(ApiFactory factory) : DataTestBase(factory)
         using var run = Factory.Services.CreateScope();
         var handler = run.ServiceProvider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
         var clock = Stopwatch.StartNew();
-        var result = await handler.HandleAsync(new RunSimulationQuery(new SimulationRequest("ORB", null, "15m", Start, new DateOnly(2025, 12, 31), ids, null)), Ct);
+        var result = await handler.HandleAsync(new RunSimulationQuery(new SimulationRequest("ORB", null, "15m", Start, new DateOnly(2025, 12, 31), ids, null, CostChoice.Gross)), Ct);
         var simulate = clock.Elapsed;
         result.IsSuccess.ShouldBeTrue();
 
         var report = new StringBuilder();
         report.AppendLine(string.Format(CultureInfo.InvariantCulture, "seeded universe: {0} instruments of {1} sessions, {2:N0} trades, {3:N0} open at end; simulation {4:F1} s", Instruments, Sessions, result.Value.Trades.Count, result.Value.OpenAtEnd.Count, simulate.TotalSeconds));
         await ExportReport.WriteAsync(result.Value, report, Ct);
+        await CardsPassAsync(run.ServiceProvider, result.Value, report);
         TestContext.Current.TestOutputHelper?.WriteLine(report.ToString());
     }
 }

@@ -5,7 +5,7 @@ public static class FillLimits
 {
     public static IReadOnlyList<FillLimit> NotModelled { get; } =
     [
-        new("auction_open", "The first 1-minute open of the data can be the auction price. A position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level), and a repaired opening bar has a wider range, so its slippage is larger, never smaller."),
+        new("auction_open", "The first 1-minute open of the data can be the auction price. A daily strategy enters there, and a position held overnight that gaps through a stop or a target is filled in that minute (a stop at the open, a target at its level); a repaired opening bar has a wider range, so its slippage is larger, never smaller."),
         new("circuit_locks", "Locked circuits are not modelled: there is no price-band data, so a fill at a locked price is not refused."),
         new("touch_is_fill", "A resting limit fills when the price touches it; real queues fill less often, so a fill on a target is optimistic, and the base slippage charged on it is only an approximation of what a resting order costs."),
         new("no_queue_or_impact", "There is no queue position, partial fill, market impact of the order size or liquidity cap."),
