@@ -1,4 +1,5 @@
 import { Alert, Button, Stack, Typography } from '@mui/material';
+import { unshownFieldErrorsText } from '@/shared/lib/fieldErrors';
 import { useRef, useState, type SyntheticEvent } from 'react';
 import type { CorporateAction } from '@/shared/api';
 import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/shared/ui/dialog';
@@ -44,7 +45,7 @@ export function ActionDialog({ action, onClose }: ActionDialogProps) {
   const adjustedTwice = mutation.isError && isCsvAlreadyAdjusted(mutation.error);
   const serverErrors = fieldErrors(mutation.error);
   const errors = { ...serverErrors, ...clientErrors };
-  const others = Object.entries(serverErrors).filter(([field]) => !shownFields.includes(field));
+  const otherErrors = unshownFieldErrorsText(serverErrors, shownFields);
   const problem =
     mutation.isError && !adjustedTwice && Object.keys(serverErrors).length === 0
       ? actionErrorText(mutation.error, 'The action could not be saved.')
@@ -95,9 +96,7 @@ export function ActionDialog({ action, onClose }: ActionDialogProps) {
         <AppDialogBody>
           <Stack spacing={2.5}>
             {problem && <Alert severity="error">{problem}</Alert>}
-            {others.length > 0 && (
-              <Alert severity="error">{others.map(([field, message]) => `${field}: ${message}`).join(' ')}</Alert>
-            )}
+            {otherErrors && <Alert severity="error">{otherErrors}</Alert>}
             {action ? (
               <Typography>
                 <strong>{action.symbol}</strong> {action.name}

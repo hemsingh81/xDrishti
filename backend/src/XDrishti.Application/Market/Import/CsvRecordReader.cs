@@ -55,7 +55,6 @@ internal sealed class CsvRecordReader(TextReader reader)
             }
 
             Append(chunk[..end]);
-            any = true;
             var terminator = chunk[end];
             _position += end + 1;
             if (terminator == '\r')

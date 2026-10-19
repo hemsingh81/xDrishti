@@ -20,8 +20,6 @@ export const reportKinds: readonly DetectedKind[] = [
   'pnl_report',
 ];
 
-export const isReportKind = (kind: DetectedKind): boolean => reportKinds.includes(kind);
-
 /** What the trade import can be told (a dividend list; a tradebook with no side column; a Dhan report). */
 export const tradeImportKinds: readonly DetectedKind[] = ['dividends', 'tradebook_without_sides', ...reportKinds];
 /** What the dividend import can be told (a tradebook; one with no side column; a statement of amounts; a Dhan report). */

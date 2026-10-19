@@ -1,4 +1,5 @@
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import { RetryAlert } from './RetryAlert';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrowsOutlined';
 import DonutSmallIcon from '@mui/icons-material/DonutSmallOutlined';
 import PaidIcon from '@mui/icons-material/PaidOutlined';
@@ -8,7 +9,7 @@ import ScaleIcon from '@mui/icons-material/ScaleOutlined';
 import TodayIcon from '@mui/icons-material/TodayOutlined';
 import TrendingDownIcon from '@mui/icons-material/TrendingDownOutlined';
 import TrendingUpIcon from '@mui/icons-material/TrendingUpOutlined';
-import { Alert, Box, Button } from '@mui/material';
+import { Box } from '@mui/material';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { HoldingsSummary, PortfolioHistory } from '@/shared/api';
 import { formatDate, formatInr, formatIstDayMonth, formatNumber } from '@/shared/lib/format';
@@ -16,7 +17,6 @@ import { useWallClock } from '@/shared/lib/useWallClock';
 import { LoadingState, StatTile } from '@/shared/ui';
 import { alphaHint, benchmarkXirrHint } from '../lib/benchmark';
 import { drawdownTileHint } from '../lib/drawdown';
-import { problemText } from '../lib/errors';
 import { noDayChangeReason, xirrOf } from '../lib/figures';
 import { isEarlierDay } from '../lib/prices';
 import { DayChangeAmount, Pnl, PnlPercent, Xirr } from './Figures';
@@ -166,23 +166,12 @@ export function SummaryTiles({ query, history, live, income }: SummaryTilesProps
   if (query.isPending) return <LoadingState label="Loading totals" />;
   if (query.isError) {
     return (
-      <Alert
-        severity="error"
+      <RetryAlert
+        error={query.error}
+        fallback="The totals could not be loaded."
+        onRetry={query.refetch}
         sx={{ mb: 2 }}
-        action={
-          <Button
-            color="inherit"
-            size="small"
-            onClick={() => {
-              void query.refetch();
-            }}
-          >
-            Retry
-          </Button>
-        }
-      >
-        {problemText(query.error, 'The totals could not be loaded.')}
-      </Alert>
+      />
     );
   }
   return <Tiles data={live ?? query.data} history={history} income={income} />;

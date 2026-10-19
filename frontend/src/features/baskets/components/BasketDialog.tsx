@@ -1,4 +1,5 @@
 import { Alert, Button, Stack, TextField } from '@mui/material';
+import { unshownFieldErrorsText } from '@/shared/lib/fieldErrors';
 import { useRef, useState, type SyntheticEvent } from 'react';
 import type { Basket } from '@/shared/api';
 import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/shared/ui/dialog';
@@ -35,7 +36,7 @@ export function BasketDialog({ basket, onClose, onSaved }: BasketDialogProps) {
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const serverErrors = basketFieldErrors(save.error);
   const errors = { ...serverErrors, ...clientErrors };
-  const others = Object.entries(serverErrors).filter(([field]) => !shownFields.includes(field));
+  const otherErrors = unshownFieldErrorsText(serverErrors, shownFields);
 
   const change = (patch: Partial<BasketForm>) => {
     setForm((previous) => ({ ...previous, ...patch }));
@@ -71,9 +72,7 @@ export function BasketDialog({ basket, onClose, onSaved }: BasketDialogProps) {
       <AppDialogBody>
         <Stack spacing={2.5}>
           {problem && <Alert severity="error">{problem}</Alert>}
-          {others.length > 0 && (
-            <Alert severity="error">{others.map(([field, message]) => `${field}: ${message}`).join(' ')}</Alert>
-          )}
+          {otherErrors && <Alert severity="error">{otherErrors}</Alert>}
           <TextField
             required
             fullWidth

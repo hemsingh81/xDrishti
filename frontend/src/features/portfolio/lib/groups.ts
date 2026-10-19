@@ -8,9 +8,6 @@ export const groupingLabels: Record<Grouping, string> = {
   basket: 'Basket',
 };
 
-/** The reserved key of "Unclassified" (sector) and "No basket": it cannot be a real sector name or id. */
-export const noGroupKey = '~none';
-
 /**
  * The reserved key of the extra last row "Unallocated" (ADR 0026): the dividends and costs that belong to no group. It is not
  * a group of holdings: no holdings to open, no price to move, not a slice of a chart.

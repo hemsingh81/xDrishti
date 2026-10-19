@@ -98,8 +98,6 @@ export function matchTitle(match: DividendMatch): string | null {
   return match.symbol === null ? match.name : bare(match.symbol);
 }
 
-export const matchesHolding = (match: DividendMatch): boolean => match.holdingId !== null;
-
 /** Whether the row is an open question the owner may answer (a name nothing fits, or more than one holding fits). */
 export const isOpen = (item: DividendPreviewItem): boolean =>
   item.status === 'needs_match' || item.status === 'ambiguous';
