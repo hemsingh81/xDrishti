@@ -76,6 +76,9 @@ P3-08 writes a second implementation of the walk and the position gate from the 
 ### The comparison set and the dry-read table
 The comparison set is the one in D4 of the spec and [the table](../research/p3-08-field-definitions.md); with this ADR no row has the status `NONE`. The build repeats the pass by reflection (a field added to `SimTrade` or `WalkCounters` without a row fails a test).
 
+### The leak properties of P3-08b (note, 2026-10-19)
+The added leak and invariance properties (scale, date shift, instrument order, state leaks between instruments, daily truncation through `Simulator.Run`) are tests in `XDrishti.Simulation.Tests/Leaks`; they change no rule, no engine behaviour and no schema, so this note is the whole record. Two readings are fixed here so a later reader does not take them for gaps: **the run key follows the run order** (P3-04: one `i=` line per instrument in run order), so a permuted universe is another run with another key, and the instrument-order property asserts that the rest of the key text and the set of `i=` lines are order-free; and **scale invariance is claimed for a power-of-two factor** applied to prices, volumes and the tick together (the three built-in strategies have no rupee or volume threshold; the test scans their condition texts). The inventory of all leak properties with their controls is [`docs/research/p3-08-leak-properties.md`](../research/p3-08-leak-properties.md).
+
 ## Consequences
 - **Nothing in the engine changes** by this ADR: every rule above is the behaviour at `sim-5`. Where it picks one reading of two sentences the log says so (D-01 to D-03); if the owner reverses one, the change is an engine decision with a new version and a regenerated golden file (P3-03e's way), and this ADR is amended.
 - **O reads these rules** before it starts. They are committed as text before the oracle is written (the commit order is the evidence of acceptance criterion 2).
