@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\..\src\XDrishti.Simulation\XDrishti.Simulation.csproj" />
+    <!-- The independent oracle (ADR 0047, P3-08): the comparison of its walk and gate with the engine's lives in this project. -->
+    <ProjectReference Include="..\XDrishti.SimOracle\XDrishti.SimOracle.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- The invented days of P3-03 (F1, F2, F6, the flat day), shared with the tests of the use case that reads the stored bars (P3-04a): one source file, compiled into each project that needs it. -->

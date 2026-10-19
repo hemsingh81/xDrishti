@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The independent reference implementation of the walk and the position gate (spec P3-08, ADR 0047).
+    A plain library under tests/: it references NO project and NO package (architecture-tested), imports no Tests.props
+    (it holds no test of its own) and is used only by XDrishti.Simulation.Tests (the comparison) and XDrishti.Architecture.Tests
+    (which loads it to inspect it). Written from the rule tables alone; see docs/adr/0047.
+  -->
+</Project>
