@@ -33,7 +33,7 @@ public sealed class ScannerSeamTests
     [Fact]
     public void The_candidates_are_equal_for_a_trailing_exit_and_a_partial_trail_exit_run_on_the_scanner()
     {
-        var trail = OrbV1.Create().WithBuy(b => b with { Exits = [Exit(ExitPolicy.AtrTrail, ("atr_mult", 2))] }) with { Sell = OrbV1.Create().Sell! with { Exits = [Exit(ExitPolicy.AtrTrail, ("atr_mult", 2))] } };
+        var trail = OrbV1.Create().WithBuy(b => b with { Exits = [Exit(ExitPolicy.AtrTrail, ("mult", 2), ("activate_at_rr", 1))] }) with { Sell = OrbV1.Create().Sell! with { Exits = [Exit(ExitPolicy.AtrTrail, ("mult", 2), ("activate_at_rr", 1))] } };
         var partial = OrbV1.Create().WithBuy(b => b with { Exits = [Exit(ExitPolicy.PartialTrail, ("book_pct", 50), ("t1_rr", 1), ("trail_atr_mult", 2))] })
             with
         { Sell = OrbV1.Create().Sell! with { Exits = [Exit(ExitPolicy.PartialTrail, ("book_pct", 50), ("t1_rr", 1), ("trail_atr_mult", 2))] } };

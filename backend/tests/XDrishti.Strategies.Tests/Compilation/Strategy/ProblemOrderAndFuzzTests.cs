@@ -51,6 +51,7 @@ public sealed class ProblemOrderAndFuzzTests
             "model.field_missing@buy.stop.lookback",
             "model.exits_empty@buy.exits",
             "model.field_shape@buy.overlays[0]",
+            "model.field_missing@buy.overlays[0].min_progress_rr",
             "model.bad_time@time_rules.first_entry",
             "model.unknown_filter@filters[0]",
         ]);
@@ -126,8 +127,10 @@ public sealed class ProblemOrderAndFuzzTests
 
     private static readonly Timeframe[] Entry = [Timeframe.M5, Timeframe.M10, Timeframe.M15, Timeframe.M30, Timeframe.H1, Timeframe.D1];
 
+    private static readonly string[] ParameterNames = ["rr", "x0", "x1", "t2_rr", "mult", "activate_at_rr", "lookback_bars", "length", "add_at_rr", "add_pct", "max_adds", "initial_pct", "intraday_bars", "swing_sessions", "days_before_results", "min_progress_rr", "enabled", "trail"];
+
     private static IReadOnlyList<ExitParameter> Parameters(Random random) =>
-        [.. Enumerable.Range(0, random.Next(0, 4)).Select(i => new ExitParameter(random.Next(5) == 0 ? "Bad" + i : random.Next(2) == 0 ? "rr" : "x" + i, [.. Enumerable.Range(0, random.Next(0, 13)).Select(_ => RandomQuantity(random))]))];
+        [.. Enumerable.Range(0, random.Next(0, 4)).Select(i => new ExitParameter(random.Next(5) == 0 ? "Bad" + i : ParameterNames[random.Next(ParameterNames.Length)], [.. Enumerable.Range(0, random.Next(0, 13)).Select(_ => RandomQuantity(random))]))];
 
     private static Quantity RandomQuantity(Random random) => random.Next(8) switch
     {
@@ -219,6 +222,45 @@ public sealed class ProblemOrderAndFuzzTests
             case 22: return OnBuy(definition, b => b with { Exits = [new ExitSpec(ExitPolicy.PartialTrail, [new ExitParameter("atr_period", [Quantity.Of(random.Next(-3, 20_000) / 3.0)]), new ExitParameter(null!, null!), null!])] });
             default: return definition with { Id = definition.Id + random.Next(3) };
         }
+    }
+
+    private static int Rank(string path) => path switch
+    {
+        _ when path.StartsWith("time_rules", StringComparison.Ordinal) => 3,
+        _ when path.StartsWith("filters", StringComparison.Ordinal) => 4,
+        _ when path.StartsWith("buy", StringComparison.Ordinal) || path.StartsWith("sell", StringComparison.Ordinal) => 2,
+        _ => 1,
+    };
+
+    [Fact]
+    public void For_200_seeded_definitions_with_FIXED_RR_exits_only_the_exit_tables_add_no_problem_and_the_groups_keep_their_order_the_side_then_the_time_rules_then_the_filters()
+    {
+        var checkedDefinitions = 0;
+        for (var seed = 0; seed < 200; seed++)
+        {
+            var random = new Random(10_000 + seed);
+            var original = new Func<StrategyDefinition>[] { () => Defs.Orb(), () => Defs.Basic(), () => Defs.Swing() }[seed % 3]();
+            var definition = original;
+            for (var m = random.Next(1, 4); m > 0; m--)
+            {
+                var mutated = Mutate(definition, random);
+                if (ReferenceEquals(mutated.Buy?.Exits, original.Buy?.Exits) && ReferenceEquals(mutated.Buy?.Overlays, original.Buy?.Overlays) && ReferenceEquals(mutated.Sell?.Exits, original.Sell?.Exits) && ReferenceEquals(mutated.Sell?.Overlays, original.Sell?.Overlays))
+                {
+                    definition = mutated;
+                }
+            }
+
+            var side = seed % 4 == 3 ? Side.Sell : Side.Buy;
+            var result = StrategyCompiler.Compile(definition, Entry[random.Next(Entry.Length)], side);
+
+            result.Problems.ShouldNotContain(p => p.Problem.Code == ModelCodes.ExitNotEvaluated, "seed " + seed);
+            result.Problems.Where(p => p.Path.Contains(".exits", StringComparison.Ordinal) || p.Path.Contains(".overlays", StringComparison.Ordinal)).ShouldAllBe(p => p.Problem.Code == ModelCodes.ExitsEmpty, "FIXED_RR-only definitions have no exit problem (seed " + seed + ")");
+            var errorRanks = result.Problems.Where(p => p.Problem.Severity == ProblemSeverity.Error && p.Path.Length > 0).Select(p => Rank(p.Path)).ToList();
+            errorRanks.ShouldBe([.. errorRanks.Order()], "the problems come in the order of the model (seed " + seed + ")");
+            checkedDefinitions++;
+        }
+
+        checkedDefinitions.ShouldBe(200);
     }
 
     [Fact]

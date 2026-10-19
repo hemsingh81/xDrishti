@@ -27,6 +27,22 @@ public sealed class ModelSnapshotTests
     }
 
     [Fact]
+    public void The_snapshot_of_P3_02b2_only_adds_to_the_46_codes_and_the_two_tables_of_ADR_0036()
+    {
+        var lines = ModelSchemaSnapshot.Text.ReplaceLineEndings("\n").Split('\n');
+
+        lines.Count(l => l.StartsWith("code ", StringComparison.Ordinal)).ShouldBe(47);
+        lines.ShouldContain("code strategy.model.exit_not_evaluated");
+        lines.ShouldContain("code strategy.model.filter_not_evaluated");
+        lines.ShouldContain("code strategy.model.duplicate_exit");
+        lines.ShouldContain("exit FIXED_RR: rr list (0,10]");
+        lines.ShouldContain("exit PARTIAL_TRAIL: book_pct scalar (0,100)");
+        lines.ShouldContain("exit PARTIAL_TRAIL: t1_rr scalar (0,10]");
+        lines.ShouldContain("exit PARTIAL_TRAIL: trail_atr_mult scalar (0,20]");
+        lines.ShouldContain("exit PARTIAL_TRAIL: atr_period scalar optional catalog");
+    }
+
+    [Fact]
     public void The_current_schema_is_one()
     {
         StrategyDefinition.CurrentSchema.ShouldBe(1);
@@ -63,7 +79,12 @@ public sealed class ModelSnapshotTests
 
         foreach (var (policy, parameters) in ExitTables.Checked.OrderBy(e => e.Key))
         {
-            lines.AddRange(parameters.Select(p => "exit " + ExitTables.PolicyName(policy) + ": " + p.Name + " " + (p.Shape == ParameterShape.List ? "list" : "scalar") + (p.Required ? string.Empty : " optional") + " " + p.Interval));
+            lines.AddRange(parameters.Select(p => "exit " + ExitTables.PolicyName(policy) + ": " + p.Name + " " + (p.Shape == ParameterShape.List ? "list" : "scalar") + (p.Required ? string.Empty : " optional") + (p.Whole && !p.IsCatalog ? " whole" : string.Empty) + " " + p.Interval));
+        }
+
+        foreach (var (kind, parameters) in ExitTables.OverlayChecked.OrderBy(e => e.Key))
+        {
+            lines.AddRange(parameters.Select(p => "overlay " + ExitTables.OverlayName(kind) + ": " + p.Name + " " + (p.Shape == ParameterShape.List ? "list" : "scalar") + (p.Required ? string.Empty : " optional") + (p.Whole && !p.IsCatalog ? " whole" : string.Empty) + " " + p.Interval));
         }
 
         lines.Add("exit values: at most " + ExitTables.MaxListValues + " per list");

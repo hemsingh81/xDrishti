@@ -2,7 +2,7 @@ namespace XDrishti.Strategies.Tests.Model;
 
 /// <summary>
 /// The stored contract of schema 1 (ADR 0002, ADR 0036), written by hand from the spec P3-02b and not generated: the public types of <c>XDrishti.Strategies.Model</c> with their members, the enum <c>Side</c>, the
-/// policy-to-parameter tables of the exit policies the compile checks, the filter names and the problem codes. A C# constant, so that no unit test reads a file. Renaming or removing a member, a value, a parameter name
+/// policy-to-parameter tables of the exit policies and overlays (provisional until P4, ADR 0036 Amendment 1), the filter names and the problem codes. A C# constant, so that no unit test reads a file. Renaming or removing a member, a value, a parameter name
 /// or a code, or changing a bound, fails <see cref="ModelSnapshotTests"/>: a stored strategy (or a client that switches on a code) would break.
 /// </summary>
 internal static class ModelSchemaSnapshot
@@ -31,10 +31,28 @@ internal static class ModelSchemaSnapshot
         record StrategyParam(string Name, double Value)
         record TimeRules(TimeOnly? FirstEntry, TimeOnly? LastEntry, TimeOnly? SquareOff, int? MaxHoldSessions)
         exit FIXED_RR: rr list (0,10]
+        exit PARTIAL_BE: book_pct scalar (0,100)
+        exit PARTIAL_BE: t1_rr scalar (0,10]
+        exit PARTIAL_BE: t2_rr list (0,10]
         exit PARTIAL_TRAIL: book_pct scalar (0,100)
         exit PARTIAL_TRAIL: t1_rr scalar (0,10]
         exit PARTIAL_TRAIL: trail_atr_mult scalar (0,20]
         exit PARTIAL_TRAIL: atr_period scalar optional catalog
+        exit ATR_TRAIL: mult list (0,20]
+        exit ATR_TRAIL: activate_at_rr scalar [0,10]
+        exit ATR_TRAIL: atr_period scalar optional catalog
+        exit STRUCTURE_TRAIL: lookback_bars scalar catalog
+        exit EMA_TRAIL: length scalar catalog
+        exit PYRAMID: initial_pct scalar (0,100]
+        exit PYRAMID: add_at_rr list (0,10]
+        exit PYRAMID: add_pct list (0,100]
+        exit PYRAMID: max_adds scalar whole [1,10]
+        exit PYRAMID: trail_atr_mult scalar (0,20]
+        exit PYRAMID: atr_period scalar optional catalog
+        overlay time_stop: min_progress_rr scalar [0,10]
+        overlay time_stop: intraday_bars scalar optional whole [1,375]
+        overlay time_stop: swing_sessions scalar optional whole [1,5]
+        overlay event_exit: days_before_results scalar whole [1,10]
         exit values: at most 10 per list
         filters: not_event_day min_turnover
         code strategy.model.bad_id
@@ -49,6 +67,7 @@ internal static class ModelSchemaSnapshot
         code strategy.model.duplicate_side
         code strategy.model.duplicate_timeframe
         code strategy.model.entry_missing
+        code strategy.model.exit_not_evaluated
         code strategy.model.exits_empty
         code strategy.model.feature_invalid
         code strategy.model.field_missing

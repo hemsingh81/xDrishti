@@ -92,6 +92,20 @@ the lagged series is the close, so the condition is known from the first bar of 
 end of the range at that open is no trade (`EntryThroughStop`, counted) and one that opens above the limit and does not trade back to it is a miss (`LimitNotReached`, counted). A figure from the simulator for this strategy is a signal-level result per instrument, in-sample, with modelled fills (the entry limit of +0.1 %, slippage on the tick grid; ADR 0038) and no costs.
 The builder is the interim source of the built-in `ORB` until P3-02d seeds it as stored text (ADR 0002); the stored text and its hash then replace it as the version.
 
+**`VWAP_PULLBACK` as built (P3-05, `VwapPullback.Create(pullAtr = 0.5, rewardRisk = 2.0)` in `XDrishti.Strategies.BuiltIn`).** The second rule set the simulator runs. **It is the owner's proposal**, approved as written for the first run on 2026-10-19 and open to change after the first look at its trades; nothing about it is evidence of an edge (passing the hand check says the mechanics are right). Id `VWAP_PULLBACK`, intraday, **15m only**, BUY and SELL both written out by hand, two parameters: `pull_atr` (default 0.5, declared range `0 < x <= 3`, [ADR 0041](../adr/0041-the-simulate-verb-the-export-library-and-the-pipeline-in-the-host.md) Amendment 2) and `rr` (default 2, as for ORB). Entries are accepted from 10:00 (the first bar at which the two lags of a session-restarting feature can be known) to 14:30; the position leaves at 15:15 at the latest.
+
+| Part | BUY (SELL is the mirror: comparison reversed, `high` for `low`, `-` for `+`) |
+|------|------|
+| Setup 0, hourly trend | `tf("1h").ema(20) > tf("1h").ema(50)` |
+| Setup 1, daily trend | `tf("1D").close > tf("1D").ema(20)` (the last closed day) |
+| Trigger 0, the trigger bar | `close > vwap and close > open` |
+| Trigger 1, two closes on the right side | `close[1] > vwap[1] and close[2] > vwap[2]` |
+| Trigger 2, the dip | `low[1] < low[2] and low[1] <= vwap[1] + pull_atr * atr(14)` |
+| Stop | `swing_low` over 2 bars (the lower of the dip bar's and the trigger bar's lows), no buffer |
+| Exit | one `FIXED_RR`, `rr` times the risk |
+
+Reading: bars *t*-2 and *t*-1 closed above the session VWAP; bar *t*-1 is the dip bar, which made a lower low and came back to within `pull_atr` ATRs of VWAP (it may go below it and close above); bar *t* closed above VWAP and above its own open. The lower low is the draft's addition to the roadmap's one-line sketch (without it a steady climb counts as a pullback); the stop at the pullback low replaces the sketch's `bar_low` (the trigger bar's own low alone is too tight and sits above the level the pattern says must hold). There is no lower bound on the dip: a long wick far below VWAP that closes above it gives a wide stop and a distant target. Only the level form is used (`vwap` keeps the history of the session only, ADR 0035), so the lagged items are unknown on the first two bars and the first bar that can be known is bar 3, decided at 10:00. On 15m **`vwap` is the volume-weighted mean of the 15-minute bars' typical prices**, not the minute-by-minute VWAP of a charting platform, and the engine's ATR may be seeded differently from a chart's: compare a trade with a chart by recomputing the engine's numbers, not by reading the chart. The hourly buckets start at 09:15 and a partial bucket from 15:15 is a bar of its own (seven hourly bars a session), so `tf("1h").ema(50)` is ready after about seven sessions and `tf("1D").ema(20)` after twenty: the first possible trade of a replay is on session 21, and the scanner's counters show the cold start as `NotReady`. A lagged item that is combined with a known False (`low[1] < low[2]` on bar 1 or 2, where the `low` history is continuous across sessions) is False, not unknown, because a False conjunct decides an `and`. The ATR stop and stop buffer that the roadmap row listed for this slice are not built (this rule set needs neither; they would be a separate slice with its own ADR). The builder is the interim source of the built-in until P3-02d.
+
 ## 4. Multi-timeframe mapping
 
 | Entry TF | Bias TFs | Typical style |

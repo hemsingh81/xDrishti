@@ -47,6 +47,15 @@ public sealed partial class SimulateCommandTests : IDisposable
         text.ShouldContain("timeframes: 5m, 15m (default)");
         text.ShouldContain("or_min=<number>  default 15");
         text.ShouldContain("rr=<number>  default 2");
+        text.ShouldBe(
+            "ORB: Opening range breakout: a close beyond the opening range, stop at the opposite end, target a multiple of the risk\n"
+            + "  timeframes: 5m, 15m (default)\n"
+            + "  --param or_min=<number>  default 15: minutes of the opening range\n"
+            + "  --param rr=<number>  default 2: target as a multiple of the risk\n"
+            + "VWAP_PULLBACK: VWAP pullback: after two closes beyond VWAP, a dip to within pull_atr ATRs of it and a close back through VWAP and the open; stop at the pullback extreme, target a multiple of the risk\n"
+            + "  timeframes: 15m (default)\n"
+            + "  --param pull_atr=<number>  default 0.5, range 0 < x <= 3: distance of the dip's extreme from VWAP, in ATRs\n"
+            + "  --param rr=<number>  default 2: target as a multiple of the risk\n");
         _verb.RunHandler.Received.ShouldBeEmpty();
         _verb.InstrumentHandler.Received.ShouldBeEmpty();
         Directory.Exists(_verb.ExportRoot).ShouldBeFalse();
@@ -263,6 +272,20 @@ public sealed partial class SimulateCommandTests : IDisposable
         request.AcknowledgeCsvAdjusted.ShouldBeTrue();
         request.Fills.ShouldBe(new FillRulesInput(0.1, 1, 0.05, 2));
         request.Fills.ShouldBe(new FillRulesInput(FillRules.Default.EntryLimitPercent, FillRules.Default.Slippage.Ticks, FillRules.Default.Slippage.BarRangeFrac, FillRules.Default.Slippage.StopExitExtraTicks));
+    }
+
+    [Fact]
+    public async Task The_parameters_of_vwap_pullback_reach_the_request_as_given()
+    {
+        _verb.AddInstrument("AAA");
+
+        var exit = await _verb.RunAsync("--strategy VWAP_PULLBACK --symbols AAA --from 2024-04-01 --to 2024-04-30 --param pull_atr=0.75 --param rr=1.5", Ct);
+
+        exit.ShouldBe(0, _verb.Error.ToString());
+        var request = _verb.RunHandler.Received.Single().Request;
+        request.StrategyId.ShouldBe("VWAP_PULLBACK");
+        request.EvaluationTimeframe.ShouldBe("15m");
+        request.Parameters.ShouldNotBeNull().OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => (p.Key, p.Value)).ShouldBe([("pull_atr", 0.75), ("rr", 1.5)]);
     }
 
     [Fact]
