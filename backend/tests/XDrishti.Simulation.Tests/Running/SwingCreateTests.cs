@@ -65,8 +65,8 @@ public sealed class SwingCreateTests
     /// <summary>The refusals that stay: a definition, the code, the path of the field and a word the message names.</summary>
     public static TheoryData<string, StrategyDefinition, Timeframe, string, string> Refusals => new()
     {
-        { "an overlay time_stop", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.TimeStop, [new ExitParameter("intraday_bars", [Quantity.Of(12)])])] }), Timeframe.H1, "simulation.unsupported_exit", "buy.overlays[0]" },
-        { "an overlay event_exit", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [])] }), Timeframe.H1, "simulation.unsupported_exit", "buy.overlays[0]" },
+        { "an overlay time_stop", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.TimeStop, [new ExitParameter("min_progress_rr", [Quantity.Of(0.5)]), new ExitParameter("swing_sessions", [Quantity.Of(2)])])] }), Timeframe.H1, "simulation.unsupported_exit", "buy.overlays[0]" },
+        { "an overlay event_exit", Buy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [new ExitParameter("days_before_results", [Quantity.Of(1)])])] }), Timeframe.H1, "simulation.unsupported_exit", "buy.overlays[0]" },
         { "a filter", TestStrategies.Swing1h() with { Filters = ["min_turnover"] }, Timeframe.H1, "simulation.filter_not_available", "filters[0]" },
         { "a market context", Buy(b => b with { Trigger = TestStrategies.All("close > or_high(60) and vix < 20") }), Timeframe.H1, "simulation.needs_context", "buy" },
         { "an expiry read", Buy(b => b with { Trigger = TestStrategies.All("close > or_high(60) and is_expiry_day == 0") }), Timeframe.H1, "simulation.needs_expiry_days", "buy" },

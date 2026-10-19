@@ -42,7 +42,7 @@ public static class StrategyCompiler
         SideCompiler.Parts? parts = null;
         if (rules is not null)
         {
-            parts = new SideCompiler(sink, declared).Compile(rules, side, evaluationTimeframe);
+            parts = new SideCompiler(sink, declared).Compile(rules, side, evaluationTimeframe, definition.Style, definition.TimeRules?.MaxHoldSessions);
         }
         else if (declaredSides.Contains(side))
         {
