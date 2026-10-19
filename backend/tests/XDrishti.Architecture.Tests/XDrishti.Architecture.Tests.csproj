@@ -9,6 +9,8 @@
     <ProjectReference Include="..\..\src\XDrishti.SimExport\XDrishti.SimExport.csproj" />
     <!-- The independent oracle (ADR 0047): loaded here only to inspect it; the exception to "only Simulation.Tests references it" is asserted in OracleArchitectureTests. -->
     <ProjectReference Include="..\XDrishti.SimOracle\XDrishti.SimOracle.csproj" />
+    <!-- The chart reader (P3-09c): loaded here only to inspect its references. -->
+    <ProjectReference Include="..\..\src\XDrishti.SimReader\XDrishti.SimReader.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />
