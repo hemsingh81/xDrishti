@@ -76,17 +76,40 @@ public sealed class ScaleInvarianceTests(ITestOutputHelper output)
             .Distinct()
             .ToList();
 
-        // A numeric literal outside a call's parentheses or a lag's brackets would be a threshold on a price or a volume. Every other literal here is an indicator period, a lag, or a named parameter. The one allowed literal outside them is the
-        // `* 100` of BASE_BREAKOUT's range-as-a-percentage (a unit conversion of a ratio, compared with the parameter base_pct): it is named, not a rupee level.
-        var offenders = texts
-            .Select(t => System.Text.RegularExpressions.Regex.Replace(System.Text.RegularExpressions.Regex.Replace(t, @"\([^()]*\)|\[[^\]]*\]", string.Empty), @"\* 100 <=", "<="))
-            .Where(t => System.Text.RegularExpressions.Regex.IsMatch(t, @"(?<![\w.])\d+(\.\d+)?(?![\w.])"))
-            .ToList();
+        var offenders = texts.Where(t => ThresholdLiterals(t).Count > 0).ToList();
 
         output.WriteLine($"{texts.Count} distinct condition texts of ORB v1, VWAP_PULLBACK and BASE_BREAKOUT; absolute-threshold exclusion list: {offenders.Count}");
         texts.Count.ShouldBeGreaterThanOrEqualTo(8);
         offenders.ShouldBeEmpty();
     }
+
+    /// <summary>
+    /// The numeric literals of a condition text that are not an indicator period, a lag or a text. Removed first: quoted strings (<c>tf("1h")</c>), lags (<c>close[1]</c>), the argument list of the period indicators (<c>ema(20)</c>, <c>atr(14)</c>,
+    /// <c>rel_volume(20)</c>, <c>or_high(..)</c>, <c>highest(..)</c> and the like) and the one documented unit conversion, the <c>* 100</c> of BASE_BREAKOUT's range percentage. A literal inside any other call (<c>max(close, 100)</c>) stays and is flagged.
+    /// </summary>
+    internal static List<string> ThresholdLiterals(string text)
+    {
+        var rx = System.Text.RegularExpressions.Regex.Replace(text, "\"[^\"]*\"", string.Empty);
+        rx = System.Text.RegularExpressions.Regex.Replace(rx, @"\[[^\]]*\]", string.Empty);
+        rx = System.Text.RegularExpressions.Regex.Replace(rx, @"\b(ema|sma|atr|rel_volume|or_high|or_low|highest|lowest)\([^()]*\)", "$1");
+        rx = System.Text.RegularExpressions.Regex.Replace(rx, @"\* 100 <=", "<=");
+        return [.. System.Text.RegularExpressions.Regex.Matches(rx, @"(?<![\w.])\d+(\.\d+)?(?![\w.])").Select(m => m.Value)];
+    }
+
+    [Theory]
+    [InlineData("close > 100.30", "100.30")]
+    [InlineData("x > 5", "5")]
+    [InlineData("close > max(close, 100)", "100")]
+    [InlineData("close > ema(20) + 2", "2")]
+    public void The_literal_scan_flags_a_threshold_in_the_open_or_hidden_in_a_call(string text, string literal) =>
+        ThresholdLiterals(text).ShouldBe([literal]);
+
+    [Theory]
+    [InlineData("close > ema(20) and close[1] <= or_high(or_min)")]
+    [InlineData("tf(\"1h\").ema(20) > tf(\"1h\").ema(50)")]
+    [InlineData("(highest(base_len, source=close) - lowest(base_len, source=close)) / lowest(base_len, source=close) * 100 <= base_pct")]
+    public void The_literal_scan_leaves_periods_lags_texts_and_the_percentage_conversion_alone(string text) =>
+        ThresholdLiterals(text).ShouldBeEmpty();
 
     [Fact]
     public void Scaling_prices_volumes_and_the_tick_by_two_or_four_changes_no_decision_and_no_ratio_and_the_prices_scale_exactly()
@@ -123,8 +146,8 @@ public sealed class ScaleInvarianceTests(ITestOutputHelper output)
         perSubject["ORB modelled"].Trades.ShouldBeGreaterThanOrEqualTo(150);
         perSubject["SWING_1H"].Trades.ShouldBeGreaterThanOrEqualTo(10);
         perSubject["SWING_DAILY"].Trades.ShouldBeGreaterThanOrEqualTo(40);
-        perSubject["VWAP_PULLBACK"].Trades.ShouldBeGreaterThanOrEqualTo(1);
-        perSubject["BASE_BREAKOUT"].Runs.ShouldBeGreaterThanOrEqualTo(12);
+        perSubject["VWAP_PULLBACK"].Trades.ShouldBeGreaterThanOrEqualTo(4);
+        perSubject["BASE_BREAKOUT"].Trades.ShouldBeGreaterThanOrEqualTo(1);
     }
 
     [Fact]

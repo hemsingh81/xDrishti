@@ -39,7 +39,7 @@ Most rules are **enforced by tooling** — a rule that can be automated should b
 
 Rules: test behaviour, not implementation; one reason to fail per test; no sleeps; tests run in parallel.
 
-Leak and invariance properties of the simulator (P3-08b): every property that says "this change must change nothing" (look-ahead, truncation, scale, date shift, instrument order, state between instruments) ships with a **negative control**, a doctored input that must fail the same comparison on at least 10 seeds while the honest run reports none. The table of properties, their tests and their controls is `docs/research/p3-08-leak-properties.md`; `PropertyInventoryTests` fails if a named test disappears.
+Leak and invariance properties of the simulator (P3-08b): every invariance or leak property that can be doctored ("this change must change nothing") (look-ahead, truncation, scale, date shift, instrument order, state between instruments) ships with a **negative control**, a doctored input that must fail the same comparison on at least 10 seeds while the honest run reports none; the two exceptions are determinism (the golden files guard it) and `RNet <= RFilled <= RExact` (its control is P3-08c). The table of properties, their tests and their controls is `docs/research/p3-08-leak-properties.md`; `PropertyInventoryTests` fails if a named test disappears.
 
 Rules learnt from flaky tests (ISS-14):
 - **A fake clock that a test moves must not outrun the code under test.** Move it to the next due timer, wait for a sign of
