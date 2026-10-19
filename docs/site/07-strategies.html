@@ -241,6 +241,44 @@ The builder is the interim source of the built-in <code>ORB</code> until P3-02d 
 </tr>
 </tbody></table>
 <p>Reading: bars <em>t</em>-2 and <em>t</em>-1 closed above the session VWAP; bar <em>t</em>-1 is the dip bar, which made a lower low and came back to within <code>pull_atr</code> ATRs of VWAP (it may go below it and close above); bar <em>t</em> closed above VWAP and above its own open. The lower low is the draft&#39;s addition to the roadmap&#39;s one-line sketch (without it a steady climb counts as a pullback); the stop at the pullback low replaces the sketch&#39;s <code>bar_low</code> (the trigger bar&#39;s own low alone is too tight and sits above the level the pattern says must hold). There is no lower bound on the dip: a long wick far below VWAP that closes above it gives a wide stop and a distant target. Only the level form is used (<code>vwap</code> keeps the history of the session only, ADR 0035), so the lagged items are unknown on the first two bars and the first bar that can be known is bar 3, decided at 10:00. On 15m <strong><code>vwap</code> is the volume-weighted mean of the 15-minute bars&#39; typical prices</strong>, not the minute-by-minute VWAP of a charting platform, and the engine&#39;s ATR may be seeded differently from a chart&#39;s: compare a trade with a chart by recomputing the engine&#39;s numbers, not by reading the chart. The hourly buckets start at 09:15 and a partial bucket from 15:15 is a bar of its own (seven hourly bars a session), so <code>tf(&quot;1h&quot;).ema(50)</code> is ready after about seven sessions and <code>tf(&quot;1D&quot;).ema(20)</code> after twenty: the first possible trade of a replay is on session 21, and the scanner&#39;s counters show the cold start as <code>NotReady</code>. A lagged item that is combined with a known False (<code>low[1] &lt; low[2]</code> on bar 1 or 2, where the <code>low</code> history is continuous across sessions) is False, not unknown, because a False conjunct decides an <code>and</code>. The ATR stop and stop buffer that the roadmap row listed for this slice are not built (this rule set needs neither; they would be a separate slice with its own ADR). The builder is the interim source of the built-in until P3-02d.</p>
+<p><strong><code>BASE_BREAKOUT</code> v1 as built (P3-06, <code>BaseBreakoutV1.Create(baseLen = 20, basePct = 8, volX = 1.5, rewardRisk = 2.0)</code> in <code>XDrishti.Strategies.BuiltIn</code>).</strong> The third rule set the simulator runs, and the first <strong>swing</strong> one. <strong>It is the owner&#39;s proposal</strong>, approved as written for the first run on 2026-10-19 and open to change after the first look at its trades (about half a day to reopen); nothing about it is evidence of an edge. Id <code>BASE_BREAKOUT</code>, swing, <strong>1D only</strong>, BUY only (no <code>sell</code> block), evaluated once a day at the step that closes the 1D bar (the 15:29 minute, decision instant 15:30). Four parameters, each with a declared range (<a href="../adr/0041-the-simulate-verb-the-export-library-and-the-pipeline-in-the-host.html">ADR 0041</a> Amendment 2): <code>base_len</code> (20, <code>10 &lt;= x &lt;= 60</code>), <code>base_pct</code> (8, <code>2 &lt;= x &lt;= 20</code>), <code>vol_x</code> (1.5, <code>1 &lt;= x &lt;= 5</code>) and <code>rr</code> (2, <code>0 &lt; x &lt;= 10</code>). The entry is the next session&#39;s open within the +0.1 % limit of the signal close (a gap above it is a counted miss, a gap to or through the stop is <code>EntryThroughStop</code>), the position is held at most five sessions (<code>max_hold_sessions = 5</code>, always on, not a parameter) and a second signal while a position is open is <code>PositionOpen</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>Text</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Setup 0, weekly trend</td>
+<td><code>tf(&quot;1W&quot;).close &gt; tf(&quot;1W&quot;).sma(10)</code></td>
+</tr>
+<tr>
+<td>Setup 1, daily trend</td>
+<td><code>close &gt; sma(50)</code></td>
+</tr>
+<tr>
+<td>Setup 2, a tight base</td>
+<td><code>(highest(base_len, source=close) - lowest(base_len, source=close)) / lowest(base_len, source=close) * 100 &lt;= base_pct</code></td>
+</tr>
+<tr>
+<td>Setup 3, volume</td>
+<td><code>rel_volume(20) &gt;= vol_x</code></td>
+</tr>
+<tr>
+<td>Trigger, the breakout</td>
+<td><code>close &gt;= highest(base_len, source=close)</code></td>
+</tr>
+<tr>
+<td>Stop</td>
+<td><code>swing_low</code>, <code>lookback = base_len</code>, no buffer: the lowest low of the last <code>base_len</code> sessions, the signal day included</td>
+</tr>
+<tr>
+<td>Exit</td>
+<td>one <code>FIXED_RR</code>, <code>rr</code> times the risk, plus the always-on <code>MAX_HOLD</code> of five sessions</td>
+</tr>
+</tbody></table>
+<p>Reading: the closes of the last <code>base_len</code> sessions, today&#39;s included, span at most <code>base_pct</code> percent and today&#39;s close is the top of that window (a tie counts), on at least <code>vol_x</code> times the mean volume of the 20 sessions before. <code>highest(n)</code> includes the current bar and a lag cannot be written on a call (ISS-24), so there is no spelling of &quot;above the previous N-day high&quot;: the base is measured on the window that ends today, which costs a breakout that itself lifts the close by more than <code>base_pct</code> percent above the window&#39;s lowest close. <strong>Ties count</strong>: a close equal to the window&#39;s high triggers if the other rules hold, so a flat series passes R3 and R5 (it is stopped by the two trend gates, which are strict; a short flat run after a rise is a candidate on a close that is above nothing, row P12 of the spec). With a stop at the base&#39;s own low the risk is as wide as the base and a target of 2R is far for five sessions: the exit reasons of the first run are what decides whether the stop should be <code>bar_low</code> instead (a new version). <strong>The weekly gate is weekday-dependent (observed, row W1 to W3 of the spec).</strong> With a trading calendar a weekly bar closes at the very step that closes the last session of the week, so on that day <code>tf(&quot;1W&quot;).close</code> is the close of the week of the decision and on every other day it is the previous week&#39;s; without a calendar the week is emitted at the first bar of the next week and a Friday decision sees the previous week. The same pattern is therefore a candidate on a Friday and not on a Thursday (when Friday is a holiday Thursday is the last session and is the Friday case). The replay supplies the calendar, so a verb run behaves as the calendar rows. <strong>Warm-up:</strong> the first fully ready decision is the fiftieth session of the stored data (a Friday when the data starts on a Monday), so about 11 weeks of daily history are needed and an instrument with fewer sessions is skipped <code>features_not_ready</code>; the daily bar is built from the 1-minute bars, so its close is the close of the last minute that holds a trade and its volume the sum of the minutes, which can differ from a vendor chart. A 15:29 minute that is missing makes the daily bar close late: it is stale, counted in <code>StaleBucketSteps</code>, and the signal is lost. Every real run is <code>--gross</code> (<code>costs: none</code>) until the owner&#39;s charge sheet passes its check; a swing trade is costed in the delivery segment. The check of its trades by the owner needs the signal day and the base on a daily chart and a hand recompute of the five rules: the card draws the fill day only (P3-04d is only proposed). The builder is the interim source of the built-in until P3-02d.</p>
 <h2 id="4-multi-timeframe-mapping">4. Multi-timeframe mapping<a class="hash" href="#4-multi-timeframe-mapping" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -395,7 +433,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-19 07:45</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-19 09:26</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>
