@@ -288,6 +288,18 @@ public sealed class TradesCsvTests
         rows[1][^1].ShouldBe("ORB|NSE:M&M|Sell|2025-12-31");
     }
 
+    [Fact]
+    public void The_key_cell_of_a_trade_filled_on_the_day_after_its_decision_ends_with_the_decision_date()
+    {
+        var monday = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:AAA", Side.Buy, new DateOnly(2026, 3, 2));
+        var trade = monday with { TradeDate = new DateOnly(2026, 3, 3) };
+        var rows = Rfc4180Reader.Read(Csv(new string('a', 64), new RunTrade(trade, [])));
+
+        trade.Key.ShouldBe("ORB|NSE:AAA|Buy|2026-03-02", "the key follows the day of the decision (ADR 0043 D6)");
+        rows[1][^1].ShouldBe(trade.Key);
+        rows[1][rows[0].IndexOf("trade_date")].ShouldBe("2026-03-03");
+    }
+
     private static CultureInfo Culture(string decimalSeparator, string groupSeparator)
     {
         var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();

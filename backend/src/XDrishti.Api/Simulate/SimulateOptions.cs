@@ -34,7 +34,7 @@ internal sealed record SimulateOptions(
     public const string Usage =
         "usage:\n"
         + "  simulate --strategy <id> (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
-        + "           [--timeframe <5m|15m>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
+        + "           [--timeframe <5m|10m|15m|30m|1h|1D>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
         + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
         + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
         + "           (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required, P3-03f)\n"
@@ -247,12 +247,12 @@ internal sealed record SimulateOptions(
             return null;
         }
 
-        if (Timeframes.TryParse(code, out var timeframe) && Timeframes.Intraday.Contains(timeframe))
+        if (Timeframes.TryParse(code, out var timeframe) && Timeframes.Aggregated.Contains(timeframe))
         {
             return timeframe.ToCode();
         }
 
-        errors.Add("'--timeframe' must be an intraday timeframe such as 5m or 15m, '" + Show(code) + "' is not");
+        errors.Add("'--timeframe' must be a derived timeframe (5m, 10m, 15m, 30m, 1h, 1D, 1W or 1M), '" + Show(code) + "' is not");
         return null;
     }
 

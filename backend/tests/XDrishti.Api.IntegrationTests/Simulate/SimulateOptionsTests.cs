@@ -24,6 +24,10 @@ public sealed class SimulateOptionsTests
         "--strategy ORB --symbols RELIANCE " + Window + " --param or_min=30 --param rr=2.5",
         "--strategy ORB --symbols RELIANCE " + Window + " --param=rr=3",
         "--strategy ORB --symbols RELIANCE " + Window + " --timeframe 5m",
+        "--strategy BASE_BREAKOUT --symbols RELIANCE " + Window + " --timeframe 1D",
+        "--strategy ORB --symbols RELIANCE " + Window + " --timeframe 15m",
+        "--strategy ORB --symbols RELIANCE " + Window + " --timeframe 1W",
+        "--strategy ORB --symbols RELIANCE " + Window + " --timeframe 1M",
         "--strategy ORB --symbols RELIANCE " + Window + " --fills no-slippage",
         "--strategy ORB --symbols RELIANCE " + Window + " --fills=modelled",
         "--strategy ORB --symbols RELIANCE " + Window + " --acknowledge-csv-adjusted --force",
@@ -64,7 +68,8 @@ public sealed class SimulateOptionsTests
         { "--strategy orb --symbols RELIANCE " + Window, "--strategy" },
         { "--strategy ORB --symbols $(x) " + Window, "--symbols" },
         { "--strategy ORB --symbols RELIANCE;ls " + Window, "--symbols" },
-        { "--strategy ORB --symbols RELIANCE " + Window + " --timeframe 1D", "--timeframe" },
+        { "--strategy ORB --symbols RELIANCE " + Window + " --timeframe 1m", "--timeframe" },
+        { "--strategy ORB --symbols RELIANCE " + Window + " --timeframe 2h", "--timeframe" },
         { "--strategy ORB --symbols RELIANCE " + Window + " --force=yes", "--force" },
         { "--strategy ORB --symbols RELIANCE " + Window + " stray", "stray" },
         { "--list-strategies --force", "--list-strategies" },
@@ -91,6 +96,22 @@ public sealed class SimulateOptionsTests
         parsed.Options.ShouldBeNull();
         parsed.Errors.ShouldNotBeEmpty();
         parsed.Errors.ShouldContain(e => e.Contains(flag, StringComparison.Ordinal), string.Join(" | ", parsed.Errors));
+    }
+
+    [Fact]
+    public void Timeframe_1m_is_a_usage_error_with_the_exact_text_of_ADR_0041_Amendment_3_and_the_usage_no_longer_lists_only_5m_and_15m()
+    {
+        var parsed = Parse("--strategy BASE_BREAKOUT --symbols RELIANCE " + Window + " --timeframe 1m");
+
+        parsed.Options.ShouldBeNull();
+        parsed.Errors.ShouldContain("'--timeframe' must be a derived timeframe (5m, 10m, 15m, 30m, 1h, 1D, 1W or 1M), '1m' is not");
+        SimulateOptions.Usage.ShouldNotContain("5m|15m");
+    }
+
+    [Fact]
+    public void Timeframe_1D_is_read_into_the_options()
+    {
+        Parse("--strategy BASE_BREAKOUT --symbols RELIANCE " + Window + " --timeframe 1D").Options.ShouldNotBeNull().Timeframe.ShouldBe("1D");
     }
 
     [Fact]

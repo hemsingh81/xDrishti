@@ -26,6 +26,14 @@ public static class BuiltInStrategies
 
     private const double MaxPullAtr = 3;
 
+    private const double DefaultBaseLen = 20;
+
+    private const double DefaultBasePct = 8;
+
+    private const double DefaultVolX = 1.5;
+
+    private const double MaxRewardRisk = 10;
+
     private static readonly SourceSpan NoText = new(0, 0, 1, 1);
 
     private static readonly BuiltInEntry[] Table =
@@ -50,6 +58,18 @@ public static class BuiltInStrategies
                 new BuiltInParameterInfo(RewardRiskParam, DefaultRewardRisk, "target as a multiple of the risk"),
             ],
             values => VwapPullback.Create(values[VwapPullback.PullAtrParam], values[RewardRiskParam])),
+        new BuiltInEntry(
+            BaseBreakoutV1.Id,
+            "Base breakout: a new closing high out of a tight base, in an uptrend, on rising volume; entered at the next open, held at most five sessions",
+            [Timeframe.D1],
+            Timeframe.D1,
+            [
+                new BuiltInParameterInfo(BaseBreakoutV1.BaseLenParam, DefaultBaseLen, "sessions in the base window, also the lookback of the stop", Min: 10, Max: 60),
+                new BuiltInParameterInfo(BaseBreakoutV1.BasePctParam, DefaultBasePct, "the widest span of the closes of the window, as % of the lowest", Min: 2, Max: 20),
+                new BuiltInParameterInfo(BaseBreakoutV1.VolXParam, DefaultVolX, "the least multiple of the volume of the 20 sessions before", Min: 1, Max: 5),
+                new BuiltInParameterInfo(RewardRiskParam, DefaultRewardRisk, "target as a multiple of the risk", Min: 0, Max: MaxRewardRisk, MinExclusive: true),
+            ],
+            values => BaseBreakoutV1.Create(values[BaseBreakoutV1.BaseLenParam], values[BaseBreakoutV1.BasePctParam], values[BaseBreakoutV1.VolXParam], values[RewardRiskParam])),
     ];
 
     /// <summary>The ids of the built-in strategies, in the order of the table.</summary>

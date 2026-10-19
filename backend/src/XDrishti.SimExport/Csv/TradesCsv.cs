@@ -1,4 +1,5 @@
 using System.Buffers;
+using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.SimExport.Csv;
@@ -184,7 +185,9 @@ public static class TradesCsv
         row.Scratch.Append('|');
         row.Scratch.Append(SideName(trade.Side));
         row.Scratch.Append('|');
-        row.Scratch.Append(trade.TradeDate);
+        row.Scratch.Append(SessionClock.DateOf(trade.DecisionEpochSeconds - SecondsPerMinute));   // the day of the decision, not of the fill (ADR 0043, D6)
         row.Text(row.Scratch.Span);
     }
+
+    private const long SecondsPerMinute = 60;
 }
