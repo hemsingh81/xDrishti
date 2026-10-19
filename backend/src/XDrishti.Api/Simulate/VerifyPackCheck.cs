@@ -66,7 +66,7 @@ internal static class VerifyPackCheck
             return SimulateCommand.UsageError;
         }
 
-        await console.Out.WriteLineAsync("log sha256: " + logHash + " (copy or commit the first-pass log before you edit it again: it is the evidence)");
+        await console.Out.WriteLineAsync("log sha256: " + logHash + " (copy or commit the log as first read before you edit it again: it is the evidence)");
         foreach (var line in report.Lines)
         {
             await console.Out.WriteLineAsync(line);
