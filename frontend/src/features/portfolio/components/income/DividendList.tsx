@@ -1,5 +1,4 @@
 import {
-  Alert,
   Button,
   Stack,
   Table,
@@ -14,8 +13,8 @@ import type { DividendPage, DividendView } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
 import type { InfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { LoadingState } from '@/shared/ui';
-import { problemText } from '../../lib/errors';
 import { DividendRow } from './DividendRow';
+import { RetryAlert } from '../RetryAlert';
 
 interface DividendListProps {
   list: InfiniteRows<DividendView, DividendPage>;
@@ -41,18 +40,7 @@ export function DividendList({ list, owner, showHolding, emptyText, onVoid }: Di
   ] as const;
   if (list.isPending) return <LoadingState label="Loading dividends" />;
   if (list.isError) {
-    return (
-      <Alert
-        severity="error"
-        action={
-          <Button color="inherit" size="small" onClick={list.refetch}>
-            Retry
-          </Button>
-        }
-      >
-        {problemText(list.error, 'The dividends could not be loaded.')}
-      </Alert>
-    );
+    return <RetryAlert error={list.error} fallback="The dividends could not be loaded." onRetry={list.refetch} />;
   }
   if (list.rows.length === 0) return <Typography color="text.secondary">{emptyText}</Typography>;
   return (
@@ -80,16 +68,12 @@ export function DividendList({ list, owner, showHolding, emptyText, onVoid }: Di
           {`Showing ${formatNumber(list.rows.length)} of ${formatNumber(list.total)}`}
         </Typography>
         {list.loadMoreError && (
-          <Alert
+          <RetryAlert
+            error={list.loadMoreError}
+            fallback="The next dividends could not be loaded."
             severity="warning"
-            action={
-              <Button color="inherit" size="small" onClick={list.retryMore}>
-                Retry
-              </Button>
-            }
-          >
-            {problemText(list.loadMoreError, 'The next dividends could not be loaded.')}
-          </Alert>
+            onRetry={list.retryMore}
+          />
         )}
         {list.hasMore && !list.loadMoreError && (
           <Button size="small" loading={list.isFetchingNextPage} onClick={list.loadMore}>

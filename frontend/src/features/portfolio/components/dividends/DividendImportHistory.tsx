@@ -1,4 +1,4 @@
-import { Alert, Button, Divider, Stack, Typography } from '@mui/material';
+import { Button, Divider, Stack, Typography } from '@mui/material';
 import { useRef, useState } from 'react';
 import type { DividendBatch } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
@@ -7,9 +7,9 @@ import { LoadingState } from '@/shared/ui';
 import { useToast } from '@/shared/ui/toastContext';
 import { dividendBatchesList } from '../../api/dividendQueries';
 import { undoneText } from '../../lib/dividendImport';
-import { problemText } from '../../lib/errors';
 import { DividendBatchRow } from './DividendBatchRow';
 import { UndoDividendDialog } from './UndoDividendDialog';
+import { RetryAlert } from '../RetryAlert';
 
 /** The imported dividend files of the account, newest first (50 at a time), each with Undo while it counts. */
 export function DividendImportHistory({ accountId }: { accountId: string }) {
@@ -20,18 +20,7 @@ export function DividendImportHistory({ accountId }: { accountId: string }) {
 
   if (list.isPending) return <LoadingState label="Loading the imports" />;
   if (list.isError) {
-    return (
-      <Alert
-        severity="error"
-        action={
-          <Button color="inherit" size="small" onClick={list.refetch}>
-            Retry
-          </Button>
-        }
-      >
-        {problemText(list.error, 'The imports could not be loaded.')}
-      </Alert>
-    );
+    return <RetryAlert error={list.error} fallback="The imports could not be loaded." onRetry={list.refetch} />;
   }
   if (list.rows.length === 0) {
     return (
@@ -59,16 +48,12 @@ export function DividendImportHistory({ accountId }: { accountId: string }) {
           {`Showing ${formatNumber(list.rows.length)} of ${formatNumber(list.total)}`}
         </Typography>
         {list.loadMoreError && (
-          <Alert
+          <RetryAlert
+            error={list.loadMoreError}
+            fallback="The next imports could not be loaded."
             severity="warning"
-            action={
-              <Button color="inherit" size="small" onClick={list.retryMore}>
-                Retry
-              </Button>
-            }
-          >
-            {problemText(list.loadMoreError, 'The next imports could not be loaded.')}
-          </Alert>
+            onRetry={list.retryMore}
+          />
         )}
         {list.hasMore && !list.loadMoreError && (
           <Button size="small" loading={list.isFetchingNextPage} onClick={list.loadMore}>

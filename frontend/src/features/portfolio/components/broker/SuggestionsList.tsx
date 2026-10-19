@@ -1,5 +1,4 @@
 import {
-  Alert,
   Box,
   Button,
   Table,
@@ -23,6 +22,7 @@ import { useFocusRequest } from '../../hooks/useFocusRequest';
 import { problemKind, problemText } from '../../lib/errors';
 import { AcceptSuggestionDialog } from './AcceptSuggestionDialog';
 import { SuggestionRow } from './SuggestionRow';
+import { RetryAlert } from '../RetryAlert';
 
 /**
  * Ledger entries of class dividend that were not accepted or dismissed yet (Dhan's documented ledger has none for an ordinary
@@ -49,16 +49,7 @@ export function SuggestionsList({ accountId, focusOnShow = false }: { accountId:
   if (list.isPending) return <LoadingState label="Loading suggested dividends" />;
   if (list.isError) {
     return (
-      <Alert
-        severity="error"
-        action={
-          <Button color="inherit" size="small" onClick={list.refetch}>
-            Retry
-          </Button>
-        }
-      >
-        {problemText(list.error, 'The suggested dividends could not be loaded.')}
-      </Alert>
+      <RetryAlert error={list.error} fallback="The suggested dividends could not be loaded." onRetry={list.refetch} />
     );
   }
   if (list.rows.length === 0 && !decided) return null;

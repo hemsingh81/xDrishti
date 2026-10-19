@@ -6,6 +6,7 @@ import { capitalise } from '@/shared/lib/format';
 import { LoadingState } from '@/shared/ui';
 import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/shared/ui/dialog';
 import { undoPreviewQuery } from '../../api/tradeQueries';
+import { RetryAlert } from '../RetryAlert';
 import { problemKind, problemText } from '../../lib/errors';
 import { countOf, notRebuiltReason, replacedSentence } from '../../lib/tradeText';
 
@@ -38,22 +39,11 @@ export function UndoBatchDialog({ batch, busy, error, onConfirm, onCancel }: Und
       <AppDialogBody>
         {preview.isPending && <LoadingState label="Checking what the undo would do" />}
         {preview.isError && (
-          <Alert
-            severity="error"
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={() => {
-                  void preview.refetch();
-                }}
-              >
-                Retry
-              </Button>
-            }
-          >
-            {problemText(preview.error, 'What the undo would do could not be checked.')}
-          </Alert>
+          <RetryAlert
+            error={preview.error}
+            fallback="What the undo would do could not be checked."
+            onRetry={preview.refetch}
+          />
         )}
         {result?.alreadyUndone && (
           <Alert severity="info">This import has been undone already. Nothing will change.</Alert>

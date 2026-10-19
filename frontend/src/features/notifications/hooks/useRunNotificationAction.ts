@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ApiError, runCommand } from '@/shared/api';
+import { ApiError, queryRoots, runCommand } from '@/shared/api';
 import { useToast } from '@/shared/ui/toastContext';
 import type { NotificationAction } from '../lib/deriveNotifications';
 
@@ -43,8 +43,8 @@ export function useRunNotificationAction() {
       } finally {
         setBusy(null);
         // A run changes the sync status, the holdings and the notices; also after a refusal ("already running").
-        void queryClient.invalidateQueries({ queryKey: ['portfolio'] });
-        void queryClient.invalidateQueries({ queryKey: ['accounts'] });
+        void queryClient.invalidateQueries({ queryKey: queryRoots.portfolio });
+        void queryClient.invalidateQueries({ queryKey: queryRoots.accounts });
       }
     },
     [navigate, queryClient, notify],

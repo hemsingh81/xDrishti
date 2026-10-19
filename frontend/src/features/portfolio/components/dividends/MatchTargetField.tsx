@@ -1,4 +1,4 @@
-import { Alert, Box, Button } from '@mui/material';
+import { Box } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type Ref } from 'react';
 import type { DividendCandidate } from '@/shared/api';
@@ -6,7 +6,7 @@ import { useDebouncedValue } from '@/shared/lib/useDebouncedValue';
 import { Typeahead, type TypeaheadOption } from '@/shared/ui/Typeahead';
 import { dividendHoldingsQuery } from '../../api/dividendQueries';
 import { alertInstrumentsQuery, bareSymbol } from '../../api/lookupQueries';
-import { problemText } from '../../lib/errors';
+import { RetryAlert } from '../RetryAlert';
 
 const noneOption: TypeaheadOption = {
   value: 'none',
@@ -81,23 +81,12 @@ export function MatchTargetField({
         inputRef={inputRef}
       />
       {failed && (
-        <Alert
-          severity="error"
+        <RetryAlert
+          error={failed.error}
+          fallback="The holdings could not be searched."
           sx={{ mt: 1 }}
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => {
-                void failed.refetch();
-              }}
-            >
-              Retry
-            </Button>
-          }
-        >
-          {problemText(failed.error, 'The holdings could not be searched.')}
-        </Alert>
+          onRetry={failed.refetch}
+        />
       )}
     </Box>
   );

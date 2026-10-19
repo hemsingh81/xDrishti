@@ -1,4 +1,4 @@
-import { Alert, Button, Divider, Stack, Typography } from '@mui/material';
+import { Button, Divider, Stack, Typography } from '@mui/material';
 import { useRef, useState } from 'react';
 import type { CostBatch, TradeBatch } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
@@ -8,9 +8,9 @@ import { useToast } from '@/shared/ui/toastContext';
 import { costBatchesList } from '../../api/costQueries';
 import { useUndoBatch } from '../../api/tradeMutations';
 import { tradeBatchesList } from '../../api/tradeQueries';
-import { problemText } from '../../lib/errors';
 import { costUndoneText } from '../../lib/reportImport';
 import { undoneText } from '../../lib/tradeText';
+import { RetryAlert } from '../RetryAlert';
 import { CostBatchRow } from '../imports/CostBatchRow';
 import { UndoCostBatchDialog } from '../imports/UndoCostBatchDialog';
 import { BatchRow } from './BatchRow';
@@ -57,23 +57,14 @@ export function ImportHistory() {
   const failed = trades.isError ? trades : costs.isError ? costs : null;
   if (failed) {
     return (
-      <Alert
-        severity="error"
-        action={
-          <Button
-            color="inherit"
-            size="small"
-            onClick={() => {
-              trades.refetch();
-              costs.refetch();
-            }}
-          >
-            Retry
-          </Button>
-        }
-      >
-        {problemText(failed.error, 'The imports could not be loaded.')}
-      </Alert>
+      <RetryAlert
+        error={failed.error}
+        fallback="The imports could not be loaded."
+        onRetry={() => {
+          trades.refetch();
+          costs.refetch();
+        }}
+      />
     );
   }
   const entries: Entry[] = [
@@ -125,23 +116,15 @@ export function ImportHistory() {
           {`Showing ${formatNumber(entries.length)} of ${formatNumber(trades.total + costs.total)}`}
         </Typography>
         {loadMoreError && (
-          <Alert
+          <RetryAlert
+            error={loadMoreError}
+            fallback="The next imports could not be loaded."
             severity="warning"
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={() => {
-                  if (trades.loadMoreError) trades.retryMore();
-                  if (costs.loadMoreError) costs.retryMore();
-                }}
-              >
-                Retry
-              </Button>
-            }
-          >
-            {problemText(loadMoreError, 'The next imports could not be loaded.')}
-          </Alert>
+            onRetry={() => {
+              if (trades.loadMoreError) trades.retryMore();
+              if (costs.loadMoreError) costs.retryMore();
+            }}
+          />
         )}
         {hasMore && !loadMoreError && (
           <Button

@@ -1,4 +1,4 @@
-import { Alert, Box, Button, Card, CardContent, Stack, Typography, useMediaQuery } from '@mui/material';
+import { Box, Card, CardContent, Stack, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -15,7 +15,8 @@ import type { Decision } from '../../lib/actionDecision';
 import { coverageNotes, decidedText, decisionProblemText, emptyListText } from '../../lib/actionText';
 import { holdingIdOf, needDecisionText, type ActionStatus, type RowActionKey } from '../../lib/actions';
 import { alertTargetOfItem, type AlertTarget } from '../../lib/alertTarget';
-import { problemKind, problemText } from '../../lib/errors';
+import { problemKind } from '../../lib/errors';
+import { RetryAlert } from '../RetryAlert';
 import { ActionCenterHeader } from './ActionCenterHeader';
 import { ActionList } from './ActionList';
 import { ActionListSkeleton } from './ActionListSkeleton';
@@ -161,30 +162,17 @@ export function ActionCenterCard({
               }}
             />
             {query.isError && (
-              <Alert
-                severity={list ? 'warning' : 'error'}
-                sx={{ mt: 1.5 }}
-                action={
-                  retryable && (
-                    <Button
-                      color="inherit"
-                      size="small"
-                      onClick={() => {
-                        void query.refetch();
-                      }}
-                    >
-                      Retry
-                    </Button>
-                  )
-                }
-              >
-                {problemText(
-                  query.error,
+              <RetryAlert
+                error={query.error}
+                fallback={
                   list
                     ? 'The Action center could not be refreshed: this is the last list that was loaded.'
-                    : 'The Action center could not be loaded.',
-                )}
-              </Alert>
+                    : 'The Action center could not be loaded.'
+                }
+                severity={list ? 'warning' : 'error'}
+                sx={{ mt: 1.5 }}
+                onRetry={retryable ? query.refetch : undefined}
+              />
             )}
             {counts && coverageNotes(counts).length > 0 && (
               <Stack spacing={0.25} sx={{ mt: 1.5 }}>
