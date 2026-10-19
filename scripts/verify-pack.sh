@@ -4,6 +4,8 @@
 # edge category that occurs, and writes the pack under data/exports/verify/<pack-id>/ (cards, index.html, check-log.csv, engine-values.csv, README.txt, pack.json, manifest.json). It writes nothing to the database.
 #   scripts/verify-pack.sh --strategies ORB --basket Lab --from 2024-04-01 --to 2026-04-30 --seed p3-check-1 --gross
 #   scripts/verify-pack.sh --check data/exports/verify/<pack-id>/check-log.csv     # compare the filled log with the engine's values (reads files only)
+#   scripts/verify-pack.sh --assist data/exports/verify/<pack-id> [--second-source-folder <dir>]   # an automatic second read of the pack (P3-09c): NOT a signed check; writes assist-*.csv/html next to the pack and never touches check-log.csv
+#     Without --second-source-folder the second source is Dhan's charts/intraday (the Data account's token from the vault; about one request per distinct symbol and day, throttled). Folder files: <TICKER>_<yyyy-MM-dd>.csv with time,open,high,low,close[,volume].
 # The SEED IS YOURS: write it down before the first draw (letters, digits, '.', '_' and '-', at most 40); it has no default. Use the next name (p3-check-2, ...) after any fix.
 # The cost choice is required: --gross (no charges, labelled 'costs: none') or --costs <sheet-id> [--capital N] [--profile standard|conservative] [--max-cost-r X].
 # Exit codes: 0 done (check: complete), 1 refused or incomplete (nothing written), 2 wrong command line, configuration or unreadable input, 3 failure, 130 cancelled.
@@ -21,12 +23,20 @@ elif [[ "${1:-}" != "--check" ]]; then
   exit 2
 fi
 unset password
-# The script changes directory below, so a relative path of --check is made absolute against where the owner stands.
+# The script changes directory below, so a relative path of --check, --assist or --second-source-folder is made absolute against where the owner stands.
 caller="$PWD"
 args=()
 while (($#)); do
   case "$1" in
     --check)
+      args+=("$1")
+      shift
+      if (($#)); then
+        [[ "$1" = /* ]] && args+=("$1") || args+=("$caller/$1")
+        shift
+      fi
+      ;;
+    --assist | --second-source-folder)
       args+=("$1")
       shift
       if (($#)); then

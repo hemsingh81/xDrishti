@@ -14,6 +14,8 @@
     <ProjectReference Include="..\XDrishti.Strategies\XDrishti.Strategies.csproj" />
     <!-- The export of a simulation run (P3-04b1): the pure library that renders the files; the folder writer in this project puts them on disk (the ADR of P3-04b2). -->
     <ProjectReference Include="..\XDrishti.SimExport\XDrishti.SimExport.csproj" />
+    <!-- The independent chart reader of the assisted check (P3-09c): a pure function that references nothing of xDrishti. -->
+    <ProjectReference Include="..\XDrishti.SimReader\XDrishti.SimReader.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

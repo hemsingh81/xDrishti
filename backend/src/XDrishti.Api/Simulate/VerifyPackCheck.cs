@@ -127,8 +127,8 @@ internal static class VerifyPackCheck
     private static Result<(string Log, string Engine, string Folder)> Fail(string message) =>
         Result.Failure<(string Log, string Engine, string Folder)>(Error.Validation("verify_pack.check_input", message));
 
-    /// <summary>Null when every file the manifest lists, but the log, is there and hashes to its recorded value; otherwise the sentence for exit 2.</summary>
-    private static string? VerifyManifest(string folder)
+    /// <summary>Null when every file the manifest lists, but the log (and <paramref name="alsoSkip"/>, which is never opened), is there and hashes to its recorded value; otherwise the sentence for exit 2.</summary>
+    internal static string? VerifyManifest(string folder, string? alsoSkip = null)
     {
         var path = Path.Combine(folder, ExportPaths.ManifestName);
         try
@@ -144,7 +144,7 @@ internal static class VerifyPackCheck
                 return "manifest.json is not the manifest of a verification pack (" + PackFiles.Format + ")";
             }
 
-            foreach (var entry in parsed.Value.Entries.Where(e => !string.Equals(e.Name, PackFiles.CheckLogName, StringComparison.Ordinal)))
+            foreach (var entry in parsed.Value.Entries.Where(e => !string.Equals(e.Name, PackFiles.CheckLogName, StringComparison.Ordinal) && !string.Equals(e.Name, alsoSkip, StringComparison.Ordinal)))
             {
                 var file = ExportPaths.Combine(folder, entry.Name);
                 if (!File.Exists(file) || ExportPaths.IsLink(file) || new FileInfo(file).Length != entry.Bytes

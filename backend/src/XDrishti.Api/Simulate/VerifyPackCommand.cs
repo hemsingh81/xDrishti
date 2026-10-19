@@ -42,15 +42,26 @@ internal static class VerifyPackCommand
             return await VerifyPackCheck.RunAsync(options.CheckPath, console, logger, cancellationToken);
         }
 
+        if (options.AssistPath is not null)
+        {
+            // the assisted check reads the pack folder the owner names and the stored bars; it writes four files of its own into that folder
+            return await RunGuardedAsync(() => VerifyPackAssist.RunAsync(options, services, console, logger, cancellationToken), console, logger, cancellationToken);
+        }
+
         var root = ExportPaths.Root(exportRoot);
         if (root.IsFailure)
         {
             return SimulatePipeline.Usage(console, [root.Error.Message], VerifyPackOptions.Usage);
         }
 
+        return await RunGuardedAsync(() => ExecuteAsync(options, root.Value, services, engine, console, logger, cancellationToken), console, logger, cancellationToken);
+    }
+
+    private static async Task<int> RunGuardedAsync(Func<Task<int>> run, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
+    {
         try
         {
-            return await ExecuteAsync(options, root.Value, services, engine, console, logger, cancellationToken);
+            return await run();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

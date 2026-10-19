@@ -38,4 +38,7 @@ internal static partial class SimulateLog
 
     [LoggerMessage(EventId = 4422, Level = LogLevel.Information, Message = "Verify-pack verb started: {Strategies} strategies, universe {UniverseKind} of {Entries} entries, {From:yyyy-MM-dd} to {To:yyyy-MM-dd}, {Count} random trades")]
     public static partial void PackStarted(ILogger logger, int strategies, string universeKind, int entries, DateOnly from, DateOnly to, int count);
+
+    [LoggerMessage(EventId = 4423, Level = LogLevel.Information, Message = "Verify-pack assist read {Rows} rows on the second source {Source}: {Agree} agree_all, {Other} other")]
+    public static partial void AssistRead(ILogger logger, int rows, string source, int agree, int other);
 }

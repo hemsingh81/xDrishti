@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The chart reader (spec P3-09c D4): a pure function from one day of 1-minute bars to the readings of the hand-check protocol.
        Written from docs/research/p3-hand-check.md and ADR 0037/0038 only. It references nothing of xDrishti (no Domain, no Simulation, no SimOracle, no SimExport), no package;
-       architecture tests assert it. Not shipped in an image. -->
+       architecture tests assert it. Referenced by XDrishti.Api (the assist mode of verify-pack), so it is built into the image with it; the Dockerfile copies this project file. -->
   <ItemGroup>
     <InternalsVisibleTo Include="XDrishti.SimReader.Tests" />
   </ItemGroup>

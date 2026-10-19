@@ -7,7 +7,7 @@ namespace XDrishti.Api.Simulate;
 /// <summary>
 /// The command line of <c>verify-pack</c> (spec P3-09, V4), parsed strictly and purely by the rules of <see cref="SimulateOptions"/> (the same tokenizer, the same readers of symbols, basket, dates and the cost choice, the invariant culture). The
 /// seed is required and has no default: a default would be a hidden random source, and a seed chosen after the trades were seen is not a pre-registration. There is no <c>--param</c>: a pack checks the rule set as it ships. The mode
-/// <c>--check &lt;log&gt;</c> is used alone. The arguments are those after the verb name.
+/// <c>--check &lt;log&gt;</c> is used alone; the mode <c>--assist &lt;pack-folder&gt;</c> (spec P3-09c) takes only <c>--second-source-folder</c>. The arguments are those after the verb name.
 /// </summary>
 internal sealed record VerifyPackOptions(
     string? CheckPath,
@@ -20,7 +20,9 @@ internal sealed record VerifyPackOptions(
     int Count,
     CostChoice Costs,
     bool AcknowledgeCsvAdjusted,
-    bool Force)
+    bool Force,
+    string? AssistPath = null,
+    string? SecondSourceFolder = null)
 {
     /// <summary>The usage text (stderr on a usage error).</summary>
     public const string Usage =
@@ -30,11 +32,12 @@ internal sealed record VerifyPackOptions(
         + "              (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required)\n"
         + "              [--acknowledge-csv-adjusted] [--force]\n"
         + "  verify-pack --check <path-to-check-log.csv>\n"
+        + "  verify-pack --assist <pack-folder> [--second-source-folder <dir>]   (an automatic second read of a pack; not a signed check)\n"
         + "The seed is a text of letters, digits, '.', '_' and '-' (at most 40) that you write down before the first draw; it has no default.\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
 
     private static readonly string[] ValueFlags =
-        ["--strategies", "--symbols", "--basket", "--from", "--to", "--seed", "--count", "--check", "--costs", "--capital", "--profile", "--max-cost-r"];
+        ["--strategies", "--symbols", "--basket", "--from", "--to", "--seed", "--count", "--check", "--costs", "--capital", "--profile", "--max-cost-r", "--assist", "--second-source-folder"];
 
     private static readonly string[] SwitchFlags = ["--gross", "--acknowledge-csv-adjusted", "--force"];
 
@@ -60,6 +63,23 @@ internal sealed record VerifyPackOptions(
             return errors.Count > 0
                 ? Invalid(errors)
                 : new VerifyPackParse(new VerifyPackOptions(path, [], [], null, default, default, string.Empty, 0, CostChoice.Gross, false, false), []);
+        }
+
+        if (values.TryGetValue("--assist", out var folder))
+        {
+            if (errors.Count == 0 && (values.Keys.Any(k => k is not ("--assist" or "--second-source-folder")) || switches.Count > 0))
+            {
+                errors.Add("'--assist' is used with '--second-source-folder' only");
+            }
+
+            return errors.Count > 0
+                ? Invalid(errors)
+                : new VerifyPackParse(new VerifyPackOptions(null, [], [], null, default, default, string.Empty, 0, CostChoice.Gross, false, false, folder, values.GetValueOrDefault("--second-source-folder")), []);
+        }
+
+        if (values.ContainsKey("--second-source-folder"))
+        {
+            errors.Add("'--second-source-folder' is used with '--assist'");
         }
 
         var strategies = ReadStrategies(values, knownStrategyIds, errors);
