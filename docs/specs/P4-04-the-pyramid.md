@@ -1,6 +1,6 @@
 # P4-04 — `PYRAMID`
 
-- **Status:** Draft (written 2026-10-19 from `main` at a6b27af; nothing here is Approved until the owner says so). The table was read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D7, D11, D12), doc 08 §1 and §4 and the Approved specs [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md), [P4-02](P4-02-partial-exits-and-the-time-stop.md) and [P4-03](P4-03-the-trails-atr-structure-and-ema.md), **none of which is built**: every name of the tape, `IExitRule`, the legs, `StopLoosenIgnored` and `TimeStop` below is the one those specs give and is UNVERIFIED against code until they are built. Written ahead of the build on the owner's request; it should be re-read against the code of P4-01 before it is approved. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
+- **Status:** Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 8 stand as recommended, including question 7: re-read D3, D4, D7 and D9 against the built P4-01 before the build starts; the build still waits for P3 to close). Written 2026-10-19 from `main` at a6b27af. The table was read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D7, D11, D12), doc 08 §1 and §4 and the Approved specs [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md), [P4-02](P4-02-partial-exits-and-the-time-stop.md) and [P4-03](P4-03-the-trails-atr-structure-and-ema.md), **none of which is built**: every name of the tape, `IExitRule`, the legs, `StopLoosenIgnored` and `TimeStop` below is the one those specs give and is UNVERIFIED against code until they are built. Written ahead of the build on the owner's request; it should be re-read against the code of P4-01 before it is approved. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 4 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md). Candidate for the cut line of P4-00 question 6 (the pyramid moves to P5 if time runs short).
 - **Design refs:** docs/design/08-exits-and-risk.md §1 (R), §4 (pyramiding: "used only where the cell shows trend persistence"), §6 (sizing) · 16-configuration.md §2 (`exits`) · [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md) Amendment 1 · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) · [ADR 0042](../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.md) · ADR 0048 to 0050 (P4-01 to P4-03, to be written).
 
@@ -77,6 +77,8 @@ As P4-01 to P4-03 (allocation-free `FIXED_RR`, deterministic bytes). A pyramid n
 Unit: the ladder, the trigger, the add's fill and misses, the risk rule and its skip, the combined trail, the single exit leg, R and costs with several entry legs, refusals. Property: leak, monotonic stop, risk cap, legs, byte-identity of the earlier policies. Oracle: D13. Integration: verbs, export, store, cards. Edge cases: D13 plus a pyramid whose first add is attempted on the very first counted bar; an `initial_pct` of 100 with a ladder that sums to nothing (no add possible: `initial_pct + Σ add_pct ≤ 100` forces `add_pct` to be empty, which the table refuses, so a pyramid always has room); a swing pyramid whose add is attempted across a session break on E = 1D (the add fills at the next session's open within the limit).
 
 ## Open questions
+All eight answered "yes to all recommendations" by the owner on 2026-10-19: each stands as the recommendation written in it.
+
 1. **The unit of R (D1, D9).** 1R of a pyramid is the risk of the **full size** `Q × R0`, so a pyramid that enters only `initial_pct` and stops out loses `initial_pct` R (hand row: −0.5R before any add), and results are comparable with the other exits on the same entries (P4-05). Recommended: yes. The alternative, 1R = the risk of what is actually open, makes a half-size loss −1R and breaks the comparison.
 2. **MAE and MFE (D9):** price excursion against the share-weighted average entry in units of `R0`, not scaled by the shares. Recommended: yes (the same as P4-01 D10).
 3. **Adds fill only at the open (D3).** An add whose open is beyond the limit is missed, never filled at the limit when the minute trades back. Recommended: yes (pessimistic; it keeps the stop's moment defined); the alternative reuses E5 and needs a rule for the stop inside that minute.
@@ -87,7 +89,7 @@ Unit: the ladder, the trigger, the add's fill and misses, the risk rule and its 
 8. **Cut line.** If P4 runs late, `PYRAMID` moves to P5 (P4-00 question 6). Recommended: yes, nothing else in P4 depends on it.
 
 ## Done when
-- [ ] The owner has answered questions 1 to 8 and the status is Approved
+- [x] The owner has answered questions 1 to 8 and the status is Approved (2026-10-19)
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] No migration, no API change
