@@ -10,7 +10,7 @@
 # The cost choice is required: --gross (no charges, labelled 'costs: none') or --costs <sheet-id> [--capital N] [--profile standard|conservative] [--max-cost-r X].
 # Exit codes: 0 done (check: complete), 1 refused or incomplete (nothing written), 2 wrong command line, configuration or unreadable input, 3 failure, 130 cancelled.
 # Start the stack first with deploy/xd-up.sh and the developer database port (compose.dev.yaml, 127.0.0.1:5433). The one secret is the database password, read from the Keychain item
-# xdrishti/db/app; no broker key and no owner secret is read. The check mode reads no database and needs no password. Quote a symbol list: --symbols 'M&M,RELIANCE'.
+# xdrishti/db/app; no owner secret is read, and the broker vault key (Keychain xdrishti/broker/vault-key) only for --assist without --second-source-folder. The check mode reads no database and needs no password. Quote a symbol list: --symbols 'M&M,RELIANCE'.
 set -euo pipefail
 source "$(dirname "$0")/_env.sh"
 export DOTNET_ENVIRONMENT=Development
@@ -55,5 +55,13 @@ while (($#)); do
       ;;
   esac
 done
+# The Dhan second source of --assist reads the Data account's token from the broker vault, which needs the vault key: the same Keychain item dev-api.sh uses. Only that mode, and only without a folder source, reads it.
+if [[ " ${args[*]-} " == *" --assist "* && " ${args[*]-} " != *" --second-source-folder "* ]]; then
+  if ! BrokerVault__Key="$(security find-generic-password -a xdrishti -s xdrishti/broker/vault-key -w 2>/dev/null)"; then
+    echo "verify-pack.sh: the Keychain has no item xdrishti/broker/vault-key (start the stack once with deploy/xd-up.sh), or use --second-source-folder" >&2
+    exit 2
+  fi
+  export BrokerVault__Key
+fi
 cd "$ROOT/backend/src/XDrishti.Api"
 exec dotnet run -c Release --no-launch-profile -- verify-pack ${args[@]+"${args[@]}"}

@@ -1,4 +1,7 @@
 using System.Runtime.Versioning;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using XDrishti.Api.Simulate;
 using XDrishti.Api.Simulate.Assist;
 using XDrishti.Application.Abstractions.Market.Bars;
@@ -142,5 +145,42 @@ public sealed class AssistSecondSourceTests
 
         parsed.Options.ShouldBeNull();
         parsed.Errors.ShouldContain(e => e.Contains(message, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(IntradayFailureKind.Unauthorized)]
+    [InlineData(IntradayFailureKind.Failed)]
+    public async Task A_token_in_a_failure_text_reaches_no_console_line_no_pack_file_and_no_report(IntradayFailureKind kind)
+    {
+        const string FakeToken = "eyJFAKE-TOKEN-0123456789";
+        var (source, _) = Dhan(p => new IntradayResult(
+            Target.InstrumentId,
+            [],
+            1,
+            new IntradayFailure(kind, $"HTTP 401 Authorization: Bearer {FakeToken} access-token: {FakeToken} body={{\"token\":\"{FakeToken}\"}}")));
+        var folder = Folder([Symbol]);
+
+        var outcome = await AssistRunner.RunAsync(folder, source, new FakeStored(BuyDay()), TestContext.Current.CancellationToken);
+
+        folder.Files.Keys.ShouldContain(DiskPackFolder.ReportName);
+        var everything = string.Join('\n', outcome.Lines) + string.Concat(folder.Files.Values.Select(System.Text.Encoding.UTF8.GetString)) + string.Join('\n', folder.Ops);
+        everything.ShouldNotContain(FakeToken);
+        everything.ShouldNotContain("Bearer");
+        everything.ShouldContain("source_unavailable");
+    }
+
+    [Theory]
+    [InlineData("--assist /nowhere", 2, "needs the broker vault key")]
+    [InlineData("--assist /nowhere --second-source-folder /elsewhere", 2, "pack folder does not exist")]
+    public async Task The_dhan_source_without_a_vault_key_is_refused_with_the_reason_and_the_folder_source_does_not_ask_for_one(string line, int exit, string message)
+    {
+        var options = VerifyPackOptions.Parse(line.Split(' '), ["ORB"]).Options!;
+        var services = new ServiceCollection().AddSingleton<IConfiguration>(new ConfigurationBuilder().Build()).BuildServiceProvider();
+        using var error = new StringWriter();
+
+        var code = await VerifyPackAssist.RunAsync(options, services, new SimulateConsole(TextWriter.Null, error), NullLogger.Instance, TestContext.Current.CancellationToken);
+
+        code.ShouldBe(exit);
+        error.ToString().ShouldContain(message);
     }
 }

@@ -419,9 +419,9 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td><strong>The assisted check</strong>: <code>verify-pack --assist</code> reads each pack row&#39;s day from a second source (Dhan <code>charts/intraday</code> or a TradingView export folder), compares the stored bars, reads each trade blind with an independent chart reader (<code>XDrishti.SimReader</code>, no reference to the engine) and writes <code>assist-log.csv</code> and a report; the owner reads the exceptions and at least 5 rows on a real chart and signs. Amends the exit rule of the check (an auto-read row does not count as one of the 5 external ones).</td>
 <td>4, before P3-09&#39;s real check</td>
 <td>2 d</td>
-<td>Approved, in build (part 1, the reader, committed 8cd5aff)</td>
+<td>Approved, built; open: the owner&#39;s real run (AC 8)</td>
 <td><a href="../specs/P3-09c-the-assisted-check.html">spec</a></td>
-<td>Reader equals the engine on 5,000 oracle series (<strong>OPEN</strong>: the oracle&#39;s series are not opening-range days, so criterion 3 is not met); planted bar differences reported exactly; <code>check-log.csv</code> never overwritten</td>
+<td>Reader equals the real engine on 6,000 seeded invented opening-range days, both sides (the oracle&#39;s series are not days a reader can read, so this replaces the 5,000 oracle series; met, no disagreement); planted bar differences reported exactly; <code>check-log.csv</code> never overwritten</td>
 </tr>
 <tr>
 <td>P4-00 to P4-04</td>
@@ -779,7 +779,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-19 19:55</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-19 20:18</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

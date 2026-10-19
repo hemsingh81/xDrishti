@@ -16,6 +16,11 @@ internal static class VerifyPackAssist
 {
     public static async Task<int> RunAsync(VerifyPackOptions options, IServiceProvider services, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
     {
+        if (options.SecondSourceFolder is null && string.IsNullOrEmpty(services.GetRequiredService<IConfiguration>()["BrokerVault:Key"]))
+        {
+            return await Refuse(console, "the Dhan second source needs the broker vault key (BrokerVault__Key, set by scripts/verify-pack.sh from the Keychain); or use --second-source-folder");
+        }
+
         var folder = Path.GetFullPath(options.AssistPath!);
         if (!Directory.Exists(folder) || ExportPaths.IsLink(folder))
         {
