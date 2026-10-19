@@ -1,20 +1,9 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-} from '@mui/material';
+import { Box, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
+import { RetryAlert } from './RetryAlert';
 import { useQuery } from '@tanstack/react-query';
 import { formatDate } from '@/shared/lib/format';
 import { LoadingState } from '@/shared/ui';
 import { lotsQuery } from '../api/portfolioQueries';
-import { problemText } from '../lib/errors';
 import { isOpeningLot } from '../lib/tradeLots';
 import { LotRowView } from './LotRowView';
 
@@ -25,24 +14,7 @@ export function LotsSection({ holdingId }: { holdingId: string }) {
   const query = useQuery(lotsQuery(holdingId));
   if (query.isPending) return <LoadingState label="Loading lots" />;
   if (query.isError) {
-    return (
-      <Alert
-        severity="error"
-        action={
-          <Button
-            color="inherit"
-            size="small"
-            onClick={() => {
-              void query.refetch();
-            }}
-          >
-            Retry
-          </Button>
-        }
-      >
-        {problemText(query.error, 'The lots could not be loaded.')}
-      </Alert>
-    );
+    return <RetryAlert error={query.error} fallback="The lots could not be loaded." onRetry={query.refetch} />;
   }
   const { lots, valuationDate } = query.data;
   return (

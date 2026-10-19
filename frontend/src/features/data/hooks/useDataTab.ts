@@ -60,5 +60,3 @@ export function useDataTab() {
 
   return useMemo(() => ({ tab, open }), [tab, open]);
 }
-
-export type DataTabState = ReturnType<typeof useDataTab>;

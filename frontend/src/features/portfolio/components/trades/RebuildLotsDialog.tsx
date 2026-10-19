@@ -9,6 +9,7 @@ import { useApplyRebuild } from '../../api/tradeMutations';
 import { rebuildPreviewQuery } from '../../api/tradeQueries';
 import { problemKind, problemText } from '../../lib/errors';
 import { countOf, statusOf } from '../../lib/tradeText';
+import { RetryAlert } from '../RetryAlert';
 import { RebuildSummary } from './RebuildSummary';
 
 interface RebuildLotsDialogProps {
@@ -59,22 +60,7 @@ export function RebuildLotsDialog({ holdingId, symbol, onClose }: RebuildLotsDia
       <AppDialogBody>
         {preview.isPending && <LoadingState label="Checking the lots against the trades" />}
         {preview.isError && (
-          <Alert
-            severity="error"
-            action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={() => {
-                  void preview.refetch();
-                }}
-              >
-                Retry
-              </Button>
-            }
-          >
-            {problemText(preview.error, 'The rebuild could not be checked.')}
-          </Alert>
+          <RetryAlert error={preview.error} fallback="The rebuild could not be checked." onRetry={preview.refetch} />
         )}
         {rebuild && <RebuildSummary rebuild={rebuild} />}
         {refused && (

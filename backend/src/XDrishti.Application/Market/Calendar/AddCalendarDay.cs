@@ -129,16 +129,14 @@ internal sealed class AddCalendarDayHandler(
             return (SessionClock.OpenMinute, SessionClock.CloseMinute);
         }
 
-        var from = 0;
-        var to = 0;
         var ok = true;
-        if (!CalendarChecks.TryClock(request.SessionFrom, out from))
+        if (!CalendarChecks.TryClock(request.SessionFrom, out var from))
         {
             errors.Add("sessionFrom", "Use the time as HH:mm (India time).");
             ok = false;
         }
 
-        if (!CalendarChecks.TryClock(request.SessionTo, out to))
+        if (!CalendarChecks.TryClock(request.SessionTo, out var to))
         {
             errors.Add("sessionTo", "Use the time as HH:mm (India time).");
             ok = false;

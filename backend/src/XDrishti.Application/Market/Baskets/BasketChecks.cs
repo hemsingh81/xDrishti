@@ -1,4 +1,5 @@
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Common;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Baskets;
 
@@ -48,7 +49,7 @@ internal static class BasketChecks
             return Result.Failure<Guid[]>(BasketErrors.Invalid(field, "An id is empty."));
         }
 
-        return ids.Distinct().Count() != ids.Count
+        return ids.HasDuplicates()
             ? Result.Failure<Guid[]>(BasketErrors.Invalid(field, "An id appears more than once."))
             : Result.Success(ids.ToArray());
     }

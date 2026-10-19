@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import {
   api,
   ensureOk,
+  queryRoots,
   unwrap,
   type AccountDetail,
   type ConnectionInput,
@@ -129,7 +130,7 @@ export function useUpdatePortfolio({ onSaved }: { onSaved?: () => void } = {}) {
       await Promise.all([
         refreshAccount(queryClient, saved.account),
         // The portfolio feature's keys all start with 'portfolio' (holdings, summary, lots, sync-status).
-        queryClient.invalidateQueries({ queryKey: ['portfolio'] }),
+        queryClient.invalidateQueries({ queryKey: queryRoots.portfolio }),
       ]);
       // A hook-level callback: unlike one passed to `mutate`, it still runs when the form that saved has been replaced.
       onSaved?.();

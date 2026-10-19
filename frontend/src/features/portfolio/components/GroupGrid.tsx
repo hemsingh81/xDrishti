@@ -1,7 +1,7 @@
 import { Alert, Box, Button, Card, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { HoldingGroups } from '@/shared/api';
 import { LoadingState } from '@/shared/ui';
 import { stateAlpha } from '@/theme';
@@ -12,6 +12,7 @@ import { isUnallocatedGroup } from '../lib/income';
 import type { GroupScope } from './GroupChildren';
 import { GroupCards } from './GroupCards';
 import { GroupTable } from './GroupTable';
+import { RetryAlert } from './RetryAlert';
 import { GroupToolbar } from './GroupToolbar';
 
 interface GroupGridProps {
@@ -26,26 +27,24 @@ interface GroupGridProps {
 /** The groups could not be loaded: Retry, or, when the server refused the request itself, a way back to the flat list. */
 function GroupsError({ query, onFlat }: { query: UseQueryResult<HoldingGroups>; onFlat: () => void }) {
   const refused = problemKind(query.error) === 'invalid';
+  if (!refused) {
+    return (
+      <RetryAlert
+        error={query.error}
+        fallback="The groups could not be loaded."
+        sx={{ m: 2 }}
+        onRetry={query.refetch}
+      />
+    );
+  }
   return (
     <Alert
       severity="error"
       sx={{ m: 2 }}
       action={
-        refused ? (
-          <Button color="inherit" size="small" onClick={onFlat}>
-            Group by None
-          </Button>
-        ) : (
-          <Button
-            color="inherit"
-            size="small"
-            onClick={() => {
-              void query.refetch();
-            }}
-          >
-            Retry
-          </Button>
-        )
+        <Button color="inherit" size="small" onClick={onFlat}>
+          Group by None
+        </Button>
       }
     >
       {problemText(query.error, 'The groups could not be loaded.')}
@@ -65,7 +64,10 @@ export function GroupGrid({ query, by, scope, emptyState, onChange }: GroupGridP
   const sort = groupSortOf(scope.filters.sort);
   // Keys of groups that are gone (another filter or order) do not count as open.
   // The extra Unallocated row is not a group of holdings: it is not counted, opened or listed by Expand all.
-  const groupKeys = data ? data.groups.filter((group) => !isUnallocatedGroup(group)).map((group) => group.key) : [];
+  const groupKeys = useMemo(
+    () => (data ? data.groups.filter((group) => !isUnallocatedGroup(group)).map((group) => group.key) : []),
+    [data],
+  );
   const openCount = groupKeys.filter((key) => open.has(key)).length;
 
   const toggle = (key: string) => {
@@ -134,23 +136,14 @@ export function GroupGrid({ query, by, scope, emptyState, onChange }: GroupGridP
         }
       />
       {query.isError && data !== undefined && (
-        <Alert
+        <RetryAlert
           severity="warning"
+          error={query.error}
+          fallback="The groups could not be refreshed."
+          suffix="What is shown may be out of date."
           sx={{ mx: 2, mb: 1 }}
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => {
-                void query.refetch();
-              }}
-            >
-              Retry
-            </Button>
-          }
-        >
-          {`${problemText(query.error, 'The groups could not be refreshed.')} What is shown may be out of date.`}
-        </Alert>
+          onRetry={query.refetch}
+        />
       )}
       <Box
         aria-busy={query.isFetching || undefined}

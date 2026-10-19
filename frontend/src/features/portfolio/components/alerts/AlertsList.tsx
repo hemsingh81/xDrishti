@@ -1,12 +1,12 @@
-import { Alert, Button, Divider, Stack, Typography } from '@mui/material';
+import { Button, Divider, Stack, Typography } from '@mui/material';
 import type { PriceAlert } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
 import { LoadingState } from '@/shared/ui';
 import type { InfiniteRows } from '@/shared/lib/useInfiniteRows';
 import type { PriceAlertPage } from '@/shared/api';
 import { alertStatusLabels, type AlertStatus } from '../../lib/alerts';
-import { problemText } from '../../lib/errors';
 import { AlertRow } from './AlertRow';
+import { RetryAlert } from '../RetryAlert';
 
 const emptyText: Record<AlertStatus, string> = {
   active: 'No active alerts. Set one with Set alert on a holding or in the Action center, or with New alert.',
@@ -24,18 +24,7 @@ interface AlertsListProps {
 export function AlertsList({ status, result, onCancel }: AlertsListProps) {
   if (result.isPending) return <LoadingState label="Loading alerts" />;
   if (result.isError) {
-    return (
-      <Alert
-        severity="error"
-        action={
-          <Button color="inherit" size="small" onClick={result.refetch}>
-            Retry
-          </Button>
-        }
-      >
-        {problemText(result.error, 'The alerts could not be loaded.')}
-      </Alert>
-    );
+    return <RetryAlert error={result.error} fallback="The alerts could not be loaded." onRetry={result.refetch} />;
   }
   if (result.rows.length === 0) {
     return (
@@ -61,16 +50,12 @@ export function AlertsList({ status, result, onCancel }: AlertsListProps) {
           {`Showing ${formatNumber(result.rows.length)} of ${formatNumber(result.total)}`}
         </Typography>
         {result.loadMoreError && (
-          <Alert
+          <RetryAlert
+            error={result.loadMoreError}
+            fallback="The next alerts could not be loaded."
             severity="warning"
-            action={
-              <Button color="inherit" size="small" onClick={result.retryMore}>
-                Retry
-              </Button>
-            }
-          >
-            {problemText(result.loadMoreError, 'The next alerts could not be loaded.')}
-          </Alert>
+            onRetry={result.retryMore}
+          />
         )}
         {result.hasMore && !result.loadMoreError && (
           <Button size="small" loading={result.isFetchingNextPage} onClick={result.loadMore}>

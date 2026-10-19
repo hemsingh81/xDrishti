@@ -1,4 +1,5 @@
 import { Alert, Button, Stack, TextField } from '@mui/material';
+import { unshownFieldErrorsText } from '@/shared/lib/fieldErrors';
 import { useRef, useState, type SyntheticEvent } from 'react';
 import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/shared/ui/dialog';
 import { useToast } from '@/shared/ui/toastContext';
@@ -27,7 +28,7 @@ export function AddCalendarDayDialog({ onClose }: { onClose: () => void }) {
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const serverErrors = fieldErrors(add.error);
   const errors = { ...serverErrors, ...clientErrors };
-  const others = Object.entries(serverErrors).filter(([field]) => !shownFields.includes(field));
+  const otherErrors = unshownFieldErrorsText(serverErrors, shownFields);
   const problem =
     add.isError && Object.keys(serverErrors).length === 0
       ? calendarErrorText(add.error, 'The day could not be added.')
@@ -68,9 +69,7 @@ export function AddCalendarDayDialog({ onClose }: { onClose: () => void }) {
       <AppDialogBody>
         <Stack spacing={2.5}>
           {problem && <Alert severity="error">{problem}</Alert>}
-          {others.length > 0 && (
-            <Alert severity="error">{others.map(([field, message]) => `${field}: ${message}`).join(' ')}</Alert>
-          )}
+          {otherErrors && <Alert severity="error">{otherErrors}</Alert>}
           <TextField
             required
             fullWidth

@@ -30,12 +30,6 @@ export const roleInfo: Record<
 export const modeLabels: Record<string, string> = { paper: 'paper', manual_live: 'manual live' };
 export const modeLabel = (mode: string): string => modeLabels[mode] ?? mode;
 
-export const instrumentLabels: Record<string, string> = {
-  EQ_MIS: 'EQ_MIS',
-  EQ_CNC: 'EQ_CNC',
-  FUT: 'FUT',
-};
-
 export const weeklyLossActionLabels: Record<string, string> = {
   halve_size: 'Halve position size',
   stop_new_entries: 'Stop new entries',

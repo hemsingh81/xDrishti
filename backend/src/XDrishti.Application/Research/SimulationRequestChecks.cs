@@ -1,3 +1,4 @@
+using XDrishti.Application.Common;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
@@ -76,7 +77,7 @@ internal static class SimulationRequestChecks
             {
                 errors.Add("instrumentIds", $"Give 1 to {MaxInstruments} instruments.");
             }
-            else if (ids.Distinct().Count() != ids.Count)
+            else if (ids.HasDuplicates())
             {
                 errors.Add("instrumentIds", "An instrument is listed twice.");
             }

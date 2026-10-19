@@ -1,5 +1,4 @@
 import {
-  Alert,
   Button,
   Stack,
   Table,
@@ -15,8 +14,8 @@ import type { LedgerEntry, LedgerPage } from '@/shared/api';
 import { formatNumber } from '@/shared/lib/format';
 import type { InfiniteRows } from '@/shared/lib/useInfiniteRows';
 import { LoadingState } from '@/shared/ui';
-import { problemText } from '../../lib/errors';
 import { LedgerRow } from './LedgerRow';
+import { RetryAlert } from '../RetryAlert';
 
 const headings = [
   { label: 'Date', align: 'left' },
@@ -46,18 +45,7 @@ export function LedgerList({ list, filtered }: LedgerListProps) {
   }, [exhausted]);
   if (list.isPending) return <LoadingState label="Loading the ledger" />;
   if (list.isError) {
-    return (
-      <Alert
-        severity="error"
-        action={
-          <Button color="inherit" size="small" onClick={list.refetch}>
-            Retry
-          </Button>
-        }
-      >
-        {problemText(list.error, 'The ledger could not be loaded.')}
-      </Alert>
-    );
+    return <RetryAlert error={list.error} fallback="The ledger could not be loaded." onRetry={list.refetch} />;
   }
   if (list.rows.length === 0) {
     return (
@@ -93,16 +81,12 @@ export function LedgerList({ list, filtered }: LedgerListProps) {
           {`Showing ${formatNumber(list.rows.length)} of ${formatNumber(list.total)}`}
         </Typography>
         {list.loadMoreError && (
-          <Alert
+          <RetryAlert
+            error={list.loadMoreError}
+            fallback="The next entries could not be loaded."
             severity="warning"
-            action={
-              <Button color="inherit" size="small" onClick={list.retryMore}>
-                Retry
-              </Button>
-            }
-          >
-            {problemText(list.loadMoreError, 'The next entries could not be loaded.')}
-          </Alert>
+            onRetry={list.retryMore}
+          />
         )}
         {list.hasMore && !list.loadMoreError && (
           // Not `loading`: that disables the button and the keyboard would lose its place while the page loads.

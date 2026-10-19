@@ -1,11 +1,12 @@
-import { Alert, Button, Card, CardContent, Stack, Typography, useMediaQuery } from '@mui/material';
+import { Card, CardContent, Stack, Typography, useMediaQuery } from '@mui/material';
+import { RetryAlert } from './RetryAlert';
 import { useTheme } from '@mui/material/styles';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useId, useMemo } from 'react';
 import type { PortfolioHistory } from '@/shared/api';
 import { formatCompact, formatInr } from '@/shared/lib/format';
 import { TimeSeriesChart } from '@/shared/ui/chart';
-import { problemText, scopeTooLarge } from '../lib/errors';
+import { scopeTooLarge } from '../lib/errors';
 import { historySeries } from '../lib/historyView';
 import type { HistoryRange } from '../lib/historyRange';
 import { CoverageLine } from './CoverageLine';
@@ -57,25 +58,13 @@ export function HistoryCard({ query, range, onRangeChange, defaultDateLots, scop
           <RangeChips value={range} onChange={onRangeChange} />
         </Stack>
         {query.isError && (
-          <Alert
-            severity="error"
+          <RetryAlert
+            error={query.error}
+            fallback="The history could not be loaded."
+            message={tooLarge}
+            onRetry={tooLarge === null ? query.refetch : undefined}
             sx={{ mb: 1.5 }}
-            action={
-              tooLarge === null && (
-                <Button
-                  color="inherit"
-                  size="small"
-                  onClick={() => {
-                    void query.refetch();
-                  }}
-                >
-                  Retry
-                </Button>
-              )
-            }
-          >
-            {tooLarge ?? problemText(query.error, 'The history could not be loaded.')}
-          </Alert>
+          />
         )}
         {!query.isError || history ? (
           <TimeSeriesChart
