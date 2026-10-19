@@ -203,6 +203,44 @@ the lagged series is the close, so the condition is known from the first bar of 
 <code>or_min = 20</code> is refused on 15m (not a whole number of bars). The target is two times the risk by default and the walker fills the entry in the minute after the decision (at the open or at the +0.1 % limit), so a breakout that gaps through the opposite
 end of the range at that open is no trade (<code>EntryThroughStop</code>, counted) and one that opens above the limit and does not trade back to it is a miss (<code>LimitNotReached</code>, counted). A figure from the simulator for this strategy is a signal-level result per instrument, in-sample, with modelled fills (the entry limit of +0.1 %, slippage on the tick grid; ADR 0038) and no costs.
 The builder is the interim source of the built-in <code>ORB</code> until P3-02d seeds it as stored text (ADR 0002); the stored text and its hash then replace it as the version.</p>
+<p><strong><code>VWAP_PULLBACK</code> as built (P3-05, <code>VwapPullback.Create(pullAtr = 0.5, rewardRisk = 2.0)</code> in <code>XDrishti.Strategies.BuiltIn</code>).</strong> The second rule set the simulator runs. <strong>It is the owner&#39;s proposal</strong>, approved as written for the first run on 2026-10-19 and open to change after the first look at its trades; nothing about it is evidence of an edge (passing the hand check says the mechanics are right). Id <code>VWAP_PULLBACK</code>, intraday, <strong>15m only</strong>, BUY and SELL both written out by hand, two parameters: <code>pull_atr</code> (default 0.5, declared range <code>0 &lt; x &lt;= 3</code>, <a href="../adr/0041-the-simulate-verb-the-export-library-and-the-pipeline-in-the-host.html">ADR 0041</a> Amendment 2) and <code>rr</code> (default 2, as for ORB). Entries are accepted from 10:00 (the first bar at which the two lags of a session-restarting feature can be known) to 14:30; the position leaves at 15:15 at the latest.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>BUY (SELL is the mirror: comparison reversed, <code>high</code> for <code>low</code>, <code>-</code> for <code>+</code>)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Setup 0, hourly trend</td>
+<td><code>tf(&quot;1h&quot;).ema(20) &gt; tf(&quot;1h&quot;).ema(50)</code></td>
+</tr>
+<tr>
+<td>Setup 1, daily trend</td>
+<td><code>tf(&quot;1D&quot;).close &gt; tf(&quot;1D&quot;).ema(20)</code> (the last closed day)</td>
+</tr>
+<tr>
+<td>Trigger 0, the trigger bar</td>
+<td><code>close &gt; vwap and close &gt; open</code></td>
+</tr>
+<tr>
+<td>Trigger 1, two closes on the right side</td>
+<td><code>close[1] &gt; vwap[1] and close[2] &gt; vwap[2]</code></td>
+</tr>
+<tr>
+<td>Trigger 2, the dip</td>
+<td><code>low[1] &lt; low[2] and low[1] &lt;= vwap[1] + pull_atr * atr(14)</code></td>
+</tr>
+<tr>
+<td>Stop</td>
+<td><code>swing_low</code> over 2 bars (the lower of the dip bar&#39;s and the trigger bar&#39;s lows), no buffer</td>
+</tr>
+<tr>
+<td>Exit</td>
+<td>one <code>FIXED_RR</code>, <code>rr</code> times the risk</td>
+</tr>
+</tbody></table>
+<p>Reading: bars <em>t</em>-2 and <em>t</em>-1 closed above the session VWAP; bar <em>t</em>-1 is the dip bar, which made a lower low and came back to within <code>pull_atr</code> ATRs of VWAP (it may go below it and close above); bar <em>t</em> closed above VWAP and above its own open. The lower low is the draft&#39;s addition to the roadmap&#39;s one-line sketch (without it a steady climb counts as a pullback); the stop at the pullback low replaces the sketch&#39;s <code>bar_low</code> (the trigger bar&#39;s own low alone is too tight and sits above the level the pattern says must hold). There is no lower bound on the dip: a long wick far below VWAP that closes above it gives a wide stop and a distant target. Only the level form is used (<code>vwap</code> keeps the history of the session only, ADR 0035), so the lagged items are unknown on the first two bars and the first bar that can be known is bar 3, decided at 10:00. On 15m <strong><code>vwap</code> is the volume-weighted mean of the 15-minute bars&#39; typical prices</strong>, not the minute-by-minute VWAP of a charting platform, and the engine&#39;s ATR may be seeded differently from a chart&#39;s: compare a trade with a chart by recomputing the engine&#39;s numbers, not by reading the chart. The hourly buckets start at 09:15 and a partial bucket from 15:15 is a bar of its own (seven hourly bars a session), so <code>tf(&quot;1h&quot;).ema(50)</code> is ready after about seven sessions and <code>tf(&quot;1D&quot;).ema(20)</code> after twenty: the first possible trade of a replay is on session 21, and the scanner&#39;s counters show the cold start as <code>NotReady</code>. A lagged item that is combined with a known False (<code>low[1] &lt; low[2]</code> on bar 1 or 2, where the <code>low</code> history is continuous across sessions) is False, not unknown, because a False conjunct decides an <code>and</code>. The ATR stop and stop buffer that the roadmap row listed for this slice are not built (this rule set needs neither; they would be a separate slice with its own ADR). The builder is the interim source of the built-in until P3-02d.</p>
 <h2 id="4-multi-timeframe-mapping">4. Multi-timeframe mapping<a class="hash" href="#4-multi-timeframe-mapping" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -357,7 +395,7 @@ part of the regime. The configuration inputs are in <a href="16-configuration.ht
     <a class="prev" href="06-instruments-and-baskets.html"><small>← Previous  [</small>06 · Instruments &amp; baskets</a>
     <a class="next" href="08-exits-and-risk.html"><small>Next  ] →</small>08 · Exits &amp; risk</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-19 07:06</footer>
+  <footer class="foot">Generated from <code>docs/07-strategies.md</code> · 2026-10-19 07:45</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-strategy-anatomy" class="d2">1. Strategy anatomy</a>
 <a href="#2-conditional-trade-plans" class="d2">2. Conditional trade plans</a>

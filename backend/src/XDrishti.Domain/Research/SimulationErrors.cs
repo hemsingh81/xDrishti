@@ -30,6 +30,9 @@ public static class SimulationErrors
     /// <summary>A parameter name the built-in strategy does not have (a located problem of the strategy factory, path <c>parameters.&lt;name&gt;</c>).</summary>
     public const string UnknownParameterCode = "simulation.unknown_parameter";
 
+    /// <summary>A finite parameter value outside the range the built-in strategy declares for it (a located problem of the strategy factory, path <c>parameters.&lt;name&gt;</c>; ADR 0041 Amendment 2).</summary>
+    public const string ParameterOutOfRangeCode = "simulation.parameter_out_of_range";
+
     /// <summary>The most problems a <see cref="StrategyInvalid"/> error lists; the rest are counted in its message.</summary>
     public const int MaxStrategyProblems = 20;
 

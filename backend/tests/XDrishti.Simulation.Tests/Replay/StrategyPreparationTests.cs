@@ -142,9 +142,9 @@ public sealed class StrategyPreparationTests
     }
 
     [Fact]
-    public void The_built_in_ids_are_exactly_orb_and_a_prepared_factory_build_is_accepted_by_prepare()
+    public void The_built_in_ids_are_exactly_orb_then_vwap_pullback_and_a_prepared_factory_build_is_accepted_by_prepare()
     {
-        BuiltInStrategies.Ids.ShouldBe(["ORB"]);
+        BuiltInStrategies.Ids.ShouldBe(["ORB", "VWAP_PULLBACK"]);
         var build = BuiltInStrategies.Build("ORB", Params(("or_min", 30)));
 
         var prepared = StrategyPreparation.Prepare(build.Definition!, build.Parameters, Timeframe.M5);

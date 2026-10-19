@@ -26,6 +26,39 @@ public sealed class BuiltInCatalogTests
     }
 
     [Fact]
+    public void Vwap_pullback_is_the_second_row_with_15m_only_and_its_two_parameters()
+    {
+        var entry = BuiltInStrategies.Catalog.Single(c => c.Id == "VWAP_PULLBACK");
+
+        BuiltInStrategies.Ids.ShouldBe(["ORB", "VWAP_PULLBACK"]);
+        entry.Timeframes.ShouldBe([Timeframe.M15]);
+        entry.DefaultTimeframe.ShouldBe(Timeframe.M15);
+        entry.Parameters.Select(p => (p.Name, p.Default)).ShouldBe([("pull_atr", 0.5), ("rr", 2.0)]);
+        entry.Description.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void Only_pull_atr_declares_a_range_and_it_is_zero_exclusive_to_three()
+    {
+        var declared = BuiltInStrategies.Catalog.SelectMany(c => c.Parameters.Where(p => p.HasRange).Select(p => (c.Id, p.Name, p.Min, p.Max, p.MinExclusive)));
+
+        declared.ShouldBe([("VWAP_PULLBACK", "pull_atr", (double?)0.0, (double?)3.0, true)]);
+    }
+
+    [Fact]
+    public void Every_default_satisfies_its_own_range_and_a_range_is_not_empty()
+    {
+        foreach (var parameter in BuiltInStrategies.Catalog.SelectMany(c => c.Parameters))
+        {
+            parameter.Contains(parameter.Default).ShouldBeTrue(parameter.Name + " default " + parameter.Default);
+            if (parameter is { Min: { } min, Max: { } max })
+            {
+                min.ShouldBeLessThanOrEqualTo(max, parameter.Name);
+            }
+        }
+    }
+
+    [Fact]
     public void Every_entry_prepares_with_its_own_defaults_on_each_timeframe_it_allows_and_records_the_defaults()
     {
         foreach (var entry in BuiltInStrategies.Catalog)

@@ -301,7 +301,7 @@ internal static class SimulateCommand
             foreach (var parameter in entry.Parameters)
             {
                 text.Append("  --param ").Append(parameter.Name).Append("=<number>  default ")
-                    .Append(parameter.Default.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(": ").Append(parameter.Note).Append('\n');
+                    .Append(parameter.Default.ToString("R", System.Globalization.CultureInfo.InvariantCulture)).Append(parameter.HasRange ? ", range " + parameter.RangeText() : string.Empty).Append(": ").Append(parameter.Note).Append('\n');
             }
         }
 
