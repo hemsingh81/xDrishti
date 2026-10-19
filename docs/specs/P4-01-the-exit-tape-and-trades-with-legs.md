@@ -1,6 +1,6 @@
 # P4-01 — The exit tape and trades with legs
 
-- **Status:** Draft (written 2026-10-19 from `main` at 7c614e4; nothing here is Approved until the owner says so). The facts about the code were read that day (`SimTrade`, `EntryCandidate`, `TradeWalker`, `MinuteRule`, `WalkRules`, `Position`, `WalkOutcome`, `TradeCosting`, `EntryScanner`, `Simulator`); what was not read or could not be verified is marked UNVERIFIED. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md), *Why P4 waits*).
+- **Status:** Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 6 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at 7c614e4. The facts about the code were read that day (`SimTrade`, `EntryCandidate`, `TradeWalker`, `MinuteRule`, `WalkRules`, `Position`, `WalkOutcome`, `TradeCosting`, `EntryScanner`, `Simulator`); what was not read or could not be verified is marked UNVERIFIED. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md), *Why P4 waits*).
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 1 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md) (approved 2026-10-19, questions 1 to 8 as recommended).
 - **Design refs:** docs/design/08-exits-and-risk.md §1, §2 (the as-built paragraph: a value of bar *k* acts only from the first minute after its close), §5, §8 · 11-strategy-lab.md *Why a condition cannot look ahead* · [ADR 0037](../adr/0037-simulation-conventions-and-the-two-stage-seam.md) · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) · [ADR 0040](../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.md) · [ADR 0042](../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.md) · [ADR 0043](../adr/0043-the-daily-evaluation-and-the-overnight-entry-order-sim-5-and-run-record-schema-5.md) · [ADR 0047](../adr/0047-the-oracle-and-the-rule-table-gaps.md) · [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md).
 
@@ -92,6 +92,8 @@ Performance: the `FIXED_RR` path stays allocation-free per minute and within 5 %
 Unit (Simulation): tape build and read, `IExitRule` plumbing with `FIXED_RR` re-expressed, the minute table with a moved stop, legs arithmetic and costs by hand. Property: byte-identity (AC 1), look-ahead (AC 4), stop never loosens (AC 5), legs invariants (AC 6). Oracle: extension (AC 10). Integration: store, export, cards (AC 11, AC 12), Testcontainers as in P3-10. Architecture: AC 13. Edge cases: a partial exit and the stop in the same minute; a leg in the fill minute of an entry at the limit (only the stop is checked there, X5); a swing position with a partial exit overnight and a gap through the moved stop; a trail level computed on the last bar of a session acting on the next session's first minute; a NaN tape value; a bar whose close coincides with the square-off minute; a leg of quantity 0; a sell.
 
 ## Open questions
+All six answered "yes to all recommendations" by the owner on 2026-10-19: each stands as the recommendation written in it.
+
 1. **The tape or the per-candidate series?** Recommended: the tape (refinement of P4-00 D1, reasons above).
 2. **Is the test-only rule enough to prove the seam?** Recommended: yes; the alternative is to move `PARTIAL_BE` (no tape needed, real legs) and one trail into this slice, which makes it about 4.5 days and so a split into two.
 3. **MAE and MFE of a trade with legs (D10):** measured against the share-weighted average entry in units of the first `R0`? Recommended: yes.
@@ -100,7 +102,7 @@ Unit (Simulation): tape build and read, `IExitRule` plumbing with `FIXED_RR` re-
 6. **The export format name (D15):** `xd-sim-export-3` if the build finds the nullable field needs it. Recommended: let the build decide and say so in the ADR.
 
 ## Done when
-- [ ] The owner has answered questions 1 to 6 and the status is Approved
+- [x] The owner has answered questions 1 to 6 and the status is Approved (2026-10-19)
 - [ ] All acceptance criteria have evidence
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
 - [ ] Migration added (if D15's column is built), the contract unchanged
