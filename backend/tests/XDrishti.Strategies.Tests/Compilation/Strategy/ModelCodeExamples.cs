@@ -84,6 +84,8 @@ public sealed record ModelCodeExample(
             Row("feature_invalid", "buy.stop.lookback", WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(0))), WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(1)))),
             Row("duplicate_exit", "buy.exits[1]", WithExits(Defs.FixedRr(2), Defs.FixedRr(3)), WithExits(Defs.FixedRr(2), Defs.PartialTrail())),
 
+            Row("exit_not_evaluated", "buy.exits[1]", WithExits(Defs.FixedRr(2), Defs.PartialTrail()), WithExits(Defs.FixedRr(2)), ProblemSeverity.Warning),
+
             // time rules and filters
             Row("time_rule_missing", "time_rules.square_off", Basic() with { TimeRules = Defs.IntradayRules with { SquareOff = null } }, Basic()),
             Row("bad_time", "time_rules.first_entry", Basic() with { TimeRules = Defs.IntradayRules with { FirstEntry = new TimeOnly(9, 14) } }, Basic() with { TimeRules = Defs.IntradayRules with { FirstEntry = new TimeOnly(9, 15) } }),

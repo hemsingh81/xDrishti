@@ -82,7 +82,7 @@ public sealed class SimulatorSeamTests
     [Fact]
     public void A_simulator_refuses_a_trailing_exit_by_name_instead_of_running_the_same_entries_under_it()
     {
-        var trail = OrbV1.Create().WithBuy(b => b with { Exits = [new ExitSpec(ExitPolicy.AtrTrail, [new ExitParameter("atr_mult", [Quantity.Of(2)])])] });
+        var trail = OrbV1.Create().WithBuy(b => b with { Exits = [new ExitSpec(ExitPolicy.AtrTrail, [new ExitParameter("mult", [Quantity.Of(2)]), new ExitParameter("activate_at_rr", [Quantity.Of(1)])])] });
 
         Simulator.Create(trail, Timeframe.M15).Problems.ShouldContain(p => p.Problem.Code == "simulation.unsupported_exit");
     }

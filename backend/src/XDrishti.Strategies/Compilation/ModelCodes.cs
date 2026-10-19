@@ -1,7 +1,7 @@
 namespace XDrishti.Strategies.Compilation;
 
 /// <summary>
-/// The stable codes of the problems of the strategy model and its compile (<c>strategy.model.*</c>, spec P3-02b): 46 codes in six groups. The problems of the conditions inside a strategy keep the codes of the language
+/// The stable codes of the problems of the strategy model and its compile (<c>strategy.model.*</c>, spec P3-02b): 47 codes in six groups. The problems of the conditions inside a strategy keep the codes of the language
 /// (<c>strategy.syntax.*</c>, <c>strategy.lint.*</c>) and add a path. A program switches on the code and the path; the messages are English and may change. A model problem has no text, so its span is (0, 0, line 1, column 1).
 /// The names are a stored contract (ADR 0002): a snapshot test fails for a renamed or removed code.
 /// </summary>
@@ -121,6 +121,9 @@ public static class ModelCodes
 
     /// <summary>A candidate policy, or an overlay, listed twice; reported at the second. Path <c>buy.exits[i]</c> or <c>buy.overlays[i]</c>. Error.</summary>
     public const string DuplicateExit = Prefix + "duplicate_exit";
+
+    /// <summary>A candidate policy other than <c>FIXED_RR</c>, or an overlay, that no simulator runs yet (P4; for <c>event_exit</c> also the results calendar, P15): the table is checked and the strategy compiles, but a simulator refuses it. One per policy or overlay. Path <c>buy.exits[i]</c> or <c>buy.overlays[i]</c>. Warning.</summary>
+    public const string ExitNotEvaluated = Prefix + "exit_not_evaluated";
 
     // ---- Time rules and filters --------------------------------------------------------------------------------------------------------------------------------
 
