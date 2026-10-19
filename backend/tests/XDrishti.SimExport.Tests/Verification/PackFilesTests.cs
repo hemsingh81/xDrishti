@@ -100,7 +100,7 @@ public sealed partial class PackFilesTests
     public void The_texts_a_reader_sees_hold_no_count_of_a_group_no_sum_or_mean_of_r_and_no_percentage_apart_from_the_run_banner_which_states_a_parameter()
     {
         var (run, _, plan) = Standard();
-        var bare = new PackRun(run, new RunLabelSet(["costs: none", "engine: not yet verified (P3-08)"], []));
+        var bare = new PackRun(run, new RunLabelSet(["costs: none", RunLabels.EngineVerification], []));
 
         NoStatistic(Json(plan, bare), "pack.json");
         NoStatistic(PackFiles.ReadmeText("p3-check-1-0123456789ab", Seed, [bare]), "README.txt");

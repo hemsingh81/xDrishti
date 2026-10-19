@@ -18,4 +18,8 @@ public enum OracleCostFaults
     ExitLegUsesEntrySchedule = 1 << 10,
     CostEqualToLimitSkipped = 1 << 11,
     NetRFromExactR = 1 << 12,
+
+    // Added by the engine owner in P3-08c from the text of the spec (Annex C names them; the author did not implement them): ADR 0042 D8 (the STT figure of the buy order is the buy figure, of the sell order the sell figure) and D13 (RNet = RFilled - CostR).
+    SttSidesSwapped = 1 << 13,
+    CostSignFlipped = 1 << 14,
 }

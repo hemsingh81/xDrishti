@@ -88,7 +88,7 @@ Pure (`XDrishti.SimExport.Tests`): selection and `SeededRank`, the renderer gold
 3. **Default `--cards 200`.** Recommendation: keep the roadmap's cap; the owner passes `--cards 5` for the early look. Consequence: a default run on a wide universe roughly doubles the read time (C2).
 
 ## Risks
-- **The cards mislead.** A clean chart and a precise R invite more trust than the engine has earned. Mitigation: the banner on every card, `engine: not yet verified`, no aggregate, the ISS-21 sentence beside the 09:15 bar.
+- **The cards mislead.** A clean chart and a precise R invite more trust than the engine has earned. Mitigation: the banner on every card with its engine line (what the oracle comparison showed and that charts were not checked, ADR 0047), no aggregate, the ISS-21 sentence beside the 09:15 bar.
 - **The second read is stale or slow.** A backfill, an added action or a master refresh between the passes makes the cards refuse (exit 1); 200 cards on 200 instruments read the data twice. Mitigation: the guard; the owner looks at 5 to 10 instruments.
 - **The rule view follows an interim text.** P3-02c changes the canonical definition text; the golden of the rule view breaks on purpose (C3).
 - **An unknown exit reason added by P3-03d.** Handled by deriving the strata from the enum (C1), tested.

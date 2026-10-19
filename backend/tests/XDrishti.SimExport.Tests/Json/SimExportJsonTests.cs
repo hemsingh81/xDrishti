@@ -36,7 +36,7 @@ public sealed partial class SimExportJsonTests
     }
 
     [Fact]
-    public void The_labels_object_has_the_lines_the_limits_and_the_unverified_flag()
+    public void The_labels_object_has_the_lines_the_limits_and_the_oracle_agreement_flag()
     {
         var run = FabricatedRun.Standard();
         var labels = Root(Json(run)).GetProperty("labels");
@@ -47,7 +47,8 @@ public sealed partial class SimExportJsonTests
         labels.GetProperty("not_modelled").EnumerateArray().Select(e => (e.GetProperty("code").GetString()!, e.GetProperty("text").GetString()!)).ShouldBe(expected.NotModelled.Select(l => (l.Code, l.Text)));
         labels.GetProperty("engine_verified").GetBoolean().ShouldBe(RunLabels.EngineVerified);
         expected.Lines.Contains(RunLabels.EngineVerification).ShouldBeTrue();
-        RunLabels.EngineVerification.Contains("not yet verified", StringComparison.Ordinal).ShouldBe(!RunLabels.EngineVerified, "the flag and the label say the same");
+        RunLabels.EngineVerification.Contains("agrees with an independent reference implementation", StringComparison.Ordinal).ShouldBe(RunLabels.EngineVerified, "the flag and the label say the same");
+        RunLabels.EngineVerification.ShouldNotContain("not yet verified");
     }
 
     [Fact]

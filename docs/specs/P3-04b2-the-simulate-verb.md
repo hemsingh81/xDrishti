@@ -120,7 +120,7 @@ Assumptions that need an owner action (not questions): the one-time read of thre
 - **The generic host without `AddApi()` lacks a service a handler needs, or the Serilog override does not merge.** UNVERIFIED until AC 2 and AC 12; the remedy is to register that service in `SimulateHost`, not to add `AddApi()`.
 - **`dotnet run` from a script is slow to start**, and the content-root assumption (D2) is untested until the smoke of AC 12.
 - **Merge conflicts with P3-03d and P3-03c** (columns, spellings, labels, flags, the ADR number): see *Hand-overs* and b1 *Merge order*.
-- **A reader mistakes a clean file for a result.** Mitigation: the banner on the console, in `run.json` and in `README.txt`, `engine: not yet verified`, no aggregate anywhere.
+- **A reader mistakes a clean file for a result.** Mitigation: the banner on the console, in `run.json` and in `README.txt`, with its engine line (what the oracle comparison showed and that charts were not checked, ADR 0047), no aggregate anywhere.
 - **The gate's threshold (0.01 rupee) rejects a real share or ETF** with a finer tick: UNVERIFIED that the owner's data has one; the remedy is to leave it out of the universe.
 
 ## Done when

@@ -8,11 +8,18 @@ namespace XDrishti.Domain.Research;
 /// </summary>
 public static class RunLabels
 {
-    /// <summary>The label that the engine is not yet verified against a hand recomputation (P3-08). P3-08 changes it, with its ADR.</summary>
-    public const string EngineVerification = "engine: not yet verified (P3-08)";
+    /// <summary>
+    /// What the engine has been checked against (P3-08, P3-08c, ADR 0047): a second implementation of the walk, the position gate and the costing, written from the rule tables
+    /// alone by a second agent (by a process that is checked and not enforced), agrees with the engine; the tables themselves are not checked against charts (P3-09 does that). The text names the engine version it was shown for; the test project
+    /// that holds the comparison keeps <c>OracleVerifiedFor</c> beside the suite and fails if this label is true while the engine is at another version, so a new engine version cannot ship it until the comparison has been rerun.
+    /// </summary>
+    public const string EngineVerification = "engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts";
 
-    /// <summary>Whether the engine has been verified; <c>run.json</c> writes it as <c>engine_verified</c>. False while <see cref="EngineVerification"/> says "not yet verified"; P3-08 changes both together.</summary>
-    public const bool EngineVerified = false;
+    /// <summary>
+    /// Whether the oracle comparison has been shown for the engine's version; <c>run.json</c> writes it as <c>engine_verified</c>. True only while <see cref="EngineVerification"/> says so, and only for the version it names: the test
+    /// <c>OracleVerifiedForTests</c> fails when this is true and the constant <c>OracleVerifiedFor</c> differs from <c>SimulationEngine.Version</c>. It is not a claim about charts and it lifts none of the other labels.
+    /// </summary>
+    public const bool EngineVerified = true;
 
     /// <summary>The first label: a run is an exploration.</summary>
     public const string Exploration = "exploration: signal-level mechanics on past data, not evidence of an edge";

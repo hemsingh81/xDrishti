@@ -83,7 +83,9 @@ public static class ReferenceCosting
                 : CostTrace.BrokerageBetween);
         }
 
-        decimal sttPct = buy && !faults.HasFlag(OracleCostFaults.SttOnBothSides) ? r.SttBuyPct : r.SttSellPct;
+        decimal sttPct = faults.HasFlag(OracleCostFaults.SttSidesSwapped)
+            ? (buy ? r.SttSellPct : r.SttBuyPct)
+            : buy && !faults.HasFlag(OracleCostFaults.SttOnBothSides) ? r.SttBuyPct : r.SttSellPct;
 
         decimal stampPct = buy || faults.HasFlag(OracleCostFaults.StampDutyOnSell) ? r.StampBuyPct : 0m;
         decimal dp = segment == OracleCostSegment.Delivery && (!buy || faults.HasFlag(OracleCostFaults.DpChargeOnBuy))
@@ -154,7 +156,7 @@ public static class ReferenceCosting
         }
 
         double basis = faults.HasFlag(OracleCostFaults.NetRFromExactR) ? t.RExact : t.RFilled;
-        double net = basis - costRd;
+        double net = faults.HasFlag(OracleCostFaults.CostSignFlipped) ? basis + costRd : basis - costRd;
         return new OracleCostResult(OracleCostSkip.None, quantity, riskAmount, riskTaken, entryT, exitT, entryLeg, exitLeg, total, costR, costRd, net == 0.0 ? 0.0 : net, trace);
     }
 }

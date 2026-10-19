@@ -37,12 +37,25 @@ public sealed class RunLabelsTests
             "sample: in-sample",
             "universe: members as of today; survivorship is bounded and disclosed, not avoided (ISS-22)",
             "data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)",
-            "engine: not yet verified (P3-08)",
+            "engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts",
             "tick: today's master tick; rounding to the grid is approximate",
             "opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)",
         ]);
         labels.NotModelled.ShouldBe(FillLimits.NotModelled);
         RunLabels.EngineVerification.ShouldBe(labels.Lines[8]);
+    }
+
+    [Fact]
+    public void The_engine_label_says_what_was_compared_for_which_version_and_what_was_not_never_verified_alone()
+    {
+        var label = RunLabels.EngineVerification;
+
+        label.ShouldBe("engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts");
+        label.ShouldContain("agrees with an independent reference implementation of the rule tables");
+        label.ShouldContain("not checked against charts");
+        label.ShouldContain("sim-5");
+        label.ShouldNotContain("verified", Case.Insensitive, "the label never claims a verification, only an agreement of two implementations");
+        RunLabels.EngineVerified.ShouldBeTrue("the flag says the comparison was shown for the version the label names; OracleVerifiedForTests binds it");
     }
 
     [Fact]

@@ -21,6 +21,11 @@ public sealed class OracleArchitectureTests
 
     private const string FaultsType = "XDrishti.SimOracle.OracleFaults";
 
+    private const string CostFaultsType = "XDrishti.SimOracle.OracleCostFaults";
+
+    /// <summary>The two fault sets of the oracle: the walker's and (P3-08c) the costing's; a production comparison passes neither.</summary>
+    private static readonly string[] FaultsTypes = [FaultsType, CostFaultsType];
+
     private static readonly string[] AllowedUsers = ["XDrishti.Architecture.Tests", "XDrishti.Simulation.Tests"];
 
     private static readonly Assembly Oracle = Assembly.Load(new AssemblyName(OracleName));
@@ -154,11 +159,10 @@ public sealed class OracleArchitectureTests
         {
             foreach (var method in type.Methods.Where(m => m.HasBody))
             {
-                foreach (var call in method.Body.Instructions.Where(i => i.Operand is MethodReference called && called.Parameters.Any(p => p.ParameterType.FullName == FaultsType)))
+                foreach (var call in method.Body.Instructions.Where(i => i.Operand is MethodReference called && called.Parameters.Any(p => FaultsTypes.Contains(p.ParameterType.FullName))))
                 {
                     var called = (MethodReference)call.Operand;
-                    var last = called.Parameters[^1].ParameterType.FullName == FaultsType;
-                    if (!last || !IsLiteralZero(call.Previous))
+                    if (!IsLiteralZero(FaultsArgument(call, called)))
                     {
                         found.Add(type.FullName + "." + method.Name + " calls " + called.DeclaringType.Name + "." + called.Name + " with faults that are not the literal None");
                     }
@@ -171,7 +175,7 @@ public sealed class OracleArchitectureTests
 
     /// <summary>How many calls in the types that match <paramref name="inScope"/> take a faults argument at all (the literal None included): the number the rule above looked at.</summary>
     private static int CallsWithFaults(ModuleDefinition module, Func<TypeDefinition, bool> inScope) =>
-        AllTypes(module).Where(inScope).SelectMany(t => t.Methods.Where(m => m.HasBody)).SelectMany(m => m.Body.Instructions).Count(i => i.Operand is MethodReference called && called.Parameters.Any(p => p.ParameterType.FullName == FaultsType));
+        AllTypes(module).Where(inScope).SelectMany(t => t.Methods.Where(m => m.HasBody)).SelectMany(m => m.Body.Instructions).Count(i => i.Operand is MethodReference called && called.Parameters.Any(p => FaultsTypes.Contains(p.ParameterType.FullName)));
 
     private static IEnumerable<TypeDefinition> AllTypes(ModuleDefinition module)
     {
@@ -187,8 +191,49 @@ public sealed class OracleArchitectureTests
         }
     }
 
+    /// <summary>
+    /// The instruction that loads the faults argument of a call: the one just before the call when the faults parameter is the last, and, when other parameters follow it (the costing's <c>Leg</c> has a trace after its faults), the one that
+    /// many single-instruction loads further back. An argument that follows and is not a single load (a call, an expression) leaves the faults argument unknown, which the caller reads as "not the literal None".
+    /// </summary>
+    private static Instruction? FaultsArgument(Instruction call, MethodReference called)
+    {
+        var index = called.Parameters.ToList().FindIndex(p => FaultsTypes.Contains(p.ParameterType.FullName));
+        var instruction = call.Previous;
+        for (var following = called.Parameters.Count - 1 - index; following > 0; following--)
+        {
+            if (instruction is null || !IsSingleLoad(instruction))
+            {
+                return null;
+            }
+
+            instruction = instruction.Previous;
+        }
+
+        return instruction;
+    }
+
+    private static bool IsSingleLoad(Instruction instruction) =>
+        instruction.OpCode.Code is Code.Ldnull or Code.Ldc_I4_0 or Code.Ldc_I4_1 or Code.Ldc_I4_M1 or Code.Ldc_I4 or Code.Ldc_I4_S or Code.Ldc_I8 or Code.Ldc_R8 or Code.Ldstr
+            or Code.Ldloc or Code.Ldloc_0 or Code.Ldloc_1 or Code.Ldloc_2 or Code.Ldloc_3 or Code.Ldloc_S or Code.Ldarg or Code.Ldarg_0 or Code.Ldarg_1 or Code.Ldarg_2 or Code.Ldarg_3 or Code.Ldarg_S or Code.Ldsfld;
+
+    /// <summary>The outermost type of a type: a lambda or a closure inside a fault test is compiled into a nested type, and it is the fault test's.</summary>
+    private static string OutermostName(TypeDefinition type)
+    {
+        while (type.DeclaringType is not null)
+        {
+            type = type.DeclaringType;
+        }
+
+        return type.Name;
+    }
+
     private static bool IsLiteralZero(Instruction? instruction)
     {
+        if (instruction is null)
+        {
+            return false;
+        }
+
         if (instruction is { OpCode.Code: Code.Conv_I8 or Code.Conv_U8 })
         {
             instruction = instruction.Previous;
@@ -198,11 +243,11 @@ public sealed class OracleArchitectureTests
     }
 
     /// <summary>A small assembly built in memory, with the shapes of the rule: the fault-set type, the oracle's entry and three callers (honest, faulty, forwarding).</summary>
-    private static MemoryStream SentinelAssembly()
+    private static MemoryStream SentinelAssembly(string faultsTypeName = "OracleFaults")
     {
         var assembly = AssemblyDefinition.CreateAssembly(new AssemblyNameDefinition("OracleSentinel", new Version(1, 0)), "OracleSentinel", ModuleKind.Dll);
         var module = assembly.MainModule;
-        var faults = new TypeDefinition("XDrishti.SimOracle", "OracleFaults", TypeAttributes.Public | TypeAttributes.Sealed, module.ImportReference(typeof(Enum)));
+        var faults = new TypeDefinition("XDrishti.SimOracle", faultsTypeName, TypeAttributes.Public | TypeAttributes.Sealed, module.ImportReference(typeof(Enum)));
         faults.Fields.Add(new FieldDefinition("value__", FieldAttributes.Public | FieldAttributes.SpecialName | FieldAttributes.RTSpecialName, module.TypeSystem.UInt64));
         module.Types.Add(faults);
 
@@ -211,11 +256,20 @@ public sealed class OracleArchitectureTests
         walk.Parameters.Add(new ParameterDefinition("faults", ParameterAttributes.None, faults));
         walk.Body.GetILProcessor().Emit(OpCodes.Ret);
         walker.Methods.Add(walk);
+
+        // the costing's shape: the faults are followed by another parameter (a trace), so the argument is one load further back
+        var walkMiddle = new MethodDefinition("WalkMiddle", MethodAttributes.Public | MethodAttributes.Static, module.TypeSystem.Void);
+        walkMiddle.Parameters.Add(new ParameterDefinition("faults", ParameterAttributes.None, faults));
+        walkMiddle.Parameters.Add(new ParameterDefinition("trace", ParameterAttributes.None, module.TypeSystem.Object));
+        walkMiddle.Body.GetILProcessor().Emit(OpCodes.Ret);
+        walker.Methods.Add(walkMiddle);
         module.Types.Add(walker);
 
         AddCaller(module, faults, walk, "Honest", il => { il.Emit(OpCodes.Ldc_I4_0); il.Emit(OpCodes.Conv_I8); });
         AddCaller(module, faults, walk, "Faulty", il => { il.Emit(OpCodes.Ldc_I4, 5); il.Emit(OpCodes.Conv_I8); });
         AddCaller(module, faults, walk, "Forwarding", il => il.Emit(OpCodes.Ldarg_0), forwards: true);
+        AddCaller(module, faults, walkMiddle, "HonestMiddle", il => { il.Emit(OpCodes.Ldc_I4_0); il.Emit(OpCodes.Conv_I8); }, trailingNull: true);
+        AddCaller(module, faults, walkMiddle, "FaultyMiddle", il => { il.Emit(OpCodes.Ldc_I4, 5); il.Emit(OpCodes.Conv_I8); }, trailingNull: true);
 
         var stream = new MemoryStream();
         assembly.Write(stream);
@@ -223,7 +277,7 @@ public sealed class OracleArchitectureTests
         return stream;
     }
 
-    private static void AddCaller(ModuleDefinition module, TypeDefinition faults, MethodDefinition walk, string name, Action<ILProcessor> loadArgument, bool forwards = false)
+    private static void AddCaller(ModuleDefinition module, TypeDefinition faults, MethodDefinition walk, string name, Action<ILProcessor> loadArgument, bool forwards = false, bool trailingNull = false)
     {
         var type = new TypeDefinition("Sentinel", name, TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed, module.TypeSystem.Object);
         var method = new MethodDefinition("Run", MethodAttributes.Public | MethodAttributes.Static, module.TypeSystem.Void);
@@ -234,6 +288,11 @@ public sealed class OracleArchitectureTests
 
         var il = method.Body.GetILProcessor();
         loadArgument(il);
+        if (trailingNull)
+        {
+            il.Emit(OpCodes.Ldnull);
+        }
+
         il.Emit(OpCodes.Call, walk);
         il.Emit(OpCodes.Ret);
         type.Methods.Add(method);
@@ -244,6 +303,20 @@ public sealed class OracleArchitectureTests
     public void The_fault_rule_accepts_a_caller_that_passes_none_and_rejects_a_caller_that_passes_faults_or_forwards_them()
     {
         using var stream = SentinelAssembly();
+        using var module = ModuleDefinition.ReadModule(stream);
+
+        NonEmptyFaultArguments(module, t => t.Name == "Honest").ShouldBeEmpty();
+        NonEmptyFaultArguments(module, t => t.Name == "Faulty").Count.ShouldBe(1);
+        NonEmptyFaultArguments(module, t => t.Name == "Forwarding").Count.ShouldBe(1);
+        NonEmptyFaultArguments(module, t => t.Name == "HonestMiddle").ShouldBeEmpty();
+        NonEmptyFaultArguments(module, t => t.Name == "FaultyMiddle").Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void The_fault_rule_covers_the_costing_fault_set_too_the_same_three_callers_give_the_same_answers()
+    {
+        // P3-08c: the cost reference has its own fault set (OracleCostFaults); the rule must see it, not only the walker's
+        using var stream = SentinelAssembly("OracleCostFaults");
         using var module = ModuleDefinition.ReadModule(stream);
 
         NonEmptyFaultArguments(module, t => t.Name == "Honest").ShouldBeEmpty();
@@ -262,7 +335,7 @@ public sealed class OracleArchitectureTests
         path.ShouldNotBeNull("build XDrishti.Simulation.Tests before this rule is run");
 
         using var module = ModuleDefinition.ReadModule(path);
-        Func<TypeDefinition, bool> inScope = t => t.FullName.StartsWith("XDrishti.Simulation.Tests.Oracle.", StringComparison.Ordinal) && !t.Name.EndsWith("FaultTests", StringComparison.Ordinal);
+        Func<TypeDefinition, bool> inScope = t => t.FullName.StartsWith("XDrishti.Simulation.Tests.Oracle.", StringComparison.Ordinal) && !OutermostName(t).EndsWith("FaultTests", StringComparison.Ordinal);
         var violations = NonEmptyFaultArguments(module, inScope);
 
         violations.ShouldBeEmpty();
@@ -270,6 +343,6 @@ public sealed class OracleArchitectureTests
         // non-vacuity (step 2): the scope holds types, and they do call the oracle with the literal None (the rule looked at calls and found them clean), and the types it exempts do pass faults (so the scan can see one)
         AllTypes(module).Count(inScope).ShouldBeGreaterThan(0, "the scan covers no type of the comparison");
         CallsWithFaults(module, inScope).ShouldBeGreaterThan(0, "the comparison calls the oracle with no faults argument at all: the scan has nothing to check");
-        NonEmptyFaultArguments(module, t => t.FullName.StartsWith("XDrishti.Simulation.Tests.Oracle.", StringComparison.Ordinal) && t.Name.EndsWith("FaultTests", StringComparison.Ordinal)).ShouldNotBeEmpty("the fault tests pass faults on purpose; a scan that cannot see that finds nothing in production either");
+        NonEmptyFaultArguments(module, t => t.FullName.StartsWith("XDrishti.Simulation.Tests.Oracle.", StringComparison.Ordinal) && OutermostName(t).EndsWith("FaultTests", StringComparison.Ordinal)).ShouldNotBeEmpty("the fault tests pass faults on purpose; a scan that cannot see that finds nothing in production either");
     }
 }
