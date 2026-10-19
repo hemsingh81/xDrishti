@@ -21,11 +21,19 @@ internal static class UniverseResolver
     public static async Task<SimulateUniverse> ResolveAsync(SimulateOptions options, IServiceProvider services, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
+
+        return await ResolveAsync(options.Basket, options.Symbols, services, cancellationToken);
+    }
+
+    /// <summary>The universe of a verb that has no <see cref="SimulateOptions"/> (<c>verify-pack</c>): a basket name or id, or else a list of symbols.</summary>
+    public static async Task<SimulateUniverse> ResolveAsync(string? basket, IReadOnlyList<string> symbols, IServiceProvider services, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(symbols);
         ArgumentNullException.ThrowIfNull(services);
 
-        return options.Basket is { } basket
+        return basket is not null
             ? await BasketAsync(basket, services, cancellationToken)
-            : await SymbolsAsync(options.Symbols, services, cancellationToken);
+            : await SymbolsAsync(symbols, services, cancellationToken);
     }
 
     private static async Task<SimulateUniverse> SymbolsAsync(IReadOnlyList<string> symbols, IServiceProvider services, CancellationToken cancellationToken)

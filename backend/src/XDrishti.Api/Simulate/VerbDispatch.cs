@@ -10,6 +10,8 @@ internal static class VerbDispatch
 
     public const string CostSheetName = "cost-sheet";
 
+    public const string VerifyPackName = "verify-pack";
+
     public static Verb Of(IReadOnlyList<string> args)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -22,6 +24,11 @@ internal static class VerbDispatch
         if (args.Count > 0 && string.Equals(args[0], CostSheetName, StringComparison.Ordinal))
         {
             return Verb.CostSheet;
+        }
+
+        if (args.Count > 0 && string.Equals(args[0], VerifyPackName, StringComparison.Ordinal))
+        {
+            return Verb.VerifyPack;
         }
 
         if (args.Contains("--healthcheck", StringComparer.Ordinal))

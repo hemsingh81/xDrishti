@@ -1,0 +1,133 @@
+# P3 hand check — the protocol and the record
+
+The exit criterion of P3 is the owner's: about 20 trades drawn at random, balanced over strategy, instrument and year, plus one trade of each edge category that occurs, each checked against a chart by hand. This file holds the protocol (fixed in advance so that the check is not a matter of taste) and, at the end, the **record** of every pack that was drawn. The tool is `scripts/verify-pack.sh` ([ADR 0046](../adr/0046-the-verification-pack-and-the-20-trade-check.md), [spec P3-09](../specs/P3-09-verification-pack-and-the-20-trade-check.md)).
+
+**Status of the values below.** They are the recommendations of the spec (the owner's Q6, protocol, and Q7, data). They are not final until the owner confirms them in chat before the first draw. **The record holds no price, no R value and no count of any group** (roadmap, *What a P3 number means*: no number from a real-data run is quoted outside its run folder); the trade keys name the owner's symbols, so whether this repository may hold them is the owner's call.
+
+Nothing in a pack is evidence of an edge. The check says that the mechanics checked match a chart. It does not say that the engine is free of defects, and it says nothing about whether a strategy works.
+
+## 1. Before the draw
+
+1. Write the **seed** here (below, in the record) and the **window** (`--from`, `--to`) before running anything. The seed is 1 to 40 characters of letters, digits, `.`, `_` and `-`; the tool has no default and no clock or machine value in the draw. Suggested names: `p3-check-1`, then `p3-check-2` after the first fix. A seed tried repeatedly until the sample looks easy defeats the check, so **every seed ever used stays in the record**, and a seed is never reused.
+2. Decide the **hold-out** (Q7). If the last months are to be kept untouched until the P5 verdict (for example from 2025-11-01), give the verb `--to` before them: looking at the trades of a month is looking at the month. If nothing is decided, the record says that all the stored months were looked at and there is no hold-out.
+3. Decide the **round**: Round A is ORB v1 on the stored data, modelled fills, `--gross`. Round B is `VWAP_PULLBACK` and `BASE_BREAKOUT`, a second pack with a different seed. Closing P3 on ORB alone is a change of the exit criterion, not a reading of it (the roadmap lets only `BASE_BREAKOUT` slide to P4); if the owner takes it, say so here and ADR 0046 gets an amendment.
+4. Look at no trade of the window.
+
+```
+scripts/verify-pack.sh --strategies ORB --basket <name> --from <yyyy-MM-dd> --to <yyyy-MM-dd> --seed <your seed> --gross
+```
+
+## 2. What is in the pack
+
+`data/exports/verify/<pack-id>/`: `README.txt` (the banner of every run first), `index.html` (the trades with a link to the card of each, and the spot checks), `cards/…` (one page per trade; the file name has no exit reason), `check-log.csv` (**your** log, the one file you edit), `engine-values.csv` (the engine's side, with the source and categories of each row, **kept closed until your row is written**), `pack.json` (identity and sources), `manifest.json` (size and SHA-256 of every file).
+
+## 3. Conventions
+
+- **Bar label.** A bar is labelled by its **start**, in India time. The card, the log and the stored data agree on it. An external chart must be set to the same; whether it is for each vendor is for the owner to confirm on the first trade.
+- **Comparison view.** The **1-minute chart** of the trade day, resampled by the chart itself to the strategy's timeframe with the first bucket anchored at 09:15 (15m buckets begin 09:15, 09:30, …). Not official daily candles, and not a chart whose daily bar differs by session definition.
+- **Prices** are as the vendor adjusts them. The stored data is adjusted at the source (ISS-18 c); a trade in an `adjusted_instrument` row can show an unadjusted figure on an external chart.
+
+## 4. Per trade, in this order
+
+1. With the rule text of the card, find the evaluation bar and read the levels from the chart (for ORB: the high and low of the first `or_min` minutes, whether the close crossed, the stop kind).
+2. **Do not open the card's marks, the index's links or `engine-values.csv` first.** Write the entry minute and price you expect, the stop, the target and the exit (the instant and the price) into `check-log.csv`. The log has no engine column for this reason, and the file names and the index say nothing about how a trade ended. The first five rows, the external ones, are done blind.
+3. Compare with the card.
+4. For the rows against an external chart, read the open, high, low and close of the minutes at the entry, the stop, the target and the exit **on the external chart** and write them in the log (`ext_open` … `ext_close` for the minute at the entry; further minutes in the notes).
+5. Sign the row: `verdict` is `agree`, `disagree`, `not_decidable` (only where the 1-minute data cannot tell the order inside a minute, with a note) or `skipped` (a spot check, with a reason).
+
+Then run the tool on the log. It compares what you saw with what the engine did, field by field, and prints which rows agree, which are unexplained and whether the pack is complete. It never says that P3 passes.
+
+```
+scripts/verify-pack.sh --check data/exports/verify/<pack-id>/check-log.csv
+```
+
+## 5. Tolerances
+
+| You write | Engine column | Tolerance |
+|---|---|---|
+| `seen_entry_price` | `entry_price` | one tick (the tick printed on the card and in `engine-values.csv`) |
+| `seen_stop` | `stop_price` | one tick |
+| `seen_target` | `target_price` (empty when none) | one tick |
+| `seen_exit_price` | `exit_price` | one tick |
+| `seen_entry_time`, `seen_exit_time` | `entry_ist`, `exit_ist` | the minute, exact (`HH:mm`, or `yyyy-MM-dd HH:mm`) |
+| `seen_exit_reason` (`stop`, `target`, `square_off`, `max_hold`) | `exit_reason` | exact match |
+| `seen_r` (your own arithmetic from the exact levels) | `r_exact` | 0.01 |
+
+**Filled prices are not read off a chart.** The filled entry and exit depend on the tick rounding and on slippage (`a = 1 tick + 0.05 × the minute's range`, plus 2 ticks on a stop exit; ADR 0038). They are a calculator check from the operands printed on the card, in `engine-values.csv` as `entry_filled_price`, `exit_filled_price`, `entry_fill`, `slippage_r` and `r_filled` (and `r_net` and the charge total when the pack is costed). The tool compares them only when you add the optional columns `calc_entry_filled`, `calc_exit_filled` and `calc_r_filled` to the log. Net R by hand needs the owner's charge sheet (Q3, ISS-25) and the bill check of P3-03f; until then the check is gross and every card says `costs: none`.
+
+## 6. Which trades go to an external chart
+
+At least **5**, of which at least one is a `sell`, one is an `adjusted_instrument` row if the category occurs, and one has the 09:15 bar repaired by the importer where the card says so (ISS-21). The rest are checked against the card's own chart, which is drawn from the stored bars: those rows check the engine against the data, and the external rows check the data and the conventions as well. The 1-minute history of a charting product may not reach back to 2024 (UNVERIFIED for each vendor and plan): draw the pack first, then pick the external rows from the trades the chosen chart can show, most recent dates first, and write the source and the reason in the record. These are not a random 5 of the 20.
+
+The spot checks (an excluded session, a flagged day, a position the data cut short) are one chart lookup each. They are optional for P3 and signed or marked `skipped` with a reason; the recommendation is to do the `flagged_day` and the `excluded_session` lines.
+
+## 7. Disagreements: the classes, the triage and the exit rule
+
+**Triage, cheapest test first.** For a row beyond tolerance or marked `disagree`:
+
+1. **Data.** Compare the stored bars the card shows with the external chart at the cited minutes. If the stored bar differs beyond the tolerance it is a data defect, whatever the engine did. The known causes first: ISS-21 (the widened 09:15 bar), ISS-20 (an unadjusted jump), the adjusted-at-source prices off the tick grid, ISS-18 c.
+2. **Model.** The stored bars are right and the engine did what its ADR says, but the ADR's convention is not what the owner intends or is ambiguous (the entry limit at the trigger close plus 0.1 %, the minute-path rule, a fill at the open of a gap, the square-off at the open of 15:15). The owner decides the rule; the fix is an ADR amendment and then code.
+3. **Implementation.** The engine contradicts its ADR or spec: a bug. The fix starts with a test that fails (the place for it is P3-08's oracle or the walker's tests) and the engine version changes.
+
+A finding has an id, a class, the trade key, the evidence (the minute and both values), the decision and the commit or ADR that closed it. A row marked `agree` with a field beyond tolerance is `inconsistent` and counts as unexplained until it is changed or given a finding.
+
+**The exit rule (recommended; Q6).** The pack passes the owner's check when **all** hold:
+
+- (a) every row (the trades and the spot checks not skipped with a reason) is signed `agree`, or `disagree` with a closed or accepted finding;
+- (b) **zero unexplained disagreements** (a row beyond tolerance with no finding, or `inconsistent`);
+- (c) **zero open model or implementation defects**: every one has been fixed and the check redone on a new pack with a new seed that has itself no such finding;
+- (d) a data defect is recorded as an issue of the roadmap and is either a known class that does not change the trade's mechanics (ISS-20, ISS-21) or is accepted in chat by the owner as not affecting the pass;
+- (e) at least 5 rows against an external chart, 20 random trades at least, and one trade of each category that occurs;
+- (f) the record below is committed;
+- (g) **the owner says in chat that P3 passes.**
+
+The rule is stated to be honest about its power. 20 random trades with no disagreement give, only informally, an upper bound of about 14 to 15 % (the rule of three, 3/20; exact 13.9 %) on the share of *independent units* that would fail. That is **not a bound on the share of trades**: the sample is equal-weight over cells, the trades of one instrument are not independent, and the edge picks are not part of it. Read it as "a defect that touches more than about a seventh of the instruments or cells would probably have shown". The edge picks are there for the rare paths. Neither says that a strategy has an edge, or that the engine is free of defects.
+
+## 8. After any model or implementation fix
+
+The pack is void (the engine version, and so the run key and the pack key, change). Draw a **new seed and a new pack** and check it in full, edge picks included. The earlier rows stay in the record as history, and the earlier seed is never reused. A fix to a data defect that changes the stored bars also changes the bar-stream hashes, so the pack is redrawn then too.
+
+## 9. Categories
+
+A trade can belong to several. `occurs: false` in `pack.json` says that no trade of the pooled runs belongs to a category, which is a path not checked by hand, and the record says so.
+
+| Code | A trade belongs to it when |
+|---|---|
+| `sell` | the side is sell |
+| `stop_gap` | exit reason stop and the exit price strictly beyond the stop (the minute opened beyond it); whether a real jump or a missing minute needs the bars on the card |
+| `stop_in_entry_minute` | exit reason stop and the exit minute is the entry minute |
+| `entry_at_limit` | the fill minute opened beyond the limit and traded back to it |
+| `entry_after_hole` | the entry is later than the decision instant on the decision date (minutes after the decision were missing or empty) |
+| `first_evaluation` | the decision instant is the first entry time of the recorded definition (reading UNVERIFIED against the roadmap's wording) |
+| `overnight_entry` | the fill date is later than the decision date (swing only) |
+| `exit_target`, `exit_square_off`, `exit_max_hold` | the exit reason |
+| `incomplete_trigger_bar` | a minute of the evaluation bucket was missing |
+| `adjusted_instrument` | an applied action has an ex-date after the trade date |
+| `tick_fallback` | the NSE default tick was used and not the master's |
+
+Not trades, so spot checks: a special session (the replay excludes it, so no trade is dated on one), a flagged day, a position the data cut short.
+
+## 10. The record
+
+One block per pack. **No price, no R value and no count of a group.** The trade keys come from `engine-values.csv` (source and categories) and the log; findings are listed with their class and the commit or ADR that closed them.
+
+| Field | Pack 1 |
+|---|---|
+| Seed (written before the draw) | |
+| Date of the draw | |
+| Pack id | |
+| Window (`--from`, `--to`), hold-out decision | |
+| Strategies, cost choice (`--gross` or the sheet id) | |
+| Run key per strategy | |
+| Engine version | |
+| Data range (first and last bar) | |
+| Bar-stream hash per instrument that has a row | |
+| Trade keys with source and categories | |
+| External chart, history depth and why these rows | |
+| Rows against an external chart | |
+| Spot checks done, skipped (with reason) | |
+| Findings (id, class, trade key, closing reference) | |
+| Open model or implementation defects | |
+| Owner's statement and date | |
+
+Seeds used so far (all of them, including abandoned ones): none.

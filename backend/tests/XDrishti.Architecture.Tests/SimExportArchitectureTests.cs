@@ -15,7 +15,7 @@ public sealed class SimExportArchitectureTests
 {
     private static readonly Assembly SimExport = typeof(XDrishti.SimExport.ExportSpellings).Assembly;
 
-    private static readonly string[] DocumentedNamespaces = ["XDrishti.SimExport", "XDrishti.SimExport.Cards", "XDrishti.SimExport.Csv", "XDrishti.SimExport.Json", "XDrishti.SimExport.Manifest", "XDrishti.SimExport.Text"];
+    private static readonly string[] DocumentedNamespaces = ["XDrishti.SimExport", "XDrishti.SimExport.Cards", "XDrishti.SimExport.Csv", "XDrishti.SimExport.Json", "XDrishti.SimExport.Manifest", "XDrishti.SimExport.Text", "XDrishti.SimExport.Verification"];
 
     private static readonly string[] ForbiddenNamespaces =
     [
@@ -134,6 +134,26 @@ public sealed class SimExportArchitectureTests
     }
 
     [Fact]
+    public void The_verification_code_reads_no_clock_no_random_source_and_no_machine_value_in_its_source()
+    {
+        var folder = Path.GetDirectoryName(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.SimExport", "Verification", "VerificationSampler.cs"))!;
+        var files = Directory.GetFiles(folder, "*.cs");
+
+        files.Length.ShouldBeGreaterThan(8, "the scan does see the verification code");
+        foreach (var file in files)
+        {
+            var code = string.Join('\n', File.ReadAllLines(file).Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal)));
+
+            foreach (var banned in new[] { "new Random", "Random.Shared", "DateTime.Now", "UtcNow", "TimeProvider", "Environment.", "Guid.NewGuid", "Stopwatch", "File.", "Directory.", "Console." })
+            {
+                code.ShouldNotContain(banned, Case.Sensitive, Path.GetFileName(file));
+            }
+        }
+
+        File.ReadAllText(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Api", "Simulate", "ExportFolderWriter.cs")).ShouldContain("RandomNumberGenerator", Case.Sensitive, "the scan does see a random source where there is one");
+    }
+
+    [Fact]
     public void No_renderer_builds_a_copy_of_a_whole_file()
     {
         // the library writes to the sink of the host: no MemoryStream, no ArrayBufferWriter, no ToArray, no string of a file in the csv and json renderers (the manifest is a few kilobytes and returns its bytes)
@@ -209,6 +229,17 @@ public sealed class SimExportArchitectureTests
             "Manifest.RunId",
             "Text.RunBanner",
             "Text.RunReadme",
+            "Verification.EdgeCategories",
+            "Verification.PackFiles",
+            "Verification.PackIndexHtml",
+            "Verification.PackPlan",
+            "Verification.PackPlanner",
+            "Verification.PackRow",
+            "Verification.PackRun",
+            "Verification.SampledTrade",
+            "Verification.SpotChecks",
+            "Verification.SpotRow",
+            "Verification.VerificationSampler",
         ]);
         typeof(ClockSentinel).Assembly.GetExportedTypes().Select(t => t.Namespace ?? string.Empty).Distinct().Except(DocumentedNamespaces).ShouldNotBeEmpty("the rule can fail");
     }

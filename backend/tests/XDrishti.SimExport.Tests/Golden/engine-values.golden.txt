@@ -1,0 +1,8 @@
+export xd-verify-pack-1
+seq,trade_key,source,categories,tick,entry_ist,entry_price,stop_price,target_price,exit_ist,exit_price,exit_reason,r_exact,entry_fill,entry_filled_price,exit_filled_price,slippage_r,r_filled,r_net,cost_total
+1,ORB|NSE:M&M|Sell|2026-03-03,random,sell;entry_after_hole,0.1,2026-03-03 10:15,200,204,192,2026-03-03 10:25,204,stop,-1,at_open,200.05,203.95,-0.10000000000000009,-1.1,,
+2,ORB|NSE:AAA|Buy|2026-03-02,random,entry_after_hole;exit_target,0.05,2026-03-02 10:00,100.5,98,105.5,2026-03-02 10:10,105.5,target,2,at_open,100.55,105.45,-0.050000000000000044,1.95,,
+3,spot|excluded_session:special_session|NSE:AAA|2025-11-01,spot,excluded_session:special_session,,,,,,,,,,,,,,,,
+4,spot|excluded_session:short_session|NSE:AAA|2025-09-03,spot,excluded_session:short_session,,,,,,,,,,,,,,,,
+5,spot|flagged_day|NSE:AAA|2025-06-02,spot,flagged_day,,,,,,,,,,,,,,,,
+6,spot|open_at_end|NSE:AAA|2026-03-04,spot,open_at_end,,,,,,,,,,,,,,,,
