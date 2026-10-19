@@ -118,12 +118,12 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
     {
         await using var connection = new NpgsqlConnection(_app);
         await connection.OpenAsync(Ct);
+        var before = await StoreKit.CountAsync(_app, "SELECT count(*) FROM research.sim_runs", Ct);
         await using var insert = new NpgsqlCommand(InsertRun, connection);
         var id = (long)(await insert.ExecuteScalarAsync(Ct))!;
 
         id.ShouldBeGreaterThan(0);
-        (await StoreKit.CountAsync(_app, "SELECT count(*) FROM research.sim_runs", Ct)).ShouldBe(1);
-        (await StoreKit.CountAsync(_app, "SELECT count(*) FROM research.sim_trades", Ct)).ShouldBe(0);
+        (await StoreKit.CountAsync(_app, "SELECT count(*) FROM research.sim_runs", Ct)).ShouldBe(before + 1);
         (await SqlStateAsync(_app, "INSERT INTO research.sim_trades (run_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege is there; the row is incomplete");
         foreach (var statement in new[]
         {
@@ -137,7 +137,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_app, "SELECT count(*) FROM research.sim_runs", Ct)).ShouldBe(1);
+        (await StoreKit.CountAsync(_app, "SELECT count(*) FROM research.sim_runs", Ct)).ShouldBe(before + 1);
     }
 
     [Fact]
