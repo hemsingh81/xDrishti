@@ -103,7 +103,8 @@ public sealed partial class SimulateDatabaseTests
         checkedLog.Logs.ShouldContain(l => l.Contains("check read", StringComparison.Ordinal));
 
         outcome.Out.ShouldStartWith(XDrishti.SimExport.Text.RunBanner.Text(RunLabels.Of(run, FillRules.Default)));
-        outcome.Out.ShouldContain("rows: " + plan.Rows.Count + " trades, " + plan.Spots.Count + " spot checks");
+        outcome.Out.ShouldContain("rows: " + (plan.Rows.Count + plan.Spots.Count) + " (trades and spot checks together)");
+        outcome.Out.ShouldNotContain(" trades, ", Case.Sensitive, "no split that reveals how many edge picks were added");
         outcome.Out.ShouldContain("pack: " + Path.GetFileName(folder));
         outcome.Out.ShouldContain("next: open index.html");
         outcome.Logs.ShouldContain(l => l.Contains("wrote pack", StringComparison.Ordinal) && l.Contains(Path.GetFileName(folder), StringComparison.Ordinal));
@@ -291,7 +292,7 @@ public sealed partial class SimulateDatabaseTests
 
         outcome.Exit.ShouldBe(0, outcome.Error);
         outcome.Error.ShouldContain("warning: the pooled runs hold no trade, so the pack has no rows");
-        outcome.Out.ShouldContain("rows: 0 trades, 0 spot checks");
+        outcome.Out.ShouldContain("rows: 0 (trades and spot checks together)");
         var folder = PackFolder(temp);
         File.Exists(Path.Combine(folder, "check-log.csv")).ShouldBeTrue();
         Directory.Exists(Path.Combine(folder, "cards")).ShouldBeFalse();

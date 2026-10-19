@@ -20,6 +20,9 @@ public static class CheckLogReader
     /// <summary>The tick used when the engine has none for the instrument (the NSE default).</summary>
     public const decimal DefaultTick = 0.05m;
 
+    /// <summary>The most rows that may be <c>not_decidable</c> in a complete pack (the order inside a minute that 1-minute data cannot tell).</summary>
+    public const int MaxNotDecidable = 3;
+
     private const int MaxEcho = 120;
 
     private static readonly string[] Verdicts = ["agree", "disagree", "not_decidable", "skipped"];
@@ -169,6 +172,7 @@ public static class CheckLogReader
         var incompleteFields = 0;
         var badSkips = 0;
         var openFindings = 0;
+        var notDecidable = 0;
         var classes = new Dictionary<string, int> { ["data"] = 0, ["model"] = 0, ["implementation"] = 0, ["unclassified"] = 0 };
 
         foreach (var e in engine)
@@ -196,7 +200,7 @@ public static class CheckLogReader
             {
                 var kind = FindingClass(finding);
                 classes[kind]++;
-                if (kind is "model" or "implementation" && !finding.Contains("closed", StringComparison.OrdinalIgnoreCase))
+                if (kind is "model" or "implementation" && !IsClosed(finding))
                 {
                     openFindings++;
                 }
@@ -204,6 +208,7 @@ public static class CheckLogReader
 
             if (verdict == "not_decidable")
             {
+                notDecidable++;
                 if (row["notes"].Trim().Length > 0)
                 {
                     lines.Add(label + ": explained (not decidable from 1-minute data; note: " + Echo(row["notes"]) + ")");
@@ -244,10 +249,10 @@ public static class CheckLogReader
             var incomplete = fields.Any(f => f.Status is Status.Missing or Status.Unreadable);
             incompleteFields += incomplete ? 1 : 0;
             lines.Add(label + ": " + RowStatus(fields, isSpot) + Suffix(verdict, beyond, finding, ref unexplained));
-            lines.AddRange(fields.Select(f => "  " + f.Name + ": " + Text(f.Status)));
+            lines.AddRange(fields.Select(f => "  " + f.Name + ": " + Text(f.Status) + (f.Unit.Length > 0 ? " (" + f.Unit + ")" : string.Empty)));
         }
 
-        return Finish(lines, engine.Count, signed, external, unexplained, unsigned, notInLog, incompleteFields, badSkips, openFindings, classes);
+        return Finish(lines, engine.Count, signed, external, unexplained, unsigned, notInLog, incompleteFields, badSkips, openFindings, notDecidable, classes);
     }
 
     private static string Suffix(string verdict, bool beyond, string finding, ref int unexplained)
@@ -297,7 +302,7 @@ public static class CheckLogReader
     }
 
     private static CheckReport Finish(
-        List<string> lines, int rows, int signed, int external, int unexplained, int unsigned, int notInLog, int incompleteFields, int badSkips, int openFindings, Dictionary<string, int> classes)
+        List<string> lines, int rows, int signed, int external, int unexplained, int unsigned, int notInLog, int incompleteFields, int badSkips, int openFindings, int notDecidable, Dictionary<string, int> classes)
     {
         var reasons = new List<string>();
         Reason(reasons, unsigned, "unsigned");
@@ -315,12 +320,23 @@ public static class CheckLogReader
             reasons.Add(openFindings.ToString(CultureInfo.InvariantCulture) + " model or implementation findings not marked closed");
         }
 
+        if (classes["unclassified"] > 0)
+        {
+            reasons.Add(classes["unclassified"].ToString(CultureInfo.InvariantCulture) + " findings without a class (write data:, model: or implementation:)");
+        }
+
+        if (notDecidable > MaxNotDecidable)
+        {
+            reasons.Add(notDecidable.ToString(CultureInfo.InvariantCulture) + " rows not decidable, more than " + MaxNotDecidable.ToString(CultureInfo.InvariantCulture) + " are allowed");
+        }
+
         var n = (int v) => v.ToString(CultureInfo.InvariantCulture);
         lines.Add(string.Empty);
         lines.Add("rows in the pack: " + n(rows));
         lines.Add("rows signed: " + n(signed));
         lines.Add("rows against an external chart: " + n(external) + " (at least " + n(MinExternal) + " are needed)");
         lines.Add("rows unexplained: " + n(unexplained));
+        lines.Add("rows not decidable: " + n(notDecidable) + " (at most " + n(MaxNotDecidable) + " are allowed)");
         lines.Add("findings by class: data " + n(classes["data"]) + ", model " + n(classes["model"]) + ", implementation " + n(classes["implementation"]) + ", unclassified " + n(classes["unclassified"]));
         lines.Add(reasons.Count == 0 ? "pack: complete" : "pack: incomplete (" + string.Join("; ", reasons) + ")");
         return new CheckReport([], lines, rows, signed, external, unexplained, reasons.Count == 0, reasons);
@@ -347,18 +363,47 @@ public static class CheckLogReader
         var results = new List<Result>();
         var chart = row["chart"].Trim();
         results.Add(new Result("chart", chart.Length == 0 ? Status.Missing : chart.Equals("card", StringComparison.OrdinalIgnoreCase) || (chart.StartsWith("external:", StringComparison.OrdinalIgnoreCase) && chart.Length > "external:".Length) ? Status.Ok : Status.Unreadable));
-        results.AddRange(Map.Select(f => new Result(f.Seen, Judge(f, row[f.Seen], engine[f.Engine], tick))));
+        results.AddRange(Map.Select(f => Judged(f, row[f.Seen], engine[f.Engine], tick)));
         if (hasCalculated)
         {
-            results.AddRange(Calculated.Where(f => row.TryGetValue(f.Seen, out var value) && value.Trim().Length > 0).Select(f => new Result(f.Seen, Judge(f, row[f.Seen], engine[f.Engine], tick))));
+            results.AddRange(Calculated.Where(f => row.TryGetValue(f.Seen, out var value) && value.Trim().Length > 0).Select(f => Judged(f, row[f.Seen], engine[f.Engine], tick)));
         }
 
         if (chart.StartsWith("external:", StringComparison.OrdinalIgnoreCase))
         {
-            results.AddRange(ExternalColumns.Select(c => new Result(c, Number(row[c], out var value) && value > 0 ? Status.Ok : row[c].Trim().Length == 0 ? Status.Missing : Status.Unreadable)));
+            var ext = ExternalColumns.ToDictionary(c => c, c => Number(row[c], out var value) && value > 0 ? (decimal?)value : null, StringComparer.Ordinal);
+            var consistent = ext.Values.All(v => v is not null) && ext["ext_high"] >= ext["ext_low"] && ext["ext_open"] >= ext["ext_low"] && ext["ext_open"] <= ext["ext_high"] && ext["ext_close"] >= ext["ext_low"] && ext["ext_close"] <= ext["ext_high"];
+            results.AddRange(ExternalColumns.Select(c => new Result(c, row[c].Trim().Length == 0 ? Status.Missing : ext[c] is null || !consistent ? Status.Unreadable : Status.Ok)));
         }
 
         return results;
+    }
+
+    private static Result Judged(Field field, string seen, string wanted, decimal tick)
+    {
+        var status = Judge(field, seen, wanted, tick);
+        return new Result(field.Seen, status, status == Status.Within ? (field.Kind == Kind.R ? "the R tolerance" : "one tick") : string.Empty);
+    }
+
+    /// <summary>Whether a finding says <c>closed</c> as a whole word, not negated by the word before it, followed by a commit (7 to 40 hex) or an ADR reference.</summary>
+    private static bool IsClosed(string finding)
+    {
+        var words = finding.Split([' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        for (var i = 0; i + 1 < words.Length; i++)
+        {
+            if (!string.Equals(words[i], "closed", StringComparison.OrdinalIgnoreCase) || (i > 0 && words[i - 1].ToLowerInvariant() is "not" or "no" or "never" or "un"))
+            {
+                continue;
+            }
+
+            var next = words[i + 1].TrimEnd('.', ',', ';', ')');
+            if (next.Length is >= 7 and <= 40 && next.All(char.IsAsciiHexDigit) || next.StartsWith("ADR", StringComparison.OrdinalIgnoreCase) && next.Length >= 3)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static Status Judge(Field field, string seenText, string engineText, decimal tick)
@@ -427,5 +472,5 @@ public static class CheckLogReader
 
     private sealed record Field(string Seen, string Engine, Kind Kind, bool Optional);
 
-    private sealed record Result(string Name, Status Status);
+    private sealed record Result(string Name, Status Status, string Unit = "");
 }

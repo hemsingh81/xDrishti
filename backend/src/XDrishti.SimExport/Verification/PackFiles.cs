@@ -226,7 +226,7 @@ public static class PackFiles
         json.WriteString("seed", seed);
         json.WriteString("sampler", VerificationSampler.Version);
         json.WriteNumber("count", count);
-        json.WriteNumber("row_count", plan.Rows.Count);
+        json.WriteBoolean("session_notes_cut", runs.Any(r => r.Run.Instruments.Any(i => i.NotesTruncated)));
         if (basketId is { } basket)
         {
             json.WriteString("basket_id", basket);
@@ -312,6 +312,7 @@ public static class PackFiles
         text.Append("  4. Tolerances: a price one tick, R 0.01, a time one minute, the exit reason exactly.\n");
         text.Append("  5. At least 5 rows against an external chart, one of them a sell; for these write the open, high, low and close of the minute at the entry.\n");
         text.Append("  6. Sign each row: verdict agree or disagree. A disagreement gets a finding: data, model or implementation.\n");
+        text.Append("  The index links to cards that show the engine's marks (the exit reason and the result): the blindness is a convention, so write your row before you follow a link.\n");
         text.Append("  7. Run the check mode on your log to compare it with the engine. After any fix draw a new pack with a new seed.\n");
         text.Append('\n');
         text.Append("Keep this folder on this machine.\n");

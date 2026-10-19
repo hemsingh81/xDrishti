@@ -211,7 +211,105 @@ public sealed class CheckLogReaderTests
 
         report.Complete.ShouldBeFalse();
         report.Lines.ShouldContain("findings by class: data 0, model 1, implementation 1, unclassified 1");
-        report.Lines[^1].ShouldContain("1 model or implementation findings not marked closed");
+        report.Lines[^1].ShouldContain("2 model or implementation findings not marked closed");
+        report.Lines[^1].ShouldContain("1 findings without a class");
+    }
+
+    private static CheckReport WithFinding(string finding, string notes = "")
+    {
+        var plan = Plan(6);
+        var rows = Perfect(plan);
+        foreach (var row in rows.Take(5))
+        {
+            External(row);
+        }
+
+        (rows[0]["verdict"], rows[0]["seen_exit_price"], rows[0]["finding"], rows[0]["notes"]) = ("disagree", Add(rows[0]["seen_exit_price"], "1"), finding, notes);
+        return CheckLogReader.Read(Csv(rows), EngineText(plan));
+    }
+
+    [Theory]
+    [InlineData("model: not closed yet")]
+    [InlineData("implementation: unclosed")]
+    [InlineData("model: closed? no")]
+    [InlineData("model: closed")]
+    [InlineData("model: closed soon")]
+    [InlineData("implementation: not closed abc1234")]
+    [InlineData("model: reclosed abc1234")]
+    public void A_finding_that_only_contains_the_letters_of_closed_does_not_release_the_pack(string finding)
+    {
+        var report = WithFinding(finding);
+
+        report.Complete.ShouldBeFalse(finding);
+        report.Lines[^1].ShouldContain("not marked closed");
+    }
+
+    [Theory]
+    [InlineData("model: the square-off rule, closed abc1234")]
+    [InlineData("implementation: wrong tick CLOSED 0123456789abcdef0123456789abcdef01234567.")]
+    [InlineData("model: Closed ADR 0048")]
+    public void A_finding_that_says_closed_and_names_a_commit_or_an_adr_releases_the_pack(string finding)
+    {
+        var report = WithFinding(finding);
+
+        report.Complete.ShouldBeTrue(string.Join('\n', report.Lines));
+    }
+
+    [Fact]
+    public void A_finding_without_a_class_keeps_the_pack_incomplete_and_a_data_finding_does_not()
+    {
+        var unclassified = WithFinding("engine looks wrong");
+        var data = WithFinding("data: ISS-21 widened 09:15 bar");
+
+        unclassified.Complete.ShouldBeFalse();
+        unclassified.Lines[^1].ShouldContain("1 findings without a class");
+        data.Complete.ShouldBeTrue(string.Join('\n', data.Lines));
+    }
+
+    [Fact]
+    public void More_than_three_not_decidable_rows_fail_the_pack_and_the_count_is_reported()
+    {
+        var plan = Plan(9);
+        var rows = Perfect(plan);
+        foreach (var row in rows.Take(5))
+        {
+            External(row);
+        }
+
+        for (var i = 5; i < 9; i++)
+        {
+            (rows[i]["verdict"], rows[i]["notes"]) = ("not_decidable", "inside the minute");
+        }
+
+        var four = CheckLogReader.Read(Csv(rows), EngineText(plan));
+        (rows[8]["verdict"], rows[8]["notes"]) = ("agree", string.Empty);
+        var three = CheckLogReader.Read(Csv(rows), EngineText(plan));
+
+        four.Complete.ShouldBeFalse();
+        four.Lines.ShouldContain("rows not decidable: 4 (at most 3 are allowed)");
+        four.Lines[^1].ShouldContain("4 rows not decidable, more than 3 are allowed");
+        three.Complete.ShouldBeTrue(string.Join('\n', three.Lines));
+        three.Lines.ShouldContain("rows not decidable: 3 (at most 3 are allowed)");
+    }
+
+    [Fact]
+    public void External_minute_values_must_be_consistent_and_a_tolerance_says_which_one_applied()
+    {
+        var plan = Plan(3);
+        var rows = Perfect(plan);
+        External(rows[0]);
+        (rows[1]["chart"], rows[1]["ext_open"], rows[1]["ext_high"], rows[1]["ext_low"], rows[1]["ext_close"]) = ("external:X", "100.5", "99", "100", "100.5");
+        (rows[2]["chart"], rows[2]["ext_open"], rows[2]["ext_high"], rows[2]["ext_low"], rows[2]["ext_close"]) = ("external:X", "102", "101", "100", "100.5");
+        rows[0]["seen_entry_price"] = Add(rows[0]["seen_entry_price"], "0.05");
+        rows[0]["seen_r"] = Add(rows[0]["seen_r"], "0.01");
+
+        var report = CheckLogReader.Read(Csv(rows), EngineText(plan));
+
+        Line(report, 1).ShouldContain("ok within tolerance");
+        report.Lines.ShouldContain("  seen_entry_price: ok within tolerance (one tick)");
+        report.Lines.ShouldContain("  seen_r: ok within tolerance (the R tolerance)");
+        Line(report, 2).ShouldContain("unreadable: ext_open, ext_high, ext_low, ext_close");
+        Line(report, 3).ShouldContain("unreadable: ext_open, ext_high, ext_low, ext_close");
     }
 
     [Fact]

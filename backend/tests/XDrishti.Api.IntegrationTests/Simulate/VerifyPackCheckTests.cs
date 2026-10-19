@@ -74,6 +74,7 @@ public sealed class VerifyPackCheckTests
         result.Out.Split('\n').Where(l => l.StartsWith("row ", StringComparison.Ordinal)).ShouldAllBe(l => l.EndsWith(": unsigned", StringComparison.Ordinal));
         result.Out.Split('\n').Count(l => l.StartsWith("row ", StringComparison.Ordinal)).ShouldBe(pack.Plan.Rows.Count + pack.Plan.Spots.Count);
         result.Out.ShouldContain("pack: incomplete (");
+        result.Out.ShouldContain("log sha256: " + ExportFixture.Sha256(pack.Log));
         result.Out.ShouldNotContain("pass", Case.Insensitive);
         ExportFixture.Tree(pack.Folder).ShouldBe(before);
         ExportFixture.Sha256(pack.Log).ShouldBe(hash);

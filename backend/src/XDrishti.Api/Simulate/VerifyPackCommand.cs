@@ -161,7 +161,7 @@ internal static class VerifyPackCommand
         }
 
         await console.Out.WriteAsync(string.Concat(packRuns.Select(r => RunBanner.Text(r.Labels))));
-        await console.Out.WriteAsync(Summary(packId, outcome, plan, resolveTime, runTime, time.GetElapsedTime(phaseStart)));
+        await console.Out.WriteAsync(Summary(packId, outcome, plan, runs.Any(r => r.Instruments.Any(i => i.NotesTruncated)), resolveTime, runTime, time.GetElapsedTime(phaseStart)));
         if (plan.Rows.Count == 0)
         {
             await console.Error.WriteLineAsync("warning: the pooled runs hold no trade, so the pack has no rows");
@@ -257,7 +257,7 @@ internal static class VerifyPackCommand
         return lines;
     }
 
-    private static string Summary(string packId, ExportOutcome outcome, PackPlan plan, TimeSpan resolve, TimeSpan runs, TimeSpan cardsAndWrite)
+    private static string Summary(string packId, ExportOutcome outcome, PackPlan plan, bool notesCut, TimeSpan resolve, TimeSpan runs, TimeSpan cardsAndWrite)
     {
         var text = new StringBuilder();
         text.Append('\n');
@@ -269,7 +269,12 @@ internal static class VerifyPackCommand
             ExportStatus.Unchanged => "unchanged (the identical pack was already there and every file was verified)",
             _ => "replaced (the old pack is kept in " + outcome.PreviousFolder + ")",
         }).Append('\n');
-        text.Append("rows: ").Append(plan.Rows.Count.ToString(CultureInfo.InvariantCulture)).Append(" trades, ").Append(plan.Spots.Count.ToString(CultureInfo.InvariantCulture)).Append(" spot checks\n");
+        text.Append("rows: ").Append((plan.Rows.Count + plan.Spots.Count).ToString(CultureInfo.InvariantCulture)).Append(" (trades and spot checks together)\n");
+        if (notesCut)
+        {
+            text.Append("note: the session notes of some instrument were cut at 100, so a kind of spot check may not be seen; pack.json says so\n");
+        }
+
         if (outcome.StaleStaging.Count > 0)
         {
             text.Append("leftover staging folders of a killed process (remove them by hand): ").Append(string.Join(", ", outcome.StaleStaging)).Append('\n');

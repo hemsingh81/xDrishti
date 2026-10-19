@@ -38,6 +38,7 @@ The protocol in short (the full text is docs/research/p3-hand-check.md):
   4. Tolerances: a price one tick, R 0.01, a time one minute, the exit reason exactly.
   5. At least 5 rows against an external chart, one of them a sell; for these write the open, high, low and close of the minute at the entry.
   6. Sign each row: verdict agree or disagree. A disagreement gets a finding: data, model or implementation.
+  The index links to cards that show the engine's marks (the exit reason and the result): the blindness is a convention, so write your row before you follow a link.
   7. Run the check mode on your log to compare it with the engine. After any fix draw a new pack with a new seed.
 
 Keep this folder on this machine.

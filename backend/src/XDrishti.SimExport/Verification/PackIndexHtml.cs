@@ -23,7 +23,7 @@ public static class PackIndexHtml
         var page = CardPage.Begin(title, [.. runs.Select(r => r.Labels)]);
         page.Append("<main>\n<h1>").Append(Html.Text(title)).Append("</h1>\n");
         page.Append("<p>seed ").Append(Html.Text(seed)).Append(", sampler ").Append(Html.Text(VerificationSampler.Version)).Append("</p>\n");
-        page.Append("<p class=\"note\">Write your row of check-log.csv before you open the marks of a card or engine-values.csv. Nothing here is evidence of an edge.</p>\n");
+        page.Append("<p class=\"note\">Write your row of check-log.csv before you open the marks of a card or engine-values.csv. The cards show the engine's marks (the exit reason and the result), so this is a convention and not a lock. Nothing here is evidence of an edge.</p>\n");
         page.Append("<table>\n<thead>");
         CardPage.Row(page, "th", "seq", "symbol", "side", "date", "card");
         page.Append("</thead>\n<tbody>\n");

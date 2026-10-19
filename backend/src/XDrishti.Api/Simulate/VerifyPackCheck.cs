@@ -41,10 +41,13 @@ internal static class VerifyPackCheck
         }
 
         string logText;
+        string logHash;
         string engineText;
         try
         {
-            logText = await ReadTextAsync(log, cancellationToken);
+            var logBytes = await File.ReadAllBytesAsync(log, cancellationToken);
+            logText = new UTF8Encoding(false, true).GetString(logBytes);
+            logHash = Convert.ToHexStringLower(SHA256.HashData(logBytes));
             engineText = await ReadTextAsync(engine, cancellationToken);
         }
         catch (Exception bad) when (bad is IOException or UnauthorizedAccessException or DecoderFallbackException)
@@ -63,6 +66,7 @@ internal static class VerifyPackCheck
             return SimulateCommand.UsageError;
         }
 
+        await console.Out.WriteLineAsync("log sha256: " + logHash + " (copy or commit the first-pass log before you edit it again: it is the evidence)");
         foreach (var line in report.Lines)
         {
             await console.Out.WriteLineAsync(line);

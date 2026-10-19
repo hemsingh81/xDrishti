@@ -44,7 +44,8 @@ public sealed partial class PackFilesTests
         root.GetProperty("format").GetString().ShouldBe("xd-verify-pack-1");
         root.GetProperty("seed").GetString().ShouldBe(Seed);
         root.GetProperty("sampler").GetString().ShouldBe("verify-sampler-1");
-        root.GetProperty("row_count").GetInt32().ShouldBe(plan.Rows.Count);
+        root.TryGetProperty("row_count", out _).ShouldBeFalse("the number of rows would reveal how many edge picks were added");
+        root.GetProperty("session_notes_cut").GetBoolean().ShouldBeFalse();
         var runElement = root.GetProperty("runs")[0];
         runElement.GetProperty("run_key").GetString().ShouldBe(run.RunKey);
         runElement.GetProperty("engine_version").GetString().ShouldBe(run.EngineVersion);
@@ -55,6 +56,17 @@ public sealed partial class PackFilesTests
         root.GetProperty("rows").GetArrayLength().ShouldBe(plan.Rows.Count);
         root.GetProperty("categories").EnumerateArray().Select(c => c.GetProperty("code").GetString()).ShouldBe(EdgeCategories.Codes);
         root.GetProperty("categories").EnumerateArray().ShouldAllBe(c => c.GetProperty("occurs").ValueKind == JsonValueKind.True || c.GetProperty("occurs").ValueKind == JsonValueKind.False);
+    }
+
+    [Fact]
+    public void The_pack_json_says_when_the_session_notes_of_an_instrument_were_cut_so_a_kind_of_spot_check_may_be_unseen()
+    {
+        var (run, _, plan) = Standard();
+        var cut = run with { Instruments = [.. run.Instruments.Select(i => i with { NotesTruncated = true })] };
+
+        using var json = JsonDocument.Parse(Json(plan, new PackRun(cut, RunLabels.Of(cut, FillRules.Default))));
+
+        json.RootElement.GetProperty("session_notes_cut").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]

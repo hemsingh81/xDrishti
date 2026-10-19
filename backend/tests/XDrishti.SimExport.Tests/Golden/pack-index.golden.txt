@@ -43,7 +43,7 @@ export xd-verify-pack-1
 <main>
 <h1>verification pack p3-check-1-0123456789ab</h1>
 <p>seed p3-check-1, sampler verify-sampler-1</p>
-<p class="note">Write your row of check-log.csv before you open the marks of a card or engine-values.csv. Nothing here is evidence of an edge.</p>
+<p class="note">Write your row of check-log.csv before you open the marks of a card or engine-values.csv. The cards show the engine's marks (the exit reason and the result), so this is a convention and not a lock. Nothing here is evidence of an edge.</p>
 <table>
 <thead><tr><th>seq</th><th>symbol</th><th>side</th><th>date</th><th>card</th></tr>
 </thead>
