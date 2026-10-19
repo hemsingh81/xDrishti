@@ -169,6 +169,10 @@ public sealed class OracleArchitectureTests
         return found;
     }
 
+    /// <summary>How many calls in the types that match <paramref name="inScope"/> take a faults argument at all (the literal None included): the number the rule above looked at.</summary>
+    private static int CallsWithFaults(ModuleDefinition module, Func<TypeDefinition, bool> inScope) =>
+        AllTypes(module).Where(inScope).SelectMany(t => t.Methods.Where(m => m.HasBody)).SelectMany(m => m.Body.Instructions).Count(i => i.Operand is MethodReference called && called.Parameters.Any(p => p.ParameterType.FullName == FaultsType));
+
     private static IEnumerable<TypeDefinition> AllTypes(ModuleDefinition module)
     {
         var pending = new Stack<TypeDefinition>(module.Types);
@@ -258,9 +262,14 @@ public sealed class OracleArchitectureTests
         path.ShouldNotBeNull("build XDrishti.Simulation.Tests before this rule is run");
 
         using var module = ModuleDefinition.ReadModule(path);
-        var violations = NonEmptyFaultArguments(module, t => t.FullName.StartsWith("XDrishti.Simulation.Tests.Oracle.", StringComparison.Ordinal) && !t.Name.EndsWith("FaultTests", StringComparison.Ordinal));
+        Func<TypeDefinition, bool> inScope = t => t.FullName.StartsWith("XDrishti.Simulation.Tests.Oracle.", StringComparison.Ordinal) && !t.Name.EndsWith("FaultTests", StringComparison.Ordinal);
+        var violations = NonEmptyFaultArguments(module, inScope);
 
         violations.ShouldBeEmpty();
-        // step 2 (the comparison) adds the assertion that the scope is not empty: AllTypes(module).Count(inScope).ShouldBeGreaterThan(0), so that this rule cannot pass for want of types
+
+        // non-vacuity (step 2): the scope holds types, and they do call the oracle with the literal None (the rule looked at calls and found them clean), and the types it exempts do pass faults (so the scan can see one)
+        AllTypes(module).Count(inScope).ShouldBeGreaterThan(0, "the scan covers no type of the comparison");
+        CallsWithFaults(module, inScope).ShouldBeGreaterThan(0, "the comparison calls the oracle with no faults argument at all: the scan has nothing to check");
+        NonEmptyFaultArguments(module, t => t.FullName.StartsWith("XDrishti.Simulation.Tests.Oracle.", StringComparison.Ordinal) && t.Name.EndsWith("FaultTests", StringComparison.Ordinal)).ShouldNotBeEmpty("the fault tests pass faults on purpose; a scan that cannot see that finds nothing in production either");
     }
 }
