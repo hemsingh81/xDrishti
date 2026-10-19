@@ -22,7 +22,7 @@ internal static class CostComparison
         try
         {
             oracle = ReferenceCosting.Cost(input, oracleSheet, sizing, OracleCostFaults.None);
-            oracleView = CostView.Of(oracle, input.Segment, engineSheet.Id);
+            oracleView = CostView.Of(oracle, input.Segment, oracleSheet.Id.ToLowerInvariant());
         }
         catch (InvalidOperationException ex) when (ex.Message.StartsWith("costs.no_rates_for_date", StringComparison.Ordinal))
         {

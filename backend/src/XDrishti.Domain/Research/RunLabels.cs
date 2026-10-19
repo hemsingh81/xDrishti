@@ -8,18 +8,20 @@ namespace XDrishti.Domain.Research;
 /// </summary>
 public static class RunLabels
 {
-    /// <summary>
-    /// What the engine has been checked against (P3-08, P3-08c, ADR 0047): a second implementation of the walk, the position gate and the costing, written from the rule tables
-    /// alone by a second agent (by a process that is checked and not enforced), agrees with the engine; the tables themselves are not checked against charts (P3-09 does that). The text names the engine version it was shown for; the test project
-    /// that holds the comparison keeps <c>OracleVerifiedFor</c> beside the suite and fails if this label is true while the engine is at another version, so a new engine version cannot ship it until the comparison has been rerun.
-    /// </summary>
-    public const string EngineVerification = "engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts";
+    /// <summary>The engine version the oracle comparison (P3-08, P3-08c, ADR 0047) was shown for. The test project that holds the comparison keeps <c>OracleVerifiedFor</c> and fails unless it equals this and the engine's version, so bumping the engine without rerunning the comparison fails the check.</summary>
+    public const string VerifiedFor = "sim-5";
 
     /// <summary>
-    /// Whether the oracle comparison has been shown for the engine's version; <c>run.json</c> writes it as <c>engine_verified</c>. True only while <see cref="EngineVerification"/> says so, and only for the version it names: the test
-    /// <c>OracleVerifiedForTests</c> fails when this is true and the constant <c>OracleVerifiedFor</c> differs from <c>SimulationEngine.Version</c>. It is not a claim about charts and it lifts none of the other labels.
+    /// The engine line for a run of <see cref="VerifiedFor"/>: a separately written reference implementation of the walk, the position gate and the costing, written from the rule tables by a second agent (a process that is checked and not
+    /// enforced), agrees with the engine. It says nothing about the tables being right (charts, P3-09) or about the owner's charge sheet.
     /// </summary>
-    public const bool EngineVerified = true;
+    public const string EngineVerification = "engine: agrees with a separately written reference implementation of the rule tables (P3-08, " + VerifiedFor + "); not checked against charts or the owner's charge sheet";
+
+    /// <summary>The engine line of a run: the agreement wording only when the run's engine version is the one the comparison was shown for; any other version says it has not been verified.</summary>
+    public static string EngineLine(string engineVersion) => IsVerified(engineVersion) ? EngineVerification : "engine: not yet verified for " + engineVersion;
+
+    /// <summary>Whether a run of this engine version may carry the agreement label; <c>run.json</c> writes it as <c>engine_verified</c>.</summary>
+    public static bool IsVerified(string engineVersion) => string.Equals(engineVersion, VerifiedFor, StringComparison.Ordinal);
 
     /// <summary>The first label: a run is an exploration.</summary>
     public const string Exploration = "exploration: signal-level mechanics on past data, not evidence of an edge";
@@ -67,7 +69,7 @@ public static class RunLabels
             FixedLabels[2],
             "universe: " + run.Universe.Label + SurvivorshipNote,
             DataLine(run),
-            EngineVerification,
+            EngineLine(run.EngineVersion),
             TickLabel,
             OpeningBarLabel,
         ];

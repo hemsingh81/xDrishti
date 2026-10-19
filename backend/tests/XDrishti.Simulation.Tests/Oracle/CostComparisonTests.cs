@@ -62,13 +62,16 @@ public sealed class CostComparisonTests(ITestOutputHelper output)
         // the spec's list: each rounding mode, a swing trade across a schedule change, quantity below 1, cost over the limit, equal to the limit, a delivery sell with the DP charge, an intraday trade, a sell
         string[] named =
         [
-            "C-ROUND-AWAY", "C-ROUND-EVEN", "C-ROUND-DOWN", CostTally.SwingAcrossScheduleChange, "C-QTY-ZERO", "C-COST-SKIP", CostTally.EqualToLimit, CostTally.DpOnDeliverySell, "C-SEG-INTRADAY", "C-TRADE-SELL", "C-TRADE-BUY", "C-SEG-DELIVERY",
+            "C-BROK-MIN", "C-ROUND-AWAY", "C-ROUND-EVEN", "C-ROUND-DOWN", CostTally.SwingAcrossScheduleChange, "C-QTY-ZERO", "C-COST-SKIP", CostTally.EqualToLimit, CostTally.DpOnDeliverySell, "C-SEG-INTRADAY", "C-TRADE-SELL", "C-TRADE-BUY", "C-SEG-DELIVERY",
         ];
         foreach (var id in named)
         {
             output.WriteLine($"{id}: author {CostCorpus.SeriesRun.Row(id)}, chain {CostCorpus.ChainRun.Row(id)}");
             CostCorpus.SeriesRun.Row(id).ShouldBeGreaterThanOrEqualTo(Floor, "the author's generator alone: " + id);
-            CostCorpus.ChainRun.Row(id).ShouldBeGreaterThanOrEqualTo(Floor, "the chain alone: " + id);
+            if (id != "C-BROK-MIN")
+            {
+                CostCorpus.ChainRun.Row(id).ShouldBeGreaterThanOrEqualTo(Floor, "the chain alone: " + id);
+            }
         }
     }
 

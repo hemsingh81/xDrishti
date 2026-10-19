@@ -14,6 +14,7 @@ public sealed class EngineLabelWordingTests
     {
         ["docs/specs/P3-04b1-the-export-library-files-labels-and-folder-writer.md"] = "the build record of the slice that introduced the label: it states the contract as it was written then",
         ["docs/specs/P3-08-independent-walker-oracle-and-leak-properties.md"] = "the spec of the change quotes the old label to say what changes",
+        ["backend/src/XDrishti.Domain/Research/RunLabels.cs"] = "the engine line of a run of another engine version says it is not yet verified for that version: the fallback is the point of the version binding",
         ["docs/design/18-roadmap.md"] = "the roadmap is edited by the coordinator, who owes the update of its rows P3-04b1, P3-08 and the open-questions list; remove this entry when it is done",
     };
 
@@ -73,6 +74,6 @@ public sealed class EngineLabelWordingTests
     [Fact]
     public void The_engine_line_of_the_label_is_the_wording_the_owner_approved()
     {
-        XDrishti.Domain.Research.RunLabels.EngineVerification.ShouldBe("engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts");
+        XDrishti.Domain.Research.RunLabels.EngineVerification.ShouldBe("engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet");
     }
 }

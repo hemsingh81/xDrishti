@@ -20,7 +20,7 @@ export xd-sim-export-2
 <li>sample: in-sample</li>
 <li>universe: instruments as listed; survivorship is bounded and disclosed, not avoided (ISS-22)</li>
 <li>data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)</li>
-<li>engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts</li>
+<li>engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner&#39;s charge sheet</li>
 <li>tick: today&#39;s master tick; rounding to the grid is approximate</li>
 <li>opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)</li>
 </ul>
@@ -43,7 +43,7 @@ export xd-sim-export-2
 <main>
 <h1>trade cards of ORB 2024-04-01 to 2026-04-30</h1>
 <p>cards asked for: up to 5; the run has 2 trades; cards written: 2</p>
-<p class="note">The cards are an early look at what the rule does, one trade each. They are chosen by a seeded order (the run key) so that every kind of outcome is shown, which is not a picture of how often each happens. Run key f9ea133bccb30eaa82c2820c710fd8f8c45df8bf33a90295a31bf70bb67caea9</p>
+<p class="note">The cards are an early look at what the rule does, one trade each. They are chosen by a seeded order (the run key) so that every kind of outcome is shown, which is not a picture of how often each happens. Run key 20fdf79c7d5c016eee1493513a42f70fb3fd5b77a0a1bebefb57908e0d1ec769</p>
 <table>
 <thead><tr><th>number</th><th>symbol</th><th>side</th><th>date</th><th>exit reason</th><th>exact result R</th><th>card</th></tr>
 </thead>

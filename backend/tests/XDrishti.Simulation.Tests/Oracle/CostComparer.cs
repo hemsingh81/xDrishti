@@ -96,7 +96,7 @@ internal sealed record CostView(
 }
 
 /// <summary>
-/// The comparator of the costing (spec P3-08c, D5): money, quantity, fate and echoes exactly (a decimal by value, a double by its bits); the two ratio fields <c>CostR</c> and <c>RNet</c> exactly first and then within the tolerance of
+/// The comparator of the costing (spec P3-08c, D5): money, quantity, fate and echoes exactly (a decimal by value, a double by its bits when it is not one of the two ratio fields); the two ratio fields <c>CostR</c> and <c>RNet</c> exactly first and then within the tolerance of
 /// <see cref="RatioStats.Tolerance"/>, with the largest difference recorded. It reads the properties by reflection, so a field added to the view is compared without a line of code here.
 /// </summary>
 internal static class CostComparer

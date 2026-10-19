@@ -37,7 +37,7 @@ public sealed class RunLabelsTests
             "sample: in-sample",
             "universe: members as of today; survivorship is bounded and disclosed, not avoided (ISS-22)",
             "data: 2 instruments; first bars 2024-04-01 to 2024-12-18, last bars 2026-04-30 to 2026-04-30; length from about 1.4 to about 2.1 years (days / 365.25, one decimal); no hold-out (ISS-19)",
-            "engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts",
+            "engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet",
             "tick: today's master tick; rounding to the grid is approximate",
             "opening bar: the stored 09:15 bar can be widened by the CSV importer and the first 1-minute open is not the auction open (ISS-21, ISS-18)",
         ]);
@@ -50,12 +50,26 @@ public sealed class RunLabelsTests
     {
         var label = RunLabels.EngineVerification;
 
-        label.ShouldBe("engine: agrees with an independent reference implementation of the rule tables (P3-08, sim-5); not checked against charts");
-        label.ShouldContain("agrees with an independent reference implementation of the rule tables");
-        label.ShouldContain("not checked against charts");
-        label.ShouldContain("sim-5");
+        label.ShouldBe("engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet");
+        label.ShouldContain("agrees with a separately written reference implementation of the rule tables");
+        label.ShouldContain("not checked against charts or the owner's charge sheet");
+        label.ShouldContain(RunLabels.VerifiedFor);
         label.ShouldNotContain("verified", Case.Insensitive, "the label never claims a verification, only an agreement of two implementations");
-        RunLabels.EngineVerified.ShouldBeTrue("the flag says the comparison was shown for the version the label names; OracleVerifiedForTests binds it");
+        label.ShouldNotContain("independent");
+        RunLabels.IsVerified(RunLabels.VerifiedFor).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_run_of_another_engine_version_prints_the_fallback_line_and_is_not_verified()
+    {
+        var run = TwoRan() with { EngineVersion = "sim-6" };
+
+        var labels = RunLabels.Of(run, FillRules.Default);
+
+        labels.Lines[8].ShouldBe("engine: not yet verified for sim-6");
+        labels.Lines.ShouldNotContain(RunLabels.EngineVerification);
+        RunLabels.IsVerified("sim-6").ShouldBeFalse();
+        RunLabels.EngineLine(RunLabels.VerifiedFor).ShouldBe(RunLabels.EngineVerification);
     }
 
     [Fact]

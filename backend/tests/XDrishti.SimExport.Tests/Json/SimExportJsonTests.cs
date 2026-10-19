@@ -45,10 +45,19 @@ public sealed partial class SimExportJsonTests
         labels.EnumerateObject().Select(p => p.Name).ShouldBe(["lines", "not_modelled", "engine_verified"]);
         labels.GetProperty("lines").EnumerateArray().Select(e => e.GetString()).ShouldBe(expected.Lines);
         labels.GetProperty("not_modelled").EnumerateArray().Select(e => (e.GetProperty("code").GetString()!, e.GetProperty("text").GetString()!)).ShouldBe(expected.NotModelled.Select(l => (l.Code, l.Text)));
-        labels.GetProperty("engine_verified").GetBoolean().ShouldBe(RunLabels.EngineVerified);
+        labels.GetProperty("engine_verified").GetBoolean().ShouldBe(RunLabels.IsVerified(run.EngineVersion));
+        labels.GetProperty("engine_verified").GetBoolean().ShouldBeTrue();
         expected.Lines.Contains(RunLabels.EngineVerification).ShouldBeTrue();
-        RunLabels.EngineVerification.Contains("agrees with an independent reference implementation", StringComparison.Ordinal).ShouldBe(RunLabels.EngineVerified, "the flag and the label say the same");
-        RunLabels.EngineVerification.ShouldNotContain("not yet verified");
+    }
+
+    [Fact]
+    public void A_run_of_another_engine_version_is_written_with_the_fallback_line_and_engine_verified_false()
+    {
+        var run = FabricatedRun.Standard() with { EngineVersion = "sim-6" };
+        var labels = Root(Json(run)).GetProperty("labels");
+
+        labels.GetProperty("engine_verified").GetBoolean().ShouldBeFalse();
+        labels.GetProperty("lines").EnumerateArray().Select(e => e.GetString()).ShouldContain("engine: not yet verified for sim-6");
     }
 
     [Fact]

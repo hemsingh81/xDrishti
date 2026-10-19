@@ -9,10 +9,11 @@ namespace XDrishti.Simulation.Tests.Oracle;
 public sealed class OracleVerifiedForTests
 {
     [Fact]
-    public void The_label_is_true_only_while_the_engine_version_is_the_one_the_comparison_was_shown_for()
+    public void The_version_the_label_is_shown_for_is_the_engine_s_version_and_the_constant_beside_the_suite()
     {
-        OracleVerification.LabelIsBound(RunLabels.EngineVerified, OracleVerification.OracleVerifiedFor, SimulationEngine.Version)
-            .ShouldBeTrue($"RunLabels.EngineVerified is {RunLabels.EngineVerified} but the oracle comparison was shown for '{OracleVerification.OracleVerifiedFor}' and the engine is '{SimulationEngine.Version}': rerun the comparison, then edit OracleVerifiedFor on purpose");
+        RunLabels.VerifiedFor.ShouldBe(OracleVerification.OracleVerifiedFor, "rerun the comparison, then edit both on purpose");
+        OracleVerification.OracleVerifiedFor.ShouldBe(SimulationEngine.Version, $"the oracle comparison was shown for '{OracleVerification.OracleVerifiedFor}' and the engine is '{SimulationEngine.Version}': rerun it, then edit the constants on purpose");
+        RunLabels.IsVerified(SimulationEngine.Version).ShouldBeTrue();
     }
 
     [Fact]
