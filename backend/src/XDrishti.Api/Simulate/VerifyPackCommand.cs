@@ -38,8 +38,8 @@ internal static class VerifyPackCommand
         var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(VerifyPackCommand).FullName!);
         if (options.CheckPath is not null)
         {
-            await console.Error.WriteLineAsync("the check mode is not in this build (P3-09 part B)");
-            return SimulateCommand.UsageError;
+            // the check mode reads two files of a pack folder and nothing else: no export root, no database
+            return await VerifyPackCheck.RunAsync(options.CheckPath, console, logger, cancellationToken);
         }
 
         var root = ExportPaths.Root(exportRoot);

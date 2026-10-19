@@ -229,6 +229,8 @@ public sealed class SimExportArchitectureTests
             "Manifest.RunId",
             "Text.RunBanner",
             "Text.RunReadme",
+            "Verification.CheckLogReader",
+            "Verification.CheckReport",
             "Verification.EdgeCategories",
             "Verification.PackFiles",
             "Verification.PackIndexHtml",

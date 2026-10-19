@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog.Core;
 using XDrishti.Api.IntegrationTests.Infrastructure;
@@ -93,6 +94,13 @@ public sealed partial class SimulateDatabaseTests
         var splitCard = System.Text.Encoding.UTF8.GetString(files[PackFiles.CardName(split.Seq, plan.Rows.Count, split.Trade.Trade)]);
         splitCard.ShouldContain("<td>as stored (raw)</td><td>198</td><td>198</td><td>198</td><td>198</td>", Case.Sensitive);
         splitCard.ShouldContain("<td>as on the chart (adjusted)</td><td>99</td><td>99</td><td>99</td><td>99</td>", Case.Sensitive);
+
+        var checkedLog = await PackAsync("--check " + Path.Combine(folder, "check-log.csv"), temp);
+        checkedLog.Exit.ShouldBe(1, checkedLog.Error);
+        checkedLog.Out.Split('\n').Where(l => l.StartsWith("row ", StringComparison.Ordinal)).ShouldAllBe(l => l.EndsWith(": unsigned", StringComparison.Ordinal));
+        checkedLog.Out.Split('\n').Count(l => l.StartsWith("row ", StringComparison.Ordinal)).ShouldBe(plan.Rows.Count + plan.Spots.Count);
+        checkedLog.Out.ShouldContain("pack: incomplete (");
+        checkedLog.Logs.ShouldContain(l => l.Contains("check read", StringComparison.Ordinal));
 
         outcome.Out.ShouldStartWith(XDrishti.SimExport.Text.RunBanner.Text(RunLabels.Of(run, FillRules.Default)));
         outcome.Out.ShouldContain("rows: " + plan.Rows.Count + " trades, " + plan.Spots.Count + " spot checks");
@@ -252,6 +260,25 @@ public sealed partial class SimulateDatabaseTests
         outcome.Out.ShouldBeEmpty();
         Directory.Exists(temp.Root).ShouldBeFalse("nothing was written, not even the root");
         outcome.Logs.ShouldContain(l => l.Contains("trade cards are stale for instrument", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Two_strategies_are_two_runs_in_one_pack_each_with_its_banner_and_its_run_key_and_the_cards_come_from_the_run_of_their_own_trade()
+    {
+        var (_, _, _, basket) = await SeedPackDaysAsync();
+        using var temp = new TempFolder();
+
+        var outcome = await PackAsync("--strategies ORB,VWAP_PULLBACK --basket Lab " + PackWindow + " --count 5", temp);
+
+        outcome.Exit.ShouldBe(0, outcome.Error);
+        var orb = await ModelledRunAsync(basket);
+        using var json = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(PackFolder(temp), "pack.json")));
+        var runs = json.RootElement.GetProperty("runs").EnumerateArray().ToList();
+        runs.Select(r => r.GetProperty("strategy").GetString()).ShouldBe(["ORB", "VWAP_PULLBACK"]);
+        runs[0].GetProperty("run_key").GetString().ShouldBe(orb.RunKey);
+        runs[1].GetProperty("run_key").GetString().ShouldNotBe(orb.RunKey);
+        json.RootElement.GetProperty("rows").EnumerateArray().Select(r => r.GetProperty("run_key").GetString()).ShouldAllBe(k => k == orb.RunKey || k == runs[1].GetProperty("run_key").GetString());
+        outcome.Out.Split('\n').Count(l => l.StartsWith("exploration: ", StringComparison.Ordinal)).ShouldBe(2, "the banner of every run");
     }
 
     [Fact]
