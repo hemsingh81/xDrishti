@@ -3569,6 +3569,460 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimRunRow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("AcknowledgeCsvAdjusted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("acknowledge_csv_adjusted");
+
+                    b.Property<long>("CandidatesInWindow")
+                        .HasColumnType("bigint")
+                        .HasColumnName("candidates_in_window");
+
+                    b.Property<string>("CostsRatesSha256")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("costs_rates_sha256");
+
+                    b.Property<string>("CostsSheetId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("costs_sheet_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DefinitionSha256")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("definition_sha256");
+
+                    b.Property<string>("EngineVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("engine_version");
+
+                    b.Property<string>("Fills")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("fills");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<int>("Instruments")
+                        .HasColumnType("integer")
+                        .HasColumnName("instruments");
+
+                    b.Property<int>("InstrumentsRun")
+                        .HasColumnType("integer")
+                        .HasColumnName("instruments_run");
+
+                    b.Property<int>("OpenAtEndCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("open_at_end_count");
+
+                    b.Property<string>("RecordJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("record_json");
+
+                    b.Property<short>("RecordSchemaVersion")
+                        .HasColumnType("smallint")
+                        .HasColumnName("record_schema_version");
+
+                    b.Property<string>("RecordSha256")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("record_sha256");
+
+                    b.Property<string>("RunKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("run_key");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.Property<int>("TradeCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("trade_count");
+
+                    b.Property<short>("TradeSchemaVersion")
+                        .HasColumnType("smallint")
+                        .HasColumnName("trade_schema_version");
+
+                    b.Property<long>("TradesInWindow")
+                        .HasColumnType("bigint")
+                        .HasColumnName("trades_in_window");
+
+                    b.Property<string>("TradesSha256")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("trades_sha256");
+
+                    b.Property<string>("UniverseKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("universe_kind");
+
+                    b.Property<string>("UniverseLabel")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("universe_label");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sim_runs");
+
+                    b.HasIndex("RunKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_sim_runs_run_key");
+
+                    b.HasIndex("StrategyId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_sim_runs_strategy_created");
+
+                    b.ToTable("sim_runs", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_sim_runs_costs", "(costs_sheet_id IS NULL) = (costs_rates_sha256 IS NULL)");
+
+                            t.HasCheckConstraint("ck_sim_runs_counts", "trade_count >= 0 AND open_at_end_count >= 0");
+
+                            t.HasCheckConstraint("ck_sim_runs_run_key", "run_key ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_sim_runs_universe_kind", "universe_kind IN ('instrumentlist', 'basket')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeRow", b =>
+                {
+                    b.Property<long>("RunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("run_id");
+
+                    b.Property<bool>("OpenAtEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("open_at_end");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<string>("TradeKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("trade_key");
+
+                    b.PrimitiveCollection<Guid[]>("basket_ids")
+                        .IsRequired()
+                        .HasColumnType("uuid[]")
+                        .HasColumnName("basket_ids");
+
+                    b.Property<decimal?>("cost_entry_turnover")
+                        .HasColumnType("numeric")
+                        .HasColumnName("cost_entry_turnover");
+
+                    b.Property<decimal?>("cost_exit_turnover")
+                        .HasColumnType("numeric")
+                        .HasColumnName("cost_exit_turnover");
+
+                    b.Property<long?>("cost_quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cost_quantity");
+
+                    b.Property<double?>("cost_r")
+                        .HasColumnType("double precision")
+                        .HasColumnName("cost_r");
+
+                    b.Property<decimal?>("cost_risk_taken")
+                        .HasColumnType("numeric")
+                        .HasColumnName("cost_risk_taken");
+
+                    b.Property<string>("cost_segment")
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("cost_segment");
+
+                    b.Property<decimal?>("cost_total")
+                        .HasColumnType("numeric")
+                        .HasColumnName("cost_total");
+
+                    b.Property<string>("costs")
+                        .IsRequired()
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("costs");
+
+                    b.Property<long>("decision_epoch_seconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decision_epoch_seconds");
+
+                    b.Property<decimal?>("entry_brokerage")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_brokerage");
+
+                    b.Property<decimal?>("entry_dp_charge")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_dp_charge");
+
+                    b.Property<long>("entry_epoch_seconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entry_epoch_seconds");
+
+                    b.Property<decimal?>("entry_exchange_txn")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_exchange_txn");
+
+                    b.Property<string>("entry_fill")
+                        .IsRequired()
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("entry_fill");
+
+                    b.Property<double>("entry_filled_price")
+                        .HasColumnType("double precision")
+                        .HasColumnName("entry_filled_price");
+
+                    b.Property<decimal?>("entry_gst")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_gst");
+
+                    b.Property<decimal?>("entry_other_charges")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_other_charges");
+
+                    b.Property<double>("entry_price")
+                        .HasColumnType("double precision")
+                        .HasColumnName("entry_price");
+
+                    b.Property<decimal?>("entry_sebi_fee")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_sebi_fee");
+
+                    b.Property<string>("entry_snapshot_json")
+                        .HasColumnType("text")
+                        .HasColumnName("entry_snapshot_json");
+
+                    b.Property<decimal?>("entry_stamp_duty")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_stamp_duty");
+
+                    b.Property<decimal?>("entry_stt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("entry_stt");
+
+                    b.Property<decimal?>("exit_brokerage")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_brokerage");
+
+                    b.Property<decimal?>("exit_dp_charge")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_dp_charge");
+
+                    b.Property<long>("exit_epoch_seconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("exit_epoch_seconds");
+
+                    b.Property<decimal?>("exit_exchange_txn")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_exchange_txn");
+
+                    b.Property<double>("exit_filled_price")
+                        .HasColumnType("double precision")
+                        .HasColumnName("exit_filled_price");
+
+                    b.Property<decimal?>("exit_gst")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_gst");
+
+                    b.Property<decimal?>("exit_other_charges")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_other_charges");
+
+                    b.Property<double>("exit_price")
+                        .HasColumnType("double precision")
+                        .HasColumnName("exit_price");
+
+                    b.Property<string>("exit_reason")
+                        .IsRequired()
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("exit_reason");
+
+                    b.Property<decimal?>("exit_sebi_fee")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_sebi_fee");
+
+                    b.Property<decimal?>("exit_stamp_duty")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_stamp_duty");
+
+                    b.Property<decimal?>("exit_stt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exit_stt");
+
+                    b.Property<string>("fills")
+                        .IsRequired()
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("fills");
+
+                    b.Property<Guid>("instrument_id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
+
+                    b.Property<double>("mae_r")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mae_r");
+
+                    b.Property<double>("mfe_r")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mfe_r");
+
+                    b.Property<double>("r_exact")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_exact");
+
+                    b.Property<double>("r_filled")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_filled");
+
+                    b.Property<double?>("r_net")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r_net");
+
+                    b.Property<int>("sessions_held")
+                        .HasColumnType("integer")
+                        .HasColumnName("sessions_held");
+
+                    b.Property<int>("sessions_unseen")
+                        .HasColumnType("integer")
+                        .HasColumnName("sessions_unseen");
+
+                    b.Property<string>("side")
+                        .IsRequired()
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("side");
+
+                    b.Property<double>("slippage_r")
+                        .HasColumnType("double precision")
+                        .HasColumnName("slippage_r");
+
+                    b.Property<double>("stop_price")
+                        .HasColumnType("double precision")
+                        .HasColumnName("stop_price");
+
+                    b.Property<string>("strategy_id")
+                        .IsRequired()
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("symbol")
+                        .IsRequired()
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("symbol");
+
+                    b.Property<double?>("target_price")
+                        .HasColumnType("double precision")
+                        .HasColumnName("target_price");
+
+                    b.Property<bool>("tick_fallback")
+                        .HasColumnType("boolean")
+                        .HasColumnName("tick_fallback");
+
+                    b.Property<DateOnly>("trade_date")
+                        .HasColumnType("date")
+                        .HasColumnName("trade_date");
+
+                    b.Property<double>("trigger_bar_close")
+                        .HasColumnType("double precision")
+                        .HasColumnName("trigger_bar_close");
+
+                    b.Property<bool>("trigger_bar_complete")
+                        .HasColumnType("boolean")
+                        .HasColumnName("trigger_bar_complete");
+
+                    b.Property<long>("trigger_bar_epoch")
+                        .HasColumnType("bigint")
+                        .HasColumnName("trigger_bar_epoch");
+
+                    b.Property<double>("trigger_bar_high")
+                        .HasColumnType("double precision")
+                        .HasColumnName("trigger_bar_high");
+
+                    b.Property<double>("trigger_bar_low")
+                        .HasColumnType("double precision")
+                        .HasColumnName("trigger_bar_low");
+
+                    b.Property<int>("trigger_bar_minutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("trigger_bar_minutes");
+
+                    b.Property<double>("trigger_bar_open")
+                        .HasColumnType("double precision")
+                        .HasColumnName("trigger_bar_open");
+
+                    b.Property<long>("trigger_bar_volume")
+                        .HasColumnType("bigint")
+                        .HasColumnName("trigger_bar_volume");
+
+                    b.Property<string>("trigger_timeframe")
+                        .IsRequired()
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("trigger_timeframe");
+
+                    b.HasKey("RunId", "OpenAtEnd", "Ordinal")
+                        .HasName("pk_sim_trades");
+
+                    b.HasIndex("RunId", "TradeKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_sim_trades_run_trade_key");
+
+                    b.ToTable("sim_trades", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_sim_trades_cost_segment", "cost_segment IS NULL OR cost_segment IN ('intradayequity', 'delivery')");
+
+                            t.HasCheckConstraint("ck_sim_trades_costing_all_or_nothing", "num_nonnulls(cost_segment, cost_quantity, cost_risk_taken, cost_entry_turnover, cost_exit_turnover, entry_brokerage, entry_stt, entry_exchange_txn, entry_sebi_fee, entry_stamp_duty, entry_other_charges, entry_dp_charge, entry_gst, exit_brokerage, exit_stt, exit_exchange_txn, exit_sebi_fee, exit_stamp_duty, exit_other_charges, exit_dp_charge, exit_gst, cost_total, cost_r, r_net) IN (0, 24)");
+
+                            t.HasCheckConstraint("ck_sim_trades_costs", "costs IN ('none', 'charged')");
+
+                            t.HasCheckConstraint("ck_sim_trades_costs_charged", "(costs = 'charged') = (cost_quantity IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_sim_trades_entry_fill", "entry_fill IN ('atopen', 'atlimit')");
+
+                            t.HasCheckConstraint("ck_sim_trades_exit_reason", "exit_reason IN ('stop', 'target', 'squareoff', 'endofdata', 'maxhold')");
+
+                            t.HasCheckConstraint("ck_sim_trades_fills", "fills IN ('exact', 'modelled')");
+
+                            t.HasCheckConstraint("ck_sim_trades_ordinal", "ordinal >= 0");
+
+                            t.HasCheckConstraint("ck_sim_trades_side", "side IN ('buy', 'sell')");
+
+                            t.HasCheckConstraint("ck_sim_trades_trigger_timeframe", "trigger_timeframe IN ('m1', 'm5', 'm10', 'm15', 'm30', 'h1', 'd1', 'w1', 'mo1')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -4116,6 +4570,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.SimRunRow", null)
+                        .WithMany()
+                        .HasForeignKey("RunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sim_trades_run");
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>

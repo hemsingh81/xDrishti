@@ -841,6 +841,7 @@ returns every indicator to its first state. <strong>The per-session rule (<a hre
 <td>job storage</td>
 </tr>
 </tbody></table>
+<p><strong><code>research.sim_runs</code> and <code>research.sim_trades</code></strong> (P3-10, <a href="../adr/0045-the-result-store-sim-runs-and-sim-trades.html">ADR 0045</a>) are the first tables of the <code>research</code> schema. <code>sim_runs</code> has one row per stored run: the run key (unique, the idempotency key), engine and schema versions, strategy, window, universe, counters, cost sheet id and rates hash as typed columns, and the canonical record without its trades as <code>text</code> with its SHA-256. <code>sim_trades</code> has one row per trade of <code>SimulationRun.Trades</code> and <code>OpenAtEnd</code> (<code>open_at_end</code> is part of the primary key <code>(run_id, open_at_end, ordinal)</code>), every field of <code>SimTrade</code> as a typed column (61 mapped columns, the 24 of the costing all null or all present), unique <code>(run_id, trade_key)</code> for the same-entries join of P4. Plain tables, not hypertables (revisit past 2 GB). The migration grants <code>xd_app</code> the schema and then makes both tables <strong>insert-only</strong> (<code>REVOKE UPDATE, DELETE</code>): the runtime role reads and inserts, nothing more; a later <code>research</code> migration either grants per table or calls <code>MakeAppendOnlyForAppRole</code> for these two again after any schema-wide grant.</p>
 <p>Every decision-relevant row carries <code>as_of</code> timestamps and the <code>config_version</code> / <code>model_version</code> used.</p>
 <h2 id="6-api-surface-rest-signalr">6. API surface (REST + SignalR)<a class="hash" href="#6-api-surface-rest-signalr" aria-label="Link to this section">#</a></h2>
 <table>
@@ -1014,7 +1015,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-19 07:06</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-19 08:27</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

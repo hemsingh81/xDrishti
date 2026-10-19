@@ -22,6 +22,8 @@
 ## Data
 - Migrations: `dotnet ef migrations add <Name> --project src/XDrishti.Infrastructure --startup-project src/XDrishti.Infrastructure --output-dir Persistence/Migrations`.
   Never edit an applied migration. New schema → call `GrantSchemaUsageToAppRole(schema)` in its migration.
+- `research.sim_runs` and `research.sim_trades` are insert-only for `xd_app` (ADR 0045): a later `research` migration that re-grants the
+  schema must call `MakeAppendOnlyForAppRole` for both again (or grant per table with `GrantTableToAppRole`); `ResearchGrantsTests` enforces it.
 - Reads: `AsNoTracking()`, project to DTOs, paginate. Writes: track only what changes; bulk → Npgsql `COPY`.
 - Time series (bars, ticks, valuations) → TimescaleDB hypertables + continuous aggregates (raw SQL in migration).
 - Runtime uses role `xd_app` (DML only); migrations run as `xd_owner` via `xd-api migrate`.

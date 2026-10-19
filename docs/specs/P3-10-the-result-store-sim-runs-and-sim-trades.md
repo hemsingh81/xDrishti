@@ -202,3 +202,32 @@ Questions 1 to 3 change the shape; the rest are the owner's preferences. The rec
 - [ ] The size and time measurement recorded in *Built* and D5 corrected if outside a factor of 1.5
 - [ ] A manual smoke recorded: `scripts/simulate.sh … --store` on five real instruments against the owner's database after `xd-up.sh` (stored, then `already stored`), and the files unchanged
 - [ ] Hand-overs written down: the join of P4, the screens and filters of P5, the aggregates of P7, the reader of the whole record (question 6) and the delete function (question 4) are theirs
+
+## Built (2026-10-19)
+**What was built, by criterion and test.** `A` = `XDrishti.Application.Tests`, `L` = `XDrishti.SimExport.Tests`, `N` = `XDrishti.Infrastructure.Tests`, `I` = `XDrishti.Api.IntegrationTests` (Testcontainers), `AR` = `XDrishti.Architecture.Tests`.
+1. Migration on a database built up to `WidenAppSettingValue`, tables, columns, checks, keys, indexes, no hypertable, `HasPendingModelChanges` false, a settings row unchanged: `I/Research/ResearchStoreMigrationTests`.
+2. `Down` removes both tables and the schema; with an extra table it fails with `2BP01` and removes nothing; up again is clean: the same class.
+3. Round trip gross and costed over a 20-instrument universe assembled by the real `RunAssembler` (bit-for-bit doubles with a `-0.0`, a null target, a swing trade, two baskets, 32-bit epochs, a symbol with a dot and one with a hyphen), the header columns and `record_json` byte for byte: `I/Research/RunStoreRoundTripTests`.
+4. `trades.csv` and `open_at_end.csv` from the store equal the ones from memory, and the pair's digest equals `trades_sha256`: the same class.
+5. Idempotent, `created_at` and `created_by` kept, two concurrent stores, a run with no trades, a run with open-at-end trades only: the same class.
+6. Conflict on the record, the trades digest, the trade count and the engine version, nothing changed, event 4417 once at error with no value: the same class.
+7. Grants as `xd_app` on a dedicated server, over every table of the schema, plus the store itself working as `xd_app`, plus the order of the two helper calls in the migration text: `I/Research/ResearchGrantsTests`.
+8. Atomicity (a constraint added by the owner, a trigger that loses a row so the count check fails, a cancellation during the copy, a database without the migration naming it): `I/Research/RunStoreAtomicityTests`.
+9. Validation with a fake store: `A/Research/StoreRunHandlerTests`.
+10. The checks of the columns: `I/Research/RunStoreReadTests`.
+11. The read path: the same class (list newest first with cursor, every filter against LINQ, keyset pages of 7 and 1,000, page sizes 0 and 1,001, malformed and foreign cursors, an unknown enum name in a damaged row on a scratch database) and `A/Research/StoredRunReadHandlersTests`.
+12. The same-entries join and the plan (with sequential scans switched off, because a table of a few hundred rows is cheaper to scan): `I/Research/RunStoreReadTests`.
+13. The verb flag: `I/Simulate/SimulateDatabaseStoreTests` (the export as without the flag, stored, already stored, no store resolved without the flag, validation exit 1, conflict exit 3, database failure exit 3, the files kept in every case).
+14. The digests from the in-memory run, with a file changed after the write: the same class.
+14b. `WriteRecord`: `L/Json/SimExportJsonRecordTests`.
+15. Size and time: `I/Research/RunStoreSizeTests`. **Measured on the test container (Podman, arm64), 200,000 costed trades:** the transaction 3,496 ms (copy 3,428 ms, 57,200 rows a second); `sim_trades` table 110.6 MiB (580 bytes a trade), indexes 21.9 MiB (primary key 6.0 MiB, unique trade key 15.8 MiB), total 132.4 MiB (694 bytes a trade); `sim_runs` 0.2 MiB (record text 1.2 MB for 500 instruments); one filtered page of 1,000 rows 53 ms, the next by cursor 35 ms; the whole stream 2,951 ms (67,800 rows a second). Against D5: table 110.6 MiB vs about 120 MB, indexes 21.9 MiB vs about 20 MB, both inside a factor of 1.5, so D5 stands; the stream is below the 100,000 rows a second the spec hoped for (a loose bound, not a gate, and the test asserts 10,000).
+16. Architecture: `AR/ResultStoreArchitectureTests` (with sentinels), `AR/ResearchLayeringArchitectureTests` (two rules extended, not relaxed), `N/Research/TradeColumnsTests` (the column list against the properties of the Domain types), `AR/LogEventIdTests`.
+17. No API change: nothing under `frontend/src/api` or the OpenAPI document was touched.
+18. and 18b. Logs and injection: `I/Research/RunStoreAtomicityTests` (a sentinel symbol and definition on the success, conflict and failure paths), `I/Research/RunStoreReadTests` (a statement, `%`, `_` and 5,000 characters as the symbol, a statement as the key).
+19. Docs: ADR 0045, Amendment 9 of ADR 0037, doc 03 section 5, doc 11 section 6, doc 17, `scripts/README.md`, `backend/CLAUDE.md`; `scripts/build-docs.sh` run. The roadmap row is the coordinator's.
+
+**Deviations and readings.**
+- The model of `sim_trades` is a class with the four keys and 61 shadow properties declared from the one column list, not a class with 65 properties; the migration is the same and the list cannot drift (decided in ADR 0045).
+- The count check of the validation compares the lists with `Totals.TradesInWindow` (it must not be smaller), not with `Fates.Trades` (see ADR 0045).
+- The store adapter returns `store.write_failed` for a database failure (a constraint, a missing table, an unreachable server) instead of raising, and names the migration when the table is missing; cancellation still raises.
+- Not done here: the manual smoke on five real instruments against the owner's database (it needs `xd-up.sh` to apply the migration first).

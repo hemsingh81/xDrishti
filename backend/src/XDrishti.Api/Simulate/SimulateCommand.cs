@@ -178,7 +178,8 @@ internal static class SimulateCommand
             return Cancelled;
         }
 
-        return Done;
+        // the files are the audit copy and are already there; the store comes second, and its failure leaves them in place (spec P3-10, D12)
+        return options.Store ? await SimulateStore.StoreAsync(run, outcome, provider, console, logger, cancellationToken) : Done;
     }
 
     private static FillRules Rules(FillsMode mode) =>

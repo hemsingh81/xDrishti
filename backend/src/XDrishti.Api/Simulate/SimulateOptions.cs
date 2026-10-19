@@ -24,7 +24,8 @@ internal sealed record SimulateOptions(
     bool AcknowledgeCsvAdjusted,
     bool Force,
     CostChoice Costs,
-    int Cards = SimulateOptions.DefaultCards)
+    int Cards = SimulateOptions.DefaultCards,
+    bool Store = false)
 {
     /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
     public const int DefaultCards = 200;
@@ -35,6 +36,7 @@ internal sealed record SimulateOptions(
         + "  simulate --strategy <id> (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
         + "           [--timeframe <5m|15m>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
         + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
+        + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
         + "           (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required, P3-03f)\n"
         + "  simulate --list-strategies\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
@@ -45,7 +47,7 @@ internal sealed record SimulateOptions(
 
     private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r"];
 
-    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross"];
+    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross", "--store"];
 
     /// <summary>Parses the arguments after the verb name.</summary>
     /// <param name="args">The arguments.</param>
@@ -149,7 +151,7 @@ internal sealed record SimulateOptions(
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards), []);
+            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store")), []);
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());

@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.SimExport.Json;
@@ -21,6 +22,13 @@ public static class SimExportJson
         SkipValidation = false,
     };
 
+    private static readonly string[] TradeMembers = ["trades", "open_at_end"];
+
+    private static readonly JsonSerializerOptions RecordOptions = new(SimExportJsonContext.Default.Options)
+    {
+        TypeInfoResolver = SimExportJsonContext.Default.WithAddedModifier(WithoutTrades),
+    };
+
     /// <summary>Writes <c>run.json</c> to the sink.</summary>
     /// <param name="sink">Where the UTF-8 bytes go; the host owns it.</param>
     /// <param name="run">The finished run.</param>
@@ -39,5 +47,39 @@ public static class SimExportJson
         using var writer = new Utf8JsonWriter(sink, WriterOptions);
         JsonSerializer.Serialize(writer, envelope, SimExportJsonContext.Default.RunEnvelope);
         writer.Flush();
+    }
+
+    /// <summary>
+    /// Writes the run object of <c>run.json</c> without its <c>trades</c> and <c>open_at_end</c> members (spec P3-10, D4): the record the result store keeps as text, in exactly the canonical form of the file (the same converters, the same order,
+    /// compact, the same escaping), so that the store and the file agree on one text. No envelope, no labels. Deterministic.
+    /// </summary>
+    /// <param name="sink">Where the UTF-8 bytes go; the host owns it.</param>
+    /// <param name="run">The finished run.</param>
+    /// <exception cref="ArgumentException">A value is a NaN or an infinity.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">An enum value has no spelling in <see cref="ExportSpellings"/>.</exception>
+    public static void WriteRecord(IBufferWriter<byte> sink, SimulationRun run)
+    {
+        ArgumentNullException.ThrowIfNull(sink);
+        ArgumentNullException.ThrowIfNull(run);
+
+        using var writer = new Utf8JsonWriter(sink, WriterOptions);
+        JsonSerializer.Serialize(writer, run, (JsonTypeInfo<SimulationRun>)RecordOptions.GetTypeInfo(typeof(SimulationRun)));
+        writer.Flush();
+    }
+
+    private static void WithoutTrades(JsonTypeInfo typeInfo)
+    {
+        if (typeInfo.Type != typeof(SimulationRun))
+        {
+            return;
+        }
+
+        for (var i = typeInfo.Properties.Count - 1; i >= 0; i--)
+        {
+            if (TradeMembers.Contains(typeInfo.Properties[i].Name, StringComparer.Ordinal))
+            {
+                typeInfo.Properties.RemoveAt(i);
+            }
+        }
     }
 }

@@ -48,14 +48,12 @@ public sealed class ResearchLayeringArchitectureTests
     [Fact]
     public void The_port_of_the_engine_names_domain_values_only_and_no_engine_type()
     {
-        var port = Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Abstractions.Research").GetTypes().Select(t => t.Name).Order().ToList();
+        var types = Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Abstractions.Research").GetTypes().ToList();
 
-        port.ShouldBe(["ICostSheetStore", "IPreparedStrategy", "ISimulationEngine"], "the store of the charge sheet (P3-03f) is the third port of the research family");
+        types.Where(t => t.IsInterface).Select(t => t.Name).Order().ShouldBe(["ICostSheetStore", "IPreparedStrategy", "IRunStore", "ISimulationEngine"]);  // the store of the charge sheet (P3-03f) and the result store (P3-10) are the third and fourth ports of the research family
+        types.Where(t => !t.IsInterface).Select(t => t.Name).Order(StringComparer.Ordinal).ShouldBe(
+            ["PageRequest", "Page`1", "RunListFilter", "RunRecordText", "RunToStore", "StoreErrors", "StoreOutcome", "StoreReadException", "StoredRunHeader", "TradePageFilter"]); // the rest are the values and failures of the result store port (P3-10)
         ShouldHaveNone(Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Abstractions.Research").ShouldNot().HaveDependencyOnAny(EngineModules).GetResult());
-        foreach (var type in typeof(XDrishti.Application.Abstractions.Research.ISimulationEngine).Assembly.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Application.Abstractions.Research"))
-        {
-            type.IsInterface.ShouldBeTrue(type.Name + " is a port: an interface");
-        }
     }
 
     [Fact]
@@ -165,8 +163,8 @@ public sealed class ResearchLayeringArchitectureTests
         adapter.IsSealed.ShouldBeTrue();
         adapter.GetInterfaces().ShouldContain(typeof(XDrishti.Application.Abstractions.Research.ISimulationEngine));
         adapter.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single().GetParameters().ShouldBeEmpty("stateless: nothing is injected, least of all a scoped service");
-        // the namespace now also holds the database store of the charge sheet (P3-03f), which is I/O by design; the rule stays for everything else in it (CostSheetArchitectureTests pins the store itself)
-        ShouldHaveNone(Types.InAssembly(Infrastructure).That().ResideInNamespace("XDrishti.Infrastructure.Research").And().DoNotHaveName("CostSheetStore").ShouldNot().HaveDependencyOnAny(IoAndClock).GetResult());
+        // the namespace now also holds the database store of the charge sheet (P3-03f), which is I/O by design; the rule stays for everything else in it (CostSheetArchitectureTests pins the store itself); the result store of P3-10 is the same, pinned by ResultStoreArchitectureTests
+        ShouldHaveNone(Types.InAssembly(Infrastructure).That().ResideInNamespace("XDrishti.Infrastructure.Research").And().DoNotHaveName("CostSheetStore").And().DoNotHaveName("RunStore").And().DoNotHaveName("TradeColumns").And().DoNotHaveName("TradeColumn").ShouldNot().HaveDependencyOnAny(IoAndClock).GetResult());
         ClockAndAmbientUses(Infrastructure, adapter.FullName!).ShouldBeEmpty();
         AssemblyScan.MembersUsedBy(Infrastructure, adapter.FullName!).ShouldNotContain(c => c.Type == "System.TimeProvider");
         adapter.GetFields(BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly).ShouldBeEmpty("no state");
