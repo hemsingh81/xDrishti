@@ -7,7 +7,7 @@ namespace XDrishti.Api.Simulate.Gate;
 /// <summary>
 /// The rules of the automated gate (spec P3-09d D2, ADR 0048), pure: the verdicts of the assisted read and the results of the spot checks in, a <see cref="GateDecision"/> out. Every category is computed from the rows on its own, never from the row's verdict (the verdict of the assisted read
 /// has a precedence that hides a category behind a stronger one), so one defect never hides a data problem and all the counts are reported. The status is the first of: <c>BLOCKED_DEFECT</c> (the reader on the STORED bars differs from the engine, or reads no trade, or the engine row is absent, or a spot check
-/// contradicts the run record, or the pack has no trade); <c>DATA_REPAIR_NEEDED</c> (a gross bar problem: a missing minute, a price level that is not constant, a gap above <see cref="BarComparison.GrossGapPercent"/> % of price); <c>RERUN_NEEDED</c> (a row with no second source);
+/// contradicts the run record, or the pack has no trade); <c>DATA_REPAIR_NEEDED</c> (a gross bar problem other than a hole: a price level that is not constant, a gap above <see cref="BarComparison.GrossGapPercent"/> % of price); <c>RERUN_NEEDED</c> (a row with no second source);
 /// <c>PASS_WITH_DATA_FINDINGS</c> (only the reader on the second source differs: the trade depends on the feed); <c>PASS</c>. No clock, no random source: the same inputs give the same decision.
 /// </summary>
 internal static class GateRules
@@ -42,14 +42,26 @@ internal static class GateRules
                 defects.Add(Finding(row, Repro(v, engine)));
             }
 
-            if (row.Bars.Any(b => b.Gross))
+            var gross = row.Bars.Where(b => b.Gross).ToList();
+            if (gross.Any(b => !IsHole(b)))
             {
-                repairs.Add(Finding(row, string.Join("; ", row.Bars.Where(b => b.Gross).Select(b => b.Minute + " " + b.Words))));
+                repairs.Add(Finding(row, string.Join("; ", gross.Where(b => !IsHole(b)).Select(b => b.Minute + " " + b.Words))));
+            }
+
+            var parts = new List<string>();
+            if (gross.Any(IsHole))
+            {
+                parts.Add("missing minutes: " + string.Join(", ", gross.Where(IsHole).Select(b => b.Minute + " " + b.Words + Between(row, b.Minute))));
             }
 
             if (v.Fields.Count == 0 && v.SecondFields.Count > 0)
             {
-                data.Add(Finding(row, "the reader on the second source differs from the engine on: " + string.Join(", ", v.SecondFields) + "; " + Gap(row)));
+                parts.Add("the reader on the second source differs from the engine on: " + string.Join(", ", v.SecondFields) + "; " + Gap(row));
+            }
+
+            if (parts.Count > 0)
+            {
+                data.Add(Finding(row, string.Join("; ", parts)));
             }
         }
 
@@ -67,6 +79,22 @@ internal static class GateRules
             : data.Count > 0 ? GateStatus.PassWithDataFindings
             : GateStatus.Pass;
         return new GateDecision(status, counts, defects, repairs, reruns, data, spots, Actions(status, counts, repairs));
+    }
+
+    /// <summary>A minute missing on a side: a hole in the data, a data finding and not evidence against the engine (ADR 0048).</summary>
+    private static bool IsHole(MinuteComparison b) => b.Words.StartsWith("missing in ", StringComparison.Ordinal);
+
+    private static string Between(AssistRow row, string minute)
+    {
+        var reading = row.StoredReading ?? row.Reading;
+        if (reading is null)
+        {
+            return " (trade minutes unknown)";
+        }
+
+        var entry = AssistLog.Time(reading.EntryEpoch)[11..];
+        var exit = AssistLog.Time(reading.ExitEpoch)[11..];
+        return string.CompareOrdinal(minute, entry) >= 0 && string.CompareOrdinal(minute, exit) <= 0 ? " (between the entry and exit minutes: YES)" : " (between the entry and exit minutes: no)";
     }
 
     private static GateFinding Finding(AssistRow row, string detail) => new(row.Pack.Seq, row.Pack.TradeKey, row.Pack.Symbol, row.Pack.Date, detail);
@@ -112,7 +140,7 @@ internal static class GateRules
             ],
             GateStatus.DataRepairNeeded =>
             [
-                "Run the existing gap backfill (doc 05 section 6.1) for these instruments and days, then check the stored bars: " + days + ".",
+                "Run the gap backfill (doc 05 section 6.1) only for days inside Data:Gaps:LookbackSessions (default 30 sessions, at most 250); it cannot reach older days, and a gross problem on an older day has no repair command yet. Days: " + days + ".",
                 "Where the gap is in the second source and not in the stored bars, move second-source-bars.csv away (or fix the folder file) so that the day is fetched again.",
                 "Re-run the gate: scripts/verify-pack.sh --gate <pack-folder>. A change of the stored bars changes the trades, so if the engine's trades change, draw a new pack.",
             ],
@@ -123,7 +151,7 @@ internal static class GateRules
             ],
             GateStatus.PassWithDataFindings =>
             [
-                "Record each data finding as an open data-quality finding (the rows and fields are listed); they are not P3 blockers.",
+                "Record each data finding as an open data-quality finding (the rows, fields and missing minutes are listed); they are not P3 blockers. A hole inside the backfill lookback can be closed with the gap backfill; a hole older than the lookback cannot be reached by it and stays open for a later repair command (the stored history is not edited for the gate).",
                 "P3 exit: the status counts as passed together with a green scripts/check.sh; an owner's chart check or a third independent source stays optional extra evidence.",
             ],
             _ =>

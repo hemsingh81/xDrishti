@@ -425,7 +425,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P3-09d</td>
-<td><strong>The automated gate</strong>: <code>verify-pack --gate &lt;pack-folder&gt; [--second-source-folder &lt;dir&gt;]</code> runs the assisted read, applies written first-match rules (<code>BLOCKED_DEFECT</code> 12, <code>DATA_REPAIR_NEEDED</code> 11, <code>RERUN_NEEDED</code> 10, <code>PASS_WITH_DATA_FINDINGS</code> 0, <code>PASS</code> 0) over independent counts, checks the spot lines of the pack by machine (and reports what it cannot check), and writes <code>gate-decision.json</code> and <code>.md</code> with numbered next actions and the input hashes. It is the P3 exit (the owner&#39;s choice of 2026-10-21, &quot;fully automated&quot;); the owner&#39;s chart check becomes optional.</td>
+<td><strong>The automated gate</strong>: <code>verify-pack --gate &lt;pack-folder&gt; [--second-source-folder &lt;dir&gt;]</code> runs the assisted read, applies written first-match rules (<code>BLOCKED_DEFECT</code> 12, <code>DATA_REPAIR_NEEDED</code> 11 for gross problems other than holes; a missing minute is a data finding, ISS-29, <code>RERUN_NEEDED</code> 10, <code>PASS_WITH_DATA_FINDINGS</code> 0, <code>PASS</code> 0) over independent counts, checks the spot lines of the pack by machine (and reports what it cannot check), and writes <code>gate-decision.json</code> and <code>.md</code> with numbered next actions and the input hashes. It is the P3 exit (the owner&#39;s choice of 2026-10-21, &quot;fully automated&quot;); the owner&#39;s chart check becomes optional.</td>
 <td>4, after P3-09c</td>
 <td>1 d (an estimate, not calibrated)</td>
 <td>Approved (the owner chose the design in chat; the spec text itself not read by the owner), built; open: the real run on the owner&#39;s pack (needs the stack and the token)</td>
@@ -781,6 +781,14 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>The owner chooses: amend the rule text (R6) to say what the code does, or change the engine (a new engine version, <code>sim-6</code>, and golden files).</td>
 <td>Open</td>
 </tr>
+<tr>
+<td>ISS-29</td>
+<td><strong>Stored-bar holes older than the backfill lookback are not repairable by the existing backfill; and a flaky frontend test.</strong> The gap backfill covers only the last <code>Data:Gaps:LookbackSessions</code> sessions (default 30, at most 250), so it can never repair a 2024 day. Found by the first real <code>verify-pack --gate</code> on <code>p3-check-1</code>: KALYANKJIL 2024-04-23 is missing 10:52 to 10:57 in the stored bars. Also seen once: <code>AddTrade.test.tsx &gt; Rebuild lots</code> failed in a full frontend run (a request escaped the network mock, <code>/api/live/status</code>) and passed alone 3 of 3.</td>
+<td>The first real gate run (2026-10-21).</td>
+<td>A hole is a data finding of the gate (ADR 0048, <code>PASS_WITH_DATA_FINDINGS</code>), not a P3 blocker; the owner does not want the stored history edited for the gate. No repair command exists for old days. The frontend test is a flake in a test that does not mock one request.</td>
+<td>A repair command for old holes is a later decision; the flaky test needs its mock completed (not done).</td>
+<td>Open</td>
+</tr>
 </tbody></table>
 
   </article>
@@ -788,7 +796,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-21 14:29</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-21 15:07</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

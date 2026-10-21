@@ -168,9 +168,9 @@ Seeds used so far (all of them, including abandoned ones): `p3-check-1`.
 | Status | Exit | Meaning | Next actions |
 |---|---|---|---|
 | `BLOCKED_DEFECT` | 12 | the reader on the stored bars differs from the engine, cannot read the trade, or the engine row is absent; a spot check is contradicted; the pack has no trade | failing test from the minimal repro of each row, fix, new pack with a new seed, re-run |
-| `DATA_REPAIR_NEEDED` | 11 | a gross bar problem (missing minute, price level not constant, a gap above 1 % of price): instrument and days listed | run the existing gap backfill (doc 05 section 6.1) for those days, then re-run the gate |
+| `DATA_REPAIR_NEEDED` | 11 | a gross bar problem other than a hole (price level not constant, a gap above 1 % of price): instrument and days listed | run the gap backfill (doc 05 section 6.1) for days inside its lookback (default 30 sessions, at most 250; older days cannot be reached), then re-run the gate |
 | `RERUN_NEEDED` | 10 | a row with no second source | reconnect or fill the folder, re-run |
-| `PASS_WITH_DATA_FINDINGS` | 0 | no defect, repair or rerun; some rows are `data_sensitive` (listed with the fields that change and the gap sizes) | record them as open data-quality findings; not P3 blockers |
+| `PASS_WITH_DATA_FINDINGS` | 0 | no defect, repair or rerun; some rows are `data_sensitive` (fields that change, gap sizes) or have a hole (a minute missing on a side: instrument, day, minutes, side, between entry and exit or not) | record them as open data-quality findings; not P3 blockers; a hole older than the backfill lookback stays open for a later repair command |
 | `PASS` | 0 | all clear | none |
 
 **The exit rule.** P3 passes when the gate says `PASS` or `PASS_WITH_DATA_FINDINGS` on a pack drawn with the owner's seed, and `scripts/check.sh` is green. Record in section 10: the seed, the pack id, the engine version, the gate status, the counts of the gate and the SHA-256 of its inputs (they are in `gate-decision.json`); no price, no R value, no count of a group in the committed text beyond the status counts.

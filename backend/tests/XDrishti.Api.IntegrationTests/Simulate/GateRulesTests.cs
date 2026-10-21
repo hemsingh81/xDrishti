@@ -131,7 +131,7 @@ public sealed class GateRulesTests
     [Fact]
     public void A_row_with_a_defect_and_a_gross_gap_is_counted_in_both()
     {
-        var row = new RowVerdict(Row(bars: [new MinuteComparison("09:46", "missing in stored", false, 0, null, true)]), Verdicts.ReaderDiffers, ["entry price"], ["stop"]);
+        var row = new RowVerdict(Row(bars: [new MinuteComparison("09:46", "differs by 50 ticks", false, 50, 2.5m, true)]), Verdicts.ReaderDiffers, ["entry price"], ["stop"]);
 
         var d = Decide([row]);
 
@@ -155,5 +155,48 @@ public sealed class GateRulesTests
         string[] codes = [.. Enum.GetValues<GateStatus>().Select(GateStatuses.Code)];
 
         codes.ShouldBe(["PASS", "PASS_WITH_DATA_FINDINGS", "RERUN_NEEDED", "DATA_REPAIR_NEEDED", "BLOCKED_DEFECT"]);
+    }
+
+    private static RowVerdict Hole(string words = "missing in stored", string minute = "09:50") =>
+        new(Row(bars: [new MinuteComparison(minute, words, false, 0, null, true)]), Verdicts.BarsDiffer, [], []);
+
+    [Fact]
+    public void A_hole_in_the_data_alone_is_a_data_finding_with_the_side_and_the_between_flag_not_a_repair()
+    {
+        var inside = Decide([Hole("missing in stored", "09:50")]);
+        var outside = Decide([Hole("missing in second source", "09:20")]);
+
+        inside.Status.ShouldBe(GateStatus.PassWithDataFindings);
+        inside.Counts.Repairs.ShouldBe(0);
+        inside.DataFindings.Single().Detail.ShouldContain("09:50 missing in stored (between the entry and exit minutes: YES)");
+        outside.DataFindings.Single().Detail.ShouldContain("09:20 missing in second source (between the entry and exit minutes: no)");
+    }
+
+    [Fact]
+    public void A_hole_with_a_reader_difference_is_BLOCKED_DEFECT_and_the_hole_is_still_counted()
+    {
+        var row = new RowVerdict(Row(bars: [new MinuteComparison("09:50", "missing in stored", false, 0, null, true)]), Verdicts.ReaderDiffers, ["exit reason"], []);
+
+        var d = Decide([row]);
+
+        d.Status.ShouldBe(GateStatus.BlockedDefect);
+        d.Counts.DataFindings.ShouldBe(1);
+        d.Counts.Repairs.ShouldBe(0);
+    }
+
+    [Fact]
+    public void A_hole_and_a_gross_gap_is_still_DATA_REPAIR_NEEDED_and_the_actions_say_the_backfill_has_a_lookback()
+    {
+        var d = Decide([Hole(), Gross(2)]);
+
+        d.Status.ShouldBe(GateStatus.DataRepairNeeded);
+        d.NextActions[0].ShouldContain("cannot reach older days");
+        d.Counts.DataFindings.ShouldBe(1);
+    }
+
+    [Fact]
+    public void The_pass_with_findings_action_says_old_holes_stay_open()
+    {
+        Decide([Hole()]).NextActions[0].ShouldContain("older than the lookback cannot be reached");
     }
 }
