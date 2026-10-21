@@ -17,7 +17,7 @@ internal static class StoredRunFixtures
 
     private static readonly DateOnly Monday = new(2026, 3, 2);
 
-    private static readonly ExitReason[] Exits = [ExitReason.Stop, ExitReason.Target, ExitReason.SquareOff, ExitReason.MaxHold];
+    private static readonly ExitReason[] Exits = [ExitReason.Stop, ExitReason.Target, ExitReason.SquareOff, ExitReason.MaxHold, ExitReason.TimeStop];
 
     public static Guid InstrumentId(int index) => new($"00000000-0000-0000-0000-{index + 1:x12}");
 

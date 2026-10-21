@@ -1,6 +1,6 @@
 # P4-02 — `PARTIAL_BE`, `PARTIAL_TRAIL` and the `time_stop` overlay
 
-- **Status:** Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 8 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at bf3cb70. The tables and the rules were read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D3, D8, D10 to D14), doc 08 §2 and §5 and [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md); P4-01 is Approved and **not built**, so every name of the tape, the legs and `IExitRule` below is the one that spec gives and is UNVERIFIED against code until it is built. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
+- **Status:** Built 2026-10-21, ahead of the P3 exit check (ADR 0050, not 0049: the number was taken by P4-01; the reviewer pass is the caller's). Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 8 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at bf3cb70. The tables and the rules were read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D3, D8, D10 to D14), doc 08 §2 and §5 and [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md); P4-01 is Approved and **not built**, so every name of the tape, the legs and `IExitRule` below is the one that spec gives and is UNVERIFIED against code until it is built. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 2 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md).
 - **Design refs:** docs/design/08-exits-and-risk.md §1, §2, §5, §8 · 16-configuration.md §2 (`exits`) · [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md) Amendment 1 · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) · [ADR 0040](../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.md) · ADR 0048 (P4-01, to be written) · [ADR 0047](../adr/0047-the-oracle-and-the-rule-table-gaps.md).
 
@@ -94,7 +94,7 @@ All eight answered "yes to all recommendations" by the owner on 2026-10-19: each
 
 ## Done when
 - [x] The owner has answered questions 1 to 8 and the status is Approved (2026-10-19)
-- [ ] All acceptance criteria have evidence
+- [x] All acceptance criteria have evidence, except 11 in the letter: the verbs take a built-in strategy by id and cannot choose an exit, so the end-to-end is the library they call (ADR 0050, Consequences)
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Migration added only if the store needs it (Contract); no API change
-- [ ] ADR 0049 written; `docs/design` (08 §2 and §5, 16, 18-roadmap), the oracle log and ADR 0036 Amendment 2 updated; `scripts/build-docs.sh` run
+- [x] Migration added only if the store needs it (Contract): `AddTimeStopExitReason` (the check constraint of `exit_reason`); no API change
+- [x] ADR 0050 written (the spec says 0049, taken by P4-01); `docs/design` (08 §2 and §5, 16, 18-roadmap), the oracle log and ADR 0036 Amendment 2 updated; `scripts/build-docs.sh` run

@@ -8,4 +8,5 @@ public enum OracleExitReason
     SquareOff,
     EndOfData,
     MaxHold,
+    TimeStop,
 }

@@ -21,7 +21,7 @@ public sealed class ExitBoundaryTests
     private static ExitParameter[] Valid(ExitPolicy policy) => policy switch
     {
         ExitPolicy.FixedRr => [P("rr", 2)],
-        ExitPolicy.PartialBe => [P("book_pct", 50), P("t1_rr", 1), P("t2_rr", 2, 3)],
+        ExitPolicy.PartialBe => [P("book_pct", 50), P("t1_rr", 1), P("t2_rr", 2)],
         ExitPolicy.PartialTrail => [P("book_pct", 50), P("t1_rr", 1), P("trail_atr_mult", 2)],
         ExitPolicy.AtrTrail => [P("mult", 2, 3), P("activate_at_rr", 1)],
         ExitPolicy.StructureTrail => [P("lookback_bars", 3)],
@@ -33,7 +33,9 @@ public sealed class ExitBoundaryTests
 
     private static string[] Errors(SimulatorBuild build) => [.. build.Problems.Where(p => p.Problem.Severity == ProblemSeverity.Error).Select(p => p.Problem.Code + "@" + p.Path)];
 
-    public static TheoryData<ExitPolicy> Refused { get; } = [ExitPolicy.PartialBe, ExitPolicy.PartialTrail, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail, ExitPolicy.Pyramid];
+    public static TheoryData<ExitPolicy> Refused { get; } = [ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail, ExitPolicy.Pyramid];
+
+    public static TheoryData<ExitPolicy> Run { get; } = [ExitPolicy.FixedRr, ExitPolicy.PartialBe, ExitPolicy.PartialTrail];
 
     [Theory]
     [MemberData(nameof(Refused))]
@@ -44,11 +46,41 @@ public sealed class ExitBoundaryTests
 
         alone.Simulator.ShouldBeNull();
         Errors(alone).ShouldBe(["simulation.unsupported_exit@buy.exits"]);
+        alone.Problems.Single(p => p.Problem.Code == "simulation.unsupported_exit").Problem.Message.ShouldContain(policy switch { ExitPolicy.AtrTrail => "ATR_TRAIL", ExitPolicy.StructureTrail => "STRUCTURE_TRAIL", ExitPolicy.EmaTrail => "EMA_TRAIL", _ => "PYRAMID" });
         Errors(withRr).ShouldBe(["simulation.unsupported_exit@buy.exits"]);
     }
 
+    [Theory]
+    [MemberData(nameof(Run))]
+    public void A_correct_table_of_a_policy_the_simulator_runs_is_accepted_alone_and_with_the_time_stop(ExitPolicy policy)
+    {
+        var alone = Simulator.Create(With([new ExitSpec(policy, Valid(policy))]), Timeframe.M15);
+        var overlay = Simulator.Create(With([new ExitSpec(policy, Valid(policy))], [new OverlaySpec(OverlayKind.TimeStop, [P("min_progress_rr", 0.5), P("intraday_bars", 12)])]), Timeframe.M15);
+
+        alone.Simulator.ShouldNotBeNull();
+        overlay.Simulator.ShouldNotBeNull();
+        Errors(alone).ShouldBeEmpty();
+        Errors(overlay).ShouldBeEmpty();
+    }
+
     [Fact]
-    public void A_correct_overlay_is_refused_by_name_at_its_overlay()
+    public void Two_candidates_are_refused_at_the_exits_and_a_list_of_two_values_is_refused_naming_the_policy_and_the_parameter()
+    {
+        var two = Simulator.Create(With([Rr(2), new ExitSpec(ExitPolicy.PartialBe, Valid(ExitPolicy.PartialBe))]), Timeframe.M15);
+        var rrList = Simulator.Create(With([new ExitSpec(ExitPolicy.FixedRr, [P("rr", 2, 3)])]), Timeframe.M15);
+        var t2List = Simulator.Create(With([new ExitSpec(ExitPolicy.PartialBe, [P("book_pct", 50), P("t1_rr", 1), P("t2_rr", 2, 3)])]), Timeframe.M15);
+
+        Errors(two).ShouldBe(["simulation.unsupported_exit@buy.exits"]);
+        Errors(rrList).ShouldBe(["simulation.unsupported_exit@buy.exits"]);
+        Errors(t2List).ShouldBe(["simulation.unsupported_exit@buy.exits"]);
+        rrList.Problems.Single(p => p.Problem.Code == "simulation.unsupported_exit").Problem.Message.ShouldContain("FIXED_RR");
+        rrList.Problems.Single(p => p.Problem.Code == "simulation.unsupported_exit").Problem.Message.ShouldContain("`rr`");
+        t2List.Problems.Single(p => p.Problem.Code == "simulation.unsupported_exit").Problem.Message.ShouldContain("PARTIAL_BE");
+        t2List.Problems.Single(p => p.Problem.Code == "simulation.unsupported_exit").Problem.Message.ShouldContain("`t2_rr`");
+    }
+
+    [Fact]
+    public void The_time_stop_is_accepted_and_event_exit_is_refused_by_name_at_its_overlay()
     {
         var overlays = new[]
         {
@@ -59,7 +91,7 @@ public sealed class ExitBoundaryTests
         var build = Simulator.Create(With([Rr(2)], overlays), Timeframe.M15);
 
         build.Simulator.ShouldBeNull();
-        Errors(build).ShouldBe(["simulation.unsupported_exit@buy.overlays[0]", "simulation.unsupported_exit@buy.overlays[1]"]);
+        Errors(build).ShouldBe(["simulation.unsupported_exit@buy.overlays[1]"]);
     }
 
     [Fact]

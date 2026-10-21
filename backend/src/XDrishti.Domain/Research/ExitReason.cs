@@ -20,4 +20,7 @@ public enum ExitReason
 
     /// <summary>A swing position reached the close of the last session it may be held (ADR 0040, X8): the close of the due session's last 1-minute bar, or of the last minute that holds a trade when the due minute is missing.</summary>
     MaxHold,
+
+    /// <summary>The <c>time_stop</c> overlay found too little progress (P4-02, D8 and D9): the open share left at the open of the minute after the check bar (intraday) or at the close of the checked session (swing).</summary>
+    TimeStop,
 }

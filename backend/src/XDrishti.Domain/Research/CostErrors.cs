@@ -17,6 +17,9 @@ public static class CostErrors
     /// <summary>A capital, entry or risk that is not above 0.</summary>
     public const string SizingInputInvalidCode = "costs.sizing_input_invalid";
 
+    /// <summary>The legs of a trade that cannot be costed: no exit leg.</summary>
+    public const string LegsInvalidCode = "costs.legs_invalid";
+
     /// <summary>No sheet is stored under the id (P3-03f), or the id is a <c>test-</c> one, which is never stored.</summary>
     public const string SheetNotFoundCode = "costs.sheet_not_found";
 
@@ -108,4 +111,8 @@ public static class CostErrors
     /// <summary>A sizing input that is not above 0.</summary>
     public static Error SizingInputInvalid(string field) =>
         Error.Validation(SizingInputInvalidCode, $"The sizing input '{field}' is not above 0 or is above its bound.");
+
+    /// <summary>A trade whose legs cannot be costed (it has no exit leg to take the shares that are left).</summary>
+    public static Error LegsInvalid(string reason) =>
+        Error.Validation(LegsInvalidCode, $"The legs of the trade cannot be costed: {reason}.");
 }

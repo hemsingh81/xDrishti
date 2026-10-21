@@ -90,6 +90,8 @@ Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): A
 | 30 | `LegsTotal` | P4-01 D15: the legs of the trades that have legs; 0 for a trade without | SPEC ONLY | ADR 0049 |
 | 31 | `LegsMerged` | P4-01 D11: legs of no shares merged into the next one by the costing; 0 in the walker | SPEC ONLY | ADR 0049 |
 | 32 | `StopLoosenIgnored` | P4-01 D6: requests of an exit rule to loosen a stop, ignored | SPEC ONLY | ADR 0049 |
+| 33 | `ExitsTimeStop` | P4-02 D8: trades that ended with the `time_stop` overlay | SPEC ONLY | ADR 0050 |
+| 34 | `TimeStopAtLastClose` | P4-02 D9: swing time-stop exits made at the close of the last minute that held a trade because the checked session ended without one at its end | SPEC ONLY | ADR 0050 |
 
 `WalkOutcome.HoldEndEpochSeconds` (the gate's input, compared as a list, section D) and the booleans of `WalkOutcome` are the same facts as the counters above.
 

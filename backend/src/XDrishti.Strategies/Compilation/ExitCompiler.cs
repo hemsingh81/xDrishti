@@ -95,7 +95,7 @@ internal sealed class ExitCompiler(ProblemSink sink, QuantityReader quantities)
             var before = sink.ErrorCount;
             var (values, _) = Checked(name, ExitTables.OverlayChecked[overlay.Kind], overlay.Parameters, null, StyleRule(overlay.Kind, context), context, at);
             ExitRelations.Check(sink, overlay.Kind, values, context, at);
-            if (!duplicate)
+            if (!duplicate && !ExitTables.OverlaysRunBySimulator.Contains(overlay.Kind))
             {
                 sink.Warning(at, ModelCodes.ExitNotEvaluated, "The overlay " + name + " is checked, but nothing runs it yet (P4)" + (overlay.Kind == OverlayKind.EventExit ? " and the results calendar it needs is missing (P15)" : string.Empty) + "; a simulator refuses a strategy that uses it.");
             }

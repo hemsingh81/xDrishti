@@ -35,6 +35,21 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
     private decimal _pendingShare;
     private int _loosenIgnored;
     private readonly List<OracleLeg> _partials = [];
+    private readonly List<(decimal Price, decimal Filled)> _partialPrices = [];
+
+    // P4-02 (D1 to D9): the policies' own reading of the position, written from the rule tables: T1 pending or done, the minute T1 filled in, the next bar of the policy not yet read, the bars counted for the intraday time stop,
+    // whether that stop found too little progress, and the session (swing) the time stop checks.
+    private decimal? _initialTarget;
+    private bool _t1Pending;
+    private bool _t1Done;
+    private int _t1Index;
+    private int _polNext;
+    private int _polBars;
+    private bool _tsSpent;
+    private bool _tsDue;
+    private bool _tsOpen;
+    private DateOnly _tsDate;
+    private int _tsMinute;
 
     private sealed class Exit
     {
@@ -57,6 +72,10 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         public bool FromBar { get; init; }
 
         public bool OpenBeyondTarget { get; init; }
+
+        public bool AtOpen { get; init; }
+
+        public bool TimeStopLast { get; init; }
     }
 
     private readonly record struct Fill(int Index, OracleNoTradeReason? NoTrade, long Reference);
@@ -161,6 +180,9 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             _target = _entry + (_d * OracleNumbers.Conv(rr) * _risk);
         }
 
+        _initialTarget = _target;
+        _t1Pending = rules.Policy is { Kind: not OraclePolicyKind.None };
+
         decimal entryFilled = EntryFilledPrice(fh, fl);
         _entryDate = OracleClock.DateOf(fb.EpochSeconds);
         _adv = _entry;
@@ -172,6 +194,12 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             _nextBar++;
         }
 
+        _polNext = 0;
+        while (rules.Policy is { } begun && _polNext < begun.Bars.Count && begun.Bars[_polNext].CloseEpochSeconds <= fb.EpochSeconds)
+        {
+            _polNext++;
+        }
+
         _prevEpoch = fb.EpochSeconds;
         _prevDate = _entryDate;
         if (_swing)
@@ -180,6 +208,12 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             _dueDate = cal.AddTradingDays(Has(OracleFaults.MaxHoldFromDecisionDate) ? decDate : _entryDate, n - 1);
             _dueMinute = cal.DueMinute(_dueDate);
             Row(OracleRows.X7);
+            if (rules.Policy is { MinProgressRr: not null, SwingSessions: > 0 } timeStop)
+            {
+                _tsOpen = true;
+                _tsDate = cal.AddTradingDays(_entryDate, timeStop.SwingSessions - 1);
+                _tsMinute = cal.DueMinute(_tsDate);
+            }
         }
 
         Exit exit = Position(f);
@@ -394,6 +428,17 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
                     return LastClose();
                 }
 
+                if (_swing && _tsOpen && (dk > _tsDate || (dk == _tsDate && Minute(ek) > _tsMinute)))
+                {
+                    // D9, second rule: the checked session ended with no minute that held a trade at its end: its last close, when the progress there is below the minimum.
+                    _tsOpen = false;
+                    decimal lastClose = OracleNumbers.Conv(bars[_lastIdx].Close);
+                    if (Below(lastClose))
+                    {
+                        return new Exit { Reason = OracleExitReason.TimeStop, Price = lastClose, Index = _lastIdx, FromBar = true, TimeStopLast = true };
+                    }
+                }
+
                 if (IsEmpty(bars[k]))
                 {
                     _pendingZero++;
@@ -467,14 +512,39 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             LadderStep(ladder, ek, o, h, l);
         }
 
+        if (!isFill && rules.Policy is { } policy)
+        {
+            PolicyStep(policy, ek);
+        }
+
         Exit? ex;
         if (!_swing && !isFill && Minute(ek) >= rules.SquareOffMinute)
         {
             ex = SquareOffMinute(o, ek);
         }
+        else if (!isFill && _tsDue && !(_buy ? o <= _stop : o >= _stop) && !(_target is { } reached && (_buy ? o >= reached : o <= reached)))
+        {
+            // D8: the time stop found too little progress at the close of its bar: the open share leaves at the open of this minute, unless the open is already beyond the stop or the target.
+            ex = new Exit { Reason = OracleExitReason.TimeStop, Price = o, AtOpen = true, FromBar = true };
+        }
         else
         {
             ex = Triggers(o, h, l, isFill);
+            if (ex is { Reason: OracleExitReason.Target } && _t1Pending)
+            {
+                TakeT1(rules.Policy!, k, ek, h, l);
+                ex = null;
+            }
+        }
+
+        if (ex is null && _tsOpen && dk == _tsDate && Minute(ek) == _tsMinute)
+        {
+            // D9: the last minute of the checked session held a trade and neither level was reached: progress against its close.
+            _tsOpen = false;
+            if (Below(c))
+            {
+                ex = new Exit { Reason = OracleExitReason.TimeStop, Price = c, FromBar = true };
+            }
         }
 
         if (ex is null && nowDue)
@@ -553,12 +623,88 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
                 var market = new Exit { Reason = OracleExitReason.SquareOff, Price = o };
                 decimal filled = ExitFilledPrice(market, h, l);
                 _partials.Add(new OracleLeg(ek, OracleNumbers.ToDouble(o), OracleNumbers.ToDouble(filled), share, "Exit", "LADDER"));
+                _partialPrices.Add((o, filled));
             }
         }
     }
 
     private bool _overnightStop;
     private bool _overnightTarget;
+
+    /// <summary>D7: the progress at <paramref name="close"/> is strictly below the minimum of the time stop.</summary>
+    private bool Below(decimal close) => rules.Policy?.MinProgressRr is { } minimum && _d * (close - _entry) < minimum * _risk;
+
+    /// <summary>
+    /// The bars that closed at or before the start of this minute and were not read yet, in order. After T1 a trail level is the highest high (a sell: lowest low) of the minutes that hold a trade from the T1 minute to the end of the bar,
+    /// less the multiple of the bar's ATR (D5); it replaces the stop only when it is tighter, otherwise it is counted and ignored. The intraday time stop counts the bars and judges the N-th (D8).
+    /// </summary>
+    private void PolicyStep(OraclePolicy policy, long ek)
+    {
+        while (_polNext < policy.Bars.Count && policy.Bars[_polNext].CloseEpochSeconds <= ek)
+        {
+            OraclePolicyBar bar = policy.Bars[_polNext++];
+            if (policy.Kind == OraclePolicyKind.Trail && _t1Done && double.IsFinite(bar.Atr))
+            {
+                decimal anchor = ExtremeSinceT1(bar.CloseEpochSeconds);
+                decimal level = anchor - (_d * policy.TrailMult * OracleNumbers.Conv(bar.Atr));
+                if (_buy ? level >= _stop : level <= _stop)
+                {
+                    _stop = level;
+                }
+                else
+                {
+                    _loosenIgnored++;
+                }
+            }
+
+            if (policy.MinProgressRr is not null && policy.IntradayBars > 0 && !_tsSpent && ++_polBars == policy.IntradayBars)
+            {
+                _tsSpent = true;
+                _tsDue = double.IsFinite(bar.Close) && Below(OracleNumbers.Conv(bar.Close));
+            }
+        }
+    }
+
+    /// <summary>The highest high (a sell: the lowest low) of the minutes that hold a trade from the T1 minute up to, but not including, <paramref name="closeEpoch"/>.</summary>
+    private decimal ExtremeSinceT1(long closeEpoch)
+    {
+        decimal best = _buy ? decimal.MinValue : decimal.MaxValue;
+        for (int j = _t1Index; j < bars.Count && bars[j].EpochSeconds < closeEpoch; j++)
+        {
+            if (IsEmpty(bars[j]))
+            {
+                continue;
+            }
+
+            best = _buy ? Math.Max(best, OracleNumbers.Conv(bars[j].High)) : Math.Min(best, OracleNumbers.Conv(bars[j].Low));
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// D1, D2 and D4: the target of the position is T1; a minute that the table gives as a target exit books the share instead and the position goes on. From the next minute, <c>PARTIAL_BE</c> has the stop at the exact entry and
+    /// the target at T2, <c>PARTIAL_TRAIL</c> has no target. T1 is a resting limit: no slippage.
+    /// </summary>
+    private void TakeT1(OraclePolicy policy, int k, long ek, decimal h, decimal l)
+    {
+        decimal t1 = _target!.Value;
+        decimal filled = ExitFilledPrice(new Exit { Reason = OracleExitReason.Target, Price = t1 }, h, l);
+        _partials.Add(new OracleLeg(ek, OracleNumbers.ToDouble(t1), OracleNumbers.ToDouble(filled), policy.Book, "Exit", "T1"));
+        _partialPrices.Add((t1, filled));
+        _t1Pending = false;
+        _t1Done = true;
+        _t1Index = k;
+        if (policy.Kind == OraclePolicyKind.Be)
+        {
+            _stop = _entry;
+            _target = _entry + (_d * policy.T2Rr * _risk);
+        }
+        else
+        {
+            _target = null;
+        }
+    }
 
     private Exit SquareOffMinute(decimal o, long ek)
     {
@@ -742,6 +888,11 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
                 WidenAdv(o, o);
                 WidenFav(o, o);
                 break;
+            case OracleExitReason.TimeStop when ex.AtOpen:
+                WidenAdv(o, o);
+                WidenFav(o, o);
+                break;
+            case OracleExitReason.TimeStop when !ex.TimeStopLast:
             case OracleExitReason.MaxHold when !ex.LastClose:
                 WidenAdv(l, h);
                 if (!(isFill && _entryFill == OracleEntryFill.AtLimit) || Has(OracleFaults.AtLimitHighCountedInMfe))
@@ -758,7 +909,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
     private OracleResult BuildTrade(Exit ex, int f, decimal entryFilled, DateOnly decDate, OracleCalendar cal, bool rests)
     {
         // R6 of the rule table, as decided for sim-6 (ISS-28): the minute of a close exit counts in full, so the favourable extreme reaches at least that close.
-        if (ex.Reason is OracleExitReason.EndOfData or OracleExitReason.MaxHold)
+        if (ex.Reason is OracleExitReason.EndOfData or OracleExitReason.MaxHold || (ex.Reason == OracleExitReason.TimeStop && !ex.AtOpen))
         {
             WidenFav(ex.Price, ex.Price);
         }
@@ -778,11 +929,12 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             decimal exactParts = 0m;
             decimal filledParts = 0m;
             legs = [new OracleLeg(bars[f].EpochSeconds, OracleNumbers.ToDouble(_entry), OracleNumbers.ToDouble(entryFilled), 1m, "Entry", string.Empty)];
-            foreach (OracleLeg part in _partials)
+            for (int p = 0; p < _partials.Count; p++)
             {
+                OracleLeg part = _partials[p];
                 rest -= part.Share;
-                exactParts += part.Share * (OracleNumbers.Conv(part.Price) - _entry);
-                filledParts += part.Share * (OracleNumbers.Conv(part.FilledPrice) - entryFilled);
+                exactParts += part.Share * (_partialPrices[p].Price - _entry);
+                filledParts += part.Share * (_partialPrices[p].Filled - entryFilled);
                 legs.Add(part);
             }
 
@@ -817,7 +969,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             fb.EpochSeconds,
             OracleNumbers.ToDouble(_entry),
             OracleNumbers.ToDouble(_initialStop),
-            _target is { } tg ? OracleNumbers.ToDouble(tg) : null,
+            _initialTarget is { } tg ? OracleNumbers.ToDouble(tg) : null,
             xb.EpochSeconds,
             OracleNumbers.ToDouble(ex.Price),
             ex.Reason,
@@ -863,6 +1015,8 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             OvernightEntries = overnightEntry ? 1 : 0,
             LegsTotal = legs?.Count ?? 0,
             StopLoosenIgnored = _loosenIgnored,
+            ExitsTimeStop = ex.Reason == OracleExitReason.TimeStop ? 1 : 0,
+            TimeStopAtLastClose = ex.TimeStopLast ? 1 : 0,
         };
         return new OracleResult(trade, null, counters, _rows, holdEnd);
     }

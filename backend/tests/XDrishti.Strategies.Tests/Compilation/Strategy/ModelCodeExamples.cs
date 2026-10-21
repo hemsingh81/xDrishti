@@ -32,6 +32,8 @@ public sealed record ModelCodeExample(
 
     private static StrategyDefinition WithStop(StopSpec stop) => Basic().WithBuy(b => b with { Stop = stop });
 
+    private static ExitSpec AtrTrail => new(ExitPolicy.AtrTrail, [new ExitParameter("mult", [Quantity.Of(2)]), new ExitParameter("activate_at_rr", [Quantity.Of(1)])]);
+
     private static StrategyDefinition WithExits(params ExitSpec[] exits) => Basic().WithBuy(b => b with { Exits = exits });
 
     private static List<ModelCodeExample> Build()
@@ -84,7 +86,7 @@ public sealed record ModelCodeExample(
             Row("feature_invalid", "buy.stop.lookback", WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(0))), WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(1)))),
             Row("duplicate_exit", "buy.exits[1]", WithExits(Defs.FixedRr(2), Defs.FixedRr(3)), WithExits(Defs.FixedRr(2), Defs.PartialTrail())),
 
-            Row("exit_not_evaluated", "buy.exits[1]", WithExits(Defs.FixedRr(2), Defs.PartialTrail()), WithExits(Defs.FixedRr(2)), ProblemSeverity.Warning),
+            Row("exit_not_evaluated", "buy.exits[1]", WithExits(Defs.FixedRr(2), AtrTrail), WithExits(Defs.FixedRr(2)), ProblemSeverity.Warning),
 
             // time rules and filters
             Row("time_rule_missing", "time_rules.square_off", Basic() with { TimeRules = Defs.IntradayRules with { SquareOff = null } }, Basic()),

@@ -3,7 +3,7 @@ using System.Reflection;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// Criterion 13 of P4-01: no production path makes a leg. The only exit rules are the test-only ones (<c>TestLadderRule</c>, <c>ScriptedRule</c>) in the test project: no type of any shipped assembly implements <c>IExitRule</c>, none is named
+/// Criterion 13 of P4-01, as P4-02 leaves it: no shipped type implements the rule contract, and the only production policies are the data of <c>LegPolicy</c> that <c>Simulator.Create</c> builds from the accepted exits. The only exit rules are the test-only ones (<c>TestLadderRule</c>, <c>ScriptedRule</c>) in the test project: no type of any shipped assembly implements <c>IExitRule</c>, none is named
 /// like a test rule, and no shipped assembly references the test project. The check has a sentinel, an implementer in this test project that the same code must find, so that a rule that finds nothing cannot pass for the wrong reason.
 /// </summary>
 public sealed class ExitRuleArchitectureTests
@@ -54,9 +54,9 @@ public sealed class ExitRuleArchitectureTests
     }
 
     [Fact]
-    public void The_simulator_still_refuses_every_exit_set_but_one_fixed_rr()
+    public void The_walker_takes_a_rule_or_a_policy_only_through_an_internal_overload()
     {
-        // the production path to a rule would be Simulator.Create; the refusal is held by SimulatorCreateTests, and the walker takes a rule only through an internal overload
+        // P4-02: the production path to a leg is Simulator.Create with PARTIAL_BE, PARTIAL_TRAIL or the time stop (a LegPolicy, not an IExitRule: no shipped type implements the contract); the refusal of every other set is held by ExitBoundaryTests, and the walker takes an exit context only through an internal overload
         var overloads = typeof(XDrishti.Simulation.Walking.TradeWalker).GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.Name == "Walk").ToList();
 
         overloads.Count.ShouldBe(1, "the overload with an exit context is internal");

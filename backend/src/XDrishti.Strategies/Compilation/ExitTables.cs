@@ -31,8 +31,8 @@ internal sealed record ParameterSpec(string Name, ParameterShape Shape, bool Req
 }
 
 /// <summary>
-/// The exit policies and the overlays, as tables (name to parameter specs): a new policy is a row (specs P3-02b and P3-02b2, <i>The exit candidates</i>). Every parameter of a policy P3 does not run is ACCEPTED but
-/// PROVISIONAL until P4's spec (ADR 0036 decision 15 and Amendment 1); only <c>FIXED_RR</c>, the policy the simulator runs, is final.
+/// The exit policies and the overlays, as tables (name to parameter specs): a new policy is a row (specs P3-02b and P3-02b2, <i>The exit candidates</i>). Every parameter of a policy no simulator runs is ACCEPTED but
+/// PROVISIONAL until P4's spec (ADR 0036 decision 15 and Amendment 1); <c>FIXED_RR</c>, <c>PARTIAL_BE</c>, <c>PARTIAL_TRAIL</c> and <c>time_stop</c> are final (P4-02, ADR 0050).
 /// </summary>
 internal static class ExitTables
 {
@@ -94,10 +94,13 @@ internal static class ExitTables
     }.ToFrozenDictionary();
 
     /// <summary>
-    /// The candidate policies a simulator runs: today only <c>FIXED_RR</c>, so every other policy, and every overlay, gets the warning <c>exit_not_evaluated</c>. P4 edits this set when it builds a walker, together with the
+    /// The candidate policies a simulator runs: <c>FIXED_RR</c>, <c>PARTIAL_BE</c> and <c>PARTIAL_TRAIL</c> (P4-02); every other policy gets the warning <c>exit_not_evaluated</c>. P4 edits this set when it builds a walker, together with the
     /// refusal in <c>Simulator.RefuseWhatItCannotRun</c>; a test asserts that the two agree.
     /// </summary>
-    public static readonly IReadOnlySet<ExitPolicy> RunBySimulator = new HashSet<ExitPolicy> { ExitPolicy.FixedRr }.ToFrozenSet();
+    public static readonly IReadOnlySet<ExitPolicy> RunBySimulator = new HashSet<ExitPolicy> { ExitPolicy.FixedRr, ExitPolicy.PartialBe, ExitPolicy.PartialTrail }.ToFrozenSet();
+
+    /// <summary>The overlays a simulator runs: <c>time_stop</c> (P4-02); <c>event_exit</c> gets the warning <c>exit_not_evaluated</c>.</summary>
+    public static readonly IReadOnlySet<OverlayKind> OverlaysRunBySimulator = new HashSet<OverlayKind> { OverlayKind.TimeStop }.ToFrozenSet();
 
     /// <summary>The feature a policy reads on the evaluation timeframe and its first (period) parameter; null for a policy that reads nothing.</summary>
     public static (string Indicator, string Parameter)? Read(ExitPolicy policy, Side side) => policy switch

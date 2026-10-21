@@ -67,6 +67,10 @@ public sealed record OracleCounters
 
     public int StopLoosenIgnored { get; init; }
 
+    public int ExitsTimeStop { get; init; }
+
+    public int TimeStopAtLastClose { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -102,5 +106,7 @@ public sealed record OracleCounters
         LegsTotal = LegsTotal + other.LegsTotal,
         LegsMerged = LegsMerged + other.LegsMerged,
         StopLoosenIgnored = StopLoosenIgnored + other.StopLoosenIgnored,
+        ExitsTimeStop = ExitsTimeStop + other.ExitsTimeStop,
+        TimeStopAtLastClose = TimeStopAtLastClose + other.TimeStopAtLastClose,
     };
 }

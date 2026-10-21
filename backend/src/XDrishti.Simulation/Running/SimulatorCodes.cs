@@ -15,7 +15,7 @@ public static class SimulatorCodes
     /// <summary>A stop kind that is not a level (<c>fixed_pct</c>, <c>atr_mult</c>), a level stop with a buffer, or one read on another timeframe. Path <c>buy.stop</c> (or a field of it).</summary>
     public const string UnsupportedStop = "simulation.unsupported_stop";
 
-    /// <summary>Exits other than exactly one <c>FIXED_RR</c> with exactly one <c>rr</c> value, or any overlay. Path <c>buy.exits</c> or <c>buy.overlays[i]</c>.</summary>
+    /// <summary>Exits other than exactly one of <c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> with one value in each list, or an overlay other than <c>time_stop</c> (P4-02). Path <c>buy.exits</c> or <c>buy.overlays[i]</c>.</summary>
     public const string UnsupportedExit = "simulation.unsupported_exit";
 
     /// <summary>A filter the strategy names (nothing evaluates them yet). Path <c>filters[i]</c>.</summary>

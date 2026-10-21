@@ -25,6 +25,7 @@ public static class EdgeCategories
         [ExitReason.Target] = "exit_target",
         [ExitReason.SquareOff] = "exit_square_off",
         [ExitReason.MaxHold] = "exit_max_hold",
+        [ExitReason.TimeStop] = "none: not a category of the pack yet; the verification of the P4 exits is the pack of P4-06, and the trade is an ordinary card in the sample",
         [ExitReason.EndOfData] = "none: the position is in OpenAtEnd, gets no card, and is a spot check",
     };
 

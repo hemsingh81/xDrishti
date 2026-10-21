@@ -39,7 +39,7 @@ public static class ExportSpellings
         _ => throw Unknown(side),
     };
 
-    /// <summary><c>stop</c> · <c>target</c> · <c>square_off</c> · <c>end_of_data</c> · <c>max_hold</c>.</summary>
+    /// <summary><c>stop</c> · <c>target</c> · <c>square_off</c> · <c>end_of_data</c> · <c>max_hold</c> · <c>time_stop</c>.</summary>
     public static string Of(ExitReason reason) => reason switch
     {
         ExitReason.Stop => "stop",
@@ -47,6 +47,7 @@ public static class ExportSpellings
         ExitReason.SquareOff => "square_off",
         ExitReason.EndOfData => "end_of_data",
         ExitReason.MaxHold => "max_hold",
+        ExitReason.TimeStop => "time_stop",
         _ => throw Unknown(reason),
     };
 

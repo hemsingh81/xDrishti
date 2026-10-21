@@ -69,7 +69,7 @@ public sealed partial class TradeColumnsTests
     public void The_enum_columns_carry_the_lower_case_names_of_their_enum()
     {
         TradeColumns.Columns.Where(c => c.AllowedNames is not null).Select(c => c.Name).Order().ShouldBe(["cost_segment", "costs", "entry_fill", "exit_reason", "fills", "side", "trigger_timeframe"]);
-        TradeColumns.Columns.Single(c => c.Name == "exit_reason").AllowedNames.ShouldBe(["stop", "target", "squareoff", "endofdata", "maxhold"]);
+        TradeColumns.Columns.Single(c => c.Name == "exit_reason").AllowedNames.ShouldBe(["stop", "target", "squareoff", "endofdata", "maxhold", "timestop"]);
         TradeColumns.Columns.Single(c => c.Name == "trigger_timeframe").AllowedNames.ShouldBe(["m1", "m5", "m10", "m15", "m30", "h1", "d1", "w1", "mo1"]);
     }
 
@@ -80,6 +80,7 @@ public sealed partial class TradeColumnsTests
         Should.Throw<XDrishti.Application.Abstractions.Research.StoreReadException>(() => EnumText<Side>.Parse("1"));
         EnumText<Side>.Parse("sell").ShouldBe(Side.Sell);
         EnumText<ExitReason>.Parse("squareoff").ShouldBe(ExitReason.SquareOff);
+        EnumText<ExitReason>.Parse("timestop").ShouldBe(ExitReason.TimeStop);
     }
 
     [Fact]

@@ -12,13 +12,30 @@ namespace XDrishti.Simulation.Walking;
 /// that holds a trade (<see cref="ExitFlags.MaxHoldAtLastClose"/>). Only the start of that minute is read.</item>
 /// <item><b>X9</b> — the list ends first: the close of the last minute that holds a trade, <see cref="ExitReason.EndOfData"/>.</item>
 /// </list>
-/// The due session is found by the calendar alone (<see cref="SwingHold.DueSession"/>), never by what the list contains, so the hold cannot depend on the future.
+/// The due session is found by the calendar alone (<see cref="SwingHold.DueSession(DateOnly)"/>), never by what the list contains, so the hold cannot depend on the future.
 /// </summary>
 internal static class SwingWalk
 {
     public static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, SwingHold hold, DateOnly entryDate, DateOnly due, int zeroBefore, LegState? legs)
     {
         var dueMinute = hold.DueMinute(due);
+
+        // P4-02, D9: the session whose end the swing time stop checks (session N counting the entry session as the first); null when the walk has none.
+        var stopSessions = legs?.TimeStopSessions ?? 0;
+        var stopDate = default(DateOnly);
+        if (stopSessions > 0)
+        {
+            var found = hold.DueSession(entryDate, stopSessions);
+            if (found.IsFailure)
+            {
+                return Result.Failure<WalkOutcome>(found.Error);
+            }
+
+            stopDate = found.Value;
+        }
+
+        var stopOpen = stopSessions > 0;
+        var stopMinute = stopOpen ? hold.DueMinute(stopDate) : 0;
         var low = position.Entry;
         var high = position.Entry;
         var examined = 0;
@@ -49,6 +66,17 @@ internal static class SwingWalk
                     break;
                 }
 
+                if (stopOpen && (date > stopDate || (date == stopDate && minuteOfDay > stopMinute)))
+                {
+                    // D9: the checked session ended without a minute that held a trade at its end: the close of the last minute that did.
+                    stopOpen = false;
+                    var late = TimeStopAtLastClose(position, bars[last], legs!, hold, entryDate, seen, low, high, examined, zeroAtLast);
+                    if (late is not null)
+                    {
+                        return late;
+                    }
+                }
+
                 if (bar.Volume <= 0)
                 {
                     zero++;
@@ -77,16 +105,43 @@ internal static class SwingWalk
 
             ref readonly var current = ref (legs is null ? ref position : ref legs.Current);
             var verdict = MinuteRule.Decide(current, minute, i == fillIndex, low, high);
-            if (verdict.Exits)
+            if (verdict.Exits && verdict.Reason == ExitReason.Target && legs is { T1Pending: true })
+            {
+                // P4-02, D1 and D4: the first target of a partial policy books its share and the walk goes on, through the checks of this minute (it may be the minute of the time stop or of the due session); the minute counts in full for the excursions.
+                legs.FillT1(minute, bar.EpochSeconds);
+                low = Math.Min(low, minute.Low);
+                high = Math.Max(high, minute.High);
+            }
+            else if (verdict.Exits)
             {
                 var flags = verdict.Flags with { Overnight = firstOfLaterDate };
                 return Leave(position, hold, entryDate, seen, verdict.Reason, bar.EpochSeconds, verdict.Exit, minute, verdict.Low, verdict.High, examined, zero, flags, bar.EpochSeconds, legs);
             }
+            else
+            {
+                legs?.Observe(minute);
+                low = verdict.Low;
+                high = verdict.High;
+            }
 
-            low = verdict.Low;
-            high = verdict.High;
             last = i;
             zeroAtLast = zero;
+            if (stopOpen && date == stopDate && minuteOfDay == stopMinute)
+            {
+                // D9: the last minute of the checked session held a trade: progress against its close.
+                stopOpen = false;
+                if (!TickGrid.TryConvert(bar.Close, out var checkClose))
+                {
+                    return WalkResults.PriceInvalid();
+                }
+
+                if (IsBelow(position, checkClose, legs!))
+                {
+                    var (checkLow, checkHigh) = MinuteRule.Raise(position.IsBuy, low, high, checkClose);
+                    return Leave(position, hold, entryDate, seen, ExitReason.TimeStop, bar.EpochSeconds, checkClose, minute, checkLow, checkHigh, examined, zero, default, bar.EpochSeconds, legs);
+                }
+            }
+
             if (date == due && minuteOfDay == dueMinute)
             {
                 // X8: the due minute held a trade and neither level was reached: the close of the minute.
@@ -115,6 +170,28 @@ internal static class SwingWalk
         }
 
         return Leave(position, hold, entryDate, seen, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, endLow, endHigh, examined, zeroAtLast, default, lastBar.EpochSeconds, legs);
+    }
+
+    /// <summary>The progress of the position at <paramref name="close"/> is strictly below the minimum of the time stop (D7).</summary>
+    private static bool IsBelow(in Position position, decimal close, LegState legs) =>
+        (position.IsBuy ? 1m : -1m) * (close - position.Entry) < legs.MinProgressRr.GetValueOrDefault() * position.Risk;
+
+    /// <summary>D9, second rule: the position leaves at the close of the last minute that held a trade when its progress there is below the minimum; null when it does not (the overlay is spent).</summary>
+    private static Result<WalkOutcome>? TimeStopAtLastClose(
+        in Position position, Bar lastBar, LegState legs, SwingHold hold, DateOnly entryDate, int seen, decimal low, decimal high, int examined, int zeroAtLast)
+    {
+        if (!WalkResults.TryRead(lastBar, out var lastMinute) || !TickGrid.TryConvert(lastBar.Close, out var close))
+        {
+            return WalkResults.PriceInvalid();
+        }
+
+        if (!IsBelow(position, close, legs))
+        {
+            return null;
+        }
+
+        var (endLow, endHigh) = MinuteRule.Raise(position.IsBuy, low, high, close);
+        return Leave(position, hold, entryDate, seen, ExitReason.TimeStop, lastBar.EpochSeconds, close, lastMinute, endLow, endHigh, examined, zeroAtLast, new ExitFlags(TimeStopAtLastClose: true), lastBar.EpochSeconds, legs);
     }
 
     private static Result<WalkOutcome> Leave(

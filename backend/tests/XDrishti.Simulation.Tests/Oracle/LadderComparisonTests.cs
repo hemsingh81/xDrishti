@@ -24,7 +24,7 @@ public sealed class LadderComparisonTests(ITestOutputHelper output)
         return series with { Groups = groups };
     }
 
-    private static IEnumerable<ComparisonCase> AllSeries() =>
+    internal static IEnumerable<ComparisonCase> AllSeries() =>
         Enumerable.Range(1, OracleCategories.Count)
             .SelectMany(category => Enumerable.Range(0, PerCategory).SelectMany(seed => Modes.Select(exact => ComparisonCases.OfOracle(OracleSeries.Of(category, seed), exact))))
             .Concat(ComparisonCases.Intraday(exact: false)).Concat(ComparisonCases.Intraday(exact: true))
