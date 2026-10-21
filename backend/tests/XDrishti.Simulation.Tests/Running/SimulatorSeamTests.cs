@@ -80,9 +80,9 @@ public sealed class SimulatorSeamTests
     }
 
     [Fact]
-    public void A_simulator_refuses_a_partial_trailing_exit_by_name_instead_of_running_the_same_entries_under_it()
+    public void A_simulator_refuses_a_pyramid_exit_by_name_instead_of_running_the_same_entries_under_it()
     {
-        var trail = OrbV1.Create().WithBuy(b => b with { Exits = [new ExitSpec(ExitPolicy.PartialTrail, [new ExitParameter("book_pct", [Quantity.Of(50)]), new ExitParameter("t1_rr", [Quantity.Of(1)]), new ExitParameter("trail_atr_mult", [Quantity.Of(2)])])] });
+        var trail = OrbV1.Create().WithBuy(b => b with { Exits = [new ExitSpec(ExitPolicy.Pyramid, [new ExitParameter("initial_pct", [Quantity.Of(50)]), new ExitParameter("add_at_rr", [Quantity.Of(1), Quantity.Of(2)]), new ExitParameter("add_pct", [Quantity.Of(30), Quantity.Of(20)]), new ExitParameter("max_adds", [Quantity.Of(2)]), new ExitParameter("trail_atr_mult", [Quantity.Of(2)])])] });
 
         Simulator.Create(trail, Timeframe.M15).Problems.ShouldContain(p => p.Problem.Code == "simulation.unsupported_exit");
     }

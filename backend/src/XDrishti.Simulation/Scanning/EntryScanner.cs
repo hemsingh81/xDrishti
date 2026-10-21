@@ -99,7 +99,9 @@ public sealed class EntryScanner
         var reads = side.Exits.SelectMany(e => e.Reads).Distinct().ToArray();
         _tapeHandles = [.. reads.Select(r => frame.HandleOf(r))];
         _tapeRow = new double[_tapeHandles.Length];
-        Tape = reads.Length == 0 ? ExitTape.Empty : new ExitTape([.. reads.Select(r => FeatureNames.Of(r))]);
+        // P4-02 (D8): an intraday time stop reads the close of the bars after the entry and no feature, so its tape holds the closes only.
+        var closesOnly = side.Overlays.Any(o => o.Kind == OverlayKind.TimeStop && o.Values.ContainsKey("intraday_bars"));
+        Tape = reads.Length == 0 && !closesOnly ? ExitTape.Empty : new ExitTape([.. reads.Select(r => FeatureNames.Of(r))]);
     }
 
     /// <summary>
@@ -211,7 +213,7 @@ public sealed class EntryScanner
         }
 
         _frame.TryLastClosed(_timeframe, out var closed);
-        if (_tapeHandles.Length > 0)
+        if (!ReferenceEquals(Tape, ExitTape.Empty))
         {
             for (var f = 0; f < _tapeHandles.Length; f++)
             {

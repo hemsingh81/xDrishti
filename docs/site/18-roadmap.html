@@ -443,8 +443,17 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>Old trades equal their sim-5 form (the golden files differ in the version lines only); the tape equals the frame stepped alone; look-ahead, stop-never-loosens and leg invariants hold over 11,100 seeded series; 13 trades with legs worked by hand, costs to the paisa; the oracle agrees on 19,000 series; no production path makes a leg</td>
 </tr>
 <tr>
+<td>P4-02</td>
+<td><strong><code>PARTIAL_BE</code>, <code>PARTIAL_TRAIL</code> and the <code>time_stop</code> overlay, built 2026-10-21 ahead of the P3 exit check</strong> (the owner pulled P4 forward; <a href="../adr/0050-partial-exits-the-trail-from-t1-and-the-time-stop.html">ADR 0050</a>, engine <code>sim-6</code> kept; spec <a href="../specs/P4-02-partial-exits-and-the-time-stop.html">P4-02</a>). The first production runs that make legs: book part at T1 and the stop to break-even with the rest at T2, or the rest trailed by the ATR from the highest high since T1, with or without the time stop (intraday in bars, swing in sessions); one exit set at a time (<code>Simulator.Create</code> refuses two candidates and lists of two values by name). <code>ExitReason.TimeStop</code> with migration <code>AddTimeStopExitReason</code>; the oracle is extended for the three rules (19,000 series each). Cut, with the spec&#39;s leave: the legs are not stored (<code>simulate --store</code> refuses a run that books T1; they are persisted when P4-05, the comparison of candidates, needs them: P4-05 is the trigger to store legs, and <code>AddTimeStopExitReason</code> then <code>AddEmaExitReason</code> are the two migrations of the exit reason), the verbs cannot choose an exit yet, the assisted check does not read these exits.</td>
+<td>-</td>
+<td>about 2 agent-days (estimate)</td>
+<td>Built</td>
+<td><a href="../specs/P4-02-partial-exits-and-the-time-stop.html">spec</a> · <a href="../adr/0050-partial-exits-the-trail-from-t1-and-the-time-stop.html">ADR 0050</a></td>
+<td>61 trades worked by hand, two costed to the paisa; the oracle agrees on 19,000 series for each family; look-ahead holds over 11,100 series for each family and a leaking tape is caught; T1 never shares a minute with T2 or the break-even stop; the <code>FIXED_RR</code> runs differ from sim-6 by two zero counters only</td>
+</tr>
+<tr>
 <td>P4-03</td>
-<td><strong>The trails, built 2026-10-21 ahead of the P3 exit check</strong> (<a href="../adr/0051-the-trails-atr-structure-and-ema.html">ADR 0051</a>, spec <a href="../specs/P4-03-the-trails-atr-structure-and-ema.html">P4-03</a>). <code>ATR_TRAIL</code> (chandelier anchored at the entry, activated on a close), <code>STRUCTURE_TRAIL</code> and <code>EMA_TRAIL</code> (leaves at the next open as the new exit reason <code>EmaExit</code>) run in the simulator, one exit per strategy, in one fill (no legs); migration <code>AddEmaExitReason</code>; 22 + 16 + 16 hand rows, an oracle that agrees on 19,000 series per rule, the leak property for each rule with a sentinel. Verbs choose built-in strategies by id and none carries a trail, so no verb runs one yet.</td>
+<td><strong>The trails, built 2026-10-21 ahead of the P3 exit check</strong> (<a href="../adr/0051-the-trails-atr-structure-and-ema.html">ADR 0051</a>, spec <a href="../specs/P4-03-the-trails-atr-structure-and-ema.html">P4-03</a>). <code>ATR_TRAIL</code> (chandelier anchored at the entry, activated on a close), <code>STRUCTURE_TRAIL</code> and <code>EMA_TRAIL</code> (leaves at the next open as the new exit reason <code>EmaExit</code>) run in the simulator, one exit per strategy, in one fill (no legs); migration <code>AddEmaExitReason</code>; 23 + 16 + 16 hand rows (23 with the <code>TimeStop</code> after a level of P4-02), an oracle that agrees on 19,000 series per rule, the leak property for each rule with a sentinel. Verbs choose built-in strategies by id and none carries a trail, so no verb runs one yet.</td>
 <td>done</td>
 <td>see spec</td>
 <td>Built</td>
@@ -452,8 +461,8 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>per spec</td>
 </tr>
 <tr>
-<td>P4-00, P4-02, P4-04</td>
-<td><strong>Exits and exit learning, specs ahead of the phase</strong> (Approved 2026-10-19, not built, start after the P3 exit check, P4-01 excepted): the plan and split (<a href="../specs/P4-00-exits-and-exit-learning-plan.html">P4-00</a>), <code>PARTIAL_BE</code>, <code>PARTIAL_TRAIL</code> and <code>time_stop</code> (<a href="../specs/P4-02-partial-exits-and-the-time-stop.html">P4-02</a>, about 2 d) and <code>PYRAMID</code> (<a href="../specs/P4-04-the-pyramid.html">P4-04</a>). Sizes are the specs&#39;.</td>
+<td>P4-00, P4-04</td>
+<td><strong>Exits and exit learning, specs ahead of the phase</strong> (Approved 2026-10-19, not built, start after the P3 exit check, P4-01 to P4-03 excepted): the plan and split (<a href="../specs/P4-00-exits-and-exit-learning-plan.html">P4-00</a>) and <code>PYRAMID</code> (<a href="../specs/P4-04-the-pyramid.html">P4-04</a>). Sizes are the specs&#39;.</td>
 <td>after P3</td>
 <td>see specs</td>
 <td>Spec Approved</td>
@@ -815,7 +824,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-21 17:17</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-21 18:00</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

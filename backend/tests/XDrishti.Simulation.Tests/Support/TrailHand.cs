@@ -70,18 +70,18 @@ internal static class TrailHand
         return row.Tuesday is null ? monday.Bars() : [.. monday.Bars(), .. Day.After(monday, Tuesday).Set(row.Tuesday).Bars()];
     }
 
-    internal static Result<WalkOutcome> Walk(TrailRow row, IExitRule rule)
+    internal static Result<WalkOutcome> Walk(TrailRow row, IExitRule rule, LegPolicy? policy = null)
     {
         var fills = row.Modelled ? FillRules.Default : Cand.NoSlippage;
         var rules = row.Hold > 0
             ? new WalkRules(null, WalkRules.NoSquareOff, fills, Cand.Tick05, SwingHold.Create(row.Hold, TestCalendars.DefaultWeek()).Value)
             : new WalkRules(null, 915, fills, Cand.Tick05);
-        return TradeWalker.Walk(Candidate(row.Side), Bars(row), rules, new ExitContext(rule, TapeOf(row.Tape)));
+        return TradeWalker.Walk(Candidate(row.Side), Bars(row), rules, new ExitContext(rule, TapeOf(row.Tape), policy));
     }
 
-    internal static void Check(TrailRow row, IExitRule rule)
+    internal static void Check(TrailRow row, IExitRule rule, LegPolicy? policy = null)
     {
-        var walked = Walk(row, rule);
+        var walked = Walk(row, rule, policy);
         walked.IsSuccess.ShouldBeTrue(walked.IsFailure ? walked.Error.Message : string.Empty);
         var outcome = walked.Value;
         var want = row.Want;

@@ -37,7 +37,7 @@ public sealed class CompiledSideTests
     }
 
     [Fact]
-    public void The_example_has_the_item_paths_the_stop_plan_the_exit_plans_the_session_rules_and_three_warnings()
+    public void The_example_has_the_item_paths_the_stop_plan_the_exit_plans_the_session_rules_and_two_warnings()
     {
         var side = Located.Ok(Defs.VwapRsiTrend());
 
@@ -60,16 +60,16 @@ public sealed class CompiledSideTests
         side.Overlays.ShouldBeEmpty();
         side.TimeRules.ShouldBe(new SessionRules(null, 870, 915, null));
         side.Filters.ShouldBe(["not_event_day", "min_turnover"]);
-        side.Warnings.Select(w => (w.Path, w.Problem.Code)).ShouldBe([("buy.exits[1]", ModelCodes.ExitNotEvaluated), ("filters[0]", ModelCodes.FilterNotEvaluated), ("filters[1]", ModelCodes.FilterNotEvaluated)]);
+        side.Warnings.Select(w => (w.Path, w.Problem.Code)).ShouldBe([("filters[0]", ModelCodes.FilterNotEvaluated), ("filters[1]", ModelCodes.FilterNotEvaluated)]);
     }
 
     [Fact]
-    public void The_example_compiles_with_no_error_and_only_those_three_problems_in_all()
+    public void The_example_compiles_with_no_error_and_only_those_two_problems_in_all()
     {
         var result = Located.Compile(Defs.VwapRsiTrend());
 
         result.Errors.ShouldBeEmpty();
-        result.Problems.Count.ShouldBe(3);
+        result.Problems.Count.ShouldBe(2);
     }
 
     // ---- criterion 14: the bare ORB -----------------------------------------------------------------------------------------------------------------------------------------------------------------

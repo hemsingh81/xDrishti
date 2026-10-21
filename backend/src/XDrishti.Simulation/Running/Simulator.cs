@@ -15,7 +15,7 @@ namespace XDrishti.Simulation.Running;
 /// the <see cref="TradeWalker"/>. The two stages share nothing but the entry candidate, which carries no exit, so the same entries can be replayed under every exit policy (P4).
 /// <para>
 /// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe up to one day, entered at the close of the trigger bar, with a stop that is a level
-/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit (<c>FIXED_RR</c> with one <c>rr</c> value, or from P4-03 one <c>ATR_TRAIL</c> with one <c>mult</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>), no overlay, no filter, no market context and no expiry dates. A swing side is held up to its
+/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, or from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>) with one value in each list, at most the <c>time_stop</c> overlay, no filter, no market context and no expiry dates. A swing side is held up to its
 /// <c>max_hold_sessions</c> (the entry session counts as the first) and is gated to one open position per instrument and side (<see cref="PositionGate"/>). <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
 /// ignoring it: a result must be what it says it is. A side that does not compile makes <see cref="Create"/> return no simulator; a half strategy is never run.
 /// </para>
@@ -106,15 +106,21 @@ public sealed class Simulator
             var square = side.TimeRules.SquareOffMinute;
             var name = side.Side == Side.Buy ? "buy" : "sell";
             var plan = side.Exits[0];   // exactly one candidate with one value in each list: RefuseWhatItCannotRun refused every other shape above
-            double? rr = plan.Policy == ExitPolicy.FixedRr ? plan.Values["rr"][0] : null;
-            var trail = plan.Policy == ExitPolicy.FixedRr ? null : plan;
+            double? rr = plan.Policy switch
+            {
+                ExitPolicy.FixedRr => plan.Values["rr"][0],
+                ExitPolicy.PartialBe or ExitPolicy.PartialTrail => plan.Values["t1_rr"][0],   // T1 is the target of a partial policy
+                _ => null,
+            };
+            var trail = plan.Policy is ExitPolicy.AtrTrail or ExitPolicy.StructureTrail or ExitPolicy.EmaTrail ? plan : null;
+            var policy = PolicyOf(side);
             if (swing && hold is { } sessions)
             {
-                runs.Add(new SideRun(side, rr, WalkRules.NoSquareOff, sessions, trail));
+                runs.Add(new SideRun(side, rr, WalkRules.NoSquareOff, sessions, trail, policy));
             }
             else if (!swing && square is { } minute)
             {
-                runs.Add(new SideRun(side, rr, minute, null, trail));
+                runs.Add(new SideRun(side, rr, minute, null, trail, policy));
             }
             else
             {
@@ -179,10 +185,11 @@ public sealed class Simulator
 
             // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
             var sideRules = rules.Value;
-            var exit = side.Trail is { } trail ? new ExitContext(TrailRules.Of(trail, scanner.TapeColumnOf(trail)), scanner.Tape) : null;
+            var rule = side.Trail is { } trail ? TrailRules.Of(trail, scanner.TapeColumnOf(trail)) : null;
+            var exitContext = rule is null && side.Policy is null ? null : new ExitContext(rule, scanner.Tape, side.Policy);
             var walked = HoldsOvernight
-                ? PositionGate.Apply(scanner.Candidates, candidate => TradeWalker.Walk(candidate, bars, sideRules, exit))
-                : WalkAll(scanner.Candidates, bars, sideRules, exit);
+                ? PositionGate.Apply(scanner.Candidates, candidate => TradeWalker.Walk(candidate, bars, sideRules, exitContext))
+                : WalkAll(scanner.Candidates, bars, sideRules, exitContext);
             if (walked.IsFailure)
             {
                 return Result.Failure<SimulationResult>(walked.Error);
@@ -259,23 +266,7 @@ public sealed class Simulator
             problems.Add(Refusal(name + ".stop.timeframe", SimulatorCodes.UnsupportedStop, "The stop `" + StopName(stop.Kind) + "` is read on " + stop.Timeframe.ToCode() + ", not on the evaluation timeframe " + side.EvaluationTimeframe.ToCode() + "; the simulator reads it on the evaluation timeframe."));
         }
 
-        if (side.Exits.Count != 1)
-        {
-            problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The simulator runs exactly one candidate exit (`FIXED_RR`, `ATR_TRAIL`, `STRUCTURE_TRAIL` or `EMA_TRAIL`); several candidates are P4's comparisons on the same entries."));
-        }
-        else if (PolicyName(side.Exits[0].Policy) is null)
-        {
-            problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The exit `" + side.Exits[0].Policy + "` is not run yet; the simulator runs `FIXED_RR`, `ATR_TRAIL`, `STRUCTURE_TRAIL` and `EMA_TRAIL`."));
-        }
-        else if (ListParameter(side.Exits[0]) is { } listed && side.Exits[0].Values.TryGetValue(listed, out var values) && values.Count != 1)
-        {
-            problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The simulator runs exactly one `" + listed + "` value of `" + PolicyName(side.Exits[0].Policy) + "`; several values are P4's comparisons on the same entries."));
-        }
-
-        for (var i = 0; i < side.Overlays.Count; i++)
-        {
-            problems.Add(Refusal(name + ".overlays[" + i + "]", SimulatorCodes.UnsupportedExit, "The overlay exit `" + OverlayName(side.Overlays[i].Kind) + "` is not run yet (P4); ignoring it would make a result look like what it is not."));
-        }
+        RefuseExits(side, name, problems);
 
         foreach (var filter in side.Filters)
         {
@@ -294,22 +285,80 @@ public sealed class Simulator
         }
     }
 
-    /// <summary>The one list parameter of a runnable policy: <c>rr</c> of <c>FIXED_RR</c>, <c>mult</c> of <c>ATR_TRAIL</c>; null for the policies whose parameters are all scalars.</summary>
-    private static string? ListParameter(ExitPlan plan) => plan.Policy switch
+    /// <summary>
+    /// D10 of P4-02: exactly one candidate of <c>FIXED_RR</c>, <c>PARTIAL_BE</c>, <c>PARTIAL_TRAIL</c> or a trail with one value in each list parameter, and at most the <c>time_stop</c> overlay. The path is `buy.exits` for the exits (the policy and,
+    /// for a list, the parameter are named in the message) and `buy.overlays[i]` for an overlay.
+    /// </summary>
+    private static void RefuseExits(CompiledSide side, string name, List<LocatedProblem> problems)
     {
-        ExitPolicy.FixedRr => "rr",
-        ExitPolicy.AtrTrail => "mult",
-        _ => null,
-    };
+        if (side.Exits.Count != 1)
+        {
+            problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The simulator runs exactly one exit candidate in a run (`FIXED_RR`, `PARTIAL_BE`, `PARTIAL_TRAIL`, `ATR_TRAIL`, `STRUCTURE_TRAIL` or `EMA_TRAIL`), not " + side.Exits.Count + "; comparing candidates on the same entries is a later slice (P4-05)."));
+        }
+        else
+        {
+            var exit = side.Exits[0];
+            var label = PolicyName(exit.Policy);
+            if (exit.Policy is not (ExitPolicy.FixedRr or ExitPolicy.PartialBe or ExitPolicy.PartialTrail or ExitPolicy.AtrTrail or ExitPolicy.StructureTrail or ExitPolicy.EmaTrail))
+            {
+                problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The exit `" + label + "` is not run yet (P4); the simulator runs `FIXED_RR`, `PARTIAL_BE`, `PARTIAL_TRAIL`, `ATR_TRAIL`, `STRUCTURE_TRAIL` and `EMA_TRAIL`."));
+            }
+            else if (exit.Values.FirstOrDefault(v => v.Value.Count != 1) is { Key: { } list })
+            {
+                problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The exit `" + label + "` has " + exit.Values[list].Count + " values in `" + list + "`; the simulator runs one value of each parameter in a run (the comparison of candidate values is P4-05)."));
+            }
+        }
 
-    /// <summary>The name of a policy this simulator runs, or null for one it does not. It agrees with <c>ExitTables.RunBySimulator</c> of the compile, which a test asserts.</summary>
-    private static string? PolicyName(ExitPolicy policy) => policy switch
+        for (var i = 0; i < side.Overlays.Count; i++)
+        {
+            if (side.Overlays[i].Kind != OverlayKind.TimeStop)
+            {
+                problems.Add(Refusal(name + ".overlays[" + i + "]", SimulatorCodes.UnsupportedExit, "The overlay exit `" + OverlayName(side.Overlays[i].Kind) + "` is not run yet (P4); ignoring it would make a result look like what it is not."));
+            }
+        }
+    }
+
+    /// <summary>The policy of the walk for a side that was accepted (RefuseExits): the partial and the time stop as decimals, or null when the side is a plain <c>FIXED_RR</c>.</summary>
+    private static LegPolicy? PolicyOf(CompiledSide side)
+    {
+        var exit = side.Exits[0];
+        var partial = exit.Policy switch
+        {
+            ExitPolicy.PartialBe => PartialKind.Be,
+            ExitPolicy.PartialTrail => PartialKind.Trail,
+            _ => PartialKind.None,
+        };
+        var stop = side.Overlays.FirstOrDefault(o => o.Kind == OverlayKind.TimeStop);
+        if (partial == PartialKind.None && stop is null)
+        {
+            return null;
+        }
+
+        var book = partial == PartialKind.None ? 0m : Decimal(exit.Values["book_pct"][0]) / 100m;
+        var t2 = partial == PartialKind.Be ? Decimal(exit.Values["t2_rr"][0]) : 0m;
+        var mult = partial == PartialKind.Trail ? Decimal(exit.Values["trail_atr_mult"][0]) : 0m;
+        return new LegPolicy(
+            partial,
+            book,
+            t2,
+            mult,
+            stop is null ? null : Decimal(stop.Values["min_progress_rr"][0]),
+            stop is not null && stop.Values.TryGetValue("intraday_bars", out var bars) ? (int)bars[0] : 0,
+            stop is not null && stop.Values.TryGetValue("swing_sessions", out var sessions) ? (int)sessions[0] : 0);
+    }
+
+    private static decimal Decimal(double value) => TickGrid.TryConvert(value, out var converted) ? converted : 0m;
+
+    private static string PolicyName(ExitPolicy policy) => policy switch
     {
         ExitPolicy.FixedRr => "FIXED_RR",
+        ExitPolicy.PartialBe => "PARTIAL_BE",
+        ExitPolicy.PartialTrail => "PARTIAL_TRAIL",
         ExitPolicy.AtrTrail => "ATR_TRAIL",
         ExitPolicy.StructureTrail => "STRUCTURE_TRAIL",
         ExitPolicy.EmaTrail => "EMA_TRAIL",
-        _ => null,
+        ExitPolicy.Pyramid => "PYRAMID",
+        _ => policy.ToString(),
     };
 
     private static string StopName(StopKind kind) => kind switch
@@ -331,6 +380,6 @@ public sealed class Simulator
         _ => kind.ToString(),
     };
 
-    /// <summary>A compiled side with what its walks need: the reward-to-risk of its one <c>FIXED_RR</c> (null for a trail), the plan of its trail (<c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>; P4-03), its square-off minute (<see cref="WalkRules.NoSquareOff"/> for a swing side) and, for a swing side, its longest hold in sessions.</summary>
-    private sealed record SideRun(CompiledSide Compiled, double? RewardRisk, int SquareOffMinute, int? MaxHoldSessions, ExitPlan? Trail = null);
+    /// <summary>A compiled side with what its walks need: the reward-to-risk of its target (the one <c>FIXED_RR</c>, or T1 of a partial policy; null for a trail), the plan of its trail (<c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>; P4-03), the policy of the partial and the time stop (P4-02), its square-off minute (<see cref="WalkRules.NoSquareOff"/> for a swing side) and, for a swing side, its longest hold in sessions.</summary>
+    private sealed record SideRun(CompiledSide Compiled, double? RewardRisk, int SquareOffMinute, int? MaxHoldSessions, ExitPlan? Trail, LegPolicy? Policy);
 }

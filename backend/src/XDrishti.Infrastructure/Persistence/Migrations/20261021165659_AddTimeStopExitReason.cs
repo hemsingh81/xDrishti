@@ -5,7 +5,7 @@
 namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     /// <inheritdoc />
-    public partial class AddEmaExitReason : Migration
+    public partial class AddTimeStopExitReason : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -19,7 +19,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 name: "ck_sim_trades_exit_reason",
                 schema: "research",
                 table: "sim_trades",
-                sql: "exit_reason IN ('stop', 'target', 'squareoff', 'endofdata', 'maxhold', 'emaexit')");
+                sql: "exit_reason IN ('stop', 'target', 'squareoff', 'endofdata', 'maxhold', 'timestop')");
         }
 
         /// <inheritdoc />

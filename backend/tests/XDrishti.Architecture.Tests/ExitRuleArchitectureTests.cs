@@ -3,8 +3,8 @@ using System.Reflection;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// Criterion 13 of P4-01: no production path makes a leg. The only rules a shipped assembly implements are the three trails of P4-03 (<c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c>, <c>EMA_TRAIL</c>), which leave in one fill and never ask for a share; the
-/// rules that make legs are the test-only ones (<c>TestLadderRule</c>, <c>ScriptedRule</c>) in the test project: none is named like a test rule, and no shipped assembly references the test project. The check has a sentinel, an implementer in this test project that the same code must find, so that a rule that finds nothing cannot pass for the wrong reason.
+/// Criterion 13 of P4-01, as P4-02 and P4-03 leave it: the only rules a shipped assembly implements are the three trails of P4-03 (<c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c>, <c>EMA_TRAIL</c>), which leave in one fill and never ask for a share, and the only other production policies are the data of <c>LegPolicy</c> that <c>Simulator.Create</c> builds from the accepted exits (P4-02). The rules that make legs are the test-only ones (<c>TestLadderRule</c>, <c>ScriptedRule</c>) in the test project: none is named
+/// like a test rule, and no shipped assembly references the test project. The check has a sentinel, an implementer in this test project that the same code must find, so that a rule that finds nothing cannot pass for the wrong reason.
 /// </summary>
 public sealed class ExitRuleArchitectureTests
 {
@@ -56,9 +56,9 @@ public sealed class ExitRuleArchitectureTests
     }
 
     [Fact]
-    public void The_walker_takes_a_rule_only_through_an_internal_overload()
+    public void The_walker_takes_a_rule_or_a_policy_only_through_an_internal_overload()
     {
-        // the production path to a rule is Simulator.Create (the refusals are held by SimulatorCreateTests and ExitBoundaryTests), and the walker takes a rule only through an internal overload
+        // the production path to a rule or a policy is Simulator.Create (a trail rule of P4-03, or a LegPolicy of P4-02 for PARTIAL_BE, PARTIAL_TRAIL or the time stop); the refusal of every other set is held by SimulatorCreateTests and ExitBoundaryTests, and the walker takes an exit context only through an internal overload
         var overloads = typeof(XDrishti.Simulation.Walking.TradeWalker).GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.Name == "Walk").ToList();
 
         overloads.Count.ShouldBe(1, "the overload with an exit context is internal");

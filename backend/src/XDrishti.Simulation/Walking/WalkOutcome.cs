@@ -21,6 +21,7 @@ namespace XDrishti.Simulation.Walking;
 /// <param name="OvernightEntry">The trade was filled on a later date than the one on which it was decided: an order that rested overnight (ADR 0043, E8 and E9).</param>
 /// <param name="LegsTotal">The legs of the trade when it has legs (P4-01); 0 otherwise.</param>
 /// <param name="StopLoosenIgnored">The requests of an exit rule to loosen the stop that the walker ignored (P4-01, D6).</param>
+/// <param name="TimeStopAtLastClose">The trade left with <c>TimeStop</c> at the close of the last minute that holds a trade, because the checked session ended without one at its end (P4-02, D9).</param>
 /// <param name="HoldEndEpochSeconds">The instant the position counts as open until, for the position gate (D11): the exit instant, or the end of the due session for a <c>MaxHoldAtLastClose</c> trade; 0 when there is no trade.</param>
 public readonly record struct WalkOutcome(
     SimTrade? Trade,
@@ -39,7 +40,8 @@ public readonly record struct WalkOutcome(
     long HoldEndEpochSeconds = 0,
     bool OvernightEntry = false,
     int LegsTotal = 0,
-    int StopLoosenIgnored = 0)
+    int StopLoosenIgnored = 0,
+    bool TimeStopAtLastClose = false)
 {
     /// <summary>The counts of this one walk, to be summed with <see cref="WalkCounters.Add"/>.</summary>
     public WalkCounters ToCounters()
@@ -78,6 +80,8 @@ public readonly record struct WalkOutcome(
             OrderPendingAtEnd: NoTrade == NoTradeReason.OrderPendingAtEnd ? 1 : 0,
             LegsTotal: LegsTotal,
             StopLoosenIgnored: StopLoosenIgnored,
-            ExitsEmaExit: exit == ExitReason.EmaExit ? 1 : 0);
+            ExitsEmaExit: exit == ExitReason.EmaExit ? 1 : 0,
+            ExitsTimeStop: exit == ExitReason.TimeStop ? 1 : 0,
+            TimeStopAtLastClose: TimeStopAtLastClose ? 1 : 0);
     }
 }

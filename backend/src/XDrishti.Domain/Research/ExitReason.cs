@@ -23,4 +23,6 @@ public enum ExitReason
 
     /// <summary>An <c>EMA_TRAIL</c> position left because a bar closed beyond its EMA (P4-03, D7): the whole position at the open of the first minute that holds a trade after that bar closed, a market-type exit.</summary>
     EmaExit,
+    /// <summary>The <c>time_stop</c> overlay found too little progress (P4-02, D8 and D9): the open share left at the open of the minute after the check bar (intraday) or at the close of the checked session (swing).</summary>
+    TimeStop,
 }

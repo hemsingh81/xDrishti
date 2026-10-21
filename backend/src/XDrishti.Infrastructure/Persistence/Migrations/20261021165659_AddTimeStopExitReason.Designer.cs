@@ -12,8 +12,8 @@ using XDrishti.Infrastructure.Persistence;
 namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(XDrishtiDbContext))]
-    [Migration("20261021165941_AddEmaExitReason")]
-    partial class AddEmaExitReason
+    [Migration("20261021165659_AddTimeStopExitReason")]
+    partial class AddTimeStopExitReason
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -4014,7 +4014,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_sim_trades_entry_fill", "entry_fill IN ('atopen', 'atlimit')");
 
-                            t.HasCheckConstraint("ck_sim_trades_exit_reason", "exit_reason IN ('stop', 'target', 'squareoff', 'endofdata', 'maxhold', 'emaexit')");
+                            t.HasCheckConstraint("ck_sim_trades_exit_reason", "exit_reason IN ('stop', 'target', 'squareoff', 'endofdata', 'maxhold', 'timestop')");
 
                             t.HasCheckConstraint("ck_sim_trades_fills", "fills IN ('exact', 'modelled')");
 

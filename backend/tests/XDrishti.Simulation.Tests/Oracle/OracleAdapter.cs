@@ -216,6 +216,8 @@ internal static class OracleAdapter
         LegsMerged = Int(w.LegsMerged),
         StopLoosenIgnored = Int(w.StopLoosenIgnored),
         ExitsEmaExit = Int(w.ExitsEmaExit),
+        ExitsTimeStop = Int(w.ExitsTimeStop),
+        TimeStopAtLastClose = Int(w.TimeStopAtLastClose),
     };
 
     private static int Int(long value) => checked((int)value);

@@ -8,7 +8,7 @@ namespace XDrishti.Simulation.Tests;
 /// Criterion 2 of P4-03: twenty-two <c>ATR_TRAIL</c> rows computed by hand from D1 to D3, buys and sells, intraday and swing, activation 0 and above 0, an activation on a close and a touch that closes back, an ATR that is not a number, a looser
 /// level that is ignored, a level the price has already passed (a gap), the initial stop before any level, the square-off, <c>MAX_HOLD</c> and the end of the data after a level, a daily bar, and two rows with slippage. The frame is that of
 /// <see cref="TrailRow"/>: entry 100.00, stop 99.00 (a sell 101.00), risk 1.00, so R is the price difference. A level is <c>H − mult × ATR</c> with H the highest high since the fill minute, read at the first minute at or after the close of the bar.
-/// <c>time_stop</c> after a level is P4-02's overlay and is not built in this slice (the row is added when the overlay exists).
+/// Row A23 is the <c>time_stop</c> overlay of P4-02 (ADR 0050) after a level: the trail and the overlay run together.
 /// </summary>
 public sealed class AtrTrailHandTableTests
 {
@@ -108,6 +108,16 @@ public sealed class AtrTrailHandTableTests
     [MemberData(nameof(Rows))]
     public void The_trade_is_the_one_computed_by_hand(TrailRow row) =>
         TrailHand.Check(row, new AtrTrailRule(0, (decimal)row.Multiple, (decimal)row.Activate));
+
+    [Fact]
+    public void A23_the_time_stop_leaves_at_the_open_after_its_bar_when_a_level_has_not_been_touched()
+    {
+        // A23: level 100.40 - 2 x 0.50 = 99.40 from 10:00 (never touched); the time stop of 2 bars, minimum progress 0.5, reads the close of bar 2 (10:15) at 100.40: progress 0.40 < 0.5, so the position leaves at the 10:15 open, 100.40. R 0.40, MAE 0, MFE 0.40
+        var row = Row("A23 the time stop after a level", Side.Buy, ["09:50 100.00/100.40/100.00/100.40"], [B("10:00", 100.40, 0.5), B("10:15", 100.40, 0.5)],
+            new(ExitReason.TimeStop, "10:15", 100.40, 0.40, 0, 0.40), 2.0, 0);
+
+        TrailHand.Check(row, new AtrTrailRule(0, 2m, 0m), new LegPolicy(PartialKind.None, 0m, 0m, 0m, 0.5m, 2, 0));
+    }
 
     [Fact]
     public void There_are_at_least_twenty_rows_of_both_sides_and_both_kinds_of_walk()

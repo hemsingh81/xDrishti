@@ -9,4 +9,5 @@ public sealed record OracleRules(
     decimal Tick,
     OracleHold? Hold = null,
     OracleLadder? Ladder = null,
-    OracleTrail? Trail = null);
+    OracleTrail? Trail = null,
+    OraclePolicy? Policy = null);

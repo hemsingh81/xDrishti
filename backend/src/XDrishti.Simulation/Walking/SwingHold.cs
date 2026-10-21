@@ -41,11 +41,14 @@ public sealed record SwingHold
             : Result.Failure<SwingHold>(Error.Validation(SimulationErrors.RulesInvalidCode, "The longest hold must be from 1 to " + MaxSessions + " sessions."));
 
     /// <summary>The due session of a position entered on <paramref name="entryDate"/>: N − 1 trading days after it. No trading day within 30 days of a step is <c>simulation.rules_invalid</c>.</summary>
-    internal Result<DateOnly> DueSession(DateOnly entryDate)
+    internal Result<DateOnly> DueSession(DateOnly entryDate) => DueSession(entryDate, MaxHoldSessions);
+
+    /// <summary>The session that is number <paramref name="sessions"/> counting the entry session as the first: the due session of a hold of that many sessions (also the checked session of the swing time stop, P4-02, D9).</summary>
+    internal Result<DateOnly> DueSession(DateOnly entryDate, int sessions)
     {
         var calendar = Calendar ?? DefaultWeek;
         var date = entryDate;
-        for (var step = 1; step < MaxHoldSessions; step++)
+        for (var step = 1; step < sessions; step++)
         {
             var found = false;
             for (var ahead = 1; ahead <= SearchDays && !found; ahead++)

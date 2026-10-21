@@ -325,13 +325,31 @@ public static class TradeWalker
                 return Leave(position, ExitReason.EmaExit, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, default, legs);
             }
 
+            // P4-02, D8: the time stop found too little progress at the close of its bar; the open share leaves at the open of this minute, market-type, unless the open is already beyond the stop or the target, which the table below fills.
+            if (legs is { TimeStopDue: true } && !MinuteRule.Beyond(isBuy, minute.Open, stop) && !(hasTarget && MinuteRule.Reaches(isBuy, minute.Open, target)))
+            {
+                return Leave(position, ExitReason.TimeStop, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, default, legs);
+            }
+
             // X2 to X5: the rows of the exit table, written once (MinuteRule) and shared with the swing loop.
             var verdict = MinuteRule.Decide(current, minute, isFill, low, high);
             if (verdict.Exits)
             {
+                if (verdict.Reason == ExitReason.Target && legs is { T1Pending: true })
+                {
+                    // P4-02, D1 and D4: the first target of a partial policy books its share and the walk goes on; the minute counts in full for the excursions and its levels are those of the next minute (D2).
+                    legs.FillT1(minute, bar.EpochSeconds);
+                    low = Math.Min(low, minute.Low);
+                    high = Math.Max(high, minute.High);
+                    last = i;
+                    zeroAtLast = zero;
+                    continue;
+                }
+
                 return Leave(position, verdict.Reason, bar.EpochSeconds, verdict.Exit, minute, verdict.Low, verdict.High, examined, zero, verdict.Flags, legs);
             }
 
+            legs?.Observe(minute);
             low = verdict.Low;
             high = verdict.High;
             legs?.Observe(minute);

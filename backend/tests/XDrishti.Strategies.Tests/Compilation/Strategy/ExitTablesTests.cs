@@ -451,8 +451,6 @@ public sealed class ExitTablesTests
 
     public static TheoryData<ExitPolicy, string> WarnedPolicies { get; } = new()
     {
-        { ExitPolicy.PartialBe, "PARTIAL_BE" },
-        { ExitPolicy.PartialTrail, "PARTIAL_TRAIL" },
         { ExitPolicy.Pyramid, "PYRAMID" },
     };
 
@@ -483,14 +481,14 @@ public sealed class ExitTablesTests
     }
 
     [Fact]
-    public void FIXED_RR_alone_has_no_such_warning_and_each_overlay_has_one_at_its_overlay()
+    public void The_policies_and_the_time_stop_the_simulator_runs_have_no_such_warning_and_event_exit_has_one()
     {
         Located.Compile(Intraday()).Problems.ShouldNotContain(p => p.Problem.Code == ModelCodes.ExitNotEvaluated);
 
         var result = Located.Compile(Intraday().WithBuy(b => b with { Overlays = [new OverlaySpec(OverlayKind.TimeStop, TimeStopBase), new OverlaySpec(OverlayKind.EventExit, [P("days_before_results", 1)])] }));
 
         result.IsSuccess.ShouldBeTrue(Located.Show(result));
-        result.ShouldHave(ModelCodes.ExitNotEvaluated, "buy.overlays[0]", ProblemSeverity.Warning);
+        result.Problems.ShouldNotContain(p => p.Problem.Code == ModelCodes.ExitNotEvaluated && p.Path == "buy.overlays[0]");
         var eventExit = result.ShouldHave(ModelCodes.ExitNotEvaluated, "buy.overlays[1]", ProblemSeverity.Warning);
         eventExit.Problem.Message.ShouldContain("P15");
     }
@@ -498,20 +496,21 @@ public sealed class ExitTablesTests
     [Fact]
     public void A_policy_with_a_table_error_gives_its_errors_and_the_warning_does_not_hide_them()
     {
-        var result = Located.Compile(Exit(ExitPolicy.PartialBe, Set(BeBase, P("book_pct", 0))));
+        var result = Located.Compile(Exit(ExitPolicy.Pyramid, Set(PyramidBase, P("max_adds", 11))));
 
         result.IsSuccess.ShouldBeFalse();
-        result.ErrorList().ShouldBe([Range + X + "book_pct"]);
+        result.ErrorList().ShouldBe([Range + X + "max_adds"]);
         result.ShouldHave(ModelCodes.ExitNotEvaluated, "buy.exits[0]", ProblemSeverity.Warning);
     }
 
     [Fact]
-    public void A_policy_listed_twice_gives_one_warning_and_the_policies_the_simulator_runs_are_exactly_FIXED_RR_and_the_three_trails()
+    public void A_policy_listed_twice_gives_one_warning_and_the_policies_the_simulator_runs_are_exactly_FIXED_RR_the_partials_and_the_trails()
     {
-        var result = Located.Compile(Intraday().WithBuy(b => b with { Exits = [new ExitSpec(ExitPolicy.PartialBe, BeBase), new ExitSpec(ExitPolicy.PartialBe, BeBase)] }));
+        var result = Located.Compile(Intraday().WithBuy(b => b with { Exits = [new ExitSpec(ExitPolicy.Pyramid, PyramidBase), new ExitSpec(ExitPolicy.Pyramid, PyramidBase)] }));
 
         result.Problems.Count(p => p.Problem.Code == ModelCodes.ExitNotEvaluated).ShouldBe(1);
-        ExitTables.RunBySimulator.ShouldBe([ExitPolicy.FixedRr, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail]);
+        ExitTables.RunBySimulator.ShouldBe([ExitPolicy.FixedRr, ExitPolicy.PartialBe, ExitPolicy.PartialTrail, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail], ignoreOrder: true);
+        ExitTables.OverlaysRunBySimulator.ShouldBe([OverlayKind.TimeStop]);
         foreach (var policy in Enum.GetValues<ExitPolicy>())
         {
             var warned = Located.Compile(Exit(policy, ValidFor(policy))).Problems.Any(p => p.Problem.Code == ModelCodes.ExitNotEvaluated);

@@ -92,7 +92,7 @@ What differs from the text above, and what the criteria rest on.
 
 **Deviations (all in [ADR 0051](../adr/0051-the-trails-atr-structure-and-ema.md)).**
 1. The ADR is 0051, not 0050 (P4-02 took 0050 in parallel).
-2. `time_stop` is not built in this branch (P4-02's), so D8 accepts one candidate and no overlay; the row "`TimeStop` after a level" of criterion 2 and the widening of D8 to "at most `time_stop`" are for the merge with P4-02. The hand tables have 22, 16 and 16 rows without it.
+2. Merged with P4-02: D8 accepts one candidate and at most `time_stop`, and the `ATR_TRAIL` hand table has the row A23 ("`TimeStop` after a level"), so it has 23 rows and the other two 16.
 3. The chandelier anchor `H` and the first counted bar reach the rule through one trailing member of `ExitView` (`Trail`) filled by `LegState.Observe`, so the rule stays a pure function (ADR decision 3). The signal is a new `ExitActionKind.SignalExit`.
 4. Criterion 11 (the verbs) is met at the simulator, the replay and the exporter, not at `simulate` and `verify-pack`: a verb runs a built-in strategy by id and none carries a trail.
 5. The oracle compares on a test tape (a stand-in for the indicators) built from the same minutes for both sides.

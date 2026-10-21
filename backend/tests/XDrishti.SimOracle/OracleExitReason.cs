@@ -9,4 +9,5 @@ public enum OracleExitReason
     EndOfData,
     MaxHold,
     EmaExit,
+    TimeStop,
 }

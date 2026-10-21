@@ -133,22 +133,18 @@ public sealed class TrailSimulatorTests
     }
 
     [Theory]
-    [InlineData(ExitPolicy.PartialBe)]
-    [InlineData(ExitPolicy.PartialTrail)]
     [InlineData(ExitPolicy.Pyramid)]
     public void The_policies_no_walker_runs_yet_are_still_refused_by_name(ExitPolicy policy)
     {
         ExitParameter[] parameters = policy switch
         {
-            ExitPolicy.PartialBe => [P("book_pct", 50), P("t1_rr", 1), P("t2_rr", 2)],
-            ExitPolicy.PartialTrail => [P("book_pct", 50), P("t1_rr", 1), P("trail_atr_mult", 2)],
             _ => [P("initial_pct", 50), P("add_at_rr", 1, 2), P("add_pct", 30, 20), P("max_adds", 2), P("trail_atr_mult", 2)],
         };
 
         var build = Simulator.Create(With(new ExitSpec(policy, parameters)), Timeframe.M15);
 
         build.Simulator.ShouldBeNull();
-        Errors(build).ShouldContain(e => e.StartsWith("simulation.unsupported_exit@buy.exits", StringComparison.Ordinal) && e.Contains(policy.ToString(), StringComparison.Ordinal));
+        Errors(build).ShouldContain(e => e.StartsWith("simulation.unsupported_exit@buy.exits", StringComparison.Ordinal) && e.Contains(policy.ToString(), StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

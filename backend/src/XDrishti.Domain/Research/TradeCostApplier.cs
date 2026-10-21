@@ -102,6 +102,12 @@ public static class TradeCostApplier
             }
         }
 
+        if (lastExit < 0)
+        {
+            return Result.Failure<CostApplication>(CostErrors.LegsInvalid("it has no exit leg"));
+        }
+
+        // A non-last exit leg whose floor(quantity × share) is 0 is dropped here and not charged; it is counted as a merged leg by the replay (legs minus charged legs, ADR 0050).
         var exited = 0L;
         for (var i = 0; i < legs.Count; i++)
         {

@@ -7,7 +7,7 @@ namespace XDrishti.Simulation.Walking;
 /// allocates nothing for it. Before each minute that holds a trade it feeds the rule the bars that closed at or before the minute's start and had not been seen (D2), applies what the rule asks in order, and takes the shares it asked to
 /// leave at the open of that minute, unless the open is already through the stop, in which case the stop row takes everything (D6). A level a rule moved is in force from this minute on, never inside the minute that closed its bar.
 /// </summary>
-internal sealed class LegState
+internal sealed partial class LegState
 {
     private readonly ExitContext _context;
     private readonly List<ExitAction> _actions = [];
@@ -25,6 +25,7 @@ internal sealed class LegState
         _position = start;
         _cursor = context.Tape.LastClosedAtOrBefore(start.FillEpoch);
         _firstBar = _cursor + 1;
+        StartPolicy();
     }
 
     /// <summary>A rule asked for the whole position to leave at the next open (P4-03, D7): set by the last <see cref="Read"/>.</summary>
@@ -36,6 +37,7 @@ internal sealed class LegState
         var favourable = _position.IsBuy ? minute.High : minute.Low;
         _extreme = !_observed ? favourable : (_position.IsBuy ? Math.Max(_extreme, favourable) : Math.Min(_extreme, favourable));
         _observed = true;
+        ObservePolicy(minute);
     }
 
     /// <summary>The position with the stop and target as they stand.</summary>
@@ -74,7 +76,8 @@ internal sealed class LegState
 
             var view = new ExitView(isBuy, _position.Entry, _position.Risk, _position.Stop, _position.Target, OpenShare - pendingShare, _partials.Count + _pending.Count, new TrailInput(_extreme, _firstBar));
             _actions.Clear();
-            _context.Rule.OnBar(view, tape, _cursor, _actions);
+            _context.Rule?.OnBar(view, tape, _cursor, _actions);
+            ReadPolicy(tape, _cursor, _actions);
             foreach (var action in _actions)
             {
                 switch (action.Kind)
@@ -107,7 +110,6 @@ internal sealed class LegState
                 }
             }
         }
-
     }
 
     /// <summary>

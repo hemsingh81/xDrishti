@@ -181,7 +181,7 @@ public sealed class TrailPropertyTests(ITestOutputHelper output)
                 foreach (var candidate in group.EngineCandidates)
                 {
                     var stops = new List<decimal>();
-                    var walked = Walk(candidate, series.Bars, group.EngineRules, kind, p, built => new SpyRule(built.Context.Rule, stops));
+                    var walked = Walk(candidate, series.Bars, group.EngineRules, kind, p, built => new SpyRule(built.Context.Rule!, stops));
                     if (walked.IsFailure)
                     {
                         lock (bad)

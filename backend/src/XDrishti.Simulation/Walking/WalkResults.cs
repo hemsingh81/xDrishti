@@ -84,7 +84,7 @@ internal static class WalkResults
 
         return Result.Success(new WalkOutcome(
             trade, null, examined, position.AfterMissingMinutes, flags.StopGap, flags.TargetGap, flags.Ambiguous, flags.LateSquareOff, position.RiskUnderFourTicks, zero,
-            flags.MaxHoldAtLastClose, flags.StopGap && flags.Overnight, flags.TargetGap && flags.Overnight, holdEnd, position.OvernightEntry, tradeLegs?.Count ?? 0, legs?.StopLoosenIgnored ?? 0));
+            flags.MaxHoldAtLastClose, flags.StopGap && flags.Overnight, flags.TargetGap && flags.Overnight, holdEnd, position.OvernightEntry, tradeLegs?.Count ?? 0, legs?.StopLoosenIgnored ?? 0, flags.TimeStopAtLastClose));
     }
 
     /// <summary>A decimal figure as the double of a <see cref="SimTrade"/> field. A decimal zero can carry a sign (<c>-1m * 0m</c>), and a double <c>-0</c> is printed as "-0" in a golden file or in JSON: zero is always +0.</summary>
