@@ -31,8 +31,10 @@ internal sealed class StoredDays(
             return new StoredDay(TickSpec.FallbackSize, []);
         }
 
-        var from = new DateTimeOffset(date.ToDateTime(new TimeOnly(9, 0)), India);
-        var stored = await bars.ReadAsync(instrument.Id, from, new DateTimeOffset(date.ToDateTime(new TimeOnly(15, 45)), India), cancellationToken);
+        // The database accepts only offset 0, so the India-time bounds are passed as UTC.
+        var from = new DateTimeOffset(date.ToDateTime(new TimeOnly(9, 0)), India).ToUniversalTime();
+        var to = new DateTimeOffset(date.ToDateTime(new TimeOnly(15, 45)), India).ToUniversalTime();
+        var stored = await bars.ReadAsync(instrument.Id, from, to, cancellationToken);
         return new StoredDay(instrument.Tick, [.. stored.Select(b => new ReaderBar(b.EpochSeconds, (decimal)Math.Round(b.Open, 4), (decimal)Math.Round(b.High, 4), (decimal)Math.Round(b.Low, 4), (decimal)Math.Round(b.Close, 4), b.Volume))]);
     }
 
