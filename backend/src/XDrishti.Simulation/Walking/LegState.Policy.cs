@@ -62,6 +62,7 @@ internal sealed partial class LegState
     {
         _policy = _context.Policy;
         T1Pending = _policy is { Partial: not PartialKind.None };
+        StartPyramid();
     }
 
     private void ReadPolicy(ExitTape tape, int bar, List<ExitAction> actions)
@@ -77,6 +78,8 @@ internal sealed partial class LegState
             // D5: the chandelier since T1; a NaN ATR gives no level; the walker keeps the stop only if the level is tighter.
             actions.Add(new ExitAction(ExitActionKind.MoveStop, _t1Extreme - (sign * policy.TrailMult * atr)));
         }
+
+        ReadPyramid(tape, bar, sign);
 
         // D8: the flag set here is ignored by the walker when the open of the next minute is beyond the stop or the target; the table fills those rows instead.
         if (policy.MinProgressRr is { } minimum && policy.IntradayBars > 0 && !_timeStopSpent && ++_barsRead == policy.IntradayBars)

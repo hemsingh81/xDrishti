@@ -10,4 +10,5 @@ public sealed record OracleRules(
     OracleHold? Hold = null,
     OracleLadder? Ladder = null,
     OracleTrail? Trail = null,
-    OraclePolicy? Policy = null);
+    OraclePolicy? Policy = null,
+    OraclePyramid? Pyramid = null);

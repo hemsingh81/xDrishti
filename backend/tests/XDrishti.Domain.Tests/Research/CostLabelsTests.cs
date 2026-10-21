@@ -95,11 +95,11 @@ public sealed partial class CostLabelsTests
     }
 
     [Fact]
-    public void The_ten_limits_are_listed_in_order_each_with_a_text_and_the_swing_gate_is_one_of_them()
+    public void The_eleven_limits_are_listed_in_order_each_with_a_text_and_the_swing_gate_and_the_pyramid_cap_are_among_them()
     {
         CostLimits.NotModelled.Select(l => l.Code).ShouldBe(
         [
-            "fixed_capital", "no_margin_or_leverage", "no_liquidity_cap", "one_order_per_leg", "cash_equity_only", "no_trading_tax", "rates_as_sheet", "dp_charge_is_flat", "no_flat_order_fees", "swing_gate_before_costing",
+            "fixed_capital", "no_margin_or_leverage", "no_liquidity_cap", "one_order_per_leg", "cash_equity_only", "no_trading_tax", "rates_as_sheet", "dp_charge_is_flat", "no_flat_order_fees", "swing_gate_before_costing", "pyramid_capital_cap",
         ]);
         CostLimits.NotModelled.ShouldAllBe(l => !string.IsNullOrWhiteSpace(l.Text));
         CostLimits.NotModelled.Select(l => l.Code).Intersect(FillLimits.NotModelled.Select(l => l.Code)).ShouldBeEmpty("a code is declared once");

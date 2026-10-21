@@ -15,7 +15,7 @@ namespace XDrishti.Simulation.Running;
 /// the <see cref="TradeWalker"/>. The two stages share nothing but the entry candidate, which carries no exit, so the same entries can be replayed under every exit policy (P4).
 /// <para>
 /// <b>What it runs.</b> An intraday strategy, or a swing strategy evaluated inside the session (30m or 1h; ADR 0040), on an evaluation timeframe up to one day, entered at the close of the trigger bar, with a stop that is a level
-/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, or from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>) with one value in each list, at most the <c>time_stop</c> overlay, no filter, no market context and no expiry dates. A swing side is held up to its
+/// (<c>or_opposite</c>, <c>swing_low</c>, <c>swing_high</c>, <c>bar_low</c> or <c>bar_high</c>, no buffer, read on the evaluation timeframe), exactly one exit candidate (<c>FIXED_RR</c>, <c>PARTIAL_BE</c> or <c>PARTIAL_TRAIL</c> from P4-02, from P4-03 <c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>, or from P4-04 <c>PYRAMID</c>, whose ladders are not candidate lists) with one value in each list, at most the <c>time_stop</c> overlay, no filter, no market context and no expiry dates. A swing side is held up to its
 /// <c>max_hold_sessions</c> (the entry session counts as the first) and is gated to one open position per instrument and side (<see cref="PositionGate"/>). <see cref="Create"/> refuses everything else by name (<see cref="SimulatorCodes"/>) with a located problem, rather than
 /// ignoring it: a result must be what it says it is. A side that does not compile makes <see cref="Create"/> return no simulator; a half strategy is never run.
 /// </para>
@@ -112,7 +112,7 @@ public sealed class Simulator
                 ExitPolicy.PartialBe or ExitPolicy.PartialTrail => plan.Values["t1_rr"][0],   // T1 is the target of a partial policy
                 _ => null,
             };
-            var trail = plan.Policy is ExitPolicy.AtrTrail or ExitPolicy.StructureTrail or ExitPolicy.EmaTrail ? plan : null;
+            var trail = plan.Policy is ExitPolicy.AtrTrail or ExitPolicy.StructureTrail or ExitPolicy.EmaTrail or ExitPolicy.Pyramid ? plan : null;
             var policy = PolicyOf(side);
             if (swing && hold is { } sessions)
             {
@@ -146,8 +146,9 @@ public sealed class Simulator
     /// <param name="bars">The instrument's 1-minute bars in ascending order.</param>
     /// <param name="tick">The instrument's tick size (<see cref="TickSpec.FromMasterPaise"/>); the price grid of its fills and of its entry limit.</param>
     /// <param name="calendar">The trading calendar, or null for the regular 09:15 to 15:30 session.</param>
+    /// <param name="quantity">The full size <c>Q</c> of ADR 0042 for an exact entry and an initial risk, for a <c>PYRAMID</c> to see an add of no whole share (P4-04, D3); null in a gross run, where no add is skipped for its quantity.</param>
     /// <exception cref="ArgumentNullException"><paramref name="bars"/> or <paramref name="tick"/> is null.</exception>
-    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null)
+    public Result<SimulationResult> Run(InstrumentRef instrument, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar = null, Func<decimal, decimal, long>? quantity = null)
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
@@ -186,7 +187,7 @@ public sealed class Simulator
             // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
             var sideRules = rules.Value;
             var rule = side.Trail is { } trail ? TrailRules.Of(trail, scanner.TapeColumnOf(trail)) : null;
-            var exitContext = rule is null && side.Policy is null ? null : new ExitContext(rule, scanner.Tape, side.Policy);
+            var exitContext = rule is null && side.Policy is null ? null : new ExitContext(rule, scanner.Tape, side.Policy, quantity);
             var walked = HoldsOvernight
                 ? PositionGate.Apply(scanner.Candidates, candidate => TradeWalker.Walk(candidate, bars, sideRules, exitContext))
                 : WalkAll(scanner.Candidates, bars, sideRules, exitContext);
@@ -293,17 +294,17 @@ public sealed class Simulator
     {
         if (side.Exits.Count != 1)
         {
-            problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The simulator runs exactly one exit candidate in a run (`FIXED_RR`, `PARTIAL_BE`, `PARTIAL_TRAIL`, `ATR_TRAIL`, `STRUCTURE_TRAIL` or `EMA_TRAIL`), not " + side.Exits.Count + "; comparing candidates on the same entries is a later slice (P4-05)."));
+            problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The simulator runs exactly one exit candidate in a run (`FIXED_RR`, `PARTIAL_BE`, `PARTIAL_TRAIL`, `ATR_TRAIL`, `STRUCTURE_TRAIL`, `EMA_TRAIL` or `PYRAMID`), not " + side.Exits.Count + "; comparing candidates on the same entries is a later slice (P4-05)."));
         }
         else
         {
             var exit = side.Exits[0];
             var label = PolicyName(exit.Policy);
-            if (exit.Policy is not (ExitPolicy.FixedRr or ExitPolicy.PartialBe or ExitPolicy.PartialTrail or ExitPolicy.AtrTrail or ExitPolicy.StructureTrail or ExitPolicy.EmaTrail))
+            if (exit.Policy is not (ExitPolicy.FixedRr or ExitPolicy.PartialBe or ExitPolicy.PartialTrail or ExitPolicy.AtrTrail or ExitPolicy.StructureTrail or ExitPolicy.EmaTrail or ExitPolicy.Pyramid))
             {
-                problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The exit `" + label + "` is not run yet (P4); the simulator runs `FIXED_RR`, `PARTIAL_BE`, `PARTIAL_TRAIL`, `ATR_TRAIL`, `STRUCTURE_TRAIL` and `EMA_TRAIL`."));
+                problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The exit `" + label + "` is not run yet (P4); the simulator runs `FIXED_RR`, `PARTIAL_BE`, `PARTIAL_TRAIL`, `ATR_TRAIL`, `STRUCTURE_TRAIL`, `EMA_TRAIL` and `PYRAMID`."));
             }
-            else if (exit.Values.FirstOrDefault(v => v.Value.Count != 1) is { Key: { } list })
+            else if (exit.Values.FirstOrDefault(v => v.Value.Count != 1 && !(exit.Policy == ExitPolicy.Pyramid && v.Key is "add_at_rr" or "add_pct")) is { Key: { } list })
             {
                 problems.Add(Refusal(name + ".exits", SimulatorCodes.UnsupportedExit, "The exit `" + label + "` has " + exit.Values[list].Count + " values in `" + list + "`; the simulator runs one value of each parameter in a run (the comparison of candidate values is P4-05)."));
             }
@@ -329,10 +330,14 @@ public sealed class Simulator
             _ => PartialKind.None,
         };
         var stop = side.Overlays.FirstOrDefault(o => o.Kind == OverlayKind.TimeStop);
-        if (partial == PartialKind.None && stop is null)
+        if (partial == PartialKind.None && stop is null && exit.Policy != ExitPolicy.Pyramid)
         {
             return null;
         }
+
+        var pyramid = exit.Policy == ExitPolicy.Pyramid
+            ? new PyramidPlan(Decimal(exit.Values["initial_pct"][0]) / 100m, [.. exit.Values["add_at_rr"].Select(Decimal)], [.. exit.Values["add_pct"].Select(v => Decimal(v) / 100m)], (int)exit.Values["max_adds"][0])
+            : null;
 
         var book = partial == PartialKind.None ? 0m : Decimal(exit.Values["book_pct"][0]) / 100m;
         var t2 = partial == PartialKind.Be ? Decimal(exit.Values["t2_rr"][0]) : 0m;
@@ -344,7 +349,8 @@ public sealed class Simulator
             mult,
             stop is null ? null : Decimal(stop.Values["min_progress_rr"][0]),
             stop is not null && stop.Values.TryGetValue("intraday_bars", out var bars) ? (int)bars[0] : 0,
-            stop is not null && stop.Values.TryGetValue("swing_sessions", out var sessions) ? (int)sessions[0] : 0);
+            stop is not null && stop.Values.TryGetValue("swing_sessions", out var sessions) ? (int)sessions[0] : 0,
+            pyramid);
     }
 
     private static decimal Decimal(double value) => TickGrid.TryConvert(value, out var converted) ? converted : 0m;

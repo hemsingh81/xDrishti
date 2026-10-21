@@ -218,6 +218,10 @@ internal static class OracleAdapter
         ExitsEmaExit = Int(w.ExitsEmaExit),
         ExitsTimeStop = Int(w.ExitsTimeStop),
         TimeStopAtLastClose = Int(w.TimeStopAtLastClose),
+        AddsTaken = Int(w.AddsTaken),
+        AddsMissed = Int(w.AddsMissed),
+        AddsSkippedRisk = Int(w.AddsSkippedRisk),
+        AddsSkippedQuantity = Int(w.AddsSkippedQuantity),
     };
 
     private static int Int(long value) => checked((int)value);

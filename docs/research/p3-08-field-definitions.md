@@ -11,7 +11,7 @@ Written 2026-10-19 for [P3-08](../specs/P3-08-independent-walker-oracle-and-leak
 - `NONE`: no sentence anywhere the oracle may read. ADR 0047 adds the rule **before O starts**.
 - `PASS-THROUGH`: an echo of the input or a constant; compared for equality only.
 
-The comparison unit for `SimTrade` is its 34 positional properties (the 34th, `Legs`, added by P4-01); for counters, the 32 positional properties (the last three added by P4-01) of `WalkCounters`; for the cost chain (Annex C, P3-08c) the 11 properties of `TradeCosting` and the 8 of `LegCharges`; plus the gate's hold end and blocked set. The `Key` is computed and not compared.
+The comparison unit for `SimTrade` is its 34 positional properties (the 34th, `Legs`, added by P4-01); for counters, the 39 positional properties (from the 30th on added by P4-01 to P4-04) of `WalkCounters`; for the cost chain (Annex C, P3-08c) the 11 properties of `TradeCosting` and the 8 of `LegCharges`; plus the gate's hold end and blocked set. The `Key` is computed and not compared.
 
 ## A. `SimTrade` (34 positional fields, schema 5)
 
@@ -54,7 +54,7 @@ The comparison unit for `SimTrade` is its 34 positional properties (the 34th, `L
 
 Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): ADR 0038 #1 (E1, E5, E6), ADR 0040 #10 (D11, `PositionOpen`), ADR 0043 #3 (D3, `OrderPendingAtEnd`): DEFINED.
 
-## B. `WalkCounters` (32 positional properties) and `WalkOutcome`
+## B. `WalkCounters` (39 positional properties) and `WalkOutcome`
 
 | # | Counter | Defining text | Status | ADR 0047 |
 |---|---|---|---|---|
@@ -93,6 +93,10 @@ Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): A
 | 33 | `ExitsEmaExit` | P4-03 D7: trades that left on an `EMA_TRAIL` signal | SPEC ONLY | ADR 0051 |
 | 34 | `ExitsTimeStop` | P4-02 D8: trades that ended with the `time_stop` overlay | SPEC ONLY | ADR 0050 |
 | 35 | `TimeStopAtLastClose` | P4-02 D9: swing time-stop exits made at the close of the last minute that held a trade because the checked session ended without one at its end | SPEC ONLY | ADR 0050 |
+| 36 | `AddsTaken` | P4-04 D3, D12: adds of a `PYRAMID` that filled | SPEC ONLY | ADR 0052 |
+| 37 | `AddsMissed` | P4-04 D3, D12: adds whose first open after the bar was beyond the entry limit | SPEC ONLY | ADR 0052 |
+| 38 | `AddsSkippedRisk` | P4-04 D4, D12: adds skipped because the stop could not be put below the add's price (unreachable by construction, ADR 0052 decision 4) | SPEC ONLY | ADR 0052 |
+| 39 | `AddsSkippedQuantity` | P4-04 D3, D12: adds of no whole share (a costed run only) | SPEC ONLY | ADR 0052 |
 
 `WalkOutcome.HoldEndEpochSeconds` (the gate's input, compared as a list, section D) and the booleans of `WalkOutcome` are the same facts as the counters above.
 

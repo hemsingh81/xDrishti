@@ -165,7 +165,7 @@ public static class InstrumentReplayer
             var from = starts[firstSession];
             var count = starts[endSession] - from;
             IReadOnlyList<Bar> list = firstSession == 0 && endSession == ran.Count ? fed : new BarSegment(fed, from, count);
-            var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar);
+            var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs));
             if (run.IsFailure)
             {
                 throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message);
@@ -246,6 +246,10 @@ public static class InstrumentReplayer
         openAtEnd = [.. openAtEnd.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
         return (scanned, trades, openAtEnd);
     }
+
+    /// <summary>The full size of ADR 0042 as the walker of a pyramid needs it (P4-04, D3): the sizing of the cost context for an exact entry and an initial risk, 0 when the input is not sizable; null for a gross run.</summary>
+    private static Func<decimal, decimal, long>? QuantityOf(CostContext? context) =>
+        context is null ? null : (entry, risk) => Sizing.Quantity(context.Capital, context.Profile, entry, risk) is { IsSuccess: true } sized ? sized.Value : 0L;
 
     /// <summary>
     /// The trade as the run keeps it: the walker's trade for a gross replay, else the trade sized and charged by <see cref="TradeCostApplier"/> (ADR 0042, D1), or null when costing skipped it (the matching counter is raised). A

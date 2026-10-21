@@ -32,7 +32,6 @@ public sealed record ModelCodeExample(
 
     private static StrategyDefinition WithStop(StopSpec stop) => Basic().WithBuy(b => b with { Stop = stop });
 
-    private static ExitSpec Pyramid => new(ExitPolicy.Pyramid, [new ExitParameter("initial_pct", [Quantity.Of(50)]), new ExitParameter("add_at_rr", [Quantity.Of(1), Quantity.Of(2)]), new ExitParameter("add_pct", [Quantity.Of(30), Quantity.Of(20)]), new ExitParameter("max_adds", [Quantity.Of(2)]), new ExitParameter("trail_atr_mult", [Quantity.Of(2)])]);
 
     private static ExitSpec AtrTrail => new(ExitPolicy.AtrTrail, [new ExitParameter("mult", [Quantity.Of(2)]), new ExitParameter("activate_at_rr", [Quantity.Of(1)])]);
 
@@ -88,7 +87,7 @@ public sealed record ModelCodeExample(
             Row("feature_invalid", "buy.stop.lookback", WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(0))), WithStop(new StopSpec(StopKind.SwingLow, Lookback: Quantity.Of(1)))),
             Row("duplicate_exit", "buy.exits[1]", WithExits(Defs.FixedRr(2), Defs.FixedRr(3)), WithExits(Defs.FixedRr(2), Defs.PartialTrail())),
 
-            Row("exit_not_evaluated", "buy.exits[1]", WithExits(Defs.FixedRr(2), Pyramid), WithExits(Defs.FixedRr(2)), ProblemSeverity.Warning),
+            Row("exit_not_evaluated", "buy.overlays[0]", Basic().WithBuy(b => b with { Overlays = [new OverlaySpec(OverlayKind.EventExit, [new ExitParameter("days_before_results", [Quantity.Of(1)])])] }), Basic(), ProblemSeverity.Warning),
 
             // time rules and filters
             Row("time_rule_missing", "time_rules.square_off", Basic() with { TimeRules = Defs.IntradayRules with { SquareOff = null } }, Basic()),

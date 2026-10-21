@@ -19,9 +19,10 @@ internal sealed partial class LegState
     private decimal _extreme;
     private bool _observed;
 
-    public LegState(in Position start, ExitContext context)
+    public LegState(in Position start, ExitContext context, AddRules add = default)
     {
         _context = context;
+        _add = add;
         _position = start;
         _cursor = context.Tape.LastClosedAtOrBefore(start.FillEpoch);
         _firstBar = _cursor + 1;

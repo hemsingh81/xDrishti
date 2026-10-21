@@ -1,6 +1,6 @@
 # P4-04 — `PYRAMID`
 
-- **Status:** Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 8 stand as recommended, including question 7: re-read D3, D4, D7 and D9 against the built P4-01 before the build starts; the build still waits for P3 to close). Written 2026-10-19 from `main` at a6b27af. The table was read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D7, D11, D12), doc 08 §1 and §4 and the Approved specs [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md), [P4-02](P4-02-partial-exits-and-the-time-stop.md) and [P4-03](P4-03-the-trails-atr-structure-and-ema.md), **none of which is built**: every name of the tape, `IExitRule`, the legs, `StopLoosenIgnored` and `TimeStop` below is the one those specs give and is UNVERIFIED against code until they are built. Written ahead of the build on the owner's request; it should be re-read against the code of P4-01 before it is approved. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
+- **Status:** Built 2026-10-22, ahead of the P3 exit check at the owner's request ([ADR 0052](../adr/0052-the-pyramid.md); the number 0051 named below is P4-03's); the build notes are at the end. Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 8 stand as recommended, including question 7: re-read D3, D4, D7 and D9 against the built P4-01 before the build starts; the build still waits for P3 to close). Written 2026-10-19 from `main` at a6b27af. The table was read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D7, D11, D12), doc 08 §1 and §4 and the Approved specs [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md), [P4-02](P4-02-partial-exits-and-the-time-stop.md) and [P4-03](P4-03-the-trails-atr-structure-and-ema.md), **none of which is built**: every name of the tape, `IExitRule`, the legs, `StopLoosenIgnored` and `TimeStop` below is the one those specs give and is UNVERIFIED against code until they are built. Written ahead of the build on the owner's request; it should be re-read against the code of P4-01 before it is approved. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 4 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md). Candidate for the cut line of P4-00 question 6 (the pyramid moves to P5 if time runs short).
 - **Design refs:** docs/design/08-exits-and-risk.md §1 (R), §4 (pyramiding: "used only where the cell shows trend persistence"), §6 (sizing) · 16-configuration.md §2 (`exits`) · [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md) Amendment 1 · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) · [ADR 0042](../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.md) · ADR 0048 to 0050 (P4-01 to P4-03, to be written).
 
@@ -90,7 +90,21 @@ All eight answered "yes to all recommendations" by the owner on 2026-10-19: each
 
 ## Done when
 - [x] The owner has answered questions 1 to 8 and the status is Approved (2026-10-19)
-- [ ] All acceptance criteria have evidence
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] No migration, no API change
-- [ ] ADR 0051 written; `docs/design` (08 §1, §4, §6, 16, 18-roadmap), the oracle log and ADR 0036 Amendment 2 updated; `scripts/build-docs.sh` run
+- [x] All acceptance criteria have evidence (see the build notes; the deviations are listed there)
+- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors (the caller runs the reviewer)
+- [x] No migration, no API change
+- [x] ADR 0052 written (not 0051: P4-03's); `docs/design` (08, 16, 18-roadmap), the oracle log and ADR 0036 Amendment 2 updated; `scripts/build-docs.sh` run
+
+## Build notes (2026-10-22)
+What differs from the text above, and what the criteria rest on.
+
+**Deviations (all in [ADR 0052](../adr/0052-the-pyramid.md)).**
+1. The ADR is 0052, not 0051.
+2. An add skipped by the risk rule cannot happen (ADR decision 4): the counter exists and is always 0, a property holds that, and there is no hand row and no oracle case for it (criterion 2 and D13 asked for both).
+3. A pyramid is always written with legs, also with no add taken (D7 and criterion 8 say it has none): `SimTrade` has no field for the share and the costing needs it.
+4. `AddsSkippedQuantity` needs the full size `Q`, known only to the costing: a gross run skips no add for its quantity; the costed replay hands its sizing to the walker.
+5. Criterion 1 (nothing else moves) holds for every trade and every counter; the goldens of `run.json` and the banners gain the four counters and the eleventh named limit `pyramid_capital_cap`, as P4-03's gained its counter.
+6. The store has no column for legs (ADR 0049), so `simulate --store` of a pyramid is refused as for the partials; the legs are in the export. Criterion 9 (the verbs) is met at the simulator, the replay and the exporter, as in P4-03: no built-in strategy carries a pyramid.
+7. Criterion 10: the allocation is tested (`PyramidAllocationTests`); the 5 % throughput check of the `FIXED_RR` path is the explicit benchmark of ADR 0051, to run by hand on a quiet machine, and has not been run.
+
+**Evidence by criterion.** 1: the whole suite with the goldens regenerated for the new counters only; 2: `PyramidHandTableTests` (25 rows, P1 and P2 are the two hand rows); 3 and 7: `PyramidPropertyTests`, `Oracle.PyramidComparisonTests`; 4: `PyramidCostTests`; 5: `PyramidComparisonTests` and `PyramidSimulatorTests`; 6: `ExitBoundaryTests`, `PyramidSimulatorTests`; 8: `PyramidExportTests`; 10: `PyramidAllocationTests`; 11: `scripts/check.sh` and the docs.

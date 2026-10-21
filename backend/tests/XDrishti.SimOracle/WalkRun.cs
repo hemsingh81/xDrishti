@@ -59,6 +59,22 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
     private bool _active;
     private bool _signal;
 
+    // P4-04 (D1 to D9): the pyramid's own reading of the position: the legs in (share, exact price, filled price, minute), the next bar not yet read, the next level, the add waiting for the next open and its limit, the share-weighted
+    // average entry of the legs open, the largest excursions against that average (taken minute by minute) and the counts of the attempts.
+    private bool _pyr;
+    private readonly List<(decimal Share, decimal Price, decimal Filled, long Epoch)> _in = [];
+    private int _pyrNext;
+    private int _pyrLevel;
+    private int _pyrPending = -1;
+    private decimal _pyrLimit;
+    private decimal _avg;
+    private decimal _maeMax;
+    private decimal _mfeMax;
+    private int _addsTaken;
+    private int _addsMissed;
+    private int _addsSkippedRisk;
+    private int _addsSkippedQuantity;
+
     private sealed class Exit
     {
         public OracleExitReason Reason { get; init; }
@@ -215,6 +231,18 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         while (rules.Policy is { } begun && _polNext < begun.Bars.Count && begun.Bars[_polNext].CloseEpochSeconds <= fb.EpochSeconds)
         {
             _polNext++;
+        }
+
+        if (rules.Pyramid is { } pyramid)
+        {
+            _pyr = true;
+            _in.Add((pyramid.InitialShare, _entry, entryFilled, fb.EpochSeconds));
+            _avg = _entry;
+            _pyrNext = 0;
+            while (_pyrNext < pyramid.Bars.Count && pyramid.Bars[_pyrNext].CloseEpochSeconds <= fb.EpochSeconds)
+            {
+                _pyrNext++;
+            }
         }
 
         _prevEpoch = fb.EpochSeconds;
@@ -539,6 +567,11 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             PolicyStep(policy, ek);
         }
 
+        if (!isFill && rules.Pyramid is { } pyramid)
+        {
+            PyramidStep(pyramid, ek, o, h, l);
+        }
+
         Exit? ex;
         if (!_swing && !isFill && Minute(ek) >= rules.SquareOffMinute)
         {
@@ -705,6 +738,80 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
                     break;
             }
         }
+    }
+
+    /// <summary>
+    /// D2 to D4. The bars that closed at or before the start of this minute and were not read yet, in order: with the next level armed (no add waiting, levels left) a close at or beyond entry plus the level times the first risk asks for an add,
+    /// unless the bar closed at or after the square-off. Then the add that is waiting is made at this open, except in a minute that ends the position anyway (the square-off, a time stop, a reach of the stop in force); it is missed when the open is
+    /// beyond the limit of the bar's close, skipped when it holds no whole share or when the stop that holds the open risk to one risk would not be below its price, and otherwise it moves the stop to the tighter of the two and fills with the entry's slippage.
+    /// </summary>
+    private void PyramidStep(OraclePyramid pyramid, long ek, decimal o, decimal h, decimal l)
+    {
+        while (_pyrNext < pyramid.Bars.Count && pyramid.Bars[_pyrNext].CloseEpochSeconds <= ek)
+        {
+            OracleTrailBar bar = pyramid.Bars[_pyrNext++];
+            decimal? close = Number(bar.Close);
+            bool armed = _pyrPending < 0 && _pyrLevel < pyramid.MaxAdds;
+            if (armed && close is { } c && _d * (c - _entry) >= pyramid.Levels[_pyrLevel] * _risk && (_swing || Minute(bar.CloseEpochSeconds) < rules.SquareOffMinute))
+            {
+                _pyrPending = _pyrLevel;
+                _pyrLimit = _buy ? OracleNumbers.TickDown(c * (1m + (OracleNumbers.Conv(rules.EntryLimitPercent) / 100m)), _tick) : OracleNumbers.TickUp(c * (1m - (OracleNumbers.Conv(rules.EntryLimitPercent) / 100m)), _tick);
+            }
+        }
+
+        if (_pyrPending < 0)
+        {
+            return;
+        }
+
+        int level = _pyrPending;
+        _pyrPending = -1;
+        bool endsAnyway = (!_swing && Minute(ek) >= rules.SquareOffMinute) || _tsDue || (_buy ? l <= _stop : h >= _stop);
+        if (endsAnyway)
+        {
+            return;
+        }
+
+        _pyrLevel++;
+        if (!(_buy ? o <= _pyrLimit : o >= _pyrLimit))
+        {
+            _addsMissed++;
+            return;
+        }
+
+        decimal share = pyramid.Shares[level];
+        if (pyramid.FullSize is { } fullSize && Math.Floor(fullSize * share) < 1m)
+        {
+            _addsSkippedQuantity++;
+            return;
+        }
+
+        decimal held = 0m;
+        decimal cost = 0m;
+        foreach (var leg in _in)
+        {
+            held += leg.Share;
+            cost += leg.Share * leg.Price;
+        }
+
+        decimal required = (cost + (share * o) - (_d * _risk)) / (held + share);
+        if (_buy ? required >= o : required <= o)
+        {
+            _addsSkippedRisk++;
+            return;
+        }
+
+        _stop = _buy ? Math.Max(_stop, required) : Math.Min(_stop, required);
+        decimal filled = o;
+        if (!rules.Slippage.IsNone)
+        {
+            decimal a = (OracleNumbers.Conv(rules.Slippage.Ticks) * _tick) + (OracleNumbers.Conv(rules.Slippage.BarRangeFrac) * (h - l));
+            filled = _buy ? Math.Min(OracleNumbers.TickUp(o + a, _tick), _pyrLimit) : Math.Max(OracleNumbers.TickDown(o - a, _tick), _pyrLimit);
+        }
+
+        _in.Add((share, o, filled, ek));
+        _addsTaken++;
+        _avg = (cost + (share * o)) / (held + share);
     }
 
     private void MoveStop(decimal level)
@@ -950,11 +1057,23 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
 
     private void WidenAdv(decimal lo, decimal hi)
     {
+        if (_pyr)
+        {
+            _maeMax = Math.Max(_maeMax, _buy ? _avg - lo : hi - _avg);
+            return;
+        }
+
         _adv = _buy ? Math.Min(_adv, lo) : Math.Max(_adv, hi);
     }
 
     private void WidenFav(decimal lo, decimal hi)
     {
+        if (_pyr)
+        {
+            _mfeMax = Math.Max(_mfeMax, _buy ? hi - _avg : _avg - lo);
+            return;
+        }
+
         _fav = _buy ? Math.Max(_fav, hi) : Math.Min(_fav, lo);
     }
 
@@ -963,7 +1082,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         switch (ex.Reason)
         {
             case OracleExitReason.Stop:
-                _adv = _buy ? Math.Min(_adv, ex.Price) : Math.Max(_adv, ex.Price);
+                WidenAdv(ex.Price, ex.Price);
                 break;
             case OracleExitReason.Target:
                 if (!ex.OpenBeyondTarget)
@@ -1037,10 +1156,30 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             legs.Add(new OracleLeg(xb.EpochSeconds, OracleNumbers.ToDouble(ex.Price), OracleNumbers.ToDouble(exitFilled), rest, "Exit", ex.Reason.ToString()));
         }
 
+        if (_pyr)
+        {
+            // D9: the unit is the risk of the full size; R is the share-weighted sum over the legs in against the one exit leg that takes them all.
+            decimal rest = 0m;
+            decimal exactIn = 0m;
+            decimal filledIn = 0m;
+            legs = [];
+            for (int q = 0; q < _in.Count; q++)
+            {
+                rest += _in[q].Share;
+                exactIn += _in[q].Share * _in[q].Price;
+                filledIn += _in[q].Share * _in[q].Filled;
+                legs.Add(new OracleLeg(_in[q].Epoch, OracleNumbers.ToDouble(_in[q].Price), OracleNumbers.ToDouble(_in[q].Filled), _in[q].Share, q == 0 ? "Entry" : "Add", string.Empty));
+            }
+
+            rExact = _d * ((rest * ex.Price) - exactIn) / _risk;
+            rFilled = _d * ((rest * exitFilled) - filledIn) / _risk;
+            legs.Add(new OracleLeg(xb.EpochSeconds, OracleNumbers.ToDouble(ex.Price), OracleNumbers.ToDouble(exitFilled), rest, "Exit", ex.Reason.ToString()));
+        }
+
         decimal slipR = rFilled - rExact;
         decimal maeBase = Has(OracleFaults.MaeFromFilledEntry) ? entryFilled : _entry;
-        decimal mae = Math.Max(0m, _d * (maeBase - _adv)) / _risk;
-        decimal mfe = Math.Max(0m, _d * (_fav - _entry)) / _risk;
+        decimal mae = _pyr ? _maeMax / _risk : Math.Max(0m, _d * (maeBase - _adv)) / _risk;
+        decimal mfe = _pyr ? _mfeMax / _risk : Math.Max(0m, _d * (_fav - _entry)) / _risk;
         DateOnly exitDate = OracleClock.DateOf(xb.EpochSeconds);
         int held = _swing ? 1 + cal.TradingDaysBetween(_entryDate, exitDate) : 1;
         int unseen = _swing ? Math.Max(0, held - _seen.Count) : 0;
@@ -1112,6 +1251,10 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             StopLoosenIgnored = _loosenIgnored,
             ExitsTimeStop = ex.Reason == OracleExitReason.TimeStop ? 1 : 0,
             TimeStopAtLastClose = ex.TimeStopLast ? 1 : 0,
+            AddsTaken = _addsTaken,
+            AddsMissed = _addsMissed,
+            AddsSkippedRisk = _addsSkippedRisk,
+            AddsSkippedQuantity = _addsSkippedQuantity,
         };
         return new OracleResult(trade, null, counters, _rows, holdEnd);
     }

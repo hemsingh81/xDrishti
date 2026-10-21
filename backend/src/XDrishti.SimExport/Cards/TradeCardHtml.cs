@@ -125,7 +125,7 @@ public static class TradeCardHtml
     /// <summary>The fills of a position that left in several (P4-01, D16): a row for each leg, with its quantity and the charge of its order when the trade is costed. The figures above are the entry and the last exit leg; R is for the whole trade.</summary>
     private static void Legs(StringBuilder page, ValueList<Leg> legs, TradeCosting? costing)
     {
-        page.Append("<h2>legs</h2>\n<p class=\"note\">the position was filled in ").Append(Html.Text(CardFormat.Int(legs.Count))).Append(" legs; result R is the share-weighted sum over the exit legs, in units of the initial risk</p>\n<table>\n<thead>");
+        page.Append("<h2>legs</h2>\n<p class=\"note\">the position was filled in ").Append(Html.Text(CardFormat.Int(legs.Count))).Append(" legs; result R is the share-weighted sum of the exit legs less the entry and add legs, in units of the initial risk of the full size</p>\n<table>\n<thead>");
         CardPage.Row(page, "th", "time (IST)", "leg", "price", "filled price", "share", "quantity", "charge (rupees)");
         page.Append("</thead>\n<tbody>\n");
         var next = 0;

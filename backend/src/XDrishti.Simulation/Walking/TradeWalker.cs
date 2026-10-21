@@ -238,7 +238,7 @@ public static class TradeWalker
             candidate, fillBar.EpochSeconds, isBuy, entry, entryFilled, kind, stop, target, risk, slip,
             overnight ? fillBar.EpochSeconds > fillOpen : fillBar.EpochSeconds > candidate.DecisionEpochSeconds, risk < RiskFloorTicks * tick, rules.Fills.Basis, rules.Tick.FromFallback, overnight);
 
-        var legs = exit is null ? null : new LegState(position, exit);
+        var legs = exit is null ? null : new LegState(position, exit, new AddRules(fraction, tick, rules.Hold is null ? rules.SquareOffMinute : int.MaxValue));
         return rules.Hold is { } swing
             ? SwingWalk.Follow(position, bars, fillIndex, swing, entryDate, due, zeroMinutes, legs)
             : Follow(position, bars, fillIndex, rules.SquareOffMinute, entryDate, zeroMinutes, legs);
@@ -292,7 +292,7 @@ public static class TradeWalker
             // P4-01: the levels as a rule has moved them, from the first minute after the close that produced them (D2, D6); without a rule the position is the entry's.
             if (legs is not null && !isFill)
             {
-                MinuteRule.AdvanceLegs(legs, minute, bar.EpochSeconds);
+                MinuteRule.AdvanceLegs(legs, minute, bar.EpochSeconds, ref low, ref high);
             }
 
             ref readonly var current = ref (legs is null ? ref position : ref legs.Current);

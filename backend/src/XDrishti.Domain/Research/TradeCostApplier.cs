@@ -93,6 +93,12 @@ public static class TradeCostApplier
             }
         }
 
+        // P4-04, D8: the first fill of a pyramid holds only part of the full size; if that is no whole share the trade is a skipped quantity, as for a trade that enters one fill.
+        if (entered < 1 || quantities[0] < 1)
+        {
+            return Result.Success(CostApplication.Skipped(TradeSkip.QuantityBelowOne));
+        }
+
         var lastExit = -1;
         for (var i = 0; i < legs.Count; i++)
         {

@@ -222,11 +222,11 @@ public sealed class CostRuleTests
     }
 
     [Fact]
-    public void The_named_limit_swing_gate_before_costing_is_the_last_of_ten_and_a_skipped_trade_still_counts_for_the_gate()
+    public void The_named_limit_swing_gate_before_costing_is_the_tenth_of_eleven_and_a_skipped_trade_still_counts_for_the_gate()
     {
-        OracleCostLimits.NotModelled.Count.ShouldBe(10);
+        OracleCostLimits.NotModelled.Count.ShouldBe(11);
         OracleCostLimits.NotModelled[9].Code.ShouldBe("swing_gate_before_costing");
-        OracleCostLimits.NotModelled.Select(l => l.Code).Distinct().Count().ShouldBe(10);
+        OracleCostLimits.NotModelled.Select(l => l.Code).Distinct().Count().ShouldBe(11);
         OracleCostLimits.TradeCountsForTheGate(OracleCostSkip.Cost).ShouldBeTrue();
         OracleCostLimits.TradeCountsForTheGate(OracleCostSkip.Quantity).ShouldBeTrue();
         // The skipped trade is still a position: costing has no effect on the gate's input, so the same trade

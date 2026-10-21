@@ -132,21 +132,6 @@ public sealed class TrailSimulatorTests
         Errors(build).ShouldContain(e => e.StartsWith("simulation.unsupported_exit@sell.exits", StringComparison.Ordinal));
     }
 
-    [Theory]
-    [InlineData(ExitPolicy.Pyramid)]
-    public void The_policies_no_walker_runs_yet_are_still_refused_by_name(ExitPolicy policy)
-    {
-        ExitParameter[] parameters = policy switch
-        {
-            _ => [P("initial_pct", 50), P("add_at_rr", 1, 2), P("add_pct", 30, 20), P("max_adds", 2), P("trail_atr_mult", 2)],
-        };
-
-        var build = Simulator.Create(With(new ExitSpec(policy, parameters)), Timeframe.M15);
-
-        build.Simulator.ShouldBeNull();
-        Errors(build).ShouldContain(e => e.StartsWith("simulation.unsupported_exit@buy.exits", StringComparison.Ordinal) && e.Contains(policy.ToString(), StringComparison.OrdinalIgnoreCase));
-    }
-
     [Fact]
     public void FIXED_RR_with_two_rr_values_is_still_refused_naming_rr()
     {

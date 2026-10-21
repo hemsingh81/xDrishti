@@ -9,7 +9,7 @@ using XDrishti.Strategies.Model;
 namespace XDrishti.Simulation.Tests.Running;
 
 /// <summary>
-/// Spec P3-02b2, criterion 13 and D2/D14: the model may describe more than the simulator can run. A correct table of any policy or overlay compiles and <c>Simulator.Create</c> refuses it by name
+/// Spec P3-02b2, criterion 13 and D2/D14: the model may describe more than the simulator can run. A correct table of any policy compiles and <c>Simulator.Create</c> accepts it (every policy runs since P4-04); an overlay it does not run is refused by name
 /// (<c>simulation.unsupported_exit</c>); a bad table is the compile's own problem; and the set of policies the compile warns about is exactly the complement of what the simulator runs.
 /// </summary>
 public sealed class ExitBoundaryTests
@@ -33,22 +33,7 @@ public sealed class ExitBoundaryTests
 
     private static string[] Errors(SimulatorBuild build) => [.. build.Problems.Where(p => p.Problem.Severity == ProblemSeverity.Error).Select(p => p.Problem.Code + "@" + p.Path)];
 
-    public static TheoryData<ExitPolicy> Refused { get; } = [ExitPolicy.Pyramid];
-
-    public static TheoryData<ExitPolicy> Run { get; } = [ExitPolicy.FixedRr, ExitPolicy.PartialBe, ExitPolicy.PartialTrail, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail];
-
-    [Theory]
-    [MemberData(nameof(Refused))]
-    public void A_correct_table_of_a_policy_the_simulator_does_not_run_is_refused_by_name_alone_and_with_a_FIXED_RR(ExitPolicy policy)
-    {
-        var alone = Simulator.Create(With([new ExitSpec(policy, Valid(policy))]), Timeframe.M15);
-        var withRr = Simulator.Create(With([Rr(2), new ExitSpec(policy, Valid(policy))]), Timeframe.M15);
-
-        alone.Simulator.ShouldBeNull();
-        Errors(alone).ShouldBe(["simulation.unsupported_exit@buy.exits"]);
-        alone.Problems.Single(p => p.Problem.Code == "simulation.unsupported_exit").Problem.Message.ShouldContain(policy switch { ExitPolicy.AtrTrail => "ATR_TRAIL", ExitPolicy.StructureTrail => "STRUCTURE_TRAIL", ExitPolicy.EmaTrail => "EMA_TRAIL", _ => "PYRAMID" });
-        Errors(withRr).ShouldBe(["simulation.unsupported_exit@buy.exits"]);
-    }
+    public static TheoryData<ExitPolicy> Run { get; } = [ExitPolicy.FixedRr, ExitPolicy.PartialBe, ExitPolicy.PartialTrail, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail, ExitPolicy.Pyramid];
 
     [Theory]
     [MemberData(nameof(Run))]

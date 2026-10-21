@@ -6,7 +6,10 @@ public static class OracleCostLimits
     /// <summary>The code of D17.</summary>
     public const string SwingGateBeforeCosting = "swing_gate_before_costing";
 
-    /// <summary>The ten limits in order.</summary>
+    /// <summary>The code of P4-04, D8.</summary>
+    public const string PyramidCapitalCap = "pyramid_capital_cap";
+
+    /// <summary>The eleven limits in order (the last is P4-04's).</summary>
     public static IReadOnlyList<OracleCostLimit> NotModelled { get; } =
     [
         new("fixed_capital", "every trade is sized from the same starting capital; trades of different instruments overlap"),
@@ -19,6 +22,7 @@ public static class OracleCostLimits
         new("dp_charge_is_flat", "the depository charge is one flat figure per delivery sale"),
         new("no_flat_order_fees", "a flat fee per order other than the brokerage cannot be expressed"),
         new(SwingGateBeforeCosting, "a swing position that costing skipped still blocks the later candidates the position gate refused"),
+        new(PyramidCapitalCap, "the cap per trade is applied at the first entry's price; the adds of a pyramid can lift the notional above it"),
     ];
 
     /// <summary>

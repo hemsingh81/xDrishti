@@ -203,11 +203,12 @@ public sealed class CostEngineExampleTests
     }
 
     [Fact]
-    public void The_ten_named_limits_of_the_costing_are_the_same_codes_in_the_same_order_the_author_read_from_the_ADR()
+    public void The_eleven_named_limits_of_the_costing_are_the_same_codes_in_the_same_order_the_author_read_from_the_ADR()
     {
         // the gate statement of D17 (a swing trade that costing skipped still counts as the position) is pinned on the engine by CostedReplayTests; here the list the author wrote from the ADR is set against the engine's
         CostLimits.NotModelled.Select(l => l.Code).ShouldBe(OracleCostLimits.NotModelled.Select(l => l.Code));
-        CostLimits.NotModelled[^1].Code.ShouldBe(OracleCostLimits.SwingGateBeforeCosting);
+        CostLimits.NotModelled[9].Code.ShouldBe(OracleCostLimits.SwingGateBeforeCosting);
+        CostLimits.NotModelled[^1].Code.ShouldBe(OracleCostLimits.PyramidCapitalCap);
     }
 
     [Fact]

@@ -15,5 +15,6 @@ public static class CostLimits
         new("dp_charge_is_flat", "The depository charge is one flat figure per delivery sale; the depository's own lines vary and some are 0."),
         new("no_flat_order_fees", "A flat fee per order other than the brokerage, such as an auto square-off fee, cannot be expressed; 'other' is a share of turnover."),
         new("swing_gate_before_costing", "A swing position that costing skipped still blocks the later candidates that the position gate refused: the gate runs before costing."),
+        new("pyramid_capital_cap", "The cap per trade is applied to the full size at the first entry's price; the adds of a PYRAMID fill at higher prices, so the notional of a pyramid can exceed it."),
     ];
 }

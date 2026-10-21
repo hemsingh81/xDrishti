@@ -16,6 +16,6 @@ internal enum PartialKind
 /// <summary>
 /// The parameters of the policies that P4-02 adds to the walk, as decimals (the walker computes in decimal): the partial (<paramref name="Book"/> is the share booked at T1, <paramref name="T2Rr"/> the second target of
 /// <c>PARTIAL_BE</c>, <paramref name="TrailMult"/> the multiple of the ATR of <c>PARTIAL_TRAIL</c>) and the <c>time_stop</c> overlay (<paramref name="MinProgressRr"/> is null when there is none; <paramref name="IntradayBars"/> or
-/// <paramref name="SwingSessions"/>, the one of the style, is above 0). T1 itself is the target of the position (<c>t1_rr</c> as the reward-to-risk of the walk).
+/// <paramref name="SwingSessions"/>, the one of the style, is above 0) and the pyramid of P4-04 (<paramref name="Pyramid"/>, null for every other exit). T1 itself is the target of the position (<c>t1_rr</c> as the reward-to-risk of the walk).
 /// </summary>
-internal sealed record LegPolicy(PartialKind Partial, decimal Book, decimal T2Rr, decimal TrailMult, decimal? MinProgressRr, int IntradayBars, int SwingSessions);
+internal sealed record LegPolicy(PartialKind Partial, decimal Book, decimal T2Rr, decimal TrailMult, decimal? MinProgressRr, int IntradayBars, int SwingSessions, PyramidPlan? Pyramid = null);

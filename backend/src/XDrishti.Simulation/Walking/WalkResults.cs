@@ -23,7 +23,30 @@ internal static class WalkResults
         var rExact = sign * (exit - entry) / risk;
         var rFilled = sign * (exitFilled - position.EntryFilled) / risk;
         ValueList<Leg>? tradeLegs = null;
-        if (legs is { Partials.Count: > 0 })
+        var adverse = isBuy ? (entry - low) / risk : (high - entry) / risk;
+        var favourable = isBuy ? (high - entry) / risk : (entry - low) / risk;
+        if (legs is { IsPyramid: true })
+        {
+            // P4-04, D7 and D9: the legs in are the first fill and the adds, the one exit leg takes them all; the unit is the risk of the full size, so R is the share-weighted sum over the legs in, and the excursions are those of the segments.
+            var final = legs.OpenShare;
+            var exactIn = 0m;
+            var filledIn = 0m;
+            var list = new List<Leg>(legs.EntryLegs.Count + 1);
+            for (var i = 0; i < legs.EntryLegs.Count; i++)
+            {
+                var leg = legs.EntryLegs[i];
+                exactIn += leg.Share * leg.Price;
+                filledIn += leg.Share * leg.Filled;
+                list.Add(new Leg(leg.Epoch, (double)leg.Price, (double)leg.Filled, leg.Share, i == 0 ? LegKind.Entry : LegKind.Add, string.Empty));
+            }
+
+            rExact = sign * ((final * exit) - exactIn) / risk;
+            rFilled = sign * ((final * exitFilled) - filledIn) / risk;
+            list.Add(new Leg(exitEpoch, (double)exit, (double)exitFilled, final, LegKind.Exit, reason.ToString()));
+            tradeLegs = new ValueList<Leg>(list);
+            (adverse, favourable) = legs.Excursions(low, high);
+        }
+        else if (legs is { Partials.Count: > 0 })
         {
             // P4-01, D10: R of a trade with legs is the sum over the exit legs of share × (exit − entry) / R0, from the exact and from the filled prices; the unit stays the risk of the first fill.
             var entryFilled = position.EntryFilled;
@@ -45,8 +68,6 @@ internal static class WalkResults
             tradeLegs = new ValueList<Leg>(list);
         }
 
-        var adverse = isBuy ? (entry - low) / risk : (high - entry) / risk;
-        var favourable = isBuy ? (high - entry) / risk : (entry - low) / risk;
         var trade = new SimTrade(
             SimTrade.CurrentSchemaVersion,
             candidate.StrategyId,
@@ -84,7 +105,8 @@ internal static class WalkResults
 
         return Result.Success(new WalkOutcome(
             trade, null, examined, position.AfterMissingMinutes, flags.StopGap, flags.TargetGap, flags.Ambiguous, flags.LateSquareOff, position.RiskUnderFourTicks, zero,
-            flags.MaxHoldAtLastClose, flags.StopGap && flags.Overnight, flags.TargetGap && flags.Overnight, holdEnd, position.OvernightEntry, tradeLegs?.Count ?? 0, legs?.StopLoosenIgnored ?? 0, flags.TimeStopAtLastClose));
+            flags.MaxHoldAtLastClose, flags.StopGap && flags.Overnight, flags.TargetGap && flags.Overnight, holdEnd, position.OvernightEntry, tradeLegs?.Count ?? 0, legs?.StopLoosenIgnored ?? 0, flags.TimeStopAtLastClose,
+            legs?.AddsTaken ?? 0, legs?.AddsMissed ?? 0, legs?.AddsSkippedRisk ?? 0, legs?.AddsSkippedQuantity ?? 0));
     }
 
     /// <summary>A decimal figure as the double of a <see cref="SimTrade"/> field. A decimal zero can carry a sign (<c>-1m * 0m</c>), and a double <c>-0</c> is printed as "-0" in a golden file or in JSON: zero is always +0.</summary>

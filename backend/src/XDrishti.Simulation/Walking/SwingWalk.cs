@@ -100,7 +100,7 @@ internal static class SwingWalk
             // P4-01: the levels as a rule has moved them, from the first minute after the close that produced them (D2, D6).
             if (legs is not null && i != fillIndex)
             {
-                MinuteRule.AdvanceLegs(legs, minute, bar.EpochSeconds);
+                MinuteRule.AdvanceLegs(legs, minute, bar.EpochSeconds, ref low, ref high);
             }
 
             ref readonly var current = ref (legs is null ? ref position : ref legs.Current);

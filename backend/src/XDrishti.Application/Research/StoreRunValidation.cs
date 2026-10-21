@@ -154,7 +154,7 @@ internal static class StoreRunValidation
 
         if (withLegs > 0)
         {
-            // Shortcut (P4-01 D15, kept by P4-02): the legs are not persisted. `simulate --store` of a PARTIAL_BE or PARTIAL_TRAIL run is refused here by name and the export files keep the legs; the columns
+            // Shortcut (P4-01 D15, kept by P4-02): the legs are not persisted. `simulate --store` of a PARTIAL_BE, PARTIAL_TRAIL or PYRAMID run (a pyramid always has legs) is refused here by name and the export files keep the legs; the columns
             // (`legs jsonb`, `cost_leg_charges jsonb`, migration AddSimTradeLegs) come with the first slice that must read a stored trade with legs back (P4-05, the comparison), as ADR 0050 decides.
             problems.Add(new FieldError("run.trades.legs", $"{withLegs} trades have legs; the store has no column for them yet (P4-01, D15): the legs stay in the run folder."));
         }

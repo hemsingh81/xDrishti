@@ -58,7 +58,7 @@ public sealed class FieldCoverageTests
         var properties = typeof(WalkCounters).GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.Name != "EqualityContract").Select(p => p.Name);
 
         Unread(properties, OracleComparer.CounterFields).ShouldBeEmpty("a WalkCounters counter that no comparison reads");
-        Positional(typeof(WalkCounters)).Count.ShouldBe(35);
+        Positional(typeof(WalkCounters)).Count.ShouldBe(39);
     }
 
     [Fact]

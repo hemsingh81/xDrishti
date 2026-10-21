@@ -72,6 +72,14 @@ public sealed record OracleCounters
 
     public int TimeStopAtLastClose { get; init; }
 
+    public int AddsTaken { get; init; }
+
+    public int AddsMissed { get; init; }
+
+    public int AddsSkippedRisk { get; init; }
+
+    public int AddsSkippedQuantity { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -110,5 +118,9 @@ public sealed record OracleCounters
         ExitsEmaExit = ExitsEmaExit + other.ExitsEmaExit,
         ExitsTimeStop = ExitsTimeStop + other.ExitsTimeStop,
         TimeStopAtLastClose = TimeStopAtLastClose + other.TimeStopAtLastClose,
+        AddsTaken = AddsTaken + other.AddsTaken,
+        AddsMissed = AddsMissed + other.AddsMissed,
+        AddsSkippedRisk = AddsSkippedRisk + other.AddsSkippedRisk,
+        AddsSkippedQuantity = AddsSkippedQuantity + other.AddsSkippedQuantity,
     };
 }

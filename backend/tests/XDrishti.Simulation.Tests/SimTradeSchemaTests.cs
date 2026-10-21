@@ -114,23 +114,23 @@ public sealed class SimTradeSchemaTests
     [Fact]
     public void The_walker_counters_add_field_by_field_and_empty_is_the_identity()
     {
-        var one = new WalkCounters(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35);
+        var one = new WalkCounters(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39);
 
         var sum = one.Add(one);
 
-        sum.ShouldBe(new WalkCounters(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70));
+        sum.ShouldBe(new WalkCounters(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 74, 76, 78));
         one.Add(WalkCounters.Empty).ShouldBe(one);
-        WalkCounters.Empty.ShouldBe(new WalkCounters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        WalkCounters.Empty.ShouldBe(new WalkCounters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
     [Fact]
-    public void The_thirty_three_counters_keep_their_positions_the_seven_of_schema_3_the_two_of_P3_03e_the_three_of_P4_01_and_the_one_of_P4_03_appended_with_default_zero()
+    public void The_thirty_nine_counters_keep_their_positions_the_seven_of_schema_3_the_two_of_P3_03e_the_three_of_P4_01_the_one_of_P4_03_and_the_four_of_P4_04_appended_with_default_zero()
     {
         var names = typeof(WalkCounters).GetConstructors().Single().GetParameters();
 
-        names.Length.ShouldBe(35);
+        names.Length.ShouldBe(39);
         names.Take(20).Last().Name.ShouldBe("RiskUnderFourTicks");
-        names.Skip(20).Select(p => p.Name).ShouldBe(["PositionOpen", "ExitsMaxHold", "MaxHoldAtLastClose", "OvernightStopGaps", "OvernightTargetGaps", "SessionsHeld", "SessionsUnseen", "OvernightEntries", "OrderPendingAtEnd", "LegsTotal", "LegsMerged", "StopLoosenIgnored", "ExitsEmaExit", "ExitsTimeStop", "TimeStopAtLastClose"]);
+        names.Skip(20).Select(p => p.Name).ShouldBe(["PositionOpen", "ExitsMaxHold", "MaxHoldAtLastClose", "OvernightStopGaps", "OvernightTargetGaps", "SessionsHeld", "SessionsUnseen", "OvernightEntries", "OrderPendingAtEnd", "LegsTotal", "LegsMerged", "StopLoosenIgnored", "ExitsEmaExit", "ExitsTimeStop", "TimeStopAtLastClose", "AddsTaken", "AddsMissed", "AddsSkippedRisk", "AddsSkippedQuantity"]);
         names.Skip(20).ShouldAllBe(p => p.HasDefaultValue && Equals(p.DefaultValue, 0L));
     }
 
@@ -139,7 +139,7 @@ public sealed class SimTradeSchemaTests
     {
         // Criterion 27: a field appended later cannot be left out of Add, because each property gets its own distinct value and the sum must double it.
         var counterProperties = typeof(WalkCounters).GetProperties().Where(p => p.PropertyType == typeof(long) && p.GetMethod!.IsPublic && p.DeclaringType == typeof(WalkCounters) && p.Name != "Empty").ToList();
-        counterProperties.Count.ShouldBe(35);
+        counterProperties.Count.ShouldBe(39);
         var counters = (WalkCounters)ConstructWithDistinctValues(typeof(WalkCounters));
         var counterSum = counters.Add(counters);
         foreach (var property in counterProperties)
