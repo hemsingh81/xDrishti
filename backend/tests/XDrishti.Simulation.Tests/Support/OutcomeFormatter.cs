@@ -67,10 +67,21 @@ internal static class OutcomeFormatter
             text.Append(" overnightEntry=True");
         }
 
+        // Facts of P4-01: printed only when set, so that every line of an earlier row is what it was.
+        if (outcome.Trade?.Legs is { } legs)
+        {
+            text.Append(" legs=").Append(string.Join(';', legs.Select(l => string.Create(CultureInfo.InvariantCulture, $"{l.EpochSeconds}|{l.Kind}|{Number(l.Price)}|{Number(l.FilledPrice)}|{l.Share}|{l.Reason}"))));
+        }
+
+        if (outcome.StopLoosenIgnored > 0)
+        {
+            text.Append(CultureInfo.InvariantCulture, $" stopLoosenIgnored={outcome.StopLoosenIgnored}");
+        }
+
         return text.ToString();
     }
 
     public static string Render(WalkCounters c) =>
         string.Create(CultureInfo.InvariantCulture,
-            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined} limitNotReached={c.LimitNotReached} entriesAtOpen={c.EntriesAtOpen} entriesAtLimit={c.EntriesAtLimit} ambiguousMinutes={c.AmbiguousMinutes} lateSquareOffs={c.LateSquareOffs} zeroVolumeMinutes={c.ZeroVolumeMinutes} riskUnderFourTicks={c.RiskUnderFourTicks} positionOpen={c.PositionOpen} exitsMaxHold={c.ExitsMaxHold} maxHoldAtLastClose={c.MaxHoldAtLastClose} overnightStopGaps={c.OvernightStopGaps} overnightTargetGaps={c.OvernightTargetGaps} sessionsHeld={c.SessionsHeld} sessionsUnseen={c.SessionsUnseen} overnightEntries={c.OvernightEntries} orderPendingAtEnd={c.OrderPendingAtEnd}");
+            $"candidates={c.Candidates} trades={c.Trades} noFillBar={c.NoFillBar} afterSquareOff={c.AfterSquareOff} entryThroughStop={c.EntryThroughStop} exitsStop={c.ExitsStop} exitsTarget={c.ExitsTarget} exitsSquareOff={c.ExitsSquareOff} exitsEndOfData={c.ExitsEndOfData} stopGapExits={c.StopGapExits} targetGapExits={c.TargetGapExits} entriesAfterMissingMinutes={c.EntriesAfterMissingMinutes} barsExamined={c.BarsExamined} limitNotReached={c.LimitNotReached} entriesAtOpen={c.EntriesAtOpen} entriesAtLimit={c.EntriesAtLimit} ambiguousMinutes={c.AmbiguousMinutes} lateSquareOffs={c.LateSquareOffs} zeroVolumeMinutes={c.ZeroVolumeMinutes} riskUnderFourTicks={c.RiskUnderFourTicks} positionOpen={c.PositionOpen} exitsMaxHold={c.ExitsMaxHold} maxHoldAtLastClose={c.MaxHoldAtLastClose} overnightStopGaps={c.OvernightStopGaps} overnightTargetGaps={c.OvernightTargetGaps} sessionsHeld={c.SessionsHeld} sessionsUnseen={c.SessionsUnseen} overnightEntries={c.OvernightEntries} orderPendingAtEnd={c.OrderPendingAtEnd}") + (c.LegsTotal + c.LegsMerged + c.StopLoosenIgnored == 0 ? string.Empty : string.Create(CultureInfo.InvariantCulture, $" legsTotal={c.LegsTotal} legsMerged={c.LegsMerged} stopLoosenIgnored={c.StopLoosenIgnored}"));
 }

@@ -98,7 +98,7 @@ public sealed class RunStoreReadTests(ApiFactory factory)
         var pageTwo = await WithStore(s => s.ListAsync(new RunListFilter(StrategyId: strategy), new PageRequest(2, pageOne.Value.NextCursor), Ct).AsTask());
         var costed = await WithStore(s => s.ListAsync(new RunListFilter(StrategyId: strategy, Costed: true), new PageRequest(10), Ct).AsTask());
         var gross = await WithStore(s => s.ListAsync(new RunListFilter(StrategyId: strategy, Costed: false), new PageRequest(10), Ct).AsTask());
-        var engine = await WithStore(s => s.ListAsync(new RunListFilter(StrategyId: strategy, EngineVersion: "sim-5"), new PageRequest(10), Ct).AsTask());
+        var engine = await WithStore(s => s.ListAsync(new RunListFilter(StrategyId: strategy, EngineVersion: "sim-6"), new PageRequest(10), Ct).AsTask());
         var otherEngine = await WithStore(s => s.ListAsync(new RunListFilter(StrategyId: strategy, EngineVersion: "sim-4"), new PageRequest(10), Ct).AsTask());
         var window = await WithStore(s => s.ListAsync(new RunListFilter(StrategyId: strategy, CreatedFrom: t0.AddMinutes(1), CreatedTo: t0.AddMinutes(2)), new PageRequest(10), Ct).AsTask());
 

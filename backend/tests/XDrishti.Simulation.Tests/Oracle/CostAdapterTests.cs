@@ -147,7 +147,8 @@ public sealed class CostAdapterTests
     [Fact]
     public void Every_property_of_TradeCosting_and_LegCharges_is_compared_or_echoed()
     {
-        var properties = FieldCoverageTests.Positional(typeof(TradeCosting)).Concat(FieldCoverageTests.Positional(typeof(LegCharges))).ToList();
+        // LegCharges of TradeCosting (P4-01) is the costing of a trade with legs, which the cost oracle does not walk: it is held by the hand table of LegCostingTests
+        var properties = FieldCoverageTests.Positional(typeof(TradeCosting)).Where(n => n != nameof(TradeCosting.LegCharges)).Concat(FieldCoverageTests.Positional(typeof(LegCharges))).ToList();
 
         properties.Count.ShouldBe(11 + 8);
         foreach (var property in properties)
@@ -171,7 +172,7 @@ public sealed class CostAdapterTests
     [Fact]
     public void The_sentinel_a_property_added_to_the_cost_record_without_a_view_is_reported()
     {
-        var withNewField = FieldCoverageTests.Positional(typeof(TradeCosting)).Append("FutureCharge");
+        var withNewField = FieldCoverageTests.Positional(typeof(TradeCosting)).Where(n => n != nameof(TradeCosting.LegCharges)).Append("FutureCharge");
 
         FieldCoverageTests.Unread(withNewField.SelectMany(ViewNames), CostComparer.Fields).ShouldBe(["FutureCharge"]);
     }

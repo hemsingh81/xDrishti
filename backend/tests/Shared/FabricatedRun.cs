@@ -81,7 +81,7 @@ internal static class FabricatedRun
         var tradeList = trades ?? [];
         var openList = openAtEnd ?? [];
         var replays = instruments.Select(i => new InstrumentReplay(i, [.. tradeList.Where(t => t.InstrumentId == i.InstrumentId)], [.. openList.Where(t => t.InstrumentId == i.InstrumentId)])).ToList();
-        var header = new RunHeader(Strategy(strategy), "sim-5", from ?? Monday, to ?? new DateOnly(2026, 4, 30), ReplayOptions.Default, false, fills ?? DefaultFills, universe, new TradingCalendar(), costs);
+        var header = new RunHeader(Strategy(strategy), "sim-6", from ?? Monday, to ?? new DateOnly(2026, 4, 30), ReplayOptions.Default, false, fills ?? DefaultFills, universe, new TradingCalendar(), costs);
         return RunAssembler.Assemble(header, replays);
     }
 

@@ -41,7 +41,7 @@ public sealed class OracleVerifiedForTests
 
         field.ShouldNotBeNull();
         field.IsLiteral.ShouldBeTrue("a compile-time constant: nothing the suite does at run time can change it");
-        field.GetRawConstantValue().ShouldBe("sim-5");
+        field.GetRawConstantValue().ShouldBe("sim-6");
     }
 
     [Fact]

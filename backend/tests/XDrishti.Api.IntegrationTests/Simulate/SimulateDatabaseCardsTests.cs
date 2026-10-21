@@ -80,7 +80,7 @@ public sealed partial class SimulateDatabaseTests
 
         var labels = RunLabels.Of(run, FillRules.Create(FillRules.Default.EntryLimitPercent, SlippageConfig.None).Value);
         File.ReadAllBytes(Path.Combine(folder, "trades.csv")).ShouldBe(Render(s => TradesCsv.Write(s, run.RunKey, run.Trades)));
-        File.ReadAllBytes(Path.Combine(folder, "run.json")).ShouldBe(Render(s => SimExportJson.Write(s, run, labels, "xd-sim-export-2")));
+        File.ReadAllBytes(Path.Combine(folder, "run.json")).ShouldBe(Render(s => SimExportJson.Write(s, run, labels, "xd-sim-export-3")));
         File.ReadAllText(Path.Combine(folder, "README.txt")).ShouldStartWith(RunBanner.Text(labels));
     }
 

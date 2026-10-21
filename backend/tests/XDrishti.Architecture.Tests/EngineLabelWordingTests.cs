@@ -73,6 +73,6 @@ public sealed class EngineLabelWordingTests
     [Fact]
     public void The_engine_line_of_the_label_is_the_wording_the_owner_approved()
     {
-        XDrishti.Domain.Research.RunLabels.EngineVerification.ShouldBe("engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-5); not checked against charts or the owner's charge sheet");
+        XDrishti.Domain.Research.RunLabels.EngineVerification.ShouldBe("engine: agrees with a separately written reference implementation of the rule tables (P3-08, sim-6); not checked against charts or the owner's charge sheet");
     }
 }

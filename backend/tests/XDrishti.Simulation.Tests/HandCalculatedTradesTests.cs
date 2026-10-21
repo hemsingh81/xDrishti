@@ -37,7 +37,7 @@ public sealed class HandCalculatedTradesTests
         trade.Fills.ShouldBe(FillBasis.Modelled, name);
         trade.Costs.ShouldBe(CostBasis.None, name);
         trade.TickFallback.ShouldBeFalse(name);
-        trade.SchemaVersion.ShouldBe(4);
+        trade.SchemaVersion.ShouldBe(5);
         AssertCounters(name, outcome, want);
     }
 

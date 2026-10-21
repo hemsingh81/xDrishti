@@ -153,7 +153,7 @@ public static class InstrumentReplayer
         var walk = WalkCounters.Empty;
         var trades = new List<SimTrade>();
         var openAtEnd = new List<SimTrade>();
-        long suppressed = 0, beforeWindow = 0, excludedAcross = 0, candidatesInWindow = 0, skippedQuantity = 0, skippedCost = 0;
+        long suppressed = 0, beforeWindow = 0, excludedAcross = 0, candidatesInWindow = 0, skippedQuantity = 0, skippedCost = 0, legsMerged = 0;
         var noTrades = RunFates.Empty;
         var holdsOvernight = strategy.Simulator.HoldsOvernight;
         var segment = holdsOvernight ? CostSegment.Delivery : CostSegment.IntradayEquity;
@@ -203,6 +203,11 @@ public static class InstrumentReplayer
                     else if (Costed(trade, input.Costs, segment, input.Symbol, ref skippedQuantity, ref skippedCost) is { } kept)
                     {
                         // ADR 0042, D1: costing comes after the window cut and the exclusion, and before the fates are counted; a skipped trade has left the lists.
+                        if (kept.Legs is { } legs && kept.Costing?.LegCharges is { } charged)
+                        {
+                            legsMerged += legs.Count - charged.Count;
+                        }
+
                         if (kept.ExitReason == ExitReason.EndOfData)
                         {
                             openAtEnd.Add(kept);
@@ -236,7 +241,7 @@ public static class InstrumentReplayer
 
         var fates = noTrades with { EntriesSuppressed = suppressed, TradesBeforeWindow = beforeWindow, OpenAtEnd = openAtEnd.Count, Trades = trades.Count, ExcludedAcrossDiscontinuity = excludedAcross, SkippedQuantity = skippedQuantity, SkippedCost = skippedCost };
         var notes = flagged.Select(n => excludedAtDay.TryGetValue(n.Date, out var count) ? n with { ExcludedPositions = count } : n).ToList();
-        var scanned = new Scanned(ran[0].Date, new DateSpan(ran[0].Date, ran[^1].Date), scans.AsReadOnly(), walk, fates, notes.AsReadOnly(), candidatesInWindow, trades.Count + openAtEnd.Count);
+        var scanned = new Scanned(ran[0].Date, new DateSpan(ran[0].Date, ran[^1].Date), scans.AsReadOnly(), walk with { LegsMerged = legsMerged }, fates, notes.AsReadOnly(), candidatesInWindow, trades.Count + openAtEnd.Count);
         trades = [.. trades.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
         openAtEnd = [.. openAtEnd.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
         return (scanned, trades, openAtEnd);

@@ -1,6 +1,6 @@
 namespace XDrishti.SimOracle;
 
-/// <summary>The 29 counters of one walk (or of several, summed by <see cref="Plus"/>).</summary>
+/// <summary>The 32 counters of one walk (or of several, summed by <see cref="Plus"/>).</summary>
 public sealed record OracleCounters
 {
     public int Candidates { get; init; }
@@ -61,6 +61,12 @@ public sealed record OracleCounters
 
     public int OrderPendingAtEnd { get; init; }
 
+    public int LegsTotal { get; init; }
+
+    public int LegsMerged { get; init; }
+
+    public int StopLoosenIgnored { get; init; }
+
     /// <summary>The sum of two counter sets, property by property.</summary>
     public OracleCounters Plus(OracleCounters other) => new()
     {
@@ -93,5 +99,8 @@ public sealed record OracleCounters
         SessionsUnseen = SessionsUnseen + other.SessionsUnseen,
         OvernightEntries = OvernightEntries + other.OvernightEntries,
         OrderPendingAtEnd = OrderPendingAtEnd + other.OrderPendingAtEnd,
+        LegsTotal = LegsTotal + other.LegsTotal,
+        LegsMerged = LegsMerged + other.LegsMerged,
+        StopLoosenIgnored = StopLoosenIgnored + other.StopLoosenIgnored,
     };
 }

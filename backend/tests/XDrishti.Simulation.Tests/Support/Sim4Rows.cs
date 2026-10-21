@@ -12,7 +12,7 @@ namespace XDrishti.Simulation.Tests.Support;
 
 /// <summary>
 /// The renderings that P3-03e freezes under sim-4 before it changes any rule (spec D8, criterion 8): the walker fixtures F and W, the hand rows H with and without slippage, 500 seeded intraday days, the swing rows M with fixture R and
-/// the flagged boundary Q1, and the gate rows G with the window rows J and Q2 of P3-03d. The text is that of the sim-4 code; <see cref="View"/> is the only difference allowed under a later version (the engine label and the two counters
+/// the flagged boundary Q1, and the gate rows G with the window rows J and Q2 of P3-03d. The text is that of the sim-4 code; <see cref="View"/> is the only difference allowed under a later version (the engine label, the trade schema and the two counters
 /// that P3-03e appends, when they are zero), so that "the same bytes in the sim-4 view" is a comparison of strings. The frozen files are <c>Golden/*.sim-4.frozen.txt</c> and are never regenerated.
 /// </summary>
 internal static class Sim4Rows
@@ -20,7 +20,7 @@ internal static class Sim4Rows
     private static readonly Regex NewCounters = new(@" (overnightEntries|orderPendingAtEnd)=0(?!\d)", RegexOptions.CultureInvariant);
 
     /// <summary>The text in the sim-4 view: the engine label of sim-4 and none of the counters appended since, which must be zero to disappear.</summary>
-    public static string View(string text) => NewCounters.Replace(text.Replace("engine=" + SimulationEngine.Version, "engine=sim-4", StringComparison.Ordinal), string.Empty);
+    public static string View(string text) => NewCounters.Replace(text.Replace("engine=" + SimulationEngine.Version, "engine=sim-4", StringComparison.Ordinal).Replace("schema=" + SimTrade.CurrentSchemaVersion, "schema=4", StringComparison.Ordinal), string.Empty);
 
     public static string Walker()
     {

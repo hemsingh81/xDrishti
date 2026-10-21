@@ -1,3 +1,5 @@
+using XDrishti.Domain.Common;
+
 namespace XDrishti.Domain.Research;
 
 /// <summary>
@@ -10,11 +12,12 @@ namespace XDrishti.Domain.Research;
 /// <param name="RiskTaken"><c>Quantity × |entry − stop|</c> in rupees: 1R of the trade.</param>
 /// <param name="EntryTurnover"><c>Quantity ×</c> the filled entry price.</param>
 /// <param name="ExitTurnover"><c>Quantity ×</c> the filled exit price.</param>
-/// <param name="EntryLeg">The charge of the entry order, on the schedule in force on the trade date.</param>
-/// <param name="ExitLeg">The charge of the exit order, on the schedule in force on the date of the exit minute.</param>
+/// <param name="EntryLeg">The charge of the entry order, on the schedule in force on the trade date (a trade with legs: the sum of the entry and add orders).</param>
+/// <param name="ExitLeg">The charge of the exit order, on the schedule in force on the date of the exit minute (a trade with legs: the sum of the exit orders).</param>
 /// <param name="TotalCost">The sum of the 16 lines, a multiple of 0.01.</param>
 /// <param name="CostR"><c>TotalCost / RiskTaken</c>, computed in decimal and converted once.</param>
 /// <param name="RNet"><c>RFilled − CostR</c>: R after the sheet's charges, from the filled prices (slippage is already in it and is never charged twice).</param>
+/// <param name="LegCharges">One charge per leg that has a quantity, for a trade with legs (P4-01, D11); null for a trade without. <see cref="TotalCost"/> is the sum of all of them.</param>
 public sealed record TradeCosting(
     CostSegment Segment,
     string SheetId,
@@ -26,4 +29,5 @@ public sealed record TradeCosting(
     LegCharges ExitLeg,
     decimal TotalCost,
     double CostR,
-    double RNet);
+    double RNet,
+    ValueList<LegCharge>? LegCharges = null);

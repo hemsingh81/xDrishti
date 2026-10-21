@@ -53,11 +53,11 @@ public sealed partial class SimExportJsonTests
     [Fact]
     public void A_run_of_another_engine_version_is_written_with_the_fallback_line_and_engine_verified_false()
     {
-        var run = FabricatedRun.Standard() with { EngineVersion = "sim-6" };
+        var run = FabricatedRun.Standard() with { EngineVersion = "sim-7" };
         var labels = Root(Json(run)).GetProperty("labels");
 
         labels.GetProperty("engine_verified").GetBoolean().ShouldBeFalse();
-        labels.GetProperty("lines").EnumerateArray().Select(e => e.GetString()).ShouldContain("engine: not yet verified for sim-6");
+        labels.GetProperty("lines").EnumerateArray().Select(e => e.GetString()).ShouldContain("engine: not yet verified for sim-7");
     }
 
     [Fact]

@@ -98,9 +98,9 @@ public sealed class StoreRunHandlerTests
     }
 
     [Fact]
-    public async Task A_run_of_record_schema_4_is_refused()
+    public async Task A_run_of_record_schema_5_is_refused()
     {
-        var error = await RefusedAsync(FabricatedRun.Standard() with { SchemaVersion = 4 });
+        var error = await RefusedAsync(FabricatedRun.Standard() with { SchemaVersion = 5 });
 
         error.Fields!.Select(f => f.Field).ShouldContain("run.schemaVersion");
     }
@@ -114,6 +114,19 @@ public sealed class StoreRunHandlerTests
         var error = await RefusedAsync(run with { Trades = [old, .. run.Trades.Skip(1)] });
 
         error.Fields!.Select(f => f.Field).ShouldContain("run.trades.schemaVersion");
+    }
+
+    [Fact]
+    public async Task A_trade_with_legs_is_refused_because_the_store_has_no_column_for_them_yet()
+    {
+        var run = FabricatedRun.Standard();
+        var first = run.Trades[0].Trade;
+        var legs = new ValueList<Leg>([new Leg(first.EntryEpochSeconds, first.EntryPrice, first.EntryFilledPrice, 1m, LegKind.Entry, string.Empty), new Leg(first.ExitEpochSeconds, first.ExitPrice, first.ExitFilledPrice, 0.5m, LegKind.Exit, "X"), new Leg(first.ExitEpochSeconds, first.ExitPrice, first.ExitFilledPrice, 0.5m, LegKind.Exit, "Y")]);
+        var withLegs = run.Trades[0] with { Trade = first with { Legs = legs } };
+
+        var error = await RefusedAsync(run with { Trades = [withLegs, .. run.Trades.Skip(1)] });
+
+        error.Fields!.Select(f => f.Field).ShouldContain("run.trades.legs");
     }
 
     [Fact]

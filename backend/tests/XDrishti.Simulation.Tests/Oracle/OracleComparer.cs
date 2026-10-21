@@ -70,11 +70,27 @@ internal static class OracleComparer
             return;
         }
 
+        if (oracle is IReadOnlyList<OracleLeg> || engine is IReadOnlyList<OracleLeg>)
+        {
+            // P4-01: the legs, in order, every field of each exactly
+            var a = (IReadOnlyList<OracleLeg>?)oracle;
+            var b = (IReadOnlyList<OracleLeg>?)engine;
+            if (!(a is null && b is null) && (a is null || b is null || !a.SequenceEqual(b)))
+            {
+                found.Add(new Mismatch(property.Name, ShowLegs(a), ShowLegs(b)));
+            }
+
+            return;
+        }
+
         if (!SameValue(oracle, engine))
         {
             found.Add(new Mismatch(property.Name, OracleAdapter.Show(oracle), OracleAdapter.Show(engine)));
         }
     }
+
+    private static string ShowLegs(IReadOnlyList<OracleLeg>? legs) =>
+        legs is null ? "none" : string.Join("; ", legs.Select(l => $"{l.EpochSeconds}|{l.Kind}|{OracleAdapter.Show(l.Price)}|{OracleAdapter.Show(l.FilledPrice)}|{l.Share}|{l.Reason}"));
 
     /// <summary>Equality for everything but the ratio fields: a double is compared by its bits (so the sign of a zero counts), the rest by <c>Equals</c>.</summary>
     private static bool SameValue(object? oracle, object? engine) => (oracle, engine) switch

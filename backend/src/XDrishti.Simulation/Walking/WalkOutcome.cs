@@ -19,6 +19,8 @@ namespace XDrishti.Simulation.Walking;
 /// <param name="OvernightStopGap">A stop gap exit whose minute is the first that holds a trade on a date later than the entry date.</param>
 /// <param name="OvernightTargetGap">A target gap exit whose minute is the first that holds a trade on a date later than the entry date.</param>
 /// <param name="OvernightEntry">The trade was filled on a later date than the one on which it was decided: an order that rested overnight (ADR 0043, E8 and E9).</param>
+/// <param name="LegsTotal">The legs of the trade when it has legs (P4-01); 0 otherwise.</param>
+/// <param name="StopLoosenIgnored">The requests of an exit rule to loosen the stop that the walker ignored (P4-01, D6).</param>
 /// <param name="HoldEndEpochSeconds">The instant the position counts as open until, for the position gate (D11): the exit instant, or the end of the due session for a <c>MaxHoldAtLastClose</c> trade; 0 when there is no trade.</param>
 public readonly record struct WalkOutcome(
     SimTrade? Trade,
@@ -35,7 +37,9 @@ public readonly record struct WalkOutcome(
     bool OvernightStopGap = false,
     bool OvernightTargetGap = false,
     long HoldEndEpochSeconds = 0,
-    bool OvernightEntry = false)
+    bool OvernightEntry = false,
+    int LegsTotal = 0,
+    int StopLoosenIgnored = 0)
 {
     /// <summary>The counts of this one walk, to be summed with <see cref="WalkCounters.Add"/>.</summary>
     public WalkCounters ToCounters()
@@ -71,6 +75,8 @@ public readonly record struct WalkOutcome(
             SessionsHeld: Trade?.SessionsHeld ?? 0,
             SessionsUnseen: Trade?.SessionsUnseen ?? 0,
             OvernightEntries: OvernightEntry ? 1 : 0,
-            OrderPendingAtEnd: NoTrade == NoTradeReason.OrderPendingAtEnd ? 1 : 0);
+            OrderPendingAtEnd: NoTrade == NoTradeReason.OrderPendingAtEnd ? 1 : 0,
+            LegsTotal: LegsTotal,
+            StopLoosenIgnored: StopLoosenIgnored);
     }
 }

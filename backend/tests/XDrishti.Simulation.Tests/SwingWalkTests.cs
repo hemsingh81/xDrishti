@@ -35,7 +35,7 @@ public sealed class SwingWalkTests
         Q(trade.MfeR).ShouldBe(want.Mfe, name + " MFE");
         (trade.SessionsHeld, trade.SessionsUnseen).ShouldBe((want.Held, want.Unseen), name);
         outcome.BarsExamined.ShouldBe(want.Examined, name + " BarsExamined");
-        trade.SchemaVersion.ShouldBe(4, name);
+        trade.SchemaVersion.ShouldBe(SimTrade.CurrentSchemaVersion, name);
         trade.Fills.ShouldBe(FillBasis.Modelled, name);
         Q(trade.EntryPrice).ShouldBe(100.00m, name);
         Q(trade.EntryFilledPrice).ShouldBe(100.10m, name);

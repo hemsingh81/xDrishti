@@ -9,7 +9,7 @@ namespace XDrishti.Domain.Research;
 public static class RunLabels
 {
     /// <summary>The engine version the oracle comparison (P3-08, P3-08c, ADR 0047) was shown for. The test project that holds the comparison keeps <c>OracleVerifiedFor</c> and fails unless it equals this and the engine's version, so bumping the engine without rerunning the comparison fails the check.</summary>
-    public const string VerifiedFor = "sim-5";
+    public const string VerifiedFor = "sim-6";
 
     /// <summary>
     /// The engine line for a run of <see cref="VerifiedFor"/>: a separately written reference implementation of the walk, the position gate and the costing, written from the rule tables by a second agent (a process that is checked and not

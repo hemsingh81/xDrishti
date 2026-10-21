@@ -19,6 +19,7 @@ public static class ExportSpellings
         [typeof(CostBasis)] = (Func<CostBasis, string>)Of,
         [typeof(CostSegment)] = (Func<CostSegment, string>)Of,
         [typeof(EntryFill)] = (Func<EntryFill, string>)Of,
+        [typeof(LegKind)] = (Func<LegKind, string>)Of,
         [typeof(Timeframe)] = (Func<Timeframe, string>)Of,
         [typeof(SkipReason)] = (Func<SkipReason, string>)Of,
         [typeof(NoTradeReason)] = (Func<NoTradeReason, string>)Of,
@@ -79,6 +80,15 @@ public static class ExportSpellings
         EntryFill.AtOpen => "at_open",
         EntryFill.AtLimit => "at_limit",
         _ => throw Unknown(fill),
+    };
+
+    /// <summary><c>entry</c> · <c>add</c> · <c>exit</c>.</summary>
+    public static string Of(LegKind kind) => kind switch
+    {
+        LegKind.Entry => "entry",
+        LegKind.Add => "add",
+        LegKind.Exit => "exit",
+        _ => throw Unknown(kind),
     };
 
     /// <summary>The code of the timeframe (<c>15m</c>, <c>1D</c>).</summary>

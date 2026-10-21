@@ -14,9 +14,9 @@ public sealed class RunRecordSchemaTests
     private static string Members(Type type) => type.Name + ": " + string.Join(", ", Enum.GetNames(type));
 
     [Fact]
-    public void The_schema_version_is_five_since_the_overnight_order_of_p3_03e()
+    public void The_schema_version_is_six_since_the_legs_of_p4_01()
     {
-        SimulationRun.CurrentSchemaVersion.ShouldBe(5);
+        SimulationRun.CurrentSchemaVersion.ShouldBe(6);
     }
 
     [Fact]

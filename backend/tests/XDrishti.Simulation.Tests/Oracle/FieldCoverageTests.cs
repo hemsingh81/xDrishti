@@ -49,7 +49,7 @@ public sealed class FieldCoverageTests
         var covered = OracleComparer.TradeFields.Concat(OracleAdapter.EchoFields);
 
         Unread(Positional(typeof(SimTrade)), covered).ShouldBeEmpty("a SimTrade field that no comparison reads");
-        Positional(typeof(SimTrade)).Count.ShouldBe(33);
+        Positional(typeof(SimTrade)).Count.ShouldBe(34);
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public sealed class FieldCoverageTests
         var properties = typeof(WalkCounters).GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.Name != "EqualityContract").Select(p => p.Name);
 
         Unread(properties, OracleComparer.CounterFields).ShouldBeEmpty("a WalkCounters counter that no comparison reads");
-        Positional(typeof(WalkCounters)).Count.ShouldBe(29);
+        Positional(typeof(WalkCounters)).Count.ShouldBe(32);
     }
 
     [Fact]

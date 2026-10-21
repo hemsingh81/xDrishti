@@ -53,8 +53,8 @@ public sealed class SwingReplayTests
         Q(trade.MaeR).ShouldBe(0.0000m);
         Q(trade.MfeR).ShouldBe(0.0857m);
         (trade.SessionsHeld, trade.SessionsUnseen).ShouldBe((3, 0));
-        result.Header.EngineVersion.ShouldBe("sim-5");
-        result.Header.SchemaVersion.ShouldBe(4);
+        result.Header.EngineVersion.ShouldBe("sim-6");
+        result.Header.SchemaVersion.ShouldBe(5);
         result.Walk.PositionOpen.ShouldBe(0);
     }
 
@@ -162,7 +162,7 @@ public sealed class SwingReplayTests
         run.Totals.Fates.ExcludedAcrossDiscontinuity.ShouldBe(1);
         run.Totals.DiscontinuitiesFlagged.ShouldBe(1);
         run.Totals.Fates.Total.ShouldBe(run.Totals.Scans.Sum(s => s.Candidates));
-        run.SchemaVersion.ShouldBe(5);
+        run.SchemaVersion.ShouldBe(6);
     }
 
     [Fact]
@@ -287,8 +287,8 @@ public sealed class SwingReplayTests
         var instruments = new[] { InstrumentRun.NotFound(Rep.Id) };
         var text = RunAssembler.KeyText(new RunHeader(Swing.Record, SimulationEngine.Version, Mon, Fri, ReplayOptions.Default, false, Swing.Fills.ToCanonicalJson(), universe, DefaultWeek()), instruments, []);
 
-        text.ShouldStartWith("xd-run 5\n");
-        SimulationRun.CurrentSchemaVersion.ShouldBe(5);
+        text.ShouldStartWith("xd-run 6\n");
+        SimulationRun.CurrentSchemaVersion.ShouldBe(6);
         holiday.ShouldNotBe(plain, "a run that counted a holiday differently has a different key");
     }
 }

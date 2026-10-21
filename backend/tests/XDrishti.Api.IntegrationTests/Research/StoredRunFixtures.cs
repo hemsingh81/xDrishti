@@ -121,7 +121,7 @@ internal static class StoredRunFixtures
     private static SimulationRun Assemble(string strategy, UniverseRecord universe, List<InstrumentRun> ran, List<SimTrade> trades, List<SimTrade> open, DateOnly to, CostRecord? costs, FillRules? fills)
     {
         var replays = ran.Select(i => new InstrumentReplay(i, [.. trades.Where(t => t.InstrumentId == i.InstrumentId)], [.. open.Where(t => t.InstrumentId == i.InstrumentId)])).ToList();
-        var header = new RunHeader(FabricatedRun.Strategy(strategy), "sim-5", new DateOnly(2026, 1, 1), to, ReplayOptions.Default, false, (fills ?? FillRules.Default).ToCanonicalJson(), universe, new TradingCalendar(), costs);
+        var header = new RunHeader(FabricatedRun.Strategy(strategy), "sim-6", new DateOnly(2026, 1, 1), to, ReplayOptions.Default, false, (fills ?? FillRules.Default).ToCanonicalJson(), universe, new TradingCalendar(), costs);
         return RunAssembler.Assemble(header, replays);
     }
 

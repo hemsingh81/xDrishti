@@ -24,7 +24,7 @@ public sealed class DomainResearchSurfaceTests
         [
             "AppliedAdjustment", "BarStreamHash", "BuiltInParameterInfo", "BuiltInStrategyInfo", "CalendarExceptionDay", "CanonicalText", "ChargeRates", "ChargeRounding", "ChargeSchedule", "ConditionCounter", "CostApplication",
             "CostBasis", "CostContext", "CostDescription", "CostErrors", "CostLimits", "CostModel", "CostRecord", "CostSegment", "CostSheet", "CostSheetJson", "DateSpan", "DiscontinuityNote", "EntryFill", "ExitReason", "FillBasis",
-            "FillDescription", "FillLimit", "FillLimits", "FillRules", "GapFillRule", "InstrumentReplay", "InstrumentReplayInput", "InstrumentRun", "LegCharges", "NoTradeReason", "ReplayOptions", "RunAssembler", "RunCounters",
+            "FillDescription", "FillLimit", "FillLimits", "FillRules", "GapFillRule", "InstrumentReplay", "InstrumentReplayInput", "InstrumentRun", "Leg", "LegCharge", "LegCharges", "LegKind", "NoTradeReason", "ReplayOptions", "RunAssembler", "RunCounters",
             "RunFates", "RunHeader", "RunLabelSet", "RunLabels", "RunTrade", "ScanCounters", "SessionCounts", "SessionExclusion", "SessionExclusions", "SessionNote", "Side", "SimTrade", "SimulationErrors", "SimulationRun",
             "Sizing", "SizingProfile", "SkipCount", "SkipReason", "SkipReasons", "SlippageConfig", "StrategyRecord", "TickProbe", "TickSpec", "TickUnitCheck", "TradeCardData", "TradeCostApplier", "TradeCosting", "TradeSkip", "UniverseKind",
             "UniverseLabels", "UniverseMember", "UniverseRecord", "WalkCounters",

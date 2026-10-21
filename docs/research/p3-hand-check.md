@@ -91,6 +91,8 @@ The rule is stated to be honest about its power. 20 random trades with no disagr
 
 The pack is void (the engine version, and so the run key and the pack key, change). Draw a **new seed and a new pack** and check it in full, edge picks included. The earlier rows stay in the record as history, and the earlier seed is never reused. A fix to a data defect that changes the stored bars also changes the bar-stream hashes, so the pack is redrawn then too.
 
+**Engine `sim-6` (P4-01, 2026-10-21).** The engine moved from `sim-5` to `sim-6` for the legs of P4-01 and the Q3-MFE decision (ISS-28). The trades of a `FIXED_RR` run are the `sim-5` trades (the golden files differ in the version and schema lines only), but the engine version, the trade and record schemas and the export format changed, so the run key and the pack key changed: a pack drawn under `sim-5` is void for the gate, and the pack for the P3 exit is drawn, with the owner's seed, from a run of `sim-6`.
+
 ## 9. Categories
 
 A trade can belong to several. `occurs: false` in `pack.json` says that no trade of the pooled runs belongs to a category, which is a path not checked by hand, and the record says so.

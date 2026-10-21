@@ -90,7 +90,7 @@ public sealed class SimulateCardsTests : IDisposable
         Directory.Exists(Path.Combine(folder, "cards")).ShouldBeFalse();
         File.Exists(Path.Combine(folder, "index.html")).ShouldBeFalse();
         var manifest = ExportManifest.ParseBytes(File.ReadAllBytes(Path.Combine(folder, "manifest.json"))).Value;
-        manifest.Format.ShouldBe("xd-sim-export-2");
+        manifest.Format.ShouldBe("xd-sim-export-3");
         manifest.ExtraLines.ShouldBe(["cards.cap=0", "cards.trades=2"]);
         _verb.CardsHandler.Received.ShouldBeEmpty("no card is wanted, so nothing is read a second time");
         _verb.Out.ToString().ShouldContain("trade cards: none (--cards 0)");
@@ -114,7 +114,7 @@ public sealed class SimulateCardsTests : IDisposable
         }
 
         var manifest = ExportManifest.ParseBytes(File.ReadAllBytes(Path.Combine(folder, "manifest.json"))).Value;
-        manifest.Format.ShouldBe("xd-sim-export-2");
+        manifest.Format.ShouldBe("xd-sim-export-3");
         manifest.Entries.Select(e => e.Name).Order(StringComparer.Ordinal).ShouldBe(["README.txt", "cards/0001-AAA-buy-2026-03-02-target.html", "cards/0002-M_M-sell-2026-03-03-stop.html", "index.html", "open_at_end.csv", "run.json", "trades.csv"]);
         foreach (var entry in manifest.Entries)
         {
@@ -129,9 +129,9 @@ public sealed class SimulateCardsTests : IDisposable
             "cards.selected=" + run.Trades[0].Trade.Key + "|target-buy",
             "cards.selected=" + run.Trades[1].Trade.Key + "|stop-sell",
         ]);
-        manifest.ExportKey.ShouldBe(ExportKey.Of("xd-sim-export-2", run.RunKey, null, manifest.Entries, manifest.ExtraLines));
+        manifest.ExportKey.ShouldBe(ExportKey.Of("xd-sim-export-3", run.RunKey, null, manifest.Entries, manifest.ExtraLines));
         using var json = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(folder, "run.json")));
-        json.RootElement.GetProperty("export").GetProperty("format").GetString().ShouldBe("xd-sim-export-2");
+        json.RootElement.GetProperty("export").GetProperty("format").GetString().ShouldBe("xd-sim-export-3");
         _verb.CardsHandler.Received.Single().TradeKeys.ShouldBe([run.Trades[0].Trade.Key, run.Trades[1].Trade.Key]);
         _verb.Out.ToString().ShouldContain("trade cards: 2 written (up to 5 asked for), with index.html");
     }

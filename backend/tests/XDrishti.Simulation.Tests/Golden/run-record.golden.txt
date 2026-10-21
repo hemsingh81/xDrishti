@@ -1,5 +1,5 @@
-engine sim-5
-run schema=5 key=55512d1323d095c8fab8e4e0ec055ac91ca6f5946d96a7262a07572b8e80dff4 engine=sim-5
+engine sim-6
+run schema=6 key=ca3411ef7cba690c75a2420a24fdd25b04bab2dfc193b0d6cb8cfa6a7414ce7e engine=sim-6
 strategy ORB timeframe=15m sides=[Buy,Sell] params=[or_min=15,rr=2] sha256=140488ea30a81bbf41a9c1d9f9fff2b4ee508a4f94459607d8f7907ad58c86a2
 json {"schema":1,"id":"ORB","style":"intraday","timeframes":["5m","15m"],"sides":["BUY","SELL"],"params":[{"name":"or_min","value":15}],"buy":{"setup":{"mode":"all","items":["close > ema(10)"]},"trigger":{"mode":"all","items":["close > or_high(or_min) and close[1] <= or_high(or_min)"]},"entry":{"kind":"at_close"},"stop":{"kind":"or_opposite","minutes":"or_min"},"exits":[{"policy":"FIXED_RR","parameters":[{"name":"rr","values":[2]}]}]},"sell":{"trigger":{"mode":"all","items":["close < or_low(or_min) and close[1] >= or_low(or_min)"]},"entry":{"kind":"at_close"},"stop":{"kind":"or_opposite","minutes":"or_min"},"exits":[{"policy":"FIXED_RR","parameters":[{"name":"rr","values":[2]}]}]},"time_rules":{"first_entry":"09:30","last_entry":"11:30","square_off":"15:15"},"filters":[]}
 window 2026-03-02..2026-03-04 options=0.9,0.2 ack=False
@@ -19,7 +19,7 @@ instrument 00000000-0000-0000-0000-0000000000a1 AAA skipped=- detail=-
   walk candidates=1 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 exitsStop=0 exitsTarget=1 exitsSquareOff=0 exitsEndOfData=0 stopGapExits=0 targetGapExits=0 entriesAfterMissingMinutes=0 barsExamined=86 limitNotReached=0 entriesAtOpen=1 entriesAtLimit=0 ambiguousMinutes=0 lateSquareOffs=0 zeroVolumeMinutes=0 riskUnderFourTicks=0 positionOpen=0 exitsMaxHold=0 maxHoldAtLastClose=0 overnightStopGaps=0 overnightTargetGaps=0 sessionsHeld=1 sessionsUnseen=0 overnightEntries=0 orderPendingAtEnd=0
   fates suppressed=0 beforeWindow=0 openAtEnd=0 trades=1 noFillBar=0 afterSquareOff=0 entryThroughStop=0 limitNotReached=0 excludedAcrossDiscontinuity=0 positionOpen=0 skippedQuantity=0 skippedCost=0 orderPendingAtEnd=0
   inWindow candidates=1 trades=1
-trade baskets=[] trade schema=4 strategy=ORB instrument=00000000-0000-0000-0000-0000000000a1 symbol=AAA side=Buy date=2026-03-03 decision=1772511300 tf=15m bar=1772510400/99/100.5/99/100.5/15000/15/True entry=1772511300@100.5 stop=98 target=105.5 exit=1772516400@105.5 reason=Target rExact=2 mae=0.4 mfe=2 fills=Exact costs=None snapshot=null rFilled=2 slippageR=0 entryFilled=100.5 exitFilled=105.5 entryFill=AtOpen tickFallback=False sessionsHeld=1 sessionsUnseen=0
+trade baskets=[] trade schema=5 strategy=ORB instrument=00000000-0000-0000-0000-0000000000a1 symbol=AAA side=Buy date=2026-03-03 decision=1772511300 tf=15m bar=1772510400/99/100.5/99/100.5/15000/15/True entry=1772511300@100.5 stop=98 target=105.5 exit=1772516400@105.5 reason=Target rExact=2 mae=0.4 mfe=2 fills=Exact costs=None snapshot=null rFilled=2 slippageR=0 entryFilled=100.5 exitFilled=105.5 entryFill=AtOpen tickFallback=False sessionsHeld=1 sessionsUnseen=0
 totals instruments=1 run=1 skipped=[]
   bars read=1125 fed=1125 excluded=0 outside=0 flagged=0
   sessions ran=3 closed=0 special=0 short=0 missing=0
