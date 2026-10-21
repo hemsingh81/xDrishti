@@ -6,7 +6,7 @@ namespace XDrishti.Api.Simulate.Assist;
 internal sealed record PackedTrade(int Seq, string TradeKey, string Symbol, ReaderSide Side, DateOnly Date, string Strategy, int OrMinutes, decimal RewardRisk);
 
 /// <summary>What the machine read for one row before the engine's value was seen: <see cref="Unavailable"/> is the reason the second source had no day, otherwise <see cref="Reading"/> is the reader's trade (null: no trade found).</summary>
-internal sealed record AssistRow(PackedTrade Pack, string? Unavailable, string Source, ReaderReading? Reading, decimal Tick, IReadOnlyList<MinuteComparison> Bars);
+internal sealed record AssistRow(PackedTrade Pack, string? Unavailable, string Source, ReaderReading? Reading, decimal Tick, IReadOnlyList<MinuteComparison> Bars, bool TickFallback = false, string? OffsetNote = null);
 
 /// <summary>The verdict of the assistant (never the owner's) with the engine fields the reader differs on.</summary>
 internal sealed record RowVerdict(AssistRow Row, string Verdict, IReadOnlyList<string> Fields);

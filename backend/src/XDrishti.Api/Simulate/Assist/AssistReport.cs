@@ -33,21 +33,28 @@ internal static class AssistReport
             page.Append("<li>").Append(verdict).Append(": ").Append(verdicts.Count(v => v.Verdict == verdict).ToString(CultureInfo.InvariantCulture)).Append("</li>");
         }
 
-        page.Append("</ul>\n<h2>Rows to read on a real chart</h2><p>Every bars_differ row, and agree_all rows picked by a fixed rule (SHA-256 of the seed and the trade key, smallest first; at least one Sell if there is one): ")
+        var all = verdicts.SelectMany(v => v.Row.Bars).ToList();
+        page.Append("<li>").Append(all.Count(b => b.IsNoise).ToString(CultureInfo.InvariantCulture)).Append(" of ").Append(all.Count.ToString(CultureInfo.InvariantCulture)).Append(" compared minutes differ within the tolerance (a feed that is off everywhere shows here)</li>");
+        page.Append("<li>").Append(verdicts.Count(v => v.Row.OffsetNote?.StartsWith("price level offset", StringComparison.Ordinal) == true).ToString(CultureInfo.InvariantCulture)).Append(" rows carry a price level offset note (stored prices are a constant ratio of the second source's; adjusted history?)</li>");
+        page.Append("</ul>\n<p>Rows with a price level note (read their level on a raw chart, with the adjustment setting in mind): ")
+            .Append(string.Join(", ", verdicts.Where(v => v.Row.OffsetNote is not null).Select(v => v.Row.Pack.Seq.ToString(CultureInfo.InvariantCulture)).DefaultIfEmpty("none"))).Append(".</p>\n<h2>Rows to read on a real chart</h2><p>Every bars_differ row, and agree_all rows picked by a fixed rule (SHA-256 of the seed and the trade key, smallest first; at least one Sell if there is one): ")
             .Append(string.Join(", ", Sample(seed, verdicts).Select(s => s.ToString(CultureInfo.InvariantCulture)).DefaultIfEmpty("none"))).Append(".</p>\n");
-        page.Append("<h2>Rows</h2><table><tr><th>seq</th><th>trade</th><th>verdict</th><th>source</th><th>reader differs on</th><th>bar comparison (minutes that are not a match)</th></tr>\n");
+        page.Append("<h2>Rows</h2><table><tr><th>seq</th><th>trade</th><th>verdict</th><th>source</th><th>reader differs on</th><th>bar comparison (compared / 1-tick noise / max ticks; minutes that are not a match)</th></tr>\n");
         foreach (var v in verdicts)
         {
             var notes = v.Row.Unavailable ?? (v.Row.Reading is null ? "the reader found no trade" : string.Empty);
             var bars = string.Join("; ", v.Row.Bars.Where(b => !b.Matches).Select(b => b.Minute + " " + b.Words));
             page.Append("<tr><td>").Append(v.Row.Pack.Seq.ToString(CultureInfo.InvariantCulture)).Append("</td><td>").Append(Enc(v.Row.Pack.TradeKey)).Append("</td><td>").Append(v.Verdict).Append("</td><td>").Append(Enc(v.Row.Source)).Append("</td><td>")
-                .Append(Enc(string.Join(", ", v.Fields.Append(notes).Where(n => n.Length > 0)))).Append("</td><td>").Append(Enc(bars.Length == 0 ? "all " + v.Row.Bars.Count.ToString(CultureInfo.InvariantCulture) + " minutes match" : bars)).Append("</td></tr>\n");
+                .Append(Enc(string.Join(", ", v.Fields.Append(notes).Where(n => n.Length > 0)))).Append("</td><td>").Append(Enc(Size(v.Row.Bars) + (v.Row.OffsetNote is null ? string.Empty : "; " + v.Row.OffsetNote) + (v.Row.TickFallback ? "; tick unknown: fallback used" : string.Empty) + (bars.Length == 0 ? "; all minutes match" : "; " + bars))).Append("</td></tr>\n");
         }
 
         page.Append("</table>\n<h2>Conventions the rows used</h2><p>Entry limit +0.1 % of the trigger close, filled at the next minute that traded; a gap fills at the open; the order inside a minute follows ADR 0038; prices exact, no slippage. ")
             .Append("The owner reads these: only the owner can say whether a convention is what is meant.</p>\n</body></html>\n");
         return page.ToString();
     }
+
+    private static string Size(IReadOnlyList<MinuteComparison> bars) =>
+        string.Create(CultureInfo.InvariantCulture, $"{bars.Count} compared, {bars.Count(b => b.IsNoise)} differ within the tolerance, max {BarComparison.Plural(bars.Select(b => b.Ticks).DefaultIfEmpty(0).Max())}");
 
     /// <summary>The seqs to read on a real chart: all <c>bars_differ</c> rows plus agree_all rows by a fixed rule, up to <see cref="ChartRows"/> rows in all (at least one agree_all, and a Sell when an agree_all Sell exists).</summary>
     public static IReadOnlyList<int> Sample(string seed, IReadOnlyList<RowVerdict> verdicts)

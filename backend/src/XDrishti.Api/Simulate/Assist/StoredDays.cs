@@ -16,7 +16,7 @@ internal sealed class StoredDays(
 {
     private static readonly TimeSpan India = TimeSpan.FromMinutes(330);
 
-    private readonly Dictionary<string, (Guid Id, decimal Tick)?> _known = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (Guid Id, decimal Tick, bool Fallback)?> _known = new(StringComparer.Ordinal);
 
     public async ValueTask<StoredDay> GetAsync(string symbol, DateOnly date, CancellationToken cancellationToken)
     {
@@ -28,17 +28,17 @@ internal sealed class StoredDays(
 
         if (known is not { } instrument)
         {
-            return new StoredDay(TickSpec.FallbackSize, []);
+            return new StoredDay(TickSpec.FallbackSize, [], true);
         }
 
         // The database accepts only offset 0, so the India-time bounds are passed as UTC.
         var from = new DateTimeOffset(date.ToDateTime(new TimeOnly(9, 0)), India).ToUniversalTime();
         var to = new DateTimeOffset(date.ToDateTime(new TimeOnly(15, 45)), India).ToUniversalTime();
         var stored = await bars.ReadAsync(instrument.Id, from, to, cancellationToken);
-        return new StoredDay(instrument.Tick, [.. stored.Select(b => new ReaderBar(b.EpochSeconds, (decimal)Math.Round(b.Open, 4), (decimal)Math.Round(b.High, 4), (decimal)Math.Round(b.Low, 4), (decimal)Math.Round(b.Close, 4), b.Volume))]);
+        return new StoredDay(instrument.Tick, [.. stored.Select(b => new ReaderBar(b.EpochSeconds, (decimal)Math.Round(b.Open, 4), (decimal)Math.Round(b.High, 4), (decimal)Math.Round(b.Low, 4), (decimal)Math.Round(b.Close, 4), b.Volume))], instrument.Fallback);
     }
 
-    private async Task<(Guid, decimal)?> FindAsync(string symbol, CancellationToken cancellationToken)
+    private async Task<(Guid, decimal, bool)?> FindAsync(string symbol, CancellationToken cancellationToken)
     {
         var ticker = symbol[(symbol.IndexOf(':', StringComparison.Ordinal) + 1)..];
         var resolved = await resolve.HandleAsync(new ResolveInstrumentsQuery(new ResolveInput([ticker])), cancellationToken);
@@ -49,6 +49,6 @@ internal sealed class StoredDays(
 
         var detail = await details.HandleAsync(new GetInstrumentQuery(match.Id), cancellationToken);
         var tick = detail.IsFailure ? TickSpec.FromMasterPaise(null) : TickSpec.FromMasterPaise(detail.Value.TickSize);
-        return (match.Id, tick.IsSuccess ? tick.Value.Size : TickSpec.FallbackSize);
+        return (match.Id, tick.IsSuccess ? tick.Value.Size : TickSpec.FallbackSize, tick.IsFailure);
     }
 }

@@ -129,8 +129,8 @@ internal static class AssistRunner
         }
 
         var open = new DateTimeOffset(row.Date.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330)).ToUnixTimeSeconds();
-        var bars = BarComparison.Compare(storedDay.Bars, second.Bars, BarComparison.Minutes(open, strategy, reading), storedDay.Tick);
-        return new AssistRow(row, null, label, reading, storedDay.Tick, bars);
+        var outcome = BarComparison.Analyse(storedDay.Bars, second.Bars, BarComparison.Minutes(open, strategy, reading), storedDay.Tick);
+        return new AssistRow(row, null, label, reading, storedDay.Tick, outcome.Minutes, storedDay.TickFallback, outcome.OffsetNote);
     }
 
     /// <summary>The verdict of the assistant for one row (D6). A bar difference is the data candidate and comes before a reader difference; the fields are listed either way.</summary>

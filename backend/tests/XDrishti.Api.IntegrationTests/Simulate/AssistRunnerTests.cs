@@ -130,6 +130,41 @@ public sealed class AssistRunnerTests
     }
 
     [Fact]
+    public async Task A_planted_one_tick_difference_is_not_a_verdict_but_is_counted()
+    {
+        var stored = BuyDay();
+        stored[0] = stored[0] with { High = stored[0].High + 0.05m };
+
+        var (_, folder, _) = await RunAsync(stored: stored);
+
+        Verdict(folder, Verdicts.AgreeAll).ShouldBe(Verdicts.AgreeAll);
+        Text(folder, DiskPackFolder.ReportName).ShouldContain("differ within the tolerance, max 1 tick");
+    }
+
+    [Fact]
+    public async Task A_constant_price_level_offset_is_agree_all_with_a_note()
+    {
+        var stored = BuyDay().Select(b => b with { Open = b.Open * 0.98m, High = b.High * 0.98m, Low = b.Low * 0.98m, Close = b.Close * 0.98m }).ToList();
+
+        var (_, folder, _) = await RunAsync(stored: stored);
+
+        Verdict(folder, Verdicts.AgreeAll).ShouldBe(Verdicts.AgreeAll);
+        Text(folder, DiskPackFolder.ReportName).ShouldContain("price level offset: stored is 0.98000 x second source");
+        Text(folder, DiskPackFolder.ReportName).ShouldContain("1 rows carry a price level offset note");
+    }
+
+    [Fact]
+    public async Task An_offset_that_changes_inside_the_day_is_bars_differ()
+    {
+        var stored = BuyDay().Select((b, i) => i >= 20 ? b : b with { Open = b.Open * 0.98m, High = b.High * 0.98m, Low = b.Low * 0.98m, Close = b.Close * 0.98m }).ToList();
+
+        var (_, folder, _) = await RunAsync(stored: stored);
+
+        Verdict(folder, Verdicts.BarsDiffer).ShouldBe(Verdicts.BarsDiffer);
+        Text(folder, DiskPackFolder.ReportName).ShouldContain("price level not constant");
+    }
+
+    [Fact]
     public async Task A_field_of_the_engine_that_the_reader_does_not_reproduce_is_reader_differs_with_the_field()
     {
         var engine = EngineValues(Read(BuyDay()), One, cells => cells["stop_price"] = "98.5");
