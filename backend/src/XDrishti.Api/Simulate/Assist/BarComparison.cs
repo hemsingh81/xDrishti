@@ -3,18 +3,21 @@ using XDrishti.SimReader;
 
 namespace XDrishti.Api.Simulate.Assist;
 
-/// <summary>One minute of the comparison: its India time (HH:mm), the words of spec P3-09c D3, whether it counts as a match (within the tolerance) and the largest difference in ticks (0 when a side is missing).</summary>
-internal sealed record MinuteComparison(string Minute, string Words, bool Matches, int Ticks = 0)
+/// <summary>
+/// One minute of the comparison: its India time (HH:mm), the words of spec P3-09c D3, whether it counts as a match (within the tolerance), the largest difference in ticks and in percent of the price (null when a side is missing),
+/// and whether the minute is a gross problem (missing on a side, a price level that is not constant, or a gap above <see cref="BarComparison.GrossGapPercent"/>). Only a gross minute makes a row <c>bars_differ</c>; every other gap is a data note.
+/// </summary>
+internal sealed record MinuteComparison(string Minute, string Words, bool Matches, int Ticks = 0, decimal? Percent = null, bool Gross = false)
 {
     /// <summary>A match that is not exact: it differs, but within the tolerance. Counted so that the owner sees the size of the noise.</summary>
     public bool IsNoise => Matches && Ticks > 0;
 }
 
-/// <summary>The minutes of one row, and the price level offset note when the stored prices sit at a constant ratio to the second source's (adjusted history).</summary>
-internal sealed record BarOutcome(IReadOnlyList<MinuteComparison> Minutes, string? OffsetNote);
+/// <summary>The minutes of one row, the ratio used to scale the second source (null: none), and the price level offset note when the stored prices sit at a constant ratio to the second source's (adjusted history).</summary>
+internal sealed record BarOutcome(IReadOnlyList<MinuteComparison> Minutes, string? OffsetNote, decimal? Ratio = null);
 
 /// <summary>
-/// The bar comparison (spec P3-09c D3, amended in ADR 0046), pure. Volume is not compared. First the median ratio stored / second source over the cited minutes' open, high, low and close is found; when it differs from 1 by more than one tick of the median price,
+/// The bar comparison (spec P3-09c D3, amended in ADR 0046), pure. Volume is not compared. A gap that is not gross is a data note (the verdict of a row comes from the reader, spec P3-09c D6); gross means missing, a price level that is not constant or outside the band, or above <see cref="GrossGapPercent"/>. First the median ratio stored / second source over the cited minutes' open, high, low and close is found; when it differs from 1 by more than one tick of the median price,
 /// a data note records the price level offset and the second source is scaled by the ratio before comparing. A minute whose own ratio strays from the day's by more than 0.1 % plus two ticks of price is <c>price level not constant</c> (not a match).
 /// Otherwise a minute is a <c>match</c> when high and low differ by at most one tick and open and close by at most <see cref="OpenCloseTicks"/> ticks plus <see cref="OpenCloseFraction"/> of the price (the two feeds disagree on a minute's first and last trade;
 /// RELIANCE showed 6 to 7 ticks, 0.02 %), <c>differs by N ticks</c> (N rounded up) otherwise, <c>missing in stored</c> or <c>missing in second source</c> when a side has no bar. The 09:15 bar names its known cause first (ISS-21). A minute neither side has is not reported.
@@ -29,10 +32,13 @@ internal static class BarComparison
     public const decimal BandHigh = 1.5m;
     public const int MinPairs = 3;
 
-    private const int IndiaOffsetSeconds = 19800;
+    /// <summary>A cited-minute gap above this percent of price is a gross problem. The 24 rows of the first real run had row-maximum gaps of 0.04 % to 0.35 % (median 0.13 %): feed noise. 1 % is well above that cluster.</summary>
+    public const decimal GrossGapPercent = 1.0m;
 
-    public static IReadOnlyList<MinuteComparison> Compare(IReadOnlyList<ReaderBar> stored, IReadOnlyList<ReaderBar> second, IReadOnlyCollection<long> epochs, decimal tick) =>
-        Analyse(stored, second, epochs, tick).Minutes;
+    /// <summary>A row whose largest gap reaches this percent is listed in the report for a look on a real chart, though it is only a data note.</summary>
+    public const decimal NoteFlagPercent = 0.5m;
+
+    private const int IndiaOffsetSeconds = 19800;
 
     public static BarOutcome Analyse(IReadOnlyList<ReaderBar> stored, IReadOnlyList<ReaderBar> second, IReadOnlyCollection<long> epochs, decimal tick)
     {
@@ -61,11 +67,11 @@ internal static class BarComparison
             var label = Label(epoch);
             if (a is null)
             {
-                result.Add(new MinuteComparison(label, "missing in stored", false));
+                result.Add(new MinuteComparison(label, "missing in stored", false, 0, null, true));
             }
             else if (b is null)
             {
-                result.Add(new MinuteComparison(label, "missing in second source", false));
+                result.Add(new MinuteComparison(label, "missing in second source", false, 0, null, true));
             }
             else
             {
@@ -73,31 +79,33 @@ internal static class BarComparison
             }
         }
 
-        return new BarOutcome(result, note);
+        return new BarOutcome(result, note, ratio);
     }
 
     private static MinuteComparison Minute(string label, ReaderBar a, ReaderBar b, decimal? ratio, decimal tick)
     {
         var scale = ratio ?? 1m;
-        if (ratio is { } r && Math.Abs(MinuteRatio(a, b) - r) > RatioSpread + (2m * tick / Math.Max(b.Close, tick)))
-        {
-            return new MinuteComparison(label, "price level not constant (this minute is " + MinuteRatio(a, b).ToString("0.00000", CultureInfo.InvariantCulture) + " x the second source, the day " + r.ToString("0.00000", CultureInfo.InvariantCulture) + ")", false);
-        }
-
         var open = Math.Abs(a.Open - (b.Open * scale));
         var close = Math.Abs(a.Close - (b.Close * scale));
         var high = Math.Abs(a.High - (b.High * scale));
         var low = Math.Abs(a.Low - (b.Low * scale));
-        var allowed = (OpenCloseTicks * tick) + (OpenCloseFraction * a.Open);
-        var ticks = (int)Math.Ceiling(new[] { open, close, high, low }.Max() / tick);
-        var within = Math.Max(high, low) <= tick && Math.Max(open, close) <= allowed;
-        if (within)
+        var largest = new[] { open, close, high, low }.Max();
+        var ticks = (int)Math.Ceiling(largest / tick);
+        var percent = largest / Math.Max(b.Close * scale, tick) * 100m;
+        var gross = percent > GrossGapPercent;
+        if (ratio is { } r && Math.Abs(MinuteRatio(a, b) - r) > RatioSpread + (2m * tick / Math.Max(b.Close, tick)))
         {
-            return new MinuteComparison(label, ticks == 0 ? "match" : "match (" + Plural(ticks) + ")", true, ticks);
+            return new MinuteComparison(label, "price level not constant (this minute is " + MinuteRatio(a, b).ToString("0.00000", CultureInfo.InvariantCulture) + " x the second source, the day " + r.ToString("0.00000", CultureInfo.InvariantCulture) + ")", false, ticks, percent, true);
+        }
+
+        var allowed = (OpenCloseTicks * tick) + (OpenCloseFraction * a.Open);
+        if (Math.Max(high, low) <= tick && Math.Max(open, close) <= allowed)
+        {
+            return new MinuteComparison(label, ticks == 0 ? "match" : "match (" + Plural(ticks) + ")", true, ticks, percent);
         }
 
         var words = "differs by " + Plural(ticks);
-        return new MinuteComparison(label, label == "09:15" ? Iss21 + "; " + words : words, false, ticks);
+        return new MinuteComparison(label, label == "09:15" ? Iss21 + "; " + words : words, false, ticks, percent, gross);
     }
 
     public static string Plural(int ticks) => ticks.ToString(CultureInfo.InvariantCulture) + (ticks == 1 ? " tick" : " ticks");

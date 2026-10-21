@@ -97,6 +97,7 @@ internal static class AssistRunner
 
         var lines = new List<string> { "assist-log.csv sha256: " + logHash, "engine-values.csv sha256 (read after the log was written): " + engineHash, "second-source-bars.csv sha256: " + cacheHash, "second sources in the cache: " + sources };
         lines.AddRange(Verdicts.All.Select(v => v + ": " + verdicts.Count(x => x.Verdict == v).ToString(CultureInfo.InvariantCulture)));
+        lines.AddRange(AssistCounters.Lines(verdicts));
         lines.Add("this is an assisted read, not a signed check: check-log.csv was not touched and no verdict was written");
         return new AssistOutcome(SimulateCommand.Done, lines, logHash, engineHash);
     }
@@ -118,22 +119,58 @@ internal static class AssistRunner
         }
 
         var strategy = ReaderStrategy.OrbV1(storedDay.Tick) with { OrMinutes = row.OrMinutes, RewardRisk = row.RewardRisk };
-        ReaderReading? reading;
+
+        // the same reader on the stored bars (the data the engine used): a difference there is about the rules, not the data
+        ReaderReading? storedReading = null;
+        string? storedNote = null;
+        try
+        {
+            storedReading = ChartReader.Read(storedDay.Bars, strategy, row.Side);
+        }
+        catch (ArgumentException)
+        {
+            storedNote = "the stored day is not usable by the reader";
+        }
+
+        storedNote ??= storedReading is null ? "the reader found no trade on the stored bars" : null;
+
+        ReaderReading? reading = null;
+        string? secondNote = null;
         try
         {
             reading = ChartReader.Read(second.Bars, strategy, row.Side);
         }
         catch (ArgumentException)
         {
-            return new AssistRow(row, "the second source's day is not usable by the reader", label, null, storedDay.Tick, []);
+            secondNote = "the second source's day is not usable by the reader";
         }
 
         var open = new DateTimeOffset(row.Date.ToDateTime(new TimeOnly(9, 15)), TimeSpan.FromMinutes(330)).ToUnixTimeSeconds();
         var outcome = BarComparison.Analyse(storedDay.Bars, second.Bars, BarComparison.Minutes(open, strategy, reading), storedDay.Tick);
-        return new AssistRow(row, null, label, reading, storedDay.Tick, outcome.Minutes, storedDay.TickFallback, outcome.OffsetNote);
+        if (outcome.Ratio is { } ratio)
+        {
+            // adjusted history against as-traded prices: the reader reads the second source at the stored price level, so that a constant offset is not mistaken for a different trade
+            var scaled = second.Bars.Select(b => b with { Open = b.Open * ratio, High = b.High * ratio, Low = b.Low * ratio, Close = b.Close * ratio }).ToList();
+            try
+            {
+                reading = ChartReader.Read(scaled, strategy, row.Side);
+                outcome = BarComparison.Analyse(storedDay.Bars, second.Bars, BarComparison.Minutes(open, strategy, reading), storedDay.Tick);
+            }
+            catch (ArgumentException)
+            {
+                reading = null;
+                secondNote = "the second source's day is not usable by the reader";
+            }
+        }
+
+        return new AssistRow(row, null, label, reading, storedDay.Tick, outcome.Minutes, storedDay.TickFallback, outcome.OffsetNote, storedReading, storedNote, secondNote);
     }
 
-    /// <summary>The verdict of the assistant for one row (D6). A bar difference is the data candidate and comes before a reader difference; the fields are listed either way.</summary>
+    /// <summary>
+    /// The verdict of the assistant for one row (D6), in this precedence: source_unavailable; cannot_read (the engine row is absent, or the reader read no trade on either the stored or the second source's bars);
+    /// reader_differs (the reader on the STORED bars differs from the engine, a stored "no trade" against an engine trade included: rules or implementation); bars_differ (a gross bar problem only, D3);
+    /// data_sensitive (the reader on the second source differs, or finds no trade, while the one on the stored bars agrees: the trade depends on the feed); agree_all. Both field lists are kept whatever the verdict, so the counters count every category.
+    /// </summary>
     internal static RowVerdict Judge(AssistRow row, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> engine)
     {
         if (row.Unavailable is not null)
@@ -141,14 +178,15 @@ internal static class AssistRunner
             return new RowVerdict(row, Verdicts.SourceUnavailable, []);
         }
 
-        if (row.Reading is null || !engine.TryGetValue(row.Pack.TradeKey, out var values))
+        if ((row.Reading is null && row.StoredReading is null) || !engine.TryGetValue(row.Pack.TradeKey, out var values))
         {
             return new RowVerdict(row, Verdicts.CannotRead, []);
         }
 
-        var fields = FieldComparison.Differences(row.Reading, values, row.Tick);
-        var verdict = row.Bars.Any(b => !b.Matches) ? Verdicts.BarsDiffer : fields.Count > 0 ? Verdicts.ReaderDiffers : Verdicts.AgreeAll;
-        return new RowVerdict(row, verdict, fields);
+        var stored = row.StoredReading is null ? [row.StoredNote ?? "no trade on the stored bars"] : FieldComparison.Differences(row.StoredReading, values, row.Tick);
+        var second = row.Reading is null ? [row.SecondNote ?? "no trade on the second source"] : FieldComparison.Differences(row.Reading, values, row.Tick);
+        var verdict = stored.Count > 0 ? Verdicts.ReaderDiffers : row.Bars.Any(b => b.Gross) ? Verdicts.BarsDiffer : second.Count > 0 ? Verdicts.DataSensitive : Verdicts.AgreeAll;
+        return new RowVerdict(row, verdict, stored, second);
     }
 
     private static string Manifest(string packId, params (string Name, byte[] Bytes)[] files)

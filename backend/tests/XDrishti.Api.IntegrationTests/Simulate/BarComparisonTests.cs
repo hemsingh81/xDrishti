@@ -14,7 +14,7 @@ public sealed class BarComparisonTests
     private static List<ReaderBar> Five() => [.. BuyDay().Take(5)];
 
     private static IReadOnlyList<MinuteComparison> Compare(List<ReaderBar> stored, List<ReaderBar> second) =>
-        BarComparison.Compare(stored, second, [.. Minutes.Select(Epoch)], FixtureTick);
+        BarComparison.Analyse(stored, second, [.. Minutes.Select(Epoch)], FixtureTick).Minutes;
 
     [Fact]
     public void Equal_days_match_on_every_minute()
@@ -110,7 +110,7 @@ public sealed class BarComparisonTests
         var stored = new List<ReaderBar> { new(at, 1350.50m, 1352m, 1349m, 1351m, 1m) };
         var second = new List<ReaderBar> { new(at, 1350m, 1352m, 1349m, 1351m, 1m) };
 
-        var minute = BarComparison.Compare(stored, second, [at], 0.05m).Single();
+        var minute = BarComparison.Analyse(stored, second, [at], 0.05m).Minutes.Single();
 
         minute.Matches.ShouldBeFalse();
         minute.Words.ShouldBe(BarComparison.Iss21 + "; differs by 10 ticks");
@@ -150,6 +150,25 @@ public sealed class BarComparisonTests
     }
 
     [Fact]
+    public void Only_a_gap_above_the_gross_threshold_or_a_missing_minute_is_gross()
+    {
+        var stored = Five();
+        var second = Five();
+        stored[0] = stored[0] with { High = stored[0].High + 0.30m };
+        stored[1] = stored[1] with { High = stored[1].High + 3m };
+        stored.RemoveAt(2);
+
+        var result = Compare(stored, second).ToDictionary(m => m.Minute);
+
+        result["09:15"].Matches.ShouldBeFalse();
+        result["09:15"].Gross.ShouldBeFalse();
+        result["09:16"].Gross.ShouldBeTrue();
+        result["09:17"].Gross.ShouldBeTrue();
+        result["09:18"].Gross.ShouldBeFalse();
+        result["09:18"].Percent.ShouldBe(0m);
+    }
+
+    [Fact]
     public void Volume_is_not_compared()
     {
         var stored = Five();
@@ -161,7 +180,7 @@ public sealed class BarComparisonTests
     [Fact]
     public void A_minute_neither_side_has_is_not_reported()
     {
-        BarComparison.Compare([], [], [Epoch("09:15")], 0.05m).ShouldBeEmpty();
+        BarComparison.Analyse([], [], [Epoch("09:15")], 0.05m).Minutes.ShouldBeEmpty();
     }
 
     [Fact]
