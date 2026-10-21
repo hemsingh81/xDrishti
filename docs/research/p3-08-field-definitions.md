@@ -11,9 +11,9 @@ Written 2026-10-19 for [P3-08](../specs/P3-08-independent-walker-oracle-and-leak
 - `NONE`: no sentence anywhere the oracle may read. ADR 0047 adds the rule **before O starts**.
 - `PASS-THROUGH`: an echo of the input or a constant; compared for equality only.
 
-The comparison unit for `SimTrade` is its 33 positional properties; for counters, the 29 positional properties of `WalkCounters`; for the cost chain (Annex C, P3-08c) the 11 properties of `TradeCosting` and the 8 of `LegCharges`; plus the gate's hold end and blocked set. The `Key` is computed and not compared.
+The comparison unit for `SimTrade` is its 34 positional properties (the 34th, `Legs`, added by P4-01); for counters, the 32 positional properties (the last three added by P4-01) of `WalkCounters`; for the cost chain (Annex C, P3-08c) the 11 properties of `TradeCosting` and the 8 of `LegCharges`; plus the gate's hold end and blocked set. The `Key` is computed and not compared.
 
-## A. `SimTrade` (33 positional fields, schema 4)
+## A. `SimTrade` (34 positional fields, schema 5)
 
 | # | Field | Defining text | Status | ADR 0047 |
 |---|---|---|---|---|
@@ -50,10 +50,11 @@ The comparison unit for `SimTrade` is its 33 positional properties; for counters
 | 31 | `SessionsHeld` | ADR 0040 #2 (D3), #7 (D8) | DEFINED | - |
 | 32 | `SessionsUnseen` | ADR 0040 #6 (D7) | DEFINED | - |
 | 33 | `Costing` | ADR 0042 #11 to #12; see section C | DEFINED | - |
+| 34 | `Legs` | P4-01 D7 to D12 (added 2026-10-21, schema 5): the fills of a position that left in several; the entry first, the last exit last; null for a trade of one entry and one exit. R of the trade: D10 | SPEC ONLY: the spec P4-01 and ADR 0049 are the text; compared leg by leg, every field | ADR 0049 |
 
 Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): ADR 0038 #1 (E1, E5, E6), ADR 0040 #10 (D11, `PositionOpen`), ADR 0043 #3 (D3, `OrderPendingAtEnd`): DEFINED.
 
-## B. `WalkCounters` (29 positional properties) and `WalkOutcome`
+## B. `WalkCounters` (32 positional properties) and `WalkOutcome`
 
 | # | Counter | Defining text | Status | ADR 0047 |
 |---|---|---|---|---|
@@ -86,6 +87,9 @@ Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): A
 | 27 | `SessionsUnseen` | ADR 0040 #9 (the sum) | DEFINED | - |
 | 28 | `OvernightEntries` | ADR 0043 #2, #9 | DEFINED | - |
 | 29 | `OrderPendingAtEnd` | ADR 0043 #3 (D3) | DEFINED | - |
+| 30 | `LegsTotal` | P4-01 D15: the legs of the trades that have legs; 0 for a trade without | SPEC ONLY | ADR 0049 |
+| 31 | `LegsMerged` | P4-01 D11: legs of no shares merged into the next one by the costing; 0 in the walker | SPEC ONLY | ADR 0049 |
+| 32 | `StopLoosenIgnored` | P4-01 D6: requests of an exit rule to loosen a stop, ignored | SPEC ONLY | ADR 0049 |
 
 `WalkOutcome.HoldEndEpochSeconds` (the gate's input, compared as a list, section D) and the booleans of `WalkOutcome` are the same facts as the counters above.
 

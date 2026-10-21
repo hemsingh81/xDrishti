@@ -1,14 +1,15 @@
 using System.Globalization;
+using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Bars;
 
 namespace XDrishti.Domain.Research;
 
 /// <summary>
-/// One simulated trade, schema version 4 (ADR 0037, ADR 0038, ADR 0040, ADR 0042): where it entered, where its stop and target were, why it left, R from the exact and from the filled prices, MAE and MFE, and what it says about itself
-/// (<see cref="Fills"/>, <see cref="Costs"/>, <see cref="EntryFill"/> and <see cref="TickFallback"/>). The 33 positional fields (the 30 of schema 2 in their order, the two of schema 3, then <see cref="Costing"/> of schema 4) are pinned by a test: changing any of them raises <see cref="CurrentSchemaVersion"/> and
+/// One simulated trade, schema version 5 (ADR 0037, ADR 0038, ADR 0040, ADR 0042, ADR 0049): where it entered, where its stop and target were, why it left, R from the exact and from the filled prices, MAE and MFE, and what it says about itself
+/// (<see cref="Fills"/>, <see cref="Costs"/>, <see cref="EntryFill"/> and <see cref="TickFallback"/>). The 34 positional fields (the 30 of schema 2 in their order, the two of schema 3, <see cref="Costing"/> of schema 4, then <see cref="Legs"/> of schema 5) are pinned by a test: changing any of them raises <see cref="CurrentSchemaVersion"/> and
 /// needs an ADR. Enum members are stored by name and never renamed.
 /// </summary>
-/// <param name="SchemaVersion">4.</param>
+/// <param name="SchemaVersion">5.</param>
 /// <param name="StrategyId">The strategy that decided (for example <c>ORB</c>).</param>
 /// <param name="InstrumentId">The instrument.</param>
 /// <param name="Symbol">Its symbol.</param>
@@ -41,6 +42,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="SessionsHeld">The sessions of the trading calendar from the entry session to the session of the exit, both included: 1 for an intraday trade and for a swing trade that leaves on its entry date (ADR 0040, D8).</param>
 /// <param name="SessionsUnseen">The sessions among those on which the walker read no minute that holds a trade (a halt, or a session the replay left out); 0 for an intraday trade (ADR 0040, D7).</param>
 /// <param name="Costing">The quantity, the turnover, the 16 charge lines and net R of the trade (ADR 0042); null for a gross trade. The walker never sets it: the replay does, after the window cut.</param>
+/// <param name="Legs">The fills of a position that left in several (P4-01, D7 to D9): the entry leg first, the last exit leg last; null for a trade that entered and left in one fill each, which is every trade of a production run. For a trade with legs the entry fields are those of the first leg, the exit fields those of the last exit leg, the R fields are for the whole trade and <see cref="StopPrice"/> and <see cref="TargetPrice"/> are the initial ones.</param>
 public sealed record SimTrade(
     int SchemaVersion,
     string StrategyId,
@@ -74,10 +76,11 @@ public sealed record SimTrade(
     bool TickFallback,
     int SessionsHeld,
     int SessionsUnseen,
-    TradeCosting? Costing = null)
+    TradeCosting? Costing = null,
+    ValueList<Leg>? Legs = null)
 {
     /// <summary>The schema version this code writes.</summary>
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>
     /// <c>StrategyId|Symbol|Side|DecisionDate</c>, the India date of the minute that closed the evaluation bar (ADR 0043, D6): unique by construction because the scanner makes one candidate per instrument, side and decision date. For an intraday

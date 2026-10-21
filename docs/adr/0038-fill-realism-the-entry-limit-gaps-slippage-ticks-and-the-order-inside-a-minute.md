@@ -51,3 +51,6 @@ Rules that no row of P3-03 exercises and that therefore add behaviour without ch
 - **A fill at the carried-forward price in an empty minute.** Would add a tenth `FillLimits` code and one more test; an empty minute holds no trade.
 - **Slippage on a resting limit.** Paying the base slippage on targets would take about 0.1 R off every winner, and a touch is still a fill: stated as `touch_is_fill`, not modelled.
 - **`double` arithmetic with a tolerance.** A tolerance hides which side of the grid a price is on; decimal makes the equality exact.
+
+## Amendment 1 (2026-10-21, [ADR 0049](0049-the-exit-tape-trades-with-legs-and-sim-6.md), engine `sim-6`)
+Row X5 ("in the fill minute of an entry at the limit only the stop is checked, and the favourable extreme of that minute is not counted") keeps its meaning for every minute that is not the last of the trade. When the fill minute is also the minute of an exit at a close (`EndOfData`, or the `MaxHold` due minute) the favourable extreme reaches at least that close, because the last minute counts in full (R6 of ADR 0047). The comparison `-MAE <= RExact <= MFE` therefore has no exception.

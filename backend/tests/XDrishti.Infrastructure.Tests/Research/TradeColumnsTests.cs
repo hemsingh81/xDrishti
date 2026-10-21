@@ -20,12 +20,12 @@ public sealed partial class TradeColumnsTests
     private static IEnumerable<string> Properties(Type type, params string[] except) =>
         type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => p.Name).Where(n => !except.Contains(n, StringComparer.Ordinal));
 
-    /// <summary>The names the Domain implies, written by rule from the types, with the few renames the spec fixes.</summary>
+    /// <summary>The names the Domain implies, written by rule from the types, with the few renames the spec fixes. The legs of a trade and the charges of its legs (P4-01) are left out on purpose: the table has no column for them yet, and a trade with legs is refused before the store (D15).</summary>
     private static List<string> ExpectedNames()
     {
-        var names = Properties(typeof(SimTrade), nameof(SimTrade.SchemaVersion), nameof(SimTrade.TriggerBar), nameof(SimTrade.Costing), nameof(SimTrade.Key)).Select(Snake).ToList();
+        var names = Properties(typeof(SimTrade), nameof(SimTrade.SchemaVersion), nameof(SimTrade.TriggerBar), nameof(SimTrade.Costing), nameof(SimTrade.Key), nameof(SimTrade.Legs)).Select(Snake).ToList();
         names.AddRange(Properties(typeof(Bar), nameof(Bar.Start)).Select(n => n == nameof(Bar.EpochSeconds) ? "trigger_bar_epoch" : "trigger_bar_" + Snake(n)));
-        names.AddRange(Properties(typeof(TradeCosting), nameof(TradeCosting.SheetId), nameof(TradeCosting.EntryLeg), nameof(TradeCosting.ExitLeg)).Select(n => n switch
+        names.AddRange(Properties(typeof(TradeCosting), nameof(TradeCosting.SheetId), nameof(TradeCosting.EntryLeg), nameof(TradeCosting.ExitLeg), nameof(TradeCosting.LegCharges)).Select(n => n switch
         {
             nameof(TradeCosting.TotalCost) => "cost_total",
             nameof(TradeCosting.CostR) => "cost_r",
@@ -51,8 +51,8 @@ public sealed partial class TradeColumnsTests
     [Fact]
     public void The_schema_versions_the_table_is_built_for_are_pinned()
     {
-        SimTrade.CurrentSchemaVersion.ShouldBe(4, "raising it needs new columns, a migration and an ADR");
-        SimulationRun.CurrentSchemaVersion.ShouldBe(5);
+        SimTrade.CurrentSchemaVersion.ShouldBe(5, "schema 5 (P4-01, ADR 0049) only appends the legs, which this table does not hold yet: a trade with legs is refused before the store, and a trade without legs equals its schema-4 form, so the columns stay (any later change needs new columns, a migration and an ADR)");
+        SimulationRun.CurrentSchemaVersion.ShouldBe(6);
     }
 
     [Fact]

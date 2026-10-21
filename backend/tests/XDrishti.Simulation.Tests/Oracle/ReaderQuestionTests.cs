@@ -56,7 +56,7 @@ public sealed class ReaderQuestionTests
     }
 
     [Fact]
-    public void Q3_the_fill_minute_of_an_entry_at_the_limit_that_is_also_the_last_minute_of_the_data_counts_no_favourable_extreme()
+    public void Q3_the_fill_minute_of_an_entry_at_the_limit_that_is_also_the_last_minute_of_the_data_counts_its_close_as_favourable()
     {
         // buy, limit 100.10; the minute 10:00 opens at 100.30 (beyond the limit), trades back to 100.05 (the order fills at the limit) and reached 100.60; the list ends there (EndOfData at the close)
         Tape t = new Tape().Day(Mon, "09:15", "10:00", 100.00m, [M("10:00", 100.30m, 100.60m, 100.05m, 100.20m)]);
@@ -68,8 +68,8 @@ public sealed class ReaderQuestionTests
         {
             result.Trade!.EntryFill.ShouldBe(OracleEntryFill.AtLimit);
             result.Trade.ExitReason.ShouldBe(OracleExitReason.EndOfData);
-            result.Trade.MfeR.ShouldBe(0.0, "the AtLimit rule wins: the favourable extreme of the fill minute is not counted (R6 'counts in full' would give (100.60 - 100.10) / 1.10 = 0.4545)");
-            result.Trade.RExact.ShouldBeGreaterThan(0.0, "the exit at the close of that minute is above the entry, so MFE (0) is below R: a consequence of the reading, worth the owner's eye");
+            result.Trade.MfeR.ShouldBe(0.1 / 1.1, 1e-12, "sim-6 (ISS-28, decided in P4-01): the favourable extreme reaches at least the close of the last minute, so MFE is not below R; the rest of the fill minute stays uncounted (X5: (100.20 - 100.10) / 1.10)");
+            result.Trade.MfeR.ShouldBeGreaterThanOrEqualTo(result.Trade.RExact - 1e-12, "-MAE <= R <= MFE holds in the corner too");
         }
     }
 

@@ -41,7 +41,7 @@ public sealed partial class SimulateDatabaseTests
 
         using var json = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(folder, "run.json")));
         var text = json.RootElement.GetRawText();
-        text.ShouldContain("\"engine_version\":\"sim-5\"");
+        text.ShouldContain("\"engine_version\":\"sim-6\"");
         text.ShouldContain("\"parameters\":{\"base_len\":10,\"base_pct\":8,\"rr\":2,\"vol_x\":1.5}");
 
         var card = Directory.EnumerateFiles(Path.Combine(folder, "cards")).ShouldHaveSingleItem();

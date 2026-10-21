@@ -34,6 +34,9 @@ namespace XDrishti.Domain.Research;
 /// <param name="SessionsUnseen">The sum of <see cref="SimTrade.SessionsUnseen"/> over the trades.</param>
 /// <param name="OvernightEntries">Trades filled on a later date than the one on which they were decided (ADR 0043, E8 and E9): at most <see cref="Trades"/>.</param>
 /// <param name="OrderPendingAtEnd">No-trade: see <see cref="NoTradeReason.OrderPendingAtEnd"/>; candidates whose order rests overnight when the list ends.</param>
+/// <param name="LegsTotal">Legs of the trades that have legs (P4-01); 0 for every production run.</param>
+/// <param name="LegsMerged">Legs of no shares that the costing merged into the next one and did not charge (P4-01, D11); 0 for every production run.</param>
+/// <param name="StopLoosenIgnored">Requests of an exit rule to loosen a stop, ignored (P4-01, D6); 0 for every production run.</param>
 public sealed record WalkCounters(
     long Candidates,
     long Trades,
@@ -63,10 +66,13 @@ public sealed record WalkCounters(
     long SessionsHeld = 0,
     long SessionsUnseen = 0,
     long OvernightEntries = 0,
-    long OrderPendingAtEnd = 0)
+    long OrderPendingAtEnd = 0,
+    long LegsTotal = 0,
+    long LegsMerged = 0,
+    long StopLoosenIgnored = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
-    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>The field-by-field sum.</summary>
     public WalkCounters Add(WalkCounters other)
@@ -101,6 +107,9 @@ public sealed record WalkCounters(
             SessionsHeld + other.SessionsHeld,
             SessionsUnseen + other.SessionsUnseen,
             OvernightEntries + other.OvernightEntries,
-            OrderPendingAtEnd + other.OrderPendingAtEnd);
+            OrderPendingAtEnd + other.OrderPendingAtEnd,
+            LegsTotal + other.LegsTotal,
+            LegsMerged + other.LegsMerged,
+            StopLoosenIgnored + other.StopLoosenIgnored);
     }
 }

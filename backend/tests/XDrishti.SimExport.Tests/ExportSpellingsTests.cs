@@ -12,7 +12,7 @@ public sealed class ExportSpellingsTests
 {
     private static readonly Type[] Named =
     [
-        typeof(CorporateActionKind), typeof(Side), typeof(ExitReason), typeof(FillBasis), typeof(CostBasis), typeof(CostSegment), typeof(EntryFill), typeof(Timeframe), typeof(SkipReason), typeof(NoTradeReason), typeof(UniverseKind), typeof(SessionExclusion),
+        typeof(CorporateActionKind), typeof(Side), typeof(ExitReason), typeof(FillBasis), typeof(CostBasis), typeof(CostSegment), typeof(EntryFill), typeof(LegKind), typeof(Timeframe), typeof(SkipReason), typeof(NoTradeReason), typeof(UniverseKind), typeof(SessionExclusion),
     ];
 
     private static string Spell(Type type, object member) =>

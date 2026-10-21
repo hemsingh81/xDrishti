@@ -53,6 +53,16 @@ internal static class MinuteRule
         return new MinuteVerdict(false, default, 0m, nextLow, nextHigh, default);
     }
 
+    /// <summary>
+    /// Brings a position with an exit rule up to the minute that starts at <paramref name="minuteEpoch"/> (P4-01, D2, D6): the rule reads the bars closed by then and moves the levels, then the shares it asked to leave go at the open, unless
+    /// the open is already through the stop the rows X2 and X4 use. The same routine for the intraday and the swing loop.
+    /// </summary>
+    public static void AdvanceLegs(LegState legs, in Minute minute, long minuteEpoch)
+    {
+        legs.Read(minuteEpoch);
+        legs.Take(minute, minuteEpoch, Beyond(legs.Current.IsBuy, minute.Open, legs.Current.Stop));
+    }
+
     /// <summary>The extremes after the adverse side reaches <paramref name="price"/>: the low of a buy, the high of a sell.</summary>
     public static (decimal Low, decimal High) Worsen(bool isBuy, decimal low, decimal high, decimal price) =>
         isBuy ? (Math.Min(low, price), high) : (low, Math.Max(high, price));

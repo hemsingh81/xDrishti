@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Globalization;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 
@@ -11,7 +12,7 @@ namespace XDrishti.SimExport.Csv;
 /// </summary>
 public static class TradesCsv
 {
-    /// <summary>The columns, in order. A reflection test requires every positional property of <see cref="SimTrade"/> but the reserved snapshot to be one of them or to feed some. <c>Costing</c> feeds the 17 columns <c>costing_*</c>, <c>cost_r</c> and <c>r_net</c>, empty for a gross trade; a line column is the sum of the two legs, the 16 lines of each leg are in <c>run.json</c>.</summary>
+    /// <summary>The columns, in order. A reflection test requires every positional property of <see cref="SimTrade"/> but the reserved snapshot to be one of them or to feed some. <c>Costing</c> feeds the 17 columns <c>costing_*</c>, <c>cost_r</c> and <c>r_net</c>, empty for a gross trade; a line column is the sum of the two legs, the 16 lines of each leg are in <c>run.json</c>. <c>Legs</c> feeds the column <c>legs</c>, empty for a trade without legs.</summary>
     public static IReadOnlyList<string> Columns { get; } = Array.AsReadOnly(
     [
         "run_key", "schema_version", "strategy_id", "instrument_id", "symbol", "side", "trade_date", "decision_epoch", "decision_ist",
@@ -19,7 +20,7 @@ public static class TradesCsv
         "entry_epoch", "entry_ist", "entry_price", "stop_price", "target_price", "exit_epoch", "exit_ist", "exit_price", "exit_reason",
         "r_exact", "mae_r", "mfe_r", "fills", "costs", "r_filled", "slippage_r", "entry_filled_price", "exit_filled_price", "entry_fill", "tick_fallback", "sessions_held", "sessions_unseen",
         "costing_segment", "costing_sheet", "costing_quantity", "costing_risk_taken", "costing_entry_turnover", "costing_exit_turnover", "costing_brokerage", "costing_stt", "costing_exchange_txn", "costing_sebi_fee", "costing_stamp_duty",
-        "costing_other", "costing_dp_charge", "costing_gst", "costing_total_cost", "cost_r", "r_net", "basket_ids", "key",
+        "costing_other", "costing_dp_charge", "costing_gst", "costing_total_cost", "cost_r", "r_net", "legs", "basket_ids", "key",
     ]);
 
     private const int CostingColumns = 17;
@@ -104,6 +105,7 @@ public static class TradesCsv
         row.Number(trade.SessionsHeld);
         row.Number(trade.SessionsUnseen);
         Costing(row, trade.Costing);
+        Legs(row, trade.Legs);
         BasketIds(row, runTrade.BasketIds);
         Key(row, trade);
         row.End(sink);
@@ -141,6 +143,19 @@ public static class TradesCsv
         row.Number(costing.TotalCost);
         row.Number(costing.CostR);
         row.Number(costing.RNet);
+    }
+
+    /// <summary>The <c>legs</c> cell (P4-01, D16): empty for a trade without legs; else one <c>epoch|kind|price|filled price|share|reason</c> group for each leg, in order, separated by <c>;</c>.</summary>
+    private static void Legs(CsvRow row, IReadOnlyList<Leg>? legs)
+    {
+        if (legs is null)
+        {
+            row.Empty();
+            return;
+        }
+
+        var text = string.Join(';', legs.Select(l => string.Join('|', l.EpochSeconds.ToString(CultureInfo.InvariantCulture), ExportSpellings.Of(l.Kind), l.Price.ToString("R", CultureInfo.InvariantCulture), l.FilledPrice.ToString("R", CultureInfo.InvariantCulture), l.Share.ToString(CultureInfo.InvariantCulture), l.Reason)));
+        row.Text(text);
     }
 
     /// <summary>The instrument id cell: composed in the scratch buffer (a GUID in the D form) so that no string is made for it.</summary>

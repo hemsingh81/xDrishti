@@ -32,7 +32,7 @@ internal static class SeriesComparison
             }
             else
             {
-                var walked = OracleAdapter.Walk(series.Bars, group.EngineCandidates, group.EngineRules);
+                var walked = OracleAdapter.Walk(series.Bars, group.EngineCandidates, group.EngineRules, group.Exit);
                 engine = walked.Results;
                 engineBlocked = walked.Blocked;
                 foreach (var echo in walked.Echoes)

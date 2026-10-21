@@ -8,7 +8,7 @@ namespace XDrishti.Simulation.Tests.Oracle;
 internal static class OracleVerification
 {
     /// <summary>The engine version the oracle comparison was shown for. Edit it only after the comparison (walker, gate and costing) has been rerun against the new version and agrees.</summary>
-    internal const string OracleVerifiedFor = "sim-5";
+    internal const string OracleVerifiedFor = "sim-6";
 
     /// <summary>The rule: the label may be true only for the engine version the comparison was shown for; a false label binds nothing.</summary>
     internal static bool LabelIsBound(bool engineVerified, string verifiedFor, string engineVersion) => !engineVerified || string.Equals(verifiedFor, engineVersion, StringComparison.Ordinal);

@@ -41,6 +41,10 @@ public sealed class EntryScanner
 
     private readonly List<EntryCandidate> _candidates = [];
 
+    // P4-01 (D1 to D3): the handles of the features some candidate exit reads, and the tape they are recorded on; empty (and shared) when no exit reads one.
+    private readonly int[] _tapeHandles;
+    private readonly double[] _tapeRow;
+
     private int _stepCalls;
     private long _currentDay = long.MinValue;
     private bool _latched;
@@ -92,7 +96,17 @@ public sealed class EntryScanner
         _setupCount = side.Setup?.Items.Count ?? 0;
         _invalidateFrom = _setupCount + side.Trigger.Items.Count;
         _readyHandles = [.. Enumerable.Range(0, _invalidateFrom).SelectMany(i => _itemHandles[i]).Distinct()];
+        var reads = side.Exits.SelectMany(e => e.Reads).Distinct().ToArray();
+        _tapeHandles = [.. reads.Select(r => frame.HandleOf(r))];
+        _tapeRow = new double[_tapeHandles.Length];
+        Tape = reads.Length == 0 ? ExitTape.Empty : new ExitTape([.. reads.Select(r => FeatureNames.Of(r))]);
     }
+
+    /// <summary>
+    /// The exit tape (P4-01): one row for each step at which the evaluation timeframe closed a bar, with the features the exits of the side read as of that close; <see cref="ExitTape.Empty"/> when no exit reads one, which is every
+    /// strategy today. A step that closed two bars gives one row, with the later bar's values.
+    /// </summary>
+    public ExitTape Tape { get; }
 
     /// <summary>The candidates made so far, in the order of their decisions.</summary>
     public IReadOnlyList<EntryCandidate> Candidates { get; }
@@ -194,6 +208,16 @@ public sealed class EntryScanner
         }
 
         _frame.TryLastClosed(_timeframe, out var closed);
+        if (_tapeHandles.Length > 0)
+        {
+            for (var f = 0; f < _tapeHandles.Length; f++)
+            {
+                _tapeRow[f] = _frame[_tapeHandles[f]];
+            }
+
+            Tape.Append(_frame.LastBarTime + 60, closed.Bar.Close, _tapeRow);
+        }
+
         if (SessionClock.DateOf(closed.StartEpochSeconds).DayNumber < day)
         {
             _staleBucketSteps++;

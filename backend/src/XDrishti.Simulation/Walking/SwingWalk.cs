@@ -16,7 +16,7 @@ namespace XDrishti.Simulation.Walking;
 /// </summary>
 internal static class SwingWalk
 {
-    public static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, SwingHold hold, DateOnly entryDate, DateOnly due, int zeroBefore)
+    public static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, SwingHold hold, DateOnly entryDate, DateOnly due, int zeroBefore, LegState? legs)
     {
         var dueMinute = hold.DueMinute(due);
         var low = position.Entry;
@@ -69,11 +69,18 @@ internal static class SwingWalk
                 seenDate = date;
             }
 
-            var verdict = MinuteRule.Decide(position, minute, i == fillIndex, low, high);
+            // P4-01: the levels as a rule has moved them, from the first minute after the close that produced them (D2, D6).
+            if (legs is not null && i != fillIndex)
+            {
+                MinuteRule.AdvanceLegs(legs, minute, bar.EpochSeconds);
+            }
+
+            ref readonly var current = ref (legs is null ? ref position : ref legs.Current);
+            var verdict = MinuteRule.Decide(current, minute, i == fillIndex, low, high);
             if (verdict.Exits)
             {
                 var flags = verdict.Flags with { Overnight = firstOfLaterDate };
-                return Leave(position, hold, entryDate, seen, verdict.Reason, bar.EpochSeconds, verdict.Exit, minute, verdict.Low, verdict.High, examined, zero, flags, bar.EpochSeconds);
+                return Leave(position, hold, entryDate, seen, verdict.Reason, bar.EpochSeconds, verdict.Exit, minute, verdict.Low, verdict.High, examined, zero, flags, bar.EpochSeconds, legs);
             }
 
             low = verdict.Low;
@@ -88,7 +95,8 @@ internal static class SwingWalk
                     return WalkResults.PriceInvalid();
                 }
 
-                return Leave(position, hold, entryDate, seen, ExitReason.MaxHold, bar.EpochSeconds, dueClose, minute, low, high, examined, zero, default, bar.EpochSeconds);
+                var (dueLow, dueHigh) = MinuteRule.Raise(position.IsBuy, low, high, dueClose);
+                return Leave(position, hold, entryDate, seen, ExitReason.MaxHold, bar.EpochSeconds, dueClose, minute, dueLow, dueHigh, examined, zero, default, bar.EpochSeconds, legs);
             }
         }
 
@@ -99,18 +107,20 @@ internal static class SwingWalk
             return WalkResults.PriceInvalid();
         }
 
+        // Q3-MFE (ISS-28, sim-6): the minute of the last close counts in full, so the favourable extreme reaches at least that close.
+        var (endLow, endHigh) = MinuteRule.Raise(position.IsBuy, low, high, close);
         if (pastDue)
         {
-            return Leave(position, hold, entryDate, seen, ExitReason.MaxHold, lastBar.EpochSeconds, close, lastMinute, low, high, examined, zeroAtLast, new ExitFlags(MaxHoldAtLastClose: true), hold.SessionEnd(due));
+            return Leave(position, hold, entryDate, seen, ExitReason.MaxHold, lastBar.EpochSeconds, close, lastMinute, endLow, endHigh, examined, zeroAtLast, new ExitFlags(MaxHoldAtLastClose: true), hold.SessionEnd(due), legs);
         }
 
-        return Leave(position, hold, entryDate, seen, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, low, high, examined, zeroAtLast, default, lastBar.EpochSeconds);
+        return Leave(position, hold, entryDate, seen, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, endLow, endHigh, examined, zeroAtLast, default, lastBar.EpochSeconds, legs);
     }
 
     private static Result<WalkOutcome> Leave(
-        in Position position, SwingHold hold, DateOnly entryDate, int seen, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, ExitFlags flags, long holdEnd)
+        in Position position, SwingHold hold, DateOnly entryDate, int seen, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, ExitFlags flags, long holdEnd, LegState? legs)
     {
         var held = hold.SessionsBetween(entryDate, SessionClock.DateOf(exitEpoch));
-        return WalkResults.Close(position, reason, exitEpoch, exit, minute, low, high, examined, zero, flags, held, Math.Max(0, held - seen), holdEnd);
+        return WalkResults.Close(position, reason, exitEpoch, exit, minute, low, high, examined, zero, flags, held, Math.Max(0, held - seen), holdEnd, legs);
     }
 }

@@ -7,4 +7,5 @@ public sealed record OracleRules(
     double EntryLimitPercent,
     OracleSlippage Slippage,
     decimal Tick,
-    OracleHold? Hold = null);
+    OracleHold? Hold = null,
+    OracleLadder? Ladder = null);

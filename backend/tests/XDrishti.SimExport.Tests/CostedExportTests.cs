@@ -128,7 +128,7 @@ public sealed class CostedExportTests
         var costing = trade.GetProperty("costing");
         var expected = run.Trades[0].Trade.Costing!;
         trade.GetProperty("costs").GetString().ShouldBe("charged");
-        trade.GetProperty("schema_version").GetInt32().ShouldBe(4);
+        trade.GetProperty("schema_version").GetInt32().ShouldBe(5);
         costing.GetProperty("segment").GetString().ShouldBe("intraday_equity");
         costing.GetProperty("quantity").GetInt64().ShouldBe(expected.Quantity);
         costing.GetProperty("total_cost").GetDecimal().ShouldBe(expected.TotalCost);

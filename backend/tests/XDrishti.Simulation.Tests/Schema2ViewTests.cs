@@ -49,7 +49,7 @@ public sealed class Schema2ViewTests
             .ToList();
 
         trades.Count.ShouldBeGreaterThan(1_000);
-        trades.ShouldAllBe(o => o.Trade!.SessionsHeld == 1 && o.Trade.SessionsUnseen == 0 && o.Trade.SchemaVersion == 4);
+        trades.ShouldAllBe(o => o.Trade!.SessionsHeld == 1 && o.Trade.SessionsUnseen == 0 && o.Trade.SchemaVersion == 5);
         trades.ShouldAllBe(o => o.Trade!.ExitReason != ExitReason.MaxHold && !o.MaxHoldAtLastClose && !o.OvernightStopGap && !o.OvernightTargetGap);
     }
 

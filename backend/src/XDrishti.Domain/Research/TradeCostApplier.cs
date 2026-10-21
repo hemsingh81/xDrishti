@@ -41,6 +41,11 @@ public static class TradeCostApplier
             return Result.Success(CostApplication.Skipped(TradeSkip.QuantityBelowOne));
         }
 
+        if (trade.Legs is { } legs)
+        {
+            return ApplyLegs(trade, legs, context, segment, quantity, risk);
+        }
+
         var entryTurnover = quantity * Price(trade.EntryFilledPrice);
         var exitTurnover = quantity * Price(trade.ExitFilledPrice);
         var exitSide = trade.Side == Side.Buy ? Side.Sell : Side.Buy;
@@ -67,6 +72,89 @@ public static class TradeCostApplier
         var costRDouble = costR == 0m ? 0d : (double)costR;
         var net = trade.RFilled - costRDouble;
         var costing = new TradeCosting(segment, context.Sheet.Id, quantity, riskTaken, entryTurnover, exitTurnover, entryLeg.Value, exitLeg.Value, totalCost, costRDouble, net == 0 ? 0d : net);
+        return Result.Success(CostApplication.Kept(trade with { Costs = CostBasis.Charged, Costing = costing }));
+    }
+
+    /// <summary>
+    /// A trade with legs (P4-01, D11): every leg is one order on the schedule in force on its date. The quantity of a leg is <c>floor(quantity × share)</c>; the last exit leg takes what is left of the shares in, so that the quantities
+    /// sum exactly; a leg that would have no shares is merged into the next one and not charged. <c>TotalCost</c> is the sum of all orders, <c>CostR</c> is against <c>quantity × R0</c>.
+    /// </summary>
+    private static Result<CostApplication> ApplyLegs(SimTrade trade, ValueList<Leg> legs, CostContext context, CostSegment segment, long quantity, decimal risk)
+    {
+        var exitSide = trade.Side == Side.Buy ? Side.Sell : Side.Buy;
+        var quantities = new long[legs.Count];
+        long entered = 0;
+        for (var i = 0; i < legs.Count; i++)
+        {
+            if (legs[i].Kind != LegKind.Exit)
+            {
+                quantities[i] = (long)Math.Floor(quantity * legs[i].Share);
+                entered += quantities[i];
+            }
+        }
+
+        var lastExit = -1;
+        for (var i = 0; i < legs.Count; i++)
+        {
+            if (legs[i].Kind == LegKind.Exit)
+            {
+                lastExit = i;
+            }
+        }
+
+        var exited = 0L;
+        for (var i = 0; i < legs.Count; i++)
+        {
+            if (legs[i].Kind == LegKind.Exit && i != lastExit)
+            {
+                quantities[i] = (long)Math.Floor(quantity * legs[i].Share);
+                exited += quantities[i];
+            }
+        }
+
+        quantities[lastExit] = entered - exited;
+        var charged = new List<LegCharge>(legs.Count);
+        LegCharges entryLines = LegCharges.Zero, exitLines = LegCharges.Zero;
+        decimal entryTurnover = 0m, exitTurnover = 0m;
+        for (var i = 0; i < legs.Count; i++)
+        {
+            if (quantities[i] < 1)
+            {
+                continue;
+            }
+
+            var isExit = legs[i].Kind == LegKind.Exit;
+            var turnover = quantities[i] * Price(legs[i].FilledPrice);
+            var lines = CostModel.Leg(context.Sheet, segment, isExit ? exitSide : trade.Side, turnover, SessionClock.DateOf(legs[i].EpochSeconds));
+            if (lines.IsFailure)
+            {
+                return Result.Failure<CostApplication>(lines.Error);
+            }
+
+            charged.Add(new LegCharge(legs[i].EpochSeconds, quantities[i], turnover, lines.Value));
+            if (isExit)
+            {
+                exitLines = exitLines.Plus(lines.Value);
+                exitTurnover += turnover;
+            }
+            else
+            {
+                entryLines = entryLines.Plus(lines.Value);
+                entryTurnover += turnover;
+            }
+        }
+
+        var totalCost = entryLines.Total + exitLines.Total;
+        var riskTaken = quantity * risk;
+        var costR = totalCost / riskTaken;
+        if (costR > context.MaxCostR)
+        {
+            return Result.Success(CostApplication.Skipped(TradeSkip.CostAboveMax));
+        }
+
+        var costRDouble = costR == 0m ? 0d : (double)costR;
+        var net = trade.RFilled - costRDouble;
+        var costing = new TradeCosting(segment, context.Sheet.Id, quantity, riskTaken, entryTurnover, exitTurnover, entryLines, exitLines, totalCost, costRDouble, net == 0 ? 0d : net, new ValueList<LegCharge>(charged));
         return Result.Success(CostApplication.Kept(trade with { Costs = CostBasis.Charged, Costing = costing }));
     }
 

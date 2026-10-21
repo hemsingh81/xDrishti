@@ -131,6 +131,7 @@ internal static class StoreRunValidation
 
         var keys = new HashSet<string>(StringComparer.Ordinal);
         var wrongSchema = 0;
+        var withLegs = 0;
         var duplicateReported = false;
         foreach (var trade in run.Trades.Concat(run.OpenAtEnd))
         {
@@ -139,11 +140,21 @@ internal static class StoreRunValidation
                 wrongSchema++;
             }
 
+            if (trade.Trade.Legs is not null)
+            {
+                withLegs++;
+            }
+
             if (!keys.Add(trade.Trade.Key) && !duplicateReported)
             {
                 duplicateReported = true;
                 problems.Add(new FieldError("run.trades.key", $"Two trades have the key '{trade.Trade.Key}'."));
             }
+        }
+
+        if (withLegs > 0)
+        {
+            problems.Add(new FieldError("run.trades.legs", $"{withLegs} trades have legs; the store has no column for them yet (P4-01, D15): the legs stay in the run folder."));
         }
 
         if (wrongSchema > 0)

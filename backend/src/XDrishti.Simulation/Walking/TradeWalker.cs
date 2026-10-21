@@ -46,7 +46,10 @@ public static class TradeWalker
     /// <param name="candidate">The decision to enter.</param>
     /// <param name="bars">The 1-minute bars of the candidate's instrument; <c>bars[candidate.DecisionBarIndex]</c> is the minute that closed the evaluation bar.</param>
     /// <param name="rules">The reward-to-risk, the square-off minute, the fill rules and the tick.</param>
-    public static Result<WalkOutcome> Walk(EntryCandidate candidate, IReadOnlyList<Bar> bars, WalkRules rules)
+    public static Result<WalkOutcome> Walk(EntryCandidate candidate, IReadOnlyList<Bar> bars, WalkRules rules) => Walk(candidate, bars, rules, null);
+
+    /// <summary>The walk of <see cref="Walk(EntryCandidate, IReadOnlyList{Bar}, WalkRules)"/> with an exit rule and its tape (P4-01); null is the <c>FIXED_RR</c> walk, whose rows and results are those of <c>sim-5</c> bit for bit.</summary>
+    internal static Result<WalkOutcome> Walk(EntryCandidate candidate, IReadOnlyList<Bar> bars, WalkRules rules, ExitContext? exit)
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(bars);
@@ -235,18 +238,16 @@ public static class TradeWalker
             candidate, fillBar.EpochSeconds, isBuy, entry, entryFilled, kind, stop, target, risk, slip,
             overnight ? fillBar.EpochSeconds > fillOpen : fillBar.EpochSeconds > candidate.DecisionEpochSeconds, risk < RiskFloorTicks * tick, rules.Fills.Basis, rules.Tick.FromFallback, overnight);
 
+        var legs = exit is null ? null : new LegState(position, exit);
         return rules.Hold is { } swing
-            ? SwingWalk.Follow(position, bars, fillIndex, swing, entryDate, due, zeroMinutes)
-            : Follow(position, bars, fillIndex, rules.SquareOffMinute, entryDate, zeroMinutes);
+            ? SwingWalk.Follow(position, bars, fillIndex, swing, entryDate, due, zeroMinutes, legs)
+            : Follow(position, bars, fillIndex, rules.SquareOffMinute, entryDate, zeroMinutes, legs);
     }
 
     /// <summary>Visits the minutes from the fill minute on until the position leaves (the intraday walk of ADR 0038: the entry date only, the square-off at <paramref name="squareOffMinute"/>).</summary>
-    private static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, int squareOffMinute, DateOnly entryDate, int zeroBefore)
+    private static Result<WalkOutcome> Follow(in Position position, IReadOnlyList<Bar> bars, int fillIndex, int squareOffMinute, DateOnly entryDate, int zeroBefore, LegState? legs)
     {
         var isBuy = position.IsBuy;
-        var stop = position.Stop;
-        var hasTarget = position.Target.HasValue;
-        var target = position.Target.GetValueOrDefault();
 
         // The extremes that count for the excursions (D5 with the additions of ADR 0038): the adverse one is the low of a buy and the high of a sell.
         var low = position.Entry;
@@ -288,30 +289,41 @@ public static class TradeWalker
             var minuteOfDay = SessionClock.MinuteOfDay(bar.EpochSeconds);
             var isFill = i == fillIndex;
 
+            // P4-01: the levels as a rule has moved them, from the first minute after the close that produced them (D2, D6); without a rule the position is the entry's.
+            if (legs is not null && !isFill)
+            {
+                MinuteRule.AdvanceLegs(legs, minute, bar.EpochSeconds);
+            }
+
+            ref readonly var current = ref (legs is null ? ref position : ref legs.Current);
+            var stop = current.Stop;
+            var hasTarget = current.Target.HasValue;
+            var target = current.Target.GetValueOrDefault();
+
             // X1: the first minute that holds a trade at or after the square-off closes the position at its open; its range is not used.
             if (!isFill && minuteOfDay >= squareOffMinute)
             {
                 if (MinuteRule.Beyond(isBuy, minute.Open, stop))
                 {
                     var (stopLow, stopHigh) = MinuteRule.Worsen(isBuy, low, high, minute.Open);
-                    return Leave(position, ExitReason.Stop, bar.EpochSeconds, minute.Open, minute, stopLow, stopHigh, examined, zero, new ExitFlags(StopGap: isBuy ? minute.Open < stop : minute.Open > stop));
+                    return Leave(position, ExitReason.Stop, bar.EpochSeconds, minute.Open, minute, stopLow, stopHigh, examined, zero, new ExitFlags(StopGap: isBuy ? minute.Open < stop : minute.Open > stop), legs);
                 }
 
                 if (hasTarget && MinuteRule.Reaches(isBuy, minute.Open, target))
                 {
                     var (targetLow, targetHigh) = MinuteRule.Raise(isBuy, low, high, target);
-                    return Leave(position, ExitReason.Target, bar.EpochSeconds, target, minute, targetLow, targetHigh, examined, zero, new ExitFlags(TargetGap: isBuy ? minute.Open > target : minute.Open < target));
+                    return Leave(position, ExitReason.Target, bar.EpochSeconds, target, minute, targetLow, targetHigh, examined, zero, new ExitFlags(TargetGap: isBuy ? minute.Open > target : minute.Open < target), legs);
                 }
 
                 return Leave(
-                    position, ExitReason.SquareOff, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, new ExitFlags(LateSquareOff: minuteOfDay > squareOffMinute));
+                    position, ExitReason.SquareOff, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, new ExitFlags(LateSquareOff: minuteOfDay > squareOffMinute), legs);
             }
 
             // X2 to X5: the rows of the exit table, written once (MinuteRule) and shared with the swing loop.
-            var verdict = MinuteRule.Decide(position, minute, isFill, low, high);
+            var verdict = MinuteRule.Decide(current, minute, isFill, low, high);
             if (verdict.Exits)
             {
-                return Leave(position, verdict.Reason, bar.EpochSeconds, verdict.Exit, minute, verdict.Low, verdict.High, examined, zero, verdict.Flags);
+                return Leave(position, verdict.Reason, bar.EpochSeconds, verdict.Exit, minute, verdict.Low, verdict.High, examined, zero, verdict.Flags, legs);
             }
 
             low = verdict.Low;
@@ -327,10 +339,12 @@ public static class TradeWalker
             return WalkResults.PriceInvalid();
         }
 
-        return Leave(position, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, low, high, examined, zeroAtLast, default);
+        // Q3-MFE (ISS-28, sim-6): the minute of the last close counts in full, so the favourable extreme reaches at least that close (it matters only in the fill minute of an entry at the limit, X5).
+        var (endLow, endHigh) = MinuteRule.Raise(isBuy, low, high, close);
+        return Leave(position, ExitReason.EndOfData, lastBar.EpochSeconds, close, lastMinute, endLow, endHigh, examined, zeroAtLast, default, legs);
     }
 
     /// <summary>An intraday exit: one session held, none unseen, the position open until the exit instant.</summary>
-    private static Result<WalkOutcome> Leave(in Position position, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, ExitFlags flags) =>
-        WalkResults.Close(position, reason, exitEpoch, exit, minute, low, high, examined, zero, flags, sessionsHeld: 1, sessionsUnseen: 0, holdEnd: exitEpoch);
+    private static Result<WalkOutcome> Leave(in Position position, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, ExitFlags flags, LegState? legs) =>
+        WalkResults.Close(position, reason, exitEpoch, exit, minute, low, high, examined, zero, flags, sessionsHeld: 1, sessionsUnseen: 0, holdEnd: exitEpoch, legs);
 }

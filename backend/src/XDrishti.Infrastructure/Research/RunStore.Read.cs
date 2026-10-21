@@ -206,9 +206,10 @@ internal sealed partial class RunStore
     /// <summary>One row of a reader as a <see cref="RunTrade"/>: the values by the mapping table, the schema and the sheet id from the run.</summary>
     private static RunTrade ReadTrade(NpgsqlDataReader reader, RunInfo run)
     {
-        if (run.TradeSchemaVersion != SimTrade.CurrentSchemaVersion)
+        // Schema 4 (sim-5) trades have no legs and equal their schema-5 form in every other field (P4-01, D8): both are read.
+        if (run.TradeSchemaVersion is not (SimTrade.CurrentSchemaVersion or SimTrade.CurrentSchemaVersion - 1))
         {
-            throw new StoreReadException($"The trades of this run are of schema {run.TradeSchemaVersion}; this code reads schema {SimTrade.CurrentSchemaVersion}.");
+            throw new StoreReadException($"The trades of this run are of schema {run.TradeSchemaVersion}; this code reads schemas {SimTrade.CurrentSchemaVersion - 1} and {SimTrade.CurrentSchemaVersion}.");
         }
 
         var columns = TradeColumns.Columns;

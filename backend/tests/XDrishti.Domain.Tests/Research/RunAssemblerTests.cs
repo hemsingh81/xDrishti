@@ -17,10 +17,10 @@ public sealed class RunAssemblerTests
     private const string Fills = "{\"entry_limit_percent\":0.1,\"slippage\":{\"ticks\":1,\"bar_range_frac\":0.05,\"stop_exit_extra_ticks\":2,\"gap_fill\":\"at_open\"}}";
 
     /// <summary>The SHA-256 of <see cref="PinnedKeyText"/> (UTF-8, as written, each line ending in a line feed).</summary>
-    private const string PinnedKey = "40b7d2db44593cb177ce714f5fd6610bffac5b048798a4ce0b0d46c686fb8091";
+    private const string PinnedKey = "af3cc569a62514558bcd9cd50600ccb0895df9dcd4d27be79ccf86dea5a53b75";
 
     private const string PinnedKeyText =
-        "xd-run 5\n"
+        "xd-run 6\n"
         + "engine=sim-3\n"
         + "strategy=1111111111111111111111111111111111111111111111111111111111111111\n"
         + "params=or_min=15,rr=2\n"
@@ -89,7 +89,7 @@ public sealed class RunAssemblerTests
         RunAssembler.KeyText(header, run.Instruments, run.CalendarExceptions).ShouldBe(PinnedKeyText);
         run.RunKey.ShouldBe(PinnedKey);
         run.RunKey.ShouldBe(CanonicalText.Sha256Hex(PinnedKeyText));
-        run.SchemaVersion.ShouldBe(5);
+        run.SchemaVersion.ShouldBe(6);
     }
 
     [Fact]

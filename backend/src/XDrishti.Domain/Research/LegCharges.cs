@@ -18,4 +18,13 @@ public sealed record LegCharges(decimal Brokerage, decimal Stt, decimal Exchange
 
     /// <summary>The sum of the eight lines (a multiple of 0.01).</summary>
     public decimal Total => Brokerage + Stt + ExchangeTxn + SebiFee + StampDuty + OtherCharges + DpCharge + Gst;
+
+    /// <summary>The line-by-line sum of two orders' charges.</summary>
+    /// <param name="other">The other order's lines.</param>
+    public LegCharges Plus(LegCharges other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return new LegCharges(
+            Brokerage + other.Brokerage, Stt + other.Stt, ExchangeTxn + other.ExchangeTxn, SebiFee + other.SebiFee, StampDuty + other.StampDuty, OtherCharges + other.OtherCharges, DpCharge + other.DpCharge, Gst + other.Gst);
+    }
 }

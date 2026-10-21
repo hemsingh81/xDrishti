@@ -178,7 +178,8 @@ internal static class OracleAdapter
         t.ExitFilledPrice,
         Enum.Parse<OracleEntryFill>(t.EntryFill.ToString()),
         t.SessionsHeld,
-        t.SessionsUnseen);
+        t.SessionsUnseen,
+        t.Legs?.Select(l => new OracleLeg(l.EpochSeconds, l.Price, l.FilledPrice, l.Share, l.Kind.ToString(), l.Reason)).ToList());
 
     internal static OracleCounters Counters(WalkCounters w) => new()
     {
@@ -211,6 +212,9 @@ internal static class OracleAdapter
         SessionsUnseen = Int(w.SessionsUnseen),
         OvernightEntries = Int(w.OvernightEntries),
         OrderPendingAtEnd = Int(w.OrderPendingAtEnd),
+        LegsTotal = Int(w.LegsTotal),
+        LegsMerged = Int(w.LegsMerged),
+        StopLoosenIgnored = Int(w.StopLoosenIgnored),
     };
 
     private static int Int(long value) => checked((int)value);
@@ -221,14 +225,14 @@ internal static class OracleAdapter
     /// The engine's answer for the candidates of one instrument and side in decision order: each walked alone, or, when the rules hold a position overnight, through the real <see cref="PositionGate"/>. The echo fields of every trade
     /// (the pass-through rows of the dry-read table) are checked against the candidate that was walked and returned as mismatches.
     /// </summary>
-    internal static (IReadOnlyList<OracleResult> Results, IReadOnlyList<Mismatch> Echoes, IReadOnlyList<bool> Blocked) Walk(IReadOnlyList<Bar> bars, IReadOnlyList<EntryCandidate> candidates, WalkRules rules)
+    internal static (IReadOnlyList<OracleResult> Results, IReadOnlyList<Mismatch> Echoes, IReadOnlyList<bool> Blocked) Walk(IReadOnlyList<Bar> bars, IReadOnlyList<EntryCandidate> candidates, WalkRules rules, ExitContext? exit = null)
     {
         var results = new List<OracleResult>();
         var echoes = new List<Mismatch>();
         var blocked = new List<bool>();
         if (rules.Hold is not null)
         {
-            var gated = PositionGate.Apply(candidates, c => TradeWalker.Walk(c, bars, rules));
+            var gated = PositionGate.Apply(candidates, c => TradeWalker.Walk(c, bars, rules, exit));
             gated.IsSuccess.ShouldBeTrue("the gate failed: " + (gated.IsFailure ? gated.Error.Code + " " + gated.Error.Message : string.Empty));
             foreach (var one in gated.Value)
             {
@@ -241,7 +245,7 @@ internal static class OracleAdapter
         {
             foreach (var candidate in candidates)
             {
-                var walked = TradeWalker.Walk(candidate, bars, rules);
+                var walked = TradeWalker.Walk(candidate, bars, rules, exit);
                 results.Add(Result(walked));
                 blocked.Add(false);
                 echoes.AddRange(Echo(walked.Value.Trade, candidate, rules));

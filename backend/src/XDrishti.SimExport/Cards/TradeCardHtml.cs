@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text;
+using XDrishti.Domain.Common;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.SimExport.Cards;
@@ -33,6 +34,11 @@ public static class TradeCardHtml
         if (trade.Costing is { } costing)
         {
             Costs(page, trade, costing);
+        }
+
+        if (trade.Legs is { } legs)
+        {
+            Legs(page, legs, trade.Costing);
         }
 
         Rule(page, run.Strategy, trade.Side);
@@ -114,6 +120,30 @@ public static class TradeCardHtml
             "favourable excursion R (MFE) = " + CardFormat.R(trade.MfeR) + ", in price = MFE R × risk = " + CardFormat.R(trade.MfeR) + " × " + CardFormat.Price(risk) + " = " + CardFormat.Price(trade.MfeR * risk),
         };
         page.Append(Html.Lines(lines)).Append("</pre>\n<p class=\"note\">each figure is rounded after the calculation</p>\n");
+    }
+
+    /// <summary>The fills of a position that left in several (P4-01, D16): a row for each leg, with its quantity and the charge of its order when the trade is costed. The figures above are the entry and the last exit leg; R is for the whole trade.</summary>
+    private static void Legs(StringBuilder page, ValueList<Leg> legs, TradeCosting? costing)
+    {
+        page.Append("<h2>legs</h2>\n<p class=\"note\">the position was filled in ").Append(Html.Text(CardFormat.Int(legs.Count))).Append(" legs; result R is the share-weighted sum over the exit legs, in units of the initial risk</p>\n<table>\n<thead>");
+        CardPage.Row(page, "th", "time (IST)", "leg", "price", "filled price", "share", "quantity", "charge (rupees)");
+        page.Append("</thead>\n<tbody>\n");
+        var next = 0;
+        foreach (var leg in legs)
+        {
+            // the charged legs are the legs that have shares, in order; a leg with none was merged and has no row of charges
+            LegCharge? charged = null;
+            if (costing?.LegCharges is { } lines && next < lines.Count && lines[next].EpochSeconds == leg.EpochSeconds)
+            {
+                charged = lines[next++];
+            }
+
+            CardPage.Row(
+                page, "td", CardFormat.Clock(leg.EpochSeconds), ExportSpellings.Of(leg.Kind) + (leg.Reason.Length > 0 ? " (" + leg.Reason + ")" : string.Empty), CardFormat.Price(leg.Price), CardFormat.Price(leg.FilledPrice),
+                leg.Share.ToString(System.Globalization.CultureInfo.InvariantCulture), charged is null ? "-" : CardFormat.Int(charged.Quantity), charged is null ? "-" : CardFormat.Money(charged.Charges.Total));
+        }
+
+        page.Append("</tbody>\n</table>\n");
     }
 
     private static void Costs(StringBuilder page, SimTrade trade, TradeCosting costing)

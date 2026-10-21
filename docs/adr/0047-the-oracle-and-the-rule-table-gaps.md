@@ -88,3 +88,6 @@ The added leak and invariance properties (scale, date shift, instrument order, s
 ## Alternatives considered
 - **Let O decide each gap.** Rejected: a disagreement would then measure the two authors' guesses, not the engine.
 - **Change the engine to a cleaner reading** (for example `SlippageR` from the stored doubles, or the target rounded to 8 places). Rejected here: it would move the golden files and the engine version for no gain; the owner may ask for it through the log.
+
+## Amendment (2026-10-21, [ADR 0049](0049-the-exit-tape-trades-with-legs-and-sim-6.md))
+**R6, the corner of ISS-28, is decided for the engine and the oracle at `sim-6`:** on an exit at a close (`EndOfData`, `MaxHold`) the favourable extreme is widened to at least that close, also in the fill minute of an entry at the limit. The oracle was extended for the legs of P4-01 (the ladder rule, `Legs`, three counters); the log has a section for it. The oracle is shown for `sim-6`.

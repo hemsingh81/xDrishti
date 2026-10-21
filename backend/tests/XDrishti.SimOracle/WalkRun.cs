@@ -16,6 +16,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
     private decimal _tick;
     private decimal _limit;
     private decimal _stop;
+    private decimal _initialStop;
     private decimal _entry;
     private decimal _risk;
     private decimal? _target;
@@ -28,6 +29,12 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
     private int _lastIdx;
     private long _prevEpoch;
     private DateOnly _prevDate;
+
+    // P4-01 (D5 to D11): the ladder rule's own reading of the position: the next bar not yet read, the share asked to leave, the partial exits taken and the loosening requests ignored.
+    private int _nextBar;
+    private decimal _pendingShare;
+    private int _loosenIgnored;
+    private readonly List<OracleLeg> _partials = [];
 
     private sealed class Exit
     {
@@ -148,6 +155,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         }
 
         _risk = Math.Abs(_entry - _stop);
+        _initialStop = _stop;
         if (rules.RewardRisk is { } rr)
         {
             _target = _entry + (_d * OracleNumbers.Conv(rr) * _risk);
@@ -158,6 +166,12 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         _adv = _entry;
         _fav = _entry;
         _lastIdx = f;
+        _nextBar = 0;
+        while (rules.Ladder is { } started && _nextBar < started.Bars.Count && started.Bars[_nextBar].CloseEpochSeconds <= fb.EpochSeconds)
+        {
+            _nextBar++;
+        }
+
         _prevEpoch = fb.EpochSeconds;
         _prevDate = _entryDate;
         if (_swing)
@@ -448,6 +462,11 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         bool firstOfDate = !isFill && dk != _prevDate && dk > _entryDate;
         _seen.Add(dk);
         bool nowDue = _swing && dk == _dueDate && Minute(ek) == _dueMinute;
+        if (!isFill && rules.Ladder is { } ladder)
+        {
+            LadderStep(ladder, ek, o, h, l);
+        }
+
         Exit? ex;
         if (!_swing && !isFill && Minute(ek) >= rules.SquareOffMinute)
         {
@@ -489,6 +508,53 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         _prevEpoch = ek;
         _prevDate = dk;
         return null;
+    }
+
+    /// <summary>
+    /// The bars that closed at or before the start of this minute and were not read yet, in order: the stop moves to the bar's extreme when that is tighter (a looser request is counted and ignored), and the first bar closing beyond
+    /// entry plus one risk asks for the share to leave; it leaves at this minute's open as a market fill, unless the open is already through the stop, when the stop takes everything.
+    /// </summary>
+    private void LadderStep(OracleLadder ladder, long ek, decimal o, decimal h, decimal l)
+    {
+        while (_nextBar < ladder.Bars.Count && ladder.Bars[_nextBar].CloseEpochSeconds <= ek)
+        {
+            OracleLadderBar bar = ladder.Bars[_nextBar++];
+            if (!double.IsNaN(bar.Low) && !double.IsNaN(bar.High))
+            {
+                decimal extreme = _buy ? OracleNumbers.Conv(bar.Low) : OracleNumbers.Conv(bar.High);
+                if (_buy ? extreme > _stop : extreme < _stop)
+                {
+                    _stop = extreme;
+                }
+
+                if (ladder.AskLoose)
+                {
+                    decimal looser = extreme - (_d * _risk);
+                    if (_buy ? looser < _stop : looser > _stop)
+                    {
+                        _loosenIgnored++;
+                    }
+                }
+            }
+
+            if (!double.IsNaN(bar.Close) && _partials.Count == 0 && _pendingShare == 0m && _d * (OracleNumbers.Conv(bar.Close) - _entry) > _risk)
+            {
+                _pendingShare = ladder.Share;
+            }
+        }
+
+        if (_pendingShare > 0m)
+        {
+            decimal share = _pendingShare;
+            _pendingShare = 0m;
+            bool throughStop = _buy ? o <= _stop : o >= _stop;
+            if (!throughStop)
+            {
+                var market = new Exit { Reason = OracleExitReason.SquareOff, Price = o };
+                decimal filled = ExitFilledPrice(market, h, l);
+                _partials.Add(new OracleLeg(ek, OracleNumbers.ToDouble(o), OracleNumbers.ToDouble(filled), share, "Exit", "LADDER"));
+            }
+        }
     }
 
     private bool _overnightStop;
@@ -691,6 +757,12 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
 
     private OracleResult BuildTrade(Exit ex, int f, decimal entryFilled, DateOnly decDate, OracleCalendar cal, bool rests)
     {
+        // R6 of the rule table, as decided for sim-6 (ISS-28): the minute of a close exit counts in full, so the favourable extreme reaches at least that close.
+        if (ex.Reason is OracleExitReason.EndOfData or OracleExitReason.MaxHold)
+        {
+            WidenFav(ex.Price, ex.Price);
+        }
+
         OracleBar xb = bars[ex.Index];
         decimal xh = OracleNumbers.Conv(xb.High);
         decimal xl = OracleNumbers.Conv(xb.Low);
@@ -698,6 +770,27 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         Row(OracleRows.S4);
         decimal rExact = _d * (ex.Price - _entry) / _risk;
         decimal rFilled = _d * (exitFilled - entryFilled) / _risk;
+        List<OracleLeg>? legs = null;
+        if (_partials.Count > 0)
+        {
+            // D10: the share-weighted sum over the exit legs, in units of the first risk
+            decimal rest = 1m;
+            decimal exactParts = 0m;
+            decimal filledParts = 0m;
+            legs = [new OracleLeg(bars[f].EpochSeconds, OracleNumbers.ToDouble(_entry), OracleNumbers.ToDouble(entryFilled), 1m, "Entry", string.Empty)];
+            foreach (OracleLeg part in _partials)
+            {
+                rest -= part.Share;
+                exactParts += part.Share * (OracleNumbers.Conv(part.Price) - _entry);
+                filledParts += part.Share * (OracleNumbers.Conv(part.FilledPrice) - entryFilled);
+                legs.Add(part);
+            }
+
+            rExact = _d * ((rest * (ex.Price - _entry)) + exactParts) / _risk;
+            rFilled = _d * ((rest * (exitFilled - entryFilled)) + filledParts) / _risk;
+            legs.Add(new OracleLeg(xb.EpochSeconds, OracleNumbers.ToDouble(ex.Price), OracleNumbers.ToDouble(exitFilled), rest, "Exit", ex.Reason.ToString()));
+        }
+
         decimal slipR = rFilled - rExact;
         decimal maeBase = Has(OracleFaults.MaeFromFilledEntry) ? entryFilled : _entry;
         decimal mae = Math.Max(0m, _d * (maeBase - _adv)) / _risk;
@@ -723,7 +816,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             cand.DecisionEpochSeconds,
             fb.EpochSeconds,
             OracleNumbers.ToDouble(_entry),
-            OracleNumbers.ToDouble(_stop),
+            OracleNumbers.ToDouble(_initialStop),
             _target is { } tg ? OracleNumbers.ToDouble(tg) : null,
             xb.EpochSeconds,
             OracleNumbers.ToDouble(ex.Price),
@@ -738,7 +831,8 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             OracleNumbers.ToDouble(exitFilled),
             _entryFill,
             held,
-            unseen);
+            unseen,
+            legs);
 
         bool overnightEntry = _entryDate > decDate;
         long reference = rests ? OracleClock.Epoch(_entryDate, cal.SessionOf(_entryDate).FromMinute) : cand.DecisionEpochSeconds;
@@ -767,6 +861,8 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             SessionsHeld = held,
             SessionsUnseen = unseen,
             OvernightEntries = overnightEntry ? 1 : 0,
+            LegsTotal = legs?.Count ?? 0,
+            StopLoosenIgnored = _loosenIgnored,
         };
         return new OracleResult(trade, null, counters, _rows, holdEnd);
     }

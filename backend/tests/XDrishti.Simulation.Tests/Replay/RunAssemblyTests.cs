@@ -25,6 +25,7 @@ public sealed class RunAssemblyTests
         ["sim-3"] = "c9aeca544c585699e455e754eef42cb3b63e8cb374910b540b0b56557be61df0",
         ["sim-4"] = "634181d931e1a209b6f79c3cda4785d9b00f36be24e36d9137741ef87685c7f3",
         ["sim-5"] = "d65ee6fcab505dfa568aa46653ebac26af91bf735e0e87eb12fc3f7d59f5c625",
+        ["sim-6"] = "48f6a547425b67c5a3ee49f7d3f9f08041bd3a0a509ebe173b690da8767a990e",
     };
 
     private static UniverseRecord Universe(params (Guid Id, string Symbol)[] members) =>
@@ -81,7 +82,7 @@ public sealed class RunAssemblyTests
         run.Totals.TradesInWindow.ShouldBe(6);
         run.Totals.Instruments.ShouldBe(2);
         run.Totals.Skipped.ShouldBeEmpty();
-        run.SchemaVersion.ShouldBe(5);
+        run.SchemaVersion.ShouldBe(6);
         run.EngineVersion.ShouldBe(SimulationEngine.Version);
         run.Fills.ShouldBe(strategy.Fills.ToCanonicalJson());
     }

@@ -1,6 +1,6 @@
 # P4-01 — The exit tape and trades with legs
 
-- **Status:** Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 6 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at 7c614e4. The facts about the code were read that day (`SimTrade`, `EntryCandidate`, `TradeWalker`, `MinuteRule`, `WalkRules`, `Position`, `WalkOutcome`, `TradeCosting`, `EntryScanner`, `Simulator`); what was not read or could not be verified is marked UNVERIFIED. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md), *Why P4 waits*).
+- **Status:** Built 2026-10-21, ahead of the P3 exit check at the owner's request ([ADR 0049](../adr/0049-the-exit-tape-trades-with-legs-and-sim-6.md); the number 0048 named below was taken the same day by the automated P3 gate); the build notes are at the end. Approved (owner, 2026-10-19, "yes to all recommendations": questions 1 to 6 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at 7c614e4. The facts about the code were read that day (`SimTrade`, `EntryCandidate`, `TradeWalker`, `MinuteRule`, `WalkRules`, `Position`, `WalkOutcome`, `TradeCosting`, `EntryScanner`, `Simulator`); what was not read or could not be verified is marked UNVERIFIED. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md), *Why P4 waits*).
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 1 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md) (approved 2026-10-19, questions 1 to 8 as recommended).
 - **Design refs:** docs/design/08-exits-and-risk.md §1, §2 (the as-built paragraph: a value of bar *k* acts only from the first minute after its close), §5, §8 · 11-strategy-lab.md *Why a condition cannot look ahead* · [ADR 0037](../adr/0037-simulation-conventions-and-the-two-stage-seam.md) · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) · [ADR 0040](../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.md) · [ADR 0042](../adr/0042-costs-and-sizing-the-charge-sheet-the-quantity-net-r-and-simtrade-schema-4.md) · [ADR 0043](../adr/0043-the-daily-evaluation-and-the-overnight-entry-order-sim-5-and-run-record-schema-5.md) · [ADR 0047](../adr/0047-the-oracle-and-the-rule-table-gaps.md) · [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md).
 
@@ -103,7 +103,22 @@ All six answered "yes to all recommendations" by the owner on 2026-10-19: each s
 
 ## Done when
 - [x] The owner has answered questions 1 to 6 and the status is Approved (2026-10-19)
-- [ ] All acceptance criteria have evidence
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Migration added (if D15's column is built), the contract unchanged
-- [ ] ADR 0048 written; `docs/design` (08 §2, §5, §8; 11; 18-roadmap), the oracle log and `docs/research/p3-hand-check.md` (the engine version of a later pack) updated; `scripts/build-docs.sh`
+- [x] All acceptance criteria have evidence (see the build notes)
+- [x] `scripts/check.sh` green; reviewer agent: not run by the builder (the caller runs it)
+- [x] Migration: not added (D15's column is cut, see the build notes), the contract unchanged
+- [x] ADR 0049 written (not 0048: taken); `docs/design` (08 §2, §5, §8; 11; 18-roadmap), the oracle log and `docs/research/p3-hand-check.md` (the engine version of a later pack) updated; `scripts/build-docs.sh`
+
+## Build notes (2026-10-21)
+What differs from the text above, and what the criteria rest on.
+
+**Deviations (all in [ADR 0049](../adr/0049-the-exit-tape-trades-with-legs-and-sim-6.md)).**
+1. The ADR is 0049, not 0048.
+2. `FIXED_RR` is the walk with **no rule**, not a first `IExitRule` (D5): it keeps the sim-5 rows, the allocation test and the benchmark untouched by construction. Measured +3 % (intraday) and +2 % (swing, hold 5) on the explicit benchmarks against the sim-5 sources on one machine (criterion 14: 5 %).
+3. **Cuts, in the spec's order:** the leg marks on the chart (D16; a text section only) and the store column (D15: no `AddSimTradeLegs`, `simulate --store` refuses a trade with legs by name, a sim-5 run is read as before). The export format is `xd-sim-export-3` (a `legs` CSV column, `legs` and `leg_charges` in `run.json`).
+4. A step that closes two bars gives one row with the later bar's values; the `Unreliable` flag is not needed (D1).
+5. `AddShare` is not an action yet and no walker produces an add; the formulas of D10 and D11 are written for adds and the costing is general over entry, add and exit legs, but only exit legs are exercised.
+6. For a trade with legs `TradeCosting.EntryLeg` and `ExitLeg` are the sums of the entry-side and the exit-side orders (D11 said "the first entry leg"; they are the same until an add exists, and the sums keep `EntryLeg + ExitLeg = TotalCost`).
+7. The cost oracle does not walk legs: criterion 8 rests on the hand table `TradeCostApplierLegsTests` (charges per leg, quantities, the merge, the date of each order).
+8. The test-only rule is `TestLadderRule` (as D14) plus a `ScriptedRule` that makes three exit legs; both are test-project types, held out of production by `ExitRuleArchitectureTests`.
+
+**Evidence by criterion.** 1: the regenerated golden files equal the sim-5 ones after undoing the version, schema and run-key lines (checked file by file; the frozen sim-4 views pass with the schema line mapped); 2 and 3: `ExitTapeTests`; 4 to 6: `LegPropertyTests` over 11,100 seeded series; 7: `LegsHandTableTests` (13 trades); 8: `TradeCostApplierLegsTests`; 9: `LegsGateAndProductionTests`; 10: `LadderComparisonTests` (19,000 series; one class C finding on the first run, the oracle's `StopPrice`) and the log section; 11 and 12: `LegsExportTests`, `StoreRunHandlerTests`, `RunStoreSchemaReadTests`, the goldens; 13: `ExitRuleArchitectureTests`, `LegsGateAndProductionTests`; 14: the benchmark above; 15: `scripts/check.sh`.

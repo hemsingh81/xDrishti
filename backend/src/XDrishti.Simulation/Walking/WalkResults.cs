@@ -12,7 +12,7 @@ internal static class WalkResults
     /// <paramref name="sessionsUnseen"/> are 1 and 0 for an intraday trade; <paramref name="holdEnd"/> is the exit instant unless the position counts as open longer (D11).
     /// </summary>
     public static Result<WalkOutcome> Close(
-        in Position position, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, ExitFlags flags, int sessionsHeld, int sessionsUnseen, long holdEnd)
+        in Position position, ExitReason reason, long exitEpoch, decimal exit, in Minute minute, decimal low, decimal high, int examined, int zero, ExitFlags flags, int sessionsHeld, int sessionsUnseen, long holdEnd, LegState? legs = null)
     {
         var candidate = position.Candidate;
         var isBuy = position.IsBuy;
@@ -22,6 +22,29 @@ internal static class WalkResults
         var sign = isBuy ? 1m : -1m;
         var rExact = sign * (exit - entry) / risk;
         var rFilled = sign * (exitFilled - position.EntryFilled) / risk;
+        ValueList<Leg>? tradeLegs = null;
+        if (legs is { Partials.Count: > 0 })
+        {
+            // P4-01, D10: R of a trade with legs is the sum over the exit legs of share × (exit − entry) / R0, from the exact and from the filled prices; the unit stays the risk of the first fill.
+            var entryFilled = position.EntryFilled;
+            var final = 1m;
+            var exactParts = 0m;
+            var filledParts = 0m;
+            var list = new List<Leg>(legs.Partials.Count + 2) { new(position.FillEpoch, (double)entry, (double)entryFilled, 1m, LegKind.Entry, string.Empty) };
+            foreach (var partial in legs.Partials)
+            {
+                final -= partial.Share;
+                exactParts += partial.Share * (partial.Price - entry);
+                filledParts += partial.Share * (partial.Filled - entryFilled);
+                list.Add(new Leg(partial.Epoch, (double)partial.Price, (double)partial.Filled, partial.Share, LegKind.Exit, partial.Code));
+            }
+
+            rExact = sign * ((final * (exit - entry)) + exactParts) / risk;
+            rFilled = sign * ((final * (exitFilled - entryFilled)) + filledParts) / risk;
+            list.Add(new Leg(exitEpoch, (double)exit, (double)exitFilled, final, LegKind.Exit, reason.ToString()));
+            tradeLegs = new ValueList<Leg>(list);
+        }
+
         var adverse = isBuy ? (entry - low) / risk : (high - entry) / risk;
         var favourable = isBuy ? (high - entry) / risk : (entry - low) / risk;
         var trade = new SimTrade(
@@ -56,11 +79,12 @@ internal static class WalkResults
             position.EntryFill,
             position.TickFallback,
             sessionsHeld,
-            sessionsUnseen);
+            sessionsUnseen,
+            Legs: tradeLegs);
 
         return Result.Success(new WalkOutcome(
             trade, null, examined, position.AfterMissingMinutes, flags.StopGap, flags.TargetGap, flags.Ambiguous, flags.LateSquareOff, position.RiskUnderFourTicks, zero,
-            flags.MaxHoldAtLastClose, flags.StopGap && flags.Overnight, flags.TargetGap && flags.Overnight, holdEnd, position.OvernightEntry));
+            flags.MaxHoldAtLastClose, flags.StopGap && flags.Overnight, flags.TargetGap && flags.Overnight, holdEnd, position.OvernightEntry, tradeLegs?.Count ?? 0, legs?.StopLoosenIgnored ?? 0));
     }
 
     /// <summary>A decimal figure as the double of a <see cref="SimTrade"/> field. A decimal zero can carry a sign (<c>-1m * 0m</c>), and a double <c>-0</c> is printed as "-0" in a golden file or in JSON: zero is always +0.</summary>

@@ -22,4 +22,5 @@ public sealed record OracleTrade(
     double ExitFilledPrice,
     OracleEntryFill EntryFill,
     int SessionsHeld,
-    int SessionsUnseen);
+    int SessionsUnseen,
+    IReadOnlyList<OracleLeg>? Legs = null);
