@@ -36,6 +36,14 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
     private int _loosenIgnored;
     private readonly List<OracleLeg> _partials = [];
 
+    // P4-03 (D1 to D7): the trail rule's own reading of the position: the next bar not yet read, the anchor H with the minute it has been read up to, the activation, the stop-out signal.
+    private int _trailNext;
+    private int _fillIdx;
+    private int _anchorIdx;
+    private decimal _anchor;
+    private bool _active;
+    private bool _signal;
+
     private sealed class Exit
     {
         public OracleExitReason Reason { get; init; }
@@ -167,6 +175,15 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
         _fav = _entry;
         _lastIdx = f;
         _nextBar = 0;
+        _fillIdx = f;
+        _anchorIdx = f;
+        _anchor = _buy ? decimal.MinValue : decimal.MaxValue;
+        _trailNext = 0;
+        while (rules.Trail is { } begun && _trailNext < begun.Bars.Count && begun.Bars[_trailNext].CloseEpochSeconds <= fb.EpochSeconds)
+        {
+            _trailNext++;
+        }
+
         while (rules.Ladder is { } started && _nextBar < started.Bars.Count && started.Bars[_nextBar].CloseEpochSeconds <= fb.EpochSeconds)
         {
             _nextBar++;
@@ -467,10 +484,20 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             LadderStep(ladder, ek, o, h, l);
         }
 
+        if (!isFill && rules.Trail is { } trail)
+        {
+            TrailStep(trail, ek);
+        }
+
         Exit? ex;
         if (!_swing && !isFill && Minute(ek) >= rules.SquareOffMinute)
         {
             ex = SquareOffMinute(o, ek);
+        }
+        else if (_signal && !(_buy ? o <= _stop : o >= _stop))
+        {
+            // D7: the signal leaves at this open as a market order; an open already through the stop is the stop's row (X2), which is a resting order.
+            ex = new Exit { Reason = OracleExitReason.EmaExit, Price = o, FromBar = true };
         }
         else
         {
@@ -556,6 +583,72 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             }
         }
     }
+
+    /// <summary>
+    /// The bars that closed at or before the start of this minute and were not read yet, in order (D1 to D7). ATR_TRAIL: once active (a close at least <c>activate_at_rr</c> risks in favour, or from the first bar when it is 0) the level is
+    /// <c>H - mult * ATR</c> (a sell: plus), H being the extreme of the minutes that hold a trade from the fill minute to the end of the bar. STRUCTURE_TRAIL: the level is the value. In both a level tighter than the stop becomes the stop and a looser
+    /// one is counted and ignored. EMA_TRAIL: a close beyond the value signals the position out.
+    /// </summary>
+    private void TrailStep(OracleTrail trail, long ek)
+    {
+        _signal = false;
+        while (_trailNext < trail.Bars.Count && trail.Bars[_trailNext].CloseEpochSeconds <= ek)
+        {
+            OracleTrailBar bar = trail.Bars[_trailNext++];
+            decimal? close = Number(bar.Close);
+            decimal? value = Number(bar.Value);
+            switch (trail.Kind)
+            {
+                case OracleTrailKind.Atr:
+                    _active = _active || trail.ActivateAtRr == 0 || (close is { } c && _d * (c - _entry) >= OracleNumbers.Conv(trail.ActivateAtRr) * _risk);
+                    if (_active && value is { } atr)
+                    {
+                        while (_anchorIdx < bars.Count && bars[_anchorIdx].EpochSeconds < bar.CloseEpochSeconds)
+                        {
+                            if (!IsEmpty(bars[_anchorIdx]))
+                            {
+                                decimal extreme = OracleNumbers.Conv(_buy ? bars[_anchorIdx].High : bars[_anchorIdx].Low);
+                                _anchor = _buy ? Math.Max(_anchor, extreme) : Math.Min(_anchor, extreme);
+                            }
+
+                            _anchorIdx++;
+                        }
+
+                        MoveStop(_anchor - (_d * OracleNumbers.Conv(trail.Multiple) * atr));
+                    }
+
+                    break;
+                case OracleTrailKind.Structure:
+                    if (value is { } level)
+                    {
+                        MoveStop(level);
+                    }
+
+                    break;
+                default:
+                    if (value is { } ema && close is { } last && (_buy ? last < ema : last > ema))
+                    {
+                        _signal = true;
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    private void MoveStop(decimal level)
+    {
+        if (_buy ? level >= _stop : level <= _stop)
+        {
+            _stop = level;
+        }
+        else
+        {
+            _loosenIgnored++;
+        }
+    }
+
+    private static decimal? Number(double value) => double.IsFinite(value) && Math.Abs(value) <= 1e12 ? OracleNumbers.Conv(value) : null;
 
     private bool _overnightStop;
     private bool _overnightTarget;
@@ -739,6 +832,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
 
                 break;
             case OracleExitReason.SquareOff:
+            case OracleExitReason.EmaExit:
                 WidenAdv(o, o);
                 WidenFav(o, o);
                 break;
@@ -845,6 +939,7 @@ internal sealed class WalkRun(IReadOnlyList<OracleBar> bars, OracleCandidate can
             ExitsSquareOff = ex.Reason == OracleExitReason.SquareOff ? 1 : 0,
             ExitsEndOfData = ex.Reason == OracleExitReason.EndOfData ? 1 : 0,
             ExitsMaxHold = ex.Reason == OracleExitReason.MaxHold ? 1 : 0,
+            ExitsEmaExit = ex.Reason == OracleExitReason.EmaExit ? 1 : 0,
             MaxHoldAtLastClose = ex.LastClose ? 1 : 0,
             StopGapExits = ex.StopGap ? 1 : 0,
             TargetGapExits = ex.TargetGap ? 1 : 0,

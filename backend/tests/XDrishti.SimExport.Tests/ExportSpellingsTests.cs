@@ -60,6 +60,7 @@ public sealed class ExportSpellingsTests
         ExportSpellings.Of(ExitReason.SquareOff).ShouldBe("square_off");
         ExportSpellings.Of(ExitReason.EndOfData).ShouldBe("end_of_data");
         ExportSpellings.Of(ExitReason.MaxHold).ShouldBe("max_hold");
+        ExportSpellings.Of(ExitReason.EmaExit).ShouldBe("ema_exit");
         ExportSpellings.Of(FillBasis.Modelled).ShouldBe("modelled");
         ExportSpellings.Of(FillBasis.Exact).ShouldBe("no_slippage");
         ExportSpellings.Of(CostBasis.None).ShouldBe("none");

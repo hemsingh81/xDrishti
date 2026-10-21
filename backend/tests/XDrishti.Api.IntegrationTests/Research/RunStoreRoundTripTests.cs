@@ -62,6 +62,21 @@ public sealed class RunStoreRoundTripTests(ApiFactory factory)
         }
     }
 
+    [Fact]
+    public async Task A_stored_run_with_EmaExit_trades_reads_back_equal_to_the_one_in_memory()
+    {
+        // P4-03: the new reason is a new name in the check constraint of research.sim_trades (migration AddEmaExitReason) and a name the store reads back
+        var run = StoredRunFixtures.Run(costed: false, to: NextTo(), emaExits: true);
+        run.Trades.Count(t => t.Trade.ExitReason == ExitReason.EmaExit).ShouldBeGreaterThan(10);
+
+        var stored = await WithStore(s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask());
+        var trades = await WithStore(async s => await s.StreamTradesAsync(run.RunKey, false, Ct).ToListAsync(Ct));
+
+        stored.IsSuccess.ShouldBeTrue(stored.IsFailure ? stored.Error.Message : string.Empty);
+        SameTrade.ShouldBeSame(trades, run.Trades, "trades");
+        trades.Count(t => t.Trade.ExitReason == ExitReason.EmaExit).ShouldBe(run.Trades.Count(t => t.Trade.ExitReason == ExitReason.EmaExit));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

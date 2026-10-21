@@ -453,9 +453,6 @@ public sealed class ExitTablesTests
     {
         { ExitPolicy.PartialBe, "PARTIAL_BE" },
         { ExitPolicy.PartialTrail, "PARTIAL_TRAIL" },
-        { ExitPolicy.AtrTrail, "ATR_TRAIL" },
-        { ExitPolicy.StructureTrail, "STRUCTURE_TRAIL" },
-        { ExitPolicy.EmaTrail, "EMA_TRAIL" },
         { ExitPolicy.Pyramid, "PYRAMID" },
     };
 
@@ -509,12 +506,12 @@ public sealed class ExitTablesTests
     }
 
     [Fact]
-    public void A_policy_listed_twice_gives_one_warning_and_the_policies_the_simulator_runs_are_exactly_FIXED_RR()
+    public void A_policy_listed_twice_gives_one_warning_and_the_policies_the_simulator_runs_are_exactly_FIXED_RR_and_the_three_trails()
     {
         var result = Located.Compile(Intraday().WithBuy(b => b with { Exits = [new ExitSpec(ExitPolicy.PartialBe, BeBase), new ExitSpec(ExitPolicy.PartialBe, BeBase)] }));
 
         result.Problems.Count(p => p.Problem.Code == ModelCodes.ExitNotEvaluated).ShouldBe(1);
-        ExitTables.RunBySimulator.ShouldBe([ExitPolicy.FixedRr]);
+        ExitTables.RunBySimulator.ShouldBe([ExitPolicy.FixedRr, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail]);
         foreach (var policy in Enum.GetValues<ExitPolicy>())
         {
             var warned = Located.Compile(Exit(policy, ValidFor(policy))).Problems.Any(p => p.Problem.Code == ModelCodes.ExitNotEvaluated);

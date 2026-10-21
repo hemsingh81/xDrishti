@@ -29,9 +29,9 @@ internal static class StoredRunFixtures
     };
 
     /// <summary>
-    /// The run: <paramref name="instruments"/> instruments, <paramref name="tradesEach"/> trades of each (and one open-at-end trade for every fifth instrument), assembled by the real assembler.
+    /// The run (with <paramref name="emaExits"/> the fourth trade of each instrument is an <c>EmaExit</c> without a target, P4-03): <paramref name="instruments"/> instruments, <paramref name="tradesEach"/> trades of each (and one open-at-end trade for every fifth instrument), assembled by the real assembler.
     /// </summary>
-    public static SimulationRun Run(bool costed = false, int instruments = 20, int tradesEach = 6, DateOnly? to = null, string strategy = "ORB", bool fixtureEdges = true, FillRules? fills = null)
+    public static SimulationRun Run(bool costed = false, int instruments = 20, int tradesEach = 6, DateOnly? to = null, string strategy = "ORB", bool fixtureEdges = true, FillRules? fills = null, bool emaExits = false)
     {
         var context = TestCostSheet.Context(sheet: FixtureSheet.Sheet);
         var ran = new List<InstrumentRun>();
@@ -47,8 +47,8 @@ internal static class StoredRunFixtures
                 var side = (i + j) % 2 == 0 ? Side.Buy : Side.Sell;
                 var entry = 100.5 + i;
                 var trade = FabricatedRun.Trade(
-                    id, symbol, side, Monday.AddDays(j), Exits[(i + j) % Exits.Length], entryMinute: 560 + ((i * 7 + j * 3) % 200), entry: entry, stop: side == Side.Buy ? entry - 2.5 : entry + 2.5,
-                    target: (i + j) % 3 == 0 ? null : entry + 5, exitPrice: entry + (j - 2), rExact: (j - 2) * 0.4, rFilled: ((j - 2) * 0.4) - 0.05, strategy: strategy);
+                    id, symbol, side, Monday.AddDays(j), emaExits && j == 3 ? ExitReason.EmaExit : Exits[(i + j) % Exits.Length], entryMinute: 560 + ((i * 7 + j * 3) % 200), entry: entry, stop: side == Side.Buy ? entry - 2.5 : entry + 2.5,
+                    target: (i + j) % 3 == 0 || (emaExits && j == 3) ? null : entry + 5, exitPrice: entry + (j - 2), rExact: (j - 2) * 0.4, rFilled: ((j - 2) * 0.4) - 0.05, strategy: strategy);
                 count += Add(trades, trade, costed, context);
             }
 

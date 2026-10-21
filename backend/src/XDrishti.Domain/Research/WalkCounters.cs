@@ -2,7 +2,7 @@ namespace XDrishti.Domain.Research;
 
 /// <summary>
 /// What the trade walker did, as plain sums (ADR 0037, decision D6; ADR 0038). A rule that never fires gives zero trades and zero losses and looks safe; these counters are how it is seen.
-/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the five exit counts (<c>ExitsStop + ExitsTarget + ExitsSquareOff + ExitsMaxHold + ExitsEndOfData</c>); ADR 0040, D10.
+/// Identities: <c>Candidates = Trades + NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd</c>, <c>Trades = EntriesAtOpen + EntriesAtLimit</c>, and <c>Trades</c> is the sum of the six exit counts (<c>ExitsStop + ExitsTarget + ExitsSquareOff + ExitsMaxHold + ExitsEndOfData + ExitsEmaExit</c>); ADR 0040, D10, ADR 0051.
 /// <c>WalkOutcome.ToCounters()</c> (in <c>XDrishti.Simulation.Walking</c>) makes the counts of one walk; this type lives in Domain because the run record of P3-04 holds it.
 /// </summary>
 /// <param name="Candidates">Walks.</param>
@@ -37,6 +37,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="LegsTotal">Legs of the trades that have legs (P4-01); 0 for every production run.</param>
 /// <param name="LegsMerged">Legs of no shares that the costing merged into the next one and did not charge (P4-01, D11); 0 for every production run.</param>
 /// <param name="StopLoosenIgnored">Requests of an exit rule to loosen a stop, ignored (P4-01, D6); 0 for every production run.</param>
+/// <param name="ExitsEmaExit">Trades that ended on an <c>EMA_TRAIL</c> signal (P4-03, D7).</param>
 public sealed record WalkCounters(
     long Candidates,
     long Trades,
@@ -69,10 +70,11 @@ public sealed record WalkCounters(
     long OrderPendingAtEnd = 0,
     long LegsTotal = 0,
     long LegsMerged = 0,
-    long StopLoosenIgnored = 0)
+    long StopLoosenIgnored = 0,
+    long ExitsEmaExit = 0)
 {
     /// <summary>All zeros: the identity of <see cref="Add"/>.</summary>
-    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    public static WalkCounters Empty { get; } = new(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>The field-by-field sum.</summary>
     public WalkCounters Add(WalkCounters other)
@@ -110,6 +112,7 @@ public sealed record WalkCounters(
             OrderPendingAtEnd + other.OrderPendingAtEnd,
             LegsTotal + other.LegsTotal,
             LegsMerged + other.LegsMerged,
-            StopLoosenIgnored + other.StopLoosenIgnored);
+            StopLoosenIgnored + other.StopLoosenIgnored,
+            ExitsEmaExit + other.ExitsEmaExit);
     }
 }

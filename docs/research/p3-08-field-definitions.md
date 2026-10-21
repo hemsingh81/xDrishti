@@ -90,6 +90,7 @@ Not a field but compared with them: **the no-trade reason** (`NoTradeReason`): A
 | 30 | `LegsTotal` | P4-01 D15: the legs of the trades that have legs; 0 for a trade without | SPEC ONLY | ADR 0049 |
 | 31 | `LegsMerged` | P4-01 D11: legs of no shares merged into the next one by the costing; 0 in the walker | SPEC ONLY | ADR 0049 |
 | 32 | `StopLoosenIgnored` | P4-01 D6: requests of an exit rule to loosen a stop, ignored | SPEC ONLY | ADR 0049 |
+| 33 | `ExitsEmaExit` | P4-03 D7: trades that left on an `EMA_TRAIL` signal | SPEC ONLY | ADR 0051 |
 
 `WalkOutcome.HoldEndEpochSeconds` (the gate's input, compared as a list, section D) and the booleans of `WalkOutcome` are the same facts as the counters above.
 

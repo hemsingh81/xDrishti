@@ -81,7 +81,7 @@ public sealed class SimTradeSchemaTests
     {
         SimTrade.CurrentSchemaVersion.ShouldBe(5, "P4-01 appends the legs");
         Enum.GetNames<LegKind>().ShouldBe(["Entry", "Add", "Exit"]);
-        Enum.GetNames<ExitReason>().ShouldBe(["Stop", "Target", "SquareOff", "EndOfData", "MaxHold"]);
+        Enum.GetNames<ExitReason>().ShouldBe(["Stop", "Target", "SquareOff", "EndOfData", "MaxHold", "EmaExit"]);
         Enum.GetNames<FillBasis>().ShouldBe(["Exact", "Modelled"]);
         Enum.GetNames<EntryFill>().ShouldBe(["AtOpen", "AtLimit"]);
         Enum.GetNames<CostBasis>().ShouldBe(["None", "Charged"]);
@@ -114,23 +114,23 @@ public sealed class SimTradeSchemaTests
     [Fact]
     public void The_walker_counters_add_field_by_field_and_empty_is_the_identity()
     {
-        var one = new WalkCounters(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
+        var one = new WalkCounters(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33);
 
         var sum = one.Add(one);
 
-        sum.ShouldBe(new WalkCounters(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64));
+        sum.ShouldBe(new WalkCounters(2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46, 48, 50, 52, 54, 56, 58, 60, 62, 64, 66));
         one.Add(WalkCounters.Empty).ShouldBe(one);
-        WalkCounters.Empty.ShouldBe(new WalkCounters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+        WalkCounters.Empty.ShouldBe(new WalkCounters(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
     }
 
     [Fact]
-    public void The_thirty_two_counters_keep_their_positions_the_seven_of_schema_3_the_two_of_P3_03e_and_the_three_of_P4_01_appended_with_default_zero()
+    public void The_thirty_three_counters_keep_their_positions_the_seven_of_schema_3_the_two_of_P3_03e_the_three_of_P4_01_and_the_one_of_P4_03_appended_with_default_zero()
     {
         var names = typeof(WalkCounters).GetConstructors().Single().GetParameters();
 
-        names.Length.ShouldBe(32);
+        names.Length.ShouldBe(33);
         names.Take(20).Last().Name.ShouldBe("RiskUnderFourTicks");
-        names.Skip(20).Select(p => p.Name).ShouldBe(["PositionOpen", "ExitsMaxHold", "MaxHoldAtLastClose", "OvernightStopGaps", "OvernightTargetGaps", "SessionsHeld", "SessionsUnseen", "OvernightEntries", "OrderPendingAtEnd", "LegsTotal", "LegsMerged", "StopLoosenIgnored"]);
+        names.Skip(20).Select(p => p.Name).ShouldBe(["PositionOpen", "ExitsMaxHold", "MaxHoldAtLastClose", "OvernightStopGaps", "OvernightTargetGaps", "SessionsHeld", "SessionsUnseen", "OvernightEntries", "OrderPendingAtEnd", "LegsTotal", "LegsMerged", "StopLoosenIgnored", "ExitsEmaExit"]);
         names.Skip(20).ShouldAllBe(p => p.HasDefaultValue && Equals(p.DefaultValue, 0L));
     }
 
@@ -139,7 +139,7 @@ public sealed class SimTradeSchemaTests
     {
         // Criterion 27: a field appended later cannot be left out of Add, because each property gets its own distinct value and the sum must double it.
         var counterProperties = typeof(WalkCounters).GetProperties().Where(p => p.PropertyType == typeof(long) && p.GetMethod!.IsPublic && p.DeclaringType == typeof(WalkCounters) && p.Name != "Empty").ToList();
-        counterProperties.Count.ShouldBe(32);
+        counterProperties.Count.ShouldBe(33);
         var counters = (WalkCounters)ConstructWithDistinctValues(typeof(WalkCounters));
         var counterSum = counters.Add(counters);
         foreach (var property in counterProperties)

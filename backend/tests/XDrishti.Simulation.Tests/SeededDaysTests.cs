@@ -69,7 +69,7 @@ public sealed class SeededDaysTests
             trades.Count(t => t.Day.Tick == tick).ShouldBeGreaterThanOrEqualTo(AtLeast, "tick " + tick);
         }
 
-        foreach (var reason in Enum.GetValues<ExitReason>().Where(r => r != ExitReason.MaxHold))
+        foreach (var reason in Enum.GetValues<ExitReason>().Where(r => r is not (ExitReason.MaxHold or ExitReason.EmaExit)))
         {
             trades.Count(t => t.Trade!.ExitReason == reason && t.Trade.Side == Side.Buy).ShouldBeGreaterThanOrEqualTo(AtLeast / 2, reason + " buy");
             trades.Count(t => t.Trade!.ExitReason == reason && t.Trade.Side == Side.Sell).ShouldBeGreaterThanOrEqualTo(AtLeast / 2, reason + " sell");

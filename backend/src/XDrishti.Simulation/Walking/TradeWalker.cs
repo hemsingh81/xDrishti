@@ -319,6 +319,12 @@ public static class TradeWalker
                     position, ExitReason.SquareOff, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, new ExitFlags(LateSquareOff: minuteOfDay > squareOffMinute), legs);
             }
 
+            // P4-03, D7: an EMA signal leaves at this open as a market order, unless the open is already through the stop (the stop is a resting order and comes first, X2).
+            if (legs is { SignalExit: true } && !MinuteRule.Beyond(isBuy, minute.Open, stop))
+            {
+                return Leave(position, ExitReason.EmaExit, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, default, legs);
+            }
+
             // X2 to X5: the rows of the exit table, written once (MinuteRule) and shared with the swing loop.
             var verdict = MinuteRule.Decide(current, minute, isFill, low, high);
             if (verdict.Exits)
@@ -328,6 +334,7 @@ public static class TradeWalker
 
             low = verdict.Low;
             high = verdict.High;
+            legs?.Observe(minute);
             last = i;
             zeroAtLast = zero;
         }

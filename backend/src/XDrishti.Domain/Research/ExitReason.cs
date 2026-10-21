@@ -20,4 +20,7 @@ public enum ExitReason
 
     /// <summary>A swing position reached the close of the last session it may be held (ADR 0040, X8): the close of the due session's last 1-minute bar, or of the last minute that holds a trade when the due minute is missing.</summary>
     MaxHold,
+
+    /// <summary>An <c>EMA_TRAIL</c> position left because a bar closed beyond its EMA (P4-03, D7): the whole position at the open of the first minute that holds a trade after that bar closed, a market-type exit.</summary>
+    EmaExit,
 }

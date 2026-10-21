@@ -108,6 +108,9 @@ public sealed class EntryScanner
     /// </summary>
     public ExitTape Tape { get; }
 
+    /// <summary>The column of <see cref="Tape"/> that holds the one feature the exit of <paramref name="plan"/> reads (P4-03), or -1 when it reads none.</summary>
+    internal int TapeColumnOf(ExitPlan plan) => plan.Reads.Count == 0 ? -1 : Tape.IndexOf(FeatureNames.Of(plan.Reads[0]));
+
     /// <summary>The candidates made so far, in the order of their decisions.</summary>
     public IReadOnlyList<EntryCandidate> Candidates { get; }
 

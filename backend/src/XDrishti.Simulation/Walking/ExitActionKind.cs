@@ -11,4 +11,7 @@ internal enum ExitActionKind
 
     /// <summary>Take a share of the maximum quantity out of the position at the open of the minute that sees the request.</summary>
     ExitShare,
+
+    /// <summary>Take the whole position out at the open of the first minute that holds a trade at or after the one that sees the request, unless that open is already through the stop (P4-03, D7); the walker reports it as <c>EmaExit</c>.</summary>
+    SignalExit,
 }

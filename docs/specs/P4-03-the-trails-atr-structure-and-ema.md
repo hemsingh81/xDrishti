@@ -1,6 +1,6 @@
 # P4-03 — The trails: `ATR_TRAIL`, `STRUCTURE_TRAIL` and `EMA_TRAIL`
 
-- **Status:** Approved (owner, 2026-10-19, "yes" to the recommendations: questions 1 to 7 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at b0ee2db. The tables were read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D4 to D6, D12, D13), doc 08 §2 and [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md) and [P4-02](P4-02-partial-exits-and-the-time-stop.md), which are Approved and **not built**: every name of the tape, `IExitRule`, the legs and `TimeStop` below is the one those specs give and is UNVERIFIED against code until they are built. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
+- **Status:** Built 2026-10-21, ahead of the P3 exit check at the owner's request ([ADR 0051](../adr/0051-the-trails-atr-structure-and-ema.md); the number 0050 named below is P4-02's); the build notes are at the end. Approved (owner, 2026-10-19, "yes" to the recommendations: questions 1 to 7 stand as recommended; the build still waits for P3 to close). Written 2026-10-19 from `main` at b0ee2db. The tables were read in [P3-02b2](P3-02b2-exit-policy-tables-of-schema-1.md) (D4 to D6, D12, D13), doc 08 §2 and [P4-01](P4-01-the-exit-tape-and-trades-with-legs.md) and [P4-02](P4-02-partial-exits-and-the-time-stop.md), which are Approved and **not built**: every name of the tape, `IExitRule`, the legs and `TimeStop` below is the one those specs give and is UNVERIFIED against code until they are built. **Nothing is built before P3 closes** ([P4-00](P4-00-exits-and-exit-learning-plan.md)).
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 3 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md).
 - **Design refs:** docs/design/08-exits-and-risk.md §2 (the as-built paragraph: a value of bar *k* acts only from the first minute after its close), §3 (trail activation from MAE/MFE giveback), §5 · 16-configuration.md §2 (`exits`) · [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md) Amendment 1 · [ADR 0038](../adr/0038-fill-realism-the-entry-limit-gaps-slippage-ticks-and-the-order-inside-a-minute.md) · [ADR 0040](../adr/0040-swing-positions-held-across-sessions-the-maximum-hold-the-position-gate-and-simtrade-schema-3.md) · ADR 0048 (P4-01) · ADR 0049 (P4-02), both to be written.
 
@@ -82,7 +82,20 @@ All seven answered "yes" to the recommendations by the owner on 2026-10-19: each
 
 ## Done when
 - [x] The owner has answered questions 1 to 7 and the status is Approved (2026-10-19)
-- [ ] All acceptance criteria have evidence
-- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Migration only if the store needs it; no API change
-- [ ] ADR 0050 written; `docs/design` (08 §2 and §3, 16, 18-roadmap), the oracle log and ADR 0036 Amendment 2 updated; `scripts/build-docs.sh` run
+- [x] All acceptance criteria have evidence (see the build notes)
+- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors (the caller runs the reviewer)
+- [x] Migration: `AddEmaExitReason` (the check constraint of `research.sim_trades`); no API change
+- [x] ADR 0051 written (not 0050: P4-02's); `docs/design` (08 §2 and §3, 16, 18-roadmap), the oracle log and ADR 0036 Amendment 2 updated; `scripts/build-docs.sh` run
+
+## Build notes (2026-10-21)
+What differs from the text above, and what the criteria rest on.
+
+**Deviations (all in [ADR 0051](../adr/0051-the-trails-atr-structure-and-ema.md)).**
+1. The ADR is 0051, not 0050 (P4-02 took 0050 in parallel).
+2. `time_stop` is not built in this branch (P4-02's), so D8 accepts one candidate and no overlay; the row "`TimeStop` after a level" of criterion 2 and the widening of D8 to "at most `time_stop`" are for the merge with P4-02. The hand tables have 22, 16 and 16 rows without it.
+3. The chandelier anchor `H` and the first counted bar reach the rule through one trailing member of `ExitView` (`Trail`) filled by `LegState.Observe`, so the rule stays a pure function (ADR decision 3). The signal is a new `ExitActionKind.SignalExit`.
+4. Criterion 11 (the verbs) is met at the simulator, the replay and the exporter, not at `simulate` and `verify-pack`: a verb runs a built-in strategy by id and none carries a trail.
+5. The oracle compares on a test tape (a stand-in for the indicators) built from the same minutes for both sides.
+6. The orders inside one minute that the spec leaves open are decided in ADR 0051 decision 5; the first is the one to read: a signal and a stop in the same minute are an `EmaExit` at the open when the open is above the stop, and a `Stop` at the open when it is at or through it.
+
+**Evidence by criterion.** 1: the whole suite, with the earlier golden files unchanged but for the `exits_ema_exit` counter in `run.json`; 2 to 4: `AtrTrailHandTableTests`, `StructureTrailHandTableTests`, `EmaTrailHandTableTests`; 5 and 7: `Running.TrailSimulatorTests`, `ExitBoundaryTests`, `ExitTablesTests`; 6: `TrailPropertyTests`; 8: `EmaExitExportTests`, `RunStoreRoundTripTests`, `TradeColumnsTests`; 9: `TrailCostTests`; 10: `TrailComparisonTests` and the log section; 11: `TrailSimulatorTests` (see deviation 4); 12: `TrailAllocationTests` and the explicit `Trail_walk_throughput_is_reported`; 13: `scripts/check.sh` and the docs.

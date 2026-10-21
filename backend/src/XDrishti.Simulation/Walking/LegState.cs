@@ -15,12 +15,27 @@ internal sealed class LegState
     private readonly List<PartialLeg> _partials = [];
     private Position _position;
     private int _cursor;
+    private readonly int _firstBar;
+    private decimal _extreme;
+    private bool _observed;
 
     public LegState(in Position start, ExitContext context)
     {
         _context = context;
         _position = start;
         _cursor = context.Tape.LastClosedAtOrBefore(start.FillEpoch);
+        _firstBar = _cursor + 1;
+    }
+
+    /// <summary>A rule asked for the whole position to leave at the next open (P4-03, D7): set by the last <see cref="Read"/>.</summary>
+    public bool SignalExit { get; private set; }
+
+    /// <summary>Records a minute the walk has finished with, for the anchor of a trail (P4-03, D2): the highest high of a buy, the lowest low of a sell, from the fill minute on.</summary>
+    public void Observe(in Minute minute)
+    {
+        var favourable = _position.IsBuy ? minute.High : minute.Low;
+        _extreme = !_observed ? favourable : (_position.IsBuy ? Math.Max(_extreme, favourable) : Math.Min(_extreme, favourable));
+        _observed = true;
     }
 
     /// <summary>The position with the stop and target as they stand.</summary>
@@ -41,6 +56,7 @@ internal sealed class LegState
         var tape = _context.Tape;
         var last = tape.LastClosedAtOrBefore(minuteEpoch);
         _pending.Clear();
+        SignalExit = false;
         if (last <= _cursor)
         {
             return;
@@ -56,7 +72,7 @@ internal sealed class LegState
                 pendingShare += asked.Value;
             }
 
-            var view = new ExitView(isBuy, _position.Entry, _position.Risk, _position.Stop, _position.Target, OpenShare - pendingShare, _partials.Count + _pending.Count);
+            var view = new ExitView(isBuy, _position.Entry, _position.Risk, _position.Stop, _position.Target, OpenShare - pendingShare, _partials.Count + _pending.Count, new TrailInput(_extreme, _firstBar));
             _actions.Clear();
             _context.Rule.OnBar(view, tape, _cursor, _actions);
             foreach (var action in _actions)
@@ -76,6 +92,9 @@ internal sealed class LegState
                         break;
                     case ExitActionKind.MoveTarget:
                         _position = _position with { Target = action.Value };
+                        break;
+                    case ExitActionKind.SignalExit:
+                        SignalExit = true;
                         break;
                     default:
                         if (action.Value > 0m && action.Value < OpenShare - pendingShare)

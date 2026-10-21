@@ -8,4 +8,5 @@ public sealed record OracleRules(
     OracleSlippage Slippage,
     decimal Tick,
     OracleHold? Hold = null,
-    OracleLadder? Ladder = null);
+    OracleLadder? Ladder = null,
+    OracleTrail? Trail = null);

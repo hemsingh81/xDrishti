@@ -3,8 +3,8 @@ using System.Reflection;
 namespace XDrishti.Architecture.Tests;
 
 /// <summary>
-/// Criterion 13 of P4-01: no production path makes a leg. The only exit rules are the test-only ones (<c>TestLadderRule</c>, <c>ScriptedRule</c>) in the test project: no type of any shipped assembly implements <c>IExitRule</c>, none is named
-/// like a test rule, and no shipped assembly references the test project. The check has a sentinel, an implementer in this test project that the same code must find, so that a rule that finds nothing cannot pass for the wrong reason.
+/// Criterion 13 of P4-01: no production path makes a leg. The only rules a shipped assembly implements are the three trails of P4-03 (<c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c>, <c>EMA_TRAIL</c>), which leave in one fill and never ask for a share; the
+/// rules that make legs are the test-only ones (<c>TestLadderRule</c>, <c>ScriptedRule</c>) in the test project: none is named like a test rule, and no shipped assembly references the test project. The check has a sentinel, an implementer in this test project that the same code must find, so that a rule that finds nothing cannot pass for the wrong reason.
 /// </summary>
 public sealed class ExitRuleArchitectureTests
 {
@@ -23,6 +23,8 @@ public sealed class ExitRuleArchitectureTests
         Assembly.Load("XDrishti.Api"),
     ];
 
+    private static readonly string[] TrailRules = ["XDrishti.Simulation.Walking.AtrTrailRule", "XDrishti.Simulation.Walking.StructureTrailRule", "XDrishti.Simulation.Walking.EmaTrailRule"];
+
     private static readonly string[] TestRuleNames = ["TestLadderRule", "ScriptedRule"];
 
     public interface IMarker;
@@ -40,7 +42,7 @@ public sealed class ExitRuleArchitectureTests
         contract.ShouldNotBeNull();
         contract.IsInterface.ShouldBeTrue();
         contract.IsPublic.ShouldBeFalse("a rule is internal to XDrishti.Simulation; only the test project (a friend assembly) writes one");
-        Shipped.SelectMany(a => Implementers(a, contract)).ShouldBeEmpty("a production exit rule would make legs in a production run");
+        Shipped.SelectMany(a => Implementers(a, contract)).Order().ShouldBe(TrailRules.Order(), "the shipped rules are the three trails, which make no leg; any other would make legs in a production run");
     }
 
     [Fact]
@@ -54,9 +56,9 @@ public sealed class ExitRuleArchitectureTests
     }
 
     [Fact]
-    public void The_simulator_still_refuses_every_exit_set_but_one_fixed_rr()
+    public void The_walker_takes_a_rule_only_through_an_internal_overload()
     {
-        // the production path to a rule would be Simulator.Create; the refusal is held by SimulatorCreateTests, and the walker takes a rule only through an internal overload
+        // the production path to a rule is Simulator.Create (the refusals are held by SimulatorCreateTests and ExitBoundaryTests), and the walker takes a rule only through an internal overload
         var overloads = typeof(XDrishti.Simulation.Walking.TradeWalker).GetMethods(BindingFlags.Public | BindingFlags.Static).Where(m => m.Name == "Walk").ToList();
 
         overloads.Count.ShouldBe(1, "the overload with an exit context is internal");

@@ -167,7 +167,7 @@ styles:                            # first_entry_time, last_entry_time, square_o
 strategies:                        # built-ins enabled by id; your own strategies live in the Strategy Lab library (database)
   enabled: [ORB, VWAP_PULLBACK, EMA_PULLBACK, PDH_PDL_BREAK, BASE_BREAKOUT, TREND_PULLBACK, RSI2_REVERSION, NR7_ID_BO]
 
-exits:                             # the strategy model (P3-02b, P3-02b2) checks every parameter below; the tables are ACCEPTED but PROVISIONAL until P4's spec (ADR 0036 Amendment 1) and only FIXED_RR is run by a simulator (PARTIAL_TRAIL is in doc 08 §2 only, not in this list)
+exits:                             # the strategy model (P3-02b, P3-02b2) checks every parameter below; the tables of FIXED_RR and, since P4-03, ATR_TRAIL, STRUCTURE_TRAIL and EMA_TRAIL are final (ADR 0036 Amendment 2) and a simulator runs one of those four per strategy; the others are ACCEPTED but PROVISIONAL until their P4 spec (ADR 0036 Amendment 1) (PARTIAL_TRAIL is in doc 08 §2 only, not in this list)
   candidate_policies:
     - { id: FIXED_RR, rr: [1.5, 2.0, 2.5, 3.0] }
     - { id: PARTIAL_BE, book_pct: 50, t1_rr: 1.0, t2_rr: [2.0, 3.0] }              # every t2_rr above t1_rr

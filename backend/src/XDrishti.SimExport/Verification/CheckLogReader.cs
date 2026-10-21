@@ -27,7 +27,7 @@ public static class CheckLogReader
 
     private static readonly string[] Verdicts = ["agree", "disagree", "not_decidable", "skipped"];
 
-    private static readonly string[] ExitReasons = ["stop", "target", "square_off", "max_hold"];
+    private static readonly string[] ExitReasons = ["stop", "target", "square_off", "max_hold", "ema_exit"];
 
     private static readonly string[] ExternalColumns = ["ext_open", "ext_high", "ext_low", "ext_close"];
 

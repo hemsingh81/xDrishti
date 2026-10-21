@@ -76,6 +76,12 @@ internal static class SwingWalk
             }
 
             ref readonly var current = ref (legs is null ? ref position : ref legs.Current);
+            if (legs is { SignalExit: true } && !MinuteRule.Beyond(position.IsBuy, minute.Open, current.Stop))
+            {
+                // P4-03, D7: an EMA signal leaves at this open as a market order, unless the open is already through the stop (the resting order comes first, X2).
+                return Leave(position, hold, entryDate, seen, ExitReason.EmaExit, bar.EpochSeconds, minute.Open, minute, Math.Min(low, minute.Open), Math.Max(high, minute.Open), examined, zero, default, bar.EpochSeconds, legs);
+            }
+
             var verdict = MinuteRule.Decide(current, minute, i == fillIndex, low, high);
             if (verdict.Exits)
             {
@@ -85,6 +91,7 @@ internal static class SwingWalk
 
             low = verdict.Low;
             high = verdict.High;
+            legs?.Observe(minute);
             last = i;
             zeroAtLast = zero;
             if (date == due && minuteOfDay == dueMinute)

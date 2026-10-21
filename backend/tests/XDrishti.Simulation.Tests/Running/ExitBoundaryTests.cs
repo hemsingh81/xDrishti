@@ -23,7 +23,7 @@ public sealed class ExitBoundaryTests
         ExitPolicy.FixedRr => [P("rr", 2)],
         ExitPolicy.PartialBe => [P("book_pct", 50), P("t1_rr", 1), P("t2_rr", 2, 3)],
         ExitPolicy.PartialTrail => [P("book_pct", 50), P("t1_rr", 1), P("trail_atr_mult", 2)],
-        ExitPolicy.AtrTrail => [P("mult", 2, 3), P("activate_at_rr", 1)],
+        ExitPolicy.AtrTrail => [P("mult", 2), P("activate_at_rr", 1)],
         ExitPolicy.StructureTrail => [P("lookback_bars", 3)],
         ExitPolicy.EmaTrail => [P("length", 20)],
         _ => [P("initial_pct", 50), P("add_at_rr", 1, 2), P("add_pct", 30, 20), P("max_adds", 2), P("trail_atr_mult", 2)],
@@ -33,7 +33,7 @@ public sealed class ExitBoundaryTests
 
     private static string[] Errors(SimulatorBuild build) => [.. build.Problems.Where(p => p.Problem.Severity == ProblemSeverity.Error).Select(p => p.Problem.Code + "@" + p.Path)];
 
-    public static TheoryData<ExitPolicy> Refused { get; } = [ExitPolicy.PartialBe, ExitPolicy.PartialTrail, ExitPolicy.AtrTrail, ExitPolicy.StructureTrail, ExitPolicy.EmaTrail, ExitPolicy.Pyramid];
+    public static TheoryData<ExitPolicy> Refused { get; } = [ExitPolicy.PartialBe, ExitPolicy.PartialTrail, ExitPolicy.Pyramid];
 
     [Theory]
     [MemberData(nameof(Refused))]

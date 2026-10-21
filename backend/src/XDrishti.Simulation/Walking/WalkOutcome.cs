@@ -77,6 +77,7 @@ public readonly record struct WalkOutcome(
             OvernightEntries: OvernightEntry ? 1 : 0,
             OrderPendingAtEnd: NoTrade == NoTradeReason.OrderPendingAtEnd ? 1 : 0,
             LegsTotal: LegsTotal,
-            StopLoosenIgnored: StopLoosenIgnored);
+            StopLoosenIgnored: StopLoosenIgnored,
+            ExitsEmaExit: exit == ExitReason.EmaExit ? 1 : 0);
     }
 }

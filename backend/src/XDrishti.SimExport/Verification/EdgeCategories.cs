@@ -25,6 +25,7 @@ public static class EdgeCategories
         [ExitReason.Target] = "exit_target",
         [ExitReason.SquareOff] = "exit_square_off",
         [ExitReason.MaxHold] = "exit_max_hold",
+        [ExitReason.EmaExit] = "none: a trail policy's own exit, not a category of the pack's table",
         [ExitReason.EndOfData] = "none: the position is in OpenAtEnd, gets no card, and is a spot check",
     };
 

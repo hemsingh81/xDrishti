@@ -12,7 +12,7 @@ public sealed partial class PackFilesTests
 {
     private const string Seed = "p3-check-1";
 
-    private static readonly string[] ExitSpellings = ["stop", "target", "square_off", "max_hold", "end_of_data"];
+    private static readonly string[] ExitSpellings = ["stop", "target", "square_off", "max_hold", "end_of_data", "ema_exit"];
 
     private static (SimulationRun Run, PackRun Pack, PackPlan Plan) Standard()
     {
