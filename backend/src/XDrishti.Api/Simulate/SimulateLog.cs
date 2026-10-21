@@ -41,4 +41,7 @@ internal static partial class SimulateLog
 
     [LoggerMessage(EventId = 4423, Level = LogLevel.Information, Message = "Verify-pack assist read {Rows} rows on the second source {Source}: {Agree} agree_all, {Other} other")]
     public static partial void AssistRead(ILogger logger, int rows, string source, int agree, int other);
+
+    [LoggerMessage(EventId = 4424, Level = LogLevel.Information, Message = "Verify-pack gate decided {Status} on the second source {Source}")]
+    public static partial void GateDecided(ILogger logger, string status, string source);
 }

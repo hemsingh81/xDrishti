@@ -42,9 +42,9 @@ internal static class VerifyPackCommand
             return await VerifyPackCheck.RunAsync(options.CheckPath, console, logger, cancellationToken);
         }
 
-        if (options.AssistPath is not null)
+        if (options.AssistPath is not null || options.GatePath is not null)
         {
-            // the assisted check reads the pack folder the owner names and the stored bars; it writes four files of its own into that folder
+            // the assisted check reads the pack folder the owner names and the stored bars; it writes four files of its own into that folder (the gate two more)
             return await RunGuardedAsync(() => VerifyPackAssist.RunAsync(options, services, console, logger, cancellationToken), console, logger, cancellationToken);
         }
 

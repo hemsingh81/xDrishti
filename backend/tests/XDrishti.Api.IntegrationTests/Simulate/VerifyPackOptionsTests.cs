@@ -112,4 +112,17 @@ public sealed class VerifyPackOptionsTests
     {
         VerbDispatch.Of(line.Split(' ')).ToString().ShouldBe(expected);
     }
+
+    [Fact]
+    public void The_gate_mode_takes_a_pack_folder_and_only_the_second_source_folder()
+    {
+        var plain = Parse("--gate /p/pack");
+        plain.Options!.GatePath.ShouldBe("/p/pack");
+        plain.Options.AssistPath.ShouldBeNull();
+        Parse("--gate /p/pack --second-source-folder /s").Options!.SecondSourceFolder.ShouldBe("/s");
+        Parse("--gate /p/pack --seed x").Errors.ShouldContain(e => e.Contains("'--gate' is used with", StringComparison.Ordinal));
+        Parse("--gate /p/pack --assist /p/pack").Errors.ShouldNotBeEmpty();
+        Parse("--assist /p/pack").Options!.GatePath.ShouldBeNull();
+        VerifyPackOptions.Usage.ShouldContain("verify-pack --gate <pack-folder>");
+    }
 }

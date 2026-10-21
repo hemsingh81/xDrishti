@@ -11,6 +11,8 @@ internal static class AssistSupport
 {
     public const string Symbol = "NSE:AAA";
 
+    public static readonly string PackKey = new('c', 64);
+
     public static readonly DateOnly Date = new(2026, 3, 2);
 
     private static readonly DateTimeOffset Midnight = new(2026, 3, 2, 0, 0, 0, TimeSpan.FromHours(5.5));
@@ -45,7 +47,7 @@ internal static class AssistSupport
     {
         var rows = symbols.Select((s, i) => $"{{\"seq\":{i + 1},\"trade_key\":\"{TradeKey(s)}\",\"symbol\":\"{s}\",\"side\":\"Buy\",\"date\":\"2026-03-02\",\"run_key\":\"rk\"}}");
         return Encoding.UTF8.GetBytes(
-            "{\"format\":\"" + PackFiles.Format + "\",\"pack_id\":\"t-1\",\"seed\":\"seed-1\",\"runs\":[{\"strategy\":\"ORB\",\"parameters\":{\"or_min\":\"15\",\"rr\":\"2\"},\"run_key\":\"rk\"}],\"rows\":[" + string.Join(',', rows) + "]}");
+            "{\"format\":\"" + PackFiles.Format + "\",\"pack_id\":\"t-1\",\"pack_key\":\"" + PackKey + "\",\"count\":" + symbols.Length + ",\"seed\":\"seed-1\",\"runs\":[{\"strategy\":\"ORB\",\"parameters\":{\"or_min\":\"15\",\"rr\":\"2\"},\"run_key\":\"rk\"}],\"rows\":[" + string.Join(',', rows) + "],\"spots\":[]}");
     }
 
     /// <summary>The engine's side for the rows, equal to the reading unless <paramref name="change"/> alters a column.</summary>
@@ -74,13 +76,31 @@ internal static class AssistSupport
         return Encoding.UTF8.GetBytes(text.ToString());
     }
 
-    public static byte[] Manifest(byte[] engine) =>
-        XDrishti.SimExport.Manifest.ExportManifest.Build(
-            PackFiles.Format,
-            new string('a', 64),
-            null,
-            [new XDrishti.SimExport.Manifest.ManifestEntry(PackFiles.EngineValuesName, engine.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(engine)))],
-            []);
+    public static byte[] Manifest(byte[] engine, byte[]? pack = null)
+    {
+        var entries = new List<XDrishti.SimExport.Manifest.ManifestEntry> { new(PackFiles.EngineValuesName, engine.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(engine))) };
+        var extra = new List<string>();
+        var key = new string('a', 64);
+        if (pack is not null)
+        {
+            entries.Add(new(PackFiles.PackJsonName, pack.Length, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(pack))));
+            using var doc = System.Text.Json.JsonDocument.Parse(pack);
+            var root = doc.RootElement;
+            key = root.GetProperty("pack_key").GetString()!;
+            extra.Add("pack.count=" + root.GetProperty("count").GetInt32().ToString(CultureInfo.InvariantCulture));
+            extra.AddRange(root.GetProperty("rows").EnumerateArray().Select(r => "pack.row=" + r.GetProperty("seq").GetInt32().ToString(CultureInfo.InvariantCulture) + "|" + r.GetProperty("trade_key").GetString()));
+            extra.AddRange(root.GetProperty("spots").EnumerateArray().Select(r => "pack.spot=" + r.GetProperty("seq").GetInt32().ToString(CultureInfo.InvariantCulture) + "|" + r.GetProperty("key").GetString()));
+        }
+
+        return XDrishti.SimExport.Manifest.ExportManifest.Build(PackFiles.Format, key, null, entries, extra);
+    }
+
+    /// <summary>Writes the manifest that matches the folder's pack.json and engine-values.csv as they are now (a complete, untouched pack).</summary>
+    public static MemoryFolder Seal(MemoryFolder folder)
+    {
+        folder.Files["manifest.json"] = Manifest(folder.Files[PackFiles.EngineValuesName], folder.Files[PackFiles.PackJsonName]);
+        return folder;
+    }
 
     public static MemoryFolder Folder(string[] symbols, byte[]? engine = null)
     {
@@ -88,7 +108,7 @@ internal static class AssistSupport
         folder.Files[PackFiles.PackJsonName] = PackJson(symbols);
         folder.Files[PackFiles.EngineValuesName] = engine ?? EngineValues(Read(BuyDay()), symbols);
         folder.Files[PackFiles.CheckLogName] = Encoding.UTF8.GetBytes("seq,trade_key\n1,x\n");
-        folder.Files["manifest.json"] = Manifest(folder.Files[PackFiles.EngineValuesName]);
+        folder.Files["manifest.json"] = Manifest(folder.Files[PackFiles.EngineValuesName], folder.Files[PackFiles.PackJsonName]);
         return folder;
     }
 

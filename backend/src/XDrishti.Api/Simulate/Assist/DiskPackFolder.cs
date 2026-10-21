@@ -1,7 +1,7 @@
 namespace XDrishti.Api.Simulate.Assist;
 
 /// <summary>
-/// The pack folder on disk for the assisted check. It writes only the four files of the assisted check, each through a temporary file and a move, and never <c>check-log.csv</c> or any file of the manifest; it reads nothing through a symbolic link and nothing above
+/// The pack folder on disk for the assisted check. It writes only the four files of the assisted check and the two of the gate (P3-09d), each through a temporary file and a move, and never <c>check-log.csv</c> or any file of the manifest; it reads nothing through a symbolic link and nothing above
 /// <see cref="AssistBarsCsv.MaxBytes"/>.
 /// </summary>
 internal sealed class DiskPackFolder(string folder) : IPackFolder
@@ -12,7 +12,7 @@ internal sealed class DiskPackFolder(string folder) : IPackFolder
 
     public const string ManifestName = "assist-manifest.json";
 
-    private static readonly string[] Writable = [AssistBarsCsv.CacheName, LogName, ReportName, ManifestName];
+    private static readonly string[] Writable = [AssistBarsCsv.CacheName, LogName, ReportName, ManifestName, Gate.GateRunner.JsonName, Gate.GateRunner.MarkdownName];
 
     public byte[]? Read(string name)
     {

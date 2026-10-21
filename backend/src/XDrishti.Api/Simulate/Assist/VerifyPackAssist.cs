@@ -1,4 +1,5 @@
 using XDrishti.Api.Simulate.Assist;
+using XDrishti.Api.Simulate.Gate;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Market.Search;
@@ -21,7 +22,8 @@ internal static class VerifyPackAssist
             return await Refuse(console, "the Dhan second source needs the broker vault key (BrokerVault__Key, set by scripts/verify-pack.sh from the Keychain); or use --second-source-folder");
         }
 
-        var folder = Path.GetFullPath(options.AssistPath!);
+        var gate = options.GatePath is not null;
+        var folder = Path.GetFullPath(options.GatePath ?? options.AssistPath!);
         if (!Directory.Exists(folder) || ExportPaths.IsLink(folder))
         {
             return await Refuse(console, "the pack folder does not exist or is a symbolic link");
@@ -46,6 +48,23 @@ internal static class VerifyPackAssist
             provider.GetRequiredService<IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>>>(),
             provider.GetRequiredService<IQueryHandler<GetInstrumentQuery, Result<InstrumentDetail>>>(),
             provider.GetRequiredService<IBarStore>());
+
+        if (gate)
+        {
+            var decided = await GateRunner.RunAsync(new DiskPackFolder(folder), source, stored, cancellationToken);
+            foreach (var line in decided.Lines)
+            {
+                await (decided.Status is null ? console.Error : console.Out).WriteLineAsync(line);
+            }
+
+            if (decided.Status is { } status)
+            {
+                var code = GateStatuses.Code(status);
+                SimulateLog.GateDecided(logger, code, source.Name);
+            }
+
+            return decided.Exit;
+        }
 
         var outcome = await AssistRunner.RunAsync(new DiskPackFolder(folder), source, stored, cancellationToken);
         foreach (var line in outcome.Lines)

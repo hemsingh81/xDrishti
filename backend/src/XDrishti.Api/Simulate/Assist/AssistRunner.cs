@@ -9,7 +9,10 @@ using XDrishti.SimReader;
 namespace XDrishti.Api.Simulate.Assist;
 
 /// <summary>What the assisted check did: the exit code, the lines for the console, and the hashes it printed.</summary>
-internal sealed record AssistOutcome(int Exit, IReadOnlyList<string> Lines, string? LogHash, string? EngineHash);
+internal sealed record AssistOutcome(int Exit, IReadOnlyList<string> Lines, string? LogHash, string? EngineHash, AssistDetails? Details = null);
+
+/// <summary>What the gate (spec P3-09d) needs from a finished read: the pack identity, the verdicts, the engine's values and the hash of the second-source file.</summary>
+internal sealed record AssistDetails(string PackId, string Seed, IReadOnlyList<RowVerdict> Verdicts, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Engine, string CacheHash);
 
 /// <summary>
 /// The assisted check (spec P3-09c), in the order that keeps it blind (D5): the second source's bars (cached in <c>second-source-bars.csv</c>), the stored bars, the reader on the second source's day, the bar comparison, then <c>assist-log.csv</c> is written
@@ -99,7 +102,7 @@ internal static class AssistRunner
         lines.AddRange(Verdicts.All.Select(v => v + ": " + verdicts.Count(x => x.Verdict == v).ToString(CultureInfo.InvariantCulture)));
         lines.AddRange(AssistCounters.Lines(verdicts));
         lines.Add("this is an assisted read, not a signed check: check-log.csv was not touched and no verdict was written");
-        return new AssistOutcome(SimulateCommand.Done, lines, logHash, engineHash);
+        return new AssistOutcome(SimulateCommand.Done, lines, logHash, engineHash, new AssistDetails(pack.PackId, pack.Seed, verdicts, engine, cacheHash));
     }
 
     private static async Task<AssistRow> ReadRowAsync(
