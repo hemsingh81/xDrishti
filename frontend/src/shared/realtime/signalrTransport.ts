@@ -2,6 +2,8 @@ import { HttpTransportType, HubConnectionBuilder, LogLevel } from '@microsoft/si
 import type { HubTransport } from './eventsHub';
 import {
   eventsHub as contract,
+  type LabRunFinished,
+  type LabRunProgress,
   type LiveFeedStatus,
   type LiveScope,
   type PricesChanged,
@@ -28,6 +30,12 @@ export function createSignalrTransport(): HubTransport {
     },
     onFeedStatus: (handler: (message: LiveFeedStatus) => void) => {
       connection.on(contract.events.feedStatus, handler);
+    },
+    onLabRunProgress: (handler: (message: LabRunProgress) => void) => {
+      connection.on(contract.events.labRunProgress, handler);
+    },
+    onLabRunFinished: (handler: (message: LabRunFinished) => void) => {
+      connection.on(contract.events.labRunFinished, handler);
     },
     onClose: (handler: () => void) => {
       connection.onclose(handler);

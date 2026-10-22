@@ -62,6 +62,8 @@ function setup(failures = 0, ack: SubscribeAck = { subscribed: 2, truncated: fal
         onFeedStatus: (handler) => {
           link.status = handler;
         },
+        onLabRunProgress: () => undefined,
+        onLabRunFinished: () => undefined,
         onClose: (handler) => {
           link.close = handler;
         },

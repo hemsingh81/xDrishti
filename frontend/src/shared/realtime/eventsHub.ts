@@ -1,4 +1,11 @@
-import type { LiveFeedStatus, LiveScope, PricesChanged, SubscribeAck } from './hubContract.generated';
+import type {
+  LabRunFinished,
+  LabRunProgress,
+  LiveFeedStatus,
+  LiveScope,
+  PricesChanged,
+  SubscribeAck,
+} from './hubContract.generated';
 
 /**
  * What the hub client needs from a connection to `/hubs/events`, in the terms of the generated contract. The real one is a
@@ -13,6 +20,8 @@ export interface HubTransport {
   /** The handlers of the server's events; set before `start`. */
   onPricesChanged(handler: (message: PricesChanged) => void): void;
   onFeedStatus(handler: (message: LiveFeedStatus) => void): void;
+  onLabRunProgress(handler: (message: LabRunProgress) => void): void;
+  onLabRunFinished(handler: (message: LabRunFinished) => void): void;
   /** Called once when a started connection ends (the server closed it, the network was lost, the session ended). */
   onClose(handler: () => void): void;
 }
@@ -69,6 +78,8 @@ export class EventsHub {
   private snapshot: HubSnapshot = idle;
   private readonly stateListeners = new Set<() => void>();
   private readonly priceHandlers = new Set<(message: PricesChanged) => void>();
+  private readonly labProgressHandlers = new Set<(message: LabRunProgress) => void>();
+  private readonly labFinishedHandlers = new Set<(message: LabRunFinished) => void>();
   private leases = 0;
   /** Grows with every open and close, so a late answer of an earlier connection is recognised and dropped. */
   private generation = 0;
@@ -102,6 +113,17 @@ export class EventsHub {
     return () => {
       this.priceHandlers.delete(handler);
     };
+  };
+
+  /** Adds a handler of `labRunProgress` / `labRunFinished`; returns the function that removes it. */
+  readonly onLabProgress = (handler: (message: LabRunProgress) => void): (() => void) => {
+    this.labProgressHandlers.add(handler);
+    return () => this.labProgressHandlers.delete(handler) && undefined;
+  };
+
+  readonly onLabFinished = (handler: (message: LabRunFinished) => void): (() => void) => {
+    this.labFinishedHandlers.add(handler);
+    return () => this.labFinishedHandlers.delete(handler) && undefined;
   };
 
   /** Asks for the connection; the returned function gives it back (call it once). */
@@ -159,6 +181,14 @@ export class EventsHub {
       transport.onPricesChanged((message) => {
         if (generation !== this.generation) return;
         for (const handler of this.priceHandlers) handler(message);
+      });
+      transport.onLabRunProgress((message) => {
+        if (generation !== this.generation) return;
+        for (const handler of this.labProgressHandlers) handler(message);
+      });
+      transport.onLabRunFinished((message) => {
+        if (generation !== this.generation) return;
+        for (const handler of this.labFinishedHandlers) handler(message);
       });
       transport.onFeedStatus((status) => {
         if (generation === this.generation) this.set({ status });

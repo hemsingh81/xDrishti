@@ -61,6 +61,9 @@ describe('the SignalR transport', () => {
     const closed = vi.fn();
     transport.onPricesChanged(prices);
     transport.onFeedStatus(status);
+    const labProgress = vi.fn();
+    transport.onLabRunProgress(labProgress);
+    transport.onLabRunFinished(vi.fn());
     transport.onClose(closed);
 
     await expect(transport.subscribe({ accountId: null, bucketId: null, holdingIds: ['h1'] })).resolves.toMatchObject({
@@ -74,6 +77,8 @@ describe('the SignalR transport', () => {
 
     calls.handlers.get('pricesChanged')?.({ asOf: 'x', instruments: [] });
     calls.handlers.get('feedStatus')?.({ state: 'connected', subscribed: 0, lastTickAt: null });
+    calls.handlers.get('labRunProgress')?.({});
+    expect(labProgress).toHaveBeenCalledOnce();
     calls.closed?.();
     expect(prices).toHaveBeenCalledOnce();
     expect(status).toHaveBeenCalledOnce();

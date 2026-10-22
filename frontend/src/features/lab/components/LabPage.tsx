@@ -6,19 +6,22 @@ import { PageHeader } from '@/shared/ui';
 import { useToast } from '@/shared/ui/toastContext';
 import { versionQuery } from '../api/labQueries';
 import { EditorCard, type Draft } from './EditorCard';
+import { LedgerCard } from './LedgerCard';
 import { LibraryCard } from './LibraryCard';
+import { RunsCard } from './RunsCard';
 
 interface Origin {
   id: string;
   version: number;
 }
 
-/** Strategy Lab: the library and the YAML editor (runs and reports arrive with P5-08b). */
+/** Strategy Lab: the library and the YAML editor and the test runs. */
 export function LabPage() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [origin, setOrigin] = useState<Origin | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>({ text: '', parentHash: null });
 
   const open = async (id: string, version: number) => {
@@ -61,6 +64,14 @@ export function LabPage() {
             onSaved={(c) => void open(c.id, c.version)}
           />
         </Grid>
+        <Grid size={12}>
+          <RunsCard familyId={familyId} target={origin} runId={runId} onSelectRun={setRunId} />
+        </Grid>
+        {familyId && (
+          <Grid size={12}>
+            <LedgerCard strategyId={familyId} onSelectRun={setRunId} />
+          </Grid>
+        )}
       </Grid>
     </>
   );

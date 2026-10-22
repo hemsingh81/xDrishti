@@ -161,7 +161,7 @@ export function EditorCard({ draft, origin, onChange, onReplace, onSaved }: Edit
         <div aria-live="polite">
           {draft.text.trim() === '' && (
             <Typography color="text.secondary" sx={{ mt: 1 }}>
-              Open a version, clone one or upload a file. Running tests arrives with the next slice.
+              Open a version, clone one or upload a file.
             </Typography>
           )}
           {validation.error && (
