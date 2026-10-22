@@ -83,7 +83,7 @@ bound of the credible interval; exponential recency weighting.</p>
 <p><strong>Layer 2 — Exit selection.</strong> See <a href="08-exits-and-risk.html">doc 08</a> §3. Its input, the replay of the same entries under every candidate with the MAE/MFE tables, is built (P4-05, <a href="../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.html">ADR 0053</a>); the choice by out-of-sample expectancy per cell, with its folds, minimum sample and stability report, is built (P4-06, <a href="../adr/0054-the-per-cell-exit-choice-by-walk-forward.html">ADR 0054</a>); it applies nothing until a stored strategy exists to apply it to.</p>
 <p><strong>Layer 3 — Meta-model (meta-labeling).</strong></p>
 <ul>
-<li>Labels: <strong>triple barrier</strong> — target, stop, time limit (session end / max hold).</li>
+<li>Labels: <strong>triple barrier</strong> — target, stop, time limit (session end / max hold). Built (P6-03, <a href="../adr/0065-triple-barrier-labels-from-the-exit-reason.html">ADR 0065</a>): label 1 only when the target ended the trade, 0 for stop, session end, max hold and exit-rule exits; end-of-data trades are left out; R at resolution is kept as a second target.</li>
 <li>Model: gradient-boosted trees (ML.NET LightGBM, FastTree fallback) per style × side (strategy as feature),
 <strong>isotonic (PAV) calibration</strong>, per-prediction feature contributions + permutation importance; trained and
 scored in-process in .NET.</li>
@@ -504,7 +504,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-22 21:17</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-22 21:56</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

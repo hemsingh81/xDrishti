@@ -22,12 +22,12 @@ public sealed class DomainResearchSurfaceTests
 
         research.ShouldBe(
         [
-            "AppliedAdjustment", "BarStreamHash", "BuiltInParameterInfo", "BuiltInStrategyInfo", "CalendarExceptionDay", "CandidateDiagnostics", "CandidateRecord", "CandidateRun", "CanonicalText", "ChargeRates", "ChargeRounding", "ChargeSchedule",
+            "AppliedAdjustment", "BarStreamHash", "BarrierOutcome", "BuiltInParameterInfo", "BuiltInStrategyInfo", "CalendarExceptionDay", "CandidateDiagnostics", "CandidateRecord", "CandidateRun", "CanonicalText", "ChargeRates", "ChargeRounding", "ChargeSchedule",
             "ComparisonReplay", "ComparisonReport", "ComparisonRow", "ComparisonRun", "ConditionCounter", "CostApplication",
             "CostBasis", "CostContext", "CostDescription", "CostErrors", "CostLimits", "CostModel", "CostRecord", "CostSegment", "CostSheet", "CostSheetJson", "DateSpan", "DiagnosticFigure", "DiscontinuityNote", "EntryFill", "ExitCandidate", "ExitChoice", "ExitFlags", "ExitParameterValue", "ExitReason", "ExitSelection", "ExitSelector", "ExitShare", "FillBasis",
-            "FillDescription", "FillLimit", "FillLimits", "FillRules", "FoldCandidateRow", "GapFillRule", "InstrumentReplay", "InstrumentReplayInput", "InstrumentRun", "Leg", "LegCharge", "LegCharges", "LegKind", "NoTradeReason", "PairedFigure", "PlateauChoice", "PooledFigure", "ReplayOptions", "RunAssembler", "RunCounters",
+            "FillDescription", "FillLimit", "FillLimits", "FillRules", "FoldCandidateRow", "GapFillRule", "InstrumentReplay", "InstrumentReplayInput", "InstrumentRun", "LabelBasis", "Leg", "LegCharge", "LegCharges", "LegKind", "NoTradeReason", "PairedFigure", "PlateauChoice", "PooledFigure", "ReplayOptions", "RunAssembler", "RunCounters",
             "RunFates", "RunHeader", "RunLabelSet", "RunLabels", "RunTrade", "SampleFigures", "ScanCounters", "SelectionFold", "SelectionInput", "SelectionOptions", "SelectionStability", "SelectionTrade", "SessionCounts", "SessionExclusion", "SessionExclusions", "SessionNote", "Side", "SimTrade", "SimulationErrors", "SimulationRun",
-            "Sizing", "SizingProfile", "SkipCount", "SkipReason", "SkipReasons", "SlippageConfig", "StrategyRecord", "TickProbe", "TickSpec", "TickUnitCheck", "TimeStopChoice", "TradeCardData", "TradeCostApplier", "TradeCosting", "TradeSkip", "UniverseKind",
+            "Sizing", "SizingProfile", "SkipCount", "SkipReason", "SkipReasons", "SlippageConfig", "StrategyRecord", "TickProbe", "TickSpec", "TickUnitCheck", "TimeStopChoice", "TradeCardData", "TradeCostApplier", "TradeCosting", "TradeSkip", "TrainingSet", "TrainingSetBuilder", "TripleBarrier", "TripleBarrierLabel", "UniverseKind",
             "UniverseLabels", "UniverseMember", "UniverseRecord", "WalkCounters",
         ]);
     }
