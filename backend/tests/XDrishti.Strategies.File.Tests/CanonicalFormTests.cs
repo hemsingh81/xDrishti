@@ -89,4 +89,32 @@ public sealed class CanonicalFormTests
             CanonicalStrategy.Json(StrategyFile.Read(StrategyFile.Write(definition)).Definition!).ShouldBe(CanonicalStrategy.Json(definition));
         }
     }
+
+    [Fact]
+    public void Unsorted_params_and_exit_parameters_hash_like_the_sorted_ones()
+    {
+        var definition = Example.Model();
+        var exit = definition.Buy!.Exits![1];
+        var shuffled = definition with
+        {
+            Params = [.. definition.Params.Reverse()],
+            Buy = definition.Buy with { Exits = [definition.Buy.Exits[0], exit with { Parameters = [.. exit.Parameters.Reverse()] }] },
+        };
+
+        StrategyHash.Of(shuffled).ShouldBe(StrategyHash.Of(definition));
+    }
+
+    [Theory]
+    [InlineData("a: 1\nb: [")]
+    [InlineData("strategy: !!binary x\n")]
+    [InlineData("\"\\uD800\"")]
+    [InlineData("- &a [*a]")]
+    [InlineData("? |\n  x\n: y")]
+    public void Odd_input_is_a_problem_never_an_exception(string text)
+    {
+        var result = StrategyFile.Read(text);
+
+        result.Definition.ShouldBeNull();
+        result.HasErrors.ShouldBeTrue();
+    }
 }

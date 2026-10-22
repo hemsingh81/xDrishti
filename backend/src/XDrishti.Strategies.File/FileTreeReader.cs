@@ -39,7 +39,7 @@ internal sealed class FileTreeReader
             problems.Add(e.Problem);
             return null;
         }
-        catch (Exception e) when (e is YamlException or InvalidOperationException or ArgumentException or IndexOutOfRangeException or FormatException or OverflowException)
+        catch (Exception e) when (e is not (OutOfMemoryException or OperationCanceledException))
         {
             // the parser library throws its own YamlException for bad syntax and, on some malformed text, a plain framework exception; both are the same answer: the text is not valid YAML
             var start = (e as YamlException)?.Start ?? Mark.Empty;
@@ -104,12 +104,18 @@ internal sealed class FileTreeReader
         return root ?? throw new FileTreeException(Problem(default, FileCodes.Empty, "The file is empty."));
     }
 
-    private FileNode ReadNode(Parser parser, ParsingEvent current, int depth)
+    private void CountNode(ParsingEvent at)
     {
         if (++_nodes > _limits.MaxNodes)
         {
-            throw new FileTreeException(Problem(At(current), FileCodes.TooManyNodes, $"The file has more than {_limits.MaxNodes} nodes."));
+            throw new FileTreeException(Problem(At(at), FileCodes.TooManyNodes, $"The file has more than {_limits.MaxNodes} nodes."));
         }
+    }
+
+    // The scalar length limit is checked after the parser has built the value; the real bound on any scalar is the byte cap on the whole text (MaxBytes), checked before parsing.
+    private FileNode ReadNode(Parser parser, ParsingEvent current, int depth)
+    {
+        CountNode(current);
 
         switch (current)
         {
@@ -184,7 +190,7 @@ internal sealed class FileTreeReader
                 throw new FileTreeException(Problem(At(keyEvent), keyEvent is AnchorAlias ? FileCodes.AliasRefused : FileCodes.BadKey, "A key must be a plain word."));
             }
 
-            _nodes++;
+            CountNode(key);
             Refuse(key.Anchor, key.Tag, key);
             if (key.Value.Length > _limits.MaxScalarLength)
             {
