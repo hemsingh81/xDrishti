@@ -15,6 +15,9 @@ internal enum Verb
     /// <summary>The <c>verify-pack</c> verb (spec P3-09): first argument <c>verify-pack</c>, nothing else selects it.</summary>
     VerifyPack,
 
+    /// <summary>The <c>xd</c> verb (spec P5-07): first argument <c>xd</c>, nothing else selects it.</summary>
+    Xd,
+
     /// <summary>The container health probe (<c>--healthcheck</c>).</summary>
     HealthCheck,
 

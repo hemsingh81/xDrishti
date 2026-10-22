@@ -560,6 +560,15 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td></td>
 </tr>
 <tr>
+<td>P5-07</td>
+<td><strong><code>xd</code> CLI, built 2026-10-22 (<a href="../adr/0061-the-xd-cli-is-a-verb-of-the-api-host-behind-a-thin-script.html">ADR 0061</a>)</strong>: there was no <code>xd</code> binary (verified), so a verb <code>xd</code> of the Api host behind <code>scripts/xd.sh</code>: <code>strategy validate</code> (located problems on stderr), <code>strategy test</code> (stores the version, queues the run, waits, prints verdict; exit 0/1/2/3/4/130), <code>lab runs</code>. <code>xd-api</code> carries the run out. Not run against a live database.</td>
+<td>P5</td>
+<td>1 d</td>
+<td>Built</td>
+<td><a href="../specs/P5-07-the-xd-cli.html">spec</a> (Approved, built 2026-10-22)</td>
+<td>Tests with fake handlers for every exit code and Ctrl-C</td>
+</tr>
+<tr>
 <td>P3-02e</td>
 <td><strong>BUY to SELL mirror</strong>: rewrite a BUY side into its SELL side on the syntax tree and print it (comparison direction, <code>crosses_above/below</code>, <code>rising/falling</code>, <code>highest/lowest</code>, <code>or_high/or_low</code>, previous-day high/low, <code>rsi(n)</code> to <code>100 − n</code>, signed features) from a closed rewrite table; anything without a defined mirror (<code>day_of_week</code>, <code>regime()</code>, several context names) is an error that tells the author to write a sell block. The three built-ins carry hand-written sell blocks, so this is for user strategies (doc 11 §2).</td>
 <td>free capacity</td>
@@ -888,7 +897,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 13:44</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 15:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
