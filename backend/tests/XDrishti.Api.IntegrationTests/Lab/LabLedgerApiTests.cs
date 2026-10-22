@@ -21,7 +21,7 @@ public sealed class LabLedgerApiTests(ApiFactory factory) : DataTestBase(factory
         await using (var connection = await OpenAsync())
         {
             await ExecuteAsync(connection, "DELETE FROM lab.test_ledger");
-            await ExecuteAsync(connection, "DELETE FROM lab.lab_runs");
+            await ExecuteAsync(connection, "DELETE FROM lab.lab_results; DELETE FROM lab.lab_runs");
         }
 
         await StrategySeeding.SeedAsync(Factory.Services, Ct);

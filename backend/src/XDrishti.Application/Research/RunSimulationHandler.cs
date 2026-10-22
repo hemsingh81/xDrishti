@@ -53,7 +53,7 @@ internal sealed class RunSimulationHandler(
     public async ValueTask<Result<ComparisonRun>> HandleAsync(RunComparisonQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var executed = await ExecuteAsync(query.Request, null, cancellationToken);
+        var executed = await ExecuteAsync(query.Request, query.Progress, cancellationToken);
         if (executed.IsFailure)
         {
             return Result.Failure<ComparisonRun>(executed.Error);

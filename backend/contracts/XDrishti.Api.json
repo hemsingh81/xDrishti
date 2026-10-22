@@ -11038,6 +11038,83 @@
         },
         "description": "The trading calendar. `days`: the confirmed holidays and special sessions from `from` to `to` (India dates, both included; default today and a\nyear on), by date. `proposals`: every proposed day, whatever its date, waiting for Confirm or Dismiss (including proposals that lie next to a confirmed day, marked `replaces`). `nextHoliday`: the first confirmed holiday\ntoday or later (null when none is known)."
       },
+      "CellView": {
+        "required": [
+          "cell",
+          "timeframe",
+          "side",
+          "default",
+          "chosen",
+          "noChoiceReason",
+          "stable",
+          "stabilityReason",
+          "folds",
+          "usableFolds",
+          "oosTrades",
+          "oosMeanR",
+          "defaultOosMeanR"
+        ],
+        "type": "object",
+        "properties": {
+          "cell": {
+            "type": "string"
+          },
+          "timeframe": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "default": {
+            "type": "string"
+          },
+          "chosen": {
+            "type": "string"
+          },
+          "noChoiceReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "stable": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "stabilityReason": {
+            "type": "string"
+          },
+          "folds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "usableFolds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "oosTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "oosMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "defaultOosMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          }
+        },
+        "description": "One cell (timeframe and side) of a full test: the exit the walk-forward chose and how stable that choice was."
+      },
       "ChangePasswordRequest": {
         "required": [
           "currentPassword",
@@ -14331,6 +14408,62 @@
         },
         "description": "An automatic (scheduled) run as the Data screen shows it. `status`: running · succeeded · failed · skipped; `message` is the reason a run failed or was skipped\n(for example the Data account was not connected). `trigger` is always `daily` here."
       },
+      "EvidenceView": {
+        "required": [
+          "oosTrades",
+          "expectancyR",
+          "profitFactor",
+          "folds",
+          "positiveFolds",
+          "maxDrawdownR",
+          "calibrationErrorPp",
+          "method"
+        ],
+        "type": "object",
+        "properties": {
+          "oosTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectancyR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "profitFactor": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "folds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "positiveFolds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "maxDrawdownR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "calibrationErrorPp": {
+            "type": "number",
+            "format": "double"
+          },
+          "method": {
+            "type": "string"
+          }
+        },
+        "description": "The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words."
+      },
       "ExecutionView": {
         "required": [
           "retries",
@@ -14485,6 +14618,55 @@
         },
         "description": "Freshness against the trading calendar: the last bar and the last closed session; `daysBehind` counts trading days."
       },
+      "FullPeriodView": {
+        "required": [
+          "cell",
+          "candidate",
+          "trades",
+          "meanR",
+          "profitFactor",
+          "totalR",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "cell": {
+            "type": "string"
+          },
+          "candidate": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "profitFactor": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "totalR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "description": "A full-period (in-sample) figure of one candidate in one cell. It is exploration and never reaches the verdict."
+      },
       "GapPage": {
         "required": [
           "items",
@@ -14602,6 +14784,44 @@
           }
         },
         "description": "How many instrument-sessions are in each state (the Dhan phase's gap table): `open` (missing bars a refetch may still add), `unfillable` (a refetch added\nnothing), `filled`; `lastDetectedAt` is when a gap was last found (null while there never was one)."
+      },
+      "GateView": {
+        "required": [
+          "name",
+          "required",
+          "adjusted",
+          "actual",
+          "passed",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "required": {
+            "type": "number",
+            "format": "double"
+          },
+          "adjusted": {
+            "type": "number",
+            "format": "double"
+          },
+          "actual": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "One gate of a verdict as served (spec P5-03, P5-04); `Actual` is null when it is not finite."
       },
       "GroupPart": {
         "required": [
@@ -16901,9 +17121,13 @@
             "format": "date-time"
           },
           "verdict": {
-            "type": [
-              "null",
-              "string"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LabVerdictView"
+              }
             ]
           }
         },
@@ -17007,6 +17231,67 @@
           }
         },
         "description": "The universe of a Lab run as it was resolved when the run was posted (spec P5-02, D2): the basket changes later, the run keeps the list. Requested is the number of members before the quick-test sample;\nSampled says the list was cut to the limit by the seeded shuffle of Seed."
+      },
+      "LabVerdictView": {
+        "required": [
+          "outcome",
+          "variantCount",
+          "adjustmentFactor",
+          "evidence",
+          "gates",
+          "limits",
+          "cells",
+          "fullPeriod",
+          "labels"
+        ],
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string"
+          },
+          "variantCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "adjustmentFactor": {
+            "type": "number",
+            "format": "double"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvidenceView"
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GateView"
+            }
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellView"
+            }
+          },
+          "fullPeriod": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FullPeriodView"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block."
       },
       "LabWindow": {
         "required": [

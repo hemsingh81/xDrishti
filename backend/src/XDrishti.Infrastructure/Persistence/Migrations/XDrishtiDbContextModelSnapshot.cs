@@ -3718,6 +3718,68 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.LabResultRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<double>("AdjustmentFactor")
+                        .HasColumnType("double precision")
+                        .HasColumnName("adjustment_factor");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("LabRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lab_run_id");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("result");
+
+                    b.Property<string>("StrategyHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("strategy_hash");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<int>("VariantCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("variant_count");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lab_results");
+
+                    b.HasIndex("LabRunId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_lab_results_run");
+
+                    b.ToTable("lab_results", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_lab_results_outcome", "outcome IN ('PASS', 'MARGINAL', 'FAIL')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.LabRunRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5290,6 +5352,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_exit_selections_comparison");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.LabResultRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.LabRunRow", null)
+                        .WithMany()
+                        .HasForeignKey("LabRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lab_results_run");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.LabRunRow", b =>

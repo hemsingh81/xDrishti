@@ -61,6 +61,7 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(LabRunView))]
 [JsonSerializable(typeof(IReadOnlyList<LabRunView>))]
 [JsonSerializable(typeof(LedgerView))]
+[JsonSerializable(typeof(LabVerdictView))]
 [JsonSerializable(typeof(LabRunProgress))]
 [JsonSerializable(typeof(LabRunFinished))]
 [JsonSerializable(typeof(LiveFeedStatus))]

@@ -25,6 +25,8 @@ internal sealed class LabRunner(
     IRunRecordWriter recordWriter,
     ICostSheetStore sheets,
     ISimulationEngine engine,
+    LabFullTest fullTest,
+    ILabResultStore results,
     ILabProgress progress,
     LabSettings settings,
     TimeProvider time,
@@ -42,6 +44,9 @@ internal sealed class LabRunner(
     /// <summary>The quick-test stage.</summary>
     public const string QuickTest = "quick_test";
 
+    /// <summary>The full-test stage (P5-04).</summary>
+    public const string FullTest = "full_test";
+
     /// <summary>How often the watcher looks at the run's progress.</summary>
     private static readonly TimeSpan WatchTick = TimeSpan.FromMilliseconds(100);
 
@@ -54,14 +59,15 @@ internal sealed class LabRunner(
         LabRunLog.Started(logger, run.Id, run.Key[..12]);
         var log = new StageLog(time);
         var counter = new InstrumentCounter();
+        var watch = new WatchState();
         using var owner = CancellationTokenSource.CreateLinkedTokenSource(hostStop);
         using var watcherStop = new CancellationTokenSource();
         var throttle = new ProgressThrottle(time, ProgressThrottle.QuarterSecond);
-        var watcher = WatchAsync(run, counter, owner, throttle, watcherStop.Token);
+        var watcher = WatchAsync(run, counter, watch, owner, throttle, watcherStop.Token);
         LabFinish finish;
         try
         {
-            finish = await StagesAsync(run, log, counter, throttle, owner.Token, hostStop);
+            finish = await StagesAsync(run, log, counter, watch, throttle, owner.Token, hostStop);
         }
         catch (OperationCanceledException) when (hostStop.IsCancellationRequested)
         {
@@ -92,7 +98,7 @@ internal sealed class LabRunner(
         await watcher;
     }
 
-    private async Task<LabFinish> StagesAsync(LabRun run, StageLog log, InstrumentCounter counter, ProgressThrottle throttle, CancellationToken ownerToken, CancellationToken hostStop)
+    private async Task<LabFinish> StagesAsync(LabRun run, StageLog log, InstrumentCounter counter, WatchState watch, ProgressThrottle throttle, CancellationToken ownerToken, CancellationToken hostStop)
     {
         var started = time.GetTimestamp();
 
@@ -127,22 +133,21 @@ internal sealed class LabRunner(
             return Failed(run, log, Compile, "lab.compile_failed", problems);
         }
 
-        // quick test
         ownerToken.ThrowIfCancellationRequested();
+        if (string.Equals(run.Method, LabSettings.FullMethod, StringComparison.Ordinal))
+        {
+            return await FullAsync(run, description, log, counter, watch, throttle, problems, started, ownerToken, hostStop);
+        }
+
+        // quick test
         var total = run.Universe.Instruments.Count;
+        watch.Set(QuickTest, total);
         await BeginAsync(run, log, QuickTest, 0, total, throttle, ownerToken);
         var request = await RequestAsync(run, description, ownerToken);
         var result = await simulation.HandleAsync(new RunSimulationQuery(request, counter), ownerToken);
         if (result.IsFailure)
         {
-            problems.AddRange((result.Error.Fields ?? []).Select(f => new LabProblem(QuickTest, f.Field, f.Code ?? result.Error.Code, f.Message, "error", null, null)));
-            if (result.Error.Fields is null or { Count: 0 })
-            {
-                problems.Add(new LabProblem(QuickTest, string.Empty, result.Error.Code, result.Error.Message, "error", null, null));
-            }
-
-            log.Finish(QuickTest, problems.Count(p => p.Stage == QuickTest), time.GetUtcNow());
-            return Failed(run, log, QuickTest, result.Error.Code, problems);
+            return FailedStage(run, log, QuickTest, result.Error, problems);
         }
 
         var simulated = result.Value;
@@ -169,6 +174,65 @@ internal sealed class LabRunner(
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
         LabRunLog.Finished(logger, run.Id, simulated.RunKey[..12], simulated.Trades.Count, simulated.OpenAtEnd.Count, elapsedMs);
         return new LabFinish(run.Id, LabRunState.Succeeded, QuickTest, [simulated.RunKey], counts, problems, log.Snapshot(), null, time.GetUtcNow());
+    }
+
+    private LabFinish FailedStage(LabRun run, StageLog log, string stage, Error error, List<LabProblem> problems)
+    {
+        problems.AddRange((error.Fields ?? []).Select(f => new LabProblem(stage, f.Field, f.Code ?? error.Code, f.Message, "error", null, null)));
+        if (error.Fields is null or { Count: 0 })
+        {
+            problems.Add(new LabProblem(stage, string.Empty, error.Code, error.Message, "error", null, null));
+        }
+
+        log.Finish(stage, problems.Count(p => p.Stage == stage), time.GetUtcNow());
+        return Failed(run, log, stage, error.Code, problems);
+    }
+
+    /// <summary>The full test (spec P5-04): the walk-forward over timeframe, side and exit, the runs stored whole, the verdict stored, then the run ends.</summary>
+    private async Task<LabFinish> FullAsync(LabRun run, StrategyDescription description, StageLog log, InstrumentCounter counter, WatchState watch, ProgressThrottle throttle, List<LabProblem> problems, long started, CancellationToken ownerToken, CancellationToken hostStop)
+    {
+        var total = run.Universe.Instruments.Count * Math.Max(1, description.Timeframes.Count);
+        watch.Set(FullTest, total);
+        await BeginAsync(run, log, FullTest, 0, total, throttle, ownerToken);
+        var template = await RequestAsync(run, description, ownerToken);
+        if (template.Costs is not CostChoice.SheetChoice)
+        {
+            return FailedStage(run, log, FullTest, Error.Validation("lab.costs_required", "A full test is costed: the charge sheet is not stored or not in force on the first day of the window."), problems);
+        }
+
+        var outcome = await fullTest.RunAsync(run, description, template, counter, ownerToken);
+        if (outcome.IsFailure)
+        {
+            return FailedStage(run, log, FullTest, outcome.Error, problems);
+        }
+
+        var full = outcome.Value;
+        ownerToken.ThrowIfCancellationRequested();
+        if (await runs.IsCancelRequestedAsync(run.Id, hostStop))
+        {
+            LabRunLog.Cancelled(logger, run.Id, FullTest);
+            return log.End(run.Id, LabRunState.Cancelled, null, problems, time.GetUtcNow());
+        }
+
+        var keys = new List<string>();
+        foreach (var simulated in full.Runs)
+        {
+            var stored = await storeRun.HandleAsync(new StoreRunCommand(simulated, recordWriter.Write(simulated), "lab:full"), hostStop);
+            if (stored.IsFailure)
+            {
+                return FailedStage(run, log, FullTest, stored.Error, problems);
+            }
+
+            keys.Add(simulated.RunKey);
+        }
+
+        await results.AppendAsync(run.Id, run.StrategyId, run.StrategyHash, full.Verdict, time.GetUtcNow(), hostStop);
+        LabRunLog.ResultStored(logger, run.Id, full.Verdict.Outcome, full.Verdict.VariantCount);
+        log.Finish(FullTest, 0, time.GetUtcNow());
+        var counts = new LabCounts(full.Instruments, full.InstrumentsRun, full.Instruments - full.InstrumentsRun, full.Trades, 0);
+        var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
+        LabRunLog.Finished(logger, run.Id, keys[0][..12], full.Trades, 0, elapsedMs);
+        return new LabFinish(run.Id, LabRunState.Succeeded, FullTest, keys, counts, problems, log.Snapshot(), null, time.GetUtcNow());
     }
 
     private LabFinish Failed(LabRun run, StageLog log, string stage, string code, List<LabProblem> problems)
@@ -205,7 +269,7 @@ internal sealed class LabRunner(
         ?? (description.Timeframes.Contains(Timeframe.M15) || description.Timeframes.Count == 0 ? Timeframe.M15 : description.Timeframes[0]);
 
     /// <summary>Looks at the run every tick: asks the database for a cancel now and then, and sends the instruments done when they changed and the throttle lets it.</summary>
-    private async Task WatchAsync(LabRun run, InstrumentCounter counter, CancellationTokenSource owner, ProgressThrottle throttle, CancellationToken stop)
+    private async Task WatchAsync(LabRun run, InstrumentCounter counter, WatchState watch, CancellationTokenSource owner, ProgressThrottle throttle, CancellationToken stop)
     {
         var lastSent = 0;
         var tick = 0;
@@ -224,9 +288,8 @@ internal sealed class LabRunner(
                 if (done != lastSent && throttle.TryPass())
                 {
                     lastSent = done;
-                    var total = run.Universe.Instruments.Count;
-                    await runs.ReportAsync(run.Id, QuickTest, done, total, [], time.GetUtcNow(), stop);
-                    await progress.ProgressAsync(new LabRunProgress(run.Id, LabRunStates.Code(LabRunState.Running), QuickTest, done, total, null), stop);
+                    await runs.ReportAsync(run.Id, watch.Stage, done, watch.Total, [], time.GetUtcNow(), stop);
+                    await progress.ProgressAsync(new LabRunProgress(run.Id, LabRunStates.Code(LabRunState.Running), watch.Stage, done, watch.Total, null), stop);
                 }
             }
         }
@@ -239,6 +302,23 @@ internal sealed class LabRunner(
 #pragma warning restore CA1031
         {
             // the run's own end writes the final state
+        }
+    }
+
+    /// <summary>The stage the watcher reports and the total it counts towards; set by the stage that begins.</summary>
+    private sealed class WatchState
+    {
+        private volatile string _stage = QuickTest;
+        private int _total;
+
+        public string Stage => _stage;
+
+        public int Total => Volatile.Read(ref _total);
+
+        public void Set(string stage, int total)
+        {
+            Volatile.Write(ref _total, total);
+            _stage = stage;
         }
     }
 

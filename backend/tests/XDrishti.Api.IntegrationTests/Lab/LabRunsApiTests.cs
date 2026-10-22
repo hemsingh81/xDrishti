@@ -9,6 +9,8 @@ using XDrishti.Api.IntegrationTests.Live;
 using XDrishti.Api.Simulate;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Platform;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Lab;
 using XDrishti.Domain.Market.Bars;
 using XDrishti.Infrastructure.Persistence;
@@ -41,7 +43,7 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
     public override async ValueTask InitializeAsync()
     {
         await base.InitializeAsync();
-        await StoreSqlAsync("DELETE FROM lab.lab_runs");
+        await StoreSqlAsync("DELETE FROM lab.lab_results; DELETE FROM lab.lab_runs");
         await StrategySeeding.SeedAsync(Factory.Services, Ct); // the built-ins ORB, VWAP_PULLBACK and BASE_BREAKOUT, as `xd-api migrate` writes them
     }
 
@@ -150,6 +152,49 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         run.GetProperty("labels").EnumerateArray().Select(l => l.GetString()).ShouldContain("Quick test: exploration, not a verdict.");
         (await CountAsync("SELECT count(*) FROM research.sim_runs WHERE run_key = @k", ("k", simKeys[0]))).ShouldBe(1, "the run is in the result store");
         (await CountAsync("SELECT count(*) FROM research.sim_runs WHERE created_by = 'lab:quick'")).ShouldBeGreaterThanOrEqualTo(1);
+    }
+
+    // P5-04
+
+    private static object FullBySymbols(IEnumerable<string> symbols) => new { strategyId = "ORB", version = 1, universe = new { symbols }, method = "full", window = new { from = D1.ToString("yyyy-MM-dd"), to = D3.ToString("yyyy-MM-dd") } };
+
+    [Fact]
+    public async Task A_full_test_without_a_stored_charge_sheet_is_refused_with_422()
+    {
+        var members = await InstrumentsAsync(2);
+
+        using var posted = await PostRunAsync(FullBySymbols(members.Select(m => m.Symbol)));
+
+        posted.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity, await posted.Content.ReadAsStringAsync(Ct));
+        (await CountAsync("SELECT count(*) FROM lab.lab_runs")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task A_full_test_runs_to_the_end_stores_the_result_and_serves_a_verdict_that_cannot_pass_on_three_days()
+    {
+        using (var scope = Factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ICostSheetStore>().SaveAsync(FixtureSheet.Build("default", null), "test", DateTimeOffset.UnixEpoch, Ct);
+            (await scope.ServiceProvider.GetRequiredService<IPlatformUnitOfWork>().TrySaveAsync(Ct)).ShouldBeTrue();
+        }
+
+        var members = await InstrumentsAsync(3);
+
+        var run = await PostAndDrainAsync(FullBySymbols(members.Select(m => m.Symbol)));
+
+        run.GetProperty("state").GetString().ShouldBe("succeeded", run.GetRawText());
+        run.GetProperty("method").GetString().ShouldBe("full");
+        run.GetProperty("stages").EnumerateArray().Select(x => x.GetProperty("name").GetString()).ShouldBe(["validate", "compile", "full_test"]);
+        run.GetProperty("simRunKeys").GetArrayLength().ShouldBe(8, "one stored run per candidate exit and timeframe (5m, 15m)");
+        var verdict = run.GetProperty("verdict");
+        verdict.GetProperty("outcome").GetString().ShouldBe("FAIL", "three days have no walk-forward fold");
+        verdict.GetProperty("gates").GetArrayLength().ShouldBe(6);
+        verdict.GetProperty("variantCount").GetInt32().ShouldBe(1);
+        verdict.GetProperty("evidence").GetProperty("method").GetString().ShouldBe("walk_forward");
+        verdict.GetProperty("limits").EnumerateArray().Select(l => l.GetString()).ShouldContain(l => l!.StartsWith("calibration gate not applicable", StringComparison.Ordinal));
+        verdict.GetProperty("fullPeriod").EnumerateArray().ShouldAllBe(f => f.GetProperty("label").GetString()!.StartsWith("exploration", StringComparison.Ordinal));
+        (await CountAsync("SELECT count(*) FROM lab.lab_results")).ShouldBe(1);
+        (await CountAsync("SELECT count(*) FROM research.sim_runs WHERE created_by = 'lab:full'")).ShouldBe(8);
     }
 
     // criterion 2
