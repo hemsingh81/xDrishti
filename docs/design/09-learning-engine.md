@@ -20,6 +20,8 @@ flowchart TB
 quantiles. Win rate uses a Beta prior **shrunk toward the parent group** when n is small; confidence = lower
 bound of the credible interval; exponential recency weighting.
 
+Built (P6-01, [ADR 0064](../adr/0064-cell-statistics-bayesian-shrinkage-recency-weights-and-point-in-time-snapshots.md)): the pure calculator reads only trades that exited on or before the as-of date; the prior is the strategy's rate shrunk toward the whole system's (strength 20), the cell's toward the strategy's; the confidence is the 5 % quantile of the posterior (90 % interval); recency weight `0.5^(days/180)`. Snapshots are insert-only in `research.cell_stats`; `xd learn cells --as-of D --run KEY:STYLE:EXIT` computes, `GET /api/cells` reads. Regime is `*` until P6-02; rows below `min_trades` read "not enough evidence".
+
 **Layer 2 — Exit selection.** See [doc 08](08-exits-and-risk.md) §3. Its input, the replay of the same entries under every candidate with the MAE/MFE tables, is built (P4-05, [ADR 0053](../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.md)); the choice by out-of-sample expectancy per cell, with its folds, minimum sample and stability report, is built (P4-06, [ADR 0054](../adr/0054-the-per-cell-exit-choice-by-walk-forward.md)); it applies nothing until a stored strategy exists to apply it to.
 
 **Layer 3 — Meta-model (meta-labeling).**

@@ -12,6 +12,7 @@ using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Lab;
+using XDrishti.Application.Learning;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
@@ -60,6 +61,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(StartLabRunRequest))]
 [JsonSerializable(typeof(LabRunView))]
 [JsonSerializable(typeof(IReadOnlyList<LabRunView>))]
+[JsonSerializable(typeof(CellStatsView))]
+[JsonSerializable(typeof(IReadOnlyList<CellStatsView>))]
 [JsonSerializable(typeof(LedgerView))]
 [JsonSerializable(typeof(LabVerdictView))]
 [JsonSerializable(typeof(RobustnessView))]

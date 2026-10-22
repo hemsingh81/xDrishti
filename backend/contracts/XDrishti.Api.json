@@ -8537,6 +8537,100 @@
           }
         }
       }
+    },
+    "/api/cells": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The cell statistics of the newest snapshot: per cell and window (all, 250d, 60d) the trades, the Beta-shrunk win rate with its credible bounds, recency-weighted expectancy and profit factor, drawdown and MAE/MFE quantiles, each with its basis, knobs and limits. Filter by strategy and window; empty before the first computation. 422 learning.invalid",
+        "operationId": "ListCells",
+        "parameters": [
+          {
+            "name": "strategy",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CellStatsView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cells/{key}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "One cell (key strategy|tf|side|style|exit|regime, URL-encoded) in its windows from the newest snapshot that holds it. 404 learning.cell_not_found",
+        "operationId": "GetCell",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CellStatsView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11194,6 +11288,208 @@
           }
         },
         "description": "The trading calendar. `days`: the confirmed holidays and special sessions from `from` to `to` (India dates, both included; default today and a\nyear on), by date. `proposals`: every proposed day, whatever its date, waiting for Confirm or Dismiss (including proposals that lie next to a confirmed day, marked `replaces`). `nextHoliday`: the first confirmed holiday\ntoday or later (null when none is known)."
+      },
+      "CellStatsView": {
+        "required": [
+          "cellKey",
+          "strategy",
+          "timeframe",
+          "side",
+          "style",
+          "exit",
+          "regime",
+          "window",
+          "asOf",
+          "basis",
+          "n",
+          "wins",
+          "effectiveN",
+          "winRateRaw",
+          "priorRate",
+          "winRatePosterior",
+          "winRateLower",
+          "winRateUpper",
+          "avgWinR",
+          "avgLossR",
+          "expectancyR",
+          "profitFactor",
+          "maxDrawdownR",
+          "maeP50",
+          "maeP90",
+          "mfeP50",
+          "mfeP90",
+          "enough",
+          "evidence",
+          "recencyHalfLifeDays",
+          "priorStrength",
+          "minTrades",
+          "credibleLevel",
+          "snapshotKey",
+          "createdAt",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "cellKey": {
+            "type": "string"
+          },
+          "strategy": {
+            "type": "string"
+          },
+          "timeframe": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "exit": {
+            "type": "string"
+          },
+          "regime": {
+            "type": "string"
+          },
+          "window": {
+            "type": "string"
+          },
+          "asOf": {
+            "type": "string",
+            "format": "date"
+          },
+          "basis": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "wins": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "effectiveN": {
+            "type": "number",
+            "format": "double"
+          },
+          "winRateRaw": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "priorRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "winRatePosterior": {
+            "type": "number",
+            "format": "double"
+          },
+          "winRateLower": {
+            "type": "number",
+            "format": "double"
+          },
+          "winRateUpper": {
+            "type": "number",
+            "format": "double"
+          },
+          "avgWinR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "avgLossR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "expectancyR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "profitFactor": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxDrawdownR": {
+            "type": "number",
+            "format": "double"
+          },
+          "maeP50": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maeP90": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "mfeP50": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "mfeP90": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "enough": {
+            "type": "boolean"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "recencyHalfLifeDays": {
+            "type": "number",
+            "format": "double"
+          },
+          "priorStrength": {
+            "type": "number",
+            "format": "double"
+          },
+          "minTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "credibleLevel": {
+            "type": "number",
+            "format": "double"
+          },
+          "snapshotKey": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "limits": {
+            "type": "string"
+          }
+        },
+        "description": "One row of the cell statistics as the API shows it (P6-01), with the facts a reader needs to judge it (spec honest limits: the basis, the knobs, the evidence flag and the limits text)."
       },
       "CellView": {
         "required": [
@@ -23864,6 +24160,9 @@
     },
     {
       "name": "Lab"
+    },
+    {
+      "name": "Learning"
     }
   ],
   "x-xdrishti-hubs": {

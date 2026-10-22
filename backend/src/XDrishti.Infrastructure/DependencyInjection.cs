@@ -7,6 +7,7 @@ using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
 using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
@@ -21,6 +22,7 @@ using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Lab;
+using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Actions;
 using XDrishti.Infrastructure.Market.Bars;
@@ -116,6 +118,7 @@ public static class DependencyInjection
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)
         services.AddScoped<ILabResultStore, LabResultStore>(); // the results of full tests (spec P5-04)
+        services.AddScoped<ICellStatsStore, CellStatsStore>(); // the cell statistics snapshots (spec P6-01)
         services.AddScoped<ITestLedger, TestLedger>(); // the per-family count of looks (spec P5-03)
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)
         services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O

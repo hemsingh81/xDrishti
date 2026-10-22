@@ -2,6 +2,7 @@
 # The `xd` command line (P5-07, ADR 0061): a thin wrapper over the `xd` verb of the Api host, like simulate.sh.
 #   scripts/xd.sh strategy validate my.yaml
 #   scripts/xd.sh strategy test my.yaml --symbols 'RELIANCE,TCS' [--method quick|full] [--from 2025-01-01 --to 2025-12-31]
+#   scripts/xd.sh learn cells --as-of 2026-04-30 --run RUNKEY:intraday:FIXED_RR   (P6-01, ADR 0064: cell statistics snapshot)
 #   scripts/xd.sh lab runs [--strategy ID] [--state succeeded] [--limit 20]
 # Exit codes: 0 done (a full test: PASS), 1 refused (located problems on stderr), 2 wrong command line or configuration, 3 failure or timeout,
 # 4 a full test with verdict MARGINAL or FAIL, 130 cancelled. A test needs the stack running (deploy/xd-up.sh): xd-api carries the run out; this command stores

@@ -3104,6 +3104,197 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("broker_secrets", "accounts");
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.CellStatsRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("AsOf")
+                        .HasColumnType("date")
+                        .HasColumnName("as_of");
+
+                    b.Property<double?>("AvgLossR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("avg_loss_r");
+
+                    b.Property<double?>("AvgWinR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("avg_win_r");
+
+                    b.Property<string>("CellKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("cell_key");
+
+                    b.Property<bool>("Costed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("costed");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<double>("CredibleLevel")
+                        .HasColumnType("double precision")
+                        .HasColumnName("credible_level");
+
+                    b.Property<double>("EffectiveN")
+                        .HasColumnType("double precision")
+                        .HasColumnName("effective_n");
+
+                    b.Property<bool>("Enough")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enough");
+
+                    b.Property<string>("ExitPolicy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("exit_policy");
+
+                    b.Property<double?>("ExpectancyR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("expectancy_r");
+
+                    b.Property<double>("HalfLifeDays")
+                        .HasColumnType("double precision")
+                        .HasColumnName("half_life_days");
+
+                    b.Property<double?>("MaeP50")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mae_p50");
+
+                    b.Property<double?>("MaeP90")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mae_p90");
+
+                    b.Property<double>("MaxDrawdownR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("max_drawdown_r");
+
+                    b.Property<double?>("MfeP50")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mfe_p50");
+
+                    b.Property<double?>("MfeP90")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mfe_p90");
+
+                    b.Property<int>("MinTrades")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_trades");
+
+                    b.Property<int>("N")
+                        .HasColumnType("integer")
+                        .HasColumnName("n");
+
+                    b.Property<double>("PriorRate")
+                        .HasColumnType("double precision")
+                        .HasColumnName("prior_rate");
+
+                    b.Property<double>("PriorStrength")
+                        .HasColumnType("double precision")
+                        .HasColumnName("prior_strength");
+
+                    b.Property<double?>("ProfitFactor")
+                        .HasColumnType("double precision")
+                        .HasColumnName("profit_factor");
+
+                    b.Property<string>("Regime")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("regime");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("side");
+
+                    b.Property<string>("SnapshotKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("snapshot_key");
+
+                    b.Property<string>("Sources")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sources");
+
+                    b.Property<string>("Strategy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("style");
+
+                    b.Property<string>("Timeframe")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("timeframe");
+
+                    b.Property<double>("WinRateLower")
+                        .HasColumnType("double precision")
+                        .HasColumnName("win_rate_lower");
+
+                    b.Property<double>("WinRatePosterior")
+                        .HasColumnType("double precision")
+                        .HasColumnName("win_rate_posterior");
+
+                    b.Property<double?>("WinRateRaw")
+                        .HasColumnType("double precision")
+                        .HasColumnName("win_rate_raw");
+
+                    b.Property<double>("WinRateUpper")
+                        .HasColumnType("double precision")
+                        .HasColumnName("win_rate_upper");
+
+                    b.Property<string>("Window")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("window_code");
+
+                    b.Property<int>("Wins")
+                        .HasColumnType("integer")
+                        .HasColumnName("wins");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cell_stats");
+
+                    b.HasIndex("CellKey")
+                        .HasDatabaseName("ix_cell_stats_cell_key");
+
+                    b.HasIndex("AsOf", "CreatedAt")
+                        .HasDatabaseName("ix_cell_stats_as_of_created");
+
+                    b.HasIndex("SnapshotKey", "CellKey", "Window")
+                        .IsUnique()
+                        .HasDatabaseName("uq_cell_stats_snapshot_cell_window");
+
+                    b.ToTable("cell_stats", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_cell_stats_shape", "snapshot_key ~ '^[0-9a-f]{64}$' AND window_code IN ('all','250d','60d') AND n >= 0 AND wins >= 0 AND wins <= n");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Market.Bars.Bar1mRecord", b =>
                 {
                     b.Property<Guid>("InstrumentId")
