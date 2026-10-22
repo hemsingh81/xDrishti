@@ -46,7 +46,7 @@ public static class ComparisonText
     {
         ArgumentNullException.ThrowIfNull(report);
         var text = new StringBuilder();
-        text.Append("MAE/MFE diagnostics (excursions are measured on the path the walk took, so the walk's own exit censors them)\n");
+        text.Append("MAE/MFE diagnostics (excursions are measured on the path the walk took, so the walk's own exit censors them; a winner here is a trade with exact R above 0, while the table above uses net R for a costed run)\n");
         foreach (var cell in report.Diagnostics)
         {
             text.Append(cell.Id).Append(": ").Append(cell.Trades.ToString(CultureInfo.InvariantCulture)).Append(" trades").Append(cell.BelowMinimum ? " (n < " + ComparisonReport.MinimumTrades.ToString(CultureInfo.InvariantCulture) + ", no reading)" : string.Empty).Append('\n');

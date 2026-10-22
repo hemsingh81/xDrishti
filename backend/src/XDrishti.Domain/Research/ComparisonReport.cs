@@ -69,7 +69,7 @@ public sealed record ComparisonRow(string Id, SampleFigures Own, SampleFigures C
 /// <param name="Reading">A sentence that reads the figure, or null when the sample is below 30 trades or the figure is censored.</param>
 public sealed record DiagnosticFigure(string Name, double? Value, bool IsShare, int Count, int Of, string Censor, bool Censored, string? Reading);
 
-/// <summary>The MAE/MFE table of one candidate.</summary>
+/// <summary>The MAE/MFE table of one candidate. A winner in it is a trade with <c>RExact</c> above 0 (the walk's own result before slippage and charges), while the comparison table uses <c>RNet</c> for a costed run and <c>RFilled</c> for a gross one.</summary>
 /// <param name="Id">The candidate id.</param>
 /// <param name="Trades">The candidate's trades.</param>
 /// <param name="BelowMinimum">The cell has fewer than <see cref="ComparisonReport.MinimumTrades"/> trades: printed with n &lt; 30 and no reading.</param>
@@ -128,7 +128,9 @@ public sealed record ComparisonReport(string Unit, int CommonEntries, bool GateA
         return new ComparisonReport(costed ? "RNet" : "RFilled", common.Count, gateApplied, rows.AsReadOnly(), diagnostics.AsReadOnly());
     }
 
-    private static double UnitR(SimTrade trade, bool costed) => costed && trade.Costing is { } costing ? costing.RNet : trade.RFilled;
+    /// <summary>R in the unit of the run. A costed run is costed in every trade (the replay sets <c>Costing</c> on each), so a costed trade without it is a broken record and is refused, not read as gross.</summary>
+    private static double UnitR(SimTrade trade, bool costed) =>
+        !costed ? trade.RFilled : trade.Costing?.RNet ?? throw new InvalidOperationException("A trade of a costed run has no costing; the comparison will not mix net and gross R.");
 
     private static SampleFigures Figures(List<SimTrade> trades, bool costed)
     {
@@ -189,9 +191,11 @@ public sealed record ComparisonReport(string Unit, int CommonEntries, bool GateA
             Share("winners with adverse excursion above 1.2R", winners.Count(w => w.MaeR > AdverseHigh), winners.Count, stopText, AdverseHigh > StopLevelR, n),
         };
 
+        var medianMfe = n == 0 ? 0 : Median([.. trades.Select(x => x.MfeR)]);
+        var medianCensored = target is { } medianCap && medianMfe > medianCap; // the walk cuts MFE at the target, so a median above it can only come from a record that is not of this walk
         figures.Add(n == 0
             ? new DiagnosticFigure("median MFE (R)", null, false, 0, 0, targetText, false, null)
-            : new DiagnosticFigure("median MFE (R)", Median([.. trades.Select(x => x.MfeR)]), false, n, n, targetText, false, below ? null : "median favourable excursion of " + n.ToString(CultureInfo.InvariantCulture) + " trades"));
+            : new DiagnosticFigure("median MFE (R)", medianMfe, false, n, n, targetText, medianCensored, below || medianCensored ? null : "median favourable excursion of " + n.ToString(CultureInfo.InvariantCulture) + " trades"));
         foreach (var level in new[] { 1.0, 2.0, 3.0 })
         {
             figures.Add(Share("trades with MFE reaching " + R(level) + "R", trades.Count(x => x.MfeR >= level), n, targetText, target is { } cap && level > cap, n));

@@ -45,11 +45,11 @@ public sealed class ComparisonReportTests
         new(5, 0.0, 0.0, 0.4, 0.9, ExitReason.SquareOff, 300),
     ];
 
-    private static SimTrade Trade(T t, bool costed)
+    private static SimTrade Trade(T t, bool costed, bool withoutCosting = false)
     {
         var date = Monday.AddDays(t.Day - 1);
         var entry = new DateTimeOffset(date.Year, date.Month, date.Day, 9, 45, 0, TimeSpan.FromMinutes(330)).ToUnixTimeSeconds();
-        var costing = costed
+        var costing = costed && !withoutCosting
             ? new TradeCosting(CostSegment.IntradayEquity, Sheet.SheetId, 100, 1000m, 10000m, 10000m, LegCharges.Zero, LegCharges.Zero, 100m, 0.1, t.RFilled - 0.1)
             : null;
         return new SimTrade(
@@ -58,13 +58,13 @@ public sealed class ComparisonReportTests
             t.RFilled, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0, costing);
     }
 
-    private static CandidateRun Candidate(string id, string rr, T[] trades, bool costed, long gated = 0)
+    private static CandidateRun Candidate(string id, string rr, T[] trades, bool costed, long gated = 0, bool withoutCosting = false)
     {
         var strategy = new StrategyRecord("ORB", new Dictionary<string, double> { ["or_min"] = 15 }, "{}", new string('1', 64), Timeframe.M15, [Side.Buy]);
         var universe = new UniverseRecord(UniverseKind.InstrumentList, null, null, UniverseLabels.InstrumentsAsListed, [new UniverseMember(Guid.Empty, "X")]);
         var header = new RunHeader(strategy, "sim-6", Monday, Monday.AddDays(6), ReplayOptions.Default, false, "{}", universe, new TradingCalendar([]), costed ? Sheet : null);
         var record = new InstrumentRun(Guid.Empty, "X", null, null, Monday, Monday, Monday, new DateSpan(Monday, Monday), 0, 0, 0, 0, null, 0.05m, false, [], SessionCounts.Empty, [], false, [], [], WalkCounters.Empty, RunFates.Empty, 0, 0);
-        var run = RunAssembler.Assemble(header, [new InstrumentReplay(record, [.. trades.Select(t => Trade(t, costed))], [])]);
+        var run = RunAssembler.Assemble(header, [new InstrumentReplay(record, [.. trades.Select(t => Trade(t, costed, withoutCosting))], [])]);
         return new CandidateRun(id, new ExitCandidate("FIXED_RR", [new ExitParameterValue("rr", [double.Parse(rr, System.Globalization.CultureInfo.InvariantCulture)])]), run, gated);
     }
 
@@ -197,5 +197,24 @@ public sealed class ComparisonReportTests
         report.Rows[1].Own.MeanR.ShouldBeNull();
         report.Rows[1].Paired.ShouldBe(new PairedFigure(0, null));
         report.Rows[0].NotCommon.ShouldBe(6);
+    }
+    [Fact]
+    public void A_median_MFE_above_the_target_is_censored_and_has_no_reading()
+    {
+        var above = Enumerable.Range(1, 40).Select(d => new T(d, 2.0, 2.0, 0.5, 3.0, ExitReason.Target, 60)).ToArray();
+
+        var report = ComparisonReport.Build([Candidate("FIXED_RR{rr=2}", "2", above, false), Candidate("FIXED_RR{rr=3}", "3", B, false)], true);
+
+        var median = report.Diagnostics[0].Figures.Single(f => f.Name == "median MFE (R)");
+        median.Censored.ShouldBeTrue("a median above the 2R target cannot come from this walk");
+        median.Reading.ShouldBeNull();
+        report.Diagnostics[1].Figures.Single(f => f.Name == "median MFE (R)").Censored.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_costed_run_cannot_hold_a_trade_without_costing_so_the_report_never_reads_it_as_gross()
+    {
+        // the invariant UnitR relies on is held by the assembler (and UnitR throws if it were ever broken)
+        Should.Throw<ArgumentException>(() => Candidate("A", "2", A, costed: true, withoutCosting: true));
     }
 }
