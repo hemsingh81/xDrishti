@@ -10,7 +10,7 @@ changes, no restart.
 | **Rules editor** | React page with Monaco YAML editor, live JSON-Schema validation and autocomplete |
 | **Form builder** | Pick indicators, conditions, stops, exits from menus → generates the same YAML |
 | **Plain English** | Describe the idea to the assistant → it drafts YAML → **you confirm** |
-| **Upload / CLI** | Upload a strategy file in the Lab, or run `xd strategy test file.yaml` — the file is imported into the database |
+| **Upload / CLI** | Upload a strategy file in the Lab, or run `xd strategy test file.yaml` (built P5-07, [ADR 0061](../adr/0061-the-xd-cli-is-a-verb-of-the-api-host-behind-a-thin-script.md): `scripts/xd.sh`, a verb of the Api host) — the file is imported into the database |
 | **C# plugin** (advanced) | Implement `IStrategy` for logic the DSL can't express; compiled and run in `xd-sandbox` (no network, resource limits) |
 
 All channels produce one validated strategy spec, run by the same engine as built-in strategies.

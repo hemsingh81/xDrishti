@@ -1,4 +1,5 @@
 using XDrishti.Api.Auth;
+using XDrishti.Api.Cli;
 using XDrishti.Api.CostSheets;
 using XDrishti.Api.Infrastructure;
 using XDrishti.Api.Simulate;
@@ -24,6 +25,12 @@ if (verb == Verb.CostSheet)
 if (verb == Verb.VerifyPack)
 {
     return await SimulateProgram.RunProcessAsync(args[1..], verifyPack: true);
+}
+
+// The xd verb (spec P5-07, ADR 0061) is chosen the same way.
+if (verb == Verb.Xd)
+{
+    return await XdProgram.RunProcessAsync(args[1..]);
 }
 
 // Container health probe: `dotnet XDrishti.Api.dll --healthcheck` (chiseled images have no curl).
