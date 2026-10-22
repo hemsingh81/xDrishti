@@ -48,7 +48,7 @@ public sealed class ExitSelectionExportTests
     {
         var selection = Selection();
 
-        ExitSelectionText.Summary(selection).ShouldContain(ExitSelection.InSampleLine);
+        ExitSelectionText.Summary(selection).ShouldContain(ExitSelection.InSampleLine(selection.FirstEntry, selection.LastEntry));
         Json(selection).ShouldContain("in-sample on the data shown");
         var lines = Csv(selection).TrimEnd('\n').Split('\n');
         lines.Length.ShouldBeGreaterThan(2);
@@ -60,7 +60,7 @@ public sealed class ExitSelectionExportTests
     {
         var selection = Selection() with { Banner = [] };
 
-        ExitSelectionText.Summary(selection).Contains(ExitSelection.InSampleLine, StringComparison.Ordinal).ShouldBeFalse("the summary prints the banner of the record: remove the line and it is gone");
+        ExitSelectionText.Summary(selection).Contains(ExitSelection.InSampleLine(selection.FirstEntry, selection.LastEntry), StringComparison.Ordinal).ShouldBeFalse("the summary prints the banner of the record: remove the line and it is gone");
         Json(selection).Contains("in-sample on the data shown", StringComparison.Ordinal).ShouldBeFalse();
     }
 

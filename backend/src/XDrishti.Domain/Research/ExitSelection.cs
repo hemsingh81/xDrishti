@@ -102,5 +102,11 @@ public sealed record ExitSelection(
     public const int Schema = 1;
 
     /// <summary>The line that says what the choice is and is not (P4-00 criterion 9).</summary>
-    public const string InSampleLine = "the choice is in-sample on the data shown (about 2.1 years, no hold-out) and is not evidence of an edge";
+    public static string InSampleLine(DateOnly? first, DateOnly? last)
+    {
+        var span = first is { } f && last is { } l
+            ? ((l.DayNumber - f.DayNumber + 1) / 365.25).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " years, " + f.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) + " to " + l.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+            : "no entries";
+        return "the choice is in-sample on the data shown (" + span + ", no hold-out) and is not evidence of an edge";
+    }
 }

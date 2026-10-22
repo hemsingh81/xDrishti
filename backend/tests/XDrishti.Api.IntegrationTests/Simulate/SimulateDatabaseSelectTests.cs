@@ -24,7 +24,8 @@ public sealed partial class SimulateDatabaseTests
         File.ReadAllText(Path.Combine(folder, "exit-selection.csv")).ShouldContain("in-sample on the data shown");
         File.ReadAllText(Path.Combine(folder, "README.txt")).ShouldContain("exit choice for ORB");
         outcome.Out.ShouldContain("exit selection key: ");
-        outcome.Out.ShouldContain("the choice is in-sample on the data shown (about 2.1 years, no hold-out) and is not evidence of an edge");
+        outcome.Out.ShouldContain("the choice is in-sample on the data shown (");
+        outcome.Out.ShouldContain(", no hold-out) and is not evidence of an edge");
         outcome.Out.ShouldContain("no stability statement");
         outcome.Out.ShouldContain("final choice: no choice, default FIXED_RR{rr=2}");
     }
