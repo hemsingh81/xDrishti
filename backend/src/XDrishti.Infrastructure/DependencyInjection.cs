@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.AddPortfolio(configuration);
         services.AddScoped<ICostSheetStore, CostSheetStore>(); // the owner's charge sheets over platform.app_settings (spec P3-03f)
         services.AddScoped<IRunStore, RunStore>(); // the result store of the simulation runs (spec P3-10)
+        services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddSingleton<ISimulationEngine, SimulationEngineAdapter>(); // the simulation library behind its port (ADR 0039): stateless, no I/O
 
         services.AddHealthChecks()

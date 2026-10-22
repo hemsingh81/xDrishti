@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -128,8 +128,16 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
         (await SqlStateAsync(_app, "INSERT INTO research.sim_trade_legs (run_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a leg is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.sim_trade_leg_charges (run_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert the charges of a leg is there; the row is incomplete");
         (await SqlStateAsync(_app, "INSERT INTO research.sim_comparisons (strategy_id) VALUES ('ORB')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a comparison is there; the row is incomplete");
+        (await SqlStateAsync(_app, "INSERT INTO research.exit_selections (strategy_id) VALUES ('ORB')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert an exit choice is there; the row is incomplete");
+        (await SqlStateAsync(_app, "INSERT INTO research.exit_selection_folds (selection_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a fold row is there; the row is incomplete");
         foreach (var statement in new[]
         {
+            "UPDATE research.exit_selections SET stable = true WHERE false",
+            "DELETE FROM research.exit_selections WHERE false",
+            "TRUNCATE research.exit_selections",
+            "UPDATE research.exit_selection_folds SET is_winner = true WHERE false",
+            "DELETE FROM research.exit_selection_folds WHERE false",
+            "TRUNCATE research.exit_selection_folds",
             "UPDATE research.sim_runs SET created_by = 'x'",
             "DELETE FROM research.sim_runs",
             "UPDATE research.sim_trades SET ordinal = 1 WHERE false",
@@ -165,7 +173,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(5);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(7);
     }
 
     [Fact]
@@ -211,6 +219,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
     [Theory]
     [InlineData("AddSimTradeLegs", new[] { "sim_trade_legs", "sim_trade_leg_charges" })]
     [InlineData("AddSimComparisons", new[] { "sim_comparisons" })]
+    [InlineData("AddExitSelections", new[] { "exit_selections", "exit_selection_folds" })]
     public void The_later_research_migrations_make_each_of_their_tables_append_only(string migration, string[] tables)
     {
         var migrations = Path.GetFullPath(Path.Combine(ThisDirectory(), "..", "..", "..", "src", "XDrishti.Infrastructure", "Persistence", "Migrations"));

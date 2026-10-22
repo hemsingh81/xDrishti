@@ -208,7 +208,8 @@ costs:                             # the broker's charge sheet: effective-dated 
   slippage: { ticks: 1, bar_range_frac: 0.05, stop_exit_extra_ticks: 2, gap_fill: at_open }   # built in P3-03b (ADR 0038): the code defaults of SlippageConfig, stored with every run as canonical JSON; reading them from the configuration store is later
 
 learning:
-  walk_forward: { train_years: 3, test_months: 3, embargo_sessions: 5 }
+  walk_forward: { train_years: 3, test_months: 3, embargo_sessions: 5 }   # the later default for ~5 years of data (ISS-19)
+  exit_walk_forward: { mode: expanding, min_train_months: 9, test_months: 3, embargo_sessions: 5, stable_folds_pct: 60 }   # the exit choice on ~2.1 years (P4-06, ADR 0054); overridden per run by --min-train-months, --test-months, --embargo-sessions, --lambda, --min-trades; stable_folds_pct is a new key: min_positive_folds_pct below keeps its meaning (qualification gates)
   min_trades: 30
   recency_half_life_days: 180
   bayes_prior: { type: beta, shrink_to_parent: true, strength: 20 }

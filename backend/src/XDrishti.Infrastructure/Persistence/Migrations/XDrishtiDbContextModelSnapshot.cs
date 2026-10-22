@@ -3569,6 +3569,155 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
+                {
+                    b.Property<long>("SelectionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("selection_id");
+
+                    b.Property<int>("FoldIndex")
+                        .HasColumnType("integer")
+                        .HasColumnName("fold_index");
+
+                    b.Property<string>("CandidateId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("candidate_id");
+
+                    b.Property<bool>("IsWinner")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_winner");
+
+                    b.Property<bool>("Qualified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("qualified");
+
+                    b.Property<DateOnly>("TestEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("test_end");
+
+                    b.Property<double?>("TestScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("test_score");
+
+                    b.Property<DateOnly>("TestStart")
+                        .HasColumnType("date")
+                        .HasColumnName("test_start");
+
+                    b.Property<int>("TestTrades")
+                        .HasColumnType("integer")
+                        .HasColumnName("test_trades");
+
+                    b.Property<double?>("TrainScore")
+                        .HasColumnType("double precision")
+                        .HasColumnName("train_score");
+
+                    b.Property<int>("TrainTrades")
+                        .HasColumnType("integer")
+                        .HasColumnName("train_trades");
+
+                    b.HasKey("SelectionId", "FoldIndex", "CandidateId")
+                        .HasName("pk_exit_selection_folds");
+
+                    b.ToTable("exit_selection_folds", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_exit_selection_folds_counts", "fold_index >= 1 AND train_trades >= 0 AND test_trades >= 0 AND test_end >= test_start");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionRow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ChosenCandidateId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("chosen_candidate_id");
+
+                    b.Property<long>("ComparisonId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("comparison_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("RecordJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("record_json");
+
+                    b.Property<string>("RecordSha256")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("record_sha256");
+
+                    b.Property<string>("Regime")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("regime");
+
+                    b.Property<string>("SelectionKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("selection_key");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("side");
+
+                    b.Property<bool?>("Stable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("stable");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("style");
+
+                    b.Property<string>("Timeframe")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("timeframe");
+
+                    b.HasKey("Id")
+                        .HasName("pk_exit_selections");
+
+                    b.HasIndex("ComparisonId")
+                        .HasDatabaseName("ix_exit_selections_comparison_id");
+
+                    b.HasIndex("SelectionKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_exit_selections_selection_key");
+
+                    b.ToTable("exit_selections", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_exit_selections_keys", "selection_key ~ '^[0-9a-f]{64}$' AND record_sha256 ~ '^[0-9a-f]{64}$'");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.SimComparisonRow", b =>
                 {
                     b.Property<long>("Id")
@@ -4799,6 +4948,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.ExitSelectionRow", null)
+                        .WithMany()
+                        .HasForeignKey("SelectionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_exit_selection_folds_selection");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.SimComparisonRow", null)
+                        .WithMany()
+                        .HasForeignKey("ComparisonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_exit_selections_comparison");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeLegChargeRow", b =>

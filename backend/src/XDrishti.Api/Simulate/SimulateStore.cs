@@ -6,6 +6,7 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Research;
 using XDrishti.SimExport.Csv;
 using XDrishti.SimExport.Json;
@@ -61,7 +62,7 @@ internal static class SimulateStore
     /// stay in every case. One line is printed for each candidate and one for the comparison.
     /// </summary>
     /// <returns>The exit code: <see cref="SimulateCommand.Done"/>, <see cref="SimulateCommand.Refused"/> or <see cref="SimulateCommand.Failed"/>.</returns>
-    public static async Task<int> StoreComparisonAsync(ComparisonRun comparison, ExportOutcome outcome, IServiceProvider provider, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
+    public static async Task<int> StoreComparisonAsync(ComparisonRun comparison, ExportOutcome outcome, IServiceProvider provider, SimulateConsole console, ILogger logger, CancellationToken cancellationToken, ExitSelection? selection = null)
     {
         var runs = provider.GetRequiredService<ICommandHandler<StoreRunCommand, StoreOutcome>>();
         for (var i = 0; i < comparison.Candidates.Count; i++)
@@ -86,6 +87,24 @@ internal static class SimulateStore
         }
 
         await console.Out.WriteLineAsync((header.Value.WasAlreadyStored ? "already stored: comparison " : "stored: comparison ") + comparison.ComparisonKey[..12] + ", " + comparison.Candidates.Count.ToString(CultureInfo.InvariantCulture) + " members, entries key " + comparison.EntriesKey[..12]);
+        return selection is null ? SimulateCommand.Done : await StoreSelectionAsync(comparison, selection, provider, console, logger, cancellationToken);
+    }
+
+    /// <summary>The <c>--store</c> step of an exit choice (spec P4-06, D10): after the comparison and its runs, so that the foreign key has something to point at. The text is the file's, and so is its digest.</summary>
+    private static async Task<int> StoreSelectionAsync(ComparisonRun comparison, ExitSelection selection, IServiceProvider provider, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
+    {
+        var strategy = comparison.Candidates[0].Run.Strategy;
+        var (json, sha) = SimulateSelect.Record(selection, SimulateCompare.ExportFormat);
+        var handler = provider.GetRequiredService<ICommandHandler<StoreExitSelectionCommand, StoreOutcome>>();
+        var command = new StoreExitSelectionCommand(selection, comparison.ComparisonKey, strategy.Id, strategy.EvaluationTimeframe.ToCode(), SimulateSelect.SideText(strategy), SimulateSelect.StyleOf(comparison), json, sha, Actor);
+        var stored = await handler.HandleAsync(command, cancellationToken);
+        var shortKey = ExitSelectionKey.Of(comparison.ComparisonKey, selection)[..12];
+        if (stored.IsFailure)
+        {
+            return await ReportAsync(stored.Error, "exit selection " + shortKey, console, logger);
+        }
+
+        await console.Out.WriteLineAsync((stored.Value.WasAlreadyStored ? "already stored: exit selection " : "stored: exit selection ") + shortKey + ", chosen " + (selection.FinalCandidate ?? "none (default " + selection.Default + ")"));
         return SimulateCommand.Done;
     }
 

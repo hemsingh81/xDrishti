@@ -26,7 +26,8 @@ internal sealed record SimulateOptions(
     CostChoice Costs,
     int Cards = SimulateOptions.DefaultCards,
     bool Store = false,
-    ExitChoice? Exits = null)
+    ExitChoice? Exits = null,
+    SelectionOptions? Selection = null)
 {
     /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
     public const int DefaultCards = 200;
@@ -39,6 +40,7 @@ internal sealed record SimulateOptions(
         + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
         + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
         + "           [--exit <POLICY[:name=value,...]>]... [--time-stop min_progress_rr=<n>,(intraday_bars|swing_sessions)=<n>]   (the exits to run in place of the strategy's own; a|b makes candidates, two candidates or more are compared on the same entries, P4-05)\n"
+        + "           [--select-exit [--min-train-months <n>] [--test-months <n>] [--embargo-sessions <n>] [--lambda <n>] [--min-trades <n>] [--no-plateau]]   (choose among the --exit candidates by walk-forward, P4-06; needs two candidates or more)\n"
         + "           (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required, P3-03f)\n"
         + "  simulate --list-strategies\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
@@ -47,9 +49,9 @@ internal sealed record SimulateOptions(
 
     private const int MaxText = 60;
 
-    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--exit", "--time-stop", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r"];
+    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--exit", "--time-stop", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r", "--min-train-months", "--test-months", "--embargo-sessions", "--lambda", "--min-trades"];
 
-    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross", "--store"];
+    private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross", "--store", "--select-exit", "--no-plateau"];
 
     /// <summary>Parses the arguments after the verb name.</summary>
     /// <param name="args">The arguments.</param>
@@ -163,13 +165,14 @@ internal sealed record SimulateOptions(
         var costs = ReadCosts(values, switches, errors);
         var named = ReadParameters(parameters, errors);
         var exitChoice = ReadExits(exits, values, named, errors);
+        var selection = ReadSelection(values, switches, exitChoice, errors);
         if (errors.Count > 0)
         {
             return Invalid(errors);
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store"), exitChoice), []);
+            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store"), exitChoice, selection), []);
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());
@@ -382,6 +385,65 @@ internal sealed record SimulateOptions(
     }
 
     private const string BuiltInRewardRisk = "rr";
+
+    private static readonly string[] SelectionValueFlags = ["--min-train-months", "--test-months", "--embargo-sessions", "--lambda", "--min-trades"];
+
+    /// <summary>
+    /// The exit choice of <c>--select-exit</c> and its overrides (spec P4-06, D3): it needs a comparison (two candidates or more); an override or <c>--no-plateau</c> without it is a usage error. The values are held to the bounds of
+    /// <see cref="SelectionOptions.Problems"/>, so that a typo is exit 2 and not a refusal.
+    /// </summary>
+    internal static SelectionOptions? ReadSelection(Dictionary<string, string> values, HashSet<string> switches, ExitChoice? exits, List<string> errors)
+    {
+        var stray = SelectionValueFlags.Where(values.ContainsKey).Concat(switches.Contains("--no-plateau") ? ["--no-plateau"] : []).ToList();
+        if (!switches.Contains("--select-exit"))
+        {
+            errors.AddRange(stray.Select(flag => "'" + flag + "' needs --select-exit"));
+            return null;
+        }
+
+        if (exits is null || exits.Candidates.Count < 2)
+        {
+            errors.Add("'--select-exit' chooses among two candidates or more: give '--exit' with a list such as FIXED_RR:rr=1.5|2|2.5|3");
+        }
+
+        var defaults = new SelectionOptions();
+        var o = defaults with
+        {
+            MinTrainMonths = Whole(values, "--min-train-months", defaults.MinTrainMonths, errors),
+            TestMonths = Whole(values, "--test-months", defaults.TestMonths, errors),
+            EmbargoSessions = Whole(values, "--embargo-sessions", defaults.EmbargoSessions, errors),
+            MinTrades = Whole(values, "--min-trades", defaults.MinTrades, errors),
+            Lambda = values.TryGetValue("--lambda", out var lambdaText) && TryNumber(lambdaText, out var lambda) ? lambda : defaults.Lambda,
+            PreferPlateau = !switches.Contains("--no-plateau"),
+        };
+        if (values.TryGetValue("--lambda", out var text) && !TryNumber(text, out _))
+        {
+            errors.Add("'--lambda' must be a finite number such as 0.5, '" + Show(text) + "' is not");
+        }
+
+        if (errors.Count == 0)
+        {
+            errors.AddRange(o.Problems().Select(p => "--select-exit: " + p));
+        }
+
+        return o;
+    }
+
+    private static int Whole(Dictionary<string, string> values, string flag, int fallback, List<string> errors)
+    {
+        if (!values.TryGetValue(flag, out var text))
+        {
+            return fallback;
+        }
+
+        if (text.Length is >= 1 and <= 4 && text.All(char.IsAsciiDigit))
+        {
+            return int.Parse(text, NumberStyles.None, CultureInfo.InvariantCulture);
+        }
+
+        errors.Add("'" + flag + "' must be a whole number, '" + Show(text) + "' is not");
+        return fallback;
+    }
 
     private static Dictionary<string, double> ReadParameters(List<string> parameters, List<string> errors)
     {

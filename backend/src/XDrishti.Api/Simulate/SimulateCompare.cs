@@ -1,7 +1,9 @@
 using System.Buffers;
 using System.Globalization;
 using System.Text;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Research;
 using XDrishti.Domain.Research;
 using XDrishti.SimExport.Csv;
 using XDrishti.SimExport.Json;
@@ -65,11 +67,20 @@ internal static class SimulateCompare
         var comparison = ran.Value;
         var first = comparison.Candidates[0].Run;
         var labels = RunLabels.Of(first, rules);
-        var runId = RunId.Of(first.Strategy.Id, first.From, first.To, comparison.ComparisonKey);
+        ExitSelection? selection = null;
+        string? selectionKey = null;
+        if (options.Selection is { } selectionOptions)
+        {
+            var calendar = await provider.GetRequiredService<ITradingCalendar>().GetAsync(cancellationToken);
+            selection = ExitSelector.Select(SimulateSelect.InputOf(comparison, calendar, selectionOptions));
+            selectionKey = ExitSelectionKey.Of(comparison.ComparisonKey, selection);
+        }
+
+        var runId = RunId.Of(first.Strategy.Id, first.From, first.To, selectionKey ?? comparison.ComparisonKey);
         var writer = provider.GetService<ExportFolderWriter>() ?? new ExportFolderWriter();
         var swing = !comparison.Report.GateApplied;
-        var readme = Readme(comparison, labels, runId, swing);
-        var written = await writer.WriteAsync(root, runId, Files(comparison, labels, readme), entries => Manifest(comparison, entries), options.Force, cancellationToken);
+        var readme = Readme(comparison, labels, runId, swing, selection);
+        var written = await writer.WriteAsync(root, runId, Files(comparison, labels, readme, selection), entries => Manifest(comparison, entries, selectionKey), options.Force, cancellationToken);
         if (written.IsFailure)
         {
             return await SimulatePipeline.RefuseAsync(console, logger, written.Error.Code, [written.Error.Message]);
@@ -103,6 +114,12 @@ internal static class SimulateCompare
 
         await console.Out.WriteAsync(ComparisonText.Table(comparison.Report));
         await console.Out.WriteAsync(ComparisonText.Diagnostics(comparison.Report));
+        if (selection is not null)
+        {
+            await console.Out.WriteLineAsync("exit selection key: " + selectionKey);
+            await console.Out.WriteAsync(ExitSelectionText.Summary(selection));
+        }
+
         if (first.Instruments.Count > 0 && first.Instruments.All(i => i.Skipped is not null))
         {
             await console.Error.WriteLineAsync("warning: every instrument was skipped; the skipped list above says why");
@@ -114,10 +131,10 @@ internal static class SimulateCompare
             return SimulateCommand.Cancelled;
         }
 
-        return options.Store ? await SimulateStore.StoreComparisonAsync(comparison, outcome, provider, console, logger, cancellationToken) : SimulateCommand.Done;
+        return options.Store ? await SimulateStore.StoreComparisonAsync(comparison, outcome, provider, console, logger, cancellationToken, selection) : SimulateCommand.Done;
     }
 
-    private static List<ExportFile> Files(ComparisonRun comparison, RunLabelSet labels, string readme)
+    private static List<ExportFile> Files(ComparisonRun comparison, RunLabelSet labels, string readme, ExitSelection? selection)
     {
         var files = new List<ExportFile>
         {
@@ -125,6 +142,12 @@ internal static class SimulateCompare
             new("diagnostics.csv", sink => ComparisonCsv.WriteDiagnostics(sink, comparison.Report)),
             new("README.txt", sink => sink.Write(Encoding.UTF8.GetBytes(readme))),
         };
+        if (selection is not null)
+        {
+            files.Add(new ExportFile("exit-selection.json", sink => ExitSelectionJson.Write(sink, selection, ExportFormat)));
+            files.Add(new ExportFile("exit-selection.csv", sink => ExitSelectionCsv.Write(sink, selection)));
+        }
+
         for (var i = 0; i < comparison.Candidates.Count; i++)
         {
             var candidate = comparison.Candidates[i];
@@ -138,7 +161,7 @@ internal static class SimulateCompare
         return files;
     }
 
-    private static string Readme(ComparisonRun comparison, RunLabelSet labels, string runId, bool swing)
+    private static string Readme(ComparisonRun comparison, RunLabelSet labels, string runId, bool swing, ExitSelection? selection)
     {
         var text = new StringBuilder();
         text.Append(RunReadme.Text(labels, runId));
@@ -158,12 +181,22 @@ internal static class SimulateCompare
 
         text.Append("No trade card is written for a comparison: a card shows one run; run the candidate you want to read alone with a single --exit.\n\n");
         text.Append(ComparisonText.Table(comparison.Report)).Append('\n').Append(ComparisonText.Diagnostics(comparison.Report));
+        if (selection is not null)
+        {
+            text.Append('\n').Append(ExitSelectionText.Summary(selection));
+        }
+
         return text.ToString();
     }
 
-    private static (byte[] Manifest, string ExportKey) Manifest(ComparisonRun comparison, IReadOnlyList<ManifestEntry> entries)
+    private static (byte[] Manifest, string ExportKey) Manifest(ComparisonRun comparison, IReadOnlyList<ManifestEntry> entries, string? selectionKey)
     {
         var extra = new List<string> { "comparison.entries_key=" + comparison.EntriesKey, "comparison.candidates=" + comparison.Candidates.Count.ToString(CultureInfo.InvariantCulture) };
+        if (selectionKey is not null)
+        {
+            extra.Add("selection.key=" + selectionKey);
+        }
+
         extra.AddRange(comparison.Candidates.Select(c => "comparison.member=" + c.Run.RunKey + "|" + c.Id));
         var basket = comparison.Candidates[0].Run.Universe.BasketId;
         return (ExportManifest.Build(ExportFormat, comparison.ComparisonKey, basket, entries, extra), ExportKey.Of(ExportFormat, comparison.ComparisonKey, basket, entries, extra));

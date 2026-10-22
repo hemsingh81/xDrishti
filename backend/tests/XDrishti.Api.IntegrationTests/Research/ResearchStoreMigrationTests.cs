@@ -107,22 +107,22 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         (await ListAsync(connection, Columns, ("t", "sim_trades"))).Order(StringComparer.Ordinal).ShouldBe(TradeColumns().Order(StringComparer.Ordinal));
         (await ListAsync(connection, "SELECT indexname FROM pg_indexes WHERE schemaname = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(
         [
-            "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges", "pk_sim_trade_legs", "pk_sim_trades",
-            "uq_sim_comparisons_comparison_key", "uq_sim_runs_run_key", "uq_sim_trades_run_trade_key",
+            "ix_exit_selections_comparison_id", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created", "pk_exit_selection_folds", "pk_exit_selections", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges", "pk_sim_trade_legs", "pk_sim_trades",
+            "uq_exit_selections_selection_key", "uq_sim_comparisons_comparison_key", "uq_sim_runs_run_key", "uq_sim_trades_run_trade_key",
         ]);
         (await ListAsync(connection, "SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_sim_runs_strategy_created'")).Single().ShouldContain("strategy_id, created_at DESC");
         (await ListAsync(connection, "SELECT indexdef FROM pg_indexes WHERE indexname = 'pk_sim_trades'")).Single().ShouldContain("(run_id, open_at_end, ordinal)");
         (await ListAsync(connection, "SELECT indexdef FROM pg_indexes WHERE indexname = 'uq_sim_trades_run_trade_key'")).Single().ShouldContain("UNIQUE");
         (await ListAsync(connection, "SELECT conname FROM pg_constraint WHERE connamespace = 'research'::regnamespace AND contype = 'c' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(
         [
-            "ck_sim_comparisons_counts", "ck_sim_comparisons_keys", "ck_sim_comparisons_members", "ck_sim_comparisons_unit",
+            "ck_exit_selection_folds_counts", "ck_exit_selections_keys", "ck_sim_comparisons_counts", "ck_sim_comparisons_keys", "ck_sim_comparisons_members", "ck_sim_comparisons_unit",
             "ck_sim_runs_costs", "ck_sim_runs_counts", "ck_sim_runs_run_key", "ck_sim_runs_universe_kind",
             "ck_sim_trade_leg_charges_ordinals", "ck_sim_trade_leg_charges_quantity", "ck_sim_trade_legs_kind", "ck_sim_trade_legs_ordinals", "ck_sim_trade_legs_share",
             "ck_sim_trades_cost_segment", "ck_sim_trades_costing_all_or_nothing", "ck_sim_trades_costs", "ck_sim_trades_costs_charged", "ck_sim_trades_entry_fill",
             "ck_sim_trades_exit_reason", "ck_sim_trades_fills", "ck_sim_trades_ordinal", "ck_sim_trades_side", "ck_sim_trades_trigger_timeframe",
         ]);
         (await ListAsync(connection, "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sim_trades_exit_reason'")).Single().ShouldContain("'timestop'", Case.Sensitive, "AddTimeStopExitReason (P4-02) lets the store hold the reason of the time stop");
-        (await ListAsync(connection, "SELECT conname || '|' || confdeltype::text FROM pg_constraint WHERE connamespace = 'research'::regnamespace AND contype = 'f'")).Order(StringComparer.Ordinal).ShouldBe(["fk_sim_trade_leg_charges_trade|r", "fk_sim_trade_legs_trade|r", "fk_sim_trades_run|r"]);
+        (await ListAsync(connection, "SELECT conname || '|' || confdeltype::text FROM pg_constraint WHERE connamespace = 'research'::regnamespace AND contype = 'f'")).Order(StringComparer.Ordinal).ShouldBe(["fk_exit_selection_folds_selection|r", "fk_exit_selections_comparison|r", "fk_sim_trade_leg_charges_trade|r", "fk_sim_trade_legs_trade|r", "fk_sim_trades_run|r"]);
         (await ListAsync(connection, "SELECT attidentity::text FROM pg_attribute WHERE attrelid = 'research.sim_runs'::regclass AND attname = 'id'")).ShouldBe(["a"]);
         (await ListAsync(connection, "SELECT count(*)::text FROM timescaledb_information.hypertables WHERE hypertable_schema = 'research'")).ShouldBe(["0"]);
         db.Database.HasPendingModelChanges().ShouldBeFalse("the model snapshot agrees with the model");
@@ -169,7 +169,43 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+    }
+
+    private const string BeforeExitSelections = "20261022055710_AddSimComparisons";
+
+    [Fact]
+    public async Task The_P4_06_migration_adds_the_exit_choice_tables_to_a_store_that_holds_a_comparison_and_Down_removes_only_them()
+    {
+        await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_research_selection_probe", Ct, migrate: false);
+        using var scope = scratch.Host.Services.CreateScope();
+        var migrator = scope.ServiceProvider.GetRequiredService<XDrishtiDbContext>().GetService<IMigrator>();
+        await migrator.MigrateAsync(BeforeExitSelections, Ct);
+        await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+        await connection.OpenAsync(Ct);
+        await ExecuteAsync(connection, "INSERT INTO research.sim_comparisons (comparison_key, entries_key, strategy_id, unit, common_entries, member_run_keys, member_candidate_ids, member_gated_blocked, comparison_csv, diagnostics_csv, record_sha256, created_at, created_by) VALUES (repeat('a', 64), repeat('b', 64), 'ORB', 'RFilled', 0, ARRAY[repeat('c', 64), repeat('d', 64)], ARRAY['x', 'y'], ARRAY[0, 0], 'c', 'd', repeat('e', 64), now(), 'probe')");
         (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+
+        await migrator.MigrateAsync(null, Ct);
+
+        string[] selectionColumns =
+        [
+            C("id", "bigint"), C("selection_key", "character", 64), C("comparison_id", "bigint"), C("strategy_id", "character varying", 64), C("timeframe", "character varying", 8), C("side", "character varying", 8),
+            C("style", "character varying", 16), C("regime", "character varying", 32), C("chosen_candidate_id", "character varying", 200, true), C("stable", "boolean", null, true), C("record_json", "text"), C("record_sha256", "character", 64),
+            C("created_at", "timestamp with time zone"), C("created_by", "character varying", 100),
+        ];
+        string[] foldColumns =
+        [
+            C("selection_id", "bigint"), C("fold_index", "integer"), C("candidate_id", "character varying", 200), C("test_start", "date"), C("test_end", "date"), C("qualified", "boolean"), C("train_trades", "integer"),
+            C("train_score", "double precision", null, true), C("test_trades", "integer"), C("test_score", "double precision", null, true), C("is_winner", "boolean"),
+        ];
+        (await ListAsync(connection, Columns, ("t", "exit_selections"))).Order(StringComparer.Ordinal).ShouldBe(selectionColumns.Order(StringComparer.Ordinal));
+        (await ListAsync(connection, Columns, ("t", "exit_selection_folds"))).Order(StringComparer.Ordinal).ShouldBe(foldColumns.Order(StringComparer.Ordinal));
+
+        await migrator.MigrateAsync(BeforeExitSelections, Ct);
+
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+        (await ListAsync(connection, "SELECT count(*)::text FROM research.sim_comparisons")).ShouldBe(["1"], "Down removes the tables of P4-06 and nothing else");
     }
 
     [Fact]
@@ -188,7 +224,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
     }
 
     [Fact]
@@ -210,6 +246,6 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(Before, Ct);
         (await ListAsync(connection, "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'research'")).ShouldBeEmpty();
         await migrator.MigrateAsync(null, Ct);
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
     }
 }

@@ -135,6 +135,11 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<SimComparisonRow> SimComparisons => Set<SimComparisonRow>();
 
+    /// <summary>The exit choices and their folds (spec P4-06).</summary>
+    internal DbSet<ExitSelectionRow> ExitSelections => Set<ExitSelectionRow>();
+
+    internal DbSet<ExitSelectionFoldRow> ExitSelectionFolds => Set<ExitSelectionFoldRow>();
+
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();
 
