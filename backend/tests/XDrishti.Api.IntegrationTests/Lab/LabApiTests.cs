@@ -125,6 +125,29 @@ public sealed class LabApiTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task A_body_over_256_KB_is_refused_by_the_transport_with_413()
+    {
+        var client = await ClientAsync();
+
+        using var content = new StringContent("{\"text\":\"" + new string('x', 300_000) + "\"}", System.Text.Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync(Url("/api/lab/validate"), content, Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.RequestEntityTooLarge);
+    }
+
+    [Fact]
+    public async Task A_parent_hash_that_is_not_stored_is_a_400_and_nothing_is_written()
+    {
+        var client = await ClientAsync();
+        var id = LabTexts.NewId();
+
+        using var response = await CreateAsync(client, LabTexts.Valid(id), new { text = LabTexts.Valid(id), parentHash = new string('e', 64) });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await VersionCountAsync(client, id)).ShouldBe(0);
+    }
+
+    [Fact]
     public async Task The_endpoints_need_the_owner_session()
     {
         using var response = await factory.CreateAnonymousClient().PostAsJsonAsync(Url("/api/lab/validate"), new { text = "a" }, Ct);

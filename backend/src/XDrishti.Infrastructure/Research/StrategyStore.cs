@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using XDrishti.Application.Abstractions.Research;
+using XDrishti.Application.Lab;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Research;
 
@@ -22,8 +23,6 @@ internal sealed partial class StrategyStore(NpgsqlDataSource dataSource, TimePro
     private const int MaxAttempts = 24;
 
     private const string VersionColumns = "strategy_id, version, schema_version, hash, source_text, canonical_json, parent_hash, note, created_at";
-
-    private static readonly Regex IdPattern = new("^[A-Za-z][A-Za-z0-9_]{0,63}$", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
 
     private static readonly Regex HashPattern = new("^[0-9a-f]{64}$", RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
 
@@ -143,7 +142,7 @@ internal sealed partial class StrategyStore(NpgsqlDataSource dataSource, TimePro
 
     private static Error? Check(NewVersion v)
     {
-        if (v.StrategyId is null || !IdPattern.IsMatch(v.StrategyId))
+        if (v.StrategyId is null || !StrategyIdFormat.IsValid(v.StrategyId))
         {
             return StrategyStoreErrors.Invalid("The strategy id must be a letter followed by up to 63 letters, digits or underscores.");
         }

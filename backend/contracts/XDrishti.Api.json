@@ -7742,7 +7742,7 @@
         "tags": [
           "Lab"
         ],
-        "summary": "Read and compile a strategy text; the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing",
+        "summary": "Read and compile a strategy text (413 over 256 KB); the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing",
         "operationId": "ValidateStrategy",
         "requestBody": {
           "content": {
@@ -7826,7 +7826,7 @@
         "tags": [
           "Lab"
         ],
-        "summary": "Store a valid text as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in",
+        "summary": "Store a valid text (413 over 256 KB) as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in",
         "operationId": "CreateStrategy",
         "requestBody": {
           "content": {

@@ -23,8 +23,9 @@ internal sealed class LabEndpoints : IEndpointModule
 
         group.MapPost("/validate", ValidateAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxBodyBytes))
+            .AddEndpointFilter(BodyLimitAsync)
             .WithName("ValidateStrategy")
-            .WithSummary("Read and compile a strategy text; the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing")
+            .WithSummary("Read and compile a strategy text (413 over 256 KB); the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing")
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
         group.MapGet("/schema", GetSchemaAsync)
@@ -40,8 +41,9 @@ internal sealed class LabEndpoints : IEndpointModule
 
         strategies.MapPost("/", CreateAsync)
             .WithMetadata(new RequestSizeLimitAttribute(MaxBodyBytes))
+            .AddEndpointFilter(BodyLimitAsync)
             .WithName("CreateStrategy")
-            .WithSummary("Store a valid text as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in")
+            .WithSummary("Store a valid text (413 over 256 KB) as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in")
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .ProducesProblem(StatusCodes.Status409Conflict)
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
@@ -69,6 +71,12 @@ internal sealed class LabEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
     }
+
+    /// <summary>The 413 for a body over the limit by its declared length; the size attribute does the same for a stream that lies (Kestrel).</summary>
+    private static ValueTask<object?> BodyLimitAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next) =>
+        context.HttpContext.Request.ContentLength > MaxBodyBytes
+            ? ValueTask.FromResult<object?>(TypedResults.Problem(ProblemResults.Create(StatusCodes.Status413PayloadTooLarge, "The request body is larger than 256 KB.", "lab.body_too_large")))
+            : next(context);
 
     private static async Task<Results<Ok<StrategyValidation>, ProblemHttpResult>> ValidateAsync(
         ValidateStrategyRequest request,

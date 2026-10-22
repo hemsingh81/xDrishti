@@ -10,6 +10,9 @@ public static class LabErrors
     /// <summary>The text has at least one error; the located problems are in the error payload under <see cref="ProblemsKey"/>.</summary>
     public const string InvalidStrategyCode = "lab.invalid_strategy";
 
+    /// <summary>A stored text no longer reads under the rules of today, so it cannot be cloned.</summary>
+    public const string StoredUnreadableCode = "lab.stored_unreadable";
+
     /// <summary>No such family or version.</summary>
     public const string NotFoundCode = "lab.not_found";
 

@@ -2255,7 +2255,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Read and compile a strategy text; the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing */
+    /** Read and compile a strategy text (413 over 256 KB); the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing */
     post: operations['ValidateStrategy'];
     delete?: never;
     options?: never;
@@ -2290,7 +2290,7 @@ export interface paths {
     /** The strategy families with their latest version number, the number of versions and whether they are built in */
     get: operations['ListStrategies'];
     put?: never;
-    /** Store a valid text as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in */
+    /** Store a valid text (413 over 256 KB) as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in */
     post: operations['CreateStrategy'];
     delete?: never;
     options?: never;

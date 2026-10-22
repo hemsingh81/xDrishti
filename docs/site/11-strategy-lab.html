@@ -135,6 +135,9 @@ test:
   method: walk_forward            # walk_forward | simple_split | full_period (exploration only)
   compare_with: [baseline_random, ORB]
   robustness: { param_sensitivity: true, monte_carlo: 1000, by_year: true, by_regime: true }</code></pre></div>
+<blockquote>
+<p><strong>Illustrative, not valid today.</strong> This example does not pass <code>POST /api/lab/validate</code> (<a href="../adr/0057-the-lab-api-validate-store-and-read-strategy-versions.html">ADR 0057</a>): it lists SELL without a <code>sell:</code> block (the automatic mirror is P3-02e), declares two exit candidates (the simulator runs one), puts <code>buffer_atr</code> on a swing-low stop and names two filters that have no data. Validate reports each with its location; the built-in texts in <code>Seed/Strategies</code> are valid examples.</p>
+</blockquote>
 <p><strong>How the sections combine.</strong> <code>setup</code>, <code>trigger</code> and the optional <code>invalidate</code> list (the <code>invalidation</code> row of <a href="07-strategies.html">doc 07</a> §1, &quot;cancel if…&quot;) are evaluated <strong>together</strong> at every closed bar of the evaluation timeframe: an entry is possible when <code>setup</code> is true, <code>trigger</code> is true and <code>invalidate</code> is not true. That is why the example may put <code>time</code> and <code>rsi(…)</code> in <code>setup</code>; which parts of a setup are knowable at the previous close, for the nightly shortlist, is the business of the planner (P7), not of the model. An <code>all:</code> list is the Kleene AND of its conditions and an <code>any:</code> list the Kleene OR; the conditions are compiled and evaluated one by one and <strong>never joined into one text</strong>. <code>time_rules</code> is the one place for windows (<code>first_entry</code> and <code>last_entry</code> inclusive, <code>square_off</code> for intraday, <code>max_hold_sessions</code> for swing); nothing is read from the configuration, so a stored strategy is self-contained. In the stored form of P3-02b the nested <code>trail: { type: ATR, mult: 2.0 }</code> of <code>PARTIAL_TRAIL</code> is the field <code>trail_atr_mult</code> (the trail is the ATR in schema 1; the file of P3-02c has no nested <code>trail</code>: it is written <code>trail_atr_mult</code>, and the nested form is <code>file.unknown_field</code>).</p>
 <p>In this example <code>time &gt;= &quot;09:45&quot;</code> is the trading rule of the sentence above (no entry before 09:45), not something the language needs in order to be correct: <code>crosses_above(close, vwap)</code> is unknown at the first evaluation of every session (09:30 on 15m) and can first be true at the second (09:45), see <em>Lags</em> below.</p>
 <table>
@@ -741,7 +744,7 @@ folder); any version can be downloaded as a file and re-imported (<a href="../ad
     <a class="prev" href="10-trade-selection.html"><small>← Previous  [</small>10 · Trade selection</a>
     <a class="next" href="12-portfolio-monitoring.html"><small>Next  ] →</small>12 · Portfolio monitoring</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-22 10:05</footer>
+  <footer class="foot">Generated from <code>docs/11-strategy-lab.md</code> · 2026-10-22 10:24</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-ways-to-submit" class="d2">1. Ways to submit</a>
 <a href="#2-rules-language-dsl" class="d2">2. Rules language (DSL)</a>

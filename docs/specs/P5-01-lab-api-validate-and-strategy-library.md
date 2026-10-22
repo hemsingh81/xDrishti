@@ -62,5 +62,6 @@ Unit: the validate pipeline order (parse, schema, compile) on tables of good and
 - [x] The owner has answered questions 1 to 5 and the status is Approved; P3-02c and P3-02d are Built and this spec re-read (2026-10-22)
 - [x] All acceptance criteria have evidence (`LabApiTests`, `LabHandlerTests`, `StoredCheckTests`, `LabStoreTests`; criterion 1 uses a valid two-sided strategy because the doc 11 example does not validate today, see ADR 0057 honest limits)
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
+- Build note: the request gained an optional `parentHash` (not in the spec; cross-family parents allowed for clones), clone gained `newId`, and `lab.stored_unreadable` / `lab.text_too_large` / `lab.unsupported_format` were added.
 - [x] Contract regenerated (`scripts/gen-api.sh`); no migration was needed (the P3-02d tables have the parent hash and the note)
 - [x] ADR 0057 for the Lab API module and version rules; doc 11 §1, §6 and doc 03 §6 updated; `scripts/build-docs.sh` run
