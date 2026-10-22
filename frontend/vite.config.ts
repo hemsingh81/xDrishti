@@ -10,7 +10,14 @@ const apiTarget = process.env.XD_API_URL ?? 'http://localhost:8080';
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: [
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+      // monaco-yaml imports `monaco-editor/esm/vs/...`, which the package's `exports` map does not serve; map it to the files.
+      {
+        find: /^monaco-editor\/esm\/vs\/(.*)$/,
+        replacement: `${fileURLToPath(new URL('./node_modules/monaco-editor/esm/vs', import.meta.url))}/$1`,
+      },
+    ],
   },
   server: {
     port: 5173,

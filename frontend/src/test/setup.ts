@@ -19,6 +19,11 @@ vi.mock('@/shared/ui/chart/CategoryChartCanvas', async () => ({
   default: (await import('./chartStub')).CategoryChartCanvasStub,
 }));
 
+// jsdom cannot run Monaco: the Lab editor is a labelled textarea in tests.
+vi.mock('@/features/lab/components/MonacoYamlEditor', async () => ({
+  default: (await import('./editorStub')).default,
+}));
+
 // Requests that got past the network mock and hit the real network. `onUnhandledFrame: 'error'` only sees requests the mock
 // takes in and finds no handler for; a request that the mock never took in (seen once after a hung request was aborted) goes
 // straight to the network and fails there with ECONNREFUSED, which looks like "the server is down", not like a test bug.
