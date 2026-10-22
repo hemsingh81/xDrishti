@@ -39,6 +39,11 @@ function useLibrary() {
       HttpResponse.text('{"type":"object"}', { headers: { 'content-type': 'application/schema+json' } }),
     ),
     http.get('/api/lab/strategies', () => HttpResponse.json(strategies)),
+    http.get('/api/lab/runs', () => HttpResponse.json([])),
+    http.get('/api/baskets', () => HttpResponse.json([])),
+    http.get('/api/lab/strategies/:id/ledger', ({ params }) =>
+      HttpResponse.json({ strategyId: params.id, variantCount: 0, adjustmentFactor: 1, rows: [] }),
+    ),
     http.post('/api/lab/validate', () => HttpResponse.json(validation())),
     http.get('/api/lab/strategies/:id', ({ params }) =>
       HttpResponse.json({

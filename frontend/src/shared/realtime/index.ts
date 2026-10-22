@@ -10,5 +10,13 @@ export {
   type HubTransportFactory,
 } from './eventsHub';
 export { eventsHub, type EventsHubEvents, type EventsHubServer } from './hubContract.generated';
-export type { InstrumentPrice, LiveFeedStatus, LiveScope, PricesChanged, SubscribeAck } from './hubContract.generated';
+export type {
+  InstrumentPrice,
+  LabRunFinished,
+  LabRunProgress,
+  LiveFeedStatus,
+  LiveScope,
+  PricesChanged,
+  SubscribeAck,
+} from './hubContract.generated';
 export { useEventsHub } from './useEventsHub';

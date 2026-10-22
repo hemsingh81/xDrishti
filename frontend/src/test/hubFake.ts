@@ -3,6 +3,8 @@ import {
   setHubTransport,
   type HubTransport,
   type InstrumentPrice,
+  type LabRunFinished,
+  type LabRunProgress,
   type LiveFeedStatus,
   type LiveScope,
   type PricesChanged,
@@ -40,6 +42,8 @@ export function createHubFake(behaviour: HubBehaviour = 'connect') {
   let mode = behaviour;
   let pricesHandler: ((message: PricesChanged) => void) | undefined;
   let statusHandler: ((message: LiveFeedStatus) => void) | undefined;
+  let labProgressHandler: ((message: LabRunProgress) => void) | undefined;
+  let labFinishedHandler: ((message: LabRunFinished) => void) | undefined;
   let closeHandler: (() => void) | undefined;
   let alive = false;
 
@@ -98,6 +102,12 @@ export function createHubFake(behaviour: HubBehaviour = 'connect') {
         onFeedStatus: (handler) => {
           statusHandler = handler;
         },
+        onLabRunProgress: (handler) => {
+          labProgressHandler = handler;
+        },
+        onLabRunFinished: (handler) => {
+          labFinishedHandler = handler;
+        },
         onClose: (handler) => {
           closeHandler = handler;
         },
@@ -116,6 +126,18 @@ export function createHubFake(behaviour: HubBehaviour = 'connect') {
     status: (status: LiveFeedStatus) => {
       act(() => {
         statusHandler?.(status);
+      });
+    },
+    /** The server reports a Lab run's progress. */
+    labProgress: (message: LabRunProgress) => {
+      act(() => {
+        labProgressHandler?.(message);
+      });
+    },
+    /** The server reports a Lab run's end. */
+    labFinished: (message: LabRunFinished) => {
+      act(() => {
+        labFinishedHandler?.(message);
       });
     },
     /** The server (or the network) ends the connection. */
