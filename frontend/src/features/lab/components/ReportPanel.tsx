@@ -19,6 +19,7 @@ import { formatNumber } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { reportHtmlHref, reportQuery, reportZipHref } from '../api/runQueries';
 import { RobustnessSummary } from './RobustnessSummary';
+import { noLimits } from './VerdictPanel';
 
 const num = (v: number | null): string => (v === null ? 'n/a' : formatNumber(v));
 
@@ -28,8 +29,8 @@ function Bullets({ label, items }: { label: string; items: string[] }) {
     <Box>
       <Typography variant="subtitle2">{label}</Typography>
       <List dense disablePadding aria-label={label}>
-        {items.map((t) => (
-          <ListItem key={t} disableGutters>
+        {items.map((t, i) => (
+          <ListItem key={`${i}${t}`} disableGutters>
             {t}
           </ListItem>
         ))}
@@ -65,8 +66,8 @@ export function ReportPanel({ runId }: { runId: string }) {
       {r.warnings.length > 0 && (
         <Alert severity="warning">
           <List dense disablePadding aria-label="Warnings">
-            {r.warnings.map((w) => (
-              <ListItem key={w.code} disableGutters>
+            {r.warnings.map((w, i) => (
+              <ListItem key={`${i}${w.code}`} disableGutters>
                 {w.text}
               </ListItem>
             ))}
@@ -74,7 +75,7 @@ export function ReportPanel({ runId }: { runId: string }) {
         </Alert>
       )}
       <Alert severity="info">
-        <Bullets label="Honest limits" items={r.honestLimits} />
+        <Bullets label="Honest limits" items={r.honestLimits.length > 0 ? r.honestLimits : [noLimits]} />
       </Alert>
       {r.bestCells.length > 0 && (
         <Table size="small" aria-label="Best cells">
@@ -88,8 +89,8 @@ export function ReportPanel({ runId }: { runId: string }) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {r.bestCells.map((c) => (
-              <TableRow key={c.cell}>
+            {r.bestCells.map((c, i) => (
+              <TableRow key={`${i}${c.cell}`}>
                 <TableCell>{c.cell}</TableCell>
                 <TableCell>{c.chosen}</TableCell>
                 <TableCell align="right">{c.oosTrades}</TableCell>
@@ -112,8 +113,8 @@ export function ReportPanel({ runId }: { runId: string }) {
             </TableRow>
           </TableHead>
           <TableBody>
-            {r.exploration.map((e) => (
-              <TableRow key={`${e.cell}${e.candidate}`}>
+            {r.exploration.map((e, i) => (
+              <TableRow key={`${i}${e.cell}${e.candidate}`}>
                 <TableCell>{e.cell}</TableCell>
                 <TableCell>{e.candidate}</TableCell>
                 <TableCell align="right">{e.trades}</TableCell>

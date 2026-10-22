@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import type { Schemas } from '@/shared/api';
@@ -157,7 +157,7 @@ function setup(runs: Run[], extra: Handler[] = []) {
 }
 
 async function openFamily(user: ReturnType<typeof userEvent.setup>, version = true) {
-  await user.click(await screen.findByRole('button', { name: /MY_ORB/ }));
+  await user.click(await screen.findByRole('button', { name: /^MY_ORB\s*intraday/ }));
   if (version) await user.click(await screen.findByRole('button', { name: /Version 2/ }));
   if (version) {
     await waitFor(() => {
@@ -172,6 +172,10 @@ async function openRun(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
 }
 
 describe('Lab runs', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('starts a quick test on typed symbols and follows the new run', async () => {
     let body: unknown;
     const started = buildRun({ state: 'queued', stage: null });
@@ -245,29 +249,117 @@ describe('Lab runs', () => {
     expect(screen.queryByRole('progressbar', { name: 'Run progress' })).not.toBeInTheDocument();
   });
 
-  it('polls the run when the hub is away', async () => {
+  it('polls the run every few seconds when the hub is away and stops when it ends', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let reads = 0;
+    let ledgerReads = 0;
+    setup(
+      [buildRun()],
+      [
+        http.get('/api/lab/runs/:id', () => {
+          reads += 1;
+          return HttpResponse.json(reads < 3 ? buildRun() : buildRun({ state: 'succeeded', stage: null }));
+        }),
+        http.get('/api/lab/strategies/:id/ledger', ({ params }) => {
+          ledgerReads += 1;
+          return HttpResponse.json({ strategyId: params.id, variantCount: 0, adjustmentFactor: 1, rows: [] });
+        }),
+      ],
+    );
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderWithProviders(<LabPage />);
+    await openRun(user, /MY_ORB v2 · quick/);
+    expect(await screen.findByRole('progressbar', { name: 'Run progress' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(ledgerReads).toBeGreaterThan(0);
+    });
+    const ledgerBefore = ledgerReads;
+
+    await act(() => vi.advanceTimersByTimeAsync(3100));
+    await waitFor(() => {
+      expect(reads).toBe(2);
+    });
+    expect(screen.getByRole('progressbar', { name: 'Run progress' })).toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(3100));
+    await waitFor(() => {
+      expect(screen.queryByRole('progressbar', { name: 'Run progress' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('status')).toHaveTextContent('Run succeeded');
+    await waitFor(() => {
+      expect(ledgerReads).toBeGreaterThan(ledgerBefore);
+    });
+
+    const done = reads;
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+    expect(reads).toBe(done);
+  });
+
+  it('keeps a slow safety poll while the hub is connected', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const hub = createHubFake();
+    hub.install();
     let reads = 0;
     setup(
       [buildRun()],
       [
         http.get('/api/lab/runs/:id', () => {
           reads += 1;
-          return HttpResponse.json(reads < 2 ? buildRun() : buildRun({ state: 'succeeded', stage: null }));
+          return HttpResponse.json(buildRun());
         }),
+      ],
+    );
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderWithProviders(<LabPage />);
+    await openRun(user, /MY_ORB v2 · quick/);
+    expect(await screen.findByRole('progressbar', { name: 'Run progress' })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(hub.alive).toBe(true);
+    });
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    const before = reads;
+
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(reads).toBe(before);
+    await act(() => vi.advanceTimersByTimeAsync(11_000));
+    await waitFor(() => {
+      expect(reads).toBeGreaterThan(before);
+    });
+  });
+
+  it('does not let an older progress event revive a finished run', async () => {
+    const hub = createHubFake();
+    hub.install();
+    const done = buildRun({ state: 'succeeded', stage: null });
+    setup([done], [http.get('/api/lab/runs/:id', () => HttpResponse.json(done))]);
+    const user = userEvent.setup();
+    renderWithProviders(<LabPage />);
+    await openRun(user, /MY_ORB v2 · quick/);
+    expect(await screen.findByRole('status')).toHaveTextContent('Run succeeded');
+    await waitFor(() => {
+      expect(hub.alive).toBe(true);
+    });
+    hub.labProgress({ runId, state: 'running', stage: 'quick_test', done: 1, total: 10, message: null });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByRole('status')).toHaveTextContent('Run succeeded');
+  });
+
+  it('says so when the verdict and the report list no limits', async () => {
+    const done = buildRun({ state: 'succeeded', stage: null, method: 'full', verdict: { ...verdict, limits: [] } });
+    setup(
+      [done],
+      [
+        http.get('/api/lab/runs/:id', () => HttpResponse.json(done)),
+        http.get('/api/lab/runs/:id/report', () => HttpResponse.json({ ...report, honestLimits: [] })),
       ],
     );
     const user = userEvent.setup();
     renderWithProviders(<LabPage />);
-    await openRun(user, /MY_ORB v2 · quick/);
+    await openRun(user, /MY_ORB v2 · full/);
 
-    expect(await screen.findByRole('progressbar', { name: 'Run progress' })).toBeInTheDocument();
-    await waitFor(
-      () => {
-        expect(screen.queryByRole('progressbar', { name: 'Run progress' })).not.toBeInTheDocument();
-      },
-      { timeout: 6000 },
-    );
-  }, 10_000);
+    expect(await screen.findByRole('region', { name: 'Report' })).toBeInTheDocument();
+    expect(await screen.findAllByText(/No limits were listed/)).toHaveLength(2);
+  });
 
   it('cancels a running run', async () => {
     let cancelled = false;

@@ -101,29 +101,21 @@ export class EventsHub {
   readonly getSnapshot = (): HubSnapshot => this.snapshot;
 
   readonly subscribe = (listener: () => void): (() => void) => {
-    this.stateListeners.add(listener);
-    return () => {
-      this.stateListeners.delete(listener);
-    };
+    return register(this.stateListeners, listener);
   };
 
   /** Adds a handler of `pricesChanged`; returns the function that removes it. */
   readonly onPrices = (handler: (message: PricesChanged) => void): (() => void) => {
-    this.priceHandlers.add(handler);
-    return () => {
-      this.priceHandlers.delete(handler);
-    };
+    return register(this.priceHandlers, handler);
   };
 
   /** Adds a handler of `labRunProgress` / `labRunFinished`; returns the function that removes it. */
   readonly onLabProgress = (handler: (message: LabRunProgress) => void): (() => void) => {
-    this.labProgressHandlers.add(handler);
-    return () => this.labProgressHandlers.delete(handler) && undefined;
+    return register(this.labProgressHandlers, handler);
   };
 
   readonly onLabFinished = (handler: (message: LabRunFinished) => void): (() => void) => {
-    this.labFinishedHandlers.add(handler);
-    return () => this.labFinishedHandlers.delete(handler) && undefined;
+    return register(this.labFinishedHandlers, handler);
   };
 
   /** Asks for the connection; the returned function gives it back (call it once). */
@@ -291,6 +283,14 @@ export class EventsHub {
       if (generation === this.generation) this.sync();
     }, this.options.resubscribeMs);
   }
+}
+
+/** Adds a handler to a set; returns the function that removes it. */
+function register<T>(handlers: Set<T>, handler: T): () => void {
+  handlers.add(handler);
+  return () => {
+    handlers.delete(handler);
+  };
 }
 
 /** How long a connection that is being closed waits for the server to acknowledge `Unsubscribe`. */

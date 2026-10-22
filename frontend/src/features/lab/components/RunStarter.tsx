@@ -45,6 +45,7 @@ export function RunStarter({ target, onStarted }: RunStarterProps) {
     },
     onSuccess: (run) => {
       void queryClient.invalidateQueries({ queryKey: runKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['lab', 'ledger'] });
       toast.notify(`Run ${run.state}: ${run.strategy.id} v${run.strategy.version}, ${run.method}.`, 'success');
       onStarted(run);
     },

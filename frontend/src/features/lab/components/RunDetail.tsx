@@ -1,5 +1,6 @@
 import { Alert, Box, Button, LinearProgress, List, ListItem, Stack, Typography } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { formatIstDateTime } from '@/shared/lib/format';
 import { ErrorState, Facts, LoadingState } from '@/shared/ui';
 import { useToast } from '@/shared/ui/toastContext';
@@ -9,7 +10,7 @@ import { VerdictPanel } from './VerdictPanel';
 
 interface RunDetailProps {
   runId: string;
-  poll: boolean;
+  poll: number | false;
 }
 
 /** One run: state and live progress, cancel, problems, the verdict with its gates and the report. */
@@ -21,6 +22,7 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
     mutationFn: () => cancelRun(runId),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: runKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['lab', 'ledger'] });
       toast.notify('Cancel requested; the run stops at the next safe point.', 'info');
     },
     onError: (e) => {
@@ -28,13 +30,27 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
     },
   });
 
+  // A run seen going and then over (read by the poll or the hub) has added its row to the ledger.
+  const state = run?.state;
+  const seenGoing = useRef(false);
+  useEffect(() => {
+    if (state === undefined) return;
+    if (isActive(state)) {
+      seenGoing.current = true;
+    } else if (seenGoing.current) {
+      seenGoing.current = false;
+      void queryClient.invalidateQueries({ queryKey: ['lab', 'ledger'] });
+    }
+  }, [state, queryClient]);
+
   if (isPending) return <LoadingState label="Loading the run" />;
-  if (error) return <ErrorState error={error} />;
+  if (!run) return <ErrorState error={error} />;
 
   const going = isActive(run.state);
   const { done, total } = run.progress;
   return (
     <Stack spacing={2}>
+      {error && <Alert severity="warning">The run could not be refreshed: {error.message}</Alert>}
       <Facts
         items={[
           { label: 'Run', value: `${run.strategy.id} v${run.strategy.version} · ${run.method}` },
@@ -56,6 +72,13 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
             : []),
         ]}
       />
+      <Typography variant="caption" color="text.secondary" role="status">
+        {going
+          ? total > 0
+            ? `${run.stage ?? run.state}: ${done} of ${total} instruments`
+            : `${run.stage ?? run.state}…`
+          : `Run ${run.state}`}
+      </Typography>
       {going && (
         <Box>
           <LinearProgress
@@ -63,9 +86,6 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
             variant={total > 0 ? 'determinate' : 'indeterminate'}
             value={total > 0 ? (done / total) * 100 : 0}
           />
-          <Typography variant="caption" color="text.secondary" role="status">
-            {total > 0 ? `${run.stage ?? run.state}: ${done} of ${total} instruments` : `${run.stage ?? run.state}…`}
-          </Typography>
           <Box sx={{ mt: 1 }}>
             <Button
               onClick={() => {
@@ -82,8 +102,8 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
       {run.problems.length > 0 && (
         <Alert severity="warning">
           <List dense disablePadding aria-label="Run problems">
-            {run.problems.map((p) => (
-              <ListItem key={`${p.stage}${p.path}${p.code}${p.message}`} disableGutters>
+            {run.problems.map((p, i) => (
+              <ListItem key={`${i}${p.stage}${p.path}${p.code}${p.message}`} disableGutters>
                 {p.severity}: {p.message} ({p.code}, {p.stage}
                 {p.path ? `, ${p.path}` : ''})
               </ListItem>
@@ -91,8 +111,8 @@ export function RunDetail({ runId, poll }: RunDetailProps) {
           </List>
         </Alert>
       )}
-      {run.labels.map((l) => (
-        <Typography key={l} variant="caption" color="text.secondary">
+      {run.labels.map((l, i) => (
+        <Typography key={`${i}${l}`} variant="caption" color="text.secondary">
           {l}
         </Typography>
       ))}

@@ -21,6 +21,9 @@ const outcomeSeverity: Record<string, 'success' | 'warning' | 'error' | undefine
   FAIL: 'error',
 };
 
+/** Shown when the server lists no limits: a result is never presented without saying it has some. */
+export const noLimits = 'No limits were listed; treat any result as exploration, not proof.';
+
 const num = (v: number | null): string => (v === null ? 'n/a' : formatNumber(v));
 
 /** The verdict: outcome, how many variants tightened it, every gate with its adjusted threshold, and the honest limits. */
@@ -49,8 +52,8 @@ export function VerdictPanel({ verdict }: { verdict: LabVerdict }) {
           </TableRow>
         </TableHead>
         <TableBody>
-          {verdict.gates.map((g) => (
-            <TableRow key={g.name}>
+          {verdict.gates.map((g, i) => (
+            <TableRow key={`${i}${g.name}`}>
               <TableCell>
                 {g.name}
                 <Typography variant="caption" component="div" color="text.secondary">
@@ -65,20 +68,22 @@ export function VerdictPanel({ verdict }: { verdict: LabVerdict }) {
           ))}
         </TableBody>
       </Table>
-      {verdict.limits.length > 0 && (
-        <Alert severity="info" sx={{ mt: 1 }}>
-          <Typography variant="subtitle2">Honest limits</Typography>
+      <Alert severity="info" sx={{ mt: 1 }}>
+        <Typography variant="subtitle2">Honest limits</Typography>
+        {verdict.limits.length > 0 ? (
           <List dense disablePadding aria-label="Honest limits of the verdict">
-            {verdict.limits.map((l) => (
-              <ListItem key={l} disableGutters>
+            {verdict.limits.map((l, i) => (
+              <ListItem key={`${i}${l}`} disableGutters>
                 {l}
               </ListItem>
             ))}
           </List>
-        </Alert>
-      )}
-      {verdict.labels.map((l) => (
-        <Typography key={l} variant="caption" component="p" color="text.secondary">
+        ) : (
+          <Typography>{noLimits}</Typography>
+        )}
+      </Alert>
+      {verdict.labels.map((l, i) => (
+        <Typography key={`${i}${l}`} variant="caption" component="p" color="text.secondary">
           {l}
         </Typography>
       ))}

@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, Grid, Typography } from '@mui/material';
+import { pollMs, safetyPollMs } from '../api/runQueries';
 import { useLabRunEvents } from '../hooks/useLabRunEvents';
 import { RunDetail } from './RunDetail';
 import { RunStarter } from './RunStarter';
@@ -11,10 +12,10 @@ interface RunsCardProps {
   onSelectRun: (id: string | null) => void;
 }
 
-/** Start a test, follow the runs (live over the hub, polling when it is away) and read one run's verdict and report. */
+/** Start a test, follow the runs (live over the hub, with a slow safety poll; fast polling when it is away) and read one run's verdict and report. */
 export function RunsCard({ familyId, target, runId, onSelectRun }: RunsCardProps) {
-  const { live } = useLabRunEvents(true);
-  const poll = !live;
+  const { live } = useLabRunEvents();
+  const poll = live ? safetyPollMs : pollMs;
   return (
     <Card>
       <CardHeader title={<Typography variant="h2">Test runs</Typography>} />

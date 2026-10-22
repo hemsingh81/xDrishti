@@ -12,6 +12,8 @@ export type RunMethod = 'quick' | 'full' | 'robust';
 export const runKeys = {
   /** Every run list and run record. */
   all: ['lab', 'runs'] as const,
+  /** Every run list. */
+  lists: ['lab', 'runs', 'list'] as const,
   list: (strategyId: string | null) => ['lab', 'runs', 'list', strategyId ?? 'all'] as const,
   one: (id: string) => ['lab', 'runs', 'one', id] as const,
   report: (id: string) => ['lab', 'runs', 'report', id] as const,
@@ -23,9 +25,11 @@ export const isActive = (state: string): boolean => active.has(state);
 
 /** How often a run still going is read when the hub does not carry its progress. */
 export const pollMs = 3000;
+/** How often it is read anyway while the hub is connected, in case an event was missed. */
+export const safetyPollMs = 20_000;
 
-/** `poll`: read again every few seconds while a run is going (the hub is not carrying its progress). */
-export const runsQuery = (strategyId: string | null, poll = false) =>
+/** `poll`: the interval (ms) at which to read again while a run is going, or false for no polling. */
+export const runsQuery = (strategyId: string | null, poll: number | false = false) =>
   queryOptions({
     queryKey: runKeys.list(strategyId),
     queryFn: async ({ signal }) =>
@@ -35,14 +39,14 @@ export const runsQuery = (strategyId: string | null, poll = false) =>
           signal,
         }),
       ),
-    refetchInterval: (q) => (poll && q.state.data?.some((r) => isActive(r.state)) ? pollMs : false),
+    refetchInterval: (q) => (poll && q.state.data?.some((r) => isActive(r.state)) ? poll : false),
   });
 
-export const runQuery = (id: string, poll = false) =>
+export const runQuery = (id: string, poll: number | false = false) =>
   queryOptions({
     queryKey: runKeys.one(id),
     queryFn: async ({ signal }) => unwrap(await api.GET('/api/lab/runs/{id}', { params: { path: { id } }, signal })),
-    refetchInterval: (q) => (poll && q.state.data && isActive(q.state.data.state) ? pollMs : false),
+    refetchInterval: (q) => (poll && q.state.data && isActive(q.state.data.state) ? poll : false),
   });
 
 export const reportQuery = (id: string) =>

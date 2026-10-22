@@ -6,7 +6,7 @@ import { runsQuery } from '../api/runQueries';
 
 interface RunsListProps {
   strategyId: string | null;
-  poll: boolean;
+  poll: number | false;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }
@@ -29,10 +29,9 @@ export function RunsList({ strategyId, poll, selectedId, onSelect }: RunsListPro
         >
           <ListItemText
             primary={`${r.strategy.id} v${r.strategy.version} · ${r.method}`}
-            secondary={`${r.universe.label} · ${formatIstDateTime(r.createdAt)}`}
+            secondary={`${r.state} · ${r.universe.label} · ${formatIstDateTime(r.createdAt)}`}
           />
-          {r.verdict && <Chip size="small" variant="outlined" label={r.verdict.outcome} sx={{ mr: 1 }} />}
-          <Chip size="small" label={r.state} />
+          {r.verdict && <Chip size="small" variant="outlined" label={r.verdict.outcome} />}
         </ListItemButton>
       ))}
     </List>
