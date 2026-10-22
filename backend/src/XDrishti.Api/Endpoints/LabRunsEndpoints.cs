@@ -1,0 +1,97 @@
+using Microsoft.AspNetCore.Http.HttpResults;
+using XDrishti.Api.Auth;
+using XDrishti.Api.Lab;
+using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Lab;
+using XDrishti.Domain.Common;
+
+namespace XDrishti.Api.Endpoints;
+
+/// <summary>The Lab runs of spec P5-02 (ADR 0058): post a quick test, list and read runs, cancel. A post never waits for the run; a background service of this host carries it out and the hub tells the screen how it goes.</summary>
+internal sealed class LabRunsEndpoints : IEndpointModule
+{
+    public void Map(IEndpointRouteBuilder api)
+    {
+        var runs = api.MapGroup("/lab/runs").WithTags("Lab");
+
+        runs.MapPost("/", StartAsync)
+            .WithName("StartLabRun")
+            .WithSummary("Queue a quick test of a stored strategy version on a basket or a list of symbols (202 with the run); the same input again returns the run that holds it (200). 422 lab.invalid_input, 404 lab.not_found, 409 lab.no_data")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        runs.MapGet("/", ListAsync)
+            .WithName("ListLabRuns")
+            .WithSummary("Lab runs, newest first; filter by strategyId and state; limit 1 to 200 (default 50)")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        runs.MapGet("/{id:guid}", GetAsync)
+            .WithName("GetLabRun")
+            .WithSummary("One Lab run: state, stage, progress, the simulation run keys, counts, located problems, the stage log and the labels (cost basis, sample, exploration)")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        runs.MapPost("/{id:guid}/cancel", CancelAsync)
+            .WithName("CancelLabRun")
+            .WithSummary("Stop a run: a queued run at once, a running run at its next safe point between instruments (202); nothing is stored for it. 409 lab.not_cancellable once it has finished")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+    }
+
+    private static async Task<Results<Accepted<LabRunView>, Ok<LabRunView>, ProblemHttpResult>> StartAsync(
+        StartLabRunRequest request,
+        HttpContext http,
+        ICommandHandler<StartLabRunCommand, StartedLabRun> handler,
+        CancellationToken cancellationToken)
+    {
+        var universe = request.Universe;
+        var result = await handler.HandleAsync(
+            new StartLabRunCommand(request.StrategyId, request.Version, universe?.BasketId, universe?.Symbols, request.Method, request.Window?.From, request.Window?.To),
+            cancellationToken);
+        if (result.IsFailure)
+        {
+            return Problem(result.Error, http);
+        }
+
+        var started = result.Value;
+        return started.Created ? TypedResults.Accepted($"/api/lab/runs/{started.Run.Id}", started.Run) : TypedResults.Ok(started.Run);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<LabRunView>>, ProblemHttpResult>> ListAsync(
+        string? strategyId,
+        string? state,
+        int? limit,
+        HttpContext http,
+        IQueryHandler<ListLabRunsQuery, Result<IReadOnlyList<LabRunView>>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ListLabRunsQuery(strategyId, state, limit), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LabRunView>, ProblemHttpResult>> GetAsync(
+        Guid id,
+        HttpContext http,
+        IQueryHandler<GetLabRunQuery, Result<LabRunView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetLabRunQuery(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Accepted<LabRunView>, ProblemHttpResult>> CancelAsync(
+        Guid id,
+        HttpContext http,
+        ICommandHandler<CancelLabRunCommand, LabRunView> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new CancelLabRunCommand(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Accepted($"/api/lab/runs/{id}", result.Value);
+    }
+
+    /// <summary>A refused input is 422 (the spec's word, as the strategy create), every other failure is the shared mapping.</summary>
+    private static ProblemHttpResult Problem(Error error, HttpContext http) =>
+        error.Code == LabErrors.InvalidInputCode
+            ? TypedResults.Problem(ProblemResults.Create(StatusCodes.Status422UnprocessableEntity, error.Message, error.Code))
+            : ProblemResults.From(error, http);
+}

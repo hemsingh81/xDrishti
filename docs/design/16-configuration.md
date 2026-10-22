@@ -286,6 +286,7 @@ strategy_lab:
   quick_test: { years: 1, symbols: 30 }
   default_test_method: walk_forward
   max_parallel_runs: 2
+  # P5-02 reads these from configuration section StrategyLab (QuickYears, QuickSymbols, MaxParallelRuns) plus CostSheetId (the stored charge sheet a quick test is costed with, default `default`; gross when not stored), PollMilliseconds and RunWorker (ADR 0058)
   plugins: { enabled: true, sandbox: { cpu: 2, memory_gb: 4, timeout_min: 60 } }
   multiple_testing_adjustment: true
   assistant_can_run_tests: true

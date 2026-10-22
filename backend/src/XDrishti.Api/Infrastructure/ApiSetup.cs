@@ -4,15 +4,18 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Scalar.AspNetCore;
 using Serilog;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
+using XDrishti.Api.Lab;
 using XDrishti.Api.Live;
 using XDrishti.Api.Market;
 using XDrishti.Api.Platform;
 using XDrishti.Api.Portfolio;
 using XDrishti.Application;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Live.Push;
 using XDrishti.Strategies.Compilation;
@@ -77,6 +80,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, PortfolioImportsEndpoints>();
         services.AddSingleton<IEndpointModule, LiveEndpoints>();
         services.AddSingleton<IEndpointModule, LabEndpoints>();
+        services.AddSingleton<IEndpointModule, LabRunsEndpoints>();
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes.
         services.AddHostedService<RefreshJobWorker>();
@@ -96,8 +100,22 @@ internal static class ApiSetup
         // The rules compiler is warmed up on a thread-pool thread when the host starts, so that the first compile of a person does not pay for the JIT (ISS-12, ADR 0034 amendment 2). Readiness is not delayed.
         services.AddHostedService(sp => new StrategyWarmupService(sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<StrategyWarmupService>>(), CompilerWarmup.Run));
 
+        services.AddLabRuns();
         services.AddLiveHub();
         return services;
+    }
+
+    /// <summary>
+    /// Lab runs (P5-02, ADR 0058): the executor and dispatcher of the Application layer, run by a hosted service of this host (the export library that renders a run's record may only be named here), the hub as the progress port, and the settings
+    /// of doc 16 <c>strategy_lab</c> from the configuration.
+    /// </summary>
+    private static void AddLabRuns(this IServiceCollection services)
+    {
+        services.AddLabRunner();
+        services.Replace(ServiceDescriptor.Singleton(sp => LabSettingsBinder.Bind(sp.GetRequiredService<IConfiguration>())));
+        services.AddSingleton<IRunRecordWriter, ExportRunRecordWriter>();
+        services.Replace(ServiceDescriptor.Singleton<ILabProgress, HubLabProgress>());
+        services.AddHostedService<LabRunService>();
     }
 
     /// <summary>

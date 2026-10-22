@@ -3718,6 +3718,165 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.LabRunRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CancelRequested")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("cancel_requested");
+
+                    b.Property<string>("ConfigHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("config_hash");
+
+                    b.Property<string>("Counts")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("counts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EngineVersion")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("engine_version");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Host")
+                        .HasColumnType("text")
+                        .HasColumnName("host");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Labels")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("labels");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<string>("Problems")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("problems");
+
+                    b.Property<int>("ProgressDone")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("progress_done");
+
+                    b.Property<int>("ProgressTotal")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("progress_total");
+
+                    b.PrimitiveCollection<string[]>("SimRunKeys")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("sim_run_keys");
+
+                    b.Property<string>("Stage")
+                        .HasColumnType("text")
+                        .HasColumnName("stage");
+
+                    b.Property<string>("Stages")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("stages");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("StrategyHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("strategy_hash");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("Universe")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("universe");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<DateOnly>("WindowFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("window_from");
+
+                    b.Property<DateOnly>("WindowTo")
+                        .HasColumnType("date")
+                        .HasColumnName("window_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lab_runs");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_lab_runs_queued")
+                        .HasFilter("state = 'queued'");
+
+                    b.HasIndex("Key")
+                        .IsUnique()
+                        .HasDatabaseName("uq_lab_runs_active_key")
+                        .HasFilter("state IN ('queued', 'running', 'succeeded')");
+
+                    b.HasIndex("StrategyHash")
+                        .HasDatabaseName("ix_lab_runs_strategy_hash");
+
+                    b.HasIndex("StrategyId", "CreatedAt")
+                        .HasDatabaseName("ix_lab_runs_strategy_created");
+
+                    b.ToTable("lab_runs", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_lab_runs_key", "key ~ '^[0-9a-f]{64}$' AND strategy_hash ~ '^[0-9a-f]{64}$' AND config_hash ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_lab_runs_progress", "progress_done >= 0 AND progress_total >= 0");
+
+                            t.HasCheckConstraint("ck_lab_runs_state", "state IN ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted')");
+
+                            t.HasCheckConstraint("ck_lab_runs_window", "window_from <= window_to");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.SimComparisonRow", b =>
                 {
                     b.Property<long>("Id")
@@ -5058,6 +5217,17 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_exit_selections_comparison");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.LabRunRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.StrategyVersionRow", null)
+                        .WithMany()
+                        .HasForeignKey("StrategyHash")
+                        .HasPrincipalKey("Hash")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_lab_runs_strategy_version");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeLegChargeRow", b =>

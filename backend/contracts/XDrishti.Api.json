@@ -8118,6 +8118,227 @@
           }
         }
       }
+    },
+    "/api/lab/runs": {
+      "post": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "Queue a quick test of a stored strategy version on a basket or a list of symbols (202 with the run); the same input again returns the run that holds it (200). 422 lab.invalid_input, 404 lab.not_found, 409 lab.no_data",
+        "operationId": "StartLabRun",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartLabRunRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabRunView"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabRunView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "Lab runs, newest first; filter by strategyId and state; limit 1 to 200 (default 50)",
+        "operationId": "ListLabRuns",
+        "parameters": [
+          {
+            "name": "strategyId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LabRunView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/runs/{id}": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "One Lab run: state, stage, progress, the simulation run keys, counts, located problems, the stage log and the labels (cost basis, sample, exploration)",
+        "operationId": "GetLabRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabRunView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/runs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "Stop a run: a queued run at once, a running run at its next safe point between instruments (202); nothing is stored for it. 409 lab.not_cancellable once it has finished",
+        "operationId": "CancelLabRun",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabRunView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -16354,6 +16575,416 @@
         }
       },
       "JsonElement": { },
+      "LabCounts": {
+        "required": [
+          "instruments",
+          "instrumentsRun",
+          "skipped",
+          "trades",
+          "openAtEnd"
+        ],
+        "type": "object",
+        "properties": {
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instrumentsRun": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "openAtEnd": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The counts of a finished run: the instruments asked for and replayed, the ones skipped, and the trades (closed and open at the end of the data)."
+      },
+      "LabInstrument": {
+        "required": [
+          "id",
+          "symbol"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        },
+        "description": "One instrument of a Lab run's universe."
+      },
+      "LabProblem": {
+        "required": [
+          "stage",
+          "path",
+          "code",
+          "message",
+          "severity",
+          "line",
+          "column"
+        ],
+        "type": "object",
+        "properties": {
+          "stage": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "line": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "column": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "One located problem of a run, with the stage that found it."
+      },
+      "LabProgressView": {
+        "required": [
+          "done",
+          "total"
+        ],
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "Where a running run is: instruments done of instruments in total (0 and 0 outside the quick test)."
+      },
+      "LabRunFinished": {
+        "required": [
+          "runId",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "description": "Client event `labRunFinished` (spec P5-02, D5): the last event of a run, with its final state."
+      },
+      "LabRunProgress": {
+        "required": [
+          "runId",
+          "state",
+          "stage",
+          "done",
+          "total",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Client event `labRunProgress` (spec P5-02, D5): a run entered a stage or advanced in it. `done` and `total` count instruments in the quick test and are 0 elsewhere."
+      },
+      "LabRunView": {
+        "required": [
+          "id",
+          "key",
+          "state",
+          "stage",
+          "strategy",
+          "universe",
+          "window",
+          "method",
+          "progress",
+          "simRunKeys",
+          "counts",
+          "problems",
+          "stages",
+          "labels",
+          "error",
+          "cancelRequested",
+          "createdAt",
+          "startedAt",
+          "finishedAt",
+          "verdict"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "key": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "stage": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "strategy": {
+            "$ref": "#/components/schemas/LabStrategyRef"
+          },
+          "universe": {
+            "$ref": "#/components/schemas/LabUniverse"
+          },
+          "window": {
+            "$ref": "#/components/schemas/LabWindow"
+          },
+          "method": {
+            "type": "string"
+          },
+          "progress": {
+            "$ref": "#/components/schemas/LabProgressView"
+          },
+          "simRunKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "counts": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LabCounts"
+              }
+            ]
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabProblem"
+            }
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabStageLog"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cancelRequested": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "verdict": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "A Lab run as the API serves it (spec P5-02, Contract): the same data the hub's events carry, so a missed event costs nothing. `verdict` is always null in this slice (P5-03); `labels` carry the cost basis, the sample and the line that a\nquick test is exploration, not a verdict (D6)."
+      },
+      "LabStageLog": {
+        "required": [
+          "name",
+          "startedAt",
+          "finishedAt",
+          "problems"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "problems": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "One entry of the stage log: when a stage began and ended and how many problems it found."
+      },
+      "LabStrategyRef": {
+        "required": [
+          "id",
+          "version",
+          "hash"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hash": {
+            "type": "string"
+          }
+        },
+        "description": "The strategy version a run tests."
+      },
+      "LabUniverse": {
+        "required": [
+          "kind",
+          "basketId",
+          "label",
+          "requested",
+          "instruments",
+          "sampled",
+          "seed"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "basketId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string"
+          },
+          "requested": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "instruments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabInstrument"
+            }
+          },
+          "sampled": {
+            "type": "boolean"
+          },
+          "seed": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "The universe of a Lab run as it was resolved when the run was posted (spec P5-02, D2): the basket changes later, the run keeps the list. Requested is the number of members before the quick-test sample;\nSampled says the list was cut to the limit by the seeded shuffle of Seed."
+      },
+      "LabWindow": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "description": "The India dates a run replays, inclusive."
+      },
       "LastDataJobs": {
         "required": [
           "csv",
@@ -19980,6 +20611,91 @@
         },
         "description": "Starts a data job. `steps`: any of csv · dhan · aggregate · quality (default csv, dhan and aggregate; always run in that order); `forceCsv` loads CSV files again that were loaded already\nand have not changed; `refetchGaps` makes the Dhan phase also retry the sessions it gave up on (status `unfillable`); `csvFiles` (at most 214 names from the CSV folder, only with the csv step) loads only\nthose files, still skipping the ones that are unchanged unless `forceCsv` — a name the folder does not have, or a list that is empty, is `data.invalid` (400)."
       },
+      "StartLabRunRequest": {
+        "type": "object",
+        "properties": {
+          "strategyId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "universe": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StartLabRunUniverse"
+              }
+            ]
+          },
+          "method": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "window": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StartLabRunWindow"
+              }
+            ]
+          }
+        },
+        "description": "Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data)."
+      },
+      "StartLabRunUniverse": {
+        "type": "object",
+        "properties": {
+          "basketId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "symbols": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The universe of a posted run: exactly one of a basket and a list of symbols."
+      },
+      "StartLabRunWindow": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "description": "The window of a posted run, India dates, inclusive; both or neither."
+      },
       "StartQualityRunRequest": {
         "type": "object",
         "properties": {
@@ -22034,6 +22750,8 @@
         "SubscribeAck",
         "InstrumentPrice",
         "PricesChanged",
+        "LabRunProgress",
+        "LabRunFinished",
         "LiveFeedStatus"
       ],
       "methods": {
@@ -22057,6 +22775,12 @@
         },
         "feedStatus": {
           "payload": "LiveFeedStatus"
+        },
+        "labRunProgress": {
+          "payload": "LabRunProgress"
+        },
+        "labRunFinished": {
+          "payload": "LabRunFinished"
         }
       },
       "limits": {

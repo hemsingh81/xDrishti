@@ -19,6 +19,15 @@ public static class LabErrors
     /// <summary>The text is larger than <see cref="MaxTextBytes"/>; refused before it is read.</summary>
     public const string TextTooLargeCode = "lab.text_too_large";
 
+    /// <summary>The post of a run is not valid (a missing strategy, two universes, an unknown method, an empty basket, an unknown symbol, a window the wrong way round): the API answers 422.</summary>
+    public const string InvalidInputCode = "lab.invalid_input";
+
+    /// <summary>No stored bar falls in the window of the run: 409.</summary>
+    public const string NoDataCode = "lab.no_data";
+
+    /// <summary>The run has finished and cannot be cancelled: 409.</summary>
+    public const string NotCancellableCode = "lab.not_cancellable";
+
     /// <summary>The name of the payload entry that carries the problems.</summary>
     public const string ProblemsKey = "problems";
 
@@ -32,6 +41,22 @@ public static class LabErrors
     /// <summary>A family or a version that is not stored.</summary>
     public static Error NotFound(string id, int? version = null) =>
         Error.NotFound(NotFoundCode, version is null ? $"No strategy `{id}` is stored." : $"The strategy `{id}` has no version {version}.");
+
+    /// <summary>A refused post of a run.</summary>
+    public static Error InvalidInput(string message) => Error.Validation(InvalidInputCode, message);
+
+    /// <summary>A run id that is not stored.</summary>
+    public static Error RunNotFound(Guid id) => Error.NotFound(NotFoundCode, $"No Lab run {id:D} is stored.");
+
+    /// <summary>A basket that is not stored or is archived.</summary>
+    public static Error BasketNotFound(Guid id) => Error.NotFound(NotFoundCode, $"No basket {id:D} is stored, or it is archived.");
+
+    /// <summary>The window holds no stored bar.</summary>
+    public static Error NoData(DateOnly from, DateOnly to) =>
+        Error.Conflict(NoDataCode, $"No stored 1-minute bar falls between {from:yyyy-MM-dd} and {to:yyyy-MM-dd}.");
+
+    /// <summary>A finished run.</summary>
+    public static Error NotCancellable(string state) => Error.Conflict(NotCancellableCode, $"The run is {state} and cannot be cancelled.");
 
     /// <summary>The issue for a text over the limit.</summary>
     public static StrategyIssue TooLarge() =>

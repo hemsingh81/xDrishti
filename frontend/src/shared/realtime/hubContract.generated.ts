@@ -5,6 +5,8 @@
 import type { components } from '../api/schema';
 
 export type InstrumentPrice = components['schemas']['InstrumentPrice'];
+export type LabRunFinished = components['schemas']['LabRunFinished'];
+export type LabRunProgress = components['schemas']['LabRunProgress'];
 export type LiveFeedStatus = components['schemas']['LiveFeedStatus'];
 export type LiveScope = components['schemas']['LiveScope'];
 export type PricesChanged = components['schemas']['PricesChanged'];
@@ -15,7 +17,12 @@ export const eventsHub = {
   route: '/hubs/events',
   transport: 'WebSockets',
   methods: { subscribe: 'Subscribe', unsubscribe: 'Unsubscribe' },
-  events: { pricesChanged: 'pricesChanged', feedStatus: 'feedStatus' },
+  events: {
+    pricesChanged: 'pricesChanged',
+    feedStatus: 'feedStatus',
+    labRunProgress: 'labRunProgress',
+    labRunFinished: 'labRunFinished',
+  },
   limits: {
     maxInstrumentsPerMessage: 500,
     maxMessageBytes: 32768,
@@ -34,4 +41,6 @@ export interface EventsHubServer {
 export interface EventsHubEvents {
   pricesChanged: (message: PricesChanged) => void;
   feedStatus: (message: LiveFeedStatus) => void;
+  labRunProgress: (message: LabRunProgress) => void;
+  labRunFinished: (message: LabRunFinished) => void;
 }

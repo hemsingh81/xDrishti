@@ -2366,6 +2366,58 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lab/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Lab runs, newest first; filter by strategyId and state; limit 1 to 200 (default 50) */
+    get: operations['ListLabRuns'];
+    put?: never;
+    /** Queue a quick test of a stored strategy version on a basket or a list of symbols (202 with the run); the same input again returns the run that holds it (200). 422 lab.invalid_input, 404 lab.not_found, 409 lab.no_data */
+    post: operations['StartLabRun'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/runs/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One Lab run: state, stage, progress, the simulation run keys, counts, located problems, the stage log and the labels (cost basis, sample, exploration) */
+    get: operations['GetLabRun'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/runs/{id}/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Stop a run: a queued run at once, a running run at its next safe point between instruments (202); nothing is stored for it. 409 lab.not_cancellable once it has finished */
+    post: operations['CancelLabRun'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5093,6 +5145,132 @@ export interface components {
       swingSell: string[];
     };
     JsonElement: unknown;
+    /** @description The counts of a finished run: the instruments asked for and replayed, the ones skipped, and the trades (closed and open at the end of the data). */
+    LabCounts: {
+      /** Format: int32 */
+      instruments: number;
+      /** Format: int32 */
+      instrumentsRun: number;
+      /** Format: int32 */
+      skipped: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      openAtEnd: number;
+    };
+    /** @description One instrument of a Lab run's universe. */
+    LabInstrument: {
+      /** Format: uuid */
+      id: string;
+      symbol: string;
+    };
+    /** @description One located problem of a run, with the stage that found it. */
+    LabProblem: {
+      stage: string;
+      path: string;
+      code: string;
+      message: string;
+      severity: string;
+      /** Format: int32 */
+      line: null | number;
+      /** Format: int32 */
+      column: null | number;
+    };
+    /** @description Where a running run is: instruments done of instruments in total (0 and 0 outside the quick test). */
+    LabProgressView: {
+      /** Format: int32 */
+      done: number;
+      /** Format: int32 */
+      total: number;
+    };
+    /** @description Client event `labRunFinished` (spec P5-02, D5): the last event of a run, with its final state. */
+    LabRunFinished: {
+      /** Format: uuid */
+      runId: string;
+      state: string;
+    };
+    /** @description Client event `labRunProgress` (spec P5-02, D5): a run entered a stage or advanced in it. `done` and `total` count instruments in the quick test and are 0 elsewhere. */
+    LabRunProgress: {
+      /** Format: uuid */
+      runId: string;
+      state: string;
+      stage: string;
+      /** Format: int32 */
+      done: number;
+      /** Format: int32 */
+      total: number;
+      message: null | string;
+    };
+    /**
+     * @description A Lab run as the API serves it (spec P5-02, Contract): the same data the hub's events carry, so a missed event costs nothing. `verdict` is always null in this slice (P5-03); `labels` carry the cost basis, the sample and the line that a
+     *     quick test is exploration, not a verdict (D6).
+     */
+    LabRunView: {
+      /** Format: uuid */
+      id: string;
+      key: string;
+      state: string;
+      stage: null | string;
+      strategy: components['schemas']['LabStrategyRef'];
+      universe: components['schemas']['LabUniverse'];
+      window: components['schemas']['LabWindow'];
+      method: string;
+      progress: components['schemas']['LabProgressView'];
+      simRunKeys: string[];
+      counts: null | components['schemas']['LabCounts'];
+      problems: components['schemas']['LabProblem'][];
+      stages: components['schemas']['LabStageLog'][];
+      labels: string[];
+      error: null | string;
+      cancelRequested: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      startedAt: null | string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      verdict: null | string;
+    };
+    /** @description One entry of the stage log: when a stage began and ended and how many problems it found. */
+    LabStageLog: {
+      name: string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: null | string;
+      /** Format: int32 */
+      problems: number;
+    };
+    /** @description The strategy version a run tests. */
+    LabStrategyRef: {
+      id: string;
+      /** Format: int32 */
+      version: number;
+      hash: string;
+    };
+    /**
+     * @description The universe of a Lab run as it was resolved when the run was posted (spec P5-02, D2): the basket changes later, the run keeps the list. Requested is the number of members before the quick-test sample;
+     *     Sampled says the list was cut to the limit by the seeded shuffle of Seed.
+     */
+    LabUniverse: {
+      kind: string;
+      /** Format: uuid */
+      basketId: null | string;
+      label: string;
+      /** Format: int32 */
+      requested: number;
+      instruments: components['schemas']['LabInstrument'][];
+      sampled: boolean;
+      /** Format: int64 */
+      seed: null | number;
+    };
+    /** @description The India dates a run replays, inclusive. */
+    LabWindow: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+    };
     /** @description The latest job in which each phase ran to an end (null when none did yet). */
     LastDataJobs: {
       csv: null | components['schemas']['DataJobView'];
@@ -6269,6 +6447,28 @@ export interface components {
       forceCsv?: null | boolean;
       refetchGaps?: null | boolean;
       csvFiles?: null | string[];
+    };
+    /** @description Body of `POST /api/lab/runs` (spec P5-02): a stored strategy version (the latest when `version` is omitted), the universe, the method (`quick`) and optionally the window (default: the last year of stored data). */
+    StartLabRunRequest: {
+      strategyId?: null | string;
+      /** Format: int32 */
+      version?: null | number;
+      universe?: null | components['schemas']['StartLabRunUniverse'];
+      method?: null | string;
+      window?: null | components['schemas']['StartLabRunWindow'];
+    };
+    /** @description The universe of a posted run: exactly one of a basket and a list of symbols. */
+    StartLabRunUniverse: {
+      /** Format: uuid */
+      basketId?: null | string;
+      symbols?: null | string[];
+    };
+    /** @description The window of a posted run, India dates, inclusive; both or neither. */
+    StartLabRunWindow: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
     };
     /** @description The body of "Run checks": the one instrument to check (null: every tracked instrument with bars). */
     StartQualityRunRequest: {
@@ -12824,6 +13024,170 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLabRuns: {
+    parameters: {
+      query?: {
+        strategyId?: string;
+        state?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LabRunView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  StartLabRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['StartLabRunRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LabRunView'];
+        };
+      };
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LabRunView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLabRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LabRunView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CancelLabRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Accepted */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LabRunView'];
         };
       };
       /** @description Not Found */

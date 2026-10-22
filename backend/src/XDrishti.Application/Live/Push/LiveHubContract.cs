@@ -21,6 +21,12 @@ public static class LiveHubContract
     /// <summary>Client event <c>feedStatus(LiveFeedStatus)</c>.</summary>
     public const string FeedStatusEvent = "feedStatus";
 
+    /// <summary>Client event <c>labRunProgress(LabRunProgress)</c> (spec P5-02, D5): a Lab run entered a stage or advanced; at most four a second for a run.</summary>
+    public const string LabRunProgressEvent = "labRunProgress";
+
+    /// <summary>Client event <c>labRunFinished(LabRunFinished)</c> (spec P5-02, D5): the last event of a Lab run, with its final state.</summary>
+    public const string LabRunFinishedEvent = "labRunFinished";
+
     /// <summary>Most instruments in one <c>pricesChanged</c>.</summary>
     public const int MaxInstrumentsPerMessage = 500;
 

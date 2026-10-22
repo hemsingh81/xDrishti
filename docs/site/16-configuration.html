@@ -369,6 +369,7 @@ strategy_lab:
   quick_test: { years: 1, symbols: 30 }
   default_test_method: walk_forward
   max_parallel_runs: 2
+  # P5-02 reads these from configuration section StrategyLab (QuickYears, QuickSymbols, MaxParallelRuns) plus CostSheetId (the stored charge sheet a quick test is costed with, default `default`; gross when not stored), PollMilliseconds and RunWorker (ADR 0058)
   plugins: { enabled: true, sandbox: { cpu: 2, memory_gb: 4, timeout_min: 60 } }
   multiple_testing_adjustment: true
   assistant_can_run_tests: true
@@ -619,7 +620,7 @@ The Dhan holdings endpoint (<code>GET https://api.dhan.co/v2/holdings</code>) is
     <a class="prev" href="15-smart-insights-and-automation.html"><small>← Previous  [</small>15 · Smart insights &amp; automation</a>
     <a class="next" href="17-deployment-and-operations.html"><small>Next  ] →</small>17 · Deployment &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-22 09:23</footer>
+  <footer class="foot">Generated from <code>docs/16-configuration.md</code> · 2026-10-22 11:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-two-kinds-of-configuration" class="d2">1. Two kinds of configuration</a>
 <a href="#2-trading-config-v1-defaults-illustrative" class="d2">2. Trading config (v1 defaults, illustrative)</a>

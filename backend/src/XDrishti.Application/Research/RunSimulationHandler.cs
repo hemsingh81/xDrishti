@@ -39,7 +39,7 @@ internal sealed class RunSimulationHandler(
     public async ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var executed = await ExecuteAsync(query.Request, cancellationToken);
+        var executed = await ExecuteAsync(query.Request, query.Progress, cancellationToken);
         if (executed.IsFailure)
         {
             return Result.Failure<SimulationRun>(executed.Error);
@@ -53,7 +53,7 @@ internal sealed class RunSimulationHandler(
     public async ValueTask<Result<ComparisonRun>> HandleAsync(RunComparisonQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var executed = await ExecuteAsync(query.Request, cancellationToken);
+        var executed = await ExecuteAsync(query.Request, null, cancellationToken);
         if (executed.IsFailure)
         {
             return Result.Failure<ComparisonRun>(executed.Error);
@@ -79,7 +79,7 @@ internal sealed class RunSimulationHandler(
     /// <summary>What a run produced: one run record per candidate (one for a plain run), the gated counts and the entries key.</summary>
     private sealed record Executed(IReadOnlyList<SimulationRun> Runs, IReadOnlyList<CandidateRecord> Candidates, IReadOnlyList<long> Gated, string EntriesKey, bool HoldsOvernight);
 
-    private async ValueTask<Result<Executed>> ExecuteAsync(SimulationRequest request, CancellationToken cancellationToken)
+    private async ValueTask<Result<Executed>> ExecuteAsync(SimulationRequest request, IProgress<int>? progress, CancellationToken cancellationToken)
     {
 
         // (1) the request, (2) the fill rules, (3) the strategy: no port is read until all three pass.
@@ -151,6 +151,8 @@ internal sealed class RunSimulationHandler(
                 replays[k].Add(many.Members[k]);
                 gated[k] += many.GatedBlocked[k];
             }
+
+            progress?.Report(replays[0].Count);
         }
 
         var assemblyStart = time.GetTimestamp();

@@ -320,7 +320,7 @@ backtest / Strategy Lab / nightly scan / grading. Modules can be split into serv
 </tr>
 <tr>
 <td>Queue</td>
-<td>Hangfire tables in Postgres; <code>LISTEN/NOTIFY</code> for events</td>
+<td>Postgres tables as the queue (Lab runs: <code>lab.lab_runs</code>, claimed with <code>FOR UPDATE SKIP LOCKED</code>, P5-02) - Hangfire was planned and is not used; <code>LISTEN/NOTIFY</code> for events</td>
 <td>No separate broker (Redis/RabbitMQ) needed</td>
 </tr>
 <tr>
@@ -940,7 +940,7 @@ returns every indicator to its first state. <strong>The per-session rule (<a hre
 </tr>
 <tr>
 <td>Real-time</td>
-<td>SignalR <code>/hubs/events</code>: live prices &amp; P&amp;L (active set), alerts, job/import progress, nightly status. <strong>Built in P2-10a (<a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a> §7, <a href="../specs/P2-10a-live-hub-and-live-portfolio-screen.html">spec</a>):</strong> the hub with server methods <code>Subscribe(scope)</code> / <code>Unsubscribe</code> and client events <code>pricesChanged</code> and <code>feedStatus</code>, plus <code>GET /api/live/status</code> (see below); alerts, job progress and nightly status use the same hub later</td>
+<td>SignalR <code>/hubs/events</code>: live prices &amp; P&amp;L (active set), alerts, job/import progress, nightly status. <strong>Built in P2-10a (<a href="../adr/0024-live-feed-xd-feed-and-live-prices.html">ADR 0024</a> §7, <a href="../specs/P2-10a-live-hub-and-live-portfolio-screen.html">spec</a>):</strong> the hub with server methods <code>Subscribe(scope)</code> / <code>Unsubscribe</code> and client events <code>pricesChanged</code> and <code>feedStatus</code>, plus <code>GET /api/live/status</code> (see below); Lab run progress is on it since P5-02 (<code>labRunProgress</code>, <code>labRunFinished</code>); alerts and nightly status use the same hub later</td>
 </tr>
 </tbody></table>
 <h2 id="7-key-flows">7. Key flows<a class="hash" href="#7-key-flows" aria-label="Link to this section">#</a></h2>
@@ -1022,7 +1022,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-22 10:05</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-22 11:12</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

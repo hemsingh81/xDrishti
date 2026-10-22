@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
@@ -398,6 +400,22 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetStrategyVersionQuery, Result<StrategyVersionView>>, GetStrategyVersionHandler>();
         services.AddScoped<IQueryHandler<CloneStrategyQuery, Result<ClonedStrategy>>, CloneStrategyHandler>();
         services.AddScoped<IQueryHandler<GetStrategySchemaQuery, string>, GetStrategySchemaHandler>();
+
+        // Lab runs (P5-02, ADR 0058): the API's use cases; the runner that executes them is AddLabRunner, called by the host that runs them.
+        services.AddScoped<ICommandHandler<StartLabRunCommand, StartedLabRun>, StartLabRunHandler>();
+        services.AddScoped<IQueryHandler<ListLabRunsQuery, Result<IReadOnlyList<LabRunView>>>, ListLabRunsHandler>();
+        services.AddScoped<IQueryHandler<GetLabRunQuery, Result<LabRunView>>, GetLabRunHandler>();
+        services.AddScoped<ICommandHandler<CancelLabRunCommand, LabRunView>, CancelLabRunHandler>();
+        services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
+        services.TryAddSingleton<ILabProgress, NullLabProgress>(); // the host that sends events replaces it
+    }
+
+    /// <summary>The executor and the dispatcher of Lab runs (P5-02): only the host that runs them (the API, ADR 0058) calls this; it also registers <see cref="IRunRecordWriter"/>.</summary>
+    public static IServiceCollection AddLabRunner(this IServiceCollection services)
+    {
+        services.AddScoped<ILabRunExecutor, LabRunner>();
+        services.AddSingleton<LabRunDispatcher>();
+        return services;
     }
 
     /// <summary>Research (P3-04a): running a strategy over the stored bars. The engine behind <see cref="ISimulationEngine"/> is an adapter in Infrastructure (ADR 0039).</summary>
