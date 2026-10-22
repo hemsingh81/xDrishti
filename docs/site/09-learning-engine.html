@@ -102,6 +102,7 @@ shadow-graded and re-qualify automatically.</li>
 <div class="code"><pre><code class="nohighlight">|---- train (3y) ----|-gap-|-- test (3m) --|
        |---- train -------------|-gap-|-- test --|</code></pre></div>
 <p>Only test windows count. Gap ≥ max holding (5 sessions). Tuning only inside train windows.</p>
+<p>Built (P6-05, <a href="../adr/0067-validation-harness-and-baselines-purged-folds-and-an-honest-eligibility-rule.html">ADR 0067</a>): quarterly folds (first test 9 months in) with train rows purged by label horizon, scored against base-rate, cell-rate and logistic baselines; a model is eligible only if it beats both of the last two by a margin in 2/3 of the folds and pooled, with calibration error within 5 pp; fewer than 6 folds is &quot;inconclusive&quot;; the last 6 months are a hold-out used once.</p>
 <h2 id="3-daily-feedback-loop">3. Daily feedback loop<a class="hash" href="#3-daily-feedback-loop" aria-label="Link to this section">#</a></h2>
 <ol>
 <li>Grade yesterday&#39;s primary, reserve and rejected items against actual data.</li>
@@ -504,7 +505,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-22 22:46</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-22 23:04</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

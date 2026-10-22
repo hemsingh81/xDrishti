@@ -47,6 +47,8 @@ Built (P6-01, [ADR 0064](../adr/0064-cell-statistics-bayesian-shrinkage-recency-
 ```
 Only test windows count. Gap ≥ max holding (5 sessions). Tuning only inside train windows.
 
+Built (P6-05, [ADR 0067](../adr/0067-validation-harness-and-baselines-purged-folds-and-an-honest-eligibility-rule.md)): quarterly folds (first test 9 months in) with train rows purged by label horizon, scored against base-rate, cell-rate and logistic baselines; a model is eligible only if it beats both of the last two by a margin in 2/3 of the folds and pooled, with calibration error within 5 pp; fewer than 6 folds is "inconclusive"; the last 6 months are a hold-out used once.
+
 ## 3. Daily feedback loop
 
 1. Grade yesterday's primary, reserve and rejected items against actual data.
