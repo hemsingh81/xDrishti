@@ -15,8 +15,21 @@ namespace XDrishti.Application.Lab;
 /// <param name="MinFoldsForPass">Fewer walk-forward folds than this cap a verdict at MARGINAL.</param>
 /// <param name="MultipleTesting">Whether the gates tighten as the variants of a family grow.</param>
 /// <param name="FullExits">The <c>--exit</c> flags of the candidate exits of a full test (P5-04); null is <see cref="DefaultFullExits"/>.</param>
-public sealed record LabSettings(int QuickYears, int QuickSymbols, int MaxParallelRuns, string CostSheetId, TimeSpan PollInterval, QualificationGates Gates, int MinFoldsForPass, bool MultipleTesting, IReadOnlyList<string>? FullExits = null)
+/// <param name="RobustSettings">The robustness keys (P5-05); null is <see cref="RobustnessSettings.Default"/>.</param>
+public sealed record LabSettings(int QuickYears, int QuickSymbols, int MaxParallelRuns, string CostSheetId, TimeSpan PollInterval, QualificationGates Gates, int MinFoldsForPass, bool MultipleTesting, IReadOnlyList<string>? FullExits = null, RobustnessSettings? RobustSettings = null)
 {
+    /// <summary>The full test and then the robustness checks (P5-05).</summary>
+    public const string RobustMethod = "robust";
+
+    /// <summary>The robustness keys in force.</summary>
+    public RobustnessSettings Robustness => RobustSettings ?? RobustnessSettings.Default;
+
+    /// <summary>True for the methods that run the walk-forward full test (<c>full</c> and <c>robust</c>).</summary>
+    public static bool RunsFullTest(string? method) => string.Equals(method, FullMethod, StringComparison.Ordinal) || string.Equals(method, RobustMethod, StringComparison.Ordinal);
+
+    /// <summary>The text of a robust run's settings: the full test's and the robustness keys.</summary>
+    public string RobustConfigText(string costBasis) => FullConfigText(costBasis) + ";" + Robustness.ConfigText();
+
     /// <summary>The method of this slice.</summary>
     public const string QuickMethod = "quick";
 

@@ -26,6 +26,8 @@ internal sealed class LabRunner(
     ICostSheetStore sheets,
     ISimulationEngine engine,
     LabFullTest fullTest,
+    LabRobustness robustness,
+    ITestLedger ledger,
     ILabResultStore results,
     ILabProgress progress,
     LabSettings settings,
@@ -46,6 +48,9 @@ internal sealed class LabRunner(
 
     /// <summary>The full-test stage (P5-04).</summary>
     public const string FullTest = "full_test";
+
+    /// <summary>The robustness stage of a <c>robust</c> run (P5-05).</summary>
+    public const string Robustness = "robustness";
 
     /// <summary>How often the watcher looks at the run's progress.</summary>
     private static readonly TimeSpan WatchTick = TimeSpan.FromMilliseconds(100);
@@ -134,7 +139,7 @@ internal sealed class LabRunner(
         }
 
         ownerToken.ThrowIfCancellationRequested();
-        if (string.Equals(run.Method, LabSettings.FullMethod, StringComparison.Ordinal))
+        if (LabSettings.RunsFullTest(run.Method))
         {
             return await FullAsync(run, description, log, counter, watch, throttle, problems, started, ownerToken, hostStop);
         }
@@ -207,10 +212,32 @@ internal sealed class LabRunner(
         }
 
         var full = outcome.Value;
+        var verdict = full.Verdict;
+        var sweepRows = new List<LedgerRow>();
+        var lastStage = FullTest;
+        if (string.Equals(run.Method, LabSettings.RobustMethod, StringComparison.Ordinal))
+        {
+            ownerToken.ThrowIfCancellationRequested();
+            log.Finish(FullTest, 0, time.GetUtcNow());
+            var plan = robustness.Plan(description);
+            var steps = run.Universe.Instruments.Count * (1 + plan.Count);
+            watch.Set(Robustness, steps);
+            await BeginAsync(run, log, Robustness, 0, steps, throttle, ownerToken);
+            var robust = await robustness.RunAsync(run, time.GetUtcNow(), plan, template, full, counter, ownerToken);
+            if (robust.IsFailure)
+            {
+                return FailedStage(run, log, Robustness, robust.Error, problems);
+            }
+
+            verdict = verdict with { Robustness = robust.Value.View };
+            sweepRows.AddRange(robust.Value.LedgerRows);
+            lastStage = Robustness;
+        }
+
         ownerToken.ThrowIfCancellationRequested();
         if (await runs.IsCancelRequestedAsync(run.Id, hostStop))
         {
-            LabRunLog.Cancelled(logger, run.Id, FullTest);
+            LabRunLog.Cancelled(logger, run.Id, lastStage);
             return log.End(run.Id, LabRunState.Cancelled, null, problems, time.GetUtcNow());
         }
 
@@ -227,18 +254,23 @@ internal sealed class LabRunner(
         }
 
         // shortcut: a failure after the candidate runs are stored leaves them stored (idempotent by key, a retry re-stores nothing); cancel is not rechecked after the store loop.
-        if (!await results.AppendAsync(run.Id, run.StrategyId, run.StrategyHash, full.Verdict, time.GetUtcNow(), hostStop)
+        foreach (var row in sweepRows)
+        {
+            await ledger.AppendAsync(row, hostStop);
+        }
+
+        if (!await results.AppendAsync(run.Id, run.StrategyId, run.StrategyHash, verdict, time.GetUtcNow(), hostStop)
             && await results.GetAsync(run.Id, hostStop) is null)
         {
             return FailedStage(run, log, FullTest, Error.Conflict("lab.result_not_stored", "The result of the full test could not be stored."), problems);
         }
 
         LabRunLog.ResultStored(logger, run.Id, full.Verdict.Outcome, full.Verdict.VariantCount);
-        log.Finish(FullTest, 0, time.GetUtcNow());
+        log.Finish(lastStage, 0, time.GetUtcNow());
         var counts = new LabCounts(full.Instruments, full.InstrumentsRun, full.Instruments - full.InstrumentsRun, full.Trades, 0);
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
         LabRunLog.Finished(logger, run.Id, keys[0][..12], full.Trades, 0, elapsedMs);
-        return new LabFinish(run.Id, LabRunState.Succeeded, FullTest, keys, counts, problems, log.Snapshot(), null, time.GetUtcNow());
+        return new LabFinish(run.Id, LabRunState.Succeeded, lastStage, keys, counts, problems, log.Snapshot(), null, time.GetUtcNow());
     }
 
     private LabFinish Failed(LabRun run, StageLog log, string stage, string code, List<LabProblem> problems)

@@ -11,7 +11,7 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Application.Lab;
 
 /// <summary>What a full test produced: the candidate runs (to be stored whole), the verdict and the counts.</summary>
-internal sealed record FullTestOutcome(IReadOnlyList<SimulationRun> Runs, LabVerdictView Verdict, int Instruments, int InstrumentsRun, int Trades);
+internal sealed record FullTestOutcome(IReadOnlyList<SimulationRun> Runs, LabVerdictView Verdict, int Instruments, int InstrumentsRun, int Trades, IReadOnlyList<SelectionTrade> OosTrades);
 
 /// <summary>
 /// The full test of a Lab run (spec P5-04, ADR 0060): for each timeframe the strategy declares, one same-entries comparison of the candidate exits over the whole window (P4-05); the trades of each side are split off and the exit of each
@@ -132,7 +132,7 @@ internal sealed class LabFullTest(
                 "The full-period figures are " + ExplorationLabel + ".",
                 "The candidate exits are a fixed list; the strategy's own exit is not a candidate.",
             ]);
-        return Result.Success(new FullTestOutcome(runs, view, instruments, instrumentsRun, defaultTrades));
+        return Result.Success(new FullTestOutcome(runs, view, instruments, instrumentsRun, defaultTrades, OosEvidenceBuilder.Trades(cells)));
     }
 
     private static CellView CellOf(string timeframe, string side, ExitSelection selection, SelectionInput input)

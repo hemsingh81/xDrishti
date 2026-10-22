@@ -156,7 +156,7 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
 
     // P5-04
 
-    private static object FullBySymbols(IEnumerable<string> symbols) => new { strategyId = "ORB", version = 1, universe = new { symbols }, method = "full", window = new { from = D1.ToString("yyyy-MM-dd"), to = D3.ToString("yyyy-MM-dd") } };
+    private static object FullBySymbols(IEnumerable<string> symbols, string method = "full") => new { strategyId = "ORB", version = 1, universe = new { symbols }, method, window = new { from = D1.ToString("yyyy-MM-dd"), to = D3.ToString("yyyy-MM-dd") } };
 
     [Fact]
     public async Task A_full_test_without_a_stored_charge_sheet_is_refused_with_422()
@@ -195,6 +195,33 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         verdict.GetProperty("fullPeriod").EnumerateArray().ShouldAllBe(f => f.GetProperty("label").GetString()!.StartsWith("exploration", StringComparison.Ordinal));
         (await CountAsync("SELECT count(*) FROM lab.lab_results")).ShouldBe(1);
         (await CountAsync("SELECT count(*) FROM research.sim_runs WHERE created_by = 'lab:full'")).ShouldBe(8);
+    }
+
+    // P5-05
+
+    [Fact]
+    public async Task A_robust_run_attaches_the_robustness_block_to_the_same_verdict_and_writes_sweep_rows_to_the_ledger()
+    {
+        using (var scope = Factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ICostSheetStore>().SaveAsync(FixtureSheet.Build("default", null), "test", DateTimeOffset.UnixEpoch, Ct);
+            (await scope.ServiceProvider.GetRequiredService<IPlatformUnitOfWork>().TrySaveAsync(Ct)).ShouldBeTrue();
+        }
+
+        var members = await InstrumentsAsync(3);
+
+        var run = await PostAndDrainAsync(FullBySymbols(members.Select(m => m.Symbol), "robust"));
+
+        run.GetProperty("state").GetString().ShouldBe("succeeded", run.GetRawText());
+        run.GetProperty("stages").EnumerateArray().Select(x => x.GetProperty("name").GetString()).ShouldBe(["validate", "compile", "full_test", "robustness"]);
+        var verdict = run.GetProperty("verdict");
+        verdict.GetProperty("outcome").GetString().ShouldBe("FAIL");
+        var block = verdict.GetProperty("robustness");
+        block.GetProperty("byRegime").GetString().ShouldStartWith("unavailable");
+        block.GetProperty("sensitivity").GetProperty("exit").GetString().ShouldBe("FIXED_RR{rr=2}");
+        block.GetProperty("limits").GetArrayLength().ShouldBeGreaterThan(0);
+        var sweepRows = await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE method = 'sweep'");
+        sweepRows.ShouldBe(block.GetProperty("sensitivity").GetProperty("parameters").EnumerateArray().Sum(p => p.GetProperty("points").GetArrayLength()));
     }
 
     // criterion 2

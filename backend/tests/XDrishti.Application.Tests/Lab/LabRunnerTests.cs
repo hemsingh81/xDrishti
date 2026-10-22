@@ -78,7 +78,7 @@ public sealed class LabRunnerTests
         });
     }
 
-    private LabRunner Runner() => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default), _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance);
+    private LabRunner Runner() => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default), new LabRobustness(_simulation, LabSettings.Default), _ledger, _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance);
 
     [Fact]
     public async Task A_valid_run_goes_through_the_three_stages_stores_the_simulation_once_and_succeeds_with_its_key_and_counts()

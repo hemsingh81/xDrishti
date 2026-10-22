@@ -5359,6 +5359,7 @@ export interface components {
       cells: components['schemas']['CellView'][];
       fullPeriod: components['schemas']['FullPeriodView'][];
       labels: string[];
+      robustness?: null | components['schemas']['RobustnessView'];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {
@@ -5556,6 +5557,30 @@ export interface components {
       date: string;
       time: string;
     };
+    /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). */
+    MonteCarloView: {
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      draws: number;
+      seed: string;
+      /** Format: double */
+      observedMeanR: number;
+      /** Format: double */
+      observedMaxDrawdownR: number;
+      /** Format: double */
+      meanP05: number;
+      /** Format: double */
+      meanP50: number;
+      /** Format: double */
+      meanP95: number;
+      /** Format: double */
+      drawdownP50: number;
+      /** Format: double */
+      drawdownP95: number;
+      /** Format: double */
+      shareNotPositive: number;
+    };
     /** @description Names a depository or demat file teaches: `Known` are remembered already, `New` would be remembered by an import. */
     NameLearning: {
       /** Format: int32 */
@@ -5574,6 +5599,13 @@ export interface components {
       before: null | number;
       /** Format: int64 */
       after: null | number;
+    };
+    /** @description The sweep of one parameter and its judgement (`stable`, `fragile`, `no_base_edge`, `inconclusive`). */
+    ParameterSensitivityView: {
+      param: string;
+      points: components['schemas']['SweepPointView'][];
+      verdict: string;
+      reason: string;
     };
     /** @description A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default. */
     ParameterView: {
@@ -6101,6 +6133,22 @@ export interface components {
       /** Format: date */
       to: null | string;
     };
+    /** @description The sign-flip baseline: not a re-run with random entries. */
+    RandomBaselineView: {
+      kind: string;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      draws: number;
+      seed: string;
+      /** Format: double */
+      observedMeanR: number;
+      /** Format: double */
+      nullMeanP95: number;
+      /** Format: double */
+      pValue: number;
+      label: string;
+    };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
       /** Format: uuid */
@@ -6297,6 +6345,15 @@ export interface components {
       weeklyLossR: number;
       weeklyLossAction: string;
     };
+    /** @description The robustness block of a result (spec P5-05, ADR 0061). It does not change the verdict; every part that cannot be computed is null or says why. */
+    RobustnessView: {
+      sensitivity: components['schemas']['SensitivityView'];
+      monteCarlo: null | components['schemas']['MonteCarloView'];
+      byYear: components['schemas']['YearView'][];
+      randomBaseline: null | components['schemas']['RandomBaselineView'];
+      byRegime: string;
+      limits: string[];
+    };
     RoleToggleInput: {
       enabled: boolean;
     };
@@ -6357,6 +6414,14 @@ export interface components {
     SecretsInput: {
       apiKey: null | string;
       apiSecret: null | string;
+    };
+    /** @description The parameter sensitivity (spec P5-05): the exit and timeframe every point used, the base and the parameters. */
+    SensitivityView: {
+      timeframe: string;
+      exit: string;
+      base: null | components['schemas']['SweepPointView'];
+      parameters: components['schemas']['ParameterSensitivityView'][];
+      label: string;
     };
     /** @description A finding of the schedule checks. `severity`: error (blocks saving) · warning. `field` is a dotted path like the request (schedule.time, retries, parameters.x); `relatedServiceId` names the other service of a finding that involves two. */
     ServiceIssueView: {
@@ -6707,6 +6772,21 @@ export interface components {
       state: string;
       /** Format: uuid */
       dividendId: null | string;
+    };
+    /** @description One run of the sweep (the base has an empty `Param`): the figures of a plain run of one exit, or the reason the engine refused it. In-sample. */
+    SweepPointView: {
+      param: string;
+      /** Format: double */
+      value: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      meanR: null | number;
+      /** Format: double */
+      profitFactor: null | number;
+      /** Format: double */
+      totalR: null | number;
+      error: null | string;
     };
     /**
      * @description Body of "Sync now" (optional). Confirm: true applies an answer that would close all or most open holdings, which is otherwise refused with
@@ -7257,6 +7337,20 @@ export interface components {
       note: null | string;
       /** Format: date-time */
       createdAt: string;
+    };
+    /** @description The out-of-sample trades of one calendar year. */
+    YearView: {
+      /** Format: int32 */
+      year: number;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      meanR: number;
+      /** Format: double */
+      totalR: number;
+      /** Format: double */
+      profitFactor: null | number;
+      positive: boolean;
     };
   };
   responses: never;

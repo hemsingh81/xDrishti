@@ -14,6 +14,19 @@ public static class OosEvidenceBuilder
     public static OosPool Pool(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells, double calibrationErrorPp)
     {
         ArgumentNullException.ThrowIfNull(cells);
+        return Pool(cells, calibrationErrorPp, out _);
+    }
+
+    /// <summary>The trades the pooled evidence is made of, in the order of exit (spec P5-05): the input of the robustness checks.</summary>
+    public static IReadOnlyList<SelectionTrade> Trades(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells)
+    {
+        ArgumentNullException.ThrowIfNull(cells);
+        Pool(cells, 0, out var trades);
+        return trades;
+    }
+
+    private static OosPool Pool(IReadOnlyList<(SelectionInput Input, ExitSelection Selection)> cells, double calibrationErrorPp, out IReadOnlyList<SelectionTrade> orderedTrades)
+    {
         var taken = new List<SelectionTrade>();
         var windows = new SortedDictionary<(DateOnly, DateOnly), (int Trades, double Total)>();
         foreach (var (input, selection) in cells)
@@ -34,6 +47,7 @@ public static class OosEvidenceBuilder
         }
 
         var ordered = taken.OrderBy(t => t.Exit).ThenBy(t => t.Entry).ThenBy(t => t.CandidateId, StringComparer.Ordinal).ThenBy(t => t.R).ToList();
+        orderedTrades = ordered;
         var gains = ordered.Where(t => t.R > 0).Sum(t => t.R);
         var losses = -ordered.Where(t => t.R < 0).Sum(t => t.R);
         var profitFactor = losses > 0 ? gains / losses : gains > 0 ? double.PositiveInfinity : 0;
