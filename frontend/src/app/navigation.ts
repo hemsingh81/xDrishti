@@ -59,7 +59,7 @@ export const navigation: NavSection[] = [
     items: [
       { path: '/learning', label: 'Learning', icon: PsychologyIcon, phase: 'P6' },
       { path: '/reports', label: 'Reports', icon: BarChartIcon, phase: 'P8' },
-      { path: '/lab', label: 'Strategy Lab', icon: ScienceIcon, phase: 'P5' },
+      { path: '/lab', label: 'Strategy Lab', icon: ScienceIcon },
     ],
   },
   {
