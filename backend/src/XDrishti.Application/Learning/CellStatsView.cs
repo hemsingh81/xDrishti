@@ -42,7 +42,7 @@ public sealed record CellStatsView(
     string Limits)
 {
     /// <summary>Printed on every row (doc 09, P6-00 honest limits).</summary>
-    public const string LimitsText = "Replayed history with modelled fills, about 2 years, in-sample on the data shown: a description of the past, not a forecast. The prior's parent group includes the cell's own trades.";
+    public const string LimitsText = "Replayed history with modelled fills, about 2 years, in-sample on the data shown: a description of the past, not a forecast. The prior's parent group includes the cell's own trades. The credible interval treats trades as independent, which overlapping trades are not, so it is too narrow. One run per strategy feeds a snapshot, else signals would be counted twice.";
 
     internal static CellStatsView Of(StoredCellStats s)
     {

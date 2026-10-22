@@ -19,7 +19,7 @@ namespace XDrishti.Api.IntegrationTests.Research;
 [Collection(ApiTestSuite.Name)]
 public sealed class CellStatsApiTests(ApiFactory factory) : DataTestBase(factory)
 {
-    private static readonly DateOnly AsOf = new(2026, 12, 31);
+    private static readonly DateOnly AsOf = new(2026, 4, 30);
 
     public override async ValueTask InitializeAsync()
     {

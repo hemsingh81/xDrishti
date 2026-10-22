@@ -49,7 +49,7 @@ Pure calculation, no clock or random. A few thousand trades compute in milliseco
 As the acceptance list. Hand tables above; tiny-n and empty cells; integration on a real TimescaleDB for grants and the endpoints.
 
 ## Honest limits
-Replayed history, modelled fills, about 2 years, in-sample on the data shown: a description of the past, not a forecast (printed on every row). Most cells will read "not enough evidence" at `min_trades` 30. The parent groups include the cell's own trades, which pulls a cell slightly toward itself. The credible interval treats trades as independent, which overlapping or correlated trades are not. Not exercised on the owner's real stored runs in this slice.
+Replayed history, modelled fills, about 2 years, in-sample on the data shown: a description of the past, not a forecast (printed on every row). Most cells will read "not enough evidence" at `min_trades` 30. The parent groups include the cell's own trades, which pulls a cell slightly toward itself. One run per strategy feeds a snapshot (more is refused, `learning.cell_duplicate`), because the strategy-level parent pools every cell of the strategy and two runs of it would count its signals twice. A cell mixing charged and uncharged trades is refused (`learning.mixed_basis`). A cell absent from the latest snapshot is found by key (its newest snapshot) but not listed. The as-of date is required and not in the future. The credible interval treats trades as independent, which overlapping or correlated trades are not. Not exercised on the owner's real stored runs in this slice.
 
 ## Open questions
 None (all taken as recommended, see Assumptions).

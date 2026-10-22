@@ -68,7 +68,12 @@ internal sealed record LearnCellsOptions(DateOnly AsOf, IReadOnlyList<CellSource
         var defaults = new CellStatsOptions();
         var half = Number(values, "--half-life-days", defaults.RecencyHalfLifeDays, errors);
         var strength = Number(values, "--prior-strength", defaults.PriorStrength, errors);
-        var min = (int)Number(values, "--min-trades", defaults.MinTrades, errors);
+        var min = defaults.MinTrades;
+        if (values.TryGetValue("--min-trades", out var minText) && !int.TryParse(minText, NumberStyles.None, CultureInfo.InvariantCulture, out min))
+        {
+            errors.Add("--min-trades must be a whole number");
+        }
+
         return errors.Count > 0 ? (null, errors) : (new LearnCellsOptions(asOf, runs, new CellStatsOptions(half, strength, min)), errors);
     }
 

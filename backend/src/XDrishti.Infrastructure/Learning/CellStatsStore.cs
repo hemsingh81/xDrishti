@@ -21,6 +21,12 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         ArgumentNullException.ThrowIfNull(snapshot);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var advisory = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtext(@k))", connection, transaction))
+        {
+            advisory.Parameters.AddWithValue("k", NpgsqlDbType.Text, snapshot.SnapshotKey);
+            await advisory.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         await using (var exists = new NpgsqlCommand("SELECT 1 FROM research.cell_stats WHERE snapshot_key = @k LIMIT 1", connection, transaction))
         {
             exists.Parameters.AddWithValue("k", NpgsqlDbType.Char, snapshot.SnapshotKey);

@@ -16,6 +16,19 @@ public sealed class CellStatsCalculatorTests
     private static CellStatsRow Row(IReadOnlyList<CellStatsRow> rows, CellWindow window, int index = 0) => rows.Where(r => r.Window == window).ElementAt(index);
 
     [Fact]
+    public void A_weight_that_underflows_to_zero_gives_unknown_values_not_NaN()
+    {
+        var input = new CellInput(Cell(), false, [Trade(3000, 1), Trade(3001, -1)]);
+
+        var all = Row(CellStatsCalculator.Compute([input], AsOf, new CellStatsOptions(RecencyHalfLifeDays: 1, PriorStrength: 0, MinTrades: 1)), CellWindow.All);
+
+        all.N.ShouldBe(2);
+        all.ExpectancyR.ShouldBeNull();
+        all.ProfitFactor.ShouldBeNull();
+        double.IsFinite(all.WinRatePosterior).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Hand_table_with_no_prior_and_recency_weights()
     {
         var input = new CellInput(Cell(), true, [Trade(60, 1, 2, 0.5), Trade(0, 2, 0.5, 3), Trade(30, -1, 1, 1)]);

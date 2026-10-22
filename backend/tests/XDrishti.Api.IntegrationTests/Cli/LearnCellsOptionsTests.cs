@@ -41,6 +41,8 @@ public sealed class LearnCellsOptionsTests
     [InlineData("--as-of", "30/04/2026")]
     [InlineData("--bogus", "1")]
     [InlineData("--half-life-days", "many")]
+    [InlineData("--min-trades", "2.5")]
+    [InlineData("--min-trades", "x")]
     public void Wrong_arguments_are_listed_and_give_no_options(string name, string value)
     {
         var (options, errors) = LearnCellsOptions.Parse(name == "--as-of" ? [name, value, "--run", $"{Key}:swing:X"] : ["--as-of", "2026-04-30", name, value]);

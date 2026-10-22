@@ -14,6 +14,9 @@ public static class LearningErrors
     /// <summary>Two sources made the same cell.</summary>
     public const string CellDuplicateCode = "learning.cell_duplicate";
 
+    /// <summary>A cell has trades with and without charges.</summary>
+    public const string MixedBasisCode = "learning.mixed_basis";
+
     /// <summary>No cell with this key is stored.</summary>
     public const string CellNotFoundCode = "learning.cell_not_found";
 
@@ -29,6 +32,12 @@ public static class LearningErrors
 
     /// <summary>Two runs gave the same cell; their trades would be counted twice.</summary>
     public static Error CellDuplicate(string cellKey) => Error.Conflict(CellDuplicateCode, $"Two sources make the cell {cellKey}; name one run per cell.");
+
+    /// <summary>Two runs hold the same strategy; the strategy-level prior would count its signals twice.</summary>
+    public static Error StrategyDuplicate(string strategy) => Error.Conflict(CellDuplicateCode, $"Two sources hold the strategy {strategy}; name one run per strategy.");
+
+    /// <summary>One cell would mix net-of-charges and gross R.</summary>
+    public static Error MixedBasis(string cellKey) => Error.Conflict(MixedBasisCode, $"The cell {cellKey} mixes trades with and without charges; use runs costed the same way.");
 
     /// <summary>No stored cell has the key.</summary>
     public static Error CellNotFound(string cellKey) => Error.NotFound(CellNotFoundCode, $"No stored cell {cellKey}.");

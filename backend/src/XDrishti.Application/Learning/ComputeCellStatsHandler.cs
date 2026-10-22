@@ -38,6 +38,7 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         var inputs = new Dictionary<string, (CellId Cell, bool Costed, List<CellTrade> Trades)>(StringComparer.Ordinal);
         var tradeCount = 0;
         var owner = new Dictionary<string, string>(StringComparer.Ordinal);
+        var strategyOwner = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var source in command.Sources)
         {
             if (await runs.FindAsync(source.RunKey, cancellationToken) is null)
@@ -56,6 +57,18 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
                 {
                     cell = (id, costed, []);
                     inputs[id.Key] = cell;
+                }
+
+                if (!strategyOwner.TryAdd(t.StrategyId, source.RunKey) && !string.Equals(strategyOwner[t.StrategyId], source.RunKey, StringComparison.Ordinal))
+                {
+                    CellStatsLog.Refused(logger, LearningErrors.CellDuplicateCode);
+                    return Result.Failure<CellStatsOutcome>(LearningErrors.StrategyDuplicate(t.StrategyId));
+                }
+
+                if (cell.Costed != costed)
+                {
+                    CellStatsLog.Refused(logger, LearningErrors.MixedBasisCode);
+                    return Result.Failure<CellStatsOutcome>(LearningErrors.MixedBasis(id.Key));
                 }
 
                 if (!owner.TryAdd(id.Key, source.RunKey) && !string.Equals(owner[id.Key], source.RunKey, StringComparison.Ordinal))
@@ -98,7 +111,7 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
     }
 
-    private static List<FieldError> Check(ComputeCellStatsCommand command)
+    private List<FieldError> Check(ComputeCellStatsCommand command)
     {
         var problems = new List<FieldError>();
         if (command.Options is null)
@@ -116,6 +129,12 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         {
             problems.Add(new FieldError("sources", $"Name 1 to {MaxSources} runs."));
             return problems;
+        }
+
+        var today = SessionClock.DateOf(time.GetUtcNow().ToUnixTimeSeconds());
+        if (command.AsOf == default || command.AsOf > today)
+        {
+            problems.Add(new FieldError("asOf", "The as-of date is required and not in the future."));
         }
 
         if (string.IsNullOrWhiteSpace(command.Actor) || command.Actor.Length > 100)

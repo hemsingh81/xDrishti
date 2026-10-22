@@ -54,6 +54,7 @@ public static class CellStatsCalculator
         return rows.AsReadOnly();
     }
 
+    // Trades are ordered by exit date only (stable sort): the order within one day is the order of the input, i.e. by source run then by that run's trade ordinal.
     private static List<CellTrade> InWindow(IReadOnlyList<CellTrade> trades, DateOnly asOf, CellWindow window)
     {
         var days = window.Days();
@@ -144,8 +145,8 @@ public static class CellStatsCalculator
             upper,
             winWeight > 0 ? winSum / winWeight : null,
             lossWeight > 0 ? lossSum / lossWeight : null,
-            any ? rSum / wTotal : null,
-            lossSum < 0 ? winSum / -lossSum : null,
+            Finite(wTotal > 0 ? rSum / wTotal : null),
+            Finite(lossSum < 0 ? winSum / -lossSum : null),
             MaxDrawdown(trades),
             Quantile(mae, 0.5),
             Quantile(mae, 0.9),
@@ -153,6 +154,9 @@ public static class CellStatsCalculator
             Quantile(mfe, 0.9),
             trades.Count >= options.MinTrades);
     }
+
+    /// <summary>Never NaN or Infinity in a row (a weight can underflow to 0): such a value is reported as unknown.</summary>
+    private static double? Finite(double? value) => value.HasValue && double.IsFinite(value.Value) ? value : null;
 
     private static double MaxDrawdown(List<CellTrade> ordered)
     {

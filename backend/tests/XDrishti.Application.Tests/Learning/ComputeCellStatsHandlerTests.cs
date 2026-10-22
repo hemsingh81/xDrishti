@@ -122,6 +122,29 @@ public sealed class ComputeCellStatsHandlerTests
     }
 
     [Fact]
+    public async Task Two_runs_of_the_same_strategy_in_different_cells_are_refused_because_the_prior_would_count_a_signal_twice()
+    {
+        Run(KeyA, Trade(Side.Buy, AsOf, 1));
+        Run(KeyB, Trade(Side.Buy, AsOf, 1));
+
+        var result = await Handler().HandleAsync(Command(new CellSource(KeyA, "intraday", "X"), new CellSource(KeyB, "swing", "X")), Ct);
+
+        result.Error.Code.ShouldBe(LearningErrors.CellDuplicateCode);
+    }
+
+    [Fact]
+    public async Task A_default_or_future_as_of_date_is_refused()
+    {
+        var source = new CellSource(KeyA, "intraday", "X");
+
+        var none = await Handler().HandleAsync(Command(source) with { AsOf = default }, Ct);
+        var future = await Handler().HandleAsync(Command(source) with { AsOf = new DateOnly(2026, 3, 20) }, Ct);
+
+        none.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+        future.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+    }
+
+    [Fact]
     public async Task A_run_that_is_not_stored_is_not_found()
     {
         _runs.FindAsync(KeyA, Ct).Returns((StoredRunHeader?)null);
