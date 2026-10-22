@@ -16,14 +16,10 @@ elif [[ "${1:-} ${2:-}" != "strategy validate" ]]; then
   exit 2
 fi
 unset password
-# an argument that is an existing file becomes an absolute path (the script changes directory below)
-args=()
-for arg in "$@"; do
-  if [[ -f "$arg" ]]; then
-    args+=("$(cd "$(dirname "$arg")" && pwd)/$(basename "$arg")")
-  else
-    args+=("$arg")
-  fi
-done
+# the positional file of `strategy validate|test FILE` becomes an absolute path (the script changes directory below); no other argument is touched
+args=("$@")
+if [[ "${1:-}" == "strategy" && -n "${3:-}" && -f "$3" ]]; then
+  args[2]="$(cd "$(dirname -- "$3")" && pwd)/$(basename -- "$3")"
+fi
 cd "$ROOT/backend/src/XDrishti.Api"
 exec dotnet run -c Release --no-launch-profile -- xd "${args[@]+"${args[@]}"}"

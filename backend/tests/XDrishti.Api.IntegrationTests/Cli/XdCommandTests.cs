@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using XDrishti.Api.Cli;
 using XDrishti.Api.Simulate;
 using XDrishti.Application.Abstractions.Lab;
@@ -155,6 +156,105 @@ public sealed class XdCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Ctrl_C_right_after_the_run_is_queued_still_cancels_it()
+    {
+        using var cancel = new CancellationTokenSource();
+        var fake = new Fake { Reads = [Run("running")], OnStart = cancel.Cancel };
+
+        var (code, _, _) = await RunAsync(fake, cancel.Token, "strategy test", File("a.yaml"), "--symbols", "TCS");
+
+        code.ShouldBe(130);
+        fake.Calls.ShouldContain("cancel");
+    }
+
+    [Fact]
+    public async Task A_failed_cancel_is_said_and_the_exit_is_still_130()
+    {
+        using var cancel = new CancellationTokenSource();
+        var fake = new Fake { Reads = [Run("running")], OnGet = cancel.Cancel, CancelFails = true };
+
+        var (code, _, error) = await RunAsync(fake, cancel.Token, "strategy test", File("a.yaml"), "--symbols", "TCS");
+
+        code.ShouldBe(130);
+        error.ShouldContain("could not cancel run " + RunId.ToString("D"));
+    }
+
+    [Fact]
+    public async Task A_run_that_outlasts_the_timeout_exits_3_and_is_left_running()
+    {
+        var time = new FakeTimeProvider();
+        var fake = new Fake { Reads = [Run("running")], Time = time, OnGet = () => time.Advance(TimeSpan.FromMinutes(2)) };
+
+        var (code, _, error) = await RunAsync(fake, "strategy test", File("a.yaml"), "--symbols", "TCS", "--timeout-minutes", "1");
+
+        code.ShouldBe(3);
+        error.ShouldContain("timed out after 1 minutes");
+        fake.Calls.ShouldNotContain("cancel");
+    }
+
+    [Fact]
+    public async Task A_refused_start_prints_its_code_and_message_and_waits_for_nothing()
+    {
+        var fake = new Fake { StartError = new Error("lab.no_data", "no bars\u001b[31m") };
+
+        var (code, _, error) = await RunAsync(fake, "strategy test", File("a.yaml"), "--symbols", "TCS");
+
+        code.ShouldBe(1);
+        error.ShouldContain("lab.no_data: no bars?[31m");
+        fake.Calls.ShouldBe(["create", "start"]);
+    }
+
+    [Fact]
+    public async Task A_file_over_the_size_limit_is_refused_before_anything_is_called()
+    {
+        var path = Path.Combine(_dir, "big.yaml");
+        System.IO.File.WriteAllText(path, new string('x', LabErrors.MaxTextBytes + 1));
+        var fake = new Fake();
+
+        var (code, _, error) = await RunAsync(fake, "strategy test", path, "--symbols", "TCS");
+
+        code.ShouldBe(1);
+        error.ShouldNotBeEmpty();
+        fake.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("full")]
+    [InlineData("robust")]
+    public async Task A_succeeded_full_or_robust_run_without_a_verdict_exits_3(string method)
+    {
+        var fake = new Fake { Reads = [Run("succeeded") with { Method = method }] };
+
+        var (code, _, error) = await RunAsync(fake, "strategy test", File("a.yaml"), "--symbols", "TCS", "--method", "full");
+
+        code.ShouldBe(3);
+        error.ShouldContain("without a verdict");
+    }
+
+    [Fact]
+    public async Task More_problems_than_the_cap_are_counted_and_a_pathless_one_has_a_space()
+    {
+        var issues = Enumerable.Range(0, SimulateCommand.MaxProblems + 3).Select(_ => new StrategyIssue("p", "c", "m", "error", null, null, null, null, null, null, null)).ToList();
+        var fake = new Fake { Validation = new StrategyValidation(false, null, null, null, null, [], [], issues) };
+
+        var (_, _, error) = await RunAsync(fake, "strategy validate", File("a.yaml"));
+
+        error.ShouldContain("a.yaml: [p] error c m");
+        error.ShouldContain("3 more problems omitted");
+    }
+
+    [Fact]
+    public async Task Run_derived_text_has_its_control_characters_replaced()
+    {
+        var fake = new Fake { Reads = [Run("failed") with { Error = "boom\u001b[2J" }] };
+
+        var (_, _, error) = await RunAsync(fake, "strategy test", File("a.yaml"), "--symbols", "TCS");
+
+        error.ShouldContain("error: boom?[2J");
+        error.ShouldNotContain("\u001b");
+    }
+
+    [Fact]
     public async Task Runs_lists_the_runs_one_a_line()
     {
         var fake = new Fake { Listed = [Run("succeeded")] };
@@ -178,7 +278,7 @@ public sealed class XdCommandTests : IDisposable
     private static async Task<(int Code, string Output, string Error)> RunAsync(Fake fake, CancellationToken token, params string[] words)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton(fake.Time);
         services.AddSingleton<IQueryHandler<ValidateStrategyQuery, StrategyValidation>>(fake);
         services.AddSingleton<ICommandHandler<CreateStrategyCommand, CreatedStrategy>>(fake);
         services.AddSingleton<ICommandHandler<StartLabRunCommand, StartedLabRun>>(fake);
@@ -220,6 +320,12 @@ public sealed class XdCommandTests : IDisposable
 
         public Action? OnGet { get; init; }
 
+        public Action? OnStart { get; init; }
+
+        public bool CancelFails { get; init; }
+
+        public TimeProvider Time { get; init; } = TimeProvider.System;
+
         public StartLabRunCommand? Started { get; private set; }
 
         ValueTask<StrategyValidation> IQueryHandler<ValidateStrategyQuery, StrategyValidation>.HandleAsync(ValidateStrategyQuery query, CancellationToken cancellationToken) => ValueTask.FromResult(Validation);
@@ -234,6 +340,7 @@ public sealed class XdCommandTests : IDisposable
         {
             Calls.Add("start");
             Started = command;
+            OnStart?.Invoke();
             return ValueTask.FromResult(StartError is { } e ? Result.Failure<StartedLabRun>(e) : Result.Success(new StartedLabRun(Run("queued"), true)));
         }
 
@@ -250,7 +357,7 @@ public sealed class XdCommandTests : IDisposable
         ValueTask<Result<LabRunView>> ICommandHandler<CancelLabRunCommand, LabRunView>.HandleAsync(CancelLabRunCommand command, CancellationToken cancellationToken)
         {
             Calls.Add("cancel");
-            return ValueTask.FromResult(Result.Success(Run("cancelled")));
+            return ValueTask.FromResult(CancelFails ? Result.Failure<LabRunView>(new Error("lab.cancel", "no")) : Result.Success(Run("cancelled")));
         }
     }
 }

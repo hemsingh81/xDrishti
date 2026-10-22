@@ -44,7 +44,7 @@ internal static class XdCommand
         {
             foreach (var error in parsed.Errors)
             {
-                await console.Error.WriteLineAsync(error);
+                await console.Error.WriteLineAsync(SimulateOptions.Show(error));
             }
 
             await console.Error.WriteAsync(XdOptions.Usage);
@@ -79,7 +79,7 @@ internal static class XdCommand
         var read = await CostSheetCommand.ReadBoundedAsync(options.File!, LabErrors.MaxTextBytes, "the strategy file", cancellationToken);
         if (read.Problem is not null)
         {
-            await console.Error.WriteLineAsync(read.Problem);
+            await console.Error.WriteLineAsync(SimulateOptions.Show(read.Problem));
             return (null, Refused);
         }
 
@@ -122,7 +122,7 @@ internal static class XdCommand
             }
             else
             {
-                await console.Error.WriteLineAsync(created.Error.Code + ": " + created.Error.Message);
+                await console.Error.WriteLineAsync(Show(created.Error));
             }
 
             return Refused;
@@ -136,13 +136,31 @@ internal static class XdCommand
             cancellationToken);
         if (started.IsFailure)
         {
-            await console.Error.WriteLineAsync(started.Error.Code + ": " + started.Error.Message);
+            await console.Error.WriteLineAsync(Show(started.Error));
             return Refused;
         }
 
         var run = started.Value.Run;
-        await console.Error.WriteLineAsync($"run {run.Id:D} {run.State}");
-        return await WaitAsync(run, options, provider, console, poll, cancellationToken);
+        try
+        {
+            await console.Error.WriteLineAsync($"run {run.Id:D} {run.State}");
+            return await WaitAsync(run, options, provider, console, poll, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Ctrl-C: stop the queued or running run too, with a token that is not cancelled.
+            try
+            {
+                var cancelled = await provider.GetRequiredService<ICommandHandler<CancelLabRunCommand, LabRunView>>().HandleAsync(new CancelLabRunCommand(run.Id), CancellationToken.None);
+                await console.Error.WriteLineAsync(cancelled.IsSuccess ? $"cancelled; run {run.Id:D} was asked to stop" : $"could not cancel run {run.Id:D}");
+            }
+            catch (Exception failure) when (failure is not OutOfMemoryException)
+            {
+                await console.Error.WriteLineAsync($"could not cancel run {run.Id:D}: " + SimulateCommand.Describe(failure));
+            }
+
+            return Cancelled;
+        }
     }
 
     private static async Task<int> WaitAsync(LabRunView run, XdOptions options, IServiceProvider provider, SimulateConsole console, TimeSpan poll, CancellationToken cancellationToken)
@@ -153,52 +171,43 @@ internal static class XdCommand
         var began = time.GetUtcNow();
         var hinted = false;
         var lastLine = string.Empty;
-        try
+        while (true)
         {
-            while (true)
+            if (run.State is not ("queued" or "running"))
             {
-                if (run.State is not ("queued" or "running"))
-                {
-                    break;
-                }
-
-                var line = $"{run.State} {run.Stage ?? "-"} {run.Progress.Done.ToString(CultureInfo.InvariantCulture)}/{run.Progress.Total.ToString(CultureInfo.InvariantCulture)}";
-                if (line != lastLine)
-                {
-                    await console.Error.WriteLineAsync(line);
-                    lastLine = line;
-                }
-
-                if (!hinted && run.State == "queued" && time.GetUtcNow() - began > QueuedHint)
-                {
-                    hinted = true;
-                    await console.Error.WriteLineAsync("the run is still queued: xd-api carries runs out; is it running?");
-                }
-
-                if (time.GetUtcNow() >= deadline)
-                {
-                    await console.Error.WriteLineAsync($"timed out after {options.TimeoutMinutes.ToString(CultureInfo.InvariantCulture)} minutes; the run {run.Id:D} goes on (read it with 'xd lab runs')");
-                    return Failed;
-                }
-
-                await Task.Delay(poll, time, cancellationToken);
-                var again = await get.HandleAsync(new GetLabRunQuery(run.Id), cancellationToken);
-                if (again.IsFailure)
-                {
-                    await console.Error.WriteLineAsync(again.Error.Code + ": " + again.Error.Message);
-                    return Failed;
-                }
-
-                run = again.Value;
+                break;
             }
+
+            var line = $"{Show(run.State)} {Show(run.Stage ?? "-")} {run.Progress.Done.ToString(CultureInfo.InvariantCulture)}/{run.Progress.Total.ToString(CultureInfo.InvariantCulture)}";
+            if (line != lastLine)
+            {
+                await console.Error.WriteLineAsync(line);
+                lastLine = line;
+            }
+
+            if (!hinted && run.State == "queued" && time.GetUtcNow() - began > QueuedHint)
+            {
+                hinted = true;
+                await console.Error.WriteLineAsync("the run is still queued: xd-api carries runs out; is it running?");
+            }
+
+            if (time.GetUtcNow() >= deadline)
+            {
+                await console.Error.WriteLineAsync($"timed out after {options.TimeoutMinutes.ToString(CultureInfo.InvariantCulture)} minutes; the run {run.Id:D} goes on (read it with 'xd lab runs')");
+                return Failed;
+            }
+
+            await Task.Delay(poll, time, cancellationToken);
+            var again = await get.HandleAsync(new GetLabRunQuery(run.Id), cancellationToken);
+            if (again.IsFailure)
+            {
+                await console.Error.WriteLineAsync(Show(again.Error));
+                return Failed;
+            }
+
+            run = again.Value;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            // Ctrl-C: stop the run too, with a token that is not cancelled.
-            await provider.GetRequiredService<ICommandHandler<CancelLabRunCommand, LabRunView>>().HandleAsync(new CancelLabRunCommand(run.Id), CancellationToken.None);
-            await console.Error.WriteLineAsync($"cancelled; run {run.Id:D} was asked to stop");
-            return Cancelled;
-        }
+
 
         return await ReportAsync(run, console);
     }
@@ -207,13 +216,13 @@ internal static class XdCommand
     {
         foreach (var p in run.Problems)
         {
-            await console.Error.WriteLineAsync($"{p.Stage}: {Where(p.Path, p.Line, p.Column)}{p.Severity} {p.Code} {p.Message}");
+            await console.Error.WriteLineAsync($"{Show(p.Stage)}: {Where(p.Path, p.Line, p.Column)}{Show(p.Severity)} {Show(p.Code)} {Show(p.Message)}");
         }
 
-        await console.Out.WriteLineAsync($"run {run.Id:D} {run.State} key {run.Key}");
+        await console.Out.WriteLineAsync($"run {run.Id:D} {run.State} key {Show(run.Key)}");
         foreach (var label in run.Labels)
         {
-            await console.Out.WriteLineAsync("  " + label);
+            await console.Out.WriteLineAsync("  " + Show(label));
         }
 
         if (run.Counts is { } c)
@@ -223,7 +232,7 @@ internal static class XdCommand
 
         foreach (var key in run.SimRunKeys)
         {
-            await console.Out.WriteLineAsync("  simulation run " + key);
+            await console.Out.WriteLineAsync("  simulation run " + Show(key));
         }
 
         if (run.Verdict is { } v)
@@ -231,12 +240,12 @@ internal static class XdCommand
             await console.Out.WriteLineAsync($"  verdict {v.Outcome} (variants {v.VariantCount})");
             foreach (var g in v.Gates)
             {
-                await console.Out.WriteLineAsync($"    {(g.Passed ? "pass" : "FAIL")} {g.Name}: {g.Reason}");
+                await console.Out.WriteLineAsync($"    {(g.Passed ? "pass" : "FAIL")} {Show(g.Name)}: {Show(g.Reason)}");
             }
 
             foreach (var limit in v.Limits)
             {
-                await console.Out.WriteLineAsync("    limit: " + limit);
+                await console.Out.WriteLineAsync("    limit: " + Show(limit));
             }
         }
 
@@ -244,10 +253,16 @@ internal static class XdCommand
         {
             if (run.Error is not null)
             {
-                await console.Error.WriteLineAsync("error: " + run.Error);
+                await console.Error.WriteLineAsync("error: " + Show(run.Error));
             }
 
             return run.State == "failed" && run.Problems.Count > 0 ? Refused : Failed;
+        }
+
+        if (run.Method != "quick" && run.Verdict is null)
+        {
+            await console.Error.WriteLineAsync($"error: the {Show(run.Method)} run succeeded without a verdict");
+            return Failed;
         }
 
         return run.Verdict is { Outcome: not "PASS" } ? NotPassing : Done;
@@ -258,14 +273,14 @@ internal static class XdCommand
         var result = await provider.GetRequiredService<IQueryHandler<ListLabRunsQuery, Result<IReadOnlyList<LabRunView>>>>().HandleAsync(new ListLabRunsQuery(options.Strategy, options.State, options.Limit), cancellationToken);
         if (result.IsFailure)
         {
-            await console.Error.WriteLineAsync(result.Error.Code + ": " + result.Error.Message);
+            await console.Error.WriteLineAsync(Show(result.Error));
             return Refused;
         }
 
         foreach (var r in result.Value)
         {
             var verdict = r.Verdict?.Outcome ?? "-";
-            await console.Out.WriteLineAsync($"{r.Id:D} {r.CreatedAt:yyyy-MM-dd HH:mm}Z {r.State,-11} {r.Method,-5} {r.Strategy.Id} v{r.Strategy.Version.ToString(CultureInfo.InvariantCulture)} verdict {verdict}");
+            await console.Out.WriteLineAsync($"{r.Id:D} {r.CreatedAt:yyyy-MM-dd HH:mm}Z {r.State,-11} {Show(r.Method),-5} {Show(r.Strategy.Id)} v{r.Strategy.Version.ToString(CultureInfo.InvariantCulture)} verdict {verdict}");
         }
 
         return Done;
@@ -276,11 +291,21 @@ internal static class XdCommand
         var name = SimulateOptions.Show(Path.GetFileName(file));
         foreach (var i in issues.Take(SimulateCommand.MaxProblems))
         {
-            var line = $"{name}:{Where(i.Path, i.Line, i.Column)}{i.Severity} {i.Code} {SimulateOptions.Show(i.Message)}" + (i.Suggestion is null ? string.Empty : $" (try: {SimulateOptions.Show(i.Suggestion)})");
+            var at = Where(i.Path, i.Line, i.Column);
+            var line = $"{name}:{(at.Length == 0 || at[0] == '[' ? " " : string.Empty)}{at}{Show(i.Severity)} {Show(i.Code)} {SimulateOptions.Show(i.Message)}" + (i.Suggestion is null ? string.Empty : $" (try: {SimulateOptions.Show(i.Suggestion)})");
             await console.Error.WriteLineAsync(line);
+        }
+
+        if (issues.Count > SimulateCommand.MaxProblems)
+        {
+            await console.Error.WriteLineAsync($"{(issues.Count - SimulateCommand.MaxProblems).ToString(CultureInfo.InvariantCulture)} more problems omitted");
         }
     }
 
+    private static string Show(Error error) => SimulateOptions.Show(error.Code + ": " + error.Message);
+
+    private static string Show(string text) => SimulateOptions.Show(text);
+
     private static string Where(string path, int? line, int? column) =>
-        (line is null ? string.Empty : $"{line.Value.ToString(CultureInfo.InvariantCulture)}:{(column ?? 1).ToString(CultureInfo.InvariantCulture)}: ") + (string.IsNullOrEmpty(path) ? string.Empty : $"[{SimulateOptions.Show(path)}] ");
+        (line is null ? string.Empty : $"{line.Value.ToString(CultureInfo.InvariantCulture)}:{(column ?? 1).ToString(CultureInfo.InvariantCulture)}: ") + (string.IsNullOrEmpty(path) ? string.Empty : $"[{Show(path)}] ");
 }

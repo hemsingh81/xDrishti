@@ -246,7 +246,7 @@ internal static class SimulateCommand
         return text.ToString();
     }
 
-    /// <summary>The exception type and its message cut to <see cref="MaxFailureMessage"/> characters, with control characters replaced; the stack goes to the log only. The verb reads no secret, so it has none to hide.</summary>
+    /// <summary>The exception type and its message cut to <see cref="MaxFailureMessage"/> characters, with control characters replaced; the stack goes to the log only. The Api-host verbs (xd, simulate) run with the database password in their environment, so only the type and message are ever printed, never the environment or a connection string.</summary>
     internal static string Describe(Exception failure)
     {
         var message = string.Concat(failure.Message.Select(c => char.IsControl(c) ? ' ' : c));
