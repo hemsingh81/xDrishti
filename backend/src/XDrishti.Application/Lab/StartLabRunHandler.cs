@@ -19,6 +19,7 @@ namespace XDrishti.Application.Lab;
 /// </summary>
 internal sealed class StartLabRunHandler(
     ILabRunStore runs,
+    ITestLedger ledger,
     IStrategyStore strategies,
     IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>> resolver,
     IBasketQueries baskets,
@@ -65,6 +66,13 @@ internal sealed class StartLabRunHandler(
         var inserted = await runs.InsertOrGetAsync(
             new NewLabRun(Guid.NewGuid(), key, version.StrategyId, version.Version, version.Hash, universe.Value, from, to, LabSettings.QuickMethod, configHash, engine.EngineVersion, labels, now),
             cancellationToken);
+        // one look at the family, counted whatever becomes of the run (spec P5-03, D1). Also for a run that already holds the key: the append is idempotent by run id, so a run whose first append failed is healed by the next post.
+        var run = inserted.Run;
+        if (await ledger.AppendAsync(new LedgerRow(run.Id, run.Key, run.StrategyId, run.Version, run.StrategyHash, version.ParentHash, run.Universe.Label, run.From, run.To, run.Method, run.CreatedAt), cancellationToken))
+        {
+            LabRunLog.LedgerAppended(logger, run.Id, run.StrategyId, run.Version);
+        }
+
         if (inserted.Created)
         {
             LabRunLog.Queued(logger, inserted.Run.Id, version.StrategyId, version.Version, key[..12], universe.Value.Instruments.Count, universe.Value.Sampled);

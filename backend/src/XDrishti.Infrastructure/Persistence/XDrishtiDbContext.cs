@@ -148,6 +148,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     /// <summary>The Lab runs, which are also the queue of the runner (spec P5-02).</summary>
     internal DbSet<LabRunRow> LabRuns => Set<LabRunRow>();
 
+    internal DbSet<TestLedgerRow> TestLedger => Set<TestLedgerRow>();
+
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();
 

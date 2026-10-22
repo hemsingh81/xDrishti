@@ -29,6 +29,8 @@ public sealed class StartLabRunHandlerTests
 
     private readonly ILabRunStore _runs = Substitute.For<ILabRunStore>();
 
+    private readonly ITestLedger _ledger = Substitute.For<ITestLedger>();
+
     private readonly IStrategyStore _strategies = Substitute.For<IStrategyStore>();
 
     private readonly IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>> _resolver = Substitute.For<IQueryHandler<ResolveInstrumentsQuery, Result<ResolveResult>>>();
@@ -59,7 +61,7 @@ public sealed class StartLabRunHandlerTests
     private static LabRun ToRun(NewLabRun n) => new(
         n.Id, n.Key, n.StrategyId, n.Version, n.StrategyHash, n.Universe, n.From, n.To, n.Method, n.ConfigHash, n.EngineVersion, LabRunState.Queued, null, 0, 0, [], null, [], [], n.Labels, null, false, n.CreatedAt, null, null);
 
-    private StartLabRunHandler Handler() => new(_runs, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance);
+    private StartLabRunHandler Handler() => new(_runs, _ledger, _strategies, _resolver, _baskets, _bars, _engine, _sheets, LabSettings.Default, new FakeTimeProvider(new DateTimeOffset(2026, 10, 22, 6, 0, 0, TimeSpan.Zero)), NullLogger<StartLabRunHandler>.Instance);
 
     private static ResolveResult Matched(int count) =>
         new([.. Enumerable.Range(1, count).Select(i => new ResolvedInstrument("S" + i, new Guid(i, 0, 0, [0, 0, 0, 0, 0, 0, 0, 1]), "S" + i, "Name " + i, "EQUITY", null, false, true))], [], count, 0);
@@ -237,5 +239,43 @@ public sealed class StartLabRunHandlerTests
         costed.Labels.ShouldContain(l => l.StartsWith("Costed with the charge sheet", StringComparison.Ordinal));
         costed.Key.ShouldNotBe(gross.Key);
         early.Labels.ShouldContain(l => l.StartsWith("Gross:", StringComparison.Ordinal), "the sheet is not in force on the first day");
+    }
+
+    [Fact]
+    public async Task A_new_run_appends_one_ledger_row_with_the_family_the_hash_and_the_parent()
+    {
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(2)));
+        _strategies.GetVersionAsync("LAB_TEST", Arg.Any<int?>(), Arg.Any<CancellationToken>()).Returns(new StoredVersion("LAB_TEST", 2, 1, Hash, "t", "{}", new string('p', 64), null, DateTimeOffset.UnixEpoch));
+        _ledger.AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var started = (await Handler().HandleAsync(BySymbols("S1"), Ct)).Value;
+
+        var row = _ledger.ReceivedCalls().Single().GetArguments()[0].ShouldBeOfType<LedgerRow>();
+        row.RunId.ShouldBe(started.Run.Id);
+        row.StrategyId.ShouldBe("LAB_TEST");
+        row.StrategyHash.ShouldBe(Hash);
+        row.ParentHash.ShouldBe(new string('p', 64));
+        row.RunKey.ShouldBe(started.Run.Key);
+        row.Method.ShouldBe("quick");
+    }
+
+    [Fact]
+    public async Task A_post_that_returns_a_held_run_appends_by_its_run_id_so_the_ledger_cannot_miss_it()
+    {
+        var held = ToRun(new NewLabRun(Guid.NewGuid(), new string('k', 64), "LAB_TEST", 2, Hash, new LabUniverse("symbols", null, "l", 1, [], false, null), new DateOnly(2025, 5, 1), new DateOnly(2026, 4, 30), "quick", Hash, "sim-5", [], DateTimeOffset.UnixEpoch));
+        _runs.InsertOrGetAsync(Arg.Any<NewLabRun>(), Arg.Any<CancellationToken>()).Returns(new InsertedLabRun(held, false));
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(2)));
+
+        await Handler().HandleAsync(BySymbols("S1"), Ct);
+
+        await _ledger.Received(1).AppendAsync(Arg.Is<LedgerRow>(r => r.RunId == held.Id), Ct);
+    }
+
+    [Fact]
+    public async Task A_refused_post_appends_nothing()
+    {
+        await Handler().HandleAsync(BySymbols(), Ct);
+
+        await _ledger.DidNotReceiveWithAnyArgs().AppendAsync(default!, Ct);
     }
 }

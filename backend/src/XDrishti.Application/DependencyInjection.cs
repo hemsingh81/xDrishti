@@ -406,6 +406,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListLabRunsQuery, Result<IReadOnlyList<LabRunView>>>, ListLabRunsHandler>();
         services.AddScoped<IQueryHandler<GetLabRunQuery, Result<LabRunView>>, GetLabRunHandler>();
         services.AddScoped<ICommandHandler<CancelLabRunCommand, LabRunView>, CancelLabRunHandler>();
+        services.AddScoped<IQueryHandler<GetLedgerQuery, Result<LedgerView>>, GetLedgerHandler>(); // the test ledger (P5-03, ADR 0059)
         services.TryAddSingleton(LabSettings.Default); // the host replaces it with its configuration
         services.TryAddSingleton<ILabProgress, NullLabProgress>(); // the host that sends events replaces it
     }
