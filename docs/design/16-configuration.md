@@ -289,6 +289,7 @@ strategy_lab:
   # P5-02 reads these from configuration section StrategyLab (QuickYears, QuickSymbols, MaxParallelRuns) plus CostSheetId (the stored charge sheet a quick test is costed with, default `default`; gross when not stored), PollMilliseconds and RunWorker (ADR 0058)
   plugins: { enabled: true, sandbox: { cpu: 2, memory_gb: 4, timeout_min: 60 } }
   multiple_testing_adjustment: true
+  # P5-03 reads StrategyLab:Gates (MinOosTrades, MinExpectancyR, MinProfitFactor, MinPositiveFoldsPct, MaxDrawdownR, MaxCalibrationErrorPp; the qualification_gates above are the defaults), StrategyLab:MinFoldsForPass (6; fewer walk-forward folds cap a verdict at MARGINAL) and StrategyLab:MultipleTesting (the switch above); the tightening is 1 + 0.25·log2(variants) (ADR 0059)
   assistant_can_run_tests: true
   assistant_can_promote: false
 

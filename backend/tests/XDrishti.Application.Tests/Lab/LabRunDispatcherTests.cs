@@ -95,7 +95,7 @@ public sealed class LabRunDispatcherTests
         await executor.Started.WaitAsync(Ct);
         await executor.Started.WaitAsync(Ct);
 
-        executor.Order.ShouldBe([runs[0].Id, runs[1].Id], "the oldest two, in order");
+        executor.Order.ShouldBe([runs[0].Id, runs[1].Id], ignoreOrder: true, "the oldest two (they start concurrently, so no order between them)");
         executor.Running.ShouldBe(2);
         draining.IsCompleted.ShouldBeFalse();
         executor.Started.CurrentCount.ShouldBe(0, "the third has not started");
@@ -104,7 +104,8 @@ public sealed class LabRunDispatcherTests
         executor.Release(runs[0].Id);
         await executor.Started.WaitAsync(Ct);
 
-        executor.Order.ShouldBe([runs[0].Id, runs[1].Id, runs[2].Id]);
+        executor.Order.Last().ShouldBe(runs[2].Id);
+        executor.Order.Count.ShouldBe(3);
         executor.Release(runs[1].Id);
         executor.Release(runs[2].Id);
         await draining.WaitAsync(TimeSpan.FromSeconds(10), Ct);

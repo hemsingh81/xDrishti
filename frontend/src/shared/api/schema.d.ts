@@ -2418,6 +2418,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lab/strategies/{id}/ledger': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The test ledger of a strategy family: every Lab run created for it, the number of distinct variants (hashes) and the factor the qualification gates are tightened by now */
+    get: operations['GetLabLedger'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5321,6 +5338,37 @@ export interface components {
       totals: components['schemas']['LedgerClassTotal'][];
       /** Format: date */
       coverageFrom?: null | string;
+    };
+    /** @description One ledger row as the API shows it (`window` is the posted window). */
+    LedgerRowView: {
+      /** Format: uuid */
+      runId: string;
+      runKey: string;
+      strategyHash: string;
+      parentHash: null | string;
+      /** Format: int32 */
+      version: number;
+      universe: string;
+      window: components['schemas']['LedgerWindow'];
+      method: string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @description The ledger of a family, the number of variants in it and the factor the gates are tightened by now (1 when the adjustment is off). */
+    LedgerView: {
+      strategyId: string;
+      /** Format: int32 */
+      variantCount: number;
+      /** Format: double */
+      adjustmentFactor: number;
+      rows: components['schemas']['LedgerRowView'][];
+    };
+    /** @description The window of a run. */
+    LedgerWindow: {
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
     };
     /**
      * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
@@ -13201,6 +13249,37 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLabLedger: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LedgerView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

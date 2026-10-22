@@ -31,6 +31,12 @@ internal sealed class LabRunsEndpoints : IEndpointModule
             .WithSummary("One Lab run: state, stage, progress, the simulation run keys, counts, located problems, the stage log and the labels (cost basis, sample, exploration)")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        api.MapGet("/lab/strategies/{id}/ledger", GetLedgerAsync)
+            .WithTags("Lab")
+            .WithName("GetLabLedger")
+            .WithSummary("The test ledger of a strategy family: every Lab run created for it, the number of distinct variants (hashes) and the factor the qualification gates are tightened by now")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         runs.MapPost("/{id:guid}/cancel", CancelAsync)
             .WithName("CancelLabRun")
             .WithSummary("Stop a run: a queued run at once, a running run at its next safe point between instruments (202); nothing is stored for it. 409 lab.not_cancellable once it has finished")
@@ -77,6 +83,16 @@ internal sealed class LabRunsEndpoints : IEndpointModule
     {
         var result = await handler.HandleAsync(new GetLabRunQuery(id), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LedgerView>, ProblemHttpResult>> GetLedgerAsync(
+        string id,
+        HttpContext http,
+        IQueryHandler<GetLedgerQuery, Result<LedgerView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetLedgerQuery(id), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Accepted<LabRunView>, ProblemHttpResult>> CancelAsync(

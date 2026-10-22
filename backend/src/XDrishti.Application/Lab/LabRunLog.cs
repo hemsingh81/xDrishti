@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 namespace XDrishti.Application.Lab;
 
 /// <summary>
-/// Structured log events of the Lab runs (spec P5-02; event ids 4439 to 4447). The run id, the key prefix, the stage and counts only: never a strategy text, a trade or a secret.
+/// Structured log events of the Lab runs (spec P5-02; event ids 4439 to 4448). The run id, the key prefix, the stage and counts only: never a strategy text, a trade or a secret.
 /// </summary>
 internal static partial class LabRunLog
 {
@@ -33,4 +33,7 @@ internal static partial class LabRunLog
 
     [LoggerMessage(EventId = 4447, Level = LogLevel.Error, Message = "lab.run.dispatcher_failed; the next tick tries again")]
     public static partial void DispatcherFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(EventId = 4448, Level = LogLevel.Information, Message = "lab.ledger.appended run {RunId} strategy {StrategyId} version {Version}")]
+    public static partial void LedgerAppended(ILogger logger, Guid runId, string strategyId, int version);
 }

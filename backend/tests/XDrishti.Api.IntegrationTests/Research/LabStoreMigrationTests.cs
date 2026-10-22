@@ -51,7 +51,7 @@ public sealed class LabStoreMigrationTests(ApiFactory factory)
         await using var connection = new NpgsqlConnection(scratch.ConnectionString);
         await connection.OpenAsync(Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["lab_runs", "strategies", "strategy_versions"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["lab_runs", "strategies", "strategy_versions", "test_ledger"]);
         (await ListAsync(connection, Columns("strategies"))).Order(StringComparer.Ordinal).ShouldBe(
             new[] { C("id", "text"), C("style", "text"), C("built_in", "boolean"), C("created_at", "timestamp with time zone") }.Order(StringComparer.Ordinal));
         (await ListAsync(connection, Columns("strategy_versions"))).Order(StringComparer.Ordinal).ShouldBe(
@@ -60,7 +60,7 @@ public sealed class LabStoreMigrationTests(ApiFactory factory)
                 C("strategy_id", "text"), C("version", "integer"), C("schema_version", "smallint"), C("hash", "character", 64), C("source_text", "text"), C("canonical_json", "text"),
                 C("parent_hash", "character", 64, true), C("note", "text", null, true), C("created_at", "timestamp with time zone"),
             }.Order(StringComparer.Ordinal));
-        (await ListAsync(connection, "SELECT conname FROM pg_constraint WHERE connamespace = 'lab'::regnamespace AND contype <> 'n' AND conname NOT LIKE '%lab_runs%' ORDER BY 1")).ShouldBe(
+        (await ListAsync(connection, "SELECT conname FROM pg_constraint WHERE connamespace = 'lab'::regnamespace AND contype <> 'n' AND conname NOT LIKE '%lab_runs%' AND conname NOT LIKE '%test_ledger%' ORDER BY 1")).ShouldBe(
         [
             "ck_strategies_id", "ck_strategies_style", "ck_strategy_versions_hash", "ck_strategy_versions_sizes", "ck_strategy_versions_version", "fk_strategy_versions_parent",
             "fk_strategy_versions_strategy", "pk_strategies", "pk_strategy_versions", "uq_strategy_versions_hash",
@@ -86,7 +86,7 @@ public sealed class LabStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["lab_runs", "strategies", "strategy_versions"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["lab_runs", "strategies", "strategy_versions", "test_ledger"]);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public sealed class LabStoreMigrationTests(ApiFactory factory)
         var failure = await Should.ThrowAsync<Exception>(() => migrator.MigrateAsync(Before, Ct));
 
         (failure as PostgresException ?? failure.InnerException as PostgresException).ShouldNotBeNull().SqlState.ShouldBe(PostgresErrorCodes.DependentObjectsStillExist);
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["later_table", "strategies", "strategy_versions"], "AddLabRuns.Down had already run in its own transaction; the older Down is what fails and removes nothing");
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["later_table", "strategies", "strategy_versions"], "AddLabTestLedger.Down and AddLabRuns.Down had already run in their own transactions; the older Down is what fails and removes nothing");
 
         await ExecuteAsync(connection, "DROP TABLE lab.later_table");
         await migrator.MigrateAsync(Before, Ct);

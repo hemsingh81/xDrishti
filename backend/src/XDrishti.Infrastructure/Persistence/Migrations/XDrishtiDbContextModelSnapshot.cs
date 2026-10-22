@@ -4650,6 +4650,79 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.TestLedgerRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("LabRunId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lab_run_id");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("method");
+
+                    b.Property<string>("ParentHash")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("parent_hash");
+
+                    b.Property<string>("RunKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("run_key");
+
+                    b.Property<string>("StrategyHash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("strategy_hash");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("UniverseLabel")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("universe_label");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<DateOnly>("WindowFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("window_from");
+
+                    b.Property<DateOnly>("WindowTo")
+                        .HasColumnType("date")
+                        .HasColumnName("window_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_test_ledger");
+
+                    b.HasIndex("LabRunId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_test_ledger_run");
+
+                    b.HasIndex("StrategyId", "CreatedAt")
+                        .HasDatabaseName("ix_test_ledger_strategy_created");
+
+                    b.ToTable("test_ledger", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_test_ledger_hash", "strategy_hash ~ '^[0-9a-f]{64}$' AND window_from <= window_to");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)

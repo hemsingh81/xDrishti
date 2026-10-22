@@ -8339,6 +8339,47 @@
           }
         }
       }
+    },
+    "/api/lab/strategies/{id}/ledger": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The test ledger of a strategy family: every Lab run created for it, the number of distinct variants (hashes) and the factor the qualification gates are tightened by now",
+        "operationId": "GetLabLedger",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -17149,6 +17190,103 @@
           }
         },
         "description": "One page of the ledger, newest first, and the totals of every class for the period (`from` to `to`, whatever class is filtered). `CoverageFrom` is the earliest date of any ledger entry stored for the account, whatever the filters\n(null: none stored): the ledger's costs are known from this date on, which reading from an earlier date can move back (ADR 0026)."
+      },
+      "LedgerRowView": {
+        "required": [
+          "runId",
+          "runKey",
+          "strategyHash",
+          "parentHash",
+          "version",
+          "universe",
+          "window",
+          "method",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "runKey": {
+            "type": "string"
+          },
+          "strategyHash": {
+            "type": "string"
+          },
+          "parentHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "universe": {
+            "type": "string"
+          },
+          "window": {
+            "$ref": "#/components/schemas/LedgerWindow"
+          },
+          "method": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "One ledger row as the API shows it (`window` is the posted window)."
+      },
+      "LedgerView": {
+        "required": [
+          "strategyId",
+          "variantCount",
+          "adjustmentFactor",
+          "rows"
+        ],
+        "type": "object",
+        "properties": {
+          "strategyId": {
+            "type": "string"
+          },
+          "variantCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "adjustmentFactor": {
+            "type": "number",
+            "format": "double"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerRowView"
+            }
+          }
+        },
+        "description": "The ledger of a family, the number of variants in it and the factor the gates are tightened by now (1 when the adjustment is off)."
+      },
+      "LedgerWindow": {
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        },
+        "description": "The window of a run."
       },
       "LiveFeedStatus": {
         "required": [

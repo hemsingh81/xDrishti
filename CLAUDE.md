@@ -17,9 +17,17 @@ the roadmap phases in `docs/design/18-roadmap.md`. Engineering standards: `docs/
 - Use the subagents in `.claude/agents/` (`backend-dev`, `frontend-dev`, `test-writer`, `reviewer`) and the skills
   `/new-feature`, `/add-endpoint`, `/new-migration`, `/phase-done`.
 - Finish every code change with `scripts/check.sh` green and an independent `reviewer` pass. Do not commit or push
-  unless the user asks.
+  unless the user asks (standing authorisation below).
 - Apply the `ponytail` skill (level `full`) on every coding task: smallest complete change, never at the cost of
   tests, validation, security or the spec's acceptance criteria.
+
+## Standing run instructions (owner, 2026-10-22)
+- Work in parallel where slices are independent (subagents / worktrees, never two writers on the same files).
+- Work on a work branch (e.g. `feature/<phase>-<slice>`), merge back to `main` at every logical point.
+- Deploy (`deploy/xd-up.sh`) after every such merge.
+- Go as fast as safely possible; keep going in a loop through the roadmap, slice after slice, without waiting
+  between slices. Still stop for a genuine owner decision, a red `scripts/check.sh`, or a reviewer blocker.
+- This authorises commit + merge to `main` + deploy for these slices; push to a remote still needs an explicit ask.
 
 ## Non-negotiables
 - SOLID, modular, reusable, testable, fast — see `docs/engineering/README.md`. Prefer extending over modifying.
