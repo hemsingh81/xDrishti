@@ -44,6 +44,16 @@ internal static class XdCommand
             return await LearnCellsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "features")
+        {
+            return await LearnFeaturesCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "training-set")
+        {
+            return await LearnTrainingSetCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         var parsed = XdOptions.Parse(args);
         if (parsed.Options is not { } options)
         {

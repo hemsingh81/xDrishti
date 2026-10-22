@@ -1,0 +1,24 @@
+# 0066 — Decision-time features as a side table, and the training-set record
+
+- **Status:** Proposed (spec [P6-04](../specs/P6-04-decision-time-features-and-the-training-set.md), approved under the owner's standing run instruction of 2026-10-22, every open question as recommended; built 2026-10-23). Becomes Accepted when the owner has read it.
+- **Date:** 2026-10-23.
+- **Relation to other ADRs:** [ADR 0064](0064-cell-statistics-bayesian-shrinkage-recency-weights-and-point-in-time-snapshots.md) (cell statistics, point in time), [ADR 0065](0065-triple-barrier-labels-from-the-exit-reason.md) (labels; its training-set table lands here), [ADR 0045](0045-the-result-store-sim-runs-and-sim-trades.md) (insert-only store), [ADR 0039](0039-an-engine-module-is-reached-from-an-adapter-in-infrastructure-never-from-application.md) (the engine behind a port), [ADR 0033](0033-weekly-monthly-timeframes-calendar-features-and-the-market-context.md) (context features). ADR 0067 belongs to another slice.
+
+## Context
+A model needs, for each simulated trade, the information that existed at the minute the entry was decided, and nothing later. `SimTrade` (schema 5) reserves `EntrySnapshotJson` but is pinned by golden files, the oracle and run keys; the label (ADR 0065) exists but has no features to join.
+
+## Decision
+1. **A side table, not a new trade schema.** `research.trade_features` holds one row per (run key, trade key, catalog version) with the values as a `double precision[]` in catalog order, NaN for unknown. `SimTrade` stays at schema 5 and `EntrySnapshotJson` stays null.
+2. **Catalog `tf-1`, 41 features, pinned by a test.** 23 bar/session/calendar features at the trade's timeframe, 9 context features, 4 plan features, 5 cell features. Every price enters as a ratio (distance in percent, position within a range, percent of close), so the vector does not depend on price level or on a split. A change of name, order or meaning raises the version; stored rows of an old version stay readable.
+3. **No leak by construction, proved by a property.** `TradeFeatureExtractor` steps a feature frame of the trade's timeframe with the instrument's adjusted 1-minute bars and reads it before the first bar that starts at or after the decision instant; it stops at the last decision, so later bars are never touched. The trade is described to the extractor by decision instant, side, stop and target only: no exit, result or excursion is passed. A test proves features equal on bars cut at the instant and on bars replaced by extremes after it, with a control that a bar before it matters.
+4. **Context features wait for P3-01d.** The extractor reads them from a `MarketContext` when given one; the adapter gives none, so they are NaN and not required by default. The `regime` is one of them; no tagger is built here (P6-02).
+5. **Cell features are computed at build time** with `PointInTimeCells`: the pure calculator with `as_of = decision date - 1 day`, so a trade never sees its own or any later exit. They are not stored because they depend on which runs feed the cells.
+6. **The rule for unknowns** (`TrainingDataBuilder`): a labelled trade with no feature row or with a required feature NaN is dropped and counted, per feature; nothing is imputed. Default required excludes the context group and the cell expectancy. Optional unknowns stay NaN in the rows.
+7. **Training-set record.** `research.training_sets` (insert-only, one row per set id) records the runs and style/exit labels (sources), rule and catalog versions, basis, required list, cell knobs, date range and every count (labelled, rows, positives, negatives, unresolved, no target, dropped). The rows are not stored: they are rebuilt from the stored runs and features, and the id (SHA-256 over the label-set id, catalog version, required names and every value) proves it. Every row carries `SessionsHeld` and the label horizon instant; for swing, sessions are preferred over minutes (ADR 0065).
+8. **Where things live.** Pure types in `Domain/Learning`; the extractor in `Simulation/Scanning` behind `ITradeFeatureExtractor` (adapter in Infrastructure); two handlers in `Application/Learning` sharing `CellSourceReader` (the source-reading rules of ADR 0064, now in one place); stores in Infrastructure by raw SQL. Computation by `xd learn features` and `xd learn training-set`; no endpoint.
+
+## Consequences
+- A model trained now sees no market context or regime; the record says which features were required. When P3-01d loads the context, a new extraction (same version, same keys, new values) needs a version bump `tf-2` or a new run key; today's rows are never overwritten.
+- Extraction is one more pass over bars per run; a run's features cost seconds per instrument, not exercised on real data in this slice.
+- The label set stays biased toward fixed reward-to-risk strategies; the record shows how many trades had no target.
+- Log event ids 4480 to 4485 are used.

@@ -3295,6 +3295,208 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.TradeFeatureRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("DecisionEpochSeconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decision_epoch_seconds");
+
+                    b.PrimitiveCollection<double[]>("FeatureValues")
+                        .IsRequired()
+                        .HasColumnType("double precision[]")
+                        .HasColumnName("feature_values");
+
+                    b.Property<string>("FeatureVersion")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("feature_version");
+
+                    b.Property<string>("RunKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("run_key");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("side");
+
+                    b.Property<string>("Strategy")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy");
+
+                    b.Property<string>("Timeframe")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("timeframe");
+
+                    b.Property<DateOnly>("TradeDate")
+                        .HasColumnType("date")
+                        .HasColumnName("trade_date");
+
+                    b.Property<string>("TradeKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("trade_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_trade_features");
+
+                    b.HasIndex("RunKey", "TradeKey", "FeatureVersion")
+                        .IsUnique()
+                        .HasDatabaseName("uq_trade_features_run_trade_version");
+
+                    b.ToTable("trade_features", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_trade_features_shape", "run_key ~ '^[0-9a-f]{64}$' AND cardinality(feature_values) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.TrainingSetRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("basis");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<double>("CredibleLevel")
+                        .HasColumnType("double precision")
+                        .HasColumnName("credible_level");
+
+                    b.Property<int>("DroppedNoFeatures")
+                        .HasColumnType("integer")
+                        .HasColumnName("dropped_no_features");
+
+                    b.Property<int>("DroppedUnknown")
+                        .HasColumnType("integer")
+                        .HasColumnName("dropped_unknown");
+
+                    b.Property<string>("FeatureVersion")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("feature_version");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<double>("HalfLifeDays")
+                        .HasColumnType("double precision")
+                        .HasColumnName("half_life_days");
+
+                    b.Property<string>("LabelSetId")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("label_set_id");
+
+                    b.Property<int>("Labelled")
+                        .HasColumnType("integer")
+                        .HasColumnName("labelled");
+
+                    b.Property<int>("MinTrades")
+                        .HasColumnType("integer")
+                        .HasColumnName("min_trades");
+
+                    b.Property<int>("Negatives")
+                        .HasColumnType("integer")
+                        .HasColumnName("negatives");
+
+                    b.Property<int>("NoTarget")
+                        .HasColumnType("integer")
+                        .HasColumnName("no_target");
+
+                    b.Property<int>("Positives")
+                        .HasColumnType("integer")
+                        .HasColumnName("positives");
+
+                    b.Property<double>("PriorStrength")
+                        .HasColumnType("double precision")
+                        .HasColumnName("prior_strength");
+
+                    b.Property<string>("RequiredFeatures")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("required_features");
+
+                    b.Property<int>("RowCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("row_count");
+
+                    b.Property<string>("RuleVersion")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("rule_version");
+
+                    b.Property<string>("SetId")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("set_id");
+
+                    b.Property<string>("Sources")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sources");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.Property<int>("Unresolved")
+                        .HasColumnType("integer")
+                        .HasColumnName("unresolved");
+
+                    b.HasKey("Id")
+                        .HasName("pk_training_sets");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_training_sets_created_at");
+
+                    b.HasIndex("SetId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_training_sets_set_id");
+
+                    b.ToTable("training_sets", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_training_sets_shape", "set_id ~ '^[0-9a-f]{64}$' AND label_set_id ~ '^[0-9a-f]{64}$' AND row_count > 0 AND positives >= 0 AND negatives >= 0 AND positives + negatives = row_count AND labelled >= row_count AND unresolved >= 0 AND no_target >= 0 AND dropped_no_features >= 0 AND dropped_unknown >= 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Market.Bars.Bar1mRecord", b =>
                 {
                     b.Property<Guid>("InstrumentId")

@@ -119,6 +119,9 @@ public static class DependencyInjection
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)
         services.AddScoped<ILabResultStore, LabResultStore>(); // the results of full tests (spec P5-04)
         services.AddScoped<ICellStatsStore, CellStatsStore>(); // the cell statistics snapshots (spec P6-01)
+        services.AddScoped<ITradeFeatureStore, TradeFeatureStore>(); // the decision-time features of trades (spec P6-04)
+        services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
+        services.AddSingleton<ITradeFeatureExtractor, TradeFeatureExtractorAdapter>(); // the feature frame behind its port (ADR 0039): stateless, no I/O
         services.AddScoped<ITestLedger, TestLedger>(); // the per-family count of looks (spec P5-03)
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)
         services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O

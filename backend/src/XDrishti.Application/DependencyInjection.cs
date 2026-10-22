@@ -439,6 +439,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListStoredRunsQuery, Result<Page<StoredRunHeader>>>, ListStoredRunsHandler>();
         services.AddScoped<IQueryHandler<PageStoredTradesQuery, Result<Page<RunTrade>>>, PageStoredTradesHandler>();
         services.AddScoped<ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>, ComputeCellStatsHandler>(); // cell statistics, Bayesian and recency (P6-01, ADR 0064)
+        services.AddScoped<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>, ExtractTradeFeaturesHandler>(); // decision-time features of a stored run (P6-04, ADR 0066)
+        services.AddScoped<ICommandHandler<BuildTrainingSetCommand, TrainingSetOutcome>, BuildTrainingSetHandler>(); // the training set: labels joined to features (P6-04)
         services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
         services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
     }
