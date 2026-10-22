@@ -587,6 +587,168 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td></td>
 </tr>
 <tr>
+<td>P6-01</td>
+<td><strong>Cell statistics, Bayesian and recency</strong> (pure <code>CellStats</code> per cell and window: Beta prior shrunk to the parent, credible lower bound, exponential recency, expectancy, profit factor, drawdown, MAE/MFE quantiles; <code>research.cell_stats</code>, <code>GET /api/cells</code>). Unblocked.</td>
+<td>P6</td>
+<td>3 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Hand-computed posteriors and weights; tiny-n tables; grants as <code>xd_app</code></td>
+</tr>
+<tr>
+<td>P6-02</td>
+<td><strong>Regime labels on trades and regime cells</strong>; lights the Lab <code>by_regime</code> block. Needs P3-01d.</td>
+<td>P6</td>
+<td>2 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Regime of the previous session only; coverage printed</td>
+</tr>
+<tr>
+<td>P6-03</td>
+<td><strong>Triple-barrier labels</strong> (target before stop and time limit; the rule per exit reason) and the training-set record. Unblocked.</td>
+<td>P6</td>
+<td>1.5 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Every exit reason labelled by a hand table</td>
+</tr>
+<tr>
+<td>P6-04</td>
+<td><strong>Decision-time features and the training set</strong> (side table <code>research.trade_features</code>, not a change of <code>SimTrade</code>; point-in-time cell stats). Unblocked after P6-01 and P6-03.</td>
+<td>P6</td>
+<td>3 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Truncation property: no feature uses data after the decision minute</td>
+</tr>
+<tr>
+<td>P6-05</td>
+<td><strong>Model validation harness and baselines</strong> (purged folds, log loss, Brier, AUC, calibration error, the cell-stats and logistic baselines, the eligibility rule).</td>
+<td>P6</td>
+<td>3 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Hand tables for the metrics and the rule</td>
+</tr>
+<tr>
+<td>P6-06</td>
+<td><strong>ML.NET trainer, PAV calibration, contributions</strong> (new project <code>XDrishti.Learning.MlNet</code>, the only one that references <code>Microsoft.ML*</code>; LightGBM with FastTree fallback; first task: explain the spike&#39;s AUC gap).</td>
+<td>P6</td>
+<td>4 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Planted signal found, pure noise does not beat the baseline; deterministic; round trip</td>
+</tr>
+<tr>
+<td>P6-07</td>
+<td><strong>Model registry and scoring</strong> (<code>research.model_versions</code>, champion/challenger, <code>GET /api/models</code>).</td>
+<td>P6</td>
+<td>3 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Insert-only grants; same set and seed give the same hash</td>
+</tr>
+<tr>
+<td>P6-08</td>
+<td><strong>Lifecycle and changelog</strong> (<code>learning_changelog</code>, revert as a new row, the transitions of doc 09 §7).</td>
+<td>P6</td>
+<td>2.5 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Transition table; revert is a row</td>
+</tr>
+<tr>
+<td>P6-09</td>
+<td><strong>Drift monitors</strong> (rolling band, CUSUM, calibration drift; on replayed history until P10).</td>
+<td>P6</td>
+<td>2 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Constructed series fire and clear as expected</td>
+</tr>
+<tr>
+<td>P6-10</td>
+<td><strong>Hypothesis loop</strong> (one variable, owner and grid sources; no LLM until P9).</td>
+<td>P6</td>
+<td>3 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>One-variable rule; state machine table</td>
+</tr>
+<tr>
+<td>P6-11</td>
+<td><strong>Experiments, tweak and re-run</strong> (common random numbers, fold rules scaled to the data, expected live gap, total-R rule, trial margin; replay in &lt; 10 min).</td>
+<td>P6</td>
+<td>4 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Cheaper slippage cannot win; fewer folds cannot say better; timed on the owner&#39;s data</td>
+</tr>
+<tr>
+<td>P6-12</td>
+<td><strong>Frozen-model counterfactual</strong> (at most about one year of &#39;stopped learning&#39; on this data).</td>
+<td>P6</td>
+<td>2 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Same days and instruments for both sides</td>
+</tr>
+<tr>
+<td>P6-13</td>
+<td><strong>Meta-labelling policy</strong> (take/reserve threshold, size 0.5 to 1.5, the over-filtering flag; wiring is P7).</td>
+<td>P6</td>
+<td>3 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Beats &#39;take all&#39; out of sample or is reported as not</td>
+</tr>
+<tr>
+<td>P6-14</td>
+<td><strong>Learned entry windows</strong> (walk-forward expectancy by entry hour per cell).</td>
+<td>P6</td>
+<td>2 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Plateau and minimum-trade rules by table</td>
+</tr>
+<tr>
+<td>P6-15</td>
+<td><strong>Automatic loss tags</strong> (the news/results tag waits for P15).</td>
+<td>P6</td>
+<td>2 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>One fixture per tag</td>
+</tr>
+<tr>
+<td>P6-16</td>
+<td><strong>Lessons</strong> (monitors that can run on replayed history; execution gap and decision drag wait for P10/P11).</td>
+<td>P6</td>
+<td>3 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Open, link, close with before/after</td>
+</tr>
+<tr>
+<td>P6-17a/b</td>
+<td><strong>Remaining strategies</strong> as stored YAML: 9 intraday and 6 swing; RS_ROTATION waits for <code>sector_rs</code>.</td>
+<td>P6</td>
+<td>4 d + 4 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>P3-05/06 test pattern for each</td>
+</tr>
+<tr>
+<td>P6-18</td>
+<td><strong>The phase check and the learning API</strong> (model vs baselines, calibration, replay timing).</td>
+<td>P6</td>
+<td>2.5 d</td>
+<td>Draft (plan)</td>
+<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Exit criteria evaluated on the owner&#39;s data, limits printed</td>
+</tr>
+<tr>
 <td>P3-02e</td>
 <td><strong>BUY to SELL mirror</strong>: rewrite a BUY side into its SELL side on the syntax tree and print it (comparison direction, <code>crosses_above/below</code>, <code>rising/falling</code>, <code>highest/lowest</code>, <code>or_high/or_low</code>, previous-day high/low, <code>rsi(n)</code> to <code>100 − n</code>, signed features) from a closed rewrite table; anything without a defined mirror (<code>day_of_week</code>, <code>regime()</code>, several context names) is an error that tells the author to write a sell block. The three built-ins carry hand-written sell blocks, so this is for user strategies (doc 11 §2).</td>
 <td>free capacity</td>
@@ -615,6 +777,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 </tbody></table>
 <p><strong>P5 specs (2026-10-22; P5-01 to P5-07 are built, the rest are Drafts):</strong> plan <a href="../specs/P5-00-strategy-lab-plan.html">P5-00</a> (slice split, sizes, seam, owner questions); first slices <a href="../specs/P5-01-lab-api-validate-and-strategy-library.html">P5-01</a> (Lab API: validate and the strategy library; needs P3-02c and P3-02d) and <a href="../specs/P5-02-lab-runs-job-run-record-and-quick-test.html">P5-02</a> (Lab runs: job, run record, quick test), <a href="../specs/P5-03-test-ledger-and-the-gates.html">P5-03</a> (test ledger and the gates).</p>
+<p><strong>P6 specs (2026-10-23; Draft, owner questions open):</strong> plan <a href="../specs/P6-00-learning-engine-and-ml-plan.html">P6-00</a> (slice split P6-01 to P6-18, sizes about 53.5 d plus P3-01d 3.5 d, the seam, honest limits, cut order, 13 owner questions). Can start with no owner decision: the P3-01d probe, P6-01, P6-03, then P6-04 and P6-05; P6-02 needs P3-01d.</p>
 <p>There is no slice P3-07: the number is not used.</p>
 <p><strong>Order and size.</strong> A size is in <em>agent-days</em>: a day of an AI coding agent&#39;s work on a slice, the unit of the 1 to 3 days that the <a href="../specs/README.html">specs README</a> allows one slice; the owner&#39;s reading, decisions and checks are not in it. The sizes are estimates; how they were derived is not written down, and they were not calibrated. For scale: the four slices P3-01 to P3-02 were committed between 2026-10-15 23:29 and 2026-10-16 21:50, and the close-out of P3-02 ran until 2026-10-17 06:32. The exit path (P3-02b, P3-03, P3-03a, P3-03b, P3-04, P3-04a, P3-04b1, P3-04b2, P3-04c, P3-03d, P3-03c, P3-03f, P3-03e, P3-05, P3-06, P3-08, P3-09) is 42.2 agent-days, of which the critical path is about 24.65 (P3-02b, P3-03, P3-03a, P3-03b, P3-03d, P3-03c, P3-03e, P3-05, P3-06, P3-09: P3-06 uses the range mechanism of P3-05); the chain through the cards, P3-02b, P3-03, P3-03a, P3-04, P3-04a, P3-04b1, P3-04b2, P3-04c, P3-09, is 21.55, and the oracle P3-08 ends at 17.75, so neither binds. The <em>Later</em> slices add 21.4 (P3-04d 1.3, P3-10 3.0, P3-02b2 1.6 and the rest of the list), 63.6 in all. P3-04d is counted in the <em>Later</em> slices because the exit path does not need it unless the owner wants the conditions on the cards; with it the exit path is 43.5 and the critical path stays 24.65, because the conditions on the cards (19.4) are ready before P3-06 ends (21.2). The 5 weeks of the chart above are indicative and were not recalculated. <em>(Note, 2026-10-18: the totals and the agent-day marks of this section were recalculated from the sizes of the table. The earlier figures, 26.5, 14.5, 17.5 and 44, assumed 2.5 agent-days for P3-02b and 3 each for P3-03 and P3-04. P3-02b is 3 after its review (+0.5 on the exit path and on the critical path), P3-02b2 adds 1 to the <em>Later</em> slices, and the reviews of the specs split P3-03 and P3-04 in two: P3-03 1.2 plus P3-03a 3 is 4.2 against the 3 budgeted (+1.2) and P3-04 1.5 plus P3-04a 2.5 is 4 against 3 (+1), +2.2 together. So 26.5 + 0.5 + 2.2 = 29.2; 14.5 + 0.5 + 1.2 = 16.2; 17.5 + 1 = 18.5; 29.2 + 18.5 = 47.7. An agent-day mark is the sum of the sizes in front of the slice on its chain.)</em> <em>(Note, 2026-10-18, second recalculation, after the specs (Approved the same day) for the export, the cards, the costs and the swing positions; the sizes are those the specs state. The former row P3-04b (3) is P3-04b1 2.4 + P3-04b2 2.0 + P3-04c 2.5 = 6.9 on the exit path, +3.9, and P3-04d 1.3 apart: 8.2 in all, +5.2. The former row P3-03c (2) is P3-03c 2.3 + P3-03f 1.6 = 3.9, +1.9; the specs themselves say 3.8, because they add the itemised 2.25 and 1.55. The former row P3-03d (2) is P3-03d 3.5, +1.5, and P3-03e is new, +1.5 (it is on the exit path only while P3-06 is). So the exit path is 29.2 + 3.9 + 1.9 + 1.5 + 1.5 = 38.0, and the table rows add up to the same: 3 + 1.2 + 3 + 2 + 1.5 + 2.5 + 2.4 + 2.0 + 2.5 + 3.5 + 2.3 + 1.6 + 1.5 + 2 + 2 + 3 + 2 = 38.0. The <em>Later</em> slices are 18.5 + 1.3 = 19.8; the total is 38.0 + 19.8 = 57.8 = 47.7 + 5.2 + 1.9 + 1.5 + 1.5. Marks are serial sums along a chain, an upper bound where work can overlap: the first ORB run 3 + 1.2 + 3 = 7.2 (unchanged); P3-03b done 9.2; P3-04a done 7.2 + 1.5 + 2.5 = 11.2; P3-04b1 done 13.6; <strong>first real-data trades (P3-04b2) 15.6</strong>; <strong>first cards (P3-04c) 18.1</strong>; conditions on cards (P3-04d) 19.4; P3-03d done 9.2 + 3.5 = 12.7; P3-03c done 12.7 + 2.3 = 15.0 (it merges after P3-03d; the parts that do not touch <code>SimTrade</code> can be built earlier, which this does not credit); P3-03e done 16.5; P3-03f starts 15.6 (after P3-03c and P3-04b2) and is done 17.2; P3-08 12.7 to 15.7; P3-05 and P3-06 16.5 to 18.5 (after the stop-kind lift of P3-03e); P3-09 starts at the latest of 18.5 (P3-06), 18.1 (cards), 17.2 (sheet) and 15.7 (oracle), so 18.5, and is done at 20.5; with P3-04d before it, 19.4 + 2 = 21.4. If P3-06 slides to P4 and takes P3-03e with it, the exit path is 38.0 − 1.5 − 2 = 34.5 and the check is at 18.1 + 2 = 20.1.)</em> <em>(Note, 2026-10-19, third recalculation, after the six Draft specs P3-02b2, P3-05, P3-06, P3-08, P3-09 and P3-10; sizes as the specs state them. P3-02b2 1 to 1.6 (+0.6), P3-05 2 to 2.7 (+0.7), P3-06 2 to 2.0 (0), P3-08 3 to 5.05 (+2.05; 2.9 + 1.3 + 0.85), P3-09 2 to 3.45 (+1.45; 2.85 + 0.6), P3-10 2 to 3.0 (+1.0). On the exit path P3-05, P3-06, P3-08 and P3-09 are counted, P3-02b2 and P3-10 are not (they are <em>Later</em>, before P4, though the central build order puts them first and before P3-09): 38.0 + 0.7 + 0 + 2.05 + 1.45 = 42.2, and the table rows add up to the same: 3 + 1.2 + 3 + 2 + 1.5 + 2.5 + 2.4 + 2.0 + 2.5 + 3.5 + 2.3 + 1.6 + 1.5 + 2.7 + 2.0 + 5.05 + 3.45 = 42.2. <em>Later</em>: 19.8 + 0.6 + 1.0 = 21.4. Total: 42.2 + 21.4 = 63.6 = 57.8 + 5.8. Marks: P3-03e done 16.5 (built); P3-05 16.5 to 19.2; P3-06 19.2 to 21.2; P3-08 12.7 to 17.75; P3-09 starts at the latest of 21.2 (P3-06), 18.1 (cards), 17.2 (sheet) and 17.75 (oracle), so 21.2, and is done at 21.2 + 3.45 = <strong>24.65</strong> (the old 20.5 + 4.15: 2.7 for P3-05 on the chain and 1.45 for P3-09). Work left in the central build order, one agent, P3-02b2, P3-05, P3-06, P3-08, P3-10, P3-09: 1.6 + 2.7 + 2.0 + 5.05 + 3.0 + 3.45 = 17.8. If P3-06 slides to P4 (P3-03e is built and stays): the exit path is 42.2 − 2.0 = 40.2 and the check is at 19.2 + 3.45 = 22.65.)</em> The owner&#39;s time (10 to 12 hours a week) is the real constraint and is <strong>not estimated here (an open item)</strong>. It is Wave 0 (reading the Goal and the Open questions of four specs of about 30,000 words in all, and answering), the early look at 3 to 5 trade cards, and the 20-trade check (at most 29 cards, at least 5 of the 20 against an external chart). Up to three slices (the P3-04b family, P3-03c and P3-08, and P3-05 if the stop-kind lift is left to it) are built at once between agent-days 12.7 and 15.0, each in its own worktree, and merged by hand one at a time.</p>
 <ul>
@@ -915,7 +1078,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 16:47</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 21:01</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
