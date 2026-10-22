@@ -28,6 +28,9 @@ public static class LabErrors
     /// <summary>The run has finished and cannot be cancelled: 409.</summary>
     public const string NotCancellableCode = "lab.not_cancellable";
 
+    /// <summary>The run has no stored full-test result to report on (a quick test, or a run that has not succeeded): 409.</summary>
+    public const string NoReportCode = "lab.no_report";
+
     /// <summary>The name of the payload entry that carries the problems.</summary>
     public const string ProblemsKey = "problems";
 
@@ -57,6 +60,10 @@ public static class LabErrors
 
     /// <summary>A finished run.</summary>
     public static Error NotCancellable(string state) => Error.Conflict(NotCancellableCode, $"The run is {state} and cannot be cancelled.");
+
+    /// <summary>A run without a report.</summary>
+    public static Error NoReport(string state, string method) =>
+        Error.Conflict(NoReportCode, $"A report needs a succeeded full or robust run; this run is {state} and its method is {method}.");
 
     /// <summary>The issue for a text over the limit.</summary>
     public static StrategyIssue TooLarge() =>

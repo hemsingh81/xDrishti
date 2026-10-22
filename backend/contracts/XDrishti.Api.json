@@ -8288,6 +8288,163 @@
         }
       }
     },
+    "/api/lab/runs/{id}/report": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The report of a succeeded full or robust run, built from the stored result: verdict, gates, figures, best cells, warnings, honest limits, a deterministic plain-English summary. 409 lab.no_report for any other run",
+        "operationId": "GetLabReport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabReportView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/runs/{id}/report/html": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The report as one static, inert HTML page",
+        "operationId": "GetLabReportHtml",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/runs/{id}/report/folder": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report",
+        "operationId": "DownloadLabReportFolder",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/lab/runs/{id}/cancel": {
       "post": {
         "tags": [
@@ -16948,6 +17105,105 @@
         },
         "description": "Where a running run is: instruments done of instruments in total (0 and 0 outside the quick test)."
       },
+      "LabReportView": {
+        "required": [
+          "runId",
+          "outcome",
+          "variantCount",
+          "adjustmentFactor",
+          "run",
+          "kpis",
+          "gates",
+          "bestCells",
+          "exploration",
+          "robustness",
+          "warnings",
+          "honestLimits",
+          "notIncluded",
+          "labels",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "variantCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "adjustmentFactor": {
+            "type": "number",
+            "format": "double"
+          },
+          "run": {
+            "$ref": "#/components/schemas/ReportRunView"
+          },
+          "kpis": {
+            "$ref": "#/components/schemas/ReportKpisView"
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GateView"
+            }
+          },
+          "bestCells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellView"
+            }
+          },
+          "exploration": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FullPeriodView"
+            }
+          },
+          "robustness": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RobustnessView"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportWarningView"
+            }
+          },
+          "honestLimits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notIncluded": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
+        "description": "The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `Summary` is a deterministic\ntemplate over the numbers above, not an assistant text."
+      },
       "LabRunFinished": {
         "required": [
           "runId",
@@ -19852,6 +20108,108 @@
         },
         "description": "What a removal did: `removed` were members, `notMembers` were not. Untracking never happens. `memberCount` = members now."
       },
+      "ReportKpisView": {
+        "required": [
+          "oosTrades",
+          "expectancyR",
+          "profitFactor",
+          "maxDrawdownR",
+          "folds",
+          "positiveFolds"
+        ],
+        "type": "object",
+        "properties": {
+          "oosTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "expectancyR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "profitFactor": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "maxDrawdownR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "folds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "positiveFolds": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The headline figures of the out-of-sample evidence; a figure that is not finite is null."
+      },
+      "ReportRunView": {
+        "required": [
+          "key",
+          "strategyId",
+          "version",
+          "hash",
+          "method",
+          "from",
+          "to",
+          "universe",
+          "instruments",
+          "simRunKeys"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "strategyId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "universe": {
+            "type": "string"
+          },
+          "instruments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "simRunKeys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "What was tested: the strategy version, the method, the window and the universe (spec P5-06)."
+      },
       "ReportUploadForm": {
         "required": [
           "accountId",
@@ -19896,6 +20254,22 @@
           }
         },
         "description": "The multipart form of the report preview and import, for the API contract only (the request is read by ReportUploads). `AccountId` is the account, `Files` the downloaded reports (one or more; CSV, XLS or XLSX). `Choices` is a JSON array of\n`{name, holdingId | instrumentId | isin, remember}`: what scrip names of a transaction report mean. For the import also `Digests` (a JSON array with the preview's digest, or null, for each file in order), `Rebuild` (whether to rebuild the lots of\ntrade files, default true) and `AcceptOtherAccount` (a JSON array of the indexes, from 0, of the files to import although the report is for another client code)."
+      },
+      "ReportWarningView": {
+        "required": [
+          "code",
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "description": "A caution derived from the report's own numbers. It never changes the outcome."
       },
       "ResolveInput": {
         "required": [

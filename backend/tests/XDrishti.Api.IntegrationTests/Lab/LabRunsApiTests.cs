@@ -43,7 +43,7 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
     public override async ValueTask InitializeAsync()
     {
         await base.InitializeAsync();
-        await StoreSqlAsync("DELETE FROM lab.lab_results; DELETE FROM lab.lab_runs");
+        await StoreSqlAsync("DELETE FROM lab.lab_results; DELETE FROM lab.test_ledger; DELETE FROM lab.lab_runs; DELETE FROM research.sim_trades WHERE run_id IN (SELECT id FROM research.sim_runs WHERE created_by = 'lab:full'); DELETE FROM research.sim_runs WHERE created_by = 'lab:full'");
         await StrategySeeding.SeedAsync(Factory.Services, Ct); // the built-ins ORB, VWAP_PULLBACK and BASE_BREAKOUT, as `xd-api migrate` writes them
     }
 
@@ -222,6 +222,45 @@ public sealed class LabRunsApiTests(ApiFactory factory) : DataTestBase(factory)
         block.GetProperty("limits").GetArrayLength().ShouldBeGreaterThan(0);
         var sweepRows = await CountAsync("SELECT count(*) FROM lab.test_ledger WHERE method = 'sweep'");
         sweepRows.ShouldBe(block.GetProperty("sensitivity").GetProperty("parameters").EnumerateArray().Sum(p => p.GetProperty("points").GetArrayLength()));
+    }
+
+    // P5-06
+
+    [Fact]
+    public async Task The_report_of_a_robust_run_is_served_as_json_html_and_a_deterministic_zip_and_a_quick_run_has_none()
+    {
+        using (var scope = Factory.Services.CreateScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<ICostSheetStore>().SaveAsync(FixtureSheet.Build("default", null), "test", DateTimeOffset.UnixEpoch, Ct);
+            (await scope.ServiceProvider.GetRequiredService<IPlatformUnitOfWork>().TrySaveAsync(Ct)).ShouldBeTrue();
+        }
+
+        var members = await InstrumentsAsync(3);
+        var symbols = members.Select(m => m.Symbol).ToList();
+        var robust = await PostAndDrainAsync(FullBySymbols(symbols, "robust"));
+        var quick = await PostAndDrainAsync(BySymbols("ORB", symbols, 1));
+        var id = robust.GetProperty("id").GetGuid();
+
+        using var json = await Client.GetAsync(new Uri($"/api/lab/runs/{id}/report", UriKind.Relative), Ct);
+        using var html = await Client.GetAsync(new Uri($"/api/lab/runs/{id}/report/html", UriKind.Relative), Ct);
+        var zip1 = await Client.GetByteArrayAsync(new Uri($"/api/lab/runs/{id}/report/folder", UriKind.Relative), Ct);
+        var zip2 = await Client.GetByteArrayAsync(new Uri($"/api/lab/runs/{id}/report/folder", UriKind.Relative), Ct);
+        using var noReport = await Client.GetAsync(new Uri($"/api/lab/runs/{quick.GetProperty("id").GetGuid()}/report", UriKind.Relative), Ct);
+        using var missing = await Client.GetAsync(new Uri($"/api/lab/runs/{Guid.NewGuid()}/report", UriKind.Relative), Ct);
+
+        json.StatusCode.ShouldBe(HttpStatusCode.OK, await json.Content.ReadAsStringAsync(Ct));
+        var report = await JsonOf(json);
+        report.GetProperty("outcome").GetString().ShouldBe(robust.GetProperty("verdict").GetProperty("outcome").GetString());
+        report.GetProperty("summary").GetString()!.ShouldContain("ended as");
+        report.GetProperty("honestLimits").GetArrayLength().ShouldBeGreaterThan(0);
+        report.GetProperty("robustness").ValueKind.ShouldBe(JsonValueKind.Object);
+        html.StatusCode.ShouldBe(HttpStatusCode.OK);
+        html.Content.Headers.ContentType!.MediaType.ShouldBe("text/html");
+        html.Headers.GetValues("Content-Security-Policy").Single().ShouldContain("default-src 'none'");
+        (await html.Content.ReadAsStringAsync(Ct)).ShouldNotContain("<script");
+        zip2.ShouldBe(zip1);
+        noReport.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+        missing.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     // criterion 2
