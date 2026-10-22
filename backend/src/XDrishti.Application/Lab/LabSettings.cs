@@ -39,6 +39,8 @@ public sealed record LabSettings(int QuickYears, int QuickSymbols, int MaxParall
         + ";fills=modelled;costs=" + costBasis;
 
     /// <summary>The text that stands for these settings in the key of a full test (P5-04): the exits and the selection options.</summary>
-    public string FullConfigText(string costBasis) =>
-        "full.exits=" + string.Join(" ", Exits) + ";select=expanding,9,3,5,0.5,30,plateau;fills=modelled;costs=" + costBasis;
+    public string FullConfigText(string costBasis) => FullConfigText(costBasis, new XDrishti.Domain.Research.SelectionOptions());
+
+    private string FullConfigText(string costBasis, XDrishti.Domain.Research.SelectionOptions o) =>
+        "full.exits=" + string.Join(" ", Exits) + ";select=expanding," + string.Join(",", new[] { o.MinTrainMonths.ToString(System.Globalization.CultureInfo.InvariantCulture), o.TestMonths.ToString(System.Globalization.CultureInfo.InvariantCulture), o.EmbargoSessions.ToString(System.Globalization.CultureInfo.InvariantCulture), o.Lambda.ToString(System.Globalization.CultureInfo.InvariantCulture), o.MinTrades.ToString(System.Globalization.CultureInfo.InvariantCulture) }) + (o.PreferPlateau ? ",plateau" : string.Empty) + ";fills=modelled;costs=" + costBasis;
 }

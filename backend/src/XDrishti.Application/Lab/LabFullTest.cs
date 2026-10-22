@@ -54,6 +54,7 @@ internal sealed class LabFullTest(
         }
 
         var timeframes = description.Timeframes.Count == 0 ? [template.EvaluationTimeframe] : description.Timeframes.Select(t => t.ToCode()).ToList();
+        // shortcut: every timeframe's candidate runs (all trades) are held in memory until the whole test ends and they are stored; fine for the Lab's universe and window, stream per timeframe if it grows.
         var runs = new List<SimulationRun>();
         var cells = new List<(SelectionInput Input, ExitSelection Selection)>();
         var cellViews = new List<(string Timeframe, string Side, ExitSelection Selection, SelectionInput Input)>();
@@ -105,6 +106,12 @@ internal sealed class LabFullTest(
         var variants = MultipleTesting.Effective(await ledger.CountVariantsAsync(run.StrategyId, cancellationToken), settings.MultipleTesting);
         var verdict = VerdictEvaluator.Evaluate(settings.Gates, pool.Evidence, variants, settings.MinFoldsForPass);
         var limits = verdict.Limits.Append(CalibrationLimit).ToList();
+        var weak = cells.Count(c => (c.Selection.Stability.Stable != true || c.Selection.NoChoiceReason is not null) && OosEvidenceBuilder.Pool([c], 0).Evidence.OosTrades > 0);
+        if (weak > 0)
+        {
+            limits.Add(weak + " cells unstable or without an exit choice contributed");
+        }
+
         if (cells.Count == 0)
         {
             limits.Add("no trades in any cell");

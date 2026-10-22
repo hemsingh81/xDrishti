@@ -4,7 +4,7 @@ namespace XDrishti.Domain.Lab;
 
 /// <summary>
 /// Turns the walk-forward choices of the cells of a full test into the <see cref="OosEvidence"/> the verdict is judged on (spec P5-04, assumption 3). Pure: the only trades that count are those of the winner of a fold that entered in that
-/// fold's test window, the same trades as the pooled figure of <see cref="ExitSelection"/>; the full-period figures never enter. Pooled windows are the test windows (same dates), a window is positive when its pooled R is above 0, the drawdown is
+/// fold's test window, a thin fold is skipped exactly as the selector leaves it out of its usable folds, the same trades as the pooled figure of <see cref="ExitSelection"/>; the full-period figures never enter. Pooled windows are the test windows (same dates), a window is positive when its pooled R is above 0, the drawdown is
 /// the largest peak-to-trough fall of the cumulative R in the order of exit.
 /// </summary>
 public static class OosEvidenceBuilder
@@ -18,7 +18,7 @@ public static class OosEvidenceBuilder
         var windows = new SortedDictionary<(DateOnly, DateOnly), (int Trades, double Total)>();
         foreach (var (input, selection) in cells)
         {
-            foreach (var fold in selection.Folds.Where(f => f.Winner is not null))
+            foreach (var fold in selection.Folds.Where(f => f.Winner is not null && !f.Thin))
             {
                 var mine = input.Trades.Where(t => string.Equals(t.CandidateId, fold.Winner, StringComparison.Ordinal) && t.Entry >= fold.TestStart && t.Entry <= fold.TestEnd).ToList();
                 if (mine.Count == 0)

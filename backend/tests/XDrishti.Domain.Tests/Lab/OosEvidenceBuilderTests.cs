@@ -44,6 +44,20 @@ public sealed class OosEvidenceBuilderTests
     }
 
     [Fact]
+    public void A_thin_fold_is_not_pooled_so_it_cannot_count_as_a_fold_or_a_positive_fold()
+    {
+        var input = Input(T(A.Id, D(7, 2), 2), T(A.Id, D(8, 2), 5));
+        var thin = Fold(2, D(8, 1), D(8, 31), A.Id) with { Thin = true };
+        var selection = Selection(input, Fold(1, D(7, 1), D(7, 31), A.Id), thin);
+
+        var pool = OosEvidenceBuilder.Pool([(input, selection)], 0);
+
+        pool.Evidence.Folds.ShouldBe(1);
+        pool.Evidence.PositiveFolds.ShouldBe(1);
+        pool.Evidence.OosTrades.ShouldBe(1);
+    }
+
+    [Fact]
     public void A_fold_without_a_winner_and_a_run_without_cells_give_no_trades()
     {
         var input = Input(T(A.Id, D(7, 2), 2));

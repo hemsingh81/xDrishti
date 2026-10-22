@@ -226,7 +226,13 @@ internal sealed class LabRunner(
             keys.Add(simulated.RunKey);
         }
 
-        await results.AppendAsync(run.Id, run.StrategyId, run.StrategyHash, full.Verdict, time.GetUtcNow(), hostStop);
+        // shortcut: a failure after the candidate runs are stored leaves them stored (idempotent by key, a retry re-stores nothing); cancel is not rechecked after the store loop.
+        if (!await results.AppendAsync(run.Id, run.StrategyId, run.StrategyHash, full.Verdict, time.GetUtcNow(), hostStop)
+            && await results.GetAsync(run.Id, hostStop) is null)
+        {
+            return FailedStage(run, log, FullTest, Error.Conflict("lab.result_not_stored", "The result of the full test could not be stored."), problems);
+        }
+
         LabRunLog.ResultStored(logger, run.Id, full.Verdict.Outcome, full.Verdict.VariantCount);
         log.Finish(FullTest, 0, time.GetUtcNow());
         var counts = new LabCounts(full.Instruments, full.InstrumentsRun, full.Instruments - full.InstrumentsRun, full.Trades, 0);
