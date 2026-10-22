@@ -10,14 +10,28 @@ namespace XDrishti.Simulation.Replay;
 /// </summary>
 public sealed class PreparedStrategy
 {
-    internal PreparedStrategy(Simulator simulator, StrategyRecord record, IReadOnlyList<LocatedProblem> warnings)
+    internal PreparedStrategy(Simulator simulator, PreparedMember member, IReadOnlyList<LocatedProblem> warnings)
     {
         Simulator = simulator;
-        Record = record;
+        Record = member.Record;
         Warnings = warnings;
+        Members = new[] { member }.AsReadOnly();
     }
 
-    /// <summary>The strategy as a run records it: id, parameters, canonical JSON and its SHA-256, timeframe and sides.</summary>
+    /// <summary>A comparison (P4-05): one scan, one member per candidate exit; the simulator of the first member stands for the properties the members share.</summary>
+    internal PreparedStrategy(SimulatorComparison comparison, IReadOnlyList<PreparedMember> members, IReadOnlyList<LocatedProblem> warnings)
+    {
+        Comparison = comparison;
+        Simulator = comparison.Members[0];
+        Record = members[0].Record;
+        Warnings = warnings;
+        Members = members;
+    }
+
+    /// <summary>The candidates, in order: one for a plain run or a single chosen exit, two or more for a comparison. Each has the record its run keeps (the definition with that exit, so the run keys differ).</summary>
+    public IReadOnlyList<PreparedMember> Members { get; }
+
+    /// <summary>The strategy as a run records it (of the first candidate for a comparison): id, parameters, canonical JSON and its SHA-256, timeframe and sides.</summary>
     public StrategyRecord Record { get; }
 
     /// <summary>The warnings of the compile (the problems of <see cref="Simulator.Create"/> when it succeeded).</summary>
@@ -27,4 +41,10 @@ public sealed class PreparedStrategy
     public FillRules Fills => Simulator.Fills;
 
     internal Simulator Simulator { get; }
+
+    /// <summary>The strategy is a swing one: its positions are held across sessions and a run gates them (a comparison does not, P4-05 D4).</summary>
+    public bool HoldsOvernight => Simulator.HoldsOvernight;
+
+    /// <summary>The one scan with N walks; null for a plain run.</summary>
+    internal SimulatorComparison? Comparison { get; }
 }

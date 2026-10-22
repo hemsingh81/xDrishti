@@ -20,7 +20,7 @@ flowchart TB
 quantiles. Win rate uses a Beta prior **shrunk toward the parent group** when n is small; confidence = lower
 bound of the credible interval; exponential recency weighting.
 
-**Layer 2 — Exit selection.** See [doc 08](08-exits-and-risk.md) §3.
+**Layer 2 — Exit selection.** See [doc 08](08-exits-and-risk.md) §3. Its input, the replay of the same entries under every candidate with the MAE/MFE tables, is built (P4-05, [ADR 0053](../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.md)); the choice by out-of-sample expectancy is P4-06.
 
 **Layer 3 — Meta-model (meta-labeling).**
 - Labels: **triple barrier** — target, stop, time limit (session end / max hold).

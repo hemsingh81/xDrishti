@@ -25,7 +25,8 @@ internal sealed record SimulateOptions(
     bool Force,
     CostChoice Costs,
     int Cards = SimulateOptions.DefaultCards,
-    bool Store = false)
+    bool Store = false,
+    ExitChoice? Exits = null)
 {
     /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
     public const int DefaultCards = 200;
@@ -37,6 +38,7 @@ internal sealed record SimulateOptions(
         + "           [--timeframe <5m|10m|15m|30m|1h|1D>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
         + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
         + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
+        + "           [--exit <POLICY[:name=value,...]>]... [--time-stop min_progress_rr=<n>,(intraday_bars|swing_sessions)=<n>]   (the exits to run in place of the strategy's own; a|b makes candidates, two candidates or more are compared on the same entries, P4-05)\n"
         + "           (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required, P3-03f)\n"
         + "  simulate --list-strategies\n"
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
@@ -45,7 +47,7 @@ internal sealed record SimulateOptions(
 
     private const int MaxText = 60;
 
-    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r"];
+    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--exit", "--time-stop", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r"];
 
     private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross", "--store"];
 
@@ -57,15 +59,16 @@ internal sealed record SimulateOptions(
         ArgumentNullException.ThrowIfNull(args);
 
         var errors = new List<string>();
-        var (values, switches, parameters) = Tokenize(args, ValueFlags, SwitchFlags, errors);
-        return Build(values, switches, parameters, knownStrategyIds, errors);
+        var exits = new List<string>();
+        var (values, switches, parameters) = Tokenize(args, ValueFlags, SwitchFlags, errors, exits);
+        return Build(values, switches, parameters, exits, knownStrategyIds, errors);
     }
 
     /// <summary>
     /// The shared reading of <c>--flag value</c> and <c>--flag=value</c> (the verbs <c>simulate</c> and <c>verify-pack</c> use it): a flag at most once except <c>--param</c>, an unknown flag, a missing value and a stray argument are errors.
     /// </summary>
     internal static (Dictionary<string, string> Values, HashSet<string> Switches, List<string> Parameters) Tokenize(
-        IReadOnlyList<string> args, IReadOnlyList<string> valueFlags, IReadOnlyList<string> switchFlags, List<string> errors)
+        IReadOnlyList<string> args, IReadOnlyList<string> valueFlags, IReadOnlyList<string> switchFlags, List<string> errors, List<string>? exits = null)
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         var switches = new HashSet<string>(StringComparer.Ordinal);
@@ -115,6 +118,10 @@ internal sealed record SimulateOptions(
             {
                 parameters.Add(value);
             }
+            else if (flag == "--exit" && exits is not null)
+            {
+                exits.Add(value);
+            }
             else if (!values.TryAdd(flag, value))
             {
                 errors.Add("'" + flag + "' is given more than once");
@@ -125,11 +132,11 @@ internal sealed record SimulateOptions(
     }
 
     private static SimulateParse Build(
-        Dictionary<string, string> values, HashSet<string> switches, List<string> parameters, IReadOnlyCollection<string>? knownStrategyIds, List<string> errors)
+        Dictionary<string, string> values, HashSet<string> switches, List<string> parameters, List<string> exits, IReadOnlyCollection<string>? knownStrategyIds, List<string> errors)
     {
         if (switches.Contains("--list-strategies"))
         {
-            if (errors.Count == 0 && (values.Count > 0 || parameters.Count > 0 || switches.Count > 1))
+            if (errors.Count == 0 && (values.Count > 0 || parameters.Count > 0 || exits.Count > 0 || switches.Count > 1))
             {
                 errors.Add("'--list-strategies' is used alone");
             }
@@ -155,13 +162,14 @@ internal sealed record SimulateOptions(
         var cards = ReadCards(values, errors);
         var costs = ReadCosts(values, switches, errors);
         var named = ReadParameters(parameters, errors);
+        var exitChoice = ReadExits(exits, values, named, errors);
         if (errors.Count > 0)
         {
             return Invalid(errors);
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store")), []);
+            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store"), exitChoice), []);
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());
@@ -357,6 +365,23 @@ internal sealed record SimulateOptions(
 
         return CostChoice.Sheet(id!, capital, profile, maxCostR);
     }
+
+    /// <summary>
+    /// The exits of <c>--exit</c> and <c>--time-stop</c> (spec P4-05, D1). The target <c>rr</c> of the built-in and an <c>--exit</c> are two sources for one value, so the two together are a usage error that names both flags; no <c>--exit</c> is
+    /// the built-in as it is.
+    /// </summary>
+    internal static ExitChoice? ReadExits(List<string> exits, Dictionary<string, string> values, Dictionary<string, double> named, List<string> errors)
+    {
+        values.TryGetValue("--time-stop", out var timeStop);
+        if (exits.Count > 0 && named.ContainsKey(BuiltInRewardRisk))
+        {
+            errors.Add("'--param " + BuiltInRewardRisk + "' and '--exit' both set the exit of the run: two sources for one value; give the target in '--exit FIXED_RR:rr=...' or drop '--exit'");
+        }
+
+        return ExitFlags.Parse(exits, timeStop, errors);
+    }
+
+    private const string BuiltInRewardRisk = "rr";
 
     private static Dictionary<string, double> ReadParameters(List<string> parameters, List<string> errors)
     {

@@ -80,6 +80,58 @@ public sealed class RunStoreRoundTripTests(ApiFactory factory)
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task A_stored_run_with_legs_reads_back_with_its_legs_and_the_charges_of_its_fills_equal_in_every_field(bool costed)
+    {
+        // P4-05, D9: the legs and the charges of a fill are rows of their own; a trade with legs comes back with them, through the stream and through the pages
+        var run = StoredRunFixtures.Run(costed, to: NextTo(), legs: true);
+        var withLegs = run.Trades.Where(t => t.Trade.Legs is not null).ToList();
+        withLegs.Count.ShouldBeGreaterThan(20);
+        if (costed)
+        {
+            withLegs.ShouldAllBe(t => t.Trade.Costing!.LegCharges != null && t.Trade.Costing.LegCharges.Count >= 2);
+        }
+
+        var stored = await WithStore(s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask());
+        var trades = await WithStore(async s => await s.StreamTradesAsync(run.RunKey, false, Ct).ToListAsync(Ct));
+        var open = await WithStore(async s => await s.StreamTradesAsync(run.RunKey, true, Ct).ToListAsync(Ct));
+        var paged = new List<RunTrade>();
+        string? cursor = null;
+        do
+        {
+            var page = await WithStore(s => s.PageTradesAsync(run.RunKey, new TradePageFilter(), new PageRequest(7, cursor), Ct).AsTask());
+            page.IsSuccess.ShouldBeTrue(page.IsFailure ? page.Error.Message : string.Empty);
+            paged.AddRange(page.Value.Items);
+            cursor = page.Value.NextCursor;
+        }
+        while (cursor is not null);
+
+        stored.IsSuccess.ShouldBeTrue(stored.IsFailure ? stored.Error.Message : string.Empty);
+        SameTrade.ShouldBeSame(trades, run.Trades, "trades");
+        SameTrade.ShouldBeSame(open, run.OpenAtEnd, "open_at_end");
+        SameTrade.ShouldBeSame(paged.Where(t => t.Trade.ExitReason != ExitReason.EndOfData).ToList(), run.Trades, "paged trades");
+        (await StoreKit.CountAsync(factory.AdminConnectionString, "SELECT count(*) FROM research.sim_trade_legs l JOIN research.sim_runs r ON r.id = l.run_id WHERE r.run_key = @k", Ct, ("k", run.RunKey))).ShouldBe(withLegs.Sum(t => t.Trade.Legs!.Count));
+        Csv(run.RunKey, trades).ShouldBe(StoreKit.TradesCsvText(run, false), "the legs column of the csv is the same from the store");
+    }
+
+    [Fact]
+    public async Task A_run_with_legs_stored_twice_is_a_no_op_the_second_time_and_writes_no_second_set_of_legs()
+    {
+        var run = StoredRunFixtures.Run(costed: true, to: NextTo(), legs: true);
+        var legCount = run.Trades.Sum(t => t.Trade.Legs?.Count ?? 0);
+        legCount.ShouldBeGreaterThan(60);
+
+        var first = await WithStore(s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask());
+        var second = await WithStore(s => s.StoreAsync(StoreKit.ToStore(run, StoreKit.At.AddMilliseconds(1), "cli:other"), Ct).AsTask());
+
+        first.Value.WasAlreadyStored.ShouldBeFalse();
+        second.Value.WasAlreadyStored.ShouldBeTrue();
+        (await StoreKit.CountAsync(factory.AdminConnectionString, "SELECT count(*) FROM research.sim_trade_legs l JOIN research.sim_runs r ON r.id = l.run_id WHERE r.run_key = @k", Ct, ("k", run.RunKey))).ShouldBe(legCount);
+        (await StoreKit.CountAsync(factory.AdminConnectionString, "SELECT count(*) FROM research.sim_trade_leg_charges c JOIN research.sim_runs r ON r.id = c.run_id WHERE r.run_key = @k", Ct, ("k", run.RunKey))).ShouldBe(run.Trades.Sum(t => t.Trade.Costing?.LegCharges?.Count ?? 0));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task The_csv_files_made_from_the_stored_trades_are_byte_identical_to_the_ones_from_memory(bool costed)
     {
         var run = StoredRunFixtures.Run(costed, to: NextTo());

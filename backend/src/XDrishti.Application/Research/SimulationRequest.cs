@@ -17,6 +17,7 @@ namespace XDrishti.Application.Research;
 /// <param name="AcknowledgeCsvAdjusted">The owner's consent to run an instrument whose CSV prices are already adjusted for an action that would adjust them again (ADR 0017 §5); part of the run key.</param>
 /// <param name="Options">The thresholds of the data notes; null means the defaults (0.90 and 0.20).</param>
 /// <param name="Fills">The fill rules (P3-03b); null means <see cref="FillRules.Default"/>.</param>
+/// <param name="Exits">The exits to use in place of the built-in's own (P4-05); null is the built-in as it is. Two or more candidates are a comparison (<see cref="RunComparisonQuery"/>).</param>
 public sealed record SimulationRequest(
     string StrategyId,
     IReadOnlyDictionary<string, double>? Parameters,
@@ -28,4 +29,5 @@ public sealed record SimulationRequest(
     CostChoice Costs,
     bool AcknowledgeCsvAdjusted = false,
     ReplayOptions? Options = null,
-    FillRulesInput? Fills = null);
+    FillRulesInput? Fills = null,
+    ExitChoice? Exits = null);

@@ -1,6 +1,6 @@
 # P4-05 — Same-entries comparison and the MAE/MFE diagnostics
 
-- **Status:** Approved (owner, 2026-10-22, "yes approve": questions 1 to 8 stand as recommended). Written 2026-10-22 from `main` at eaee23a, after P4-01 to P4-04 were built (ADRs 0049 to 0052). The code named below was read that day; what could not be verified is marked UNVERIFIED. Not Approved: the questions at the end are the owner's to answer.
+- **Status:** Built 2026-10-22 ([ADR 0053](../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.md); the reviewer pass is the caller's). Approved (owner, 2026-10-22, "yes approve": questions 1 to 8 stand as recommended). Built with these changes, all in ADR 0053: `--diagnose` (D8's optional walk) is not built; the run record stays at schema 6 and a comparison is a record of its own in a folder of format `xd-sim-export-4` (D11); the union of the candidates' exits is a union side, not one compile (D2); the legs are two child tables (D9); the 8-candidate throughput is not timed (criterion 10). Written 2026-10-22 from `main` at eaee23a, after P4-01 to P4-04 were built (ADRs 0049 to 0052). The code named below was read that day; what could not be verified is marked UNVERIFIED. Not Approved: the questions at the end are the owner's to answer.
 - **Phase / roadmap row:** P4 — Exits & exit learning; slice 5 of the plan [P4-00](P4-00-exits-and-exit-learning-plan.md) ("same-entries comparison; MAE/MFE diagnostics"). It carries P4-00 acceptance criteria 2, 6, 7 and 9 and is the slice that P4-01 to P4-03 named as the trigger to **store legs** and as the first slice that must let a verb **choose an exit**.
 - **Design refs:** docs/design/08-exits-and-risk.md §2 (policy library), §3 (how the exit is chosen: "replay the same historical entries under every candidate policy", the MAE/MFE reading of stop, target and trail activation) · 09-learning-engine.md §1 (layer 2) · 11-strategy-lab.md §2 (`exits` as candidates) · 16-configuration.md §2 (`exits`) · [P4-00](P4-00-exits-and-exit-learning-plan.md) D2, D3 · [P3-10](P3-10-the-result-store-sim-runs-and-sim-trades.md) / [ADR 0045](../adr/0045-the-result-store-sim-runs-and-sim-trades.md) (the unique `(run_id, trade_key)` was kept "for the join of P4's same-entries comparison") · [ADR 0049](../adr/0049-the-exit-tape-trades-with-legs-and-sim-6.md) to [0052](../adr/0052-the-pyramid.md) · [ADR 0039](../adr/0039-an-engine-module-is-reached-from-an-adapter-in-infrastructure-never-from-application.md) (the port).
 
@@ -104,8 +104,8 @@ Unit: the flag parser (every refusal, expansion of lists, ladders not expanded),
 10. **Approval order.** P4-06 reads what this slice stores. Recommended: approve P4-05 first; P4-06 is written to depend on D1, D9 and D10 as proposed here, and must be re-read if any of them changes.
 
 ## Done when
-- [ ] The owner has answered questions 1 to 10 and the status is Approved
-- [ ] All acceptance criteria have evidence
+- [x] The owner has answered questions 1 to 10 and the status is Approved
+- [x] All acceptance criteria have evidence, except as the status line says (`--diagnose` in criterion 6, the benchmark of criterion 10, the schema 7 of criterion 9)
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Contract regenerated if an API appears (none expected: `scripts/gen-api.sh` not needed); migrations `AddSimTradeLegs` and `AddSimComparisons` added with `Down`
-- [ ] ADR 0053 written; `docs/design` (08, 09, 11, 16, 18-roadmap), the oracle log updated; `scripts/build-docs.sh` run
+- [x] Contract regenerated if an API appears (none: `scripts/gen-api.sh` not needed); migrations `AddSimTradeLegs` and `AddSimComparisons` added with `Down`
+- [x] ADR 0053 written; `docs/design` (08, 09, 11, 16, 18-roadmap), the oracle log updated; `scripts/build-docs.sh` run

@@ -224,6 +224,10 @@ public sealed class SimulationEngineAdapterTests
     {
         public StrategyRecord Record => throw new NotSupportedException();
 
+        public IReadOnlyList<CandidateRecord> Candidates => throw new NotSupportedException();
+
+        public bool HoldsOvernight => throw new NotSupportedException();
+
         public IReadOnlyList<FieldError> Warnings => [];
     }
 }

@@ -12,6 +12,9 @@ internal static class StoreRunValidation
     /// <summary>The most problems reported.</summary>
     public const int MaxProblems = 20;
 
+    /// <summary>The longest reason of a leg, the width of its column.</summary>
+    public const int MaxLegReason = 64;
+
     public static IReadOnlyList<FieldError> Check(SimulationRun? run, RunRecordText? record, string? actor)
     {
         var problems = new List<FieldError>();
@@ -131,7 +134,7 @@ internal static class StoreRunValidation
 
         var keys = new HashSet<string>(StringComparer.Ordinal);
         var wrongSchema = 0;
-        var withLegs = 0;
+        var badLegs = 0;
         var duplicateReported = false;
         foreach (var trade in run.Trades.Concat(run.OpenAtEnd))
         {
@@ -140,9 +143,9 @@ internal static class StoreRunValidation
                 wrongSchema++;
             }
 
-            if (trade.Trade.Legs is not null)
+            if (trade.Trade.Legs is { } legs && (legs.Count < 2 || legs.Any(l => l.Reason is null || l.Reason.Length > MaxLegReason || !Enum.IsDefined(l.Kind))))
             {
-                withLegs++;
+                badLegs++;
             }
 
             if (!keys.Add(trade.Trade.Key) && !duplicateReported)
@@ -152,11 +155,10 @@ internal static class StoreRunValidation
             }
         }
 
-        if (withLegs > 0)
+        if (badLegs > 0)
         {
-            // Shortcut (P4-01 D15, kept by P4-02): the legs are not persisted. `simulate --store` of a PARTIAL_BE, PARTIAL_TRAIL or PYRAMID run (a pyramid always has legs) is refused here by name and the export files keep the legs; the columns
-            // (`legs jsonb`, `cost_leg_charges jsonb`, migration AddSimTradeLegs) come with the first slice that must read a stored trade with legs back (P4-05, the comparison), as ADR 0050 decides.
-            problems.Add(new FieldError("run.trades.legs", $"{withLegs} trades have legs; the store has no column for them yet (P4-01, D15): the legs stay in the run folder."));
+            // P4-05, D9: the legs are stored in child tables; what the tables cannot hold is refused here by name
+            problems.Add(new FieldError("run.trades.legs", $"{badLegs} trades have legs that cannot be stored: fewer than two, an unknown kind, or a reason of over {MaxLegReason} characters."));
         }
 
         if (wrongSchema > 0)

@@ -470,8 +470,26 @@ monitoring comes early because it is useful on its own while the trading engine 
 <td>per spec</td>
 </tr>
 <tr>
+<td>P4-05</td>
+<td><strong>The same-entries comparison and the MAE/MFE diagnostics, built 2026-10-22</strong> (<a href="../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.html">ADR 0053</a>, spec <a href="../specs/P4-05-same-entries-comparison-and-mae-mfe-diagnostics.html">P4-05</a>). <code>simulate</code> and <code>verify-pack</code> take <code>--exit</code> (repeatable, `a</td>
+<td>b<code>lists candidates) and</code>--time-stop<code>: the first way to run a partial, a trail or a pyramid from the command line. Two candidates or more are one scan and one walk of each on the same entries (the swing comparison is ungated, the gated count printed), a table on each candidate&#39;s own trades and on the common set with the paired difference and the downside deviation, and the MAE/MFE table with its censor levels. The result store holds legs (</code>AddSimTradeLegs<code>) and a comparison (</code>AddSimComparisons<code>: member runs, the entries key, the text of the tables). Cut or changed with the spec&#39;s leave (ADR 0053): </code>--diagnose<code>(the walk without a target) is not built; the run record keeps schema 6 and a single run is byte-identical (the comparison is a record of its own, folder format</code>xd-sim-export-4`); no trade cards for a comparison; the legs are two child tables; the 8-candidate throughput is not timed.</td>
+<td>-</td>
+<td>2 to 2.5 agent-days (estimate)</td>
+<td>Built</td>
+<td><a href="../specs/P4-05-same-entries-comparison-and-mae-mfe-diagnostics.html">spec</a> · <a href="../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.html">ADR 0053</a></td>
+</tr>
+<tr>
+<td>P4-06</td>
+<td><strong>Per-cell exit choice by walk-forward</strong> (<a href="../specs/P4-06-per-cell-exit-choice-walk-forward.html">spec</a>, Approved 2026-10-22): from the candidates of a P4-05 comparison, the one with the best out-of-sample risk-adjusted expectancy per cell, its stability across folds, and &quot;no choice&quot; when the sample is too small. Reads what P4-05 stores (the entries key, the join on <code>trade_key</code>, the downside deviation of doc 08 §3).</td>
+<td>after P4-05</td>
+<td>see spec</td>
+<td>Not built</td>
+<td><a href="../specs/P4-06-per-cell-exit-choice-walk-forward.html">spec</a></td>
+<td>per spec</td>
+</tr>
+<tr>
 <td>P4-00</td>
-<td><strong>Exits and exit learning, the plan</strong> (<a href="../specs/P4-00-exits-and-exit-learning-plan.html">P4-00</a>, Approved 2026-10-19): the split of P4 into slices and the cut line; P4-01 to P4-04 are built, P4-05 onward are not.</td>
+<td><strong>Exits and exit learning, the plan</strong> (<a href="../specs/P4-00-exits-and-exit-learning-plan.html">P4-00</a>, Approved 2026-10-19): the split of P4 into slices and the cut line; P4-01 to P4-05 are built, P4-06 onward are not.</td>
 <td>after P3</td>
 <td>see spec</td>
 <td>Spec Approved</td>
@@ -833,7 +851,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-21 18:43</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 06:16</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

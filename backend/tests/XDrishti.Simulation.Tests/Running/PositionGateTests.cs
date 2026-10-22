@@ -277,6 +277,23 @@ public sealed class PositionGateTests
     }
 
     [Fact]
+    public void P4_05_the_count_of_the_entries_the_gate_would_block_on_ungated_walks_equals_the_position_open_fates_of_the_gated_run()
+    {
+        var bars = G1Bars();
+        var candidates = new[] { Candidate(bars, Mon, "10:15", 99.00, 100.00), Candidate(bars, Tue, "10:15", 99.00, 100.20), Candidate(bars, Wed, "10:15", 98.00, 99.00), Candidate(bars, Wed, "10:45", 98.00, 99.00) };
+        var rules = Rules(5);
+        var gated = Apply(bars, candidates, rules);
+        var ungated = candidates.Select(c => new CandidateOutcome(c, TradeWalker.Walk(c, bars, rules).Value)).ToList();
+
+        var blocked = PositionGate.CountBlocked(ungated, _ => true);
+        var inWindow = PositionGate.CountBlocked(ungated, c => c.DecisionBarIndex != candidates[1].DecisionBarIndex);
+
+        blocked.ShouldBe(gated.Count(o => o.Walk.NoTrade == NoTradeReason.PositionOpen));
+        blocked.ShouldBe(2);
+        inWindow.ShouldBe(1, "a blocked entry outside the window is not counted");
+    }
+
+    [Fact]
     public void G6_the_gate_has_no_quantity_or_cost_input_so_a_sizing_skip_cannot_open_it()
     {
         var apply = typeof(PositionGate).GetMethod(nameof(PositionGate.Apply))!;

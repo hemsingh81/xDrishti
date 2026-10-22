@@ -39,6 +39,33 @@ internal sealed class PositionGate
     public static WalkOutcome BlockedOutcome() => WalkResults.NoTrade(NoTradeReason.PositionOpen, 0, 0).Value;
 
     /// <summary>
+    /// How many of the candidates of <paramref name="outcomes"/> (walked <b>without</b> the gate, as a comparison walks them, P4-05 D4) the gate would have blocked, among those <paramref name="counted"/> accepts. The gate is applied to each side in
+    /// decision order, accepting the trades of the walks: a blocked candidate is not walked in a plain run and the others' walks do not depend on it, so the answer is the one the plain run's gate gives.
+    /// </summary>
+    public static long CountBlocked(IReadOnlyList<CandidateOutcome> outcomes, Func<EntryCandidate, bool> counted)
+    {
+        ArgumentNullException.ThrowIfNull(outcomes);
+        ArgumentNullException.ThrowIfNull(counted);
+        long blocked = 0;
+        foreach (var side in outcomes.GroupBy(o => o.Candidate.Side))
+        {
+            var gate = new PositionGate();
+            foreach (var outcome in side.OrderBy(o => o.Candidate.DecisionEpochSeconds))
+            {
+                if (gate.Blocks(outcome.Candidate.DecisionEpochSeconds))
+                {
+                    blocked += counted(outcome.Candidate) ? 1 : 0;
+                    continue;
+                }
+
+                gate.Accept(outcome.Walk);
+            }
+        }
+
+        return blocked;
+    }
+
+    /// <summary>
     /// Walks the candidates in order with <paramref name="walk"/> and applies the gate between two walks: a blocked candidate is not walked. A failure of a walk is returned as it is.
     /// </summary>
     public static Result<IReadOnlyList<CandidateOutcome>> Apply(IEnumerable<EntryCandidate> candidates, Func<EntryCandidate, Result<WalkOutcome>> walk)

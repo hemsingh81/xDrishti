@@ -390,11 +390,13 @@ public static class DependencyInjection
     private static void AddResearch(this IServiceCollection services)
     {
         services.AddScoped<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, RunSimulationHandler>();
+        services.AddScoped<IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>, RunSimulationHandler>();
         services.AddScoped<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>, BuildTradeCardsHandler>();
         services.AddScoped<ICommandHandler<LoadCostSheetCommand, LoadedCostSheet>, LoadCostSheetHandler>();
         services.AddScoped<IQueryHandler<ShowCostSheetQuery, Result<ShownCostSheet>>, ShowCostSheetHandler>();
         services.AddScoped<IQueryHandler<CheckCostSheetQuery, Result<CostCheckReport>>, CheckCostSheetHandler>();
         services.AddScoped<ICommandHandler<StoreRunCommand, StoreOutcome>, StoreRunHandler>(); // the result store (P3-10)
+        services.AddScoped<ICommandHandler<StoreComparisonCommand, StoreOutcome>, StoreComparisonHandler>(); // a comparison of exits (P4-05)
         services.AddScoped<IQueryHandler<GetStoredRunQuery, Result<StoredRunHeader>>, GetStoredRunHandler>();
         services.AddScoped<IQueryHandler<ListStoredRunsQuery, Result<Page<StoredRunHeader>>>, ListStoredRunsHandler>();
         services.AddScoped<IQueryHandler<PageStoredTradesQuery, Result<Page<RunTrade>>>, PageStoredTradesHandler>();

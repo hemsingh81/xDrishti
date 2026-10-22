@@ -47,6 +47,7 @@ internal sealed partial class RunStore
 
             var copyStart = time.GetTimestamp();
             await CopyTradesAsync(connection, id.Value, run.Run, cancellationToken);
+            await CopyLegsAsync(connection, id.Value, run.Run, cancellationToken);
             var copyMilliseconds = (long)time.GetElapsedTime(copyStart).TotalMilliseconds;
 
             await using (var count = new NpgsqlCommand("SELECT count(*) FROM research.sim_trades WHERE run_id = @id", connection, transaction))
@@ -59,6 +60,12 @@ internal sealed partial class RunStore
                     await transaction.RollbackAsync(cancellationToken);
                     return Result.Failure<StoreOutcome>(StoreErrors.WriteFailed($"The trade rows written ({stored}) differ from the trades of the run ({expected}); nothing was stored."));
                 }
+            }
+
+            if (await CheckLegCountsAsync(connection, transaction, id.Value, run.Run, cancellationToken) is { } legProblem)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return Result.Failure<StoreOutcome>(StoreErrors.WriteFailed(legProblem));
             }
 
             await transaction.CommitAsync(cancellationToken);

@@ -52,7 +52,7 @@ public sealed class ResearchLayeringArchitectureTests
 
         types.Where(t => t.IsInterface).Select(t => t.Name).Order().ShouldBe(["ICostSheetStore", "IPreparedStrategy", "IRunStore", "ISimulationEngine"]);  // the store of the charge sheet (P3-03f) and the result store (P3-10) are the third and fourth ports of the research family
         types.Where(t => !t.IsInterface).Select(t => t.Name).Order(StringComparer.Ordinal).ShouldBe(
-            ["PageRequest", "Page`1", "RunListFilter", "RunRecordText", "RunToStore", "StoreErrors", "StoreOutcome", "StoreReadException", "StoredRunHeader", "TradePageFilter"]); // the rest are the values and failures of the result store port (P3-10)
+            ["ComparisonMemberToStore", "ComparisonRecordText", "ComparisonToStore", "PageRequest", "Page`1", "RunListFilter", "RunRecordText", "RunToStore", "StoreErrors", "StoreOutcome", "StoreReadException", "StoredComparisonHeader", "StoredRunHeader", "TradePageFilter"]); // the rest are the values and failures of the result store port (P3-10, and the comparison of P4-05)
         ShouldHaveNone(Types.InAssembly(Application).That().ResideInNamespace("XDrishti.Application.Abstractions.Research").ShouldNot().HaveDependencyOnAny(EngineModules).GetResult());
     }
 

@@ -90,9 +90,38 @@ internal sealed partial class RunStore
         command.Parameters.AddWithValue("run_id", NpgsqlDbType.Bigint, run.Id);
         command.Parameters.AddWithValue("open_at_end", NpgsqlDbType.Boolean, openAtEnd);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await HasLegsAsync(run.Id, cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                yield return ReadTrade(reader, run);
+            }
+
+            yield break;
+        }
+
+        // P4-05, D9: a run with legs reads them in chunks beside the trades, from tables keyed like the trades
+        var chunk = new List<(bool OpenAtEnd, int Ordinal, RunTrade Trade)>(LegChunk);
         while (await reader.ReadAsync(cancellationToken))
         {
-            yield return ReadTrade(reader, run);
+            chunk.Add((reader.GetBoolean(0), reader.GetInt32(1), ReadTrade(reader, run)));
+            if (chunk.Count == LegChunk)
+            {
+                foreach (var trade in await WithLegsAsync(run.Id, chunk, cancellationToken))
+                {
+                    yield return trade;
+                }
+
+                chunk.Clear();
+            }
+        }
+
+        if (chunk.Count > 0)
+        {
+            foreach (var trade in await WithLegsAsync(run.Id, chunk, cancellationToken))
+            {
+                yield return trade;
+            }
         }
     }
 
@@ -154,7 +183,7 @@ internal sealed partial class RunStore
         command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, page.Size + 1);
         command.CommandText = sql.ToString();
 
-        var items = new List<RunTrade>(page.Size);
+        var chunk = new List<(bool OpenAtEnd, int Ordinal, RunTrade Trade)>(page.Size);
         (bool OpenAtEnd, int Ordinal) last = default;
         var more = false;
         try
@@ -162,14 +191,14 @@ internal sealed partial class RunStore
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                if (items.Count == page.Size)
+                if (chunk.Count == page.Size)
                 {
                     more = true;
                     break;
                 }
 
                 last = (reader.GetBoolean(0), reader.GetInt32(1));
-                items.Add(ReadTrade(reader, run));
+                chunk.Add((last.OpenAtEnd, last.Ordinal, ReadTrade(reader, run)));
             }
         }
         catch (StoreReadException unreadable)
@@ -177,6 +206,10 @@ internal sealed partial class RunStore
             return Result.Failure<Page<RunTrade>>(StoreErrors.RowUnreadable(unreadable.Message));
         }
 
+        // the page is read to the end before the legs are, on a connection of their own; a run with no leg skips the second read
+        var items = chunk.Count > 0 && await HasLegsAsync(run.Id, cancellationToken)
+            ? await WithLegsAsync(run.Id, chunk, cancellationToken)
+            : [.. chunk.Select(c => c.Trade)];
         return Result.Success(new Page<RunTrade>(items, more ? PageCursor.ForTrade(last.OpenAtEnd, last.Ordinal) : null));
     }
 

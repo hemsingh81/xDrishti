@@ -1,3 +1,4 @@
+using XDrishti.Domain.Common;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
@@ -31,7 +32,7 @@ internal static class StoredRunFixtures
     /// <summary>
     /// The run (with <paramref name="emaExits"/> the fourth trade of each instrument is an <c>EmaExit</c> without a target, P4-03): <paramref name="instruments"/> instruments, <paramref name="tradesEach"/> trades of each (and one open-at-end trade for every fifth instrument), assembled by the real assembler.
     /// </summary>
-    public static SimulationRun Run(bool costed = false, int instruments = 20, int tradesEach = 6, DateOnly? to = null, string strategy = "ORB", bool fixtureEdges = true, FillRules? fills = null, bool emaExits = false)
+    public static SimulationRun Run(bool costed = false, int instruments = 20, int tradesEach = 6, DateOnly? to = null, string strategy = "ORB", bool fixtureEdges = true, FillRules? fills = null, bool emaExits = false, bool legs = false)
     {
         var context = TestCostSheet.Context(sheet: FixtureSheet.Sheet);
         var ran = new List<InstrumentRun>();
@@ -49,7 +50,7 @@ internal static class StoredRunFixtures
                 var trade = FabricatedRun.Trade(
                     id, symbol, side, Monday.AddDays(j), emaExits && j == 3 ? ExitReason.EmaExit : Exits[(i + j) % Exits.Length], entryMinute: 560 + ((i * 7 + j * 3) % 200), entry: entry, stop: side == Side.Buy ? entry - 2.5 : entry + 2.5,
                     target: (i + j) % 3 == 0 || (emaExits && j == 3) ? null : entry + 5, exitPrice: entry + (j - 2), rExact: (j - 2) * 0.4, rFilled: ((j - 2) * 0.4) - 0.05, strategy: strategy);
-                count += Add(trades, trade, costed, context);
+                count += Add(trades, legs && j % 3 == 1 ? WithLegs(trade) : trade, costed, context);
             }
 
             if (i % 5 == 0)
@@ -98,6 +99,23 @@ internal static class StoredRunFixtures
 
         var members = Enumerable.Range(0, ran.Count).Select(i => (ran[i].InstrumentId, ran[i].Symbol)).ToArray();
         return Assemble("ORB", FabricatedRun.List(members), ran, list, [], new DateOnly(2026, 4, 30), costed ? CostRecord.Of(context) : null, null);
+    }
+
+    /// <summary>The trade left in three fills (P4-05, D9): the entry, a partial at 40 % five minutes later, the rest at the exit ten minutes after the entry. The first leg is the entry of the trade, the last the exit.</summary>
+    private static SimTrade WithLegs(SimTrade trade)
+    {
+        var exit = trade.EntryEpochSeconds + 600;
+        var partial = trade.EntryFilledPrice + ((trade.ExitFilledPrice - trade.EntryFilledPrice) / 2);
+        return trade with
+        {
+            ExitEpochSeconds = exit,
+            Legs = new ValueList<Leg>(
+            [
+                new Leg(trade.EntryEpochSeconds, trade.EntryPrice, trade.EntryFilledPrice, 1m, LegKind.Entry, string.Empty),
+                new Leg(trade.EntryEpochSeconds + 300, partial, partial, 0.4m, LegKind.Exit, "partial_1"),
+                new Leg(exit, trade.ExitPrice, trade.ExitFilledPrice, 0.6m, LegKind.Exit, trade.ExitReason.ToString()),
+            ]),
+        };
     }
 
     private static int Add(List<SimTrade> into, SimTrade trade, bool costed, CostContext context)

@@ -48,13 +48,14 @@ internal static class SimulatePipeline
         ISimulationEngine engine,
         FillRules rules,
         CostChoice costs,
-        bool acknowledgeCsvAdjusted)
+        bool acknowledgeCsvAdjusted,
+        ExitChoice? exits = null)
     {
         var frame = timeframe
             ?? engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, strategyId, StringComparison.Ordinal))?.DefaultTimeframe.ToCode()
             ?? Timeframe.M15.ToCode();
         var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
-        return new SimulationRequest(strategyId, parameters, frame, from, to, universe.InstrumentIds, universe.BasketId, costs, acknowledgeCsvAdjusted, null, fills);
+        return new SimulationRequest(strategyId, parameters, frame, from, to, universe.InstrumentIds, universe.BasketId, costs, acknowledgeCsvAdjusted, null, fills, exits);
     }
 
     /// <summary>Runs the handler.</summary>
@@ -62,6 +63,13 @@ internal static class SimulatePipeline
     {
         var handler = provider.GetRequiredService<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
         return await handler.HandleAsync(new RunSimulationQuery(request), cancellationToken);
+    }
+
+    /// <summary>Runs the comparison handler (P4-05): the same request with two exit candidates or more.</summary>
+    public static async Task<Result<ComparisonRun>> RunComparisonAsync(IServiceProvider provider, SimulationRequest request, CancellationToken cancellationToken)
+    {
+        var handler = provider.GetRequiredService<IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>>();
+        return await handler.HandleAsync(new RunComparisonQuery(request), cancellationToken);
     }
 
     /// <summary>The second read for the chosen trades (spec P3-04c, C2); nothing is read when no card is wanted.</summary>

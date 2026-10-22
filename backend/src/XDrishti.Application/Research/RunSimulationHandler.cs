@@ -33,31 +33,72 @@ internal sealed class RunSimulationHandler(
     ISimulationEngine engine,
     ICostSheetStore costSheets,
     TimeProvider time,
-    ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>
+    ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
 {
     public async ValueTask<Result<SimulationRun>> HandleAsync(RunSimulationQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var request = query.Request;
+        var executed = await ExecuteAsync(query.Request, cancellationToken);
+        if (executed.IsFailure)
+        {
+            return Result.Failure<SimulationRun>(executed.Error);
+        }
+
+        return executed.Value.Runs.Count == 1
+            ? Result.Success(executed.Value.Runs[0])
+            : Result.Failure<SimulationRun>(SimulationErrors.Invalid([new FieldError("exits", "The request names " + executed.Value.Runs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) + " candidate exits; a comparison is a RunComparisonQuery.", null, "simulation.exits_are_a_comparison")]));
+    }
+
+    public async ValueTask<Result<ComparisonRun>> HandleAsync(RunComparisonQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        var executed = await ExecuteAsync(query.Request, cancellationToken);
+        if (executed.IsFailure)
+        {
+            return Result.Failure<ComparisonRun>(executed.Error);
+        }
+
+        var done = executed.Value;
+        if (done.Runs.Count < 2)
+        {
+            return Result.Failure<ComparisonRun>(SimulationErrors.Invalid([new FieldError("exits", "A comparison needs two candidate exits or more; give --exit twice or a list of values.", null, "simulation.comparison_needs_candidates")]));
+        }
+
+        var candidates = new List<CandidateRun>(done.Runs.Count);
+        for (var i = 0; i < done.Runs.Count; i++)
+        {
+            candidates.Add(new CandidateRun(done.Candidates[i].Id, done.Candidates[i].Exit!, done.Runs[i], done.Gated[i]));
+        }
+
+        // D4: a swing comparison is not gated, an intraday one has nothing to gate
+        var report = ComparisonReport.Build(candidates, gateApplied: !done.HoldsOvernight);
+        return Result.Success(new ComparisonRun(candidates.AsReadOnly(), report, done.EntriesKey));
+    }
+
+    /// <summary>What a run produced: one run record per candidate (one for a plain run), the gated counts and the entries key.</summary>
+    private sealed record Executed(IReadOnlyList<SimulationRun> Runs, IReadOnlyList<CandidateRecord> Candidates, IReadOnlyList<long> Gated, string EntriesKey, bool HoldsOvernight);
+
+    private async ValueTask<Result<Executed>> ExecuteAsync(SimulationRequest request, CancellationToken cancellationToken)
+    {
 
         // (1) the request, (2) the fill rules, (3) the strategy: no port is read until all three pass.
         var errors = SimulationRequestChecks.Validate(request, out var timeframe);
         if (errors.HasErrors)
         {
-            return Result.Failure<SimulationRun>(SimulationErrors.Invalid(errors.Items));
+            return Result.Failure<Executed>(SimulationErrors.Invalid(errors.Items));
         }
 
         var fills = BuildFills(request.Fills);
         if (fills.IsFailure)
         {
-            return Result.Failure<SimulationRun>(fills.Error);
+            return Result.Failure<Executed>(fills.Error);
         }
 
-        var prepared = engine.Prepare(request.StrategyId, request.Parameters ?? new Dictionary<string, double>(), timeframe, fills.Value);
+        var prepared = engine.Prepare(request.StrategyId, request.Parameters ?? new Dictionary<string, double>(), timeframe, fills.Value, request.Exits);
         if (prepared.IsFailure)
         {
             // The port contract already caps the list at 20; this is a guard for an engine that does not.
-            return Result.Failure<SimulationRun>(prepared.Error.Fields is { Count: > SimulationErrors.MaxStrategyProblems } fields ? SimulationErrors.StrategyInvalid(fields) : prepared.Error);
+            return Result.Failure<Executed>(prepared.Error.Fields is { Count: > SimulationErrors.MaxStrategyProblems } fields ? SimulationErrors.StrategyInvalid(fields) : prepared.Error);
         }
 
         // (4) only then the ports: the charge sheet first (a gross choice reads nothing), then the rest.
@@ -65,14 +106,14 @@ internal sealed class RunSimulationHandler(
         var costs = await ResolveCostsAsync(request, cancellationToken);
         if (costs.IsFailure)
         {
-            return Result.Failure<SimulationRun>(costs.Error);
+            return Result.Failure<Executed>(costs.Error);
         }
 
         var costContext = costs.Value;
         var universe = await ResolveUniverseAsync(request, cancellationToken);
         if (universe.IsFailure)
         {
-            return Result.Failure<SimulationRun>(universe.Error);
+            return Result.Failure<Executed>(universe.Error);
         }
 
         var targets = universe.Value;
@@ -83,7 +124,9 @@ internal sealed class RunSimulationHandler(
         var context = new RunContext(request, calendar, csvThrough, targets, request.Options ?? ReplayOptions.Default, costContext);
         var readTime = time.GetElapsedTime(started);
         var replayTime = TimeSpan.Zero;
-        var replays = new List<InstrumentReplay>(targets.Ids.Count);
+        var candidates = prepared.Value.Candidates;
+        var replays = candidates.Select(_ => new List<InstrumentReplay>(targets.Ids.Count)).ToList();
+        var gated = new long[candidates.Count];
         foreach (var id in targets.Ids)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -92,37 +135,53 @@ internal sealed class RunSimulationHandler(
             var replayStart = time.GetTimestamp();
             readTime += time.GetElapsedTime(readStart, replayStart);
 
-            var replay = input is null ? new InstrumentReplay(InstrumentRun.NotFound(id), [], []) : engine.Replay(prepared.Value, input);
+            var many = input is null
+                ? new ComparisonReplay(candidates.Select(_ => new InstrumentReplay(InstrumentRun.NotFound(id), [], [])).ToList(), candidates.Select(_ => 0L).ToList())
+                : candidates.Count == 1 ? new ComparisonReplay([engine.Replay(prepared.Value, input)], [0L]) : engine.ReplayComparison(prepared.Value, input);
             replayTime += time.GetElapsedTime(replayStart);
-            if (replay.Record.Skipped is { } reason)
+            if (many.Members[0].Record.Skipped is { } reason)
             {
                 var code = reason.ToCode();
-                SimulationLog.InstrumentSkipped(logger, replay.Record.Symbol, replay.Record.InstrumentId, code);
+                SimulationLog.InstrumentSkipped(logger, many.Members[0].Record.Symbol, many.Members[0].Record.InstrumentId, code);
             }
 
-            replays.Add(replay);
+            for (var k = 0; k < candidates.Count; k++)
+            {
+                replays[k].Add(many.Members[k]);
+                gated[k] += many.GatedBlocked[k];
+            }
         }
 
         var assemblyStart = time.GetTimestamp();
-        var members = replays.Select(r => new UniverseMember(r.Record.InstrumentId, r.Record.Symbol)).ToList();
-        var header = new RunHeader(
-            prepared.Value.Record,
-            engine.EngineVersion,
-            request.From,
-            request.To,
-            context.Options,
-            request.AcknowledgeCsvAdjusted,
-            (fills.Value ?? FillRules.Default).ToCanonicalJson(),
-            new UniverseRecord(targets.Kind, targets.BasketId, targets.BasketName, targets.Label, members),
-            calendar,
-            costContext is null ? null : CostRecord.Of(costContext));
-        var run = RunAssembler.Assemble(header, replays);
-        var skipped = replays.Count(r => r.Record.Skipped is not null);
+        var members = replays[0].Select(r => new UniverseMember(r.Record.InstrumentId, r.Record.Symbol)).ToList();
+        var universeRecord = new UniverseRecord(targets.Kind, targets.BasketId, targets.BasketName, targets.Label, members);
+        var runs = new List<SimulationRun>(candidates.Count);
+        RunHeader? firstHeader = null;
+        for (var k = 0; k < candidates.Count; k++)
+        {
+            var header = new RunHeader(
+                candidates[k].Record,
+                engine.EngineVersion,
+                request.From,
+                request.To,
+                context.Options,
+                request.AcknowledgeCsvAdjusted,
+                (fills.Value ?? FillRules.Default).ToCanonicalJson(),
+                universeRecord,
+                calendar,
+                costContext is null ? null : CostRecord.Of(costContext));
+            firstHeader ??= header;
+            runs.Add(RunAssembler.Assemble(header, replays[k]));
+        }
+
+        var run = runs[0];
+        var skipped = replays[0].Count(r => r.Record.Skipped is not null);
         var readMs = (long)readTime.TotalMilliseconds;
         var replayMs = (long)replayTime.TotalMilliseconds;
         var assemblyMs = (long)time.GetElapsedTime(assemblyStart).TotalMilliseconds;
-        SimulationLog.RunFinished(logger, run.RunKey, replays.Count - skipped, skipped, run.Trades.Count, readMs, replayMs, assemblyMs);
-        return Result.Success(run);
+        SimulationLog.RunFinished(logger, run.RunKey, replays[0].Count - skipped, skipped, run.Trades.Count, readMs, replayMs, assemblyMs);
+        var entriesKey = RunAssembler.EntriesKey(firstHeader!, run, candidates[0].EntriesDefinitionSha256);
+        return Result.Success(new Executed(runs.AsReadOnly(), candidates, gated, entriesKey, prepared.Value.HoldsOvernight));
     }
 
     /// <summary>The fill rules of the request: null when it gave none (the engine then uses <see cref="FillRules.Default"/>), otherwise built with <c>Create</c> so that an invalid number comes back as the P3-03b code.</summary>

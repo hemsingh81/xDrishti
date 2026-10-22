@@ -122,6 +122,31 @@ public sealed class CompiledSide
     public IReadOnlyList<LocatedProblem> Warnings { get; }
 
     /// <summary>
+    /// This side with the exits of <paramref name="others"/> added to its own, for one scan that serves several candidate exits (P4-05, D2): the entry, the stop, the time rules and the history depth are this side's, <see cref="Exits"/> holds every
+    /// candidate's plan and <see cref="Features"/> holds this side's features followed by the features only the other candidates read, so a frame created from it records the tape of the union. The others must be the same side of the same
+    /// strategy compiled with another exit; this is not checked.
+    /// </summary>
+    /// <param name="others">The same side compiled with the other candidates' exits.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="others"/> is null.</exception>
+    public CompiledSide WithExitsOf(IEnumerable<CompiledSide> others)
+    {
+        ArgumentNullException.ThrowIfNull(others);
+        var exits = new List<ExitPlan>(Exits);
+        var features = new List<FeatureSpec>(Features);
+        var seen = new HashSet<FeatureSpec>(features);
+        foreach (var other in others)
+        {
+            exits.AddRange(other.Exits);
+            foreach (var spec in other.Exits.SelectMany(e => e.Reads).Where(seen.Add))
+            {
+                features.Add(spec);
+            }
+        }
+
+        return new CompiledSide(StrategyId, Side, Style, EvaluationTimeframe, Setup, Trigger, Invalidate, Entry, Stop, exits.AsReadOnly(), Overlays, TimeRules, Filters, features.AsReadOnly(), HistoryDepth, NeedsContext, NeedsExpiryDays, Warnings);
+    }
+
+    /// <summary>
     /// Binds every condition to the frame and returns the side ready to <see cref="BoundSide.Evaluate"/>. The layout is checked here, because a bound condition alone cannot (ADR 0034, Consequences): the frame must have been
     /// created from <see cref="Features"/> in this order (a longer list that starts with them is fine) and keep at least <see cref="HistoryDepth"/> closed bars; anything else is a programming error and throws an
     /// <see cref="ArgumentException"/> that names the feature or the depth.

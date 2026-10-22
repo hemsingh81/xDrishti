@@ -128,6 +128,13 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<SimTradeRow> SimTrades => Set<SimTradeRow>();
 
+    /// <summary>The legs of stored trades, the charges of their fills, and the comparisons of exits (spec P4-05).</summary>
+    internal DbSet<SimTradeLegRow> SimTradeLegs => Set<SimTradeLegRow>();
+
+    internal DbSet<SimTradeLegChargeRow> SimTradeLegCharges => Set<SimTradeLegChargeRow>();
+
+    internal DbSet<SimComparisonRow> SimComparisons => Set<SimComparisonRow>();
+
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();
 

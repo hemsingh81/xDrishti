@@ -28,11 +28,17 @@ public interface ISimulationEngine
     /// <param name="parameters">The parameters by name (empty: the defaults); the names are the strategy's.</param>
     /// <param name="evaluationTimeframe">The timeframe the rules are evaluated on.</param>
     /// <param name="fills">The fill rules; null means <see cref="FillRules.Default"/>.</param>
-    Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills);
+    /// <param name="exits">The exits to use in place of the built-in's own (P4-05, D1): null is the built-in as it is, one candidate a plain run of that exit, two or more a comparison on the same entries. The entry, the stop and the time rules are never replaced.</param>
+    Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null);
 
     /// <summary>
     /// Replays the prepared strategy over one instrument. Pure and synchronous. A caller error throws (<see cref="ArgumentException"/>, <see cref="InvalidOperationException"/>); a handle that this engine did not make throws
     /// <see cref="ArgumentException"/>.
     /// </summary>
     InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input);
+
+    /// <summary>
+    /// Replays a prepared comparison (two or more candidates) over one instrument with one scan (P4-05): the replay of each candidate in order and the gated counts. Pure and synchronous; the errors of <see cref="Replay"/> apply.
+    /// </summary>
+    ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input);
 }

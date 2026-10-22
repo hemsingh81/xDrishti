@@ -99,7 +99,7 @@ internal static class VerifyPackCommand
         foreach (var strategy in options.Strategies)
         {
             // the registered defaults and the timeframe of the built-in: a pack checks the rule set as it ships
-            var request = SimulatePipeline.Request(strategy, new Dictionary<string, double>(), null, options.From, options.To, gate.Universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted);
+            var request = SimulatePipeline.Request(strategy, new Dictionary<string, double>(), null, options.From, options.To, gate.Universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits);
             var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken);
             if (ran.IsFailure)
             {

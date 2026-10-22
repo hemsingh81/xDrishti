@@ -9,8 +9,14 @@ namespace XDrishti.Application.Abstractions.Research;
 /// </summary>
 public interface IPreparedStrategy
 {
-    /// <summary>The strategy as a run records it: id, parameters, canonical JSON and its SHA-256, timeframe and sides.</summary>
+    /// <summary>The strategy as a run records it (of the first candidate for a comparison): id, parameters, canonical JSON and its SHA-256, timeframe and sides.</summary>
     StrategyRecord Record { get; }
+
+    /// <summary>The candidates in order (P4-05): one for a plain run or a single chosen exit, two or more for a comparison.</summary>
+    IReadOnlyList<CandidateRecord> Candidates { get; }
+
+    /// <summary>The strategy holds its positions overnight (a swing strategy): a comparison of its candidates is not gated (P4-05, D4).</summary>
+    bool HoldsOvernight { get; }
 
     /// <summary>The warnings of the compile (path in <see cref="FieldError.Field"/>, code in <see cref="FieldError.Code"/>); counted in the log, not stored in the run record.</summary>
     IReadOnlyList<FieldError> Warnings { get; }

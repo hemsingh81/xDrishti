@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.ShouldBe(["sim_runs", "sim_trades"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -125,6 +125,9 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
         id.ShouldBeGreaterThan(0);
         (await StoreKit.CountAsync(_app, "SELECT count(*) FROM research.sim_runs", Ct)).ShouldBe(before + 1);
         (await SqlStateAsync(_app, "INSERT INTO research.sim_trades (run_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege is there; the row is incomplete");
+        (await SqlStateAsync(_app, "INSERT INTO research.sim_trade_legs (run_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a leg is there; the row is incomplete");
+        (await SqlStateAsync(_app, "INSERT INTO research.sim_trade_leg_charges (run_id) VALUES (1)")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert the charges of a leg is there; the row is incomplete");
+        (await SqlStateAsync(_app, "INSERT INTO research.sim_comparisons (strategy_id) VALUES ('ORB')")).ShouldBe(PostgresErrorCodes.NotNullViolation, "the privilege to insert a comparison is there; the row is incomplete");
         foreach (var statement in new[]
         {
             "UPDATE research.sim_runs SET created_by = 'x'",
@@ -132,6 +135,14 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             "UPDATE research.sim_trades SET ordinal = 1 WHERE false",
             "DELETE FROM research.sim_trades WHERE false",
             "TRUNCATE research.sim_trades",
+            "UPDATE research.sim_trade_legs SET ordinal = 1 WHERE false",
+            "DELETE FROM research.sim_trade_legs WHERE false",
+            "TRUNCATE research.sim_trade_legs",
+            "UPDATE research.sim_trade_leg_charges SET ordinal = 1 WHERE false",
+            "DELETE FROM research.sim_trade_leg_charges WHERE false",
+            "UPDATE research.sim_comparisons SET unit = 'x' WHERE false",
+            "DELETE FROM research.sim_comparisons WHERE false",
+            "TRUNCATE research.sim_comparisons",
         })
         {
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
@@ -154,7 +165,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(2);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(5);
     }
 
     [Fact]
@@ -195,6 +206,20 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
         grant.ShouldBeGreaterThan(text.LastIndexOf("CreateTable(", StringComparison.Ordinal));
         runs.ShouldBeGreaterThan(grant);
         trades.ShouldBeGreaterThan(grant);
+    }
+
+    [Theory]
+    [InlineData("AddSimTradeLegs", new[] { "sim_trade_legs", "sim_trade_leg_charges" })]
+    [InlineData("AddSimComparisons", new[] { "sim_comparisons" })]
+    public void The_later_research_migrations_make_each_of_their_tables_append_only(string migration, string[] tables)
+    {
+        var migrations = Path.GetFullPath(Path.Combine(ThisDirectory(), "..", "..", "..", "src", "XDrishti.Infrastructure", "Persistence", "Migrations"));
+        var text = File.ReadAllText(Directory.EnumerateFiles(migrations, "*_" + migration + ".cs").Single());
+
+        foreach (var table in tables)
+        {
+            text.IndexOf("MakeAppendOnlyForAppRole(Schemas.Research, \"" + table + "\")", StringComparison.Ordinal).ShouldBeGreaterThan(text.LastIndexOf("CreateTable(", StringComparison.Ordinal), table);
+        }
     }
 
     private static string ThisDirectory([CallerFilePath] string path = "") => Path.GetDirectoryName(path)!;

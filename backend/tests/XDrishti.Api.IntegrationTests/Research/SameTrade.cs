@@ -37,6 +37,20 @@ internal static class SameTrade
             return;
         }
 
+        if (actual is IEnumerable and not string && actual.GetType().Namespace?.StartsWith("XDrishti.Domain", StringComparison.Ordinal) == true)
+        {
+            // the legs and the charges of a trade: element by element, so that a double of a leg is compared by its bits too
+            var left = ((IEnumerable)actual).Cast<object?>().ToList();
+            var right = ((IEnumerable)expected).Cast<object?>().ToList();
+            left.Count.ShouldBe(right.Count, path);
+            for (var i = 0; i < left.Count; i++)
+            {
+                Bits(left[i], right[i], path + "[" + i + "]");
+            }
+
+            return;
+        }
+
         var type = actual.GetType();
         if (type.Namespace?.StartsWith("XDrishti.Domain", StringComparison.Ordinal) != true || type.IsEnum || actual is IEnumerable)
         {

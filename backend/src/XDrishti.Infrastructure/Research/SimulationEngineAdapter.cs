@@ -19,12 +19,12 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
 
     public IReadOnlyList<BuiltInStrategyInfo> BuiltIns => BuiltInStrategies.Catalog;
 
-    public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills)
+    public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null)
     {
         ArgumentNullException.ThrowIfNull(strategyId);
         ArgumentNullException.ThrowIfNull(parameters);
 
-        var prepared = BuiltInStrategies.Prepare(strategyId, parameters, evaluationTimeframe, fills);
+        var prepared = BuiltInStrategies.Prepare(strategyId, parameters, evaluationTimeframe, fills, exits);
         return prepared.Strategy is { } strategy
             ? Result.Success<IPreparedStrategy>(new PreparedHandle(strategy, Fields(prepared.Problems)))
             : Refused(prepared.Problems);
@@ -42,6 +42,18 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
         return InstrumentReplayer.Replay(handle.Strategy, input);
     }
 
+    public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        ArgumentNullException.ThrowIfNull(input);
+        if (strategy is not PreparedHandle handle)
+        {
+            throw new ArgumentException("The strategy was not prepared by this engine.", nameof(strategy));
+        }
+
+        return InstrumentReplayer.ReplayAll(handle.Strategy, input);
+    }
+
     private static Result<IPreparedStrategy> Refused(IReadOnlyList<LocatedProblem> problems) =>
         Result.Failure<IPreparedStrategy>(SimulationErrors.StrategyInvalid(Fields(problems)));
 
@@ -55,6 +67,10 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
         public PreparedStrategy Strategy { get; } = strategy;
 
         public StrategyRecord Record => Strategy.Record;
+
+        public IReadOnlyList<CandidateRecord> Candidates { get; } = [.. strategy.Members.Select(m => new CandidateRecord(m.Id, m.Exit, m.Record, m.EntriesDefinitionSha256))];
+
+        public bool HoldsOvernight => Strategy.HoldsOvernight;
 
         public IReadOnlyList<FieldError> Warnings { get; } = warnings;
     }

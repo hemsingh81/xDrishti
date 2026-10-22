@@ -88,6 +88,11 @@ internal static class SimulateCommand
     private static async Task<int> ExecuteAsync(
         SimulateOptions options, string root, IServiceProvider services, ISimulationEngine engine, SimulateConsole console, ILogger logger, CancellationToken cancellationToken)
     {
+        if (options.Exits is { Candidates.Count: > 1 })
+        {
+            return await SimulateCompare.RunAsync(options, root, services, engine, console, logger, cancellationToken);
+        }
+
         var time = services.GetRequiredService<TimeProvider>();
         SimulateLog.Started(logger, options.StrategyId, options.Basket is null ? "symbols" : "basket", options.Symbols.Count, options.From, options.To);
         await using var scope = services.CreateAsyncScope();
@@ -105,7 +110,7 @@ internal static class SimulateCommand
 
         phaseStart = time.GetTimestamp();
         var rules = SimulatePipeline.Rules(options.Fills);
-        var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted);
+        var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits);
         var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken);
         if (ran.IsFailure)
         {
@@ -226,6 +231,13 @@ internal static class SimulateCommand
             }
         }
 
+        text.Append("exits (--exit POLICY:name=value,...; a|b lists candidate values and two candidates or more are compared on the same entries):\n");
+        foreach (var line in ExitFlags.Catalog)
+        {
+            text.Append("  ").Append(line).Append('\n');
+        }
+
+        text.Append("  --time-stop min_progress_rr=<n>,intraday_bars=<n> (or swing_sessions=<n>): an overlay on every candidate\n");
         return text.ToString();
     }
 

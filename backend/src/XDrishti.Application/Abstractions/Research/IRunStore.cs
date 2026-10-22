@@ -12,6 +12,15 @@ public interface IRunStore
     /// <summary>Stores the header and every trade in one transaction. <c>store.run_conflict</c> for another record under a stored key; <c>store.write_failed</c> when the write or its count check failed.</summary>
     ValueTask<Result<StoreOutcome>> StoreAsync(RunToStore run, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Stores the header of a comparison (P4-05, D10): its members are runs stored on their own, and the comparison is refused when one of them is not (<c>store.write_failed</c>). Idempotent by comparison key; another record under a stored key is
+    /// <c>store.run_conflict</c>.
+    /// </summary>
+    ValueTask<Result<StoreOutcome>> StoreComparisonAsync(ComparisonToStore comparison, CancellationToken cancellationToken);
+
+    /// <summary>The header of a stored comparison, or null.</summary>
+    ValueTask<StoredComparisonHeader?> FindComparisonAsync(string comparisonKey, CancellationToken cancellationToken);
+
     /// <summary>The header of a stored run, or null.</summary>
     ValueTask<StoredRunHeader?> FindAsync(string runKey, CancellationToken cancellationToken);
 

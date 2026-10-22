@@ -79,7 +79,7 @@ conditions, and shifting recommendations accordingly — with guards against foo
 (all / 250 days / 60 days): n, win rate, avg win/loss R, expectancy, profit factor, max drawdown, MAE/MFE
 quantiles. Win rate uses a Beta prior <strong>shrunk toward the parent group</strong> when n is small; confidence = lower
 bound of the credible interval; exponential recency weighting.</p>
-<p><strong>Layer 2 — Exit selection.</strong> See <a href="08-exits-and-risk.html">doc 08</a> §3.</p>
+<p><strong>Layer 2 — Exit selection.</strong> See <a href="08-exits-and-risk.html">doc 08</a> §3. Its input, the replay of the same entries under every candidate with the MAE/MFE tables, is built (P4-05, <a href="../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.html">ADR 0053</a>); the choice by out-of-sample expectancy is P4-06.</p>
 <p><strong>Layer 3 — Meta-model (meta-labeling).</strong></p>
 <ul>
 <li>Labels: <strong>triple barrier</strong> — target, stop, time limit (session end / max hold).</li>
@@ -503,7 +503,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-21 18:43</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-22 06:16</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

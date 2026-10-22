@@ -20,7 +20,7 @@ public sealed partial class TradeColumnsTests
     private static IEnumerable<string> Properties(Type type, params string[] except) =>
         type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(p => p.Name).Where(n => !except.Contains(n, StringComparer.Ordinal));
 
-    /// <summary>The names the Domain implies, written by rule from the types, with the few renames the spec fixes. The legs of a trade and the charges of its legs (P4-01) are left out on purpose: the table has no column for them yet, and a trade with legs is refused before the store (D15).</summary>
+    /// <summary>The names the Domain implies, written by rule from the types, with the few renames the spec fixes. The legs of a trade and the charges of its legs (P4-01) are left out of this list on purpose: they are rows of the two child tables of P4-05, compared in their own test below.</summary>
     private static List<string> ExpectedNames()
     {
         var names = Properties(typeof(SimTrade), nameof(SimTrade.SchemaVersion), nameof(SimTrade.TriggerBar), nameof(SimTrade.Costing), nameof(SimTrade.Key), nameof(SimTrade.Legs)).Select(Snake).ToList();
@@ -49,9 +49,18 @@ public sealed partial class TradeColumnsTests
     }
 
     [Fact]
+    public void The_columns_of_the_leg_tables_are_the_properties_of_the_leg_the_fill_charge_and_its_eight_amounts()
+    {
+        // P4-05, D9: a field added to Leg, LegCharge or LegCharges fails here until the tables, the copy, the reads and a migration are written
+        RunStore.LegColumnNames.Order(StringComparer.Ordinal).ShouldBe(Properties(typeof(Leg)).Select(Snake).Order(StringComparer.Ordinal));
+        RunStore.ChargeColumnNames.Order(StringComparer.Ordinal).ShouldBe(
+            Properties(typeof(LegCharge), nameof(LegCharge.Charges)).Concat(Properties(typeof(LegCharges), nameof(LegCharges.Total))).Select(Snake).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
     public void The_schema_versions_the_table_is_built_for_are_pinned()
     {
-        SimTrade.CurrentSchemaVersion.ShouldBe(5, "schema 5 (P4-01, ADR 0049) only appends the legs, which this table does not hold yet: a trade with legs is refused before the store, and a trade without legs equals its schema-4 form, so the columns stay (any later change needs new columns, a migration and an ADR)");
+        SimTrade.CurrentSchemaVersion.ShouldBe(5, "schema 5 (P4-01, ADR 0049) only appends the legs, which the child tables of P4-05 hold; a trade without legs equals its schema-4 form, so the columns stay (any later change needs new columns, a migration and an ADR)");
         SimulationRun.CurrentSchemaVersion.ShouldBe(6);
     }
 

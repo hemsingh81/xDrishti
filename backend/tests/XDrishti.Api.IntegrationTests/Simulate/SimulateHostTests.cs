@@ -126,7 +126,9 @@ public sealed class SimulateHostTests
 
         public IReadOnlyList<BuiltInStrategyInfo> BuiltIns => [];
 
-        public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, XDrishti.Domain.Market.Bars.Timeframe evaluationTimeframe, FillRules? fills) => throw new NotSupportedException();
+        public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, XDrishti.Domain.Market.Bars.Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null) => throw new NotSupportedException();
+
+        public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException();
 
         public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException();
     }

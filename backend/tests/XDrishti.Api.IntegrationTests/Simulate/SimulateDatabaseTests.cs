@@ -542,8 +542,15 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
 
         public IReadOnlyList<BuiltInStrategyInfo> BuiltIns => inner.BuiltIns;
 
-        public Result<ResearchPort.IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills) =>
-            inner.Prepare(strategyId, parameters, evaluationTimeframe, fills);
+        public Result<ResearchPort.IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null) =>
+            inner.Prepare(strategyId, parameters, evaluationTimeframe, fills, exits);
+
+        public ComparisonReplay ReplayComparison(ResearchPort.IPreparedStrategy strategy, InstrumentReplayInput input)
+        {
+            var replay = inner.ReplayComparison(strategy, input);
+            cancel.Cancel();
+            return replay;
+        }
 
         public InstrumentReplay Replay(ResearchPort.IPreparedStrategy strategy, InstrumentReplayInput input)
         {

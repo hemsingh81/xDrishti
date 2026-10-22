@@ -33,16 +33,29 @@ public static class InstrumentReplayer
     /// <exception cref="InvalidOperationException">The bars are not strictly ascending (two equal epochs or a descending pair); the message names the instrument.</exception>
     public static InstrumentReplay Replay(PreparedStrategy strategy, InstrumentReplayInput input) => ReplayCore(strategy, input, null);
 
+    /// <summary>
+    /// Replays a prepared comparison over the instrument (P4-05): one scan and one replay record for each candidate, each as the replay of that candidate alone would give it except that a swing side is not gated (D4); the number of entries the gate
+    /// would have skipped is in <see cref="ComparisonReplay.GatedBlocked"/>. A plain strategy gives one member.
+    /// </summary>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    /// <exception cref="ArgumentException">As <see cref="Replay"/>.</exception>
+    /// <exception cref="InvalidOperationException">As <see cref="Replay"/>.</exception>
+    public static ComparisonReplay ReplayAll(PreparedStrategy strategy, InstrumentReplayInput input) => ReplayMembers(strategy, input, null);
+
     /// <summary>The replay with an observer that is given the list and the result of every call of <see cref="Simulator.Run"/>, for the tests of the decision index (criterion 1b).</summary>
-    internal static InstrumentReplay ReplayCore(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer)
+    internal static InstrumentReplay ReplayCore(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer) => ReplayMembers(strategy, input, observer).Members[0];
+
+    /// <summary>The replay of every candidate of the strategy, with the observer of <see cref="ReplayCore"/> given the result of each candidate's call.</summary>
+    internal static ComparisonReplay ReplayMembers(PreparedStrategy strategy, InstrumentReplayInput input, Action<IReadOnlyList<Bar>, SimulationResult>? observer)
     {
         ArgumentNullException.ThrowIfNull(strategy);
         ArgumentNullException.ThrowIfNull(input);
+        var count = strategy.Members.Count;
         var raw = Validated(input);
         var hash = BarStreamHash.Compute(raw);
         if (raw.Count == 0)
         {
-            return new InstrumentReplay(Record(input, Facts.NoData(hash), SkipReason.NoBars, null, Scanned.None), [], []);
+            return Same(new InstrumentReplay(Record(input, Facts.NoData(hash), SkipReason.NoBars, null, Scanned.None), [], []), count);
         }
 
         var scan = SessionScan.Classify(raw, input.Calendar, input.Options);
@@ -50,35 +63,44 @@ public static class InstrumentReplayer
         var facts = new Facts(first, SessionClock.DateOf(raw[^1].EpochSeconds), raw.Count, scan.BarsFed, scan.BarsExcluded, scan.BarsOutsideSession, hash, AdjustmentsOf(input, first), scan);
         if (input.PresetSkip is { } preset)
         {
-            return new InstrumentReplay(Record(input, facts, preset, input.SkipDetail, Scanned.None), [], []);
+            return Same(new InstrumentReplay(Record(input, facts, preset, input.SkipDetail, Scanned.None), [], []), count);
         }
 
         if (scan.Ran.Count == 0)
         {
-            return new InstrumentReplay(Record(input, facts, SkipReason.NoRunnableSessions, null, Scanned.None), [], []);
+            return Same(new InstrumentReplay(Record(input, facts, SkipReason.NoRunnableSessions, null, Scanned.None), [], []), count);
         }
 
-        var (scanned, trades, openAtEnd) = Scan(strategy, input, scan, observer);
-        var windowSteps = scanned.Scans.Sum(s => s.WindowSteps);
-        SkipReason? skip = null;
-        if (windowSteps == 0)
+        var members = Scan(strategy, input, scan, observer);
+        var replays = new List<InstrumentReplay>(count);
+        foreach (var (scanned, trades, openAtEnd, _) in members)
         {
-            skip = SkipReason.NoRunnableSessions;
-        }
-        else if (scan.Ran[^1].Date < input.From)
-        {
-            skip = SkipReason.NoSessionsInWindow;
-        }
-        else if (scanned.Scans.All(s => s.FullyReadySteps == 0))
-        {
-            skip = SkipReason.FeaturesNotReady;
+            var windowSteps = scanned.Scans.Sum(s => s.WindowSteps);
+            SkipReason? skip = null;
+            if (windowSteps == 0)
+            {
+                skip = SkipReason.NoRunnableSessions;
+            }
+            else if (scan.Ran[^1].Date < input.From)
+            {
+                skip = SkipReason.NoSessionsInWindow;
+            }
+            else if (scanned.Scans.All(s => s.FullyReadySteps == 0))
+            {
+                skip = SkipReason.FeaturesNotReady;
+            }
+
+            // A skipped instrument keeps its data facts and its counters and has no trades.
+            replays.Add(skip is null
+                ? new InstrumentReplay(Record(input, facts, null, null, scanned), trades, openAtEnd)
+                : new InstrumentReplay(Record(input, facts, skip, null, scanned), [], []));
         }
 
-        // A skipped instrument keeps its data facts and its counters and has no trades.
-        return skip is null
-            ? new InstrumentReplay(Record(input, facts, null, null, scanned), trades, openAtEnd)
-            : new InstrumentReplay(Record(input, facts, skip, null, scanned), [], []);
+        return new ComparisonReplay(replays.AsReadOnly(), members.Select(m => m.Gated).ToList().AsReadOnly());
     }
+
+    private static ComparisonReplay Same(InstrumentReplay replay, int count) =>
+        new(Enumerable.Repeat(replay, count).ToList().AsReadOnly(), Enumerable.Repeat(0L, count).ToList().AsReadOnly());
 
     private static IReadOnlyList<Bar> Validated(InstrumentReplayInput input)
     {
@@ -127,7 +149,7 @@ public static class InstrumentReplayer
     private static List<AppliedAdjustment> AdjustmentsOf(InstrumentReplayInput input, DateOnly firstBar) =>
         [.. input.Factors.ActionsAfter(firstBar).Select(a => new AppliedAdjustment(a.ExDate, a.Kind, a.Numerator, a.Denominator, a.Factor, input.CsvAdjustedThrough is { } through && a.ExDate <= through))];
 
-    private static (Scanned Scanned, List<SimTrade> Trades, List<SimTrade> OpenAtEnd) Scan(PreparedStrategy strategy, InstrumentReplayInput input, SessionScan scan, Action<IReadOnlyList<Bar>, SimulationResult>? observer)
+    private static List<(Scanned Scanned, List<SimTrade> Trades, List<SimTrade> OpenAtEnd, long Gated)> Scan(PreparedStrategy strategy, InstrumentReplayInput input, SessionScan scan, Action<IReadOnlyList<Bar>, SimulationResult>? observer)
     {
         var bars = ReplayBars.Build(input.RawBars, scan.Ran, input.Factors);
         var fed = bars.Fed;
@@ -150,14 +172,9 @@ public static class InstrumentReplayer
 
         var instrument = new InstrumentRef(input.InstrumentId, input.Symbol);
         var scans = new List<ScanCounters>();
-        var walk = WalkCounters.Empty;
-        var trades = new List<SimTrade>();
-        var openAtEnd = new List<SimTrade>();
-        long suppressed = 0, beforeWindow = 0, excludedAcross = 0, candidatesInWindow = 0, skippedQuantity = 0, skippedCost = 0, legsMerged = 0;
-        var noTrades = RunFates.Empty;
+        var tallies = strategy.Members.Select(_ => new Tally()).ToList();
         var holdsOvernight = strategy.Simulator.HoldsOvernight;
         var segment = holdsOvernight ? CostSegment.Delivery : CostSegment.IntradayEquity;
-        var excludedAtDay = new Dictionary<DateOnly, int>();
         for (var s = 0; s < segmentStarts.Count; s++)
         {
             var firstSession = segmentStarts[s];
@@ -165,86 +182,139 @@ public static class InstrumentReplayer
             var from = starts[firstSession];
             var count = starts[endSession] - from;
             IReadOnlyList<Bar> list = firstSession == 0 && endSession == ran.Count ? fed : new BarSegment(fed, from, count);
-            var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs));
-            if (run.IsFailure)
-            {
-                throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message);
-            }
-
-            var result = run.Value;
-            observer?.Invoke(list, result);
+            var segmentRun = RunSegment(strategy, instrument, list, input);
+            var results = segmentRun.Members;
             DateOnly? flaggedDate = s == 0 ? null : ran[firstSession].Date;
-            foreach (var outcome in result.Outcomes)
+            for (var m = 0; m < results.Count; m++)
             {
-                // The date of a candidate is the one of its decision (ADR 0043, D6): an order that rests overnight is filled on the next session, and the window cuts by the day of the decision.
-                var date = SessionClock.DateOf(outcome.Candidate.DecisionEpochSeconds - 60);
-                if (date >= input.From && date <= input.To)
+                var result = results[m];
+                var tally = tallies[m];
+                observer?.Invoke(list, result);
+                if (strategy.Comparison is not null && holdsOvernight)
                 {
-                    candidatesInWindow++;
+                    // D4: the comparison walk is not gated; what the gate would have skipped under this exit is counted, for the entries decided in the window
+                    tally.Gated += segmentRun.BlockedByGate(m, c => InWindow(c, input, flaggedDate));
                 }
 
-                if (flaggedDate is { } day && date == day)
+                foreach (var outcome in result.Outcomes)
                 {
-                    suppressed++;
-                }
-                else if (outcome.Walk.Trade is { } trade)
-                {
-                    if (date < input.From)
+                    // The date of a candidate is the one of its decision (ADR 0043, D6): an order that rests overnight is filled on the next session, and the window cuts by the day of the decision.
+                    var date = SessionClock.DateOf(outcome.Candidate.DecisionEpochSeconds - 60);
+                    if (date >= input.From && date <= input.To)
                     {
-                        beforeWindow++;
+                        tally.CandidatesInWindow++;
                     }
-                    else if (trade.ExitReason == ExitReason.EndOfData && holdsOvernight && s + 1 < segmentStarts.Count)
-                    {
-                        // D13: a swing position that was still open when the segment ended, and a flagged day follows, cannot be followed across the discontinuity: excluded and counted (not open at the end, not a trade).
-                        excludedAcross++;
-                        var nextDay = ran[segmentStarts[s + 1]].Date;
-                        excludedAtDay[nextDay] = excludedAtDay.GetValueOrDefault(nextDay) + 1;
-                    }
-                    else if (Costed(trade, input.Costs, segment, input.Symbol, ref skippedQuantity, ref skippedCost) is { } kept)
-                    {
-                        // ADR 0042, D1: costing comes after the window cut and the exclusion, and before the fates are counted; a skipped trade has left the lists.
-                        if (kept.Legs is { } legs && kept.Costing?.LegCharges is { } charged)
-                        {
-                            legsMerged += legs.Count - charged.Count;
-                        }
 
-                        if (kept.ExitReason == ExitReason.EndOfData)
+                    if (flaggedDate is { } day && date == day)
+                    {
+                        tally.Suppressed++;
+                    }
+                    else if (outcome.Walk.Trade is { } trade)
+                    {
+                        if (date < input.From)
                         {
-                            openAtEnd.Add(kept);
+                            tally.BeforeWindow++;
                         }
-                        else
+                        else if (trade.ExitReason == ExitReason.EndOfData && holdsOvernight && s + 1 < segmentStarts.Count)
                         {
-                            trades.Add(kept);
+                            // D13: a swing position that was still open when the segment ended, and a flagged day follows, cannot be followed across the discontinuity: excluded and counted (not open at the end, not a trade).
+                            tally.ExcludedAcross++;
+                            var nextDay = ran[segmentStarts[s + 1]].Date;
+                            tally.ExcludedAtDay[nextDay] = tally.ExcludedAtDay.GetValueOrDefault(nextDay) + 1;
+                        }
+                        else if (Costed(trade, input.Costs, segment, input.Symbol, ref tally.SkippedQuantity, ref tally.SkippedCost) is { } kept)
+                        {
+                            // ADR 0042, D1: costing comes after the window cut and the exclusion, and before the fates are counted; a skipped trade has left the lists.
+                            if (kept.Legs is { } legs && kept.Costing?.LegCharges is { } charged)
+                            {
+                                tally.LegsMerged += legs.Count - charged.Count;
+                            }
+
+                            if (kept.ExitReason == ExitReason.EndOfData)
+                            {
+                                tally.OpenAtEnd.Add(kept);
+                            }
+                            else
+                            {
+                                tally.Trades.Add(kept);
+                            }
                         }
                     }
+                    else
+                    {
+                        tally.NoTrades = tally.NoTrades.Add(NoTradeFate(outcome.Walk.NoTrade, input.Symbol));
+                    }
                 }
-                else
-                {
-                    noTrades = noTrades.Add(NoTradeFate(outcome.Walk.NoTrade, input.Symbol));
-                }
+
+                tally.Walk = tally.Walk.Add(result.Walk);
             }
 
-            for (var side = 0; side < result.Scans.Count; side++)
+            // one scan: the counters are the same list in every member's result
+            for (var side = 0; side < results[0].Scans.Count; side++)
             {
                 if (scans.Count <= side)
                 {
-                    scans.Add(result.Scans[side]);
+                    scans.Add(results[0].Scans[side]);
                 }
                 else
                 {
-                    scans[side] = scans[side].Add(result.Scans[side]);
+                    scans[side] = scans[side].Add(results[0].Scans[side]);
                 }
             }
-
-            walk = walk.Add(result.Walk);
         }
 
-        var fates = noTrades with { EntriesSuppressed = suppressed, TradesBeforeWindow = beforeWindow, OpenAtEnd = openAtEnd.Count, Trades = trades.Count, ExcludedAcrossDiscontinuity = excludedAcross, SkippedQuantity = skippedQuantity, SkippedCost = skippedCost };
-        var notes = flagged.Select(n => excludedAtDay.TryGetValue(n.Date, out var count) ? n with { ExcludedPositions = count } : n).ToList();
-        var scanned = new Scanned(ran[0].Date, new DateSpan(ran[0].Date, ran[^1].Date), scans.AsReadOnly(), walk with { LegsMerged = legsMerged }, fates, notes.AsReadOnly(), candidatesInWindow, trades.Count + openAtEnd.Count);
-        trades = [.. trades.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
-        openAtEnd = [.. openAtEnd.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)];
-        return (scanned, trades, openAtEnd);
+        var done = new List<(Scanned Scanned, List<SimTrade> Trades, List<SimTrade> OpenAtEnd, long Gated)>(tallies.Count);
+        foreach (var tally in tallies)
+        {
+            var fates = tally.NoTrades with { EntriesSuppressed = tally.Suppressed, TradesBeforeWindow = tally.BeforeWindow, OpenAtEnd = tally.OpenAtEnd.Count, Trades = tally.Trades.Count, ExcludedAcrossDiscontinuity = tally.ExcludedAcross, SkippedQuantity = tally.SkippedQuantity, SkippedCost = tally.SkippedCost };
+            var notes = flagged.Select(n => tally.ExcludedAtDay.TryGetValue(n.Date, out var count) ? n with { ExcludedPositions = count } : n).ToList();
+            var scanned = new Scanned(ran[0].Date, new DateSpan(ran[0].Date, ran[^1].Date), scans.AsReadOnly(), tally.Walk with { LegsMerged = tally.LegsMerged }, fates, notes.AsReadOnly(), tally.CandidatesInWindow, tally.Trades.Count + tally.OpenAtEnd.Count);
+            done.Add((scanned, [.. tally.Trades.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)], [.. tally.OpenAtEnd.OrderBy(t => t.EntryEpochSeconds).ThenBy(t => t.Side)], tally.Gated));
+        }
+
+        return done;
+    }
+
+    /// <summary>A candidate decided inside the window, on a day that is not the flagged one.</summary>
+    private static bool InWindow(EntryCandidate candidate, InstrumentReplayInput input, DateOnly? flaggedDate)
+    {
+        var date = SessionClock.DateOf(candidate.DecisionEpochSeconds - 60);
+        return date >= input.From && date <= input.To && (flaggedDate is not { } day || date != day);
+    }
+
+    /// <summary>One call of the simulator on a segment: the results of the one candidate of a plain strategy, or of every candidate of a comparison (one scan).</summary>
+    private static ComparisonResult RunSegment(PreparedStrategy strategy, InstrumentRef instrument, IReadOnlyList<Bar> list, InstrumentReplayInput input)
+    {
+        if (strategy.Comparison is { } comparison)
+        {
+            var many = comparison.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs));
+            return many.IsFailure
+                ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + many.Error.Code + ": " + many.Error.Message)
+                : many.Value;
+        }
+
+        var run = strategy.Simulator.Run(instrument, list, input.Tick!, input.Calendar, QuantityOf(input.Costs));
+        return run.IsFailure
+            ? throw new InvalidOperationException("The simulation of instrument " + input.Symbol + " failed: " + run.Error.Code + ": " + run.Error.Message)
+            : new ComparisonResult([run.Value], run.Value.Scans);
+    }
+
+    /// <summary>What the replay of one candidate counts across the segments of an instrument.</summary>
+    private sealed class Tally
+    {
+        public readonly List<SimTrade> Trades = [];
+        public readonly List<SimTrade> OpenAtEnd = [];
+        public readonly Dictionary<DateOnly, int> ExcludedAtDay = [];
+        public WalkCounters Walk = WalkCounters.Empty;
+        public RunFates NoTrades = RunFates.Empty;
+        public long Suppressed;
+        public long BeforeWindow;
+        public long ExcludedAcross;
+        public long CandidatesInWindow;
+        public long SkippedQuantity;
+        public long SkippedCost;
+        public long LegsMerged;
+        public long Gated;
     }
 
     /// <summary>The full size of ADR 0042 as the walker of a pyramid needs it (P4-04, D3): the sizing of the cost context for an exact entry and an initial risk, 0 when the input is not sizable; null for a gross run.</summary>

@@ -152,12 +152,9 @@ public sealed class Simulator
     {
         ArgumentNullException.ThrowIfNull(bars);
         ArgumentNullException.ThrowIfNull(tick);
-        for (var i = 1; i < bars.Count; i++)
+        if (NotAscending(bars) is { } unordered)
         {
-            if (bars[i].EpochSeconds <= bars[i - 1].EpochSeconds)
-            {
-                return Result.Failure<SimulationResult>(Error.Validation(SimulatorCodes.BarsNotAscending, "The minutes are not strictly ascending at position " + i + ": two equal epochs or a descending pair."));
-            }
+            return Result.Failure<SimulationResult>(unordered);
         }
 
         var outcomes = new List<CandidateOutcome>();
@@ -178,19 +175,9 @@ public sealed class Simulator
             }
 
             scans.Add(scanner.Counters);
-            var rules = RulesOf(side, _fills, tick, calendar);
-            if (rules.IsFailure)
-            {
-                return Result.Failure<SimulationResult>(rules.Error);
-            }
 
             // D11: a swing side keeps one open position at a time, so its candidates go through the gate; an intraday trade leaves on its entry date and is not gated.
-            var sideRules = rules.Value;
-            var rule = side.Trail is { } trail ? TrailRules.Of(trail, scanner.TapeColumnOf(trail)) : null;
-            var exitContext = rule is null && side.Policy is null ? null : new ExitContext(rule, scanner.Tape, side.Policy, quantity);
-            var walked = HoldsOvernight
-                ? PositionGate.Apply(scanner.Candidates, candidate => TradeWalker.Walk(candidate, bars, sideRules, exitContext))
-                : WalkAll(scanner.Candidates, bars, sideRules, exitContext);
+            var walked = WalkSide(side, scanner, bars, tick, calendar, quantity, HoldsOvernight);
             if (walked.IsFailure)
             {
                 return Result.Failure<SimulationResult>(walked.Error);
@@ -206,6 +193,43 @@ public sealed class Simulator
         var ordered = outcomes.OrderBy(o => o.Candidate.DecisionEpochSeconds).ThenBy(o => o.Candidate.Side).ToList().AsReadOnly();
         return Result.Success(new SimulationResult(HeaderOf(), ordered, scans.AsReadOnly(), walk));
     }
+
+    /// <summary>The refusal for minutes that are not strictly ascending, or null.</summary>
+    internal static Error? NotAscending(IReadOnlyList<Bar> bars)
+    {
+        for (var i = 1; i < bars.Count; i++)
+        {
+            if (bars[i].EpochSeconds <= bars[i - 1].EpochSeconds)
+            {
+                return Error.Validation(SimulatorCodes.BarsNotAscending, "The minutes are not strictly ascending at position " + i + ": two equal epochs or a descending pair.");
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Walks every candidate of a scanned side under this simulator's one exit (P4-05: the scanner may belong to another simulator of a comparison, whose tape holds the features of every candidate; the column of this exit is found by name).
+    /// With <paramref name="gated"/> the candidates go through the <see cref="PositionGate"/>, else every candidate is walked.
+    /// </summary>
+    internal Result<IReadOnlyList<CandidateOutcome>> WalkSide(SideRun side, EntryScanner scanner, IReadOnlyList<Bar> bars, TickSpec tick, TradingCalendar? calendar, Func<decimal, decimal, long>? quantity, bool gated)
+    {
+        var rules = RulesOf(side, _fills, tick, calendar);
+        if (rules.IsFailure)
+        {
+            return Result.Failure<IReadOnlyList<CandidateOutcome>>(rules.Error);
+        }
+
+        var sideRules = rules.Value;
+        var rule = side.Trail is { } trail ? TrailRules.Of(trail, scanner.TapeColumnOf(trail)) : null;
+        var exitContext = rule is null && side.Policy is null ? null : new ExitContext(rule, scanner.Tape, side.Policy, quantity);
+        return gated
+            ? PositionGate.Apply(scanner.Candidates, candidate => TradeWalker.Walk(candidate, bars, sideRules, exitContext))
+            : WalkAll(scanner.Candidates, bars, sideRules, exitContext);
+    }
+
+    /// <summary>The side runs of this simulator, Buy first (for a comparison, which walks them against a scanner of its own).</summary>
+    internal IReadOnlyList<SideRun> SideRuns => _sides;
 
     /// <summary>The one place the rules of a walk are built: the exit rules of the side, the fill rules, the tick of the instrument and, for a swing side, the hold counted with the calendar.</summary>
     private static Result<WalkRules> RulesOf(SideRun side, FillRules fills, TickSpec tick, TradingCalendar? calendar)
@@ -239,7 +263,7 @@ public sealed class Simulator
     }
 
     /// <summary>The one place the header is built: the first two labels come from the description of the fill rules, the other three are fixed.</summary>
-    private SimulationHeader HeaderOf() =>
+    internal SimulationHeader HeaderOf() =>
         new(SimulationEngine.Version, SimTrade.CurrentSchemaVersion, _strategyId, _fills, _fills.Basis, CostBasis.None, SimulationHeader.LabelsOf(_fills));
 
     private static LocatedProblem Refusal(string path, string code, string message) => new(path, new Problem(code, message, NoText));
@@ -387,5 +411,5 @@ public sealed class Simulator
     };
 
     /// <summary>A compiled side with what its walks need: the reward-to-risk of its target (the one <c>FIXED_RR</c>, or T1 of a partial policy; null for a trail), the plan of its trail (<c>ATR_TRAIL</c>, <c>STRUCTURE_TRAIL</c> or <c>EMA_TRAIL</c>; P4-03), the policy of the partial and the time stop (P4-02), its square-off minute (<see cref="WalkRules.NoSquareOff"/> for a swing side) and, for a swing side, its longest hold in sessions.</summary>
-    private sealed record SideRun(CompiledSide Compiled, double? RewardRisk, int SquareOffMinute, int? MaxHoldSessions, ExitPlan? Trail, LegPolicy? Policy);
+    internal sealed record SideRun(CompiledSide Compiled, double? RewardRisk, int SquareOffMinute, int? MaxHoldSessions, ExitPlan? Trail, LegPolicy? Policy);
 }

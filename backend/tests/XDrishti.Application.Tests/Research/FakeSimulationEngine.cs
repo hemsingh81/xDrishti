@@ -18,6 +18,9 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
     /// <summary>What <see cref="Prepare"/> was asked, in order.</summary>
     public List<(string StrategyId, IReadOnlyDictionary<string, double> Parameters, Timeframe Timeframe, FillRules? Fills)> Prepared { get; } = [];
 
+    /// <summary>The exit choice of each <see cref="Prepare"/>, in order.</summary>
+    public List<ExitChoice?> PreparedExits { get; } = [];
+
     /// <summary>The inputs of <see cref="Replay"/>, in order.</summary>
     public List<InstrumentReplayInput> Replays { get; } = [];
 
@@ -32,12 +35,23 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
     /// <summary>Runs at the start of every replay (a test moves the clock or throws).</summary>
     public Action<InstrumentReplayInput>? OnReplay { get; set; }
 
-    public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills)
+    public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null)
     {
         Prepared.Add((strategyId, parameters, evaluationTimeframe, fills));
+        PreparedExits.Add(exits);
         return PrepareResult ?? Result.Success<IPreparedStrategy>(new FakePrepared(
             new StrategyRecord(strategyId, parameters, "{}", new string('a', 64), evaluationTimeframe, [Side.Buy, Side.Sell]),
-            Warnings));
+            Warnings,
+            exits));
+    }
+
+    public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input)
+    {
+        ArgumentNullException.ThrowIfNull(strategy);
+        Replays.Add(input);
+        OnReplay?.Invoke(input);
+        var members = strategy.Candidates.Select(_ => Script?.Invoke(input) ?? Default(input)).ToList();
+        return new ComparisonReplay(members, members.Select(_ => 0L).ToList());
     }
 
     public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input)
@@ -82,9 +96,15 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             2.0, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0);
     }
 
-    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings) : IPreparedStrategy
+    private sealed class FakePrepared(StrategyRecord record, IReadOnlyList<FieldError> warnings, ExitChoice? exits) : IPreparedStrategy
     {
         public StrategyRecord Record => record;
+
+        public IReadOnlyList<CandidateRecord> Candidates { get; } = exits is null
+            ? [new CandidateRecord(record.Id, null, record, record.DefinitionSha256)]
+            : [.. exits.Candidates.Select(c => new CandidateRecord(exits.IdOf(c), c, record with { DefinitionSha256 = CanonicalText.Sha256Hex(record.DefinitionSha256 + exits.IdOf(c)) }, record.DefinitionSha256))];
+
+        public bool HoldsOvernight => false;
 
         public IReadOnlyList<FieldError> Warnings => warnings;
     }

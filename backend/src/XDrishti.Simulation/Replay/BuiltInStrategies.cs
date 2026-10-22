@@ -137,12 +137,31 @@ public static class BuiltInStrategies
     /// </summary>
     /// <exception cref="ArgumentNullException"><paramref name="strategyId"/> is null.</exception>
     /// <exception cref="ArgumentException">A parameter value is not a finite number.</exception>
-    public static PreparedBuild Prepare(string strategyId, IReadOnlyDictionary<string, double>? parameters, Timeframe evaluationTimeframe, FillRules? fills = null)
+    /// <param name="strategyId">A built-in id.</param>
+    /// <param name="parameters">Its parameters (null or empty: the defaults).</param>
+    /// <param name="evaluationTimeframe">The timeframe the rules are evaluated on.</param>
+    /// <param name="fills">The fill rules; null means the defaults.</param>
+    /// <param name="exits">The exits a verb chose (P4-05, D1): the exits and overlays of the built-in are replaced, its entry, stop and time rules are not. One candidate prepares a plain run of that exit; two or more prepare a comparison (one scan, N walks). Null is the built-in as it is.</param>
+    public static PreparedBuild Prepare(string strategyId, IReadOnlyDictionary<string, double>? parameters, Timeframe evaluationTimeframe, FillRules? fills = null, ExitChoice? exits = null)
     {
         var built = Build(strategyId, parameters);
-        return built.Definition is { } definition
-            ? StrategyPreparation.Prepare(definition, built.Parameters, evaluationTimeframe, fills)
-            : new PreparedBuild(null, built.Problems);
+        if (built.Definition is not { } definition)
+        {
+            return new PreparedBuild(null, built.Problems);
+        }
+
+        if (exits is null)
+        {
+            return StrategyPreparation.Prepare(definition, built.Parameters, evaluationTimeframe, fills);
+        }
+
+        if (exits.Candidates.Count == 1)
+        {
+            return StrategyPreparation.Prepare(ExitChoices.With(definition, exits.Candidates, exits), built.Parameters, evaluationTimeframe, fills, exits.IdOf(exits.Candidates[0]), exits.Candidates[0]);
+        }
+
+        var members = exits.Candidates.Select(c => ExitChoices.With(definition, [c], exits)).ToList();
+        return StrategyPreparation.PrepareComparison(members, [.. exits.Candidates.Select(exits.IdOf)], exits.Candidates, built.Parameters, evaluationTimeframe, fills);
     }
 
     /// <summary>The parameter names as prose: <c>`a` and `b`</c>, <c>`a`, `b` and `c`</c>.</summary>

@@ -116,17 +116,41 @@ public sealed class StoreRunHandlerTests
         error.Fields!.Select(f => f.Field).ShouldContain("run.trades.schemaVersion");
     }
 
+    private static ValueList<Leg> TwoLegsAndAnExit(SimTrade first, string reason = "X") => new(
+    [
+        new Leg(first.EntryEpochSeconds, first.EntryPrice, first.EntryFilledPrice, 1m, LegKind.Entry, string.Empty),
+        new Leg(first.ExitEpochSeconds, first.ExitPrice, first.ExitFilledPrice, 0.5m, LegKind.Exit, reason),
+        new Leg(first.ExitEpochSeconds, first.ExitPrice, first.ExitFilledPrice, 0.5m, LegKind.Exit, "Y"),
+    ]);
+
     [Fact]
-    public async Task A_trade_with_legs_is_refused_because_the_store_has_no_column_for_them_yet()
+    public async Task A_trade_with_legs_is_stored_the_legs_have_their_own_tables_since_P4_05()
     {
         var run = FabricatedRun.Standard();
         var first = run.Trades[0].Trade;
-        var legs = new ValueList<Leg>([new Leg(first.EntryEpochSeconds, first.EntryPrice, first.EntryFilledPrice, 1m, LegKind.Entry, string.Empty), new Leg(first.ExitEpochSeconds, first.ExitPrice, first.ExitFilledPrice, 0.5m, LegKind.Exit, "X"), new Leg(first.ExitEpochSeconds, first.ExitPrice, first.ExitFilledPrice, 0.5m, LegKind.Exit, "Y")]);
-        var withLegs = run.Trades[0] with { Trade = first with { Legs = legs } };
+        var withLegs = run.Trades[0] with { Trade = first with { Legs = TwoLegsAndAnExit(first) } };
+        var fixture = new Fixture();
 
-        var error = await RefusedAsync(run with { Trades = [withLegs, .. run.Trades.Skip(1)] });
+        var stored = await fixture.RunAsync(run with { Trades = [withLegs, .. run.Trades.Skip(1)] });
 
-        error.Fields!.Select(f => f.Field).ShouldContain("run.trades.legs");
+        stored.IsSuccess.ShouldBeTrue(stored.IsFailure ? stored.Error.Message : string.Empty);
+        await fixture.Store.Received(1).StoreAsync(Arg.Is<RunToStore>(r => r.Run.Trades[0].Trade.Legs!.Count == 3), Ct);
+    }
+
+    [Fact]
+    public async Task Legs_the_tables_cannot_hold_are_refused_by_name()
+    {
+        var run = FabricatedRun.Standard();
+        var first = run.Trades[0].Trade;
+        var oneLeg = first with { Legs = new ValueList<Leg>([new Leg(first.EntryEpochSeconds, first.EntryPrice, first.EntryFilledPrice, 1m, LegKind.Entry, string.Empty)]) };
+        var longReason = first with { Legs = TwoLegsAndAnExit(first, new string('r', 65)) };
+
+        foreach (var trade in new[] { oneLeg, longReason })
+        {
+            var error = await RefusedAsync(run with { Trades = [run.Trades[0] with { Trade = trade }, .. run.Trades.Skip(1)] });
+
+            error.Fields!.Select(f => f.Field).ShouldContain("run.trades.legs");
+        }
     }
 
     [Fact]

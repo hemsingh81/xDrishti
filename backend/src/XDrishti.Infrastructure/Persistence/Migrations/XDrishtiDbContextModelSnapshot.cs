@@ -3569,6 +3569,103 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimComparisonRow", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("CommonEntries")
+                        .HasColumnType("integer")
+                        .HasColumnName("common_entries");
+
+                    b.Property<string>("ComparisonCsv")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("comparison_csv");
+
+                    b.Property<string>("ComparisonKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("comparison_key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("DiagnosticsCsv")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("diagnostics_csv");
+
+                    b.Property<string>("EntriesKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("entries_key");
+
+                    b.PrimitiveCollection<string[]>("MemberCandidateIds")
+                        .IsRequired()
+                        .HasColumnType("character varying(200)[]")
+                        .HasColumnName("member_candidate_ids");
+
+                    b.PrimitiveCollection<long[]>("MemberGatedBlocked")
+                        .IsRequired()
+                        .HasColumnType("bigint[]")
+                        .HasColumnName("member_gated_blocked");
+
+                    b.PrimitiveCollection<string[]>("MemberRunKeys")
+                        .IsRequired()
+                        .HasColumnType("character(64)[]")
+                        .HasColumnName("member_run_keys");
+
+                    b.Property<string>("RecordSha256")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("record_sha256");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("unit");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sim_comparisons");
+
+                    b.HasIndex("ComparisonKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_sim_comparisons_comparison_key");
+
+                    b.HasIndex("EntriesKey")
+                        .HasDatabaseName("ix_sim_comparisons_entries_key");
+
+                    b.ToTable("sim_comparisons", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_sim_comparisons_counts", "common_entries >= 0");
+
+                            t.HasCheckConstraint("ck_sim_comparisons_keys", "comparison_key ~ '^[0-9a-f]{64}$' AND entries_key ~ '^[0-9a-f]{64}$' AND record_sha256 ~ '^[0-9a-f]{64}$'");
+
+                            t.HasCheckConstraint("ck_sim_comparisons_members", "cardinality(member_run_keys) >= 2 AND cardinality(member_run_keys) = cardinality(member_candidate_ids) AND cardinality(member_run_keys) = cardinality(member_gated_blocked)");
+
+                            t.HasCheckConstraint("ck_sim_comparisons_unit", "unit IN ('RFilled', 'RNet')");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.SimRunRow", b =>
                 {
                     b.Property<long>("Id")
@@ -3716,6 +3813,138 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("ck_sim_runs_run_key", "run_key ~ '^[0-9a-f]{64}$'");
 
                             t.HasCheckConstraint("ck_sim_runs_universe_kind", "universe_kind IN ('instrumentlist', 'basket')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeLegChargeRow", b =>
+                {
+                    b.Property<long>("RunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("run_id");
+
+                    b.Property<bool>("OpenAtEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("open_at_end");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<int>("ChargeOrdinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("charge_ordinal");
+
+                    b.Property<decimal>("Brokerage")
+                        .HasColumnType("numeric")
+                        .HasColumnName("brokerage");
+
+                    b.Property<decimal>("DpCharge")
+                        .HasColumnType("numeric")
+                        .HasColumnName("dp_charge");
+
+                    b.Property<long>("EpochSeconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_seconds");
+
+                    b.Property<decimal>("ExchangeTxn")
+                        .HasColumnType("numeric")
+                        .HasColumnName("exchange_txn");
+
+                    b.Property<decimal>("Gst")
+                        .HasColumnType("numeric")
+                        .HasColumnName("gst");
+
+                    b.Property<decimal>("OtherCharges")
+                        .HasColumnType("numeric")
+                        .HasColumnName("other_charges");
+
+                    b.Property<long>("Quantity")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quantity");
+
+                    b.Property<decimal>("SebiFee")
+                        .HasColumnType("numeric")
+                        .HasColumnName("sebi_fee");
+
+                    b.Property<decimal>("StampDuty")
+                        .HasColumnType("numeric")
+                        .HasColumnName("stamp_duty");
+
+                    b.Property<decimal>("Stt")
+                        .HasColumnType("numeric")
+                        .HasColumnName("stt");
+
+                    b.Property<decimal>("Turnover")
+                        .HasColumnType("numeric")
+                        .HasColumnName("turnover");
+
+                    b.HasKey("RunId", "OpenAtEnd", "Ordinal", "ChargeOrdinal")
+                        .HasName("pk_sim_trade_leg_charges");
+
+                    b.ToTable("sim_trade_leg_charges", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_sim_trade_leg_charges_ordinals", "ordinal >= 0 AND charge_ordinal >= 0");
+
+                            t.HasCheckConstraint("ck_sim_trade_leg_charges_quantity", "quantity >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeLegRow", b =>
+                {
+                    b.Property<long>("RunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("run_id");
+
+                    b.Property<bool>("OpenAtEnd")
+                        .HasColumnType("boolean")
+                        .HasColumnName("open_at_end");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("ordinal");
+
+                    b.Property<int>("LegOrdinal")
+                        .HasColumnType("integer")
+                        .HasColumnName("leg_ordinal");
+
+                    b.Property<long>("EpochSeconds")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_seconds");
+
+                    b.Property<double>("FilledPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("filled_price");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<double>("Price")
+                        .HasColumnType("double precision")
+                        .HasColumnName("price");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason");
+
+                    b.Property<decimal>("Share")
+                        .HasColumnType("numeric")
+                        .HasColumnName("share");
+
+                    b.HasKey("RunId", "OpenAtEnd", "Ordinal", "LegOrdinal")
+                        .HasName("pk_sim_trade_legs");
+
+                    b.ToTable("sim_trade_legs", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_sim_trade_legs_kind", "kind IN ('entry', 'add', 'exit')");
+
+                            t.HasCheckConstraint("ck_sim_trade_legs_ordinals", "ordinal >= 0 AND leg_ordinal >= 0");
+
+                            t.HasCheckConstraint("ck_sim_trade_legs_share", "share > 0");
                         });
                 });
 
@@ -4570,6 +4799,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeLegChargeRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.SimTradeRow", null)
+                        .WithMany()
+                        .HasForeignKey("RunId", "OpenAtEnd", "Ordinal")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sim_trade_leg_charges_trade");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeLegRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.SimTradeRow", null)
+                        .WithMany()
+                        .HasForeignKey("RunId", "OpenAtEnd", "Ordinal")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sim_trade_legs_trade");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.SimTradeRow", b =>

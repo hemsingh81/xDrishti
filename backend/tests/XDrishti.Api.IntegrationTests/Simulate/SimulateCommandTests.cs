@@ -47,7 +47,7 @@ public sealed partial class SimulateCommandTests : IDisposable
         text.ShouldContain("timeframes: 5m, 15m (default)");
         text.ShouldContain("or_min=<number>  default 15");
         text.ShouldContain("rr=<number>  default 2");
-        text.ShouldBe(
+        text.ShouldStartWith(
             "ORB: Opening range breakout: a close beyond the opening range, stop at the opposite end, target a multiple of the risk\n"
             + "  timeframes: 5m, 15m (default)\n"
             + "  --param or_min=<number>  default 15: minutes of the opening range\n"
@@ -62,6 +62,8 @@ public sealed partial class SimulateCommandTests : IDisposable
             + "  --param base_pct=<number>  default 8, range 2 <= x <= 20: the widest span of the closes of the window, as % of the lowest\n"
             + "  --param vol_x=<number>  default 1.5, range 1 <= x <= 5: the least multiple of the volume of the 20 sessions before\n"
             + "  --param rr=<number>  default 2, range 0 < x <= 10: target as a multiple of the risk\n");
+        text.ShouldContain("exits (--exit POLICY:name=value,...; a|b lists candidate values and two candidates or more are compared on the same entries):\n  FIXED_RR: rr (candidate lists with '|': rr)\n");
+        text.ShouldEndWith("  --time-stop min_progress_rr=<n>,intraday_bars=<n> (or swing_sessions=<n>): an overlay on every candidate\n");
         _verb.RunHandler.Received.ShouldBeEmpty();
         _verb.InstrumentHandler.Received.ShouldBeEmpty();
         Directory.Exists(_verb.ExportRoot).ShouldBeFalse();

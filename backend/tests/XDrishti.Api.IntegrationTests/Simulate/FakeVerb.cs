@@ -223,8 +223,10 @@ internal sealed class FakeVerb : IDisposable
 
         public IReadOnlyList<BuiltInStrategyInfo> BuiltIns => BuiltInStrategies.Catalog;
 
-        public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, XDrishti.Domain.Market.Bars.Timeframe evaluationTimeframe, FillRules? fills) =>
+        public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, XDrishti.Domain.Market.Bars.Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null) =>
             throw new NotSupportedException("the handler is a fake in these tests");
+
+        public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException("the handler is a fake in these tests");
 
         public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException("the handler is a fake in these tests");
     }

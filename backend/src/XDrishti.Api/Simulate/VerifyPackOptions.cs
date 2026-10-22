@@ -1,5 +1,6 @@
 using System.Globalization;
 using XDrishti.Application.Research;
+using XDrishti.Domain.Research;
 using XDrishti.SimExport.Verification;
 
 namespace XDrishti.Api.Simulate;
@@ -23,7 +24,8 @@ internal sealed record VerifyPackOptions(
     bool Force,
     string? AssistPath = null,
     string? SecondSourceFolder = null,
-    string? GatePath = null)
+    string? GatePath = null,
+    ExitChoice? Exits = null)
 {
     /// <summary>The usage text (stderr on a usage error).</summary>
     public const string Usage =
@@ -32,6 +34,7 @@ internal sealed record VerifyPackOptions(
         + "              [--count <1..100>]   (random trades; default 20)\n"
         + "              (--gross | --costs <sheet-id> [--capital <rupees>] [--profile standard|conservative] [--max-cost-r <0..100>])   (the cost choice is required)\n"
         + "              [--acknowledge-csv-adjusted] [--force]\n"
+        + "              [--exit <POLICY[:name=value,...]>] [--time-stop min_progress_rr=<n>,(intraday_bars|swing_sessions)=<n>]   (one exit in place of each strategy's own, for the hand check of a policy; one candidate only: compare candidates with simulate)\n"
         + "  verify-pack --check <path-to-check-log.csv>\n"
         + "  verify-pack --assist <pack-folder> [--second-source-folder <dir>]   (an automatic second read of a pack; not a signed check)\n"
         + "  verify-pack --gate <pack-folder> [--second-source-folder <dir>]   (the automated gate: the assisted read, then the rules; writes gate-decision.json and .md; exit 0 PASS or PASS_WITH_DATA_FINDINGS, 10 RERUN_NEEDED, 11 DATA_REPAIR_NEEDED, 12 BLOCKED_DEFECT)\n"
@@ -39,7 +42,7 @@ internal sealed record VerifyPackOptions(
         + "Quote a symbol list in the shell: --symbols 'M&M,RELIANCE'\n";
 
     private static readonly string[] ValueFlags =
-        ["--strategies", "--symbols", "--basket", "--from", "--to", "--seed", "--count", "--check", "--costs", "--capital", "--profile", "--max-cost-r", "--assist", "--gate", "--second-source-folder"];
+        ["--strategies", "--symbols", "--basket", "--from", "--to", "--seed", "--count", "--check", "--costs", "--capital", "--profile", "--max-cost-r", "--assist", "--gate", "--second-source-folder", "--exit", "--time-stop"];
 
     private static readonly string[] SwitchFlags = ["--gross", "--acknowledge-csv-adjusted", "--force"];
 
@@ -54,7 +57,8 @@ internal sealed record VerifyPackOptions(
         ArgumentNullException.ThrowIfNull(knownStrategyIds);
 
         var errors = new List<string>();
-        var (values, switches, parameters) = SimulateOptions.Tokenize(args, ValueFlags, SwitchFlags, errors);
+        var exits = new List<string>();
+        var (values, switches, parameters) = SimulateOptions.Tokenize(args, ValueFlags, SwitchFlags, errors, exits);
         if (values.TryGetValue("--check", out var path))
         {
             if (errors.Count == 0 && (values.Count > 1 || switches.Count > 0))
@@ -105,9 +109,15 @@ internal sealed record VerifyPackOptions(
             errors.Add("unknown option '--param'");
         }
 
+        var choice = SimulateOptions.ReadExits(exits, values, new Dictionary<string, double>(), errors);
+        if (choice is { Candidates.Count: > 1 })
+        {
+            errors.Add("'--exit' names " + choice.Candidates.Count.ToString(CultureInfo.InvariantCulture) + " candidates; a pack checks one exit set: compare candidates with 'simulate', then pack the one you chose");
+        }
+
         return errors.Count > 0
             ? Invalid(errors)
-            : new VerifyPackParse(new VerifyPackOptions(null, strategies, symbols, basket, from!.Value, to!.Value, seed!, count, costs, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force")), []);
+            : new VerifyPackParse(new VerifyPackOptions(null, strategies, symbols, basket, from!.Value, to!.Value, seed!, count, costs, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), Exits: choice), []);
     }
 
     private static VerifyPackParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());
