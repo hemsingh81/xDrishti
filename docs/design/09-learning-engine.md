@@ -23,7 +23,7 @@ bound of the credible interval; exponential recency weighting.
 **Layer 2 — Exit selection.** See [doc 08](08-exits-and-risk.md) §3. Its input, the replay of the same entries under every candidate with the MAE/MFE tables, is built (P4-05, [ADR 0053](../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.md)); the choice by out-of-sample expectancy per cell, with its folds, minimum sample and stability report, is built (P4-06, [ADR 0054](../adr/0054-the-per-cell-exit-choice-by-walk-forward.md)); it applies nothing until a stored strategy exists to apply it to.
 
 **Layer 3 — Meta-model (meta-labeling).**
-- Labels: **triple barrier** — target, stop, time limit (session end / max hold).
+- Labels: **triple barrier** — target, stop, time limit (session end / max hold). Built (P6-03, [ADR 0065](../adr/0065-triple-barrier-labels-from-the-exit-reason.md)): label 1 only when the target ended the trade, 0 for stop, session end, max hold and exit-rule exits; end-of-data trades are left out; R at resolution is kept as a second target.
 - Model: gradient-boosted trees (ML.NET LightGBM, FastTree fallback) per style × side (strategy as feature),
   **isotonic (PAV) calibration**, per-prediction feature contributions + permutation importance; trained and
   scored in-process in .NET.
