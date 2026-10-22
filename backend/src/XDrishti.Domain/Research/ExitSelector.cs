@@ -96,7 +96,7 @@ public static class ExitSelector
         var defaultId = input.Candidates[0].Id;
         var pooled = Pooled(folds, trades, ids, defaultId, o);
         var stability = Stability(folds, exits, neighbours, ids, o);
-        var banner = BannerOf(input, folds.Count, noChoice, stability);
+        var banner = BannerOf(input, first, last, folds.Count, noChoice, stability, finalId is not null);
         return new ExitSelection(
             input, defaultId, first, last, dropped, folds.AsReadOnly(), finalId, finalId is not null && finalPick!.Value.Plateau, finalId is not null && finalPick!.Value.LonePeak,
             finalId ?? defaultId, noChoice, pooled, stability, banner);
@@ -503,17 +503,27 @@ public static class ExitSelector
         return b.Parameters.Any(q => q.Name == name);
     }
 
-    private static List<string> BannerOf(SelectionInput input, int folds, string? noChoice, SelectionStability stability)
+    private static List<string> BannerOf(SelectionInput input, DateOnly? first, DateOnly? last, int folds, string? noChoice, SelectionStability stability, bool chosen)
     {
         var lines = new List<string>
         {
-            ExitSelection.InSampleLine,
+            ExitSelection.InSampleLine(first, last),
             folds.ToString(CultureInfo.InvariantCulture) + " folds only: the " + input.Options.StableFoldsPct.ToString("0.##", CultureInfo.InvariantCulture) + " % rule on few folds is weak evidence",
             "unit: " + input.Unit + (input.Unit == "RNet" ? " (after charges)" : " (gross, no charges)"),
         };
         if (stability.ChancePass is { } p)
         {
             lines.Add(stability.Folds.ToString(CultureInfo.InvariantCulture) + " folds; the " + input.Options.StableFoldsPct.ToString("0.##", CultureInfo.InvariantCulture) + " % rule on " + stability.Folds.ToString(CultureInfo.InvariantCulture) + " folds can pass by chance about " + p.ToString("0.0000", CultureInfo.InvariantCulture) + " of the time");
+        }
+
+        else
+        {
+            lines.Add("chance-pass not computed");
+        }
+
+        if (chosen && stability.Stable == false)
+        {
+            lines.Add("chosen but unstable: the choice is set, the verdict says it is not stable across folds");
         }
 
         if (input.OverlapNotGated)

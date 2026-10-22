@@ -159,10 +159,26 @@ public sealed class PlantedSignalTests
     {
         var result = ExitSelector.Select(SelectionSeries.Input(4, SelectionSeries.Line(4), [0, 0.5, 0, 0]));
 
-        result.Banner.ShouldContain(ExitSelection.InSampleLine);
+        result.Banner.ShouldContain(ExitSelection.InSampleLine(result.FirstEntry, result.LastEntry));
         result.Banner.ShouldContain(l => l.Contains("folds only", StringComparison.Ordinal));
         result.Banner.ShouldContain(l => l.Contains("can pass by chance about", StringComparison.Ordinal));
         result.Stability.ChancePass.ShouldNotBeNull();
         result.Stability.ChancePass!.Value.ShouldBeInRange(0, 1);
+    }
+
+    [Fact]
+    public void The_in_sample_line_derives_the_span_from_the_first_and_last_entry()
+    {
+        ExitSelection.InSampleLine(new DateOnly(2024, 1, 1), new DateOnly(2025, 12, 31)).ShouldContain("2.0 years, 2024-01-01 to 2025-12-31");
+        ExitSelection.InSampleLine(null, null).ShouldContain("no entries");
+    }
+
+    [Fact]
+    public void An_unstable_verdict_with_a_choice_set_says_so_in_the_banner()
+    {
+        var result = ExitSelector.Select(SelectionSeries.Input(4, SelectionSeries.Line(4), [0, 0.5, 0, 0]));
+
+        (result.Stability.Stable == false && result.FinalCandidate is not null).ShouldBe(result.Banner.Any(l => l.StartsWith("chosen but unstable", StringComparison.Ordinal)));
+        (result.Stability.ChancePass is null).ShouldBe(result.Banner.Contains("chance-pass not computed"));
     }
 }

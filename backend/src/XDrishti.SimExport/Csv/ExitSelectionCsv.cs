@@ -5,7 +5,7 @@ namespace XDrishti.SimExport.Csv;
 
 /// <summary>
 /// <c>exit-selection.csv</c> (spec P4-06, D9): one row for each fold and candidate, with the dates of the fold, the train and test figures to four decimals, the flags of the fold's winner and, on every row, the in-sample line of the record
-/// (<see cref="ExitSelection.InSampleLine"/>), so that a row read alone still says what it is. A run with no fold writes one row, <c>none</c>. UTF-8 without a byte order mark, <c>\n</c> line ends, RFC 4180 quoting, like <see cref="TradesCsv"/>.
+/// (<see cref="ExitSelection.InSampleLine(DateOnly?, DateOnly?)"/>), so that a row read alone still says what it is. A run with no fold writes one row, <c>none</c>. UTF-8 without a byte order mark, <c>\n</c> line ends, RFC 4180 quoting, like <see cref="TradesCsv"/>.
 /// </summary>
 public static class ExitSelectionCsv
 {
@@ -45,7 +45,7 @@ public static class ExitSelectionCsv
                 row.Empty();
             }
 
-            row.Text(ExitSelection.InSampleLine);
+            row.Text(ExitSelection.InSampleLine(selection.FirstEntry, selection.LastEntry));
             row.End(sink);
             return;
         }
@@ -81,7 +81,7 @@ public static class ExitSelectionCsv
                 row.Bool(winner && fold.Isolated);
                 row.Bool(winner && fold.LonePeak);
                 row.Bool(fold.Thin);
-                row.Text(ExitSelection.InSampleLine);
+                row.Text(ExitSelection.InSampleLine(selection.FirstEntry, selection.LastEntry));
                 row.End(sink);
             }
         }
