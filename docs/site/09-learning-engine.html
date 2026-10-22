@@ -79,6 +79,7 @@ conditions, and shifting recommendations accordingly — with guards against foo
 (all / 250 days / 60 days): n, win rate, avg win/loss R, expectancy, profit factor, max drawdown, MAE/MFE
 quantiles. Win rate uses a Beta prior <strong>shrunk toward the parent group</strong> when n is small; confidence = lower
 bound of the credible interval; exponential recency weighting.</p>
+<p>Built (P6-01, <a href="../adr/0064-cell-statistics-bayesian-shrinkage-recency-weights-and-point-in-time-snapshots.html">ADR 0064</a>): the pure calculator reads only trades that exited on or before the as-of date; the prior is the strategy&#39;s rate shrunk toward the whole system&#39;s (strength 20), the cell&#39;s toward the strategy&#39;s; the confidence is the 5 % quantile of the posterior (90 % interval); recency weight <code>0.5^(days/180)</code>. Snapshots are insert-only in <code>research.cell_stats</code>; <code>xd learn cells --as-of D --run KEY:STYLE:EXIT</code> computes, <code>GET /api/cells</code> reads. Regime is <code>*</code> until P6-02; rows below <code>min_trades</code> read &quot;not enough evidence&quot;.</p>
 <p><strong>Layer 2 — Exit selection.</strong> See <a href="08-exits-and-risk.html">doc 08</a> §3. Its input, the replay of the same entries under every candidate with the MAE/MFE tables, is built (P4-05, <a href="../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.html">ADR 0053</a>); the choice by out-of-sample expectancy per cell, with its folds, minimum sample and stability report, is built (P4-06, <a href="../adr/0054-the-per-cell-exit-choice-by-walk-forward.html">ADR 0054</a>); it applies nothing until a stored strategy exists to apply it to.</p>
 <p><strong>Layer 3 — Meta-model (meta-labeling).</strong></p>
 <ul>
@@ -503,7 +504,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-22 21:01</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-22 21:17</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

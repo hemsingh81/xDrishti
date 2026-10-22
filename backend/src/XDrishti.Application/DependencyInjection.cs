@@ -12,6 +12,7 @@ using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
 using XDrishti.Application.Lab;
+using XDrishti.Application.Learning;
 using XDrishti.Application.Live;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
@@ -437,5 +438,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetStoredRunQuery, Result<StoredRunHeader>>, GetStoredRunHandler>();
         services.AddScoped<IQueryHandler<ListStoredRunsQuery, Result<Page<StoredRunHeader>>>, ListStoredRunsHandler>();
         services.AddScoped<IQueryHandler<PageStoredTradesQuery, Result<Page<RunTrade>>>, PageStoredTradesHandler>();
+        services.AddScoped<ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>, ComputeCellStatsHandler>(); // cell statistics, Bayesian and recency (P6-01, ADR 0064)
+        services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
+        services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
     }
 }

@@ -11,6 +11,7 @@ using XDrishti.Domain.Platform;
 using XDrishti.Domain.Platform.Services;
 using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Accounts;
+using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Live;
@@ -149,6 +150,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<LabRunRow> LabRuns => Set<LabRunRow>();
 
     internal DbSet<TestLedgerRow> TestLedger => Set<TestLedgerRow>();
+
+    internal DbSet<CellStatsRecord> CellStats => Set<CellStatsRecord>();
 
     /// <summary>The verdicts of full tests (spec P5-04).</summary>
     internal DbSet<LabResultRow> LabResults => Set<LabResultRow>();

@@ -2486,6 +2486,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/cells': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The cell statistics of the newest snapshot: per cell and window (all, 250d, 60d) the trades, the Beta-shrunk win rate with its credible bounds, recency-weighted expectancy and profit factor, drawdown and MAE/MFE quantiles, each with its basis, knobs and limits. Filter by strategy and window; empty before the first computation. 422 learning.invalid */
+    get: operations['ListCells'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cells/{key}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One cell (key strategy|tf|side|style|exit|regime, URL-encoded) in its windows from the newest snapshot that holds it. 404 learning.cell_not_found */
+    get: operations['GetCell'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3404,6 +3438,68 @@ export interface components {
       days: components['schemas']['CalendarDayView'][];
       proposals: components['schemas']['CalendarDayView'][];
       nextHoliday: null | components['schemas']['CalendarDayView'];
+    };
+    /** @description One row of the cell statistics as the API shows it (P6-01), with the facts a reader needs to judge it (spec honest limits: the basis, the knobs, the evidence flag and the limits text). */
+    CellStatsView: {
+      cellKey: string;
+      strategy: string;
+      timeframe: string;
+      side: string;
+      style: string;
+      exit: string;
+      regime: string;
+      window: string;
+      /** Format: date */
+      asOf: string;
+      basis: string;
+      /** Format: int32 */
+      n: number;
+      /** Format: int32 */
+      wins: number;
+      /** Format: double */
+      effectiveN: number;
+      /** Format: double */
+      winRateRaw: null | number;
+      /** Format: double */
+      priorRate: number;
+      /** Format: double */
+      winRatePosterior: number;
+      /** Format: double */
+      winRateLower: number;
+      /** Format: double */
+      winRateUpper: number;
+      /** Format: double */
+      avgWinR: null | number;
+      /** Format: double */
+      avgLossR: null | number;
+      /** Format: double */
+      expectancyR: null | number;
+      /** Format: double */
+      profitFactor: null | number;
+      /** Format: double */
+      maxDrawdownR: number;
+      /** Format: double */
+      maeP50: null | number;
+      /** Format: double */
+      maeP90: null | number;
+      /** Format: double */
+      mfeP50: null | number;
+      /** Format: double */
+      mfeP90: null | number;
+      enough: boolean;
+      evidence: string;
+      /** Format: double */
+      recencyHalfLifeDays: number;
+      /** Format: double */
+      priorStrength: number;
+      /** Format: int32 */
+      minTrades: number;
+      /** Format: double */
+      credibleLevel: number;
+      snapshotKey: string;
+      /** Format: date-time */
+      createdAt: string;
+      limits: string;
     };
     /** @description One cell (timeframe and side) of a full test: the exit the walk-forward chose and how stable that choice was. */
     CellView: {
@@ -13681,6 +13777,69 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LedgerView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListCells: {
+    parameters: {
+      query?: {
+        strategy?: string;
+        window?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CellStatsView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetCell: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CellStatsView'][];
         };
       };
       /** @description Not Found */
