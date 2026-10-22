@@ -7,6 +7,7 @@ namespace XDrishti.Domain.Research;
 /// <param name="Id">SHA-256 (lower-case hex) of the rule version, the sorted run keys and every label in key order.</param>
 /// <param name="RuleVersion">The <see cref="TripleBarrier.RuleVersion"/> that labelled it.</param>
 /// <param name="RunKeys">The keys of the source runs, sorted ordinally.</param>
+/// <param name="Basis">The one basis of every label'"'"'s R; a mix of gross and net runs is refused.</param>
 /// <param name="FromDate">Earliest trade date among the labelled trades.</param>
 /// <param name="ToDate">Latest trade date among the labelled trades.</param>
 /// <param name="Positives">Labels equal to 1.</param>
@@ -18,6 +19,7 @@ public sealed record TrainingSet(
     string Id,
     string RuleVersion,
     IReadOnlyList<string> RunKeys,
+    LabelBasis Basis,
     DateOnly FromDate,
     DateOnly ToDate,
     int Positives,

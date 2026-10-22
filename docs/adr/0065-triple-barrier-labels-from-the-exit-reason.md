@@ -1,6 +1,6 @@
 # 0065 — Triple-barrier labels read from the exit reason
 
-- **Status:** Accepted (spec [P6-03](../specs/P6-03-triple-barrier-labels.md), approved under the owner's standing run instruction of 2026-10-22, every open question as recommended; built 2026-10-23). The text of this ADR has not been read by the owner.
+- **Status:** Proposed (spec [P6-03](../specs/P6-03-triple-barrier-labels.md), approved under the owner's standing run instruction of 2026-10-22, every open question as recommended; built 2026-10-23). Becomes Accepted when the owner has read it.
 - **Date:** 2026-10-23.
 - **Relation to other ADRs:** [ADR 0037](0037-simulation-conventions-and-the-two-stage-seam.md) family (`SimTrade`, `ExitReason`), ADR 0045 (result store). ADR 0064 belongs to another slice.
 
@@ -9,11 +9,11 @@ Doc 09 layer 3 trains the meta-model on triple-barrier labels: target, stop and 
 
 ## Decision
 1. **Pure labeller over `SimTrade`** (`TripleBarrier.Label`), rule version `tb-1`. It reads the exit reason, not prices, so it cannot see more than the barrier definition: the same label whatever the path after or around the barrier (property test).
-2. **Label 1 only for `Target`.** `Stop`, `SquareOff` (session end), `MaxHold`, `EmaExit` and `TimeStop` are 0, a profitable time exit included (P6-00 question 6, recommended). `EndOfData` is unresolved and left out, as statistics already do. A trade without a target level has no upper barrier and is left out and counted.
+2. **Label 1 only for `Target`.** `Stop`, `SquareOff` (session end), `MaxHold`, `EmaExit` and `TimeStop` are 0, a profitable time exit included (P6-00 question 6, recommended). `EndOfData` is unresolved and left out, as statistics already do. A trade without a target level (`EMA_TRAIL` and the like) has no upper barrier and is left out and counted in `NoTarget`; this biases the set toward fixed reward-to-risk strategies, and the count shows how much. An unknown exit reason throws: a new reason must be added to the table with a new rule version. A `Target` exit is always 1, even if the level is missing.
 3. **R at resolution is a second target**, on a basis: net when the trade was charged, filled when modelled, else exact (doc 09 §9). The label does not depend on the basis.
 4. **Legs.** A trade with legs is labelled by its last exit and its initial target, flagged `HasLegs`; whether a partial leg touched the target is not inferred. Swing time exits use `MaxHold` the same way.
-5. **Horizon.** The label carries the decision instant and the exit-minute instant so that a purged walk-forward can keep train labels clear of the test window. Minutes to resolution are wall-clock minutes from the fill minute (overnight included); `SessionsHeld` counts sessions.
-6. **Training-set record** is a pure `TrainingSet` (rule version, sorted run keys, date range, counts, labels, SHA-256 id) built by `TrainingSetBuilder`. A duplicate trade key or an empty result is a failure.
+5. **Horizon.** The label carries the decision instant and the exit-minute instant so that a purged walk-forward can keep train labels clear of the test window. Minutes to resolution are wall-clock minutes from the fill minute (overnight included); `SessionsHeld` counts sessions, and P6-04 should prefer it over minutes for swing. The exit minute is inside the horizon: a purge must add one bar (or use `ResolvedEpochSeconds` + 60).
+6. **Training-set record** is a pure `TrainingSet` (rule version, sorted run keys, date range, counts, labels, SHA-256 id) built by `TrainingSetBuilder`. It carries one `Basis`; a mix of gross and net runs is refused. The id hashes the rule, length-prefixed run keys, the excluded counts, the date range and every label. A duplicate trade key (runs of one set must not overlap), blank or no run keys, or an empty result is a failure.
 
 ## Consequences
 - No migration now: `research.training_sets` (insert-only for `xd_app`, with the Down) arrives with `trade_features` in P6-04, where the set has a consumer. Deviation from the P6-00 row, which listed the record in this slice.

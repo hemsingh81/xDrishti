@@ -190,4 +190,92 @@ public sealed class TripleBarrierTests
         TrainingSetBuilder.Build(["r"], [Trade(ExitReason.Target), Trade(ExitReason.Stop)]).Error.Code.ShouldBe("training_set.duplicate_key");
         TrainingSetBuilder.Build(["r"], [Trade(ExitReason.EndOfData)]).Error.Code.ShouldBe("training_set.empty");
     }
+
+    [Fact]
+    public void An_exit_reason_the_table_does_not_know_throws()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => TripleBarrier.Label(Trade((ExitReason)999)));
+    }
+
+    [Fact]
+    public void A_target_exit_labels_1_even_without_a_target_level()
+    {
+        TripleBarrier.Label(Trade(ExitReason.Target, target: null)).Value.Label.ShouldBe(1);
+    }
+
+    [Fact]
+    public void The_net_basis_through_the_default_path_reports_net_R_for_a_trade_with_legs()
+    {
+        ValueList<Leg> legs = new([
+            new Leg(Entry, 100.5, 100.5, 1m, LegKind.Entry, string.Empty),
+            new Leg(Entry + 1800, 105.5, 105.5, 1m, LegKind.Exit, "Target"),
+        ]);
+
+        var label = TripleBarrier.Label(Trade(ExitReason.Target, rExact: 2.0, rFilled: 1.9, rNet: 1.7, legs: legs)).Value;
+
+        label.Basis.ShouldBe(LabelBasis.Net);
+        label.R.ShouldBe(1.7);
+        label.Label.ShouldBe(1);
+        label.HasLegs.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_swing_max_hold_keeps_the_decision_instant_apart_from_the_entry_and_counts_overnight_minutes()
+    {
+        var decision = Entry - 900;
+        var trade = Trade(ExitReason.MaxHold, minutes: 3 * 24 * 60) with { DecisionEpochSeconds = decision, SessionsHeld = 3 };
+
+        var label = TripleBarrier.Label(trade).Value;
+
+        label.Outcome.ShouldBe(BarrierOutcome.MaxHold);
+        label.Label.ShouldBe(0);
+        label.DecisionEpochSeconds.ShouldBe(decision);
+        label.MinutesToResolution.ShouldBe(3 * 24 * 60);
+        label.SessionsHeld.ShouldBe(3);
+        label.ResolvedEpochSeconds.ShouldBe(Entry + (3 * 24 * 3600L));
+    }
+
+    [Fact]
+    public void A_training_set_has_one_basis_and_refuses_a_mix_of_gross_and_net()
+    {
+        var net = Trade(ExitReason.Target, symbol: "A", rNet: 1.0);
+        var gross = Trade(ExitReason.Stop, symbol: "B");
+
+        TrainingSetBuilder.Build(["r"], [net, net with { StrategyId = "X2" }]).Value.Basis.ShouldBe(LabelBasis.Net);
+        TrainingSetBuilder.Build(["r"], [net, gross]).Error.Code.ShouldBe("training_set.mixed_basis");
+    }
+
+    [Fact]
+    public void A_training_set_needs_run_keys_none_blank()
+    {
+        TrainingSetBuilder.Build([], [Trade(ExitReason.Target)]).Error.Code.ShouldBe("training_set.run_keys");
+        TrainingSetBuilder.Build(["a", " "], [Trade(ExitReason.Target)]).Error.Code.ShouldBe("training_set.run_keys");
+    }
+
+    [Fact]
+    public void Run_keys_that_would_join_into_the_same_text_give_different_ids()
+    {
+        var trades = new[] { Trade(ExitReason.Target) };
+
+        TrainingSetBuilder.Build(["a,b"], trades).Value.Id.ShouldNotBe(TrainingSetBuilder.Build(["a", "b"], trades).Value.Id);
+    }
+
+    [Fact]
+    public void The_same_trade_in_two_overlapping_runs_is_refused()
+    {
+        var trade = Trade(ExitReason.Target);
+
+        TrainingSetBuilder.Build(["run-1", "run-2"], [trade, trade]).Error.Code.ShouldBe("training_set.duplicate_key");
+    }
+
+    [Fact]
+    public void The_excluded_counts_are_part_of_the_id()
+    {
+        var kept = Trade(ExitReason.Target);
+
+        var without = TrainingSetBuilder.Build(["r"], [kept]).Value;
+        var with = TrainingSetBuilder.Build(["r"], [kept, Trade(ExitReason.EndOfData, symbol: "Z")]).Value;
+
+        with.Id.ShouldNotBe(without.Id);
+    }
 }

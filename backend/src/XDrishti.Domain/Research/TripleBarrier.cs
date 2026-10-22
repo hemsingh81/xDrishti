@@ -11,6 +11,12 @@ public static class TripleBarrier
     /// <summary>The version of the rule; changes whenever a label can change (a training set records it).</summary>
     public const string RuleVersion = "tb-1";
 
+    /// <summary>Error code of a trade left out for want of a target level.</summary>
+    public const string NoTargetCode = "label.no_target";
+
+    /// <summary>Error code of a trade left out because the bars ended while it was open.</summary>
+    public const string UnresolvedCode = "label.unresolved";
+
     /// <summary>The basis a run reports: net when the trade was charged, filled when its fills were modelled, else exact (doc 09 §9: grade on what could be executed).</summary>
     /// <param name="trade">The trade.</param>
     public static LabelBasis BasisOf(SimTrade trade)
@@ -29,9 +35,9 @@ public static class TripleBarrier
     public static Result<TripleBarrierLabel> Label(SimTrade trade, LabelBasis basis)
     {
         ArgumentNullException.ThrowIfNull(trade);
-        if (trade.TargetPrice is null)
+        if (trade.TargetPrice is null && trade.ExitReason != ExitReason.Target)
         {
-            return Result.Failure<TripleBarrierLabel>(Error.Validation("label.no_target", "The trade has no target level, so there is no upper barrier."));
+            return Result.Failure<TripleBarrierLabel>(Error.Validation(NoTargetCode, "The trade has no target level, so there is no upper barrier."));
         }
 
         BarrierOutcome outcome;
@@ -53,8 +59,10 @@ public static class TripleBarrier
             case ExitReason.TimeStop:
                 outcome = BarrierOutcome.RuleExit;
                 break;
+            case ExitReason.EndOfData:
+                return Result.Failure<TripleBarrierLabel>(Error.Validation(UnresolvedCode, "The bars ended while the position was open, so no barrier was reached."));
             default:
-                return Result.Failure<TripleBarrierLabel>(Error.Validation("label.unresolved", "The bars ended while the position was open, so no barrier was reached."));
+                throw new ArgumentOutOfRangeException(nameof(trade), trade.ExitReason, "Unknown exit reason: add it to the barrier table and raise the rule version.");
         }
 
         double r;
