@@ -2246,6 +2246,126 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lab/validate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Read and compile a strategy text; the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing */
+    post: operations['ValidateStrategy'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/schema': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The JSON Schema (draft 2020-12) of the strategy file, for the editor */
+    get: operations['GetStrategySchema'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/strategies': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The strategy families with their latest version number, the number of versions and whether they are built in */
+    get: operations['ListStrategies'];
+    put?: never;
+    /** Store a valid text as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in */
+    post: operations['CreateStrategy'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/strategies/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One strategy family with the list of its versions */
+    get: operations['GetStrategy'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/strategies/{id}/versions/{version}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One stored version: the text as posted, hash, parent hash, note and whether the text is free of errors under today's rules */
+    get: operations['GetStrategyVersion'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/strategies/{id}/versions/{version}/file': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The text of a stored version as a YAML file (attachment); posted to validate it gives the same hash */
+    get: operations['DownloadStrategyVersion'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/strategies/{id}/versions/{version}/clone': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** The text of a stored version with a new id (a built-in gets <ID>_COPY) and the parent hash to post with it; stores nothing */
+    post: operations['CloneStrategyVersion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3170,6 +3290,19 @@ export interface components {
       currentPassword: string;
       newPassword: string;
     };
+    /** @description Body of the clone endpoint: the id of the new strategy; omitted keeps the id (a built-in gets `&lt;ID&gt;_COPY`). */
+    CloneStrategyRequest: {
+      newId?: null | string;
+    };
+    /** @description A clone (spec P5-01): the text with the new id, the hash of the version it came from (post it as `parentHash` to record the lineage) and the source. */
+    ClonedStrategy: {
+      id: string;
+      text: string;
+      parentHash: string;
+      sourceId: string;
+      /** Format: int32 */
+      sourceVersion: number;
+    };
     /**
      * @description Completeness: the 1-minute bars the trading calendar expects in the window against the ones stored. `missingPercent` is of the expected minutes; `unfillableMinutes` are missing
      *     minutes of sessions a refetch could not fill (a halt, a circuit-locked day): they are a warning, never a failure.
@@ -3339,6 +3472,21 @@ export interface components {
       trading: null | components['schemas']['TradingInput'];
       portfolio: null | components['schemas']['PortfolioInput'];
       data: null | components['schemas']['DataInput'];
+    };
+    /** @description Body of `POST /api/lab/strategies`: the text, an optional note (at most 500 characters) and the hash of the version it was cloned from. There is no way to ask for a built-in: the request cannot set it. */
+    CreateStrategyRequest: {
+      text: string;
+      note?: null | string;
+      parentHash?: null | string;
+    };
+    /** @description What a create did (spec P5-01): the version the content has, its hash and parent, and whether a row was written (false: the same content was already stored). */
+    CreatedStrategy: {
+      id: string;
+      /** Format: int32 */
+      version: number;
+      hash: string;
+      parentHash: null | string;
+      created: boolean;
     };
     /** @description The files by state over the whole folder (not narrowed by `state`, but by `q`), and how many cannot be loaded (`unmapped`: unknown, ambiguous or invalid name). */
     CsvFileCounts: {
@@ -6143,6 +6291,77 @@ export interface components {
        */
       elevatedUntil: string;
     };
+    /** @description A strategy family as the library lists it (spec P3-02d, D4): the id, the style copied from its first version, whether it is a built-in, when it was created, its latest version number and how many versions it has. */
+    StoredStrategy: {
+      id: string;
+      style: string;
+      builtIn: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: int32 */
+      latestVersion: number;
+      /** Format: int32 */
+      versionCount: number;
+    };
+    /** @description One family with the list of its versions (spec P5-01): no texts, those are read one version at a time. */
+    StrategyDetail: {
+      id: string;
+      style: string;
+      builtIn: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: int32 */
+      latestVersion: number;
+      versions: components['schemas']['VersionSummary'][];
+    };
+    /**
+     * @description One located problem of a strategy text (spec P5-01): the model path, a stable code, a message, the severity (`error`, `warning`, `information`), the place of the field in the file (1-based; null when the path is not in the
+     *     file) and, for a problem of the rules language, the item-relative span (zero-based offset and length inside the condition text, ADR 0036).
+     */
+    StrategyIssue: {
+      path: string;
+      code: string;
+      message: string;
+      severity: string;
+      /** Format: int32 */
+      line: null | number;
+      /** Format: int32 */
+      column: null | number;
+      /** Format: int32 */
+      endLine: null | number;
+      /** Format: int32 */
+      endColumn: null | number;
+      /** Format: int32 */
+      start: null | number;
+      /** Format: int32 */
+      length: null | number;
+      suggestion: null | string;
+    };
+    /** @description The answer of validate (spec P5-01): whether the text has no error, its hash when it has none, what it declares and every problem. Invalid text is still an answer, not a failure. */
+    StrategyValidation: {
+      valid: boolean;
+      hash: null | string;
+      id: null | string;
+      style: null | string;
+      /** Format: int32 */
+      version: null | number;
+      timeframes: string[];
+      sides: string[];
+      problems: components['schemas']['StrategyIssue'][];
+    };
+    /** @description One stored version as the library shows it (spec P5-01): the text exactly as it was posted, its hash and lineage, and whether the text is free of errors under the rules of today. */
+    StrategyVersionView: {
+      id: string;
+      /** Format: int32 */
+      version: number;
+      hash: string;
+      parentHash: null | string;
+      note: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      text: string;
+      problemsFree: boolean;
+    };
     /**
      * @description The answer to `Subscribe`: how many instruments the connection now follows, whether the scope had more than the server follows per connection (1000 instruments, 1000 holding ids), in which case the rest get no pushes and the screen
      *     keeps their prices from its reads, and `failed` when the server could not read the scope (the database is unavailable): the connection then follows nothing and the screen should subscribe again later. After a good answer the server sends the
@@ -6696,6 +6915,21 @@ export interface components {
     UserInfo: {
       email: string;
       displayName: string;
+    };
+    /** @description Body of `POST /api/lab/validate`: the strategy text and its format (only `yaml`; omitted means yaml). */
+    ValidateStrategyRequest: {
+      text: string;
+      format?: null | string;
+    };
+    /** @description A stored version in the list of a family: number, hash, parent hash, note and creation time. */
+    VersionSummary: {
+      /** Format: int32 */
+      version: number;
+      hash: string;
+      parentHash: null | string;
+      note: null | string;
+      /** Format: date-time */
+      createdAt: string;
     };
   };
   responses: never;
@@ -12326,6 +12560,288 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LiveFeedStatus'];
+        };
+      };
+    };
+  };
+  ValidateStrategy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ValidateStrategyRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StrategyValidation'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetStrategySchema: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/schema+json': string;
+        };
+      };
+    };
+  };
+  ListStrategies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StoredStrategy'][];
+        };
+      };
+    };
+  };
+  CreateStrategy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateStrategyRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreatedStrategy'];
+        };
+      };
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CreatedStrategy'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetStrategy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StrategyDetail'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetStrategyVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        version: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StrategyVersionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DownloadStrategyVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        version: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/yaml': string;
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  CloneStrategyVersion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+        version: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['CloneStrategyRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ClonedStrategy'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

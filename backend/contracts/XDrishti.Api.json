@@ -7736,6 +7736,388 @@
           }
         }
       }
+    },
+    "/api/lab/validate": {
+      "post": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "Read and compile a strategy text; the answer is valid (no error), the hash and the located problems. An invalid text is still 200. Writes nothing",
+        "operationId": "ValidateStrategy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateStrategyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyValidation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/schema": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The JSON Schema (draft 2020-12) of the strategy file, for the editor",
+        "operationId": "GetStrategySchema",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/schema+json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/strategies": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The strategy families with their latest version number, the number of versions and whether they are built in",
+        "operationId": "ListStrategies",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StoredStrategy"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "Store a valid text as a new family (201) or as the next version of one (201); the same content again is the same version (200, nothing written). 422 lab.invalid_strategy with the problems; 409 lab.version_exists when the text's version is not the next number, lab.builtin_readonly for a built-in",
+        "operationId": "CreateStrategy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStrategyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedStrategy"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedStrategy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/strategies/{id}": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "One strategy family with the list of its versions",
+        "operationId": "GetStrategy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/strategies/{id}/versions/{version}": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "One stored version: the text as posted, hash, parent hash, note and whether the text is free of errors under today's rules",
+        "operationId": "GetStrategyVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyVersionView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/strategies/{id}/versions/{version}/file": {
+      "get": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The text of a stored version as a YAML file (attachment); posted to validate it gives the same hash",
+        "operationId": "DownloadStrategyVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab/strategies/{id}/versions/{version}/clone": {
+      "post": {
+        "tags": [
+          "Lab"
+        ],
+        "summary": "The text of a stored version with a new id (a built-in gets <ID>_COPY) and the parent hash to post with it; stores nothing",
+        "operationId": "CloneStrategyVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CloneStrategyRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClonedStrategy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10410,6 +10792,47 @@
         },
         "description": "Body of `POST /api/auth/change-password`."
       },
+      "CloneStrategyRequest": {
+        "type": "object",
+        "properties": {
+          "newId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Body of the clone endpoint: the id of the new strategy; omitted keeps the id (a built-in gets `&lt;ID&gt;_COPY`)."
+      },
+      "ClonedStrategy": {
+        "required": [
+          "id",
+          "text",
+          "parentHash",
+          "sourceId",
+          "sourceVersion"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "parentHash": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A clone (spec P5-01): the text with the new id, the hash of the version it came from (post it as `parentHash` to record the lineage) and the source."
+      },
       "CompletenessCheck": {
         "required": [
           "status",
@@ -10961,6 +11384,62 @@
           }
         },
         "description": "A new Dhan account. ClientId and Secrets (API key and secret) are required. ApiKeyIssuedOn is the day the API key was generated\n(default today, India time)."
+      },
+      "CreateStrategyRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "parentHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Body of `POST /api/lab/strategies`: the text, an optional note (at most 500 characters) and the hash of the version it was cloned from. There is no way to ask for a built-in: the request cannot set it."
+      },
+      "CreatedStrategy": {
+        "required": [
+          "id",
+          "version",
+          "hash",
+          "parentHash",
+          "created"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "parentHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created": {
+            "type": "boolean"
+          }
+        },
+        "description": "What a create did (spec P5-01): the version the content has, its hash and parent, and whether a row was written (false: the same content was already stored)."
       },
       "CsvFileCounts": {
         "required": [
@@ -19549,6 +20028,267 @@
           }
         }
       },
+      "StoredStrategy": {
+        "required": [
+          "id",
+          "style",
+          "builtIn",
+          "createdAt",
+          "latestVersion",
+          "versionCount"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "builtIn": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "versionCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "A strategy family as the library lists it (spec P3-02d, D4): the id, the style copied from its first version, whether it is a built-in, when it was created, its latest version number and how many versions it has."
+      },
+      "StrategyDetail": {
+        "required": [
+          "id",
+          "style",
+          "builtIn",
+          "createdAt",
+          "latestVersion",
+          "versions"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "style": {
+            "type": "string"
+          },
+          "builtIn": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "latestVersion": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VersionSummary"
+            }
+          }
+        },
+        "description": "One family with the list of its versions (spec P5-01): no texts, those are read one version at a time."
+      },
+      "StrategyIssue": {
+        "required": [
+          "path",
+          "code",
+          "message",
+          "severity",
+          "line",
+          "column",
+          "endLine",
+          "endColumn",
+          "start",
+          "length",
+          "suggestion"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "line": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "column": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "endLine": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "endColumn": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "start": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "length": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "suggestion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One located problem of a strategy text (spec P5-01): the model path, a stable code, a message, the severity (`error`, `warning`, `information`), the place of the field in the file (1-based; null when the path is not in the\nfile) and, for a problem of the rules language, the item-relative span (zero-based offset and length inside the condition text, ADR 0036)."
+      },
+      "StrategyValidation": {
+        "required": [
+          "valid",
+          "hash",
+          "id",
+          "style",
+          "version",
+          "timeframes",
+          "sides",
+          "problems"
+        ],
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "hash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "style": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "version": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int32"
+          },
+          "timeframes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sides": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StrategyIssue"
+            }
+          }
+        },
+        "description": "The answer of validate (spec P5-01): whether the text has no error, its hash when it has none, what it declares and every problem. Invalid text is still an answer, not a failure."
+      },
+      "StrategyVersionView": {
+        "required": [
+          "id",
+          "version",
+          "hash",
+          "parentHash",
+          "note",
+          "createdAt",
+          "text",
+          "problemsFree"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "parentHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "text": {
+            "type": "string"
+          },
+          "problemsFree": {
+            "type": "boolean"
+          }
+        },
+        "description": "One stored version as the library shows it (spec P5-01): the text exactly as it was posted, its hash and lineage, and whether the text is free of errors under the rules of today."
+      },
       "SubscribeAck": {
         "required": [
           "subscribed",
@@ -21167,6 +21907,60 @@
             "type": "string"
           }
         }
+      },
+      "ValidateStrategyRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "format": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Body of `POST /api/lab/validate`: the strategy text and its format (only `yaml`; omitted means yaml)."
+      },
+      "VersionSummary": {
+        "required": [
+          "version",
+          "hash",
+          "parentHash",
+          "note",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "parentHash": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "A stored version in the list of a family: number, hash, parent hash, note and creation time."
       }
     }
   },
@@ -21227,6 +22021,9 @@
     },
     {
       "name": "Live"
+    },
+    {
+      "name": "Lab"
     }
   ],
   "x-xdrishti-hubs": {

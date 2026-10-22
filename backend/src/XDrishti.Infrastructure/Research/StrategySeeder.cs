@@ -27,7 +27,10 @@ internal sealed partial class StrategySeeder(IStrategyStore store, ISimulationEn
         return texts;
     }
 
-    /// <summary>Seeds the embedded texts; the number of strategies that are stored after the call (written now or before).</summary>
+    /// <summary>
+    /// Seeds the embedded texts; the number of strategies that are stored after the call (written now or before). Only a failed <see cref="Domain.Common.Result"/> (a text that does not pass, an append the store refuses) is logged and skipped;
+    /// a database exception is not caught and aborts <c>xd-api migrate</c>, so a broken database never reads as a partial seed.
+    /// </summary>
     public ValueTask<int> SeedAsync(CancellationToken cancellationToken) => SeedAsync(EmbeddedTexts(), cancellationToken);
 
     /// <summary>Seeds the given texts (the embedded ones, or a test's).</summary>

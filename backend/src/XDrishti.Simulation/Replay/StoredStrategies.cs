@@ -45,8 +45,81 @@ public static class StoredStrategies
             return new StoredInspection(null, problems);
         }
 
+        return new StoredInspection(Describe(definition), []);
+    }
+
+    /// <summary>Reads and compiles the text like <see cref="Inspect"/> but keeps every problem, warnings included, each with the place of its field in the file (spec P5-01). Never throws on any text.</summary>
+    public static StoredCheck Check(string sourceText)
+    {
+        ArgumentNullException.ThrowIfNull(sourceText);
+        var read = StrategyFile.Read(sourceText);
+        var issues = read.Problems.Select(p => new StoredIssue(p.Path, p.Code, p.Message, SeverityName(p.Severity), p.Line, p.Column, p.EndLine, p.EndColumn, null, null, null)).ToList();
+        if (read.Definition is not { } definition || read.HasErrors)
+        {
+            return new StoredCheck(null, read.Envelope.Version, issues);
+        }
+
+        var compiled = new List<StoredIssue>();
+        foreach (var timeframe in definition.Timeframes)
+        {
+            foreach (var located in Simulator.Create(definition, timeframe, null).Problems)
+            {
+                var problem = located.Problem;
+                var at = Locate(read, located.Path);
+                var item = problem.Span.Length > 0 || problem.Span.Start > 0;
+                var issue = new StoredIssue(located.Path, problem.Code, problem.Message, SeverityName(problem.Severity), at?.Line, at?.Column, at?.EndLine, at?.EndColumn, item ? problem.Span.Start : null, item ? problem.Span.Length : null, problem.Suggestion);
+                if (!compiled.Contains(issue))
+                {
+                    compiled.Add(issue);
+                }
+            }
+        }
+
+        issues.AddRange(compiled);
+        return new StoredCheck(compiled.Any(i => i.Severity == "error") ? null : Describe(definition), read.Envelope.Version, issues);
+    }
+
+    /// <summary>The text with its strategy id replaced, written in the fixed layout of the file (spec P5-01, clone); null when the text does not read.</summary>
+    public static string? Retarget(string sourceText, string newId)
+    {
+        ArgumentNullException.ThrowIfNull(sourceText);
+        ArgumentNullException.ThrowIfNull(newId);
+        var (definition, _) = Read(sourceText);
+        return definition is null ? null : StrategyFile.Write(definition with { Id = newId });
+    }
+
+    /// <summary>The JSON Schema of the strategy file, for the editor.</summary>
+    public static string SchemaJson() => StrategyFileSchema.Json();
+
+    private static string SeverityName(ProblemSeverity severity) => severity switch
+    {
+        ProblemSeverity.Error => "error",
+        ProblemSeverity.Warning => "warning",
+        _ => "information",
+    };
+
+    /// <summary>The place of the field at the model path, or of the nearest enclosing field when the path itself is not in the file.</summary>
+    private static FilePosition? Locate(FileReadResult read, string path)
+    {
+        var current = path;
+        while (current.Length > 0)
+        {
+            if (read.Locate(current) is { } found)
+            {
+                return found;
+            }
+
+            var cut = Math.Max(current.LastIndexOf('.'), current.LastIndexOf('['));
+            current = cut < 0 ? string.Empty : current[..cut];
+        }
+
+        return read.Locate(string.Empty);
+    }
+
+    private static StoredDescription Describe(StrategyDefinition definition)
+    {
         var json = CanonicalStrategy.Json(definition);
-        var description = new StoredDescription(
+        return new StoredDescription(
             definition.Id,
             definition.Style == Style.Swing ? "swing" : "intraday",
             CanonicalText.Sha256Hex(json),
@@ -54,7 +127,6 @@ public static class StoredStrategies
             definition.Timeframes,
             definition.Sides,
             [.. definition.Params.Select(p => new KeyValuePair<string, double>(p.Name, p.Value))]);
-        return new StoredInspection(description, []);
     }
 
     /// <summary>Prepares the stored text for a run: the values replace the declared parameters (a name not declared is <c>simulation.unknown_parameter</c>), the compile judges them.</summary>

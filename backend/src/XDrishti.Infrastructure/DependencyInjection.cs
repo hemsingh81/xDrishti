@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
+using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market;
 using XDrishti.Application.Abstractions.Market.Actions;
@@ -19,6 +20,7 @@ using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Infrastructure.Accounts;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
+using XDrishti.Infrastructure.Lab;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Actions;
 using XDrishti.Infrastructure.Market.Bars;
@@ -113,6 +115,7 @@ public static class DependencyInjection
         services.AddScoped<IRunStore, RunStore>(); // the result store of the simulation runs (spec P3-10)
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)
+        services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O
         services.AddScoped<StrategySeeder>(); // the built-ins as text, written by `xd-api migrate`
         services.AddSingleton<ISimulationEngine, SimulationEngineAdapter>(); // the simulation library behind its port (ADR 0039): stateless, no I/O
 

@@ -14,6 +14,9 @@ public interface IStrategyStore
     /// <summary>One family, or null.</summary>
     ValueTask<StoredStrategy?> GetAsync(string id, CancellationToken cancellationToken);
 
+    /// <summary>Every version of a family, oldest first; empty for an unknown family.</summary>
+    ValueTask<IReadOnlyList<StoredVersion>> ListVersionsAsync(string id, CancellationToken cancellationToken);
+
     /// <summary>A version of a family (the latest when <paramref name="version"/> is null), or null.</summary>
     ValueTask<StoredVersion?> GetVersionAsync(string id, int? version, CancellationToken cancellationToken);
 

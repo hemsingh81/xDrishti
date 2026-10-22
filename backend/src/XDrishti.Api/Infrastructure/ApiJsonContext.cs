@@ -3,11 +3,15 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using XDrishti.Api.Auth;
 using XDrishti.Api.Endpoints;
+using XDrishti.Api.Lab;
+using XDrishti.Application.Abstractions.Lab;
+using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Accounts;
 using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Lab;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
 using XDrishti.Application.Market.Bars;
@@ -43,6 +47,16 @@ namespace XDrishti.Api.Infrastructure;
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, NumberHandling = JsonNumberHandling.Strict)]
 [JsonSerializable(typeof(SystemStatusResponse))]
+[JsonSerializable(typeof(ValidateStrategyRequest))]
+[JsonSerializable(typeof(CreateStrategyRequest))]
+[JsonSerializable(typeof(CloneStrategyRequest))]
+[JsonSerializable(typeof(StrategyValidation))]
+[JsonSerializable(typeof(CreatedStrategy))]
+[JsonSerializable(typeof(IReadOnlyList<StoredStrategy>))]
+[JsonSerializable(typeof(StrategyDetail))]
+[JsonSerializable(typeof(StrategyVersionView))]
+[JsonSerializable(typeof(ClonedStrategy))]
+[JsonSerializable(typeof(IReadOnlyList<StrategyIssue>))]
 [JsonSerializable(typeof(LiveFeedStatus))]
 [JsonSerializable(typeof(LiveScope))]
 [JsonSerializable(typeof(SubscribeAck))]

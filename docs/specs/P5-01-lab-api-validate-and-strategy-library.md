@@ -1,6 +1,6 @@
 # P5-01 — Lab API: validate and the strategy library
 
-- **Status:** Approved (owner, 2026-10-22, "approve all": the questions stand as recommended). Written 2026-10-22 from `main` at f4294e31. It **depends on P3-02c (strategy file) and P3-02d (storage and seeding), neither of which is built or specced**; every name taken from them (the parser, the schema generator, the hash, the store port, the tables) is **UNVERIFIED against code** and the spec must be re-read when they are written. Other code facts were not re-read for this draft and are marked UNVERIFIED.
+- **Status:** Approved (owner, 2026-10-22, "approve all": the questions stand as recommended); **built 2026-10-22 ([ADR 0057](../adr/0057-the-lab-api-validate-store-and-read-strategy-versions.md))** after P3-02c and P3-02d. Written 2026-10-22 from `main` at f4294e31 when those two were not yet built, so the text below still marks names as UNVERIFIED; every name taken from them (the parser, the schema generator, the hash, the store port, the tables) is **UNVERIFIED against code** and the spec must be re-read when they are written. Other code facts were not re-read for this draft and are marked UNVERIFIED.
 - **Phase / roadmap row:** P5 — Strategy Lab v1; slice 1 of the plan [P5-00](P5-00-strategy-lab-plan.md).
 - **Design refs:** docs/design/11-strategy-lab.md §1 (channels), §2 (language, model as built), §3 step 1 and 2, §6 (storage) · 03-target-architecture.md §6 · [ADR 0002](../adr/0002-config-and-strategies-in-app.md) (strategies in the database) · [ADR 0034](../adr/0034-the-rules-expression-language-lint-and-compiler.md), [ADR 0036](../adr/0036-the-typed-strategy-model-and-the-compile-of-its-sections.md) · P3-02c, P3-02d (future).
 
@@ -59,8 +59,8 @@ Unit: the validate pipeline order (parse, schema, compile) on tables of good and
 5. **Size limit.** 64 KB of text? Recommended: yes (UNVERIFIED value; a strategy is a few hundred lines).
 
 ## Done when
-- [ ] The owner has answered questions 1 to 5 and the status is Approved; P3-02c and P3-02d are Built and this spec re-read
-- [ ] All acceptance criteria have evidence
+- [x] The owner has answered questions 1 to 5 and the status is Approved; P3-02c and P3-02d are Built and this spec re-read (2026-10-22)
+- [x] All acceptance criteria have evidence (`LabApiTests`, `LabHandlerTests`, `StoredCheckTests`, `LabStoreTests`; criterion 1 uses a valid two-sided strategy because the doc 11 example does not validate today, see ADR 0057 honest limits)
 - [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
-- [ ] Contract regenerated (`scripts/gen-api.sh`); migration added only if a column is missing
-- [ ] ADR (UNVERIFIED next number) for the Lab API module and version rules; doc 11 §1, §6 and doc 03 §6 updated; `scripts/build-docs.sh` run
+- [x] Contract regenerated (`scripts/gen-api.sh`); no migration was needed (the P3-02d tables have the parent hash and the note)
+- [x] ADR 0057 for the Lab API module and version rules; doc 11 §1, §6 and doc 03 §6 updated; `scripts/build-docs.sh` run

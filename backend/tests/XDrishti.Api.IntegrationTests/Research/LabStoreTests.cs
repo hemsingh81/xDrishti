@@ -213,6 +213,29 @@ public sealed class LabStoreTests(ApiFactory factory, ResearchGrantsTests.Dedica
         (await store.GetAsync("orb_case", Ct)).ShouldBeNull();
     }
 
+    [Fact]
+    public async Task One_family_is_read_by_its_id_with_its_counts_and_its_versions_in_order()
+    {
+        await ResetAsync();
+        await using var host = Host();
+        using var scope = host.Services.CreateScope();
+        var store = StoreOf(scope);
+        await store.AppendAsync(Version("FAM_A", "one"), Ct);
+        await store.AppendAsync(Version("FAM_A", "two"), Ct);
+        await store.AppendAsync(Version("FAM_B", "one", style: "swing"), Ct);
+
+        var a = await store.GetAsync("FAM_A", Ct);
+        var versions = await store.ListVersionsAsync("FAM_A", Ct);
+
+        a.ShouldNotBeNull();
+        a.LatestVersion.ShouldBe(2);
+        a.VersionCount.ShouldBe(2);
+        (await store.GetAsync("FAM_B", Ct))!.Style.ShouldBe("swing");
+        (await store.GetAsync("FAM_C", Ct)).ShouldBeNull();
+        versions.Select(v => v.Version).ShouldBe([1, 2]);
+        (await store.ListVersionsAsync("FAM_C", Ct)).ShouldBeEmpty();
+    }
+
     // criterion 7
 
     [Fact]

@@ -48,7 +48,32 @@ internal sealed partial class StrategyStore(NpgsqlDataSource dataSource, TimePro
     public async ValueTask<StoredStrategy?> GetAsync(string id, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(id);
-        return (await ListAsync(cancellationToken)).FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.Ordinal));
+        await using var command = dataSource.CreateCommand("""
+            SELECT s.id, s.style, s.built_in, s.created_at, COALESCE(max(v.version), 0), count(v.version)
+            FROM lab.strategies s LEFT JOIN lab.strategy_versions v ON v.strategy_id = s.id
+            WHERE s.id = @id
+            GROUP BY s.id, s.style, s.built_in, s.created_at
+            """);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Text, id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new StoredStrategy(reader.GetString(0), reader.GetString(1), reader.GetBoolean(2), reader.GetFieldValue<DateTimeOffset>(3), reader.GetInt32(4), (int)reader.GetInt64(5))
+            : null;
+    }
+
+    public async ValueTask<IReadOnlyList<StoredVersion>> ListVersionsAsync(string id, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        await using var command = dataSource.CreateCommand($"SELECT {VersionColumns} FROM lab.strategy_versions WHERE strategy_id = @id ORDER BY version");
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Text, id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var list = new List<StoredVersion>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            list.Add(ReadVersion(reader));
+        }
+
+        return list;
     }
 
     public async ValueTask<StoredVersion?> GetVersionAsync(string id, int? version, CancellationToken cancellationToken)
@@ -246,7 +271,11 @@ internal sealed partial class StrategyStore(NpgsqlDataSource dataSource, TimePro
             return null;
         }
 
-        return new StoredVersion(
+        return ReadVersion(reader);
+    }
+
+    private static StoredVersion ReadVersion(NpgsqlDataReader reader) =>
+        new(
             reader.GetString(0),
             reader.GetInt32(1),
             reader.GetInt16(2),
@@ -256,7 +285,6 @@ internal sealed partial class StrategyStore(NpgsqlDataSource dataSource, TimePro
             reader.IsDBNull(6) ? null : reader.GetString(6),
             reader.IsDBNull(7) ? null : reader.GetString(7),
             reader.GetFieldValue<DateTimeOffset>(8));
-    }
 
     [LoggerMessage(EventId = 4431, Level = LogLevel.Information, Message = "lab.store.appended strategy {StrategyId} version {Version} hash {Hash}, created {Created}")]
     private static partial void LogAppended(ILogger logger, string strategyId, int version, string hash, bool created);

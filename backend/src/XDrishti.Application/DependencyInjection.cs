@@ -9,6 +9,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Lab;
 using XDrishti.Application.Live;
 using XDrishti.Application.Live.Push;
 using XDrishti.Application.Market.Actions;
@@ -75,6 +76,7 @@ public static class DependencyInjection
         services.AddMarket();
         services.AddPortfolio();
         services.AddResearch();
+        services.AddLab();
 
         return services;
     }
@@ -384,6 +386,18 @@ public static class DependencyInjection
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();
+    }
+
+    /// <summary>The Lab API (P5-01, ADR 0057): validate, store and read strategy texts.</summary>
+    private static void AddLab(this IServiceCollection services)
+    {
+        services.AddScoped<IQueryHandler<ValidateStrategyQuery, StrategyValidation>, ValidateStrategyHandler>();
+        services.AddScoped<ICommandHandler<CreateStrategyCommand, CreatedStrategy>, CreateStrategyHandler>();
+        services.AddScoped<IQueryHandler<ListStrategiesQuery, IReadOnlyList<StoredStrategy>>, ListStrategiesHandler>();
+        services.AddScoped<IQueryHandler<GetStrategyQuery, Result<StrategyDetail>>, GetStrategyHandler>();
+        services.AddScoped<IQueryHandler<GetStrategyVersionQuery, Result<StrategyVersionView>>, GetStrategyVersionHandler>();
+        services.AddScoped<IQueryHandler<CloneStrategyQuery, Result<ClonedStrategy>>, CloneStrategyHandler>();
+        services.AddScoped<IQueryHandler<GetStrategySchemaQuery, string>, GetStrategySchemaHandler>();
     }
 
     /// <summary>Research (P3-04a): running a strategy over the stored bars. The engine behind <see cref="ISimulationEngine"/> is an adapter in Infrastructure (ADR 0039).</summary>

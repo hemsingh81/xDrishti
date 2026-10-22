@@ -22,6 +22,9 @@ internal sealed class FakeStrategyStore : IStrategyStore
     public async ValueTask<StoredStrategy?> GetAsync(string id, CancellationToken cancellationToken) =>
         (await ListAsync(cancellationToken)).FirstOrDefault(s => s.Id == id);
 
+    public ValueTask<IReadOnlyList<StoredVersion>> ListVersionsAsync(string id, CancellationToken cancellationToken) =>
+        ValueTask.FromResult<IReadOnlyList<StoredVersion>>([.. _versions.Where(v => v.StrategyId == id).OrderBy(v => v.Version)]);
+
     public ValueTask<StoredVersion?> GetVersionAsync(string id, int? version, CancellationToken cancellationToken) =>
         ValueTask.FromResult(_versions.Where(v => v.StrategyId == id && (version is null || v.Version == version)).OrderByDescending(v => v.Version).FirstOrDefault());
 

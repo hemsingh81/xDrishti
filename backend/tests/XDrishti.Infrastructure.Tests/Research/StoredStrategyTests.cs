@@ -234,6 +234,8 @@ public sealed class StoredStrategyTests
 
         public ValueTask<StoredStrategy?> GetAsync(string id, CancellationToken cancellationToken) => throw new NotSupportedException();
 
+        public ValueTask<IReadOnlyList<StoredVersion>> ListVersionsAsync(string id, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public ValueTask<StoredVersion?> GetVersionAsync(string id, int? version, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public ValueTask<StoredVersion?> GetByHashAsync(string hash, CancellationToken cancellationToken) => throw new NotSupportedException();
