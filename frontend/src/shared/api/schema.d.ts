@@ -6133,22 +6133,6 @@ export interface components {
       /** Format: date */
       to: null | string;
     };
-    /** @description The sign-flip baseline: not a re-run with random entries. */
-    RandomBaselineView: {
-      kind: string;
-      /** Format: int32 */
-      trades: number;
-      /** Format: int32 */
-      draws: number;
-      seed: string;
-      /** Format: double */
-      observedMeanR: number;
-      /** Format: double */
-      nullMeanP95: number;
-      /** Format: double */
-      pValue: number;
-      label: string;
-    };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
       /** Format: uuid */
@@ -6345,12 +6329,12 @@ export interface components {
       weeklyLossR: number;
       weeklyLossAction: string;
     };
-    /** @description The robustness block of a result (spec P5-05, ADR 0061). It does not change the verdict; every part that cannot be computed is null or says why. */
+    /** @description The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why. */
     RobustnessView: {
       sensitivity: components['schemas']['SensitivityView'];
       monteCarlo: null | components['schemas']['MonteCarloView'];
       byYear: components['schemas']['YearView'][];
-      randomBaseline: null | components['schemas']['RandomBaselineView'];
+      signFlipBaseline: null | components['schemas']['SignFlipBaselineView'];
       byRegime: string;
       limits: string[];
     };
@@ -6604,6 +6588,22 @@ export interface components {
        * @description End of the step-up window (password re-entered); null when the session is not elevated right now.
        */
       elevatedUntil?: null | string;
+    };
+    /** @description The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries. */
+    SignFlipBaselineView: {
+      kind: string;
+      /** Format: int32 */
+      trades: number;
+      /** Format: int32 */
+      draws: number;
+      seed: string;
+      /** Format: double */
+      observedMeanR: number;
+      /** Format: double */
+      nullMeanP95: number;
+      /** Format: double */
+      pValue: number;
+      label: string;
     };
     /**
      * @description Spikes: a 1-minute move greater than `spikeMultiple` times the median move and greater than 1 %. One the next bar takes back (at least half) is a spike (a warning); one that is not

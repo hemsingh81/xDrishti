@@ -59,7 +59,7 @@ public sealed class LabRobustnessTests
         var outcome = await service.RunAsync(Run(), Now, plan, Template(), Full(1, -1, 2), null, Ct);
 
         outcome.IsSuccess.ShouldBeTrue();
-        _queries.Count.ShouldBe(1 + plan.Count);
+        _queries.Count.ShouldBe(1 + plan.Points.Count);
         _queries[0].Request.Parameters.ShouldBeEmpty();
         _queries.ShouldAllBe(q => q.Request.Exits!.Candidates.Count == 1 && q.Request.Exits.Candidates[0].Id == "FIXED_RR{rr=2}");
         _queries.Skip(1).ShouldAllBe(q => q.Request.Parameters!.Count == 1);
@@ -76,8 +76,8 @@ public sealed class LabRobustnessTests
         var outcome = await service.RunAsync(Run(), Now, plan, Template(), Full(1, -1), null, Ct);
 
         outcome.Value.View.Sensitivity.Parameters.Single().Points.ShouldAllBe(p => p.Error == "no such parameter");
-        outcome.Value.LedgerRows.Count.ShouldBe(plan.Count);
-        plan.Count.ShouldBeGreaterThan(0);
+        outcome.Value.LedgerRows.Count.ShouldBe(plan.Points.Count);
+        plan.Points.Count.ShouldBeGreaterThan(0);
     }
 
     [Fact]
@@ -91,9 +91,9 @@ public sealed class LabRobustnessTests
         var again = (await service.RunAsync(run, Now, plan, Template(), Full(1, -1), null, Ct)).Value.LedgerRows;
 
         rows.ShouldAllBe(r => r.Method == "sweep" && r.ParentHash == run.StrategyHash && r.StrategyId == "LAB_TEST" && r.Version == 2);
-        rows.Select(r => r.StrategyHash).Distinct().Count().ShouldBe(plan.Count);
+        rows.Select(r => r.StrategyHash).Distinct().Count().ShouldBe(plan.Points.Count);
         rows.Select(r => r.StrategyHash).ShouldNotContain(run.StrategyHash);
-        rows.Select(r => r.RunId).Distinct().Count().ShouldBe(plan.Count);
+        rows.Select(r => r.RunId).Distinct().Count().ShouldBe(plan.Points.Count);
         again.Select(r => r.RunId).ShouldBe(rows.Select(r => r.RunId));
     }
 
@@ -107,7 +107,7 @@ public sealed class LabRobustnessTests
         view.Sensitivity.Parameters.ShouldBeEmpty();
         view.Sensitivity.Label.ShouldContain("no parameter");
         view.MonteCarlo!.Trades.ShouldBe(4);
-        view.RandomBaseline!.Kind.ShouldBe("sign_flip");
+        view.SignFlipBaseline!.Kind.ShouldBe("sign_flip");
         view.ByYear.Single().Year.ShouldBe(2026);
         view.ByRegime.ShouldStartWith("unavailable");
         view.Limits.ShouldContain(l => l.Contains("sign-flip", StringComparison.Ordinal));
@@ -118,10 +118,10 @@ public sealed class LabRobustnessTests
     {
         var service = Service();
 
-        var view = (await service.RunAsync(Run(), Now, [], Template(), Full(1), null, Ct)).Value.View;
+        var view = (await service.RunAsync(Run(), Now, SweepSchedule.None, Template(), Full(1), null, Ct)).Value.View;
 
         view.MonteCarlo.ShouldBeNull();
-        view.RandomBaseline.ShouldBeNull();
+        view.SignFlipBaseline.ShouldBeNull();
         view.Limits.ShouldContain(l => l.StartsWith("fewer than 2", StringComparison.Ordinal));
     }
 
@@ -131,11 +131,41 @@ public sealed class LabRobustnessTests
         var service = Service();
         var run = Run();
 
-        var a = (await service.RunAsync(run, Now, [], Template(), Full(1, -1, 2, -1, 3), null, Ct)).Value.View.MonteCarlo;
-        var b = (await service.RunAsync(run, Now, [], Template(), Full(1, -1, 2, -1, 3), null, Ct)).Value.View.MonteCarlo;
-        var other = (await service.RunAsync(run with { Key = new string('2', 64) }, Now, [], Template(), Full(1, -1, 2, -1, 3), null, Ct)).Value.View.MonteCarlo;
+        var a = (await service.RunAsync(run, Now, SweepSchedule.None, Template(), Full(1, -1, 2, -1, 3), null, Ct)).Value.View.MonteCarlo;
+        var b = (await service.RunAsync(run, Now, SweepSchedule.None, Template(), Full(1, -1, 2, -1, 3), null, Ct)).Value.View.MonteCarlo;
+        var other = (await service.RunAsync(run with { Key = new string('2', 64) }, Now, SweepSchedule.None, Template(), Full(1, -1, 2, -1, 3), null, Ct)).Value.View.MonteCarlo;
 
         a.ShouldBe(b);
         other!.Seed.ShouldNotBe(a!.Seed);
+    }
+
+    [Fact]
+    public async Task A_parameter_whose_steps_all_vanish_is_reported_inconclusive_with_no_points()
+    {
+        var service = Service();
+        var plan = service.Plan(Described(("flag", 2.0)));
+
+        var view = (await service.RunAsync(Run(), Now, plan, Template(), Full(1, -1), null, Ct)).Value.View;
+
+        plan.Points.ShouldBeEmpty();
+        var parameter = view.Sensitivity.Parameters.Single();
+        (parameter.Param, parameter.Verdict).ShouldBe(("flag", "inconclusive"));
+        parameter.Points.ShouldBeEmpty();
+        parameter.Reason.ShouldStartWith("no points");
+    }
+
+    [Fact]
+    public async Task A_cancel_between_sweep_points_stops_the_sweep()
+    {
+        var service = Service();
+        var plan = service.Plan(Described(("period", 10)));
+        using var source = new CancellationTokenSource();
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            source.Cancel();
+            return Result.Success(FabricatedRun.Standard());
+        });
+
+        await Should.ThrowAsync<OperationCanceledException>(async () => await service.RunAsync(Run(), Now, plan, Template(), Full(1, -1), null, source.Token));
     }
 }

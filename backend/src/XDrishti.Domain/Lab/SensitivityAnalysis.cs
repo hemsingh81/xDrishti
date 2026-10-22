@@ -37,6 +37,12 @@ public static class SensitivityAnalysis
         }
 
         var weak = valid.Count(p => p.MeanR <= 0 || p.MeanR < KeepFraction * baseMean);
+        var unusable = points.Count - valid.Count;
+        if (weak == 0 && unusable > 0)
+        {
+            return new ParameterSensitivity(parameter, points, "inconclusive", unusable + " of " + points.Count + " points gave no trades or were refused; a plateau cannot be claimed.");
+        }
+
         return weak == 0
             ? new ParameterSensitivity(parameter, points, "stable", "Every valid point keeps a positive mean R of at least half the base (in-sample).")
             : new ParameterSensitivity(parameter, points, "fragile", weak + " of " + valid.Count + " valid points lose the edge or fall below half the base mean R (in-sample).");

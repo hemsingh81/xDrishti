@@ -19626,51 +19626,6 @@
         },
         "description": "The window of the checks: how many closed sessions, from which date to which (the ones a run started now would look at)."
       },
-      "RandomBaselineView": {
-        "required": [
-          "kind",
-          "trades",
-          "draws",
-          "seed",
-          "observedMeanR",
-          "nullMeanP95",
-          "pValue",
-          "label"
-        ],
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string"
-          },
-          "trades": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "draws": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "seed": {
-            "type": "string"
-          },
-          "observedMeanR": {
-            "type": "number",
-            "format": "double"
-          },
-          "nullMeanP95": {
-            "type": "number",
-            "format": "double"
-          },
-          "pValue": {
-            "type": "number",
-            "format": "double"
-          },
-          "label": {
-            "type": "string"
-          }
-        },
-        "description": "The sign-flip baseline: not a re-run with random entries."
-      },
       "RefreshRunView": {
         "required": [
           "id",
@@ -20307,7 +20262,7 @@
           "sensitivity",
           "monteCarlo",
           "byYear",
-          "randomBaseline",
+          "signFlipBaseline",
           "byRegime",
           "limits"
         ],
@@ -20332,13 +20287,13 @@
               "$ref": "#/components/schemas/YearView"
             }
           },
-          "randomBaseline": {
+          "signFlipBaseline": {
             "oneOf": [
               {
                 "type": "null"
               },
               {
-                "$ref": "#/components/schemas/RandomBaselineView"
+                "$ref": "#/components/schemas/SignFlipBaselineView"
               }
             ]
           },
@@ -20352,7 +20307,7 @@
             }
           }
         },
-        "description": "The robustness block of a result (spec P5-05, ADR 0061). It does not change the verdict; every part that cannot be computed is null or says why."
+        "description": "The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why."
       },
       "RoleToggleInput": {
         "required": [
@@ -21170,6 +21125,51 @@
           }
         },
         "description": "What the client needs to know about its session."
+      },
+      "SignFlipBaselineView": {
+        "required": [
+          "kind",
+          "trades",
+          "draws",
+          "seed",
+          "observedMeanR",
+          "nullMeanP95",
+          "pValue",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "draws": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seed": {
+            "type": "string"
+          },
+          "observedMeanR": {
+            "type": "number",
+            "format": "double"
+          },
+          "nullMeanP95": {
+            "type": "number",
+            "format": "double"
+          },
+          "pValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "description": "The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries."
       },
       "SpikeCheck": {
         "required": [

@@ -261,6 +261,113 @@ public sealed class LabRunnerTests
         finish.Problems.ShouldBeEmpty();
     }
 
+    private static LabRun RobustRun() => FullRun() with { Method = "robust" };
+
+    /// <summary>A robust or full run whose comparison succeeds with the four candidate exits and whose strategy declares one parameter (so the sweep has points).</summary>
+    private void ArrangeFullTest()
+    {
+        _sheets.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
+        _calendars.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
+        _checker.Check("the text").Returns(new StrategyCheck(new StrategyDescription("LAB_TEST", "intraday", Hash, "{}", [Timeframe.M15], [Side.Buy], [new KeyValuePair<string, double>("period", 10)]), 1, []));
+        var candidates = ExitFlags.Parse([.. LabSettings.Default.Exits], null, [])!.Candidates
+            .Select((exit, i) => new CandidateRun(exit.Id, exit, FabricatedRun.CostedStandard() with { RunKey = new string((char)('1' + i), 64) }, 0))
+            .ToList();
+        _comparisons.HandleAsync(Arg.Any<RunComparisonQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Success(new ComparisonRun(candidates, ComparisonReport.Build(candidates, true), new string('e', 64))));
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<LabVerdictView>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+    }
+
+    [Fact]
+    public async Task A_robust_run_has_the_same_verdict_as_a_full_run_on_the_same_input_plus_the_block()
+    {
+        ArrangeFullTest();
+        var verdicts = new List<LabVerdictView>();
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Do<LabVerdictView>(verdicts.Add), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Runner().ExecuteAsync(FullRun(), Ct);
+        await Runner().ExecuteAsync(RobustRun(), Ct);
+
+        verdicts.Count.ShouldBe(2);
+        verdicts[0].Robustness.ShouldBeNull();
+        verdicts[1].Robustness.ShouldNotBeNull();
+        System.Text.Json.JsonSerializer.Serialize(verdicts[1] with { Robustness = null }).ShouldBe(System.Text.Json.JsonSerializer.Serialize(verdicts[0]));
+    }
+
+    [Fact]
+    public async Task A_robust_run_goes_through_validate_compile_full_test_and_robustness_in_that_order()
+    {
+        ArrangeFullTest();
+
+        await Runner().ExecuteAsync(RobustRun(), Ct);
+
+        var finish = _finishes.Single();
+        finish.State.ShouldBe(LabRunState.Succeeded);
+        finish.Stages.Select(s => s.Name).ShouldBe(["validate", "compile", "full_test", "robustness"]);
+    }
+
+    [Fact]
+    public async Task A_cancel_during_the_robustness_stage_stores_no_result_no_run_and_no_sweep_ledger_row()
+    {
+        ArrangeFullTest();
+        _simulation = new Scripted(token => WaitForCancelAsync(token));
+        _runs.IsCancelRequestedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var running = Runner().ExecuteAsync(RobustRun(), Ct);
+        await AdvanceUntilAsync(running);
+
+        var finish = _finishes.Single();
+        finish.State.ShouldBe(LabRunState.Cancelled);
+        finish.Stage.ShouldBe("robustness");
+        await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _ledger.DidNotReceiveWithAnyArgs().AppendAsync(default!, Ct);
+        await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task A_cancel_seen_after_the_sweep_ran_writes_no_ledger_row()
+    {
+        ArrangeFullTest();
+        _runs.IsCancelRequestedAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        await Runner().ExecuteAsync(RobustRun(), Ct);
+
+        _finishes.Single().State.ShouldBe(LabRunState.Cancelled);
+        await _simulation.ReceivedWithAnyArgs().HandleAsync(default!, Ct);
+        await _ledger.DidNotReceiveWithAnyArgs().AppendAsync(default!, Ct);
+        await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task The_sweep_ledger_rows_are_appended_after_the_runs_are_stored_and_before_the_result()
+    {
+        ArrangeFullTest();
+        var calls = new List<string>();
+        _store.HandleAsync(Arg.Any<StoreRunCommand>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            calls.Add("run");
+            return Result.Success(StoreOutcome.Stored(1, 0));
+        });
+        _ledger.AppendAsync(Arg.Any<LedgerRow>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            calls.Add("ledger");
+            return true;
+        });
+        _results.AppendAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<LabVerdictView>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            calls.Add("result");
+            return true;
+        });
+
+        await Runner().ExecuteAsync(RobustRun(), Ct);
+
+        calls.Count(c => c == "ledger").ShouldBe(4);
+        calls.Last().ShouldBe("result");
+        calls.LastIndexOf("run").ShouldBeLessThan(calls.IndexOf("ledger"));
+        calls.LastIndexOf("ledger").ShouldBeLessThan(calls.IndexOf("result"));
+        _finishes.Single().State.ShouldBe(LabRunState.Succeeded);
+    }
+
     private async ValueTask<Result<SimulationRun>> WaitForCancelAsync(CancellationToken token)
     {
         await Task.Delay(Timeout.InfiniteTimeSpan, token);

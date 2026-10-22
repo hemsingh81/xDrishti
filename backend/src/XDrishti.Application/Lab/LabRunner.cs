@@ -220,7 +220,7 @@ internal sealed class LabRunner(
             ownerToken.ThrowIfCancellationRequested();
             log.Finish(FullTest, 0, time.GetUtcNow());
             var plan = robustness.Plan(description);
-            var steps = run.Universe.Instruments.Count * (1 + plan.Count);
+            var steps = run.Universe.Instruments.Count * (1 + plan.Points.Count);
             watch.Set(Robustness, steps);
             await BeginAsync(run, log, Robustness, 0, steps, throttle, ownerToken);
             var robust = await robustness.RunAsync(run, time.GetUtcNow(), plan, template, full, counter, ownerToken);
@@ -253,7 +253,7 @@ internal sealed class LabRunner(
             keys.Add(simulated.RunKey);
         }
 
-        // shortcut: a failure after the candidate runs are stored leaves them stored (idempotent by key, a retry re-stores nothing); cancel is not rechecked after the store loop.
+        // shortcut: a failure after the candidate runs are stored leaves them stored (idempotent by key, a retry re-stores nothing); cancel is not rechecked after the store loop. A retry after a crash between the sweep rows and the result can see up to 16 more variants (the rows of the first attempt count).
         foreach (var row in sweepRows)
         {
             await ledger.AppendAsync(row, hostStop);

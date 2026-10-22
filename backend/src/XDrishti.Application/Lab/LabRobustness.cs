@@ -21,22 +21,28 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
     /// <summary>Said in the block: why <c>by_regime</c> has no numbers.</summary>
     public const string RegimeUnavailable = "unavailable: the market-context job (P3-01d) is not built";
 
+    /// <summary>XORed into the seed of the sign-flip baseline so its draws do not repeat those of the Monte Carlo.</summary>
+    private const ulong FlipSeedMask = 0xA5A5_5A5A_C3C3_3C3CUL;
+
     /// <summary>The method written on the ledger rows of the sweep points.</summary>
     public const string SweepMethod = "sweep";
 
-    /// <summary>The points the sweep of this strategy would run.</summary>
-    public IReadOnlyList<SweepPoint> Plan(StrategyDescription description)
+    /// <summary>The sweep of this strategy: the parameters taken and the points it would run.</summary>
+    public SweepSchedule Plan(StrategyDescription description)
     {
         ArgumentNullException.ThrowIfNull(description);
-        return SweepPlan.Build(description.Parameters, settings.Robustness.SweepParams, settings.Robustness.SweepSteps);
+        return new SweepSchedule(
+            SweepPlan.Swept(description.Parameters, settings.Robustness.SweepParams),
+            SweepPlan.Build(description.Parameters, settings.Robustness.SweepParams, settings.Robustness.SweepSteps));
     }
 
-    public async ValueTask<Result<RobustnessOutcome>> RunAsync(LabRun run, DateTimeOffset now, IReadOnlyList<SweepPoint> plan, SimulationRequest template, FullTestOutcome full, IProgress<int>? progress, CancellationToken cancellationToken)
+    public async ValueTask<Result<RobustnessOutcome>> RunAsync(LabRun run, DateTimeOffset now, SweepSchedule schedule, SimulationRequest template, FullTestOutcome full, IProgress<int>? progress, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(run);
-        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(schedule);
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(full);
+        var plan = schedule.Points;
         var errors = new List<string>();
         var exits = ExitFlags.Parse([.. settings.Exits], null, errors);
         if (exits is null || exits.Candidates.Count == 0)
@@ -51,12 +57,18 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
         var rows = new List<LedgerRow>();
         for (var i = 0; i < plan.Count; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var point = plan[i];
             results.Add(await PointAsync(template, exit, point, new Dictionary<string, double> { [point.Parameter] = point.Value }, progress, i + 1, instruments, cancellationToken));
             rows.Add(LedgerRowOf(run, point, now));
         }
 
-        var judged = SensitivityAnalysis.Judge(baseResult, results);
+        var judged = SensitivityAnalysis.Judge(baseResult, results).ToList();
+        foreach (var name in schedule.Parameters.Where(n => judged.TrueForAll(j => !string.Equals(j.Parameter, n, StringComparison.Ordinal))))
+        {
+            judged.Add(new ParameterSensitivity(name, [], "inconclusive", "no points: every step rounds to the declared value or is not a positive number."));
+        }
+
         var sensitivity = new SensitivityView(
             template.EvaluationTimeframe,
             exits.Candidates[0].Id,
@@ -68,12 +80,14 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
         var r = full.OosTrades.Select(t => t.R).ToList();
         var draws = settings.Robustness.McDraws;
         var mc = MonteCarlo.Run(r, draws, seed);
-        var flip = SignFlipBaseline.Run(r, draws, seed);
+        var flip = SignFlipBaseline.Run(r, draws, seed ^ FlipSeedMask);
         var limits = new List<string>
         {
             "The sweep is in-sample on the whole window: a plateau there is not evidence, a cliff is a warning.",
             "One parameter at a time: interactions are not seen.",
             "Monte Carlo treats the trades as independent: clustered losses are understated.",
+            "The sign-flip baseline is lenient: it tests the mean R against 0 given the trade sizes, and random entries with a 2R target would lose money before costs.",
+            "The out-of-sample trades are winners of an exit selection, so selection bias is not nulled by the baseline.",
             "The baseline is a sign-flip null, not a re-run with random entries.",
             "About three partial calendar years of data: the by-year figures are thin.",
             "Each sweep point is a variant in the test ledger of the family and tightens the next run.",
@@ -87,7 +101,7 @@ internal sealed class LabRobustness(IQueryHandler<RunSimulationQuery, Result<Sim
             sensitivity,
             mc is null ? null : new MonteCarloView(mc.Trades, mc.Draws, mc.Seed.ToString(CultureInfo.InvariantCulture), mc.ObservedMeanR, mc.ObservedMaxDrawdownR, mc.MeanP05, mc.MeanP50, mc.MeanP95, mc.DrawdownP50, mc.DrawdownP95, mc.ShareNotPositive),
             [.. YearBreakdown.Of(full.OosTrades).Select(y => new YearView(y.Year, y.Trades, y.MeanR, y.TotalR, y.ProfitFactor, y.Positive))],
-            flip is null ? null : new RandomBaselineView("sign_flip", flip.Trades, flip.Draws, flip.Seed.ToString(CultureInfo.InvariantCulture), flip.ObservedMeanR, flip.NullMeanP95, flip.PValue, "each trade keeps its size, its sign is a coin flip; not a random-entry run"),
+            flip is null ? null : new SignFlipBaselineView("sign_flip", flip.Trades, flip.Draws, flip.Seed.ToString(CultureInfo.InvariantCulture), flip.ObservedMeanR, flip.NullMeanP95, flip.PValue, "each trade keeps its size, its sign is a coin flip; not a random-entry run"),
             RegimeUnavailable,
             limits);
         return Result.Success(new RobustnessOutcome(view, rows));

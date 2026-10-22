@@ -14,6 +14,13 @@ public static class SweepPlan
     /// <summary>The most points a sweep runs.</summary>
     public const int MaxPoints = 16;
 
+    /// <summary>The names of the parameters a sweep takes, in order, whether or not any of their points survives.</summary>
+    public static IReadOnlyList<string> Swept(IReadOnlyList<KeyValuePair<string, double>> declared, int maxParameters)
+    {
+        ArgumentNullException.ThrowIfNull(declared);
+        return [.. declared.Take(Math.Min(maxParameters, MaxParameters)).Select(d => d.Key)];
+    }
+
     public static IReadOnlyList<SweepPoint> Build(IReadOnlyList<KeyValuePair<string, double>> declared, int maxParameters, IReadOnlyList<double> steps)
     {
         ArgumentNullException.ThrowIfNull(declared);

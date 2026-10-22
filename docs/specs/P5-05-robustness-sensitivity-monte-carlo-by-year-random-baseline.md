@@ -25,7 +25,7 @@
 
 ## Acceptance criteria
 1. Given method `robust`, then the run is queued under its own key and costs are mandatory (422 `lab.invalid_input` without a charge sheet); `quick` and `full` behave as before.
-2. Given a robust run, then the result carries `robustness` with `sensitivity`, `monteCarlo`, `byYear`, `randomBaseline`, `byRegime` (unavailable) and limits; `full` results have `robustness` null.
+2. Given a robust run, then the result carries `robustness` with `sensitivity`, `monteCarlo`, `byYear`, `signFlipBaseline`, `byRegime` (unavailable) and limits; `full` results have `robustness` null.
 3. Monte Carlo and the baseline are deterministic for a seed and differ for another; hand-checked tables for percentiles, drawdown, the share of non-positive means and the p-value (unit).
 4. By year groups by entry year with the exact numbers of a hand-made list (unit).
 5. The sweep plan takes at most four parameters and 16 points, rounds whole-number parameters, drops duplicates and the declared value (unit); the analysis gives stable / fragile / no_base_edge / inconclusive on hand tables (unit).
@@ -50,7 +50,9 @@ Unit (Domain): seeded generator, Monte Carlo, sign-flip, by year, sweep plan, se
 - The sweep is in-sample on the whole window; a plateau there is not evidence, a cliff is a warning.
 - One parameter at a time: interactions are not seen.
 - Monte Carlo resamples the trades as independent; clustered losses (one bad month) are understated.
-- The baseline is a sign-flip null, not a random-entry run.
+- The baseline is a sign-flip null, not a random-entry run. It is lenient: it tests the mean R against 0 given the trade sizes, while random entries with a 2R target lose money before costs.
+- The out-of-sample trades are winners of an exit selection, so selection bias is not nulled by the baseline.
+- A retry after a crash between the sweep rows and the result can see up to 16 more variants.
 - Three partial years of data: by-year numbers are thin; no regime split.
 
 ## Open questions (all taken as recommended)

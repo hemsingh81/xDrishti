@@ -15,6 +15,11 @@ A PASS on a few hundred out-of-sample trades says little about whether the edge 
 5. **Monte Carlo and the baseline** read the out-of-sample trades the verdict was judged on (`OosEvidenceBuilder.Trades`). A seeded SplitMix64 generator (platform independent) with the seed from the sha256 of the run key. Bootstrap: percentiles of the mean R and the drawdown, the share of non-positive means. Baseline: a **sign-flip null** (each trade keeps its size, its sign is a coin flip), p-value `(k + 1) / (draws + 1)`.
 6. **By year** of entry of the same trades. **`by_regime`** is the text `unavailable: the market-context job (P3-01d) is not built`.
 
+## Limits of the baseline and the ledger rows
+- The sign-flip baseline is lenient: it tests the mean R against 0 given the trade sizes, while real random entries with a 2R target lose money before costs; and the out-of-sample trades are winners of an exit selection, so selection bias is not nulled. The contract field is `signFlipBaseline` (`SignFlipBaselineView`) and the block's limits say so. Its seed is the run seed XOR a constant so its draws do not repeat those of the Monte Carlo.
+- Sweep ledger rows carry a synthetic `lab_run_id` (derived from the run and the point, not a real run): filter `method = 'sweep'` when reading the ledger by run. A retry after a crash between the sweep rows and the result can see up to 16 more variants (the rows of the first attempt count).
+- A parameter with a refused or zero-trade point is `inconclusive`, never `stable`; one whose steps all vanish is `inconclusive` with `no points`.
+
 ## Deviation
 P5-00 names a "random-entry baseline". The engine has no random-entry mode; adding one is an engine change. The sign-flip null answers a narrower question (is the mean R larger than chance with these trade sizes) and says so in the document. A true random-entry run is future work.
 

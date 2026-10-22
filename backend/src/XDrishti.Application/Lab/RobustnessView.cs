@@ -15,14 +15,14 @@ public sealed record MonteCarloView(int Trades, int Draws, string Seed, double O
 /// <summary>The out-of-sample trades of one calendar year.</summary>
 public sealed record YearView(int Year, int Trades, double MeanR, double TotalR, double? ProfitFactor, bool Positive);
 
-/// <summary>The sign-flip baseline: not a re-run with random entries.</summary>
-public sealed record RandomBaselineView(string Kind, int Trades, int Draws, string Seed, double ObservedMeanR, double NullMeanP95, double PValue, string Label);
+/// <summary>The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries.</summary>
+public sealed record SignFlipBaselineView(string Kind, int Trades, int Draws, string Seed, double ObservedMeanR, double NullMeanP95, double PValue, string Label);
 
 /// <summary>The robustness block of a result (spec P5-05, ADR 0062). It does not change the verdict; every part that cannot be computed is null or says why.</summary>
 public sealed record RobustnessView(
     SensitivityView Sensitivity,
     MonteCarloView? MonteCarlo,
     IReadOnlyList<YearView> ByYear,
-    RandomBaselineView? RandomBaseline,
+    SignFlipBaselineView? SignFlipBaseline,
     string ByRegime,
     IReadOnlyList<string> Limits);

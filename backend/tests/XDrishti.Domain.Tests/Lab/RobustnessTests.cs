@@ -140,4 +140,83 @@ public sealed class RobustnessTests
         SensitivityAnalysis.Judge(R(string.Empty, 0, -0.1), [R("a", 1, 0.5), R("a", 2, 0.3)]).Single().Verdict.ShouldBe("no_base_edge");
         SensitivityAnalysis.Judge(R(string.Empty, 0, null, "boom"), [R("a", 1, 0.5), R("a", 2, 0.3)]).Single().Reason.ShouldContain("boom");
     }
+
+    [Fact]
+    public void A_parameter_with_a_refused_or_zero_trade_point_is_inconclusive_even_when_the_others_look_stable()
+    {
+        var baseline = R(string.Empty, 0, 0.4);
+        var noTrades = new SweepResult(new SweepPoint("a", 3), 0, null, null, null, null);
+
+        var judged = SensitivityAnalysis.Judge(baseline, [R("a", 1, 0.5), R("a", 2, 0.5), noTrades, R("b", 1, 0.5), R("b", 2, 0.5), R("b", 3, null, "refused")]);
+
+        judged.Single(j => j.Parameter == "a").Verdict.ShouldBe("inconclusive");
+        judged.Single(j => j.Parameter == "b").Verdict.ShouldBe("inconclusive");
+    }
+
+    [Fact]
+    public void The_swept_names_include_a_parameter_whose_steps_all_vanish()
+    {
+        var declared = new List<KeyValuePair<string, double>> { new("a", 2.0), new("b", 14) };
+
+        SweepPlan.Swept(declared, 4).ShouldBe(["a", "b"]);
+        SweepPlan.Build(declared, 4, [0.8, 0.9, 1.1, 1.2]).Select(p => p.Parameter).ShouldNotContain("a");
+    }
+
+    [Fact]
+    public void The_generator_matches_the_published_splitmix64_values_for_seed_zero()
+    {
+        var rng = new SeededRandom(0);
+
+        new[] { rng.NextBits(), rng.NextBits(), rng.NextBits(), rng.NextBits() }
+            .ShouldBe([0xE220A8397B1DCDAFUL, 0x6E789E6AA1B965F4UL, 0x06C45D188009454FUL, 0xF88BB8A8724C81ECUL]);
+    }
+
+    [Fact]
+    public void The_generator_bounded_draws_for_a_fixed_seed_are_golden()
+    {
+        var rng = new SeededRandom(0);
+
+        Enumerable.Range(0, 8).Select(_ => rng.Next(2)).ShouldBe([1, 0, 0, 1, 0, 0, 0, 1]);
+    }
+
+    [Fact]
+    public void Monte_carlo_of_a_two_trade_case_has_exact_percentiles_drawdowns_and_non_positive_share()
+    {
+        // seed 0, bound 2 draws 1,0 | 0,1 | 0,0 | 0,1 pick trades [1,-3] as -3,1 | 1,-3 | 1,1 | 1,-3:
+        // means -1, -1, 1, -1 (sorted -1 -1 -1 1); drawdowns 3, 3, 0, 3 (sorted 0 3 3 3); ranks round(p x 3): 0, 2, 3 for 0.05, 0.50, 0.95
+        var mc = MonteCarlo.Run([1, -3], 4, 0)!;
+
+        mc.ObservedMeanR.ShouldBe(-1);
+        mc.ObservedMaxDrawdownR.ShouldBe(3);
+        mc.MeanP05.ShouldBe(-1);
+        mc.MeanP50.ShouldBe(-1);
+        mc.MeanP95.ShouldBe(1);
+        mc.DrawdownP50.ShouldBe(3);
+        mc.DrawdownP95.ShouldBe(3);
+        mc.ShareNotPositive.ShouldBe(0.75);
+    }
+
+    [Fact]
+    public void Monte_carlo_percentiles_of_a_second_two_trade_case_are_exact()
+    {
+        // trades [3,-1], same draws: 3 picks -1,3 | 3,-1 | 3,3 | 3,-1: means 1, 1, 3, 1; drawdowns 1, 1, 0, 1
+        var mc = MonteCarlo.Run([3, -1], 4, 0)!;
+
+        (mc.MeanP05, mc.MeanP50, mc.MeanP95).ShouldBe((1.0, 1.0, 3.0));
+        (mc.DrawdownP50, mc.DrawdownP95).ShouldBe((1.0, 1.0));
+        mc.ShareNotPositive.ShouldBe(0);
+    }
+
+    [Fact]
+    public void The_sign_flip_p_value_is_exactly_reached_plus_one_over_draws_plus_one()
+    {
+        // seed 0 low bits 1,0,1 | 0,1,0 (a 0 bit is +, a 1 bit is -): sizes 1 give means -1/3 and +1/3; the observed mean of [1,-1,1] is 1/3, reached by one draw of two
+        var flip = SignFlipBaseline.Run([1, -1, 1], 2, 0)!;
+
+        flip.PValue.ShouldBe(2.0 / 3.0);
+        flip.ObservedMeanR.ShouldBe(1.0 / 3.0);
+        flip.NullMeanP95.ShouldBe(1.0 / 3.0);
+        SignFlipBaseline.Run([1, 1, 1], 2, 0)!.PValue.ShouldBe(1.0 / 3.0, "no draw reaches the observed mean 1: (0 + 1) / (2 + 1)");
+        SignFlipBaseline.Run([-1, 1, -1], 2, 0)!.PValue.ShouldBe(1.0, "both draws reach -1/3: (2 + 1) / (2 + 1)");
+    }
 }
