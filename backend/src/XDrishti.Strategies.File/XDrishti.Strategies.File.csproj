@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The strategy file (P3-02c, ADR 0055): untrusted YAML text becomes a StrategyDefinition with located problems, a definition becomes YAML text and a JSON Schema.
+       Pure library, no I/O: depends on Strategies and Domain and on the YAML parser package (events only), enforced by architecture tests. -->
+  <ItemGroup>
+    <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
+    <ProjectReference Include="..\XDrishti.Strategies\XDrishti.Strategies.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="XDrishti.Strategies.File.Tests" />
+  </ItemGroup>
+</Project>

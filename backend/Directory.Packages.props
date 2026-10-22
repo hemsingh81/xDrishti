@@ -45,6 +45,10 @@
   <ItemGroup Label="Rules language (P3-02)">
     <PackageVersion Include="Superpower" Version="3.2.1" />
   </ItemGroup>
+  <ItemGroup Label="Strategy file (P3-02c, ADR 0055)">
+    <PackageVersion Include="YamlDotNet" Version="16.3.0" />
+    <PackageVersion Include="JsonSchema.Net" Version="7.4.0" />
+  </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />

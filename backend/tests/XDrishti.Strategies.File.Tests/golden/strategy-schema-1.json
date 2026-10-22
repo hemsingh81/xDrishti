@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:xdrishti:strategy:1",
+  "title": "xDrishti strategy file, schema 1",
+  "type": "object",
+  "required": [
+    "strategy"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "strategy": {
+      "$ref": "#/$defs/strategy"
+    },
+    "test": {},
+    "universe": {}
+  },
+  "$defs": {
+    "quantity": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!(false|inf|nan|no|null|off|on|true|yes)$)[a-z][a-z0-9_]{0,31}$"
+        }
+      ]
+    },
+    "time": {
+      "type": "string",
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "conditionList": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "all": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "any": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      }
+    },
+    "values": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/quantity"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/quantity"
+          }
+        }
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "at_close",
+            "stop_above_high",
+            "limit_pullback"
+          ]
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "fixed_pct",
+            "atr_mult",
+            "swing_low",
+            "swing_high",
+            "bar_low",
+            "bar_high",
+            "or_opposite"
+          ]
+        },
+        "timeframe": {
+          "enum": [
+            "1m",
+            "5m",
+            "10m",
+            "15m",
+            "30m",
+            "1h",
+            "1D",
+            "1W",
+            "1M"
+          ]
+        },
+        "pct": {
+          "$ref": "#/$defs/quantity"
+        },
+        "mult": {
+          "$ref": "#/$defs/quantity"
+        },
+        "lookback": {
+          "$ref": "#/$defs/quantity"
+        },
+        "minutes": {
+          "$ref": "#/$defs/quantity"
+        },
+        "buffer_atr": {
+          "$ref": "#/$defs/quantity"
+        },
+        "atr_period": {
+          "$ref": "#/$defs/quantity"
+        }
+      },
+      "required": [
+        "type"
+      ]
+    },
+    "exit": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "const": "FIXED_RR"
+            },
+            "rr": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "policy"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "const": "PARTIAL_BE"
+            },
+            "book_pct": {
+              "$ref": "#/$defs/values"
+            },
+            "t1_rr": {
+              "$ref": "#/$defs/values"
+            },
+            "t2_rr": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "policy"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "const": "PARTIAL_TRAIL"
+            },
+            "book_pct": {
+              "$ref": "#/$defs/values"
+            },
+            "t1_rr": {
+              "$ref": "#/$defs/values"
+            },
+            "trail_atr_mult": {
+              "$ref": "#/$defs/values"
+            },
+            "atr_period": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "policy"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "const": "ATR_TRAIL"
+            },
+            "mult": {
+              "$ref": "#/$defs/values"
+            },
+            "activate_at_rr": {
+              "$ref": "#/$defs/values"
+            },
+            "atr_period": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "policy"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "const": "STRUCTURE_TRAIL"
+            },
+            "lookback_bars": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "policy"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "const": "EMA_TRAIL"
+            },
+            "length": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "policy"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "policy": {
+              "const": "PYRAMID"
+            },
+            "initial_pct": {
+              "$ref": "#/$defs/values"
+            },
+            "add_at_rr": {
+              "$ref": "#/$defs/values"
+            },
+            "add_pct": {
+              "$ref": "#/$defs/values"
+            },
+            "max_adds": {
+              "$ref": "#/$defs/values"
+            },
+            "trail_atr_mult": {
+              "$ref": "#/$defs/values"
+            },
+            "atr_period": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "policy"
+          ]
+        }
+      ]
+    },
+    "overlay": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "time_stop"
+            },
+            "min_progress_rr": {
+              "$ref": "#/$defs/values"
+            },
+            "intraday_bars": {
+              "$ref": "#/$defs/values"
+            },
+            "swing_sessions": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "event_exit"
+            },
+            "days_before_results": {
+              "$ref": "#/$defs/values"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        }
+      ]
+    },
+    "timeRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "first_entry": {
+          "$ref": "#/$defs/time"
+        },
+        "last_entry": {
+          "$ref": "#/$defs/time"
+        },
+        "square_off": {
+          "$ref": "#/$defs/time"
+        },
+        "max_hold_sessions": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "setup": {
+          "$ref": "#/$defs/conditionList"
+        },
+        "trigger": {
+          "$ref": "#/$defs/conditionList"
+        },
+        "invalidate": {
+          "$ref": "#/$defs/conditionList"
+        },
+        "entry": {
+          "$ref": "#/$defs/entry"
+        },
+        "stop": {
+          "$ref": "#/$defs/stop"
+        },
+        "exits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exit"
+          }
+        },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/overlay"
+          }
+        }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "schema": {
+          "const": 1
+        },
+        "id": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "style": {
+          "enum": [
+            "intraday",
+            "swing"
+          ]
+        },
+        "timeframes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "1m",
+              "5m",
+              "10m",
+              "15m",
+              "30m",
+              "1h",
+              "1D",
+              "1W",
+              "1M"
+            ]
+          }
+        },
+        "sides": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "BUY",
+              "SELL"
+            ]
+          }
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "sell": {
+          "$ref": "#/$defs/side"
+        },
+        "time_rules": {
+          "$ref": "#/$defs/timeRules"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "test": {},
+        "universe": {},
+        "setup": {
+          "$ref": "#/$defs/conditionList"
+        },
+        "trigger": {
+          "$ref": "#/$defs/conditionList"
+        },
+        "invalidate": {
+          "$ref": "#/$defs/conditionList"
+        },
+        "entry": {
+          "$ref": "#/$defs/entry"
+        },
+        "stop": {
+          "$ref": "#/$defs/stop"
+        },
+        "exits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exit"
+          }
+        },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/overlay"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "style"
+      ]
+    }
+  }
+}

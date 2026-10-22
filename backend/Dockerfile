@@ -17,6 +17,7 @@ COPY src/XDrishti.Domain/XDrishti.Domain.csproj src/XDrishti.Domain/
 COPY src/XDrishti.Application/XDrishti.Application.csproj src/XDrishti.Application/
 COPY src/XDrishti.Indicators/XDrishti.Indicators.csproj src/XDrishti.Indicators/
 COPY src/XDrishti.Strategies/XDrishti.Strategies.csproj src/XDrishti.Strategies/
+COPY src/XDrishti.Strategies.File/XDrishti.Strategies.File.csproj src/XDrishti.Strategies.File/
 COPY src/XDrishti.Simulation/XDrishti.Simulation.csproj src/XDrishti.Simulation/
 COPY src/XDrishti.SimExport/XDrishti.SimExport.csproj src/XDrishti.SimExport/
 COPY src/XDrishti.SimReader/XDrishti.SimReader.csproj src/XDrishti.SimReader/
