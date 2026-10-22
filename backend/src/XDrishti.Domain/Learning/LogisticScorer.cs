@@ -2,15 +2,15 @@ namespace XDrishti.Domain.Learning;
 
 /// <summary>
 /// The logistic-regression baseline (P6-05), written here so that Domain needs no package: features standardised on the train rows (a missing or non-finite value counts as the train mean), a ridge penalty on the weights (not the intercept), Newton steps solved by
-/// Gaussian elimination with partial pivoting, at most 50 steps. Sequential sums only, so the same rows give the same weights. With no features, or one class in the train rows, it is the base rate.
+/// Gaussian elimination with partial pivoting, at most 50 steps; a fit that does not reach the tolerance says so (<see cref="IFitNote"/>). Sequential sums only, so the same rows give the same weights. With no features, or one class in the train rows, it is the base rate.
 /// </summary>
 /// <param name="Ridge">The penalty on the squared weights (1).</param>
-public sealed class LogisticScorer(double Ridge = 1) : IScorerFactory
+/// <param name="MaxSteps">The most Newton steps (50).</param>
+public sealed class LogisticScorer(double Ridge = 1, int MaxSteps = 50) : IScorerFactory
 {
     /// <summary>The report name.</summary>
     public const string ScorerName = "logistic";
 
-    private const int MaxSteps = 50;
     private const double Tolerance = 1e-8;
 
     /// <inheritdoc />
@@ -25,7 +25,7 @@ public sealed class LogisticScorer(double Ridge = 1) : IScorerFactory
         var wins = train.Count(r => r.Label == 1);
         if (width == 0 || wins == 0 || wins == train.Count)
         {
-            return new Model(baseRate, [], [], [], 0);
+            return new Model(baseRate, [], [], [], 0, true);
         }
 
         var mean = new double[width];
@@ -42,6 +42,7 @@ public sealed class LogisticScorer(double Ridge = 1) : IScorerFactory
         var x = train.Select(r => Standardise(r, mean, sd)).ToArray();
         var beta = new double[width + 1];
         beta[0] = Math.Log(baseRate / (1 - baseRate));
+        var converged = false;
         for (var step = 0; step < MaxSteps; step++)
         {
             var gradient = new double[width + 1];
@@ -81,11 +82,12 @@ public sealed class LogisticScorer(double Ridge = 1) : IScorerFactory
 
             if (largest < Tolerance)
             {
+                converged = true;
                 break;
             }
         }
 
-        return new Model(baseRate, beta, mean, sd, width);
+        return new Model(baseRate, beta, mean, sd, width, converged);
     }
 
     private static double[] Standardise(ValidationRow row, double[] mean, double[] sd)
@@ -139,6 +141,7 @@ public sealed class LogisticScorer(double Ridge = 1) : IScorerFactory
                 (v[col], v[pivot]) = (v[pivot], v[col]);
             }
 
+            // A (near) zero pivot means a singular system; 1e-12 keeps the step finite instead of dividing by zero. The ridge makes it rare.
             var d = Math.Abs(m[col, col]) < 1e-12 ? 1e-12 : m[col, col];
             for (var r = col + 1; r < n; r++)
             {
@@ -167,8 +170,10 @@ public sealed class LogisticScorer(double Ridge = 1) : IScorerFactory
         return x;
     }
 
-    private sealed class Model(double baseRate, double[] beta, double[] mean, double[] sd, int width) : IRowScorer
+    private sealed class Model(double baseRate, double[] beta, double[] mean, double[] sd, int width, bool converged) : IRowScorer, IFitNote
     {
+        public string? Note => converged ? null : "logistic baseline did not converge in a fold (Newton steps hit the cap); its numbers are less reliable.";
+
         public double Score(ValidationRow row) => width == 0 ? baseRate : Sigmoid(Linear(beta, Standardise(row, mean, sd)));
     }
 }

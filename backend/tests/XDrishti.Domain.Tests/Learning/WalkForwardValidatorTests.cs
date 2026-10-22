@@ -88,6 +88,34 @@ public sealed class WalkForwardValidatorTests
         recorder.Trains[0].ShouldNotContain(r => r.Key == "k0900");
     }
 
+    private sealed class Noted : IScorerFactory
+    {
+        public string Name => "noted";
+
+        public IRowScorer Fit(IReadOnlyList<ValidationRow> train) => new Fitted();
+
+        private sealed class Fitted : IRowScorer, IFitNote
+        {
+            public string? Note => "noted did not converge";
+
+            public double Score(ValidationRow row) => 0.5;
+        }
+    }
+
+    [Fact]
+    public void A_fit_note_reaches_the_limits_once_and_the_verdict_counts_the_last_folds_train_rows()
+    {
+        var report = Run(Data(), [new Noted(), new Cheat()]);
+
+        report.Limits.Count(l => l == "noted did not converge").ShouldBe(1);
+        var last = report.Results[^1].Fold.TrainCount;
+        last.ShouldBeLessThan(Data().Count);
+        report.Verdicts.ShouldAllBe(v => !v.Reasons.Any(r => r.StartsWith("trained on", StringComparison.Ordinal)));
+
+        var strict = Run(Data(), [new Cheat()], new ValidationOptions(MinTrainTrades: last));
+        strict.Verdicts[0].Reasons.ShouldNotContain(r => r.StartsWith("trained on", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void A_scorer_sees_only_rows_that_are_over_before_the_test_window_begins()
     {

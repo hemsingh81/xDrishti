@@ -14,7 +14,7 @@ public static class EligibilityRule
     /// <param name="name">The candidate.</param>
     /// <param name="folds">One comparison per used fold.</param>
     /// <param name="pooled">The comparison over the pooled out-of-sample rows.</param>
-    /// <param name="trainRows">All rows the final model would train on.</param>
+    /// <param name="trainRows">The rows the final model would train on: the train size of the last used fold.</param>
     /// <param name="options">The margins and limits.</param>
     public static CandidateVerdict Judge(string name, IReadOnlyList<BaselineComparison> folds, BaselineComparison pooled, int trainRows, ValidationOptions options)
     {

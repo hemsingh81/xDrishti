@@ -31,6 +31,29 @@ public sealed class MetricsAndScorersTests
     }
 
     [Fact]
+    public void A_constant_scorer_has_ece_of_its_gap_and_lift_one_whatever_the_row_order()
+    {
+        int[] labels = [1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0];
+        var scores = Enumerable.Repeat(0.3, labels.Length).ToArray();
+
+        foreach (var l in new[] { labels, [.. labels.Reverse()], [.. labels.OrderBy(x => x)] })
+        {
+            var m = MetricsCalculator.Compute(scores, l, bins: 5);
+            m.EcePp.ShouldBe(Math.Abs((4.0 / 12.0) - 0.3) * 100, 1e-9);
+            m.Lift!.Value.ShouldBe(1.0, 1e-12);
+        }
+    }
+
+    [Fact]
+    public void Logistic_says_when_it_hit_the_step_cap()
+    {
+        var train = Enumerable.Range(0, 60).Select(i => Row("k" + i, i % 2, "A", ((i % 2) * 2.0) + ((i % 5) * 0.1))).ToArray();
+
+        ((IFitNote)new LogisticScorer().Fit(train)).Note.ShouldBeNull();
+        ((IFitNote)new LogisticScorer(MaxSteps: 1).Fit(train)).Note.ShouldNotBeNull();
+    }
+
+    [Fact]
     public void A_certain_wrong_probability_has_a_finite_log_loss()
     {
         double.IsFinite(MetricsCalculator.Compute([0.0], [1]).LogLoss).ShouldBeTrue();
@@ -80,7 +103,8 @@ public sealed class MetricsAndScorersTests
     {
         var row = new ValidationRow("k", 1, 1, new DateOnly(2025, 1, 1), 0, 0, "A", default(ImmutableArray<double>));
 
-        row.Features.IsDefault.ShouldBeTrue();
+        row.Features.IsDefault.ShouldBeFalse();
+        row.Features.Length.ShouldBe(0);
         new LogisticScorer().Fit([Row("1", 1), Row("2", 0)]).Score(row).ShouldBe(0.5, 1e-12);
     }
 }

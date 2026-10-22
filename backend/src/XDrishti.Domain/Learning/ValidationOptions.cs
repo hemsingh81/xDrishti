@@ -6,7 +6,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="MinTrainMonths">The first test window starts at least this many months after the first trade (ADR 0054).</param>
 /// <param name="TestMonths">The length of a test window in calendar months (quarterly).</param>
 /// <param name="EmbargoDays">Train rows that entered within this many calendar days before a window start are dropped (5 sessions, about 7 days); on top of the purge by label horizon.</param>
-/// <param name="MinTrainTrades">A fold with fewer train rows is not used, and a candidate needs this many rows in all (doc 16 <c>min_trades</c>).</param>
+/// <param name="MinTrainTrades">A fold with fewer train rows is not used, and a candidate needs this many rows in the last used fold (the largest train set, standing for the final model) (doc 16 <c>min_trades</c>).</param>
 /// <param name="MinFoldsForVerdict">Fewer usable folds than this cap a passing candidate at inconclusive (P6-00 question 4, as P5-03).</param>
 /// <param name="FoldsBetterShare">The share of the usable folds, rounded up, in which the candidate must beat both baselines (2/3: 4 of 6).</param>
 /// <param name="LogLossMargin">The log loss must be lower than a baseline's by more than this (times the multiple-testing factor).</param>

@@ -47,6 +47,8 @@ public static class WalkForwardValidator
         var results = new List<FoldResult>();
         var pooledScores = scorers.Select(_ => new List<double>()).ToArray();
         var pooledLabels = new List<int>();
+        var notes = new SortedSet<string>(StringComparer.Ordinal);
+        var lastTrain = 0;
         var comparisons = candidates.Select(_ => new List<BaselineComparison>()).ToArray();
         for (var i = 0; i < windows.Count; i++)
         {
@@ -65,6 +67,11 @@ public static class WalkForwardValidator
             for (var s = 0; s < scorers.Length; s++)
             {
                 var scorer = scorers[s].Fit(fold.Train);
+                if (scorer is IFitNote { Note: { } note })
+                {
+                    notes.Add(note);
+                }
+
                 var scores = new double[test.Length];
                 for (var k = 0; k < test.Length; k++)
                 {
@@ -80,6 +87,7 @@ public static class WalkForwardValidator
             }
 
             pooledLabels.AddRange(labels);
+            lastTrain = fold.Train.Length;
             for (var k = 0; k < candidates.Count; k++)
             {
                 comparisons[k].Add(new BaselineComparison(metrics[baselines.Length + k].Metrics, metrics[1].Metrics, metrics[2].Metrics));
@@ -99,10 +107,10 @@ public static class WalkForwardValidator
         for (var k = 0; k < candidates.Count; k++)
         {
             var p = new BaselineComparison(pooled[baselines.Length + k].Metrics, pooled[1].Metrics, pooled[2].Metrics);
-            verdicts.Add(EligibilityRule.Judge(candidates[k].Name, comparisons[k], p, ordered.Length, options));
+            verdicts.Add(EligibilityRule.Judge(candidates[k].Name, comparisons[k], p, lastTrain, options));
         }
 
-        return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count)));
+        return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes)));
     }
 
     private static (ValidationFold Fold, ValidationRow[] Train) Cut(int index, DateOnly start, DateOnly end, ValidationRow[] before, ValidationRow[] test, ValidationOptions options)
@@ -157,7 +165,7 @@ public static class WalkForwardValidator
         return null;
     }
 
-    private static List<string> LimitsOf(ValidationOptions o, int rows, DateOnly from, DateOnly to, int folds)
+    private static List<string> LimitsOf(ValidationOptions o, int rows, DateOnly from, DateOnly to, int folds, IEnumerable<string> notes)
     {
         var c = CultureInfo.InvariantCulture;
         var limits = new List<string>
@@ -178,6 +186,7 @@ public static class WalkForwardValidator
             limits.Add(string.Create(c, $"{o.Trials} trials: margins widened by {Lab.MultipleTesting.Factor(o.Trials):F2}."));
         }
 
+        limits.AddRange(notes);
         return limits;
     }
 

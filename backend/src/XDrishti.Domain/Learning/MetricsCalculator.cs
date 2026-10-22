@@ -1,6 +1,6 @@
 namespace XDrishti.Domain.Learning;
 
-/// <summary>Pure metrics of predictions (P6-05). The input order breaks ties of equal scores, so the same input gives the same numbers.</summary>
+/// <summary>Pure metrics of predictions (P6-05). Tied scores are never split: they share a rank (AUC), a calibration bin (ECE) and the top-fifth slots (lift), so the row order does not matter.</summary>
 public static class MetricsCalculator
 {
     private const double Eps = 1e-15;
@@ -26,7 +26,7 @@ public static class MetricsCalculator
         }
 
         var order = Enumerable.Range(0, n).OrderBy(i => scores[i]).ToArray();
-        return new ProbabilityMetrics(n, positives, loss / n, brier / n, Auc(scores, labels, order, positives), Ece(scores, labels, order, bins), Lift(labels, order, positives));
+        return new ProbabilityMetrics(n, positives, loss / n, brier / n, Auc(scores, labels, order, positives), Ece(scores, labels, order, bins), Lift(scores, labels, order, positives));
     }
 
     private static double? Auc(IReadOnlyList<double> scores, IReadOnlyList<int> labels, int[] order, int positives)
@@ -65,32 +65,43 @@ public static class MetricsCalculator
 
     private static double Ece(IReadOnlyList<double> scores, IReadOnlyList<int> labels, int[] order, int bins)
     {
+        // Rows with the same score are one unit, so a bin never cuts through a tie and the input order cannot matter.
         var n = order.Length;
         var b = Math.Min(bins, n);
-        double total = 0;
-        for (var k = 0; k < b; k++)
+        double total = 0, p = 0, y = 0;
+        long size = 0;
+        var closed = 0;
+        var i = 0;
+        while (i < n)
         {
-            int from = (int)((long)k * n / b), to = (int)((long)(k + 1) * n / b);
-            if (to == from)
+            var j = i;
+            while (j + 1 < n && scores[order[j + 1]] == scores[order[i]])
             {
-                continue;
+                j++;
             }
 
-            double p = 0, y = 0;
-            for (var i = from; i < to; i++)
+            for (var k = i; k <= j; k++)
             {
-                p += scores[order[i]];
-                y += labels[order[i]];
+                y += labels[order[k]];
             }
 
-            var size = to - from;
-            total += (size / (double)n) * Math.Abs((p / size) - (y / size));
+            p += scores[order[i]] * (j - i + 1);
+            size += j - i + 1;
+            i = j + 1;
+            if (size * b >= (long)(closed + 1) * n || i == n)
+            {
+                total += (size / (double)n) * Math.Abs((p / size) - (y / size));
+                closed = (int)Math.Min(b, size * b / n);
+                p = 0;
+                y = 0;
+                size = 0;
+            }
         }
 
         return total * 100;
     }
 
-    private static double? Lift(IReadOnlyList<int> labels, int[] order, int positives)
+    private static double? Lift(IReadOnlyList<double> scores, IReadOnlyList<int> labels, int[] order, int positives)
     {
         var n = order.Length;
         if (positives == 0)
@@ -99,12 +110,26 @@ public static class MetricsCalculator
         }
 
         var top = Math.Max(1, (int)Math.Ceiling(n * 0.2));
-        var wins = 0;
-        for (var i = n - top; i < n; i++)
+        var boundary = scores[order[n - top]];
+        double wins = 0;
+        int tied = 0, tiedWins = 0, taken = 0;
+        for (var i = 0; i < n; i++)
         {
-            wins += labels[order[i]];
+            var row = order[i];
+            if (scores[row] == boundary)
+            {
+                tied++;
+                tiedWins += labels[row];
+            }
+            else if (scores[row] > boundary)
+            {
+                wins += labels[row];
+                taken++;
+            }
         }
 
-        return ((double)wins / top) / ((double)positives / n);
+        // Rows tied at the boundary share the remaining slots equally, so the input order cannot matter.
+        wins += (top - taken) * (tiedWins / (double)tied);
+        return (wins / top) / ((double)positives / n);
     }
 }

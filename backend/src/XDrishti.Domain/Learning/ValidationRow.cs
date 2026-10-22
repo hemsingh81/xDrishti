@@ -24,6 +24,9 @@ public sealed record ValidationRow(
     string CellKey,
     ImmutableArray<double> Features)
 {
+    /// <summary>The features at the decision; a default array reads as empty.</summary>
+    public ImmutableArray<double> Features { get; init; } = Features.IsDefault ? [] : Features;
+
     /// <summary>A row from a label and the context of its trade.</summary>
     public static ValidationRow From(TripleBarrierLabel label, ValidationContext context)
     {
