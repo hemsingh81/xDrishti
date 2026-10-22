@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Strategies.File\XDrishti.Strategies.File.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="golden\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="..\Tests.props" />
+</Project>

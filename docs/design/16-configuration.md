@@ -164,7 +164,7 @@ styles:                            # first_entry_time, last_entry_time, square_o
   intraday: { enabled: true, first_entry_time: "09:30", last_entry_time: "14:30", square_off_time: "15:15" }
   swing:    { enabled: true, max_holding_sessions: 5, signal_valid_sessions: 1 }
 
-strategies:                        # built-ins enabled by id; your own strategies live in the Strategy Lab library (database)
+strategies:                        # built-ins enabled by id; your own strategies live in the Strategy Lab library (database), each a YAML file of doc 11 §2 read by `XDrishti.Strategies.File` (P3-02c)
   enabled: [ORB, VWAP_PULLBACK, EMA_PULLBACK, PDH_PDL_BREAK, BASE_BREAKOUT, TREND_PULLBACK, RSI2_REVERSION, NR7_ID_BO]
 
 exits:                             # the strategy model (P3-02b, P3-02b2) checks every parameter below; the tables of FIXED_RR, PARTIAL_BE, PARTIAL_TRAIL, ATR_TRAIL, STRUCTURE_TRAIL, EMA_TRAIL, PYRAMID and time_stop are final (P4-02 ADR 0050, P4-03 ADR 0051, P4-04 ADR 0052, ADR 0036 Amendment 2) and run by the simulator, one candidate and one value in each list at a time (the two ladders of PYRAMID are not candidate lists); event_exit is ACCEPTED but PROVISIONAL until its slice (ADR 0036 Amendment 1) (PARTIAL_TRAIL is in doc 08 §2 only, not in this list); the verbs choose them with `--exit` and `--time-stop` and compare several candidates on the same entries (P4-05, [ADR 0053](../adr/0053-the-same-entries-comparison-and-the-mae-mfe-diagnostics.md))

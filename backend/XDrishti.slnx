@@ -10,6 +10,7 @@
     <Project Path="src/XDrishti.Application/XDrishti.Application.csproj" />
     <Project Path="src/XDrishti.Indicators/XDrishti.Indicators.csproj" />
     <Project Path="src/XDrishti.Strategies/XDrishti.Strategies.csproj" />
+    <Project Path="src/XDrishti.Strategies.File/XDrishti.Strategies.File.csproj" />
     <Project Path="src/XDrishti.Simulation/XDrishti.Simulation.csproj" />
     <Project Path="src/XDrishti.SimExport/XDrishti.SimExport.csproj" />
     <Project Path="src/XDrishti.SimReader/XDrishti.SimReader.csproj" />
@@ -24,6 +25,7 @@
     <Project Path="tests/XDrishti.Application.Tests/XDrishti.Application.Tests.csproj" />
     <Project Path="tests/XDrishti.Indicators.Tests/XDrishti.Indicators.Tests.csproj" />
     <Project Path="tests/XDrishti.Strategies.Tests/XDrishti.Strategies.Tests.csproj" />
+    <Project Path="tests/XDrishti.Strategies.File.Tests/XDrishti.Strategies.File.Tests.csproj" />
     <Project Path="tests/XDrishti.Simulation.Tests/XDrishti.Simulation.Tests.csproj" />
     <Project Path="tests/XDrishti.SimOracle/XDrishti.SimOracle.csproj" />
     <Project Path="tests/XDrishti.SimExport.Tests/XDrishti.SimExport.Tests.csproj" />

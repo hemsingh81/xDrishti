@@ -5,6 +5,7 @@
     <ProjectReference Include="..\..\src\XDrishti.Feed\XDrishti.Feed.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Indicators\XDrishti.Indicators.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Strategies\XDrishti.Strategies.csproj" />
+    <ProjectReference Include="..\..\src\XDrishti.Strategies.File\XDrishti.Strategies.File.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.Simulation\XDrishti.Simulation.csproj" />
     <ProjectReference Include="..\..\src\XDrishti.SimExport\XDrishti.SimExport.csproj" />
     <!-- The independent oracle (ADR 0047): loaded here only to inspect it; the exception to "only Simulation.Tests references it" is asserted in OracleArchitectureTests. -->

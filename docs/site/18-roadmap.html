@@ -507,11 +507,11 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P3-02c</td>
-<td><strong>Strategy file</strong>: read the YAML sections of doc 11 §2 into the P3-02b model with located problems (untrusted YAML is parsed to a generic tree first; the package lives outside <code>XDrishti.Strategies</code>, which allows Superpower only), generate the JSON Schema from the model types (ADR 0002), canonical text and SHA-256 taken from the plan, not from the printed text. Needed by P5 (Lab editor, upload, <code>xd</code> CLI).</td>
+<td><strong>Strategy file, built 2026-10-22 (<a href="../adr/0055-the-strategy-file-its-schema-and-the-content-hash.html">ADR 0055</a>)</strong>: read the YAML sections of doc 11 §2 into the P3-02b model with located problems (untrusted YAML is parsed to a generic tree first; the package lives outside <code>XDrishti.Strategies</code>, which allows Superpower only), generate the JSON Schema from the model types (ADR 0002), canonical text and SHA-256 taken from the plan, not from the printed text. Needed by P5 (Lab editor, upload, <code>xd</code> CLI).</td>
 <td>free capacity</td>
 <td>3 d</td>
 <td>Later</td>
-<td><a href="../specs/P3-02c-the-strategy-file-yaml-schema-and-hash.html">spec</a> (Draft, 2026-10-22)</td>
+<td><a href="../specs/P3-02c-the-strategy-file-yaml-schema-and-hash.html">spec</a> (Approved and built, 2026-10-22)</td>
 <td>The doc 11 §2 example parses verbatim and round-trips; the schema accepts it and rejects 10 mutations with located messages; alias and anchor bombs and oversize input are refused; the hash is stable under white space and key order; the run records of P3 can be re-keyed without losing their meaning</td>
 </tr>
 <tr>
@@ -852,7 +852,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 08:13</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 08:30</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
