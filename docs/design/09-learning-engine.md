@@ -26,6 +26,8 @@ Built (P6-01, [ADR 0064](../adr/0064-cell-statistics-bayesian-shrinkage-recency-
 
 **Layer 3 — Meta-model (meta-labeling).**
 - Labels: **triple barrier** — target, stop, time limit (session end / max hold). Built (P6-03, [ADR 0065](../adr/0065-triple-barrier-labels-from-the-exit-reason.md)): label 1 only when the target ended the trade, 0 for stop, session end, max hold and exit-rule exits; end-of-data trades are left out; R at resolution is kept as a second target.
+
+Built (P6-04, [ADR 0066](../adr/0066-decision-time-features-a-side-table-and-the-training-set-record.md)): the decision-time snapshot is a side table `research.trade_features` (the trade record is unchanged), catalog `tf-1` of 41 features expressed as ratios; the extractor steps the feature frame and reads it before the first bar at or after the decision instant, and a property test proves that cutting or replacing later bars changes nothing. The cell statistics in a row are those of the day before the decision. Context and regime features are unknown until the daily context is loaded (P3-01d). The training set joins labels to features, drops and counts rows with a required feature unknown, and its record is kept in `research.training_sets` (insert-only); `xd learn features` and `xd learn training-set` run it.
 - Model: gradient-boosted trees (ML.NET LightGBM, FastTree fallback) per style × side (strategy as feature),
   **isotonic (PAV) calibration**, per-prediction feature contributions + permutation importance; trained and
   scored in-process in .NET.

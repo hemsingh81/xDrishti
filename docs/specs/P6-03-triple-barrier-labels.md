@@ -7,7 +7,7 @@
 ## Assumptions (taken as recommended)
 - P6-00 question 6: a trade that ends at the session end or the max hold is label 0 even in profit; label 1 only when the target ended the trade. R at resolution is kept as a second target.
 - The label is read from the walker's `ExitReason`; no price is re-read, so nothing beyond the barrier definition can leak.
-- The `training_sets` table is **not** created here (no consumer yet); the record is a pure domain type and is persisted with the features in P6-04. Reversible, and the roadmap row is amended to say so.
+- (Landed in [P6-04](P6-04-decision-time-features-and-the-training-set.md), ADR 0066.) The `training_sets` table is **not** created here (no consumer yet); the record is a pure domain type and is persisted with the features in P6-04. Reversible, and the roadmap row is amended to say so.
 - ADR number 0065 (0064 is used by another slice).
 
 ## Goal

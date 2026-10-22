@@ -8,7 +8,6 @@ using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market.Bars;
-using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Learning;
 
@@ -35,54 +34,15 @@ internal sealed class ComputeCellStatsHandler(IRunStore runs, ICellStatsStore st
         }
 
         var started = time.GetTimestamp();
-        var inputs = new Dictionary<string, (CellId Cell, bool Costed, List<CellTrade> Trades)>(StringComparer.Ordinal);
-        var tradeCount = 0;
-        var owner = new Dictionary<string, string>(StringComparer.Ordinal);
-        var strategyOwner = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var source in command.Sources)
+        var read = await CellSourceReader.ReadAsync(runs, command.Sources, cancellationToken);
+        if (read.IsFailure)
         {
-            if (await runs.FindAsync(source.RunKey, cancellationToken) is null)
-            {
-                CellStatsLog.Refused(logger, LearningErrors.RunNotFoundCode);
-                return Result.Failure<CellStatsOutcome>(LearningErrors.RunNotFound(source.RunKey));
-            }
-
-            await foreach (var runTrade in runs.StreamTradesAsync(source.RunKey, false, cancellationToken))
-            {
-                var t = runTrade.Trade;
-                var id = new CellId(t.StrategyId, t.TriggerTimeframe.ToCode(), t.Side.ToString().ToUpperInvariant(), source.Style, source.Exit);
-                var costed = t.Costs == CostBasis.Charged && t.Costing is not null;
-                var r = costed ? t.Costing!.RNet : t.RFilled;
-                if (!inputs.TryGetValue(id.Key, out var cell))
-                {
-                    cell = (id, costed, []);
-                    inputs[id.Key] = cell;
-                }
-
-                if (!strategyOwner.TryAdd(t.StrategyId, source.RunKey) && !string.Equals(strategyOwner[t.StrategyId], source.RunKey, StringComparison.Ordinal))
-                {
-                    CellStatsLog.Refused(logger, LearningErrors.CellDuplicateCode);
-                    return Result.Failure<CellStatsOutcome>(LearningErrors.StrategyDuplicate(t.StrategyId));
-                }
-
-                if (cell.Costed != costed)
-                {
-                    CellStatsLog.Refused(logger, LearningErrors.MixedBasisCode);
-                    return Result.Failure<CellStatsOutcome>(LearningErrors.MixedBasis(id.Key));
-                }
-
-                if (!owner.TryAdd(id.Key, source.RunKey) && !string.Equals(owner[id.Key], source.RunKey, StringComparison.Ordinal))
-                {
-                    CellStatsLog.Refused(logger, LearningErrors.CellDuplicateCode);
-                    return Result.Failure<CellStatsOutcome>(LearningErrors.CellDuplicate(id.Key));
-                }
-
-                cell.Trades.Add(new CellTrade(SessionClock.DateOf(t.ExitEpochSeconds), r, t.MaeR, t.MfeR));
-                tradeCount++;
-            }
+            CellStatsLog.Refused(logger, read.Error.Code);
+            return Result.Failure<CellStatsOutcome>(read.Error);
         }
 
-        var ordered = inputs.Values.OrderBy(c => c.Cell.Key, StringComparer.Ordinal).Select(c => new CellInput(c.Cell, c.Costed, c.Trades)).ToList();
+        var ordered = read.Value.Cells;
+        var tradeCount = read.Value.Trades.Count;
         var rows = CellStatsCalculator.Compute(ordered, command.AsOf, command.Options);
         var sources = string.Join(',', command.Sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}"));
         var key64 = KeyOf(command.AsOf, command.Options, sources);

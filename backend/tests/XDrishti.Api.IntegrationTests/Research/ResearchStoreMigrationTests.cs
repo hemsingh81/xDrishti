@@ -107,8 +107,8 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         (await ListAsync(connection, Columns, ("t", "sim_trades"))).Order(StringComparer.Ordinal).ShouldBe(TradeColumns().Order(StringComparer.Ordinal));
         (await ListAsync(connection, "SELECT indexname FROM pg_indexes WHERE schemaname = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(
         [
-            "ix_cell_stats_as_of_created", "ix_cell_stats_cell_key", "ix_exit_selections_comparison_id", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created", "pk_cell_stats", "pk_exit_selection_folds", "pk_exit_selections", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges", "pk_sim_trade_legs", "pk_sim_trades",
-            "uq_cell_stats_snapshot_cell_window", "uq_exit_selections_selection_key", "uq_sim_comparisons_comparison_key", "uq_sim_runs_run_key", "uq_sim_trades_run_trade_key",
+            "ix_cell_stats_as_of_created", "ix_cell_stats_cell_key", "ix_exit_selections_comparison_id", "ix_sim_comparisons_entries_key", "ix_sim_runs_strategy_created", "ix_training_sets_created_at", "pk_cell_stats", "pk_exit_selection_folds", "pk_exit_selections", "pk_sim_comparisons", "pk_sim_runs", "pk_sim_trade_leg_charges", "pk_sim_trade_legs", "pk_sim_trades", "pk_trade_features", "pk_training_sets",
+            "uq_cell_stats_snapshot_cell_window", "uq_exit_selections_selection_key", "uq_sim_comparisons_comparison_key", "uq_sim_runs_run_key", "uq_sim_trades_run_trade_key", "uq_trade_features_run_trade_version", "uq_training_sets_set_id",
         ]);
         (await ListAsync(connection, "SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_sim_runs_strategy_created'")).Single().ShouldContain("strategy_id, created_at DESC");
         (await ListAsync(connection, "SELECT indexdef FROM pg_indexes WHERE indexname = 'pk_sim_trades'")).Single().ShouldContain("(run_id, open_at_end, ordinal)");
@@ -119,7 +119,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
             "ck_sim_runs_costs", "ck_sim_runs_counts", "ck_sim_runs_run_key", "ck_sim_runs_universe_kind",
             "ck_sim_trade_leg_charges_ordinals", "ck_sim_trade_leg_charges_quantity", "ck_sim_trade_legs_kind", "ck_sim_trade_legs_ordinals", "ck_sim_trade_legs_share",
             "ck_sim_trades_cost_segment", "ck_sim_trades_costing_all_or_nothing", "ck_sim_trades_costs", "ck_sim_trades_costs_charged", "ck_sim_trades_entry_fill",
-            "ck_sim_trades_exit_reason", "ck_sim_trades_fills", "ck_sim_trades_ordinal", "ck_sim_trades_side", "ck_sim_trades_trigger_timeframe",
+            "ck_sim_trades_exit_reason", "ck_sim_trades_fills", "ck_sim_trades_ordinal", "ck_sim_trades_side", "ck_sim_trades_trigger_timeframe", "ck_trade_features_shape", "ck_training_sets_shape",
         ]);
         (await ListAsync(connection, "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'ck_sim_trades_exit_reason'")).Single().ShouldContain("'timestop'", Case.Sensitive, "AddTimeStopExitReason (P4-02) lets the store hold the reason of the time stop");
         (await ListAsync(connection, "SELECT conname || '|' || confdeltype::text FROM pg_constraint WHERE connamespace = 'research'::regnamespace AND contype = 'f'")).Order(StringComparer.Ordinal).ShouldBe(["fk_exit_selection_folds_selection|r", "fk_exit_selections_comparison|r", "fk_sim_trade_leg_charges_trade|r", "fk_sim_trade_legs_trade|r", "fk_sim_trades_run|r"]);
@@ -169,7 +169,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
     }
 
     private const string BeforeExitSelections = "20261022055710_AddSimComparisons";
@@ -224,7 +224,7 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
     }
 
     [Fact]
@@ -246,6 +246,6 @@ public sealed class ResearchStoreMigrationTests(ApiFactory factory)
         await migrator.MigrateAsync(Before, Ct);
         (await ListAsync(connection, "SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'research'")).ShouldBeEmpty();
         await migrator.MigrateAsync(null, Ct);
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'research' ORDER BY 1")).Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
     }
 }
