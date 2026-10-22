@@ -1,0 +1,51 @@
+strategy:
+  schema: 1
+  id: VWAP_PULLBACK
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    pull_atr: 0.5
+    rr: 2
+  setup:
+    all:
+      - "tf(\"1h\").ema(20) > tf(\"1h\").ema(50)"
+      - "tf(\"1D\").close > tf(\"1D\").ema(20)"
+  trigger:
+    all:
+      - "close > vwap and close > open"
+      - "close[1] > vwap[1] and close[2] > vwap[2]"
+      - "low[1] < low[2] and low[1] <= vwap[1] + pull_atr * atr(14)"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 2
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    setup:
+      all:
+        - "tf(\"1h\").ema(20) < tf(\"1h\").ema(50)"
+        - "tf(\"1D\").close < tf(\"1D\").ema(20)"
+    trigger:
+      all:
+        - "close < vwap and close < open"
+        - "close[1] < vwap[1] and close[2] < vwap[2]"
+        - "high[1] > high[2] and high[1] >= vwap[1] - pull_atr * atr(14)"
+    entry:
+      type: at_close
+    stop:
+      type: swing_high
+      lookback: 2
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "10:00"
+    last_entry: "14:30"
+    square_off: "15:15"

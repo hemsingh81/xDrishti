@@ -10,7 +10,7 @@ namespace XDrishti.Strategies.BuiltIn;
 /// most <c>base_pct</c> percent, on at least <c>vol_x</c> times the mean volume of the previous 20 sessions, is entered at the next session's open within the entry limit. The stop is the lowest low of the last <c>base_len</c> sessions
 /// (<c>swing_low</c>, no buffer), the exit one <c>FIXED_RR</c>, and the position leaves at the close of its fifth session at the latest. No lag on a call is used (ISS-24), so the base is measured on the closes of the window that ends today.
 /// <para>
-/// This builder is the interim source of the built-in until P3-02d seeds it as stored text (ADR 0002). Pure: builds a new definition on every call.
+/// This builder is the test oracle of the stored built-in (ADR 0056): the embedded seed text must read to a definition equal to what it builds, and the runtime reads the stored text. Pure: builds a new definition on every call.
 /// </para>
 /// </summary>
 public static class BaseBreakoutV1
@@ -26,6 +26,9 @@ public static class BaseBreakoutV1
 
     /// <summary>The name of the parameter that is the least multiple of the volume of the 20 sessions before.</summary>
     public const string VolXParam = "vol_x";
+
+    /// <summary>The name of the parameter that is the target as a multiple of the risk (ADR 0056 D5).</summary>
+    public const string RewardRiskParam = "rr";
 
     /// <summary>The sessions a position is held at most.</summary>
     public const int MaxHoldSessions = 5;
@@ -52,14 +55,14 @@ public static class BaseBreakoutV1
         Style.Swing,
         [Timeframe.D1],
         [Side.Buy],
-        [new StrategyParam(BaseLenParam, baseLen), new StrategyParam(BasePctParam, basePct), new StrategyParam(VolXParam, volX)],
+        [new StrategyParam(BaseLenParam, baseLen), new StrategyParam(BasePctParam, basePct), new StrategyParam(VolXParam, volX), new StrategyParam(RewardRiskParam, rewardRisk)],
         new SideRules(
             new ConditionList(ListMode.All, [WeeklyTrend, DailyTrend, TightBase, Volume]),
             new ConditionList(ListMode.All, [Breakout]),
             null,
             new EntrySpec(EntryKind.AtClose),
             new StopSpec(StopKind.SwingLow, Lookback: Quantity.Named(BaseLenParam)),
-            [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Of(rewardRisk)])])],
+            [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter(RewardRiskParam, [Quantity.Named(RewardRiskParam)])])],
             null),
         null,
         new TimeRules(null, null, null, MaxHoldSessions),

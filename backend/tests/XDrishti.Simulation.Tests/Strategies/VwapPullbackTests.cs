@@ -20,7 +20,7 @@ public sealed class VwapPullbackTests
         null,
         new EntrySpec(EntryKind.AtClose),
         new StopSpec(stop, Lookback: Quantity.Of(2)),
-        [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Of(2.0)])])],
+        [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Named("rr")])])],
         null);
 
     private static Dictionary<string, double> Params(params (string Name, double Value)[] values) => values.ToDictionary(v => v.Name, v => v.Value);
@@ -34,7 +34,7 @@ public sealed class VwapPullbackTests
             Style.Intraday,
             [Timeframe.M15],
             [Domain.Research.Side.Buy, Domain.Research.Side.Sell],
-            [new StrategyParam("pull_atr", 0.5)],
+            [new StrategyParam("pull_atr", 0.5), new StrategyParam("rr", 2)],
             Side(
                 ["tf(\"1h\").ema(20) > tf(\"1h\").ema(50)", "tf(\"1D\").close > tf(\"1D\").ema(20)"],
                 ["close > vwap and close > open", "close[1] > vwap[1] and close[2] > vwap[2]", "low[1] < low[2] and low[1] <= vwap[1] + pull_atr * atr(14)"],
@@ -56,9 +56,9 @@ public sealed class VwapPullbackTests
         var custom = VwapPullback.Create(pullAtr: 1.0, rewardRisk: 1.5);
 
         VwapPullback.Create().ShouldBe(VwapPullback.Create());
-        custom.Params.ShouldBe([new StrategyParam("pull_atr", 1.0)]);
-        custom.Buy!.Exits!.Single().Parameters.Single().Values.ShouldBe([Quantity.Of(1.5)]);
-        custom.Sell!.Exits!.Single().Parameters.Single().Values.ShouldBe([Quantity.Of(1.5)]);
+        custom.Params.ShouldBe([new StrategyParam("pull_atr", 1.0), new StrategyParam("rr", 1.5)]);
+        custom.Buy!.Exits!.Single().Parameters.Single().Values.ShouldBe([Quantity.Named("rr")]);
+        custom.Sell!.Exits!.Single().Parameters.Single().Values.ShouldBe([Quantity.Named("rr")]);
     }
 
     [Theory]
@@ -132,7 +132,7 @@ public sealed class VwapPullbackTests
         var build = BuiltInStrategies.Build("VWAP_PULLBACK", Params(("pull_atr", value)));
 
         build.Problems.ShouldBeEmpty();
-        build.Definition.ShouldNotBeNull().Params.ShouldBe([new StrategyParam("pull_atr", value)]);
+        build.Definition.ShouldNotBeNull().Params.ShouldBe([new StrategyParam("pull_atr", value), new StrategyParam("rr", 2)]);
     }
 
     [Theory]

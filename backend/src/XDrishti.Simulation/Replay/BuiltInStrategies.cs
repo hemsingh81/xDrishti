@@ -16,7 +16,7 @@ namespace XDrishti.Simulation.Replay;
 public static class BuiltInStrategies
 {
     /// <summary>The parameter of <c>ORB</c> that is the target as a multiple of the risk (<c>FIXED_RR</c>'s <c>rr</c>).</summary>
-    public const string RewardRiskParam = "rr";
+    public const string RewardRiskParam = OrbV1.RewardRiskParam;
 
     private const double DefaultOrMinutes = 15;
 
@@ -150,18 +150,7 @@ public static class BuiltInStrategies
             return new PreparedBuild(null, built.Problems);
         }
 
-        if (exits is null)
-        {
-            return StrategyPreparation.Prepare(definition, built.Parameters, evaluationTimeframe, fills);
-        }
-
-        if (exits.Candidates.Count == 1)
-        {
-            return StrategyPreparation.Prepare(ExitChoices.With(definition, exits.Candidates, exits), built.Parameters, evaluationTimeframe, fills, exits.IdOf(exits.Candidates[0]), exits.Candidates[0]);
-        }
-
-        var members = exits.Candidates.Select(c => ExitChoices.With(definition, [c], exits)).ToList();
-        return StrategyPreparation.PrepareComparison(members, [.. exits.Candidates.Select(exits.IdOf)], exits.Candidates, built.Parameters, evaluationTimeframe, fills);
+        return StrategyPreparation.PrepareWithExits(definition, built.Parameters, evaluationTimeframe, fills, exits);
     }
 
     /// <summary>The parameter names as prose: <c>`a` and `b`</c>, <c>`a`, `b` and `c`</c>.</summary>

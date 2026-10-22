@@ -226,6 +226,11 @@ internal sealed class FakeVerb : IDisposable
         public Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, XDrishti.Domain.Market.Bars.Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null) =>
             throw new NotSupportedException("the handler is a fake in these tests");
 
+        public Result<IPreparedStrategy> PrepareStored(string sourceText, string expectedHash, IReadOnlyDictionary<string, double> parameters, XDrishti.Domain.Market.Bars.Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null) =>
+            throw new NotSupportedException("the handler is a fake in these tests");
+
+        public Result<StrategyDescription> Describe(string sourceText) => throw new NotSupportedException("the handler is a fake in these tests");
+
         public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException("the handler is a fake in these tests");
 
         public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input) => throw new NotSupportedException("the handler is a fake in these tests");

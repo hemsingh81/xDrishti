@@ -11,7 +11,7 @@ namespace XDrishti.Strategies.BuiltIn;
 /// <c>FIXED_RR</c>, entries are accepted from 10:00 (the first bar the two lags can be known) to 14:30, and the position leaves at 15:15 at the latest. Only the level form is used: <c>vwap</c> keeps the history of the session only
 /// (ADR 0035), so its lags are unknown on the first bars and unknown never fires.
 /// <para>
-/// This builder is the interim source of the built-in until P3-02d seeds it as stored text (ADR 0002). Pure: builds a new definition on every call.
+/// This builder is the test oracle of the stored built-in (ADR 0056): the embedded seed text must read to a definition equal to what it builds, and the runtime reads the stored text. Pure: builds a new definition on every call.
 /// </para>
 /// </summary>
 public static class VwapPullback
@@ -21,6 +21,9 @@ public static class VwapPullback
 
     /// <summary>The name of the parameter that is the distance of the dip's low from VWAP, in ATRs.</summary>
     public const string PullAtrParam = "pull_atr";
+
+    /// <summary>The name of the parameter that is the target as a multiple of the risk (ADR 0056 D5).</summary>
+    public const string RewardRiskParam = "rr";
 
     /// <summary>BUY setup 0: the hourly trend is up.</summary>
     public const string BuyHourlyTrend = "tf(\"1h\").ema(20) > tf(\"1h\").ema(50)";
@@ -59,18 +62,18 @@ public static class VwapPullback
         Style.Intraday,
         [Timeframe.M15],
         [Side.Buy, Side.Sell],
-        [new StrategyParam(PullAtrParam, pullAtr)],
-        Rules([BuyHourlyTrend, BuyDailyTrend], [BuyTriggerBar, BuyTwoClosesAbove, BuyDip], StopKind.SwingLow, rewardRisk),
-        Rules([SellHourlyTrend, SellDailyTrend], [SellTriggerBar, SellTwoClosesBelow, SellRally], StopKind.SwingHigh, rewardRisk),
+        [new StrategyParam(PullAtrParam, pullAtr), new StrategyParam(RewardRiskParam, rewardRisk)],
+        Rules([BuyHourlyTrend, BuyDailyTrend], [BuyTriggerBar, BuyTwoClosesAbove, BuyDip], StopKind.SwingLow),
+        Rules([SellHourlyTrend, SellDailyTrend], [SellTriggerBar, SellTwoClosesBelow, SellRally], StopKind.SwingHigh),
         new TimeRules(new TimeOnly(10, 0), new TimeOnly(14, 30), new TimeOnly(15, 15), null),
         []);
 
-    private static SideRules Rules(string[] setup, string[] trigger, StopKind stop, double rewardRisk) => new(
+    private static SideRules Rules(string[] setup, string[] trigger, StopKind stop) => new(
         new ConditionList(ListMode.All, setup),
         new ConditionList(ListMode.All, trigger),
         null,
         new EntrySpec(EntryKind.AtClose),
         new StopSpec(stop, Lookback: Quantity.Of(2)),
-        [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Of(rewardRisk)])])],
+        [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter(RewardRiskParam, [Quantity.Named(RewardRiskParam)])])],
         null);
 }

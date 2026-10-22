@@ -22,14 +22,14 @@ public sealed class OrbV1Tests
             Style.Intraday,
             [Timeframe.M5, Timeframe.M15],
             [Side.Buy, Side.Sell],
-            [new StrategyParam("or_min", 15)],
+            [new StrategyParam("or_min", 15), new StrategyParam("rr", 2)],
             new SideRules(
                 null,
                 new ConditionList(ListMode.All, ["close > or_high(or_min) and close[1] <= or_high(or_min)"]),
                 null,
                 new EntrySpec(EntryKind.AtClose),
                 new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Named("or_min")),
-                [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Of(2.0)])])],
+                [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Named("rr")])])],
                 null),
             new SideRules(
                 null,
@@ -37,7 +37,7 @@ public sealed class OrbV1Tests
                 null,
                 new EntrySpec(EntryKind.AtClose),
                 new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Named("or_min")),
-                [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Of(2.0)])])],
+                [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Named("rr")])])],
                 null),
             new TimeRules(new TimeOnly(9, 30), new TimeOnly(11, 30), new TimeOnly(15, 15), null),
             []);
@@ -49,9 +49,9 @@ public sealed class OrbV1Tests
     public void Each_call_builds_an_equal_but_separate_definition_and_the_reward_risk_reaches_the_exit()
     {
         OrbV1.Create().ShouldBe(OrbV1.Create());
-        OrbV1.Create(rewardRisk: 1.5).Buy!.Exits!.Single().Parameters.Single().Values.ShouldBe([Quantity.Of(1.5)]);
-        OrbV1.Create(rewardRisk: 3.0).Sell!.Exits!.Single().Parameters.Single().Values.ShouldBe([Quantity.Of(3.0)]);
-        OrbV1.Create(orMinutes: 30).Params.ShouldBe([new StrategyParam("or_min", 30)]);
+        OrbV1.Create(rewardRisk: 1.5).Params.ShouldBe([new StrategyParam("or_min", 15), new StrategyParam("rr", 1.5)]);
+        OrbV1.Create(rewardRisk: 3.0).Sell!.Exits!.Single().Parameters.Single().Values.ShouldBe([Quantity.Named("rr")]);
+        OrbV1.Create(orMinutes: 30).Params.ShouldBe([new StrategyParam("or_min", 30), new StrategyParam("rr", 2)]);
     }
 
     [Theory]

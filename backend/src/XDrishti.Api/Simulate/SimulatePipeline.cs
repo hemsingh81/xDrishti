@@ -49,13 +49,23 @@ internal static class SimulatePipeline
         FillRules rules,
         CostChoice costs,
         bool acknowledgeCsvAdjusted,
-        ExitChoice? exits = null)
+        ExitChoice? exits = null,
+        int? strategyVersion = null,
+        string? strategyHash = null)
     {
         var frame = timeframe
             ?? engine.BuiltIns.FirstOrDefault(b => string.Equals(b.Id, strategyId, StringComparison.Ordinal))?.DefaultTimeframe.ToCode()
             ?? Timeframe.M15.ToCode();
         var fills = new FillRulesInput(rules.EntryLimitPercent, rules.Slippage.Ticks, rules.Slippage.BarRangeFrac, rules.Slippage.StopExitExtraTicks);
-        return new SimulationRequest(strategyId, parameters, frame, from, to, universe.InstrumentIds, universe.BasketId, costs, acknowledgeCsvAdjusted, null, fills, exits);
+        return new SimulationRequest(strategyId, parameters, frame, from, to, universe.InstrumentIds, universe.BasketId, costs, acknowledgeCsvAdjusted, null, fills, exits, strategyVersion, strategyHash);
+    }
+
+    /// <summary>The line that names the stored version a run used (spec P3-02d, question 5): <c>strategy ORB version 1, hash ...</c>; none for a strategy that is not stored.</summary>
+    public static async Task<string?> StrategyLineAsync(IServiceProvider provider, string hash, CancellationToken cancellationToken)
+    {
+        var store = provider.GetService<IStrategyStore>();
+        var stored = store is null ? null : await store.GetByHashAsync(hash, cancellationToken);
+        return stored is null ? null : "strategy " + stored.StrategyId + " version " + stored.Version.ToString(System.Globalization.CultureInfo.InvariantCulture) + ", hash " + stored.Hash;
     }
 
     /// <summary>Runs the handler.</summary>

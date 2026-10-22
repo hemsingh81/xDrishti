@@ -545,6 +545,11 @@ public sealed partial class SimulateDatabaseTests(ApiFactory factory) : DataTest
         public Result<ResearchPort.IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null) =>
             inner.Prepare(strategyId, parameters, evaluationTimeframe, fills, exits);
 
+        public Result<ResearchPort.IPreparedStrategy> PrepareStored(string sourceText, string expectedHash, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null) =>
+            inner.PrepareStored(sourceText, expectedHash, parameters, evaluationTimeframe, fills, exits);
+
+        public Result<ResearchPort.StrategyDescription> Describe(string sourceText) => inner.Describe(sourceText);
+
         public ComparisonReplay ReplayComparison(ResearchPort.IPreparedStrategy strategy, InstrumentReplayInput input)
         {
             var replay = inner.ReplayComparison(strategy, input);

@@ -31,6 +31,7 @@ internal sealed class RunSimulationHandler(
     ICorporateActionQueries actions,
     ITradingCalendar calendars,
     ISimulationEngine engine,
+    IStrategyStore strategies,
     ICostSheetStore costSheets,
     TimeProvider time,
     ILogger<RunSimulationHandler> logger) : IQueryHandler<RunSimulationQuery, Result<SimulationRun>>, IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>
@@ -94,7 +95,7 @@ internal sealed class RunSimulationHandler(
             return Result.Failure<Executed>(fills.Error);
         }
 
-        var prepared = engine.Prepare(request.StrategyId, request.Parameters ?? new Dictionary<string, double>(), timeframe, fills.Value, request.Exits);
+        var prepared = await PrepareStrategyAsync(request, timeframe, fills.Value, cancellationToken);
         if (prepared.IsFailure)
         {
             // The port contract already caps the list at 20; this is a guard for an engine that does not.
@@ -183,6 +184,59 @@ internal sealed class RunSimulationHandler(
         var entriesKey = RunAssembler.EntriesKey(firstHeader!, run, candidates[0].EntriesDefinitionSha256);
         return Result.Success(new Executed(runs.AsReadOnly(), candidates, gated, entriesKey, prepared.Value.HoldsOvernight));
     }
+
+    /// <summary>
+    /// The strategy of the request (spec P3-02d, D7): a hash names a stored version; an id names the stored family (the latest version, or the one asked for); an id that is not stored but is a built-in runs the built-in of the engine, which
+    /// is the same strategy by construction (the seed equals the builder). Anything else is refused with what exists.
+    /// </summary>
+    private async ValueTask<Result<IPreparedStrategy>> PrepareStrategyAsync(SimulationRequest request, Timeframe timeframe, FillRules? fills, CancellationToken cancellationToken)
+    {
+        var parameters = request.Parameters ?? new Dictionary<string, double>();
+        StoredVersion? stored;
+        if (!string.IsNullOrWhiteSpace(request.StrategyHash))
+        {
+            stored = await strategies.GetByHashAsync(request.StrategyHash, cancellationToken);
+            if (stored is null)
+            {
+                return Refuse("strategy_hash", SimulationErrors.UnknownStrategyHashCode, "No stored strategy version has this hash.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.StrategyId) && !string.Equals(request.StrategyId, stored.StrategyId, StringComparison.Ordinal))
+            {
+                return Refuse("strategy_id", SimulationErrors.UnknownStrategyCode, "The hash is a version of `" + stored.StrategyId + "`, not of `" + request.StrategyId + "`.");
+            }
+        }
+        else
+        {
+            stored = await strategies.GetVersionAsync(request.StrategyId, request.StrategyVersion, cancellationToken);
+            if (stored is null)
+            {
+                if (request.StrategyVersion is { } version)
+                {
+                    var family = await strategies.GetAsync(request.StrategyId, cancellationToken);
+                    return family is null
+                        ? await UnknownStrategyAsync(request.StrategyId, cancellationToken)
+                        : Refuse("strategy_version", SimulationErrors.UnknownStrategyVersionCode, "The strategy `" + family.Id + "` has no version " + version.ToString(System.Globalization.CultureInfo.InvariantCulture) + "; its versions are 1 to " + family.LatestVersion.ToString(System.Globalization.CultureInfo.InvariantCulture) + ".");
+                }
+
+                var builtIn = engine.Prepare(request.StrategyId, parameters, timeframe, fills, request.Exits);
+                return builtIn.IsFailure && builtIn.Error.Fields is [{ Code: SimulationErrors.UnknownStrategyCode }]
+                    ? await UnknownStrategyAsync(request.StrategyId, cancellationToken)
+                    : builtIn;
+            }
+        }
+
+        return engine.PrepareStored(stored.SourceText, stored.Hash, parameters, timeframe, fills, request.Exits);
+    }
+
+    private async ValueTask<Result<IPreparedStrategy>> UnknownStrategyAsync(string id, CancellationToken cancellationToken)
+    {
+        var known = (await strategies.ListAsync(cancellationToken)).Select(s => s.Id).Concat(engine.BuiltIns.Select(b => b.Id)).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        return Refuse("strategy_id", SimulationErrors.UnknownStrategyCode, "The strategy `" + id + "` is not stored; the strategies are " + string.Join(", ", known.Select(k => "`" + k + "`")) + ".");
+    }
+
+    private static Result<IPreparedStrategy> Refuse(string path, string code, string message) =>
+        Result.Failure<IPreparedStrategy>(SimulationErrors.StrategyInvalid([new FieldError(path, message, null, code)]));
 
     /// <summary>The fill rules of the request: null when it gave none (the engine then uses <see cref="FillRules.Default"/>), otherwise built with <c>Create</c> so that an invalid number comes back as the P3-03b code.</summary>
     private static Result<FillRules?> BuildFills(FillRulesInput? input)

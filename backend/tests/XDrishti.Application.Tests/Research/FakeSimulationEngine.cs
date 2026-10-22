@@ -45,6 +45,23 @@ internal sealed class FakeSimulationEngine : ISimulationEngine
             exits));
     }
 
+    /// <summary>What <see cref="PrepareStored"/> was asked, in order: the text, the hash the store held for it and the parameters.</summary>
+    public List<(string SourceText, string ExpectedHash, IReadOnlyDictionary<string, double> Parameters)> PreparedStored { get; } = [];
+
+    /// <summary>The answer of <see cref="PrepareStored"/>; null means success, with the record of the strategy named by the first word of the text.</summary>
+    public Result<IPreparedStrategy>? PrepareStoredResult { get; set; }
+
+    public Result<IPreparedStrategy> PrepareStored(string sourceText, string expectedHash, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null)
+    {
+        PreparedStored.Add((sourceText, expectedHash, parameters));
+        return PrepareStoredResult ?? Result.Success<IPreparedStrategy>(new FakePrepared(
+            new StrategyRecord(sourceText.Split(' ')[0], parameters, "{}", expectedHash, evaluationTimeframe, [Side.Buy, Side.Sell]),
+            Warnings,
+            exits));
+    }
+
+    public Result<StrategyDescription> Describe(string sourceText) => throw new NotSupportedException("the handler tests do not describe a text");
+
     public ComparisonReplay ReplayComparison(IPreparedStrategy strategy, InstrumentReplayInput input)
     {
         ArgumentNullException.ThrowIfNull(strategy);

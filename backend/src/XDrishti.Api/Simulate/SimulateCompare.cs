@@ -54,7 +54,7 @@ internal static class SimulateCompare
 
         phaseStart = time.GetTimestamp();
         var rules = SimulatePipeline.Rules(options.Fills);
-        var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits);
+        var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits, options.StrategyVersion, options.StrategyHash);
         var ran = await SimulatePipeline.RunComparisonAsync(provider, request, cancellationToken);
         if (ran.IsFailure)
         {

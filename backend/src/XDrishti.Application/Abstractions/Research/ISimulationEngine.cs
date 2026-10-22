@@ -8,8 +8,8 @@ namespace XDrishti.Application.Abstractions.Research;
 /// The simulation engine as the use case reaches it (spec P3-04a, D6; ADR 0039): a port in front of the engine modules, which are pure calculation and are reached from an adapter in Infrastructure, never from Application. Everything
 /// the signatures use is a Domain value. The calls are synchronous and do no I/O: the use case reads the bars and the rest through its own ports and hands them over.
 /// <para>
-/// <see cref="Prepare"/> takes a built-in strategy id: until stored strategies exist (P3-02c, P3-02d) there is no text to give. The port changes then (a strategy spec with id, text and parameters); ADR 0037 records this so that nobody mistakes the id
-/// for the final shape.
+/// <see cref="Prepare"/> takes a built-in strategy id and is kept for the oracle and the tests; a run reads the stored strategy and calls <see cref="PrepareStored"/> with its text and hash (spec P3-02d, ADR 0056). Application hands over
+/// strings and numbers only: the engine behind the port reads the text.
 /// </para>
 /// </summary>
 public interface ISimulationEngine
@@ -17,7 +17,7 @@ public interface ISimulationEngine
     /// <summary>The version of the replay rules (<c>SimulationEngine.Version</c>), written in every run record and run key.</summary>
     string EngineVersion { get; }
 
-    /// <summary>The built-in strategies a run can name, with their timeframes and parameters (spec P3-04b2, D3). When stored strategies exist (P3-02d) this list becomes their seed.</summary>
+    /// <summary>The built-in strategies a run can name, with their timeframes and parameters (spec P3-04b2, D3). The built-ins are also the stored strategies seeded from embedded text (P3-02d); this table is the oracle of that seed and the default timeframes of the verbs.</summary>
     IReadOnlyList<BuiltInStrategyInfo> BuiltIns { get; }
 
     /// <summary>
@@ -30,6 +30,21 @@ public interface ISimulationEngine
     /// <param name="fills">The fill rules; null means <see cref="FillRules.Default"/>.</param>
     /// <param name="exits">The exits to use in place of the built-in's own (P4-05, D1): null is the built-in as it is, one candidate a plain run of that exit, two or more a comparison on the same entries. The entry, the stop and the time rules are never replaced.</param>
     Result<IPreparedStrategy> Prepare(string strategyId, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null);
+
+    /// <summary>
+    /// Prepares a stored strategy (spec P3-02d, D7): reads the text, refuses it with <c>strategy_store.hash_mismatch</c> when it does not give <paramref name="expectedHash"/>, puts the given values in the place of the declared parameters (a name
+    /// that is not declared is <c>simulation.unknown_parameter</c>) and prepares it as <see cref="Prepare"/> does, so the run record has the same fields. The failures are those of <see cref="Prepare"/>.
+    /// </summary>
+    /// <param name="sourceText">The stored text.</param>
+    /// <param name="expectedHash">The hash the store holds for it.</param>
+    /// <param name="parameters">Values by declared parameter name; empty keeps the declared values.</param>
+    /// <param name="evaluationTimeframe">The timeframe the rules are evaluated on.</param>
+    /// <param name="fills">The fill rules; null means <see cref="FillRules.Default"/>.</param>
+    /// <param name="exits">The exits to use in place of the strategy's own (P4-05); null keeps them.</param>
+    Result<IPreparedStrategy> PrepareStored(string sourceText, string expectedHash, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null);
+
+    /// <summary>Reads and compiles a strategy text on every timeframe it declares and describes it (id, style, hash, canonical text, timeframes, sides, declared parameters); a text that does not read or compile is <c>simulation.strategy_invalid</c> with located fields.</summary>
+    Result<StrategyDescription> Describe(string sourceText);
 
     /// <summary>
     /// Replays the prepared strategy over one instrument. Pure and synchronous. A caller error throws (<see cref="ArgumentException"/>, <see cref="InvalidOperationException"/>); a handle that this engine did not make throws

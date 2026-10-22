@@ -69,6 +69,27 @@ public static class StrategyPreparation
         return new PreparedBuild(new PreparedStrategy(comparison, prepared.AsReadOnly(), build.Problems), build.Problems);
     }
 
+    /// <summary>
+    /// Prepares a definition with the exits a verb chose (P4-05, D1): the exits and overlays of the definition are replaced, its entry, stop and time rules are not. No exits: the strategy as it is; one candidate: a plain run of that exit;
+    /// two or more: a comparison (one scan, N walks). The one path of the built-ins and of the stored strategies (ADR 0056), so both build the run record the same way.
+    /// </summary>
+    public static PreparedBuild PrepareWithExits(StrategyDefinition definition, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (exits is null)
+        {
+            return Prepare(definition, parameters, evaluationTimeframe, fills);
+        }
+
+        if (exits.Candidates.Count == 1)
+        {
+            return Prepare(ExitChoices.With(definition, exits.Candidates, exits), parameters, evaluationTimeframe, fills, exits.IdOf(exits.Candidates[0]), exits.Candidates[0]);
+        }
+
+        var members = exits.Candidates.Select(c => ExitChoices.With(definition, [c], exits)).ToList();
+        return PrepareComparison(members, [.. exits.Candidates.Select(exits.IdOf)], exits.Candidates, parameters, evaluationTimeframe, fills);
+    }
+
     private static void CheckParameters(IReadOnlyDictionary<string, double> parameters)
     {
         ArgumentNullException.ThrowIfNull(parameters);

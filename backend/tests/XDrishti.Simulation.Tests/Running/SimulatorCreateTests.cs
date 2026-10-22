@@ -129,14 +129,14 @@ public sealed class SimulatorCreateTests
     [Fact]
     public void The_warnings_of_the_compile_are_carried_when_a_simulator_exists()
     {
-        var definition = OrbV1.Create() with { Params = [new StrategyParam("or_min", 15), new StrategyParam("volume", 1)] };
+        var definition = OrbV1.Create() with { Params = [new StrategyParam("or_min", 15), new StrategyParam("rr", 2), new StrategyParam("volume", 1)] };
 
         var build = Simulator.Create(definition, Timeframe.M15);
 
         build.Simulator.ShouldNotBeNull();
         build.Problems.ShouldNotBeEmpty();
         build.Problems.ShouldAllBe(p => p.Problem.Severity == ProblemSeverity.Warning);
-        build.Problems.ShouldContain(p => p.Problem.Code == "strategy.model.param_shadows_name" && p.Path == "params[1]");
+        build.Problems.ShouldContain(p => p.Problem.Code == "strategy.model.param_shadows_name" && p.Path == "params[2]");
         build.Problems.Count.ShouldBe(build.Problems.Distinct().Count(), "a problem both sides found is given once");
     }
 

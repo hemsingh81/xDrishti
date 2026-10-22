@@ -27,7 +27,9 @@ internal sealed record SimulateOptions(
     int Cards = SimulateOptions.DefaultCards,
     bool Store = false,
     ExitChoice? Exits = null,
-    SelectionOptions? Selection = null)
+    SelectionOptions? Selection = null,
+    int? StrategyVersion = null,
+    string? StrategyHash = null)
 {
     /// <summary>The default of <c>--cards</c>: the roadmap's cap (spec P3-04c, C1).</summary>
     public const int DefaultCards = 200;
@@ -35,7 +37,7 @@ internal sealed record SimulateOptions(
     /// <summary>The usage text (stderr on a usage error).</summary>
     public const string Usage =
         "usage:\n"
-        + "  simulate --strategy <id> (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
+        + "  simulate (--strategy <id> [--strategy-version <n>] | --strategy-hash <64 hex>) (--symbols <a,b,...> | --basket <name|id>) --from <yyyy-MM-dd> --to <yyyy-MM-dd>\n"
         + "           [--timeframe <5m|10m|15m|30m|1h|1D>] [--param <name>=<number>]... [--fills modelled|no-slippage] [--acknowledge-csv-adjusted] [--force]\n"
         + "           [--cards <0..500>]   (trade cards and index.html; default 200, 0 writes none)\n"
         + "           [--store]   (keep the run in the database as well as in the export folder; default off, P3-10)\n"
@@ -49,7 +51,7 @@ internal sealed record SimulateOptions(
 
     private const int MaxText = 60;
 
-    private static readonly string[] ValueFlags = ["--strategy", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--exit", "--time-stop", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r", "--min-train-months", "--test-months", "--embargo-sessions", "--lambda", "--min-trades"];
+    private static readonly string[] ValueFlags = ["--strategy", "--strategy-version", "--strategy-hash", "--symbols", "--basket", "--from", "--to", "--timeframe", "--param", "--exit", "--time-stop", "--fills", "--cards", "--costs", "--capital", "--profile", "--max-cost-r", "--min-train-months", "--test-months", "--embargo-sessions", "--lambda", "--min-trades"];
 
     private static readonly string[] SwitchFlags = ["--acknowledge-csv-adjusted", "--force", "--list-strategies", "--gross", "--store", "--select-exit", "--no-plateau"];
 
@@ -150,6 +152,8 @@ internal sealed record SimulateOptions(
         }
 
         var strategy = Strategy(values, knownStrategyIds, errors);
+        var version = ReadVersion(values, errors);
+        var hash = ReadHash(values, errors);
         var symbols = ReadSymbols(values, errors);
         var basket = ReadBasket(values, errors);
         if (values.ContainsKey("--symbols") == values.ContainsKey("--basket"))
@@ -172,7 +176,7 @@ internal sealed record SimulateOptions(
         }
 
         return new SimulateParse(
-            new SimulateOptions(false, strategy!, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store"), exitChoice, selection), []);
+            new SimulateOptions(false, strategy ?? string.Empty, symbols, basket, from!.Value, to!.Value, timeframe, named, fills, switches.Contains("--acknowledge-csv-adjusted"), switches.Contains("--force"), costs, cards, switches.Contains("--store"), exitChoice, selection, version, hash), []);
     }
 
     private static SimulateParse Invalid(List<string> errors) => new(null, errors.AsReadOnly());
@@ -181,7 +185,11 @@ internal sealed record SimulateOptions(
     {
         if (!values.TryGetValue("--strategy", out var id))
         {
-            errors.Add("'--strategy' is required");
+            if (!values.ContainsKey("--strategy-hash"))
+            {
+                errors.Add("'--strategy' (or '--strategy-hash') is required");
+            }
+
             return null;
         }
 
@@ -198,6 +206,50 @@ internal sealed record SimulateOptions(
         }
 
         return id;
+    }
+
+    /// <summary>The stored version (spec P3-02d, D8): a whole number from 1, with <c>--strategy</c> and not with <c>--strategy-hash</c>.</summary>
+    private static int? ReadVersion(Dictionary<string, string> values, List<string> errors)
+    {
+        if (!values.TryGetValue("--strategy-version", out var text))
+        {
+            return null;
+        }
+
+        if (!values.ContainsKey("--strategy") || values.ContainsKey("--strategy-hash"))
+        {
+            errors.Add("'--strategy-version' goes with '--strategy' and not with '--strategy-hash' (a hash names the version)");
+        }
+
+        if (text.Length is >= 1 and <= 9 && text.All(char.IsAsciiDigit) && int.Parse(text, NumberStyles.None, CultureInfo.InvariantCulture) >= 1)
+        {
+            return int.Parse(text, NumberStyles.None, CultureInfo.InvariantCulture);
+        }
+
+        errors.Add("'--strategy-version' must be a whole number from 1, '" + Show(text) + "' is not");
+        return null;
+    }
+
+    /// <summary>A stored version by content (spec P3-02d, D8): 64 lowercase hex characters; it needs <c>--timeframe</c> because the verb cannot tell the default timeframe of a text it has not read.</summary>
+    private static string? ReadHash(Dictionary<string, string> values, List<string> errors)
+    {
+        if (!values.TryGetValue("--strategy-hash", out var text))
+        {
+            return null;
+        }
+
+        if (text.Length != 64 || !text.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f')))
+        {
+            errors.Add("'--strategy-hash' must be 64 lowercase hex characters, '" + Show(text) + "' is not");
+            return null;
+        }
+
+        if (!values.ContainsKey("--timeframe"))
+        {
+            errors.Add("'--strategy-hash' needs '--timeframe'");
+        }
+
+        return text;
     }
 
     internal static List<string> ReadSymbols(Dictionary<string, string> values, List<string> errors)

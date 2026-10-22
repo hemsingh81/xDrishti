@@ -140,6 +140,11 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<ExitSelectionFoldRow> ExitSelectionFolds => Set<ExitSelectionFoldRow>();
 
+    /// <summary>The stored strategies and their immutable versions (spec P3-02d).</summary>
+    internal DbSet<StrategyRow> Strategies => Set<StrategyRow>();
+
+    internal DbSet<StrategyVersionRow> StrategyVersions => Set<StrategyVersionRow>();
+
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();
 

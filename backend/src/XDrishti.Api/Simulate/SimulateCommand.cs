@@ -110,7 +110,7 @@ internal static class SimulateCommand
 
         phaseStart = time.GetTimestamp();
         var rules = SimulatePipeline.Rules(options.Fills);
-        var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits);
+        var request = SimulatePipeline.Request(options.StrategyId, options.Parameters, options.Timeframe, options.From, options.To, universe, engine, rules, options.Costs, options.AcknowledgeCsvAdjusted, options.Exits, options.StrategyVersion, options.StrategyHash);
         var ran = await SimulatePipeline.RunAsync(provider, request, cancellationToken);
         if (ran.IsFailure)
         {
@@ -156,6 +156,11 @@ internal static class SimulateCommand
                 var cardBytes = outcome.Entries.Where(e => e.Name.StartsWith(CardNames.Folder + "/", StringComparison.Ordinal) || e.Name == CardNames.IndexName).Sum(e => e.Bytes);
                 SimulateLog.CardsWritten(logger, choices.Count, cardBytes);
             }
+        }
+
+        if (await SimulatePipeline.StrategyLineAsync(provider, run.Strategy.DefinitionSha256, cancellationToken) is { } strategyLine)
+        {
+            await console.Out.WriteLineAsync(strategyLine);
         }
 
         await console.Out.WriteAsync(RunBanner.Text(labels));

@@ -30,6 +30,33 @@ internal sealed class SimulationEngineAdapter : ISimulationEngine
             : Refused(prepared.Problems);
     }
 
+    public Result<IPreparedStrategy> PrepareStored(string sourceText, string expectedHash, IReadOnlyDictionary<string, double> parameters, Timeframe evaluationTimeframe, FillRules? fills, ExitChoice? exits = null)
+    {
+        ArgumentNullException.ThrowIfNull(sourceText);
+        ArgumentNullException.ThrowIfNull(expectedHash);
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        var prepared = StoredStrategies.Prepare(sourceText, expectedHash, parameters, evaluationTimeframe, fills, exits);
+        if (prepared.Strategy is { } strategy)
+        {
+            return Result.Success<IPreparedStrategy>(new PreparedHandle(strategy, Fields(prepared.Problems)));
+        }
+
+        // a text that does not give its stored hash is a fault of the store or of the reader, not of the request: it keeps its own code
+        return prepared.Problems.Any(p => p.Problem.Code == StoredStrategies.HashMismatchCode)
+            ? Result.Failure<IPreparedStrategy>(new Error(StoredStrategies.HashMismatchCode, prepared.Problems[0].Problem.Message, ErrorKind.Conflict))
+            : Refused(prepared.Problems);
+    }
+
+    public Result<StrategyDescription> Describe(string sourceText)
+    {
+        ArgumentNullException.ThrowIfNull(sourceText);
+        var inspection = StoredStrategies.Inspect(sourceText);
+        return inspection.Description is { } d
+            ? Result.Success(new StrategyDescription(d.Id, d.Style, d.Hash, d.CanonicalJson, d.Timeframes, d.Sides, d.Parameters))
+            : Result.Failure<StrategyDescription>(SimulationErrors.StrategyInvalid(Fields(inspection.Problems)));
+    }
+
     public InstrumentReplay Replay(IPreparedStrategy strategy, InstrumentReplayInput input)
     {
         ArgumentNullException.ThrowIfNull(strategy);

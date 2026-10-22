@@ -4401,6 +4401,96 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.StrategyRow", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("BuiltIn")
+                        .HasColumnType("boolean")
+                        .HasColumnName("built_in");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Style")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("style");
+
+                    b.HasKey("Id")
+                        .HasName("pk_strategies");
+
+                    b.ToTable("strategies", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_strategies_id", "id ~ '^[A-Za-z][A-Za-z0-9_]{0,63}$'");
+
+                            t.HasCheckConstraint("ck_strategies_style", "style IN ('intraday', 'swing')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.StrategyVersionRow", b =>
+                {
+                    b.Property<string>("StrategyId")
+                        .HasColumnType("text")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.Property<string>("CanonicalJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("canonical_json");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("ParentHash")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("parent_hash");
+
+                    b.Property<short>("SchemaVersion")
+                        .HasColumnType("smallint")
+                        .HasColumnName("schema_version");
+
+                    b.Property<string>("SourceText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("source_text");
+
+                    b.HasKey("StrategyId", "Version")
+                        .HasName("pk_strategy_versions");
+
+                    b.HasAlternateKey("Hash")
+                        .HasName("uq_strategy_versions_hash");
+
+                    b.HasIndex("ParentHash")
+                        .HasDatabaseName("ix_strategy_versions_parent_hash");
+
+                    b.ToTable("strategy_versions", "lab", t =>
+                        {
+                            t.HasCheckConstraint("ck_strategy_versions_hash", "hash ~ '^[0-9a-f]{64}$' AND (parent_hash IS NULL OR parent_hash ~ '^[0-9a-f]{64}$')");
+
+                            t.HasCheckConstraint("ck_strategy_versions_sizes", "octet_length(source_text) <= 262144 AND (note IS NULL OR char_length(note) <= 500)");
+
+                            t.HasCheckConstraint("ck_strategy_versions_version", "version >= 1");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Domain.Accounts.AccountEvent", b =>
                 {
                     b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
@@ -4998,6 +5088,23 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sim_trades_run");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Research.StrategyVersionRow", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Research.StrategyVersionRow", null)
+                        .WithMany()
+                        .HasForeignKey("ParentHash")
+                        .HasPrincipalKey("Hash")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_strategy_versions_parent");
+
+                    b.HasOne("XDrishti.Infrastructure.Research.StrategyRow", null)
+                        .WithMany()
+                        .HasForeignKey("StrategyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_strategy_versions_strategy");
                 });
 
             modelBuilder.Entity("XDrishti.Domain.Portfolio.Holding", b =>

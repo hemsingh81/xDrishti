@@ -24,9 +24,19 @@ internal static class SimulationRequestChecks
     {
         ArgumentNullException.ThrowIfNull(request);
         var errors = new FieldErrors();
-        if (string.IsNullOrWhiteSpace(request.StrategyId))
+        if (string.IsNullOrWhiteSpace(request.StrategyId) && string.IsNullOrWhiteSpace(request.StrategyHash))
         {
-            errors.Add("strategyId", "Name a built-in strategy.");
+            errors.Add("strategyId", "Name a strategy (an id, or the hash of a stored version).");
+        }
+
+        if (request.StrategyVersion is < 1)
+        {
+            errors.Add("strategyVersion", "A version is a number from 1.");
+        }
+
+        if (request.StrategyHash is not null && request.StrategyVersion is not null)
+        {
+            errors.Add("strategyVersion", "A hash names the version; give a hash or a version, not both.");
         }
 
         if (!Timeframes.TryParse(request.EvaluationTimeframe, out timeframe))

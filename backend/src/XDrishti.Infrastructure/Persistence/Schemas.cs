@@ -15,4 +15,7 @@ public static class Schemas
 
     /// <summary>Simulation results (spec P3-10): <c>sim_runs</c> and <c>sim_trades</c>, insert-only for the runtime role.</summary>
     public const string Research = "research";
+
+    /// <summary>Stored strategies (spec P3-02d, ADR 0056): <c>strategies</c> and <c>strategy_versions</c>, insert-only for the runtime role.</summary>
+    public const string Lab = "lab";
 }

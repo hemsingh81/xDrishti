@@ -6,7 +6,7 @@ namespace XDrishti.Application.Research;
 /// The request of a simulation run (spec P3-04a, D1): a built-in strategy, the window, and exactly one universe, an explicit list of instruments or a basket. All dates are India dates, inclusive. Nothing here is a time of day or a
 /// random seed: equal requests on equal stored data give equal records.
 /// </summary>
-/// <param name="StrategyId">A built-in strategy id (<c>ORB</c>); the built-in factory of the engine knows it.</param>
+/// <param name="StrategyId">A stored strategy id (<c>ORB</c>), latest version unless <paramref name="StrategyVersion"/> says one; an id that is not stored but is a built-in runs the built-in of the engine (the oracle path).</param>
 /// <param name="Parameters">The strategy's parameters by name; null or empty means the defaults. Every value is finite.</param>
 /// <param name="EvaluationTimeframe">The timeframe the rules are evaluated on, the code of <c>Timeframe</c> (<c>5m</c> or <c>15m</c> for ORB).</param>
 /// <param name="From">First date of the window; the year is 2000 to 2099 (the importer's range).</param>
@@ -18,6 +18,8 @@ namespace XDrishti.Application.Research;
 /// <param name="Options">The thresholds of the data notes; null means the defaults (0.90 and 0.20).</param>
 /// <param name="Fills">The fill rules (P3-03b); null means <see cref="FillRules.Default"/>.</param>
 /// <param name="Exits">The exits to use in place of the built-in's own (P4-05); null is the built-in as it is. Two or more candidates are a comparison (<see cref="RunComparisonQuery"/>).</param>
+/// <param name="StrategyVersion">The version of the stored strategy <paramref name="StrategyId"/>; null is the latest (spec P3-02d, D7).</param>
+/// <param name="StrategyHash">A stored version by its content hash instead of by id and version; <paramref name="StrategyId"/> may then be empty, and if given must be that version's family.</param>
 public sealed record SimulationRequest(
     string StrategyId,
     IReadOnlyDictionary<string, double>? Parameters,
@@ -30,4 +32,6 @@ public sealed record SimulationRequest(
     bool AcknowledgeCsvAdjusted = false,
     ReplayOptions? Options = null,
     FillRulesInput? Fills = null,
-    ExitChoice? Exits = null);
+    ExitChoice? Exits = null,
+    int? StrategyVersion = null,
+    string? StrategyHash = null);

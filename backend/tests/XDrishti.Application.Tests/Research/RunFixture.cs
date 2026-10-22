@@ -44,6 +44,8 @@ internal sealed class RunFixture
 
     public FakeSimulationEngine Engine { get; } = new();
 
+    public FakeStrategyStore Strategies { get; } = new();
+
     public FakeCostSheetStore CostSheets { get; } = new();
 
     public FakeTimeProvider Time { get; } = new();
@@ -61,7 +63,7 @@ internal sealed class RunFixture
         Store.ForbidMerge = true;
     }
 
-    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, CostSheets, Time, Log);
+    public RunSimulationHandler Handler => new(Store, BarQueries, Baskets, Factors, Actions, Calendar, Engine, Strategies, CostSheets, Time, Log);
 
     /// <summary>Registers an instrument with a row (the tick is in paise, as the master has it) and its stored bars.</summary>
     public Guid Add(string symbol, IEnumerable<Bar>? bars = null, decimal? tickPaise = 5m, Guid? id = null)

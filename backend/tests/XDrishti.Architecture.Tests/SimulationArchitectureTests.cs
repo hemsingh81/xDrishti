@@ -43,14 +43,15 @@ public sealed class SimulationArchitectureTests
             .Where(n => !n.StartsWith("System.", StringComparison.Ordinal) && !n.StartsWith("XDrishti.", StringComparison.Ordinal) && n is not ("netstandard" or "mscorlib" or "Microsoft.CSharp"))];
 
     [Fact]
-    public void The_library_references_only_domain_indicators_and_strategies_among_the_projects_and_no_package()
+    public void The_library_references_only_domain_indicators_strategies_and_the_strategy_file_library_among_the_projects_and_no_package()
     {
-        ProjectsReferencedBy(Simulation).ShouldBeSubsetOf(["XDrishti.Domain", "XDrishti.Indicators", "XDrishti.Strategies"]);
+        // the strategy file library (P3-02c) is the one addition of P3-02d (ADR 0056 D7): the library reads a stored text; it still references no package (the YAML package belongs to the file library)
+        ProjectsReferencedBy(Simulation).ShouldBeSubsetOf(["XDrishti.Domain", "XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Strategies.File"]);
         PackagesReferencedBy(Simulation).ShouldBeEmpty();
         Simulation.GetReferencedAssemblies().Select(a => a.Name).ShouldNotContain(n => n != null && n.StartsWith("Microsoft.", StringComparison.Ordinal) && n != "Microsoft.CSharp");
 
         var project = XDocument.Load(RepositoryFiles.RepositoryFile("backend", "src", "XDrishti.Simulation", "XDrishti.Simulation.csproj"));
-        RepositoryFiles.ProjectReferences(project).ShouldBe(["XDrishti.Domain", "XDrishti.Indicators", "XDrishti.Strategies"], "the compiled references can hide a reference the compiler never used; the project file cannot");
+        RepositoryFiles.ProjectReferences(project).ShouldBe(["XDrishti.Domain", "XDrishti.Indicators", "XDrishti.Strategies", "XDrishti.Strategies.File"], "the compiled references can hide a reference the compiler never used; the project file cannot");
         project.Descendants("PackageReference").ShouldBeEmpty();
         project.Descendants("Reference").ShouldBeEmpty();
     }
@@ -162,10 +163,10 @@ public sealed class SimulationArchitectureTests
     public void The_replay_namespace_holds_the_documented_types_and_the_canonical_json_writer_is_internal()
     {
         TypeNamesIn("XDrishti.Simulation.Replay").Where(n => !n.Contains('+', StringComparison.Ordinal) && !n.Contains('<', StringComparison.Ordinal)).Select(n => n["XDrishti.Simulation.Replay.".Length..]).Order().ShouldBe(
-            ["BarSegment", "BuiltInBuild", "BuiltInEntry", "BuiltInStrategies", "DefinitionJson", "Discontinuity", "ExitChoices", "InstrumentReplayer", "PreparedBuild", "PreparedMember", "PreparedStrategy", "RanSession", "ReplayBars", "SessionScan", "StrategyPreparation"]);
+            ["BarSegment", "BuiltInBuild", "BuiltInEntry", "BuiltInStrategies", "DefinitionJson", "Discontinuity", "ExitChoices", "InstrumentReplayer", "PreparedBuild", "PreparedMember", "PreparedStrategy", "RanSession", "ReplayBars", "SessionScan", "StoredDescription", "StoredInspection", "StoredStrategies", "StrategyPreparation"]);
         Simulation.GetType("XDrishti.Simulation.Replay.DefinitionJson")!.IsPublic.ShouldBeFalse();
         Simulation.GetExportedTypes().Where(t => t.Namespace == "XDrishti.Simulation.Replay").Select(t => t.Name).Order().ShouldBe(
-            ["BuiltInBuild", "BuiltInStrategies", "InstrumentReplayer", "PreparedBuild", "PreparedMember", "PreparedStrategy", "StrategyPreparation"]);
+            ["BuiltInBuild", "BuiltInStrategies", "InstrumentReplayer", "PreparedBuild", "PreparedMember", "PreparedStrategy", "StoredDescription", "StoredInspection", "StoredStrategies", "StrategyPreparation"]);
     }
 
     [Fact]

@@ -14,7 +14,7 @@ namespace XDrishti.Simulation.Tests.Replay;
 public sealed class DefinitionJsonTests
 {
     /// <summary>The SHA-256 of the golden text, computed with an independent tool (Python 3 <c>hashlib</c>) on 2026-10-18.</summary>
-    private const string OrbGoldenSha256 = "9c1141cf1835d03a0b25b280bbab9b2a7367db8e13ec7568cb0083ca9db14e03";
+    private const string OrbGoldenSha256 = "0ba11bc69d2f1cfa24d8801f78f8fcc111415b39fa1454a1a09e59eeebf8574c";
 
     private static string Golden() => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Golden", "orb-v1.definition.golden.txt")).TrimEnd('\r', '\n');
 
@@ -171,7 +171,7 @@ public sealed class DefinitionJsonTests
             var record = RecordOf(OrbV1.Create(30, 2.5));
 
             record.DefinitionJson.ShouldContain("\"value\":30");
-            record.DefinitionJson.ShouldContain("\"values\":[2.5]");
+            record.DefinitionJson.ShouldContain("{\"name\":\"rr\",\"value\":2.5}");
             RecordOf(OrbV1.Create()).DefinitionJson.ShouldBe(Golden());
             RecordOf(OrbV1.Create()).DefinitionSha256.ShouldBe(OrbGoldenSha256);
         }

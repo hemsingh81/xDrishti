@@ -52,6 +52,7 @@ var app = builder.Build();
 if (verb == Verb.Migrate)
 {
     await DatabaseMigrator.MigrateAsync(app.Services);
+    await StrategySeeding.SeedAsync(app.Services); // the built-in strategies as stored text (spec P3-02d); idempotent
     return await OwnerBootstrap.ProvisionAsync(app.Services);
 }
 

@@ -15,6 +15,10 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
   <ItemGroup>
+    <!-- the built-in strategies as text, written to the lab tables after the migrations (spec P3-02d, ADR 0056) -->
+    <EmbeddedResource Include="Seed\Strategies\*.yaml" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="XDrishti.Infrastructure.Tests" />
   </ItemGroup>
 </Project>

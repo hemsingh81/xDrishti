@@ -10,7 +10,7 @@ namespace XDrishti.Strategies.BuiltIn;
 /// the bar before it did not is a BUY (SELL: below the low); the level form is used because <c>or_high</c> keeps the history of the session only (ADR 0035), so the close, whose history is continuous, is the one lagged. The
 /// stop is the opposite end of the opening range, the exit is one <c>FIXED_RR</c>, entries are accepted from 09:30 to 11:30 and the position leaves at 15:15 at the latest.
 /// <para>
-/// This builder is the interim source of the built-in ORB until P3-02d seeds it as stored text (ADR 0002); the stored text and its hash then replace it as the version. Pure: builds a new definition on every call.
+/// This builder is the test oracle of the stored built-in (ADR 0056): the embedded seed text must read to a definition equal to what it builds, and the runtime reads the stored text. Pure: builds a new definition on every call.
 /// </para>
 /// </summary>
 public static class OrbV1
@@ -20,6 +20,9 @@ public static class OrbV1
 
     /// <summary>The name of the one parameter, the minutes of the opening range.</summary>
     public const string OrMinutesParam = "or_min";
+
+    /// <summary>The name of the parameter that is the target as a multiple of the risk (ADR 0056 D5: declared in the model, read by the exit as a named quantity).</summary>
+    public const string RewardRiskParam = "rr";
 
     /// <summary>The BUY trigger: the close is above the high of the opening range and the bar before was not.</summary>
     public const string BuyTrigger = "close > or_high(or_min) and close[1] <= or_high(or_min)";
@@ -34,18 +37,18 @@ public static class OrbV1
         Style.Intraday,
         [Timeframe.M5, Timeframe.M15],
         [Side.Buy, Side.Sell],
-        [new StrategyParam(OrMinutesParam, orMinutes)],
-        Rules(BuyTrigger, rewardRisk),
-        Rules(SellTrigger, rewardRisk),
+        [new StrategyParam(OrMinutesParam, orMinutes), new StrategyParam(RewardRiskParam, rewardRisk)],
+        Rules(BuyTrigger),
+        Rules(SellTrigger),
         new TimeRules(new TimeOnly(9, 30), new TimeOnly(11, 30), new TimeOnly(15, 15), null),
         []);
 
-    private static SideRules Rules(string trigger, double rewardRisk) => new(
+    private static SideRules Rules(string trigger) => new(
         null,
         new ConditionList(ListMode.All, [trigger]),
         null,
         new EntrySpec(EntryKind.AtClose),
         new StopSpec(StopKind.OrOpposite, Minutes: Quantity.Named(OrMinutesParam)),
-        [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter("rr", [Quantity.Of(rewardRisk)])])],
+        [new ExitSpec(ExitPolicy.FixedRr, [new ExitParameter(RewardRiskParam, [Quantity.Named(RewardRiskParam)])])],
         null);
 }

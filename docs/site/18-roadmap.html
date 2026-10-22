@@ -516,11 +516,11 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P3-02d</td>
-<td><strong>Strategy storage and seeding</strong>: <code>lab.strategies</code> and <code>lab.strategy_versions</code> (text and hash, doc 11 §6), migration, store port, and the embedded seed of ORB, VWAP_PULLBACK and BASE_BREAKOUT written on first start (ADR 0002; until then the built-ins are C# builders). Needed by P5 and by the nightly scanner (P7).</td>
+<td><strong>Strategy storage and seeding, built 2026-10-22 (<a href="../adr/0056-stored-strategies-the-lab-tables-the-seed-and-loading-by-version.html">ADR 0056</a>)</strong>: <code>lab.strategies</code> and <code>lab.strategy_versions</code> (text and hash, doc 11 §6, insert-only for <code>xd_app</code>), migration <code>AddLabStrategies</code>, <code>IStrategyStore</code>, and the embedded seed of ORB, VWAP_PULLBACK and BASE_BREAKOUT written by <code>xd-api migrate</code> (ADR 0002); a run resolves a strategy by id, version or hash in the store (<code>--strategy</code>, <code>--strategy-version</code>, <code>--strategy-hash</code>) and the C# builders are now the test oracle. <code>rr</code> is a declared parameter, so the three built-in hashes changed once (ADR 0056 lists old and new). Needed by P5 and by the nightly scanner (P7).</td>
 <td>free capacity</td>
 <td>2 d</td>
-<td>Later</td>
-<td><a href="../specs/P3-02d-stored-strategies-lab-tables-and-the-seed-of-the-built-ins.html">spec</a> (Draft, 2026-10-22)</td>
+<td>Built</td>
+<td><a href="../specs/P3-02d-stored-strategies-lab-tables-and-the-seed-of-the-built-ins.html">spec</a> (Approved, built 2026-10-22)</td>
 <td>The migration applies on a clean database; seeding is idempotent and versions are immutable (<code>xd_app</code> has no UPDATE on a version row); the seeded text compiles with no errors and equals the C# builder&#39;s definition; a grants test as <code>xd_app</code></td>
 </tr>
 <tr>
@@ -568,7 +568,7 @@ monitoring comes early because it is useful on its own while the trading engine 
 <p><strong>What a P3 number means.</strong> The exit criterion says the mechanics are right (entries, stops, exits and arithmetic match a chart), not that a strategy has an edge. Every run record and trade card says: fills modelled (ISS-18), costs none until the charge sheet is in (ISS-25), portfolio limits not simulated, in-sample, members as of today (ISS-22), about 2.1 years of data and no hold-out (ISS-19), and the engine line (the engine agrees with a separately written reference implementation of the rule tables, P3-08; it is not checked against charts or the charge sheet; ADR 0047). No number from a real-data run is quoted outside its run folder before the 20-trade check.</p>
 <p><strong>Costs of this plan</strong>, stated so that the owner can choose differently:</p>
 <ul>
-<li>No interactive screens in P3, and the strategy file leaves it: the owner reads cards and a CSV, cannot type an own strategy idea before P3-02c and the Lab (P5), and the built-ins are C# builders until P3-02d (&quot;seeded in the database&quot;, ADR 0002, is untrue until then). Two forms of strategy text, canonical JSON in the run records and YAML later, are reconciled by a hash-equality test.</li>
+<li>No interactive screens in P3, and the strategy file leaves it: the owner reads cards and a CSV, cannot type an own strategy idea before P3-02c and the Lab (P5), and the built-ins are stored text since P3-02d (&quot;seeded in the database&quot;, ADR 0002; the C# builders remain as the test oracle). Two forms of strategy text, canonical JSON in the run records and YAML later, are reconciled by a hash-equality test.</li>
 <li>P3-01d moves behind the exit check: P3 trades carry no regime tag, <code>by_regime</code> waits for P5 and regime cells for P6, and the probe may find that index and VIX history cannot be had through the allow-listed endpoint (an allow-list change is the owner&#39;s security decision).</li>
 <li>The fill rule is pessimistic and differs from the wording of doc 07 §2: results will be lower than a fill at the trigger close, and a gap-up beyond the limit is a counted miss.</li>
 <li>The scanner/walker seam may not survive P4 unchanged: ATR, structure and EMA trails and pyramids need features after the entry, and the P3 walker has no frame. The likely fix, a per-bar feature series emitted by the scanner, is left to the P4 spec.</li>
@@ -852,7 +852,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 08:30</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-22 09:23</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

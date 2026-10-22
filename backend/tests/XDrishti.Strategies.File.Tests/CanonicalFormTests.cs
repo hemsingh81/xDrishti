@@ -69,10 +69,11 @@ public sealed class CanonicalFormTests
     }
 
     [Theory]
-    [InlineData(OrbV1.Id, "9c1141cf1835d03a0b25b280bbab9b2a7367db8e13ec7568cb0083ca9db14e03")]
-    [InlineData(VwapPullback.Id, "7c1c2493b220e3c343c50960b08a623d48be346e198c7bc233710aaccbe7cca9")]
-    [InlineData(BaseBreakoutV1.Id, "c41e6a82171fbef80953512750c2eec2a300c461893d6ff627a936956b585374")]
-    public void The_hash_of_a_built_in_is_the_one_every_stored_run_already_names(string id, string hash)
+    // ADR 0056 D6: `rr` became a declared parameter of the three built-ins, so their texts changed once; these are the hashes since (the ones before are listed in the ADR)
+    [InlineData(OrbV1.Id, "0ba11bc69d2f1cfa24d8801f78f8fcc111415b39fa1454a1a09e59eeebf8574c")]
+    [InlineData(VwapPullback.Id, "82f2d536dd1f8879c36620226ae00466fcca73f65a129e110ed276595f23a401")]
+    [InlineData(BaseBreakoutV1.Id, "68c445de513df1e644de3dcae920629c0cf131ad6a6e26d8a2107dbffd7d074b")]
+    public void The_hash_of_a_built_in_is_the_one_every_stored_run_names_since_rr_became_a_parameter(string id, string hash)
     {
         var definition = id switch { OrbV1.Id => OrbV1.Create(), VwapPullback.Id => VwapPullback.Create(), _ => BaseBreakoutV1.Create() };
 
