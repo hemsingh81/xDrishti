@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 
 namespace XDrishti.Application.Lab;
 
@@ -32,6 +33,7 @@ internal static class LabReportBuilder
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(verdict);
+        verdict = Sanitise(verdict);
         var e = verdict.Evidence;
         var cells = verdict.Cells
             .OrderByDescending(c => c.OosMeanR ?? double.NegativeInfinity)
@@ -42,7 +44,7 @@ internal static class LabReportBuilder
             verdict.Outcome,
             verdict.VariantCount,
             verdict.AdjustmentFactor,
-            new ReportRunView(run.Key, run.Strategy.Id, run.Strategy.Version, run.Strategy.Hash, run.Method, run.Window.From, run.Window.To, run.Universe.Label, run.Universe.Instruments.Count, run.SimRunKeys),
+            new ReportRunView(run.Key, S(run.Strategy.Id), run.Strategy.Version, run.Strategy.Hash, run.Method, run.Window.From, run.Window.To, S(run.Universe.Label), run.Universe.Instruments.Count, run.SimRunKeys),
             new ReportKpisView(e.OosTrades, e.ExpectancyR, e.ProfitFactor, e.MaxDrawdownR, e.Folds, e.PositiveFolds),
             verdict.Gates,
             cells,
@@ -51,7 +53,7 @@ internal static class LabReportBuilder
             Warnings(verdict, cells),
             Limits(run, verdict, minFoldsForPass),
             Missing,
-            [.. run.Labels.Concat(verdict.Labels).Distinct(StringComparer.Ordinal)],
+            [.. run.Labels.Select(S).Concat(verdict.Labels).Distinct(StringComparer.Ordinal)],
             string.Empty);
         return report with { Summary = ReportSummary.Write(report) };
     }
@@ -96,6 +98,7 @@ internal static class LabReportBuilder
         }
 
         var unstable = new List<string>();
+        // Shortcut: anything but "stable" counts as unstable; a new verdict word of the sweep would be flagged until listed here.
         unstable.AddRange(v.Robustness?.Sensitivity.Parameters.Where(p => p.Verdict != "stable").Select(p => $"{p.Param} ({p.Verdict})") ?? []);
         unstable.AddRange(cells.Where(c => c.Stable == false).Select(c => $"exit choice of {c.Cell}"));
         if (unstable.Count > 0)
@@ -106,17 +109,17 @@ internal static class LabReportBuilder
         var chance = new List<string>();
         if (v.Robustness?.SignFlipBaseline is { } b && b.PValue > ChanceLevel)
         {
-            chance.Add($"sign-flip p-value {F(b.PValue)}");
+            chance.Add($"sign-flip p-value {P(b.PValue)}");
         }
 
         if (v.Robustness?.MonteCarlo is { } m && m.ShareNotPositive >= ChanceLevel)
         {
-            chance.Add($"Monte Carlo share without edge {F(m.ShareNotPositive)}");
+            chance.Add($"Monte Carlo share without edge {P(m.ShareNotPositive)}");
         }
 
         if (chance.Count > 0)
         {
-            w.Add(new ReportWarningView("chance_not_excluded", "Chance is not excluded: " + string.Join(", ", chance) + $" (limit {F(ChanceLevel)})."));
+            w.Add(new ReportWarningView("chance_not_excluded", "Chance is not excluded: " + string.Join(", ", chance) + $" (limit {P(ChanceLevel)})."));
         }
 
         return w;
@@ -126,6 +129,7 @@ internal static class LabReportBuilder
     {
         var l = new List<string>
         {
+            // Shortcut: the 2.1 years is the history stored today (P0 data load), not read from the store; revisit when the history grows.
             $"Data: the run window is {run.Window.From:yyyy-MM-dd} to {run.Window.To:yyyy-MM-dd}; the stored history is about 2.1 years with no hold-out, so every figure rests on a short sample.",
             $"Walk-forward folds: {v.Evidence.Folds}; a PASS needs at least {minFolds}.",
             $"Full-period figures are {LabFullTest.ExplorationLabel}.",
@@ -142,5 +146,64 @@ internal static class LabReportBuilder
         return [.. l.Distinct(StringComparer.Ordinal)];
     }
 
-    internal static string F(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+    internal static string F(double value) => NoNegativeZero(value.ToString("0.##", CultureInfo.InvariantCulture));
+
+    /// <summary>A p-value or share: four decimals, and a positive value under 0.0001 as "&lt;0.0001", so a small value never prints as 0.</summary>
+    internal static string P(double value) => value > 0 && value < 0.0001 ? "<0.0001" : NoNegativeZero(value.ToString("0.####", CultureInfo.InvariantCulture));
+
+    private static string NoNegativeZero(string text) => text == "-0" ? "0" : text;
+
+    /// <summary>Free text from outside (strategy id, labels, cell names, sweep text): control, format (bidi) and unpaired surrogate characters removed, line breaks and tabs become spaces.</summary>
+    internal static string S(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var text = new StringBuilder(value.Length);
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (char.IsHighSurrogate(c))
+            {
+                if (i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
+                {
+                    if (CharUnicodeInfo.GetUnicodeCategory(value, i) != UnicodeCategory.Format)
+                    {
+                        text.Append(c).Append(value[i + 1]);
+                    }
+
+                    i++;
+                }
+            }
+            else if (c is '\n' or '\r' or '\t')
+            {
+                text.Append(' ');
+            }
+            else if (!char.IsLowSurrogate(c) && CharUnicodeInfo.GetUnicodeCategory(c) is not (UnicodeCategory.Control or UnicodeCategory.Format))
+            {
+                text.Append(c);
+            }
+        }
+
+        return text.ToString();
+    }
+
+    private static LabVerdictView Sanitise(LabVerdictView v) => v with
+    {
+        Gates = [.. v.Gates.Select(g => g with { Name = S(g.Name), Reason = S(g.Reason) })],
+        Cells = [.. v.Cells.Select(c => c with { Cell = S(c.Cell), Default = S(c.Default), Chosen = S(c.Chosen), NoChoiceReason = c.NoChoiceReason is null ? null : S(c.NoChoiceReason), StabilityReason = S(c.StabilityReason) })],
+        Limits = [.. v.Limits.Select(S)],
+        Labels = [.. v.Labels.Select(S)],
+        Robustness = v.Robustness is null ? null : v.Robustness with
+        {
+            Sensitivity = v.Robustness.Sensitivity with
+            {
+                Parameters = [.. v.Robustness.Sensitivity.Parameters.Select(p => p with { Param = S(p.Param), Verdict = S(p.Verdict), Reason = S(p.Reason) })],
+            },
+            ByRegime = S(v.Robustness.ByRegime),
+            Limits = [.. v.Robustness.Limits.Select(S)],
+        },
+    };
 }

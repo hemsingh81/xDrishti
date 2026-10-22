@@ -10,7 +10,7 @@ namespace XDrishti.Api.Lab;
 
 /// <summary>
 /// The downloadable folder of a Lab report (spec P5-06, ADR 0063): a zip of <c>report.json</c>, <c>report.html</c>, <c>summary.txt</c>, <c>README.txt</c> and <c>manifest.json</c> (the export library's manifest: size and SHA-256 of the other four).
-/// Entry times are fixed, so equal reports give equal bytes.
+/// Entry times are fixed and entries are stored without compression (the deflate output is not promised stable across runtime versions), so equal reports give equal bytes.
 /// </summary>
 internal static class ReportFolder
 {
@@ -37,7 +37,7 @@ internal static class ReportFolder
         {
             foreach (var (name, bytes) in files)
             {
-                var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
+                var entry = zip.CreateEntry(name, CompressionLevel.NoCompression);
                 entry.LastWriteTime = EntryTime;
                 using var target = entry.Open();
                 target.Write(bytes);

@@ -127,7 +127,8 @@ internal sealed class LabRunsEndpoints : IEndpointModule
             return ProblemResults.From(result.Error, http);
         }
 
-        http.Response.Headers.ContentSecurityPolicy = ReportHtml.Policy;
+        http.Response.Headers.ContentSecurityPolicy = ReportHtml.Policy + "; sandbox; frame-ancestors 'none'";
+        http.Response.Headers.XContentTypeOptions = "nosniff";
         return TypedResults.Text(ReportHtml.Render(result.Value), "text/html", System.Text.Encoding.UTF8);
     }
 

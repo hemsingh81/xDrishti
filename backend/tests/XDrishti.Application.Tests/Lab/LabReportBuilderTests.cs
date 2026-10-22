@@ -90,9 +90,10 @@ public sealed partial class LabReportBuilderTests
         var rng = new Random(2026);
         for (var i = 0; i < 200; i++)
         {
-            var rob = rng.Next(2) == 0 ? null : Robust(p: rng.NextDouble(), share: rng.NextDouble());
-            var v = Verdict(rng.Next(3) == 0 ? "FAIL" : "PASS", rng.Next(0, 900), Math.Round(rng.NextDouble() - 0.3, 6), 1 + (rng.NextDouble() * 2), rng.NextDouble() * 30, rng.Next(1, 12), rng.Next(0, 12), rob,
-                [Cell("15m|BUY", rng.Next(0, 500), rng.NextDouble()), Cell("5m|SELL", rng.Next(0, 500), rng.NextDouble())]);
+            var tiny = rng.Next(3) == 0;
+            var rob = rng.Next(2) == 0 ? null : Robust(p: tiny ? rng.NextDouble() * 0.0001 : rng.NextDouble(), share: rng.NextDouble());
+            var v = Verdict(rng.Next(3) == 0 ? "FAIL" : "PASS", rng.Next(0, 900), tiny ? -rng.NextDouble() * 0.004 : Math.Round(rng.NextDouble() - 0.3, 6), 1 + (rng.NextDouble() * 2), rng.NextDouble() * 30, rng.Next(1, 12), rng.Next(0, 12), rob,
+                [Cell("15m|BUY", rng.Next(0, 500), rng.Next(4) == 0 ? null : rng.NextDouble()), Cell("5m|SELL", rng.Next(0, 500), rng.NextDouble())]);
             var report = Build(v, Run(rob is null ? "full" : "robust"));
 
             var allowed = Allowed(report);
@@ -101,6 +102,8 @@ public sealed partial class LabReportBuilderTests
             {
                 allowed.ShouldContain(m.Value, $"'{m.Value}' in: {report.Summary}");
             }
+
+            Regex.IsMatch(text, @"-0(?![.\d])").ShouldBeFalse(text);
         }
     }
 
@@ -119,6 +122,8 @@ public sealed partial class LabReportBuilderTests
         {
             case JsonValueKind.Number:
                 set.Add(Math.Round(e.GetDouble(), 2).ToString("0.##", CultureInfo.InvariantCulture));
+                set.Add(Math.Round(e.GetDouble(), 4).ToString("0.####", CultureInfo.InvariantCulture));
+                set.Add("0.0001");
                 break;
             case JsonValueKind.String:
                 foreach (Match m in Number().Matches(e.GetString()!))
@@ -144,5 +149,18 @@ public sealed partial class LabReportBuilderTests
             default:
                 break;
         }
+    }
+
+    [Fact]
+    public void A_small_p_value_is_not_printed_as_zero_and_free_text_loses_control_characters()
+    {
+        var rob = Robust(p: 0.004);
+        var report = Build(Verdict(rob: rob), Run(id: "A\u202EB\nC"));
+
+        report.Summary.ShouldContain("p-value of 0.004.");
+        report.Run.StrategyId.ShouldBe("AB C");
+        report.Summary.ShouldNotContain("\u202E", Case.Sensitive);
+        LabReportBuilder.P(0.00004).ShouldBe("<0.0001");
+        LabReportBuilder.F(-0.003).ShouldBe("0");
     }
 }

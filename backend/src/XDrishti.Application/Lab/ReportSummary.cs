@@ -33,7 +33,7 @@ internal static class ReportSummary
 
         if (r.Robustness?.SignFlipBaseline is { } b)
         {
-            s.Append(" The sign-flip baseline gave a p-value of ").Append(F(b.PValue)).Append('.');
+            s.Append(" The sign-flip baseline gave a p-value of ").Append(P(b.PValue)).Append('.');
         }
 
         if (r.Robustness?.MonteCarlo is { } m)

@@ -18,3 +18,4 @@ Doc 11 §4 lists a report: verdict, KPIs, best cells, by instrument, charts, com
 - No migration; OpenAPI and frontend types regenerated (`LabReportView` and parts).
 - Adding win rate, rupees, per-instrument tables, charts or the trade list means storing more in the full test's document first (a later slice); the `notIncluded` list shrinks then.
 - The folder does not contain the trades; the run section lists the keys of the candidate runs in `research.sim_runs`.
+- The page prints numbers with up to four decimals (`0.####`); the summary prints R figures with two decimals and p-values and shares with four (`<0.0001` below that), so the same value can read slightly differently in the two. Free text from outside is stripped of control and bidi characters once in the builder, so every representation is safe. The HTTP header adds `sandbox` and `frame-ancestors 'none'` to the page's policy, plus `nosniff`.
