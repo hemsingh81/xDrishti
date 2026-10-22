@@ -290,6 +290,7 @@ strategy_lab:
   plugins: { enabled: true, sandbox: { cpu: 2, memory_gb: 4, timeout_min: 60 } }
   multiple_testing_adjustment: true
   # P5-03 reads StrategyLab:Gates (MinOosTrades, MinExpectancyR, MinProfitFactor, MinPositiveFoldsPct, MaxDrawdownR, MaxCalibrationErrorPp; the qualification_gates above are the defaults), StrategyLab:MinFoldsForPass (6; fewer walk-forward folds cap a verdict at MARGINAL) and StrategyLab:MultipleTesting (the switch above); the tightening is 1 + 0.25·log2(variants) (ADR 0059)
+  # P5-04 reads StrategyLab:FullExits (array of --exit flags, default ["FIXED_RR:rr=2|1.5|2.5|3"]; must expand to 2 to 16 candidates, the first is the default exit) for the candidate exits of a full test.
   assistant_can_run_tests: true
   assistant_can_promote: false
 

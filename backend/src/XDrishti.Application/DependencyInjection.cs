@@ -415,6 +415,7 @@ public static class DependencyInjection
     public static IServiceCollection AddLabRunner(this IServiceCollection services)
     {
         services.AddScoped<ILabRunExecutor, LabRunner>();
+        services.AddScoped<LabFullTest>(); // the full test of a run (P5-04, ADR 0060)
         services.AddSingleton<LabRunDispatcher>();
         return services;
     }

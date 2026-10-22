@@ -36,4 +36,7 @@ internal static partial class LabRunLog
 
     [LoggerMessage(EventId = 4448, Level = LogLevel.Information, Message = "lab.ledger.appended run {RunId} strategy {StrategyId} version {Version}")]
     public static partial void LedgerAppended(ILogger logger, Guid runId, string strategyId, int version);
+
+    [LoggerMessage(EventId = 4449, Level = LogLevel.Information, Message = "lab.result.stored run {RunId} outcome {Outcome} variants {Variants}")]
+    public static partial void ResultStored(ILogger logger, Guid runId, string outcome, int variants);
 }

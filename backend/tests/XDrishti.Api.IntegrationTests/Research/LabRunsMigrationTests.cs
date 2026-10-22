@@ -77,6 +77,6 @@ public sealed class LabRunsMigrationTests(ApiFactory factory)
 
         await migrator.MigrateAsync(null, Ct);
 
-        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["lab_runs", "strategies", "strategy_versions", "test_ledger"]);
+        (await ListAsync(connection, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'lab' ORDER BY 1")).ShouldBe(["lab_results", "lab_runs", "strategies", "strategy_versions", "test_ledger"]);
     }
 }

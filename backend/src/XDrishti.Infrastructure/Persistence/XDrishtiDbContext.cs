@@ -150,6 +150,9 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<TestLedgerRow> TestLedger => Set<TestLedgerRow>();
 
+    /// <summary>The verdicts of full tests (spec P5-04).</summary>
+    internal DbSet<LabResultRow> LabResults => Set<LabResultRow>();
+
     /// <summary>Encrypted broker secrets; used only by the broker vault.</summary>
     internal DbSet<BrokerSecretRecord> BrokerSecrets => Set<BrokerSecretRecord>();
 

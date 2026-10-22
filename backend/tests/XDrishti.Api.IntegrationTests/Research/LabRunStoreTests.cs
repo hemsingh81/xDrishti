@@ -26,7 +26,7 @@ public sealed class LabRunStoreTests(ApiFactory factory, ResearchGrantsTests.Ded
 
     private async Task ResetAsync()
     {
-        await StoreKit.ExecuteAsync(server.Owner, "DELETE FROM lab.lab_runs; DELETE FROM lab.strategy_versions; DELETE FROM lab.strategies;", Ct);
+        await StoreKit.ExecuteAsync(server.Owner, "DELETE FROM lab.lab_results; DELETE FROM lab.lab_runs; DELETE FROM lab.strategy_versions; DELETE FROM lab.strategies;", Ct);
         await StoreKit.ExecuteAsync(server.Owner, "INSERT INTO lab.strategies (id, style, built_in, created_at) VALUES ('RUNSTORE', 'intraday', false, now()); INSERT INTO lab.strategy_versions (strategy_id, version, schema_version, hash, source_text, canonical_json, created_at) VALUES ('RUNSTORE', 1, 1, '" + Hash + "', 't', '{}', now());", Ct);
     }
 

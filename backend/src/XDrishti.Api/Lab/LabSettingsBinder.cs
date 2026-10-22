@@ -1,5 +1,6 @@
 using XDrishti.Application.Lab;
 using XDrishti.Domain.Lab;
+using XDrishti.Domain.Research;
 
 namespace XDrishti.Api.Lab;
 
@@ -25,10 +26,17 @@ internal static class LabSettingsBinder
                 gates.GetValue("MaxDrawdownR", d.Gates.MaxDrawdownR),
                 gates.GetValue("MaxCalibrationErrorPp", d.Gates.MaxCalibrationErrorPp)),
             section.GetValue("MinFoldsForPass", d.MinFoldsForPass),
-            section.GetValue("MultipleTesting", d.MultipleTesting));
+            section.GetValue("MultipleTesting", d.MultipleTesting),
+            section.GetSection("FullExits").Get<string[]>());
         if (settings.QuickYears is < 1 or > 5 || settings.QuickSymbols is < 1 or > 200 || settings.MaxParallelRuns is < 1 or > 8 || settings.PollInterval < TimeSpan.FromMilliseconds(50) || settings.MinFoldsForPass is < 1 or > 100 || !GatesValid(settings.Gates))
         {
             throw new InvalidOperationException("StrategyLab: QuickYears 1 to 5, QuickSymbols 1 to 200, MaxParallelRuns 1 to 8, PollMilliseconds 50 or more, MinFoldsForPass 1 to 100, Gates not negative (MinPositiveFoldsPct up to 100).");
+        }
+
+        var errors = new List<string>();
+        if (ExitFlags.Parse([.. settings.Exits], null, errors) is not { Candidates.Count: >= 2 } || errors.Count > 0)
+        {
+            throw new InvalidOperationException("StrategyLab:FullExits must be --exit flags that expand to two to 16 candidates.");
         }
 
         return settings;

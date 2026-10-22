@@ -14,10 +14,20 @@ namespace XDrishti.Application.Lab;
 /// <param name="Gates">The qualification gates a verdict is judged against (doc 16, P5-03).</param>
 /// <param name="MinFoldsForPass">Fewer walk-forward folds than this cap a verdict at MARGINAL.</param>
 /// <param name="MultipleTesting">Whether the gates tighten as the variants of a family grow.</param>
-public sealed record LabSettings(int QuickYears, int QuickSymbols, int MaxParallelRuns, string CostSheetId, TimeSpan PollInterval, QualificationGates Gates, int MinFoldsForPass, bool MultipleTesting)
+/// <param name="FullExits">The <c>--exit</c> flags of the candidate exits of a full test (P5-04); null is <see cref="DefaultFullExits"/>.</param>
+public sealed record LabSettings(int QuickYears, int QuickSymbols, int MaxParallelRuns, string CostSheetId, TimeSpan PollInterval, QualificationGates Gates, int MinFoldsForPass, bool MultipleTesting, IReadOnlyList<string>? FullExits = null)
 {
     /// <summary>The method of this slice.</summary>
     public const string QuickMethod = "quick";
+
+    /// <summary>The method of the full test (P5-04).</summary>
+    public const string FullMethod = "full";
+
+    /// <summary>The candidate exits of a full test when none are configured: a fixed reward-to-risk grid, 2R first (the default exit).</summary>
+    public static readonly IReadOnlyList<string> DefaultFullExits = ["FIXED_RR:rr=2|1.5|2.5|3"];
+
+    /// <summary>The flags in force.</summary>
+    public IReadOnlyList<string> Exits => FullExits is { Count: > 0 } ? FullExits : DefaultFullExits;
 
     /// <summary>Doc 16: one year, 30 symbols, two runs at once; the sheet called <c>default</c>.</summary>
     public static LabSettings Default { get; } = new(1, 30, 2, "default", TimeSpan.FromSeconds(1), QualificationGates.Default, 6, true);
@@ -27,4 +37,8 @@ public sealed record LabSettings(int QuickYears, int QuickSymbols, int MaxParall
         "quick.years=" + QuickYears.ToString(System.Globalization.CultureInfo.InvariantCulture)
         + ";quick.symbols=" + QuickSymbols.ToString(System.Globalization.CultureInfo.InvariantCulture)
         + ";fills=modelled;costs=" + costBasis;
+
+    /// <summary>The text that stands for these settings in the key of a full test (P5-04): the exits and the selection options.</summary>
+    public string FullConfigText(string costBasis) =>
+        "full.exits=" + string.Join(" ", Exits) + ";select=expanding,9,3,5,0.5,30,plateau;fills=modelled;costs=" + costBasis;
 }

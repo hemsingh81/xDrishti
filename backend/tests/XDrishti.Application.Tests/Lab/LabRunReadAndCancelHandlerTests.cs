@@ -28,7 +28,7 @@ public sealed class LabRunReadAndCancelHandlerTests
         var id = Guid.NewGuid();
         _runs.GetAsync(id, Ct).Returns(Run(id, LabRunState.Running));
 
-        var view = (await new GetLabRunHandler(_runs).HandleAsync(new GetLabRunQuery(id), Ct)).Value;
+        var view = (await new GetLabRunHandler(_runs, Substitute.For<ILabResultStore>()).HandleAsync(new GetLabRunQuery(id), Ct)).Value;
 
         view.State.ShouldBe("running");
         view.Progress.ShouldBe(new LabProgressView(3, 12));
@@ -40,7 +40,7 @@ public sealed class LabRunReadAndCancelHandlerTests
     [Fact]
     public async Task A_run_that_is_not_stored_is_not_found()
     {
-        var result = await new GetLabRunHandler(_runs).HandleAsync(new GetLabRunQuery(Guid.NewGuid()), Ct);
+        var result = await new GetLabRunHandler(_runs, Substitute.For<ILabResultStore>()).HandleAsync(new GetLabRunQuery(Guid.NewGuid()), Ct);
 
         result.Error.Code.ShouldBe(LabErrors.NotFoundCode);
     }

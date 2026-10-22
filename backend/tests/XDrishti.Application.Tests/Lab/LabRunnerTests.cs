@@ -10,6 +10,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Lab;
 using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
 
@@ -40,6 +41,14 @@ public sealed class LabRunnerTests
 
     private readonly ISimulationEngine _engine = Substitute.For<ISimulationEngine>();
 
+    private readonly IQueryHandler<RunComparisonQuery, Result<ComparisonRun>> _comparisons = Substitute.For<IQueryHandler<RunComparisonQuery, Result<ComparisonRun>>>();
+
+    private readonly XDrishti.Application.Abstractions.Market.Calendar.ITradingCalendar _calendars = Substitute.For<XDrishti.Application.Abstractions.Market.Calendar.ITradingCalendar>();
+
+    private readonly ITestLedger _ledger = Substitute.For<ITestLedger>();
+
+    private readonly ILabResultStore _results = Substitute.For<ILabResultStore>();
+
     private readonly ILabProgress _progress = Substitute.For<ILabProgress>();
 
     private readonly SimulationRun _run = FabricatedRun.Standard();
@@ -69,7 +78,7 @@ public sealed class LabRunnerTests
         });
     }
 
-    private LabRunner Runner() => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance);
+    private LabRunner Runner() => new(_runs, _strategies, _checker, _simulation, _store, _writer, _sheets, _engine, new LabFullTest(_comparisons, _calendars, _ledger, LabSettings.Default), _results, _progress, LabSettings.Default, _time, NullLogger<LabRunner>.Instance);
 
     [Fact]
     public async Task A_valid_run_goes_through_the_three_stages_stores_the_simulation_once_and_succeeds_with_its_key_and_counts()
@@ -105,6 +114,55 @@ public sealed class LabRunnerTests
         query.Request.To.ShouldBe(new DateOnly(2026, 4, 30));
         query.Request.Costs.ShouldBe(CostChoice.Gross);
         query.Request.Fills.ShouldBe(new FillRulesInput(FillRules.Default.EntryLimitPercent, FillRules.Default.Slippage.Ticks, FillRules.Default.Slippage.BarRangeFrac, FillRules.Default.Slippage.StopExitExtraTicks));
+    }
+
+    private static LabRun FullRun() => Run() with { Method = "full", From = new DateOnly(2026, 2, 1) };
+
+    [Fact]
+    public async Task A_full_test_without_a_stored_sheet_fails_the_run_at_the_full_test_stage_and_runs_nothing()
+    {
+        await Runner().ExecuteAsync(FullRun(), Ct);
+
+        var finish = _finishes.Single();
+        finish.State.ShouldBe(LabRunState.Failed);
+        finish.Stage.ShouldBe("full_test");
+        finish.Error.ShouldBe("lab.costs_required");
+        await _comparisons.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task A_refusal_of_the_comparison_fails_the_full_test_stores_no_run_and_no_result()
+    {
+        _sheets.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
+        _comparisons.HandleAsync(Arg.Any<RunComparisonQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Result.Failure<ComparisonRun>(SimulationErrors.StrategyInvalid([new FieldError("buy.stop", "no stop", null, "simulation.x")])));
+        _calendars.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
+
+        await Runner().ExecuteAsync(FullRun(), Ct);
+
+        var finish = _finishes.Single();
+        finish.State.ShouldBe(LabRunState.Failed);
+        finish.Stage.ShouldBe("full_test");
+        finish.Problems.Single(p => p.Stage == "full_test").Code.ShouldBe("simulation.x");
+        await _store.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+        await _results.DidNotReceiveWithAnyArgs().AppendAsync(default, default!, default!, default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task A_full_test_asks_the_comparison_for_the_candidate_exits_costed_over_the_whole_window()
+    {
+        _sheets.FindAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
+        _comparisons.HandleAsync(Arg.Any<RunComparisonQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Failure<ComparisonRun>(Error.Validation("x", "stop here")));
+        _calendars.GetAsync(Arg.Any<CancellationToken>()).Returns(new TradingCalendar());
+
+        await Runner().ExecuteAsync(FullRun(), Ct);
+
+        var query = (RunComparisonQuery)_comparisons.ReceivedCalls().Single().GetArguments()[0]!;
+        query.Request.Exits!.Candidates.Select(c => c.Id).ShouldBe(["FIXED_RR{rr=2}", "FIXED_RR{rr=1.5}", "FIXED_RR{rr=2.5}", "FIXED_RR{rr=3}"]);
+        query.Request.Costs.ShouldBeOfType<CostChoice.SheetChoice>();
+        query.Request.From.ShouldBe(new DateOnly(2026, 2, 1));
+        query.Request.StrategyHash.ShouldBe(Hash);
     }
 
     [Fact]

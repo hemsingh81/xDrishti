@@ -115,6 +115,7 @@ public static class DependencyInjection
         services.AddScoped<IRunStore, RunStore>(); // the result store of the simulation runs (spec P3-10)
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)
+        services.AddScoped<ILabResultStore, LabResultStore>(); // the results of full tests (spec P5-04)
         services.AddScoped<ITestLedger, TestLedger>(); // the per-family count of looks (spec P5-03)
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)
         services.AddSingleton<IStrategyChecker, StrategyChecker>(); // the strategy file library behind its port for the Lab (spec P5-01): stateless, no I/O

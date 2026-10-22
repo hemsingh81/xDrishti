@@ -45,13 +45,14 @@ internal sealed class StartLabRunHandler(
             return Result.Failure<StartedLabRun>(LabErrors.NotFound(command.StrategyId!, command.Version));
         }
 
-        var universe = await ResolveUniverseAsync(command, cancellationToken);
+        var full = string.Equals(command.Method, LabSettings.FullMethod, StringComparison.Ordinal);
+        var universe = await ResolveUniverseAsync(command, full, cancellationToken);
         if (universe.IsFailure)
         {
             return Result.Failure<StartedLabRun>(universe.Error);
         }
 
-        var window = await ResolveWindowAsync(command, cancellationToken);
+        var window = await ResolveWindowAsync(command, full, cancellationToken);
         if (window.IsFailure)
         {
             return Result.Failure<StartedLabRun>(window.Error);
@@ -59,12 +60,18 @@ internal sealed class StartLabRunHandler(
 
         var (from, to, firstSession, lastSession) = window.Value;
         var (basis, basisLabel) = await CostBasisAsync(from, cancellationToken);
-        var configHash = LabRunIdentity.Sha256(settings.ConfigText(basis));
-        var key = LabRunIdentity.Key(version.Hash, universe.Value.Label, [.. universe.Value.Instruments.Select(i => i.Id)], from, to, LabSettings.QuickMethod, configHash, engine.EngineVersion);
-        var labels = Labels(universe.Value, from, to, firstSession, lastSession, basisLabel);
+        if (full && basis == "none")
+        {
+            return Result.Failure<StartedLabRun>(LabErrors.InvalidInput($"A full test is costed: the charge sheet `{settings.CostSheetId}` is not stored or not in force on the first day of the window."));
+        }
+
+        var method = full ? LabSettings.FullMethod : LabSettings.QuickMethod;
+        var configHash = LabRunIdentity.Sha256(full ? settings.FullConfigText(basis) : settings.ConfigText(basis));
+        var key = LabRunIdentity.Key(version.Hash, universe.Value.Label, [.. universe.Value.Instruments.Select(i => i.Id)], from, to, method, configHash, engine.EngineVersion);
+        var labels = full ? FullLabels(universe.Value, from, to, firstSession, lastSession, basisLabel) : Labels(universe.Value, from, to, firstSession, lastSession, basisLabel);
         var now = time.GetUtcNow();
         var inserted = await runs.InsertOrGetAsync(
-            new NewLabRun(Guid.NewGuid(), key, version.StrategyId, version.Version, version.Hash, universe.Value, from, to, LabSettings.QuickMethod, configHash, engine.EngineVersion, labels, now),
+            new NewLabRun(Guid.NewGuid(), key, version.StrategyId, version.Version, version.Hash, universe.Value, from, to, method, configHash, engine.EngineVersion, labels, now),
             cancellationToken);
         // one look at the family, counted whatever becomes of the run (spec P5-03, D1). Also for a run that already holds the key: the append is idempotent by run id, so a run whose first append failed is healed by the next post.
         var run = inserted.Run;
@@ -88,9 +95,9 @@ internal sealed class StartLabRunHandler(
             return LabErrors.InvalidInput("`strategyId` is required.");
         }
 
-        if (!string.Equals(command.Method, LabSettings.QuickMethod, StringComparison.Ordinal))
+        if (!string.Equals(command.Method, LabSettings.QuickMethod, StringComparison.Ordinal) && !string.Equals(command.Method, LabSettings.FullMethod, StringComparison.Ordinal))
         {
-            return LabErrors.InvalidInput("`method` must be `quick`; the other methods are later slices.");
+            return LabErrors.InvalidInput("`method` must be `quick` or `full`; the other methods are later slices.");
         }
 
         if (command.Version is < 1)
@@ -113,7 +120,7 @@ internal sealed class StartLabRunHandler(
             : (command.From is null) != (command.To is null) ? LabErrors.InvalidInput("Give both `window.from` and `window.to`, or neither.") : null;
     }
 
-    private async ValueTask<Result<LabUniverse>> ResolveUniverseAsync(StartLabRunCommand command, CancellationToken cancellationToken)
+    private async ValueTask<Result<LabUniverse>> ResolveUniverseAsync(StartLabRunCommand command, bool full, CancellationToken cancellationToken)
     {
         List<LabInstrument> members;
         string kind;
@@ -151,7 +158,7 @@ internal sealed class StartLabRunHandler(
             return Result.Failure<LabUniverse>(LabErrors.InvalidInput("The universe has no instrument."));
         }
 
-        var choice = QuickSample.Choose(members.Select(m => m.Id), settings.QuickSymbols);
+        var choice = QuickSample.Choose(members.Select(m => m.Id), full ? int.MaxValue : settings.QuickSymbols);
         var byId = members.ToDictionary(m => m.Id);
         var chosen = choice.Ids.Select(id => byId[id]).ToList();
         return Result.Success(new LabUniverse(kind, command.BasketId, kind == "basket" ? "basket members at the time of the post" : "symbols as listed", members.Count, chosen, choice.Sampled, choice.Seed));
@@ -160,7 +167,7 @@ internal sealed class StartLabRunHandler(
     private static string Show(string term) => term.Length <= 40 ? term : term[..40];
 
     /// <summary>The window of the run and the first and last stored session: the posted window, or the last <c>QuickYears</c> of stored data ending at the last stored session (D2).</summary>
-    private async ValueTask<Result<(DateOnly From, DateOnly To, DateOnly First, DateOnly Last)>> ResolveWindowAsync(StartLabRunCommand command, CancellationToken cancellationToken)
+    private async ValueTask<Result<(DateOnly From, DateOnly To, DateOnly First, DateOnly Last)>> ResolveWindowAsync(StartLabRunCommand command, bool full, CancellationToken cancellationToken)
     {
         var totals = await bars.GetBarTotalsAsync(time.GetUtcNow(), cancellationToken);
         if (totals.FirstBar is not { } firstBar || totals.LastBar is not { } lastBar)
@@ -172,7 +179,7 @@ internal sealed class StartLabRunHandler(
         var first = SessionClock.DateOf(firstBar.ToUnixTimeSeconds());
         var last = SessionClock.DateOf(lastBar.ToUnixTimeSeconds());
         var to = command.To ?? last;
-        var start = command.From ?? Max(first, last.AddYears(-settings.QuickYears).AddDays(1));
+        var start = command.From ?? (full ? first : Max(first, last.AddYears(-settings.QuickYears).AddDays(1)));
         return start > last || to < first
             ? Result.Failure<(DateOnly, DateOnly, DateOnly, DateOnly)>(LabErrors.NoData(start, to))
             : Result.Success((start, to, first, last));
@@ -188,6 +195,16 @@ internal sealed class StartLabRunHandler(
             ? ($"{sheet.Value.Id}|{sheet.Value.RatesSha256}", $"Costed with the charge sheet `{sheet.Value.Id}` (capital {CostChoice.DefaultCapital.ToString("0", CultureInfo.InvariantCulture)}, profile {CostChoice.DefaultProfile}).")
             : ("none", $"Gross: no charges applied, because the charge sheet `{settings.CostSheetId}` is not stored or not in force on the first day of the window.");
     }
+
+    private IReadOnlyList<string> FullLabels(LabUniverse universe, DateOnly from, DateOnly to, DateOnly firstSession, DateOnly lastSession, string basisLabel) =>
+    [
+        "Full test: walk-forward out of sample. Only the out-of-sample numbers are judged; the full-period figures are exploration, in-sample.",
+        basisLabel,
+        $"Window {from:yyyy-MM-dd} to {to:yyyy-MM-dd} (all stored data unless posted); no hold-out (ISS-19).",
+        $"All {universe.Instruments.Count} instruments (no sample).",
+        $"Candidate exits: {string.Join(' ', settings.Exits)}; the strategy's own exit is not a candidate.",
+        $"Stored data runs from {firstSession:yyyy-MM-dd} to {lastSession:yyyy-MM-dd}.",
+    ];
 
     private IReadOnlyList<string> Labels(LabUniverse universe, DateOnly from, DateOnly to, DateOnly firstSession, DateOnly lastSession, string basisLabel)
     {

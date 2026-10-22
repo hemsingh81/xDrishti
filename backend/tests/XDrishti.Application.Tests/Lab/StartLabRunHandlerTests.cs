@@ -78,7 +78,7 @@ public sealed class StartLabRunHandlerTests
 
     [Theory]
     [InlineData(null, "quick", true, false, "strategyId")]
-    [InlineData("LAB_TEST", "full", true, false, "method")]
+    [InlineData("LAB_TEST", "robust", true, false, "method")]
     [InlineData("LAB_TEST", null, true, false, "method")]
     [InlineData("LAB_TEST", "quick", false, false, "exactly one")]
     [InlineData("LAB_TEST", "quick", true, true, "exactly one")]
@@ -92,6 +92,35 @@ public sealed class StartLabRunHandlerTests
         result.Error.Code.ShouldBe(LabErrors.InvalidInputCode);
         result.Error.Message.ShouldContain(word);
         await _runs.DidNotReceiveWithAnyArgs().InsertOrGetAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_full_test_is_refused_without_a_stored_charge_sheet()
+    {
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(2)));
+
+        var result = await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], "full", null, null), Ct);
+
+        result.Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        result.Error.Message.ShouldContain("costed");
+        await _runs.DidNotReceiveWithAnyArgs().InsertOrGetAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task A_full_test_takes_the_whole_universe_has_its_own_key_and_says_what_it_is()
+    {
+        _sheets.FindAsync(LabSettings.Default.CostSheetId, Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(45)));
+        var quick = (await Handler().HandleAsync(BySymbols("S1"), Ct)).Value.Run.Key;
+
+        var full = (await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], "full", new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30)), Ct)).Value.Run;
+
+        full.Method.ShouldBe("full");
+        full.Key.ShouldNotBe(quick);
+        full.Universe.Instruments.Count.ShouldBe(45);
+        full.Universe.Sampled.ShouldBeFalse();
+        full.Labels.ShouldContain(l => l.StartsWith("Full test: walk-forward out of sample", StringComparison.Ordinal));
+        full.Labels.ShouldContain(l => l.Contains("FIXED_RR", StringComparison.Ordinal));
     }
 
     [Fact]

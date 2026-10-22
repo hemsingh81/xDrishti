@@ -36,10 +36,10 @@ public sealed record LabRunView(
     DateTimeOffset CreatedAt,
     DateTimeOffset? StartedAt,
     DateTimeOffset? FinishedAt,
-    string? Verdict)
+    LabVerdictView? Verdict)
 {
     /// <summary>The served form of a stored run.</summary>
-    public static LabRunView Of(LabRun run)
+    public static LabRunView Of(LabRun run, LabVerdictView? verdict = null)
     {
         ArgumentNullException.ThrowIfNull(run);
         return new LabRunView(
@@ -62,6 +62,6 @@ public sealed record LabRunView(
             run.CreatedAt,
             run.StartedAt,
             run.FinishedAt,
-            null);
+            verdict);
     }
 }

@@ -32,6 +32,6 @@ internal sealed class ListLabRunsHandler(ILabRunStore runs) : IQueryHandler<List
         }
 
         var list = await runs.ListAsync(string.IsNullOrWhiteSpace(query.StrategyId) ? null : query.StrategyId, state, Math.Min(query.Limit ?? DefaultLimit, MaxLimit), cancellationToken);
-        return Result.Success<IReadOnlyList<LabRunView>>([.. list.Select(LabRunView.Of)]);
+        return Result.Success<IReadOnlyList<LabRunView>>([.. list.Select(r => LabRunView.Of(r))]);
     }
 }

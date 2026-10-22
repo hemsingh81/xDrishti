@@ -3354,6 +3354,27 @@ export interface components {
       proposals: components['schemas']['CalendarDayView'][];
       nextHoliday: null | components['schemas']['CalendarDayView'];
     };
+    /** @description One cell (timeframe and side) of a full test: the exit the walk-forward chose and how stable that choice was. */
+    CellView: {
+      cell: string;
+      timeframe: string;
+      side: string;
+      default: string;
+      chosen: string;
+      noChoiceReason: null | string;
+      stable: null | boolean;
+      stabilityReason: string;
+      /** Format: int32 */
+      folds: number;
+      /** Format: int32 */
+      usableFolds: number;
+      /** Format: int32 */
+      oosTrades: number;
+      /** Format: double */
+      oosMeanR: null | number;
+      /** Format: double */
+      defaultOosMeanR: null | number;
+    };
     /** @description Body of `POST /api/auth/change-password`. */
     ChangePasswordRequest: {
       currentPassword: string;
@@ -4429,6 +4450,24 @@ export interface components {
       trigger: string;
       message: null | string;
     };
+    /** @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. */
+    EvidenceView: {
+      /** Format: int32 */
+      oosTrades: number;
+      /** Format: double */
+      expectancyR: null | number;
+      /** Format: double */
+      profitFactor: null | number;
+      /** Format: int32 */
+      folds: number;
+      /** Format: int32 */
+      positiveFolds: number;
+      /** Format: double */
+      maxDrawdownR: null | number;
+      /** Format: double */
+      calibrationErrorPp: number;
+      method: string;
+    };
     /** @description How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell. */
     ExecutionView: {
       /** Format: int32 */
@@ -4489,6 +4528,20 @@ export interface components {
       /** Format: int32 */
       daysBehind: number;
     };
+    /** @description A full-period (in-sample) figure of one candidate in one cell. It is exploration and never reaches the verdict. */
+    FullPeriodView: {
+      cell: string;
+      candidate: string;
+      /** Format: int32 */
+      trades: number;
+      /** Format: double */
+      meanR: null | number;
+      /** Format: double */
+      profitFactor: null | number;
+      /** Format: double */
+      totalR: null | number;
+      label: string;
+    };
     GapPage: {
       items: components['schemas']['GapRow'][];
       /** Format: int32 */
@@ -4535,6 +4588,18 @@ export interface components {
       filled: number;
       /** Format: date-time */
       lastDetectedAt: null | string;
+    };
+    /** @description One gate of a verdict as served (spec P5-03, P5-04); `Actual` is null when it is not finite. */
+    GateView: {
+      name: string;
+      /** Format: double */
+      required: number;
+      /** Format: double */
+      adjusted: number;
+      /** Format: double */
+      actual: null | number;
+      passed: boolean;
+      reason: string;
     };
     /** @description The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value. */
     GroupPart: {
@@ -5246,7 +5311,7 @@ export interface components {
       startedAt: null | string;
       /** Format: date-time */
       finishedAt: null | string;
-      verdict: null | string;
+      verdict: null | components['schemas']['LabVerdictView'];
     };
     /** @description One entry of the stage log: when a stage began and ended and how many problems it found. */
     LabStageLog: {
@@ -5280,6 +5345,20 @@ export interface components {
       sampled: boolean;
       /** Format: int64 */
       seed: null | number;
+    };
+    /** @description The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block. */
+    LabVerdictView: {
+      outcome: string;
+      /** Format: int32 */
+      variantCount: number;
+      /** Format: double */
+      adjustmentFactor: number;
+      evidence: components['schemas']['EvidenceView'];
+      gates: components['schemas']['GateView'][];
+      limits: string[];
+      cells: components['schemas']['CellView'][];
+      fullPeriod: components['schemas']['FullPeriodView'][];
+      labels: string[];
     };
     /** @description The India dates a run replays, inclusive. */
     LabWindow: {
