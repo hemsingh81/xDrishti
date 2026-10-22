@@ -31,6 +31,26 @@ internal sealed class LabRunsEndpoints : IEndpointModule
             .WithSummary("One Lab run: state, stage, progress, the simulation run keys, counts, located problems, the stage log and the labels (cost basis, sample, exploration)")
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        runs.MapGet("/{id:guid}/report", GetReportAsync)
+            .WithName("GetLabReport")
+            .WithSummary("The report of a succeeded full or robust run, built from the stored result: verdict, gates, figures, best cells, warnings, honest limits, a deterministic plain-English summary. 409 lab.no_report for any other run")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        runs.MapGet("/{id:guid}/report/html", GetReportHtmlAsync)
+            .WithName("GetLabReportHtml")
+            .WithSummary("The report as one static, inert HTML page")
+            .Produces<string>(StatusCodes.Status200OK, "text/html")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
+        runs.MapGet("/{id:guid}/report/folder", GetReportFolderAsync)
+            .WithName("DownloadLabReportFolder")
+            .WithSummary("The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report")
+            .Produces<byte[]>(StatusCodes.Status200OK, "application/zip")
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict);
+
         api.MapGet("/lab/strategies/{id}/ledger", GetLedgerAsync)
             .WithTags("Lab")
             .WithName("GetLabLedger")
@@ -83,6 +103,44 @@ internal sealed class LabRunsEndpoints : IEndpointModule
     {
         var result = await handler.HandleAsync(new GetLabRunQuery(id), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<LabReportView>, ProblemHttpResult>> GetReportAsync(
+        Guid id,
+        HttpContext http,
+        IQueryHandler<GetLabReportQuery, Result<LabReportView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetLabReportQuery(id), cancellationToken);
+        return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<ContentHttpResult, ProblemHttpResult>> GetReportHtmlAsync(
+        Guid id,
+        HttpContext http,
+        IQueryHandler<GetLabReportQuery, Result<LabReportView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetLabReportQuery(id), cancellationToken);
+        if (result.IsFailure)
+        {
+            return ProblemResults.From(result.Error, http);
+        }
+
+        http.Response.Headers.ContentSecurityPolicy = ReportHtml.Policy;
+        return TypedResults.Text(ReportHtml.Render(result.Value), "text/html", System.Text.Encoding.UTF8);
+    }
+
+    private static async Task<Results<FileContentHttpResult, ProblemHttpResult>> GetReportFolderAsync(
+        Guid id,
+        HttpContext http,
+        IQueryHandler<GetLabReportQuery, Result<LabReportView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetLabReportQuery(id), cancellationToken);
+        return result.IsFailure
+            ? ProblemResults.From(result.Error, http)
+            : TypedResults.File(ReportFolder.Build(result.Value), "application/zip", $"lab-report-{id:D}.zip");
     }
 
     private static async Task<Results<Ok<LedgerView>, ProblemHttpResult>> GetLedgerAsync(

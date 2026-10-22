@@ -2401,6 +2401,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lab/runs/{id}/report': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The report of a succeeded full or robust run, built from the stored result: verdict, gates, figures, best cells, warnings, honest limits, a deterministic plain-English summary. 409 lab.no_report for any other run */
+    get: operations['GetLabReport'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/runs/{id}/report/html': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The report as one static, inert HTML page */
+    get: operations['GetLabReportHtml'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lab/runs/{id}/report/folder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The report as a zip folder (report.json, report.html, summary.txt, README.txt, manifest.json), identical bytes for the same report */
+    get: operations['DownloadLabReportFolder'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/lab/runs/{id}/cancel': {
     parameters: {
       query?: never;
@@ -5265,6 +5316,30 @@ export interface components {
       /** Format: int32 */
       total: number;
     };
+    /**
+     * @description The report of a finished full or robust test (spec P5-06, doc 11 §4), built from the stored result only. `NotIncluded` names the sections of doc 11 §4 that the stored result cannot fill, so nothing is invented. `Summary` is a deterministic
+     *     template over the numbers above, not an assistant text.
+     */
+    LabReportView: {
+      /** Format: uuid */
+      runId: string;
+      outcome: string;
+      /** Format: int32 */
+      variantCount: number;
+      /** Format: double */
+      adjustmentFactor: number;
+      run: components['schemas']['ReportRunView'];
+      kpis: components['schemas']['ReportKpisView'];
+      gates: components['schemas']['GateView'][];
+      bestCells: components['schemas']['CellView'][];
+      exploration: components['schemas']['FullPeriodView'][];
+      robustness: null | components['schemas']['RobustnessView'];
+      warnings: components['schemas']['ReportWarningView'][];
+      honestLimits: string[];
+      notIncluded: string[];
+      labels: string[];
+      summary: string;
+    };
     /** @description Client event `labRunFinished` (spec P5-02, D5): the last event of a run, with its final state. */
     LabRunFinished: {
       /** Format: uuid */
@@ -6203,6 +6278,38 @@ export interface components {
       /** Format: int32 */
       memberCount: number;
     };
+    /** @description The headline figures of the out-of-sample evidence; a figure that is not finite is null. */
+    ReportKpisView: {
+      /** Format: int32 */
+      oosTrades: number;
+      /** Format: double */
+      expectancyR: null | number;
+      /** Format: double */
+      profitFactor: null | number;
+      /** Format: double */
+      maxDrawdownR: null | number;
+      /** Format: int32 */
+      folds: number;
+      /** Format: int32 */
+      positiveFolds: number;
+    };
+    /** @description What was tested: the strategy version, the method, the window and the universe (spec P5-06). */
+    ReportRunView: {
+      key: string;
+      strategyId: string;
+      /** Format: int32 */
+      version: number;
+      hash: string;
+      method: string;
+      /** Format: date */
+      from: string;
+      /** Format: date */
+      to: string;
+      universe: string;
+      /** Format: int32 */
+      instruments: number;
+      simRunKeys: string[];
+    };
     /**
      * @description The multipart form of the report preview and import, for the API contract only (the request is read by ReportUploads). `AccountId` is the account, `Files` the downloaded reports (one or more; CSV, XLS or XLSX). `Choices` is a JSON array of
      *     `{name, holdingId | instrumentId | isin, remember}`: what scrip names of a transaction report mean. For the import also `Digests` (a JSON array with the preview's digest, or null, for each file in order), `Rebuild` (whether to rebuild the lots of
@@ -6216,6 +6323,11 @@ export interface components {
       digests: null | string;
       rebuild: null | boolean;
       acceptOtherAccount: null | string;
+    };
+    /** @description A caution derived from the report's own numbers. It never changes the outcome. */
+    ReportWarningView: {
+      code: string;
+      text: string;
     };
     /** @description Pasted tickers, canonical symbols (`NSE:RELIANCE`) or ISINs, up to 5,000 entries. */
     ResolveInput: {
@@ -13382,6 +13494,126 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLabReport: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LabReportView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLabReportHtml: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/html': string;
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  DownloadLabReportFolder: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/zip': string;
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };
