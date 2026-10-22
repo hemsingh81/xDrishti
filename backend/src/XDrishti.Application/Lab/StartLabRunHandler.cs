@@ -45,7 +45,7 @@ internal sealed class StartLabRunHandler(
             return Result.Failure<StartedLabRun>(LabErrors.NotFound(command.StrategyId!, command.Version));
         }
 
-        var full = string.Equals(command.Method, LabSettings.FullMethod, StringComparison.Ordinal);
+        var full = LabSettings.RunsFullTest(command.Method);
         var universe = await ResolveUniverseAsync(command, full, cancellationToken);
         if (universe.IsFailure)
         {
@@ -65,10 +65,11 @@ internal sealed class StartLabRunHandler(
             return Result.Failure<StartedLabRun>(LabErrors.InvalidInput($"A full test is costed: the charge sheet `{settings.CostSheetId}` is not stored or not in force on the first day of the window."));
         }
 
-        var method = full ? LabSettings.FullMethod : LabSettings.QuickMethod;
-        var configHash = LabRunIdentity.Sha256(full ? settings.FullConfigText(basis) : settings.ConfigText(basis));
+        var robust = string.Equals(command.Method, LabSettings.RobustMethod, StringComparison.Ordinal);
+        var method = robust ? LabSettings.RobustMethod : full ? LabSettings.FullMethod : LabSettings.QuickMethod;
+        var configHash = LabRunIdentity.Sha256(robust ? settings.RobustConfigText(basis) : full ? settings.FullConfigText(basis) : settings.ConfigText(basis));
         var key = LabRunIdentity.Key(version.Hash, universe.Value.Label, [.. universe.Value.Instruments.Select(i => i.Id)], from, to, method, configHash, engine.EngineVersion);
-        var labels = full ? FullLabels(universe.Value, from, to, firstSession, lastSession, basisLabel) : Labels(universe.Value, from, to, firstSession, lastSession, basisLabel);
+        var labels = full ? FullLabels(universe.Value, from, to, firstSession, lastSession, basisLabel, robust) : Labels(universe.Value, from, to, firstSession, lastSession, basisLabel);
         var now = time.GetUtcNow();
         var inserted = await runs.InsertOrGetAsync(
             new NewLabRun(Guid.NewGuid(), key, version.StrategyId, version.Version, version.Hash, universe.Value, from, to, method, configHash, engine.EngineVersion, labels, now),
@@ -95,9 +96,9 @@ internal sealed class StartLabRunHandler(
             return LabErrors.InvalidInput("`strategyId` is required.");
         }
 
-        if (!string.Equals(command.Method, LabSettings.QuickMethod, StringComparison.Ordinal) && !string.Equals(command.Method, LabSettings.FullMethod, StringComparison.Ordinal))
+        if (!string.Equals(command.Method, LabSettings.QuickMethod, StringComparison.Ordinal) && !LabSettings.RunsFullTest(command.Method))
         {
-            return LabErrors.InvalidInput("`method` must be `quick` or `full`; the other methods are later slices.");
+            return LabErrors.InvalidInput("`method` must be `quick`, `full` or `robust`; the other methods are later slices.");
         }
 
         if (command.Version is < 1)
@@ -196,7 +197,7 @@ internal sealed class StartLabRunHandler(
             : ("none", $"Gross: no charges applied, because the charge sheet `{settings.CostSheetId}` is not stored or not in force on the first day of the window.");
     }
 
-    private IReadOnlyList<string> FullLabels(LabUniverse universe, DateOnly from, DateOnly to, DateOnly firstSession, DateOnly lastSession, string basisLabel) =>
+    private IReadOnlyList<string> FullLabels(LabUniverse universe, DateOnly from, DateOnly to, DateOnly firstSession, DateOnly lastSession, string basisLabel, bool robust) =>
     [
         "Full test: walk-forward out of sample. Only the out-of-sample numbers are judged; the full-period figures are exploration, in-sample.",
         basisLabel,
@@ -204,6 +205,7 @@ internal sealed class StartLabRunHandler(
         $"All {universe.Instruments.Count} instruments (no sample).",
         $"Candidate exits: {string.Join(' ', settings.Exits)}; the strategy's own exit is not a candidate.",
         $"Stored data runs from {firstSession:yyyy-MM-dd} to {lastSession:yyyy-MM-dd}.",
+        .. robust ? ["Robustness checks (sensitivity sweep, Monte Carlo, by year, sign-flip baseline) are exploration beside the verdict and do not change it; each sweep point is a variant in the ledger."] : Array.Empty<string>(),
     ];
 
     private IReadOnlyList<string> Labels(LabUniverse universe, DateOnly from, DateOnly to, DateOnly firstSession, DateOnly lastSession, string basisLabel)

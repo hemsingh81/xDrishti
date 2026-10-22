@@ -22,4 +22,5 @@ public sealed record LabVerdictView(
     IReadOnlyList<string> Limits,
     IReadOnlyList<CellView> Cells,
     IReadOnlyList<FullPeriodView> FullPeriod,
-    IReadOnlyList<string> Labels);
+    IReadOnlyList<string> Labels,
+    RobustnessView? Robustness = null);

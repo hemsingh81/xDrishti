@@ -17289,6 +17289,16 @@
             "items": {
               "type": "string"
             }
+          },
+          "robustness": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RobustnessView"
+              }
+            ]
           }
         },
         "description": "The verdict of a full test with everything it rests on (spec P5-04): outcome, gates, limits, the cells and the exploration block."
@@ -17886,6 +17896,68 @@
         },
         "description": "A missing minute: the India date and the minute (`HH:mm`)."
       },
+      "MonteCarloView": {
+        "required": [
+          "trades",
+          "draws",
+          "seed",
+          "observedMeanR",
+          "observedMaxDrawdownR",
+          "meanP05",
+          "meanP50",
+          "meanP95",
+          "drawdownP50",
+          "drawdownP95",
+          "shareNotPositive"
+        ],
+        "type": "object",
+        "properties": {
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "draws": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seed": {
+            "type": "string"
+          },
+          "observedMeanR": {
+            "type": "number",
+            "format": "double"
+          },
+          "observedMaxDrawdownR": {
+            "type": "number",
+            "format": "double"
+          },
+          "meanP05": {
+            "type": "number",
+            "format": "double"
+          },
+          "meanP50": {
+            "type": "number",
+            "format": "double"
+          },
+          "meanP95": {
+            "type": "number",
+            "format": "double"
+          },
+          "drawdownP50": {
+            "type": "number",
+            "format": "double"
+          },
+          "drawdownP95": {
+            "type": "number",
+            "format": "double"
+          },
+          "shareNotPositive": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number)."
+      },
       "NameLearning": {
         "required": [
           "known",
@@ -17943,6 +18015,33 @@
           }
         },
         "description": "The quantity the lots count as opening (the shares the trades do not explain): now, and after the rebuild. Null where it cannot be told (no holding, or a quantity that is not whole after a split or bonus)."
+      },
+      "ParameterSensitivityView": {
+        "required": [
+          "param",
+          "points",
+          "verdict",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "param": {
+            "type": "string"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SweepPointView"
+            }
+          },
+          "verdict": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "description": "The sweep of one parameter and its judgement (`stable`, `fragile`, `no_base_edge`, `inconclusive`)."
       },
       "ParameterView": {
         "required": [
@@ -19527,6 +19626,51 @@
         },
         "description": "The window of the checks: how many closed sessions, from which date to which (the ones a run started now would look at)."
       },
+      "RandomBaselineView": {
+        "required": [
+          "kind",
+          "trades",
+          "draws",
+          "seed",
+          "observedMeanR",
+          "nullMeanP95",
+          "pValue",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "draws": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "seed": {
+            "type": "string"
+          },
+          "observedMeanR": {
+            "type": "number",
+            "format": "double"
+          },
+          "nullMeanP95": {
+            "type": "number",
+            "format": "double"
+          },
+          "pValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "description": "The sign-flip baseline: not a re-run with random entries."
+      },
       "RefreshRunView": {
         "required": [
           "id",
@@ -20158,6 +20302,58 @@
         },
         "description": "A shared set of risk limits. Percentages are in percent; \"R\" values are multiples of the risk per trade. IsSeeded marks a built-in profile\n(can be edited, not deleted); AccountCount is how many active accounts use it (a profile in use cannot be deleted);\nWeeklyLossAction is \"halve_size\", \"stop_new_entries\" or \"alert_only\"."
       },
+      "RobustnessView": {
+        "required": [
+          "sensitivity",
+          "monteCarlo",
+          "byYear",
+          "randomBaseline",
+          "byRegime",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "sensitivity": {
+            "$ref": "#/components/schemas/SensitivityView"
+          },
+          "monteCarlo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MonteCarloView"
+              }
+            ]
+          },
+          "byYear": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/YearView"
+            }
+          },
+          "randomBaseline": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RandomBaselineView"
+              }
+            ]
+          },
+          "byRegime": {
+            "type": "string"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "The robustness block of a result (spec P5-05, ADR 0061). It does not change the verdict; every part that cannot be computed is null or says why."
+      },
       "RoleToggleInput": {
         "required": [
           "enabled"
@@ -20392,6 +20588,44 @@
           }
         },
         "description": "The Dhan API key and secret, write-only (app_id / app_secret). Surrounding spaces are\nremoved; the values are stored encrypted and never returned."
+      },
+      "SensitivityView": {
+        "required": [
+          "timeframe",
+          "exit",
+          "base",
+          "parameters",
+          "label"
+        ],
+        "type": "object",
+        "properties": {
+          "timeframe": {
+            "type": "string"
+          },
+          "exit": {
+            "type": "string"
+          },
+          "base": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SweepPointView"
+              }
+            ]
+          },
+          "parameters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParameterSensitivityView"
+            }
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "description": "The parameter sensitivity (spec P5-05): the exit and timeframe every point used, the base and the parameters."
       },
       "ServiceIssueView": {
         "required": [
@@ -21473,6 +21707,59 @@
           }
         },
         "description": "The decision about a suggested dividend: `State` is `accepted` (with the `DividendId` created) or `dismissed`."
+      },
+      "SweepPointView": {
+        "required": [
+          "param",
+          "value",
+          "trades",
+          "meanR",
+          "profitFactor",
+          "totalR",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "param": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "format": "double"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "profitFactor": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "totalR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "One run of the sweep (the base has an empty `Param`): the figures of a plain run of one exit, or the reason the engine refused it. In-sample."
       },
       "SyncInput": {
         "required": [
@@ -23100,6 +23387,46 @@
           }
         },
         "description": "A stored version in the list of a family: number, hash, parent hash, note and creation time."
+      },
+      "YearView": {
+        "required": [
+          "year",
+          "trades",
+          "meanR",
+          "totalR",
+          "profitFactor",
+          "positive"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": "number",
+            "format": "double"
+          },
+          "totalR": {
+            "type": "number",
+            "format": "double"
+          },
+          "profitFactor": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "positive": {
+            "type": "boolean"
+          }
+        },
+        "description": "The out-of-sample trades of one calendar year."
       }
     }
   },

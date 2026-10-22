@@ -78,7 +78,7 @@ public sealed class StartLabRunHandlerTests
 
     [Theory]
     [InlineData(null, "quick", true, false, "strategyId")]
-    [InlineData("LAB_TEST", "robust", true, false, "method")]
+    [InlineData("LAB_TEST", "sensitivity", true, false, "method")]
     [InlineData("LAB_TEST", null, true, false, "method")]
     [InlineData("LAB_TEST", "quick", false, false, "exactly one")]
     [InlineData("LAB_TEST", "quick", true, true, "exactly one")]
@@ -121,6 +121,24 @@ public sealed class StartLabRunHandlerTests
         full.Universe.Sampled.ShouldBeFalse();
         full.Labels.ShouldContain(l => l.StartsWith("Full test: walk-forward out of sample", StringComparison.Ordinal));
         full.Labels.ShouldContain(l => l.Contains("FIXED_RR", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_robust_run_is_a_full_test_with_its_own_key_whole_universe_and_a_label_and_needs_a_sheet()
+    {
+        _resolver.HandleAsync(Arg.Any<ResolveInstrumentsQuery>(), Arg.Any<CancellationToken>()).Returns(Result.Success(Matched(45)));
+        var refused = await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], "robust", null, null), Ct);
+        refused.Error.Code.ShouldBe(LabErrors.InvalidInputCode);
+        _sheets.FindAsync(LabSettings.Default.CostSheetId, Arg.Any<CancellationToken>()).Returns(Result.Success(FixtureSheet.Sheet));
+        var window = (new DateOnly(2026, 2, 1), new DateOnly(2026, 4, 30));
+        var full = (await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], "full", window.Item1, window.Item2), Ct)).Value.Run;
+
+        var robust = (await Handler().HandleAsync(new StartLabRunCommand("LAB_TEST", null, null, ["S1"], "robust", window.Item1, window.Item2), Ct)).Value.Run;
+
+        robust.Method.ShouldBe("robust");
+        robust.Key.ShouldNotBe(full.Key);
+        robust.Universe.Instruments.Count.ShouldBe(45);
+        robust.Labels.ShouldContain(l => l.StartsWith("Robustness checks", StringComparison.Ordinal));
     }
 
     [Fact]

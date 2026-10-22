@@ -17,7 +17,7 @@ internal sealed class GetLabRunHandler(ILabRunStore runs, ILabResultStore result
             return Result.Failure<LabRunView>(LabErrors.RunNotFound(query.Id));
         }
 
-        var verdict = run.State == LabRunState.Succeeded && string.Equals(run.Method, LabSettings.FullMethod, StringComparison.Ordinal)
+        var verdict = run.State == LabRunState.Succeeded && LabSettings.RunsFullTest(run.Method)
             ? await results.GetAsync(run.Id, cancellationToken)
             : null;
         return Result.Success(LabRunView.Of(run, verdict));
