@@ -2554,6 +2554,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/experiments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The recorded experiments (knob changes judged against a baseline run), newest first (limit 1 to 200, default 50): the knob, the outcome (Better, NotBetter, Inconclusive or CheaperAssumption), folds better of folds used, the improvement required after the trials, totals after the expected live gap, and the measured time of the comparison. Empty before the first experiment. 422 learning.invalid */
+    get: operations['ListExperiments'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/experiments/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One experiment with its full report, honest limits and the rules it was judged with. 404 experiments.not_found */
+    get: operations['GetExperiment'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4689,6 +4723,123 @@ export interface components {
       timeoutMinutes: number;
       catchUp: boolean;
       notifyOnFailure: boolean;
+    };
+    /** @description An experiment as the API shows it (P6-11, ADR 0072). The report text and the parameters are empty in a list and filled for one experiment. */
+    ExperimentView: {
+      /**
+       * Format: int64
+       * @description The ledger id.
+       */
+      id: number;
+      /** @description The hash that identifies the experiment. */
+      experimentKey: string;
+      /** @description What was changed. */
+      knobName: string;
+      /** @description Parameter, Exit or Slippage. */
+      knobKind: string;
+      /** @description The baseline value. */
+      baselineValue: string;
+      /** @description The candidate value. */
+      candidateValue: string;
+      /** @description The baseline run. */
+      baselineRunKey: string;
+      /** @description The candidate run. */
+      candidateRunKey: string;
+      /**
+       * Format: date
+       * @description Earliest trade date.
+       */
+      from: string;
+      /**
+       * Format: date
+       * @description Latest trade date.
+       */
+      to: string;
+      /**
+       * Format: date
+       * @description First day of the hold-out that was not read, or null when none was kept.
+       */
+      holdOutStart: null | string;
+      /** @description Better, NotBetter, Inconclusive or CheaperAssumption. */
+      outcome: string;
+      /**
+       * Format: int32
+       * @description The experiments of the last 30 days when it was judged, itself included.
+       */
+      trials: number;
+      /**
+       * Format: int32
+       * @description Folds used.
+       */
+      usedFolds: number;
+      /**
+       * Format: int32
+       * @description Folds better.
+       */
+      foldsBetter: number;
+      /**
+       * Format: int32
+       * @description Folds needed.
+       */
+      foldsNeeded: number;
+      /**
+       * Format: double
+       * @description The improvement required, mean R per trade.
+       */
+      requiredImprovementR: number;
+      /**
+       * Format: int32
+       * @description Baseline trades.
+       */
+      baselineTrades: number;
+      /**
+       * Format: int32
+       * @description Candidate trades.
+       */
+      candidateTrades: number;
+      /**
+       * Format: double
+       * @description Pooled mean R of the baseline over the used folds, or null.
+       */
+      pooledBaselineMeanR: null | number;
+      /**
+       * Format: double
+       * @description The same for the candidate.
+       */
+      pooledCandidateMeanR: null | number;
+      /**
+       * Format: double
+       * @description Total R of the baseline after the live gap.
+       */
+      baselineTotalR: number;
+      /**
+       * Format: double
+       * @description The same for the candidate.
+       */
+      candidateTotalR: number;
+      /**
+       * Format: double
+       * @description The live gap assumed, R per trade.
+       */
+      expectedLiveGapR: number;
+      /**
+       * Format: int64
+       * @description Milliseconds spent reading both runs and judging them (measured); the replay is not included and not measured.
+       */
+      compareMs: number;
+      /** @description Why it is not better; empty when better. */
+      reasons: string[];
+      /** @description The report with its honest limits; empty in a list. */
+      reportText: string;
+      /** @description The rules used; empty in a list. */
+      parameters: string;
+      /**
+       * Format: date-time
+       * @description When it was recorded.
+       */
+      createdAt: string;
+      /** @description Who recorded it. */
+      createdBy: string;
     };
     /** @description A filter value and how many active instruments have it. */
     FacetCount: {
@@ -14091,6 +14242,68 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ModelDetailView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListExperiments: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetExperiment: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExperimentView'];
         };
       };
       /** @description Not Found */
