@@ -2503,6 +2503,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/learning/digest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The weekly learning digest of an ISO week (week=2026-W43), or the newest stored one: new and changed cells, drift and loss-tag proposals, lessons, hypotheses and experiments awaiting the owner, plan outcomes (simulated on plan prices), model status with the phase check, and the honest limits. Every section says nothing was applied. Read only. 404 learning.digest_not_found, 422 learning.invalid */
+    get: operations['GetLearningDigest'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/digests': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored weekly digests, newest week first (limit 1 to 52, default 12). Read only. 422 learning.invalid */
+    get: operations['ListLearningDigests'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/cells': {
     parameters: {
       query?: never;
@@ -4725,6 +4759,48 @@ export interface components {
     /** @description The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`. */
     DhanRedirectView: {
       redirectUrl: string;
+    };
+    /** @description One section of the weekly digest (P7-15). IReadOnlyList&lt;string&gt; DigestSection.Lines is never empty: a section with nothing to list says so. */
+    DigestSection: {
+      /** @description The stable key (`cells`, `drift` ...). */
+      key: string;
+      /** @description The heading. */
+      title: string;
+      /** @description The lines, in order. */
+      lines: string[];
+    };
+    /** @description The weekly digest as the API and the verb show it. */
+    DigestView: {
+      /**
+       * Format: int64
+       * @description The row id; null for a dry run that stored nothing.
+       */
+      id: null | number;
+      /** @description The week. */
+      isoWeek: string;
+      /**
+       * Format: date
+       * @description The Monday.
+       */
+      weekStart: string;
+      /**
+       * Format: date
+       * @description The Sunday.
+       */
+      weekEnd: string;
+      /** @description The sections. */
+      sections: components['schemas']['DigestSection'][];
+      /** @description The text. */
+      text: string;
+      /** @description Who built it. */
+      builtBy: null | string;
+      /**
+       * Format: date-time
+       * @description When it was stored; null for a dry run.
+       */
+      createdAt: null | string;
+      /** @description The week already had a digest: that one is shown and nothing was written. */
+      repeated: boolean;
     };
     /** @description A row that cannot be imported: the line of the file it starts on and why. */
     DividendBadRow: {
@@ -15176,6 +15252,77 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LearningOverviewView'];
+        };
+      };
+    };
+  };
+  GetLearningDigest: {
+    parameters: {
+      query?: {
+        week?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DigestView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLearningDigests: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DigestView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

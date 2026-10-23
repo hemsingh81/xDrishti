@@ -130,6 +130,7 @@ public static class DependencyInjection
         services.AddScoped<IExperimentLedger, ExperimentLedger>(); // the experiment ledger: insert-only, its 30-day count is the trials (spec P6-11)
         services.AddScoped<IHypothesisLog, HypothesisLogStore>(); // the insert-only hypothesis log (spec P6-10)
         services.AddScoped<ILessonLog, LessonLogStore>(); // the insert-only lesson log (spec P6-16)
+        services.AddScoped<IDigestStore, DigestStore>(); // the insert-only weekly digests (spec P7-15, ADR 0094)
         services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
         services.AddScoped<IGradeStore, GradeStore>(); // insert-only grades of tickets (P7-13, ADR 0090)
         services.AddSingleton<IGradeSettings, GradeSettings>();

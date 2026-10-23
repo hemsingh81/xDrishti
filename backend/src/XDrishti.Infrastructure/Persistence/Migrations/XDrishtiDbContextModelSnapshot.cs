@@ -3295,6 +3295,62 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.DigestRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BuiltBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("built_by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("IsoWeek")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("iso_week");
+
+                    b.Property<string>("SectionsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sections_json");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.Property<DateOnly>("WeekEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("week_end");
+
+                    b.Property<DateOnly>("WeekStart")
+                        .HasColumnType("date")
+                        .HasColumnName("week_start");
+
+                    b.HasKey("Id")
+                        .HasName("pk_digests");
+
+                    b.HasIndex("IsoWeek")
+                        .IsUnique()
+                        .HasDatabaseName("uq_digests_iso_week");
+
+                    b.ToTable("digests", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_digests_shape", "iso_week ~ '^[0-9]{4}-W[0-9]{2}$' AND week_end = week_start + 6 AND position('Nothing was applied' IN text) > 0 AND length(built_by) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ExperimentRecord", b =>
                 {
                     b.Property<long>("Id")

@@ -8559,6 +8559,100 @@
         }
       }
     },
+    "/api/learning/digest": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The weekly learning digest of an ISO week (week=2026-W43), or the newest stored one: new and changed cells, drift and loss-tag proposals, lessons, hypotheses and experiments awaiting the owner, plan outcomes (simulated on plan prices), model status with the phase check, and the honest limits. Every section says nothing was applied. Read only. 404 learning.digest_not_found, 422 learning.invalid",
+        "operationId": "GetLearningDigest",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DigestView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/learning/digests": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The stored weekly digests, newest week first (limit 1 to 52, default 12). Read only. 422 learning.invalid",
+        "operationId": "ListLearningDigests",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DigestView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cells": {
       "get": {
         "tags": [
@@ -14978,6 +15072,101 @@
           }
         },
         "description": "The redirect URL to register with the Dhan app, exactly as shown: `{PublicBaseUrl}/api/brokers/dhan/callback`."
+      },
+      "DigestSection": {
+        "required": [
+          "key",
+          "title",
+          "lines"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The stable key (`cells`, `drift` ...)."
+          },
+          "title": {
+            "type": "string",
+            "description": "The heading."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The lines, in order."
+          }
+        },
+        "description": "One section of the weekly digest (P7-15). IReadOnlyList&lt;string&gt; DigestSection.Lines is never empty: a section with nothing to list says so."
+      },
+      "DigestView": {
+        "required": [
+          "id",
+          "isoWeek",
+          "weekStart",
+          "weekEnd",
+          "sections",
+          "text",
+          "builtBy",
+          "createdAt",
+          "repeated"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row id; null for a dry run that stored nothing.",
+            "format": "int64"
+          },
+          "isoWeek": {
+            "type": "string",
+            "description": "The week."
+          },
+          "weekStart": {
+            "type": "string",
+            "description": "The Monday.",
+            "format": "date"
+          },
+          "weekEnd": {
+            "type": "string",
+            "description": "The Sunday.",
+            "format": "date"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DigestSection"
+            },
+            "description": "The sections."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text."
+          },
+          "builtBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who built it."
+          },
+          "createdAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was stored; null for a dry run.",
+            "format": "date-time"
+          },
+          "repeated": {
+            "type": "boolean",
+            "description": "The week already had a digest: that one is shown and nothing was written."
+          }
+        },
+        "description": "The weekly digest as the API and the verb show it."
       },
       "DividendBadRow": {
         "required": [
