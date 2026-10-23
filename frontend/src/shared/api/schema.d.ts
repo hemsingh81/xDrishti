@@ -2520,6 +2520,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The registered models, newest first (limit 1 to 200, default 50; role challenger, champion or retired filters on the current role): hash, the training set, the validation verdict against the baselines (Eligible, CannotBeatBaselines or Inconclusive) with its reasons and pooled numbers, and the role. Advisory: nothing uses a model until P7. Empty before the first registration. 422 learning.invalid */
+    get: operations['ListModels'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/models/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One model with its parameters, the full validation report with its honest limits, the calibration table, the feature importance (path-based, not exact, not SHAP) and every designation. No model bytes. 404 models.not_found */
+    get: operations['GetModel'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3439,6 +3473,19 @@ export interface components {
       proposals: components['schemas']['CalendarDayView'][];
       nextHoliday: null | components['schemas']['CalendarDayView'];
     };
+    /** @description One point of the calibration table of a model: a raw score and the probability it maps to. */
+    CalibrationPoint: {
+      /**
+       * Format: double
+       * @description The raw score of the trees.
+       */
+      score: number;
+      /**
+       * Format: double
+       * @description The calibrated probability.
+       */
+      probability: number;
+    };
     /** @description One row of the cell statistics as the API shows it (P6-01), with the facts a reader needs to judge it (spec honest limits: the basis, the knobs, the evidence flag and the limits text). */
     CellStatsView: {
       cellKey: string;
@@ -4123,6 +4170,25 @@ export interface components {
       /** Format: double */
       quantity: number;
     };
+    /** @description One designation of a model. */
+    DesignationView: {
+      /**
+       * Format: int64
+       * @description The row id.
+       */
+      id: number;
+      /** @description challenger, champion or retired. */
+      role: string;
+      /** @description Why. */
+      reason: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      createdAt: string;
+      /** @description Who. */
+      createdBy: string;
+    };
     /** @description What a detection run did: `instruments` looked at, `candidates` found, `suggested` new suggestions stored (the others were known already, ignored ones included) and `pending` suggestions now waiting. */
     DetectionResult: {
       /** Format: int32 */
@@ -4629,6 +4695,16 @@ export interface components {
       value: string;
       /** Format: int32 */
       count: number;
+    };
+    /** @description The weight of one feature in a model or in one score: a path-based contribution in raw-score units (not exact, not SHAP). */
+    FeatureImportanceView: {
+      /** @description The feature name, or `f&lt;index&gt;` when the catalog of the model is not the current one. */
+      feature: string;
+      /**
+       * Format: double
+       * @description For a model the mean absolute contribution over its training rows; for one score the signed contribution.
+       */
+      meanAbsContribution: number;
     };
     /**
      * @description Optional per-holding dates for the first import that happens when the portfolio settings are saved (ADR 0013). Without rows, every holding Dhan lists is
@@ -5727,6 +5803,118 @@ export interface components {
       /** Format: date */
       date: string;
       time: string;
+    };
+    /** @description A model with everything the registry keeps about it (P6-07). */
+    ModelDetailView: {
+      /** @description The model. */
+      model: components['schemas']['ModelView'];
+      /** @description The trainer and validation settings. */
+      parameters: string;
+      /** @description The validation report with its honest limits. */
+      reportText: string;
+      /** @description The calibration table. */
+      calibration: components['schemas']['CalibrationPoint'][];
+      /** @description The features by weight, largest first. */
+      importance: components['schemas']['FeatureImportanceView'][];
+      /** @description Every designation, oldest first. */
+      designations: components['schemas']['DesignationView'][];
+      /** @description The sentences that must be read with the model. */
+      limits: string[];
+    };
+    /** @description A registered model as the API shows it (P6-07, ADR 0070): what made it, what the harness said about it and its current role. No model bytes. */
+    ModelView: {
+      /**
+       * Format: int64
+       * @description The registry id.
+       */
+      id: number;
+      /** @description The hash of the model file. */
+      sha256: string;
+      /**
+       * Format: date-time
+       * @description When it was registered.
+       */
+      createdAt: string;
+      /** @description Who registered it. */
+      createdBy: string;
+      /** @description The training set it was made from. */
+      trainingSetId: string;
+      /** @description The feature catalog version. */
+      featureVersion: string;
+      /** @description FastTree or LightGbm. */
+      trainer: string;
+      /** @description What a reader must know about the fit, or null. */
+      note: null | string;
+      /**
+       * Format: int32
+       * @description Rows the trees were fitted on.
+       */
+      fitRows: number;
+      /**
+       * Format: int32
+       * @description Rows the calibration was fitted on.
+       */
+      calibrationRows: number;
+      /**
+       * Format: int32
+       * @description Development rows it was trained on.
+       */
+      trainRows: number;
+      /**
+       * Format: date
+       * @description Earliest trade date among them.
+       */
+      from: string;
+      /**
+       * Format: date
+       * @description Latest trade date among them.
+       */
+      to: string;
+      /**
+       * Format: date
+       * @description First day of the hold-out that was not read, or null when none was kept.
+       */
+      holdOutStart: null | string;
+      /** @description Eligible, CannotBeatBaselines or Inconclusive. */
+      verdict: string;
+      /**
+       * Format: int32
+       * @description Folds used.
+       */
+      usedFolds: number;
+      /**
+       * Format: int32
+       * @description Folds in which it beat both baselines.
+       */
+      foldsBeatingBoth: number;
+      /**
+       * Format: int32
+       * @description Folds it had to win.
+       */
+      foldsNeeded: number;
+      /** @description It beat both baselines pooled. */
+      pooledBeatsBoth: boolean;
+      /**
+       * Format: double
+       * @description Pooled expected calibration error in percentage points.
+       */
+      pooledEcePp: number;
+      /**
+       * Format: double
+       * @description Pooled out-of-sample log loss.
+       */
+      pooledLogLoss: number;
+      /**
+       * Format: double
+       * @description Pooled out-of-sample Brier score.
+       */
+      pooledBrier: number;
+      /** @description Why it is not eligible; empty when eligible. */
+      reasons: string[];
+      /** @description The current role: challenger, champion or retired. */
+      role: string;
+      /** @description The verdict allows the role champion. */
+      mayBeChampion: boolean;
     };
     /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). */
     MonteCarloView: {
@@ -13840,6 +14028,69 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['CellStatsView'][];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListModels: {
+    parameters: {
+      query?: {
+        role?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ModelView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetModel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ModelDetailView'];
         };
       };
       /** @description Not Found */

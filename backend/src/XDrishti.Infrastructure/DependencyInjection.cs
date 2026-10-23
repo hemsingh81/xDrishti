@@ -121,6 +121,11 @@ public static class DependencyInjection
         services.AddScoped<ICellStatsStore, CellStatsStore>(); // the cell statistics snapshots (spec P6-01)
         services.AddScoped<ITradeFeatureStore, TradeFeatureStore>(); // the decision-time features of trades (spec P6-04)
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
+        services.AddOptions<ModelStoreOptions>().Bind(configuration.GetSection(ModelStoreOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddScoped<IModelRegistry, ModelRegistry>(); // the registered models and their designations (spec P6-07)
+        services.AddSingleton<IModelFiles, ModelFiles>(); // the model files under data/models, named by hash (spec P6-07)
+        services.AddSingleton<IModelTrainer, MlNetModelTrainer>(); // the ML.NET adapter behind its port (ADR 0070): stateless
+        services.AddSingleton<IModelScorerLoader, MlNetScorerLoader>();
         services.AddSingleton<ITradeFeatureExtractor, TradeFeatureExtractorAdapter>(); // the feature frame behind its port (ADR 0039): stateless, no I/O
         services.AddScoped<ITestLedger, TestLedger>(); // the per-family count of looks (spec P5-03)
         services.AddScoped<ILabRunStore, LabRunStore>(); // the Lab runs and their queue (spec P5-02)

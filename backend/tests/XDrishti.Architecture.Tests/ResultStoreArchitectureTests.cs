@@ -98,7 +98,7 @@ public sealed partial class ResultStoreArchitectureTests
     {
         var writers = SourceFiles().Where(f => WritesResearch().IsMatch(Code(f))).Select(Relative).Order(StringComparer.Ordinal).ToList();
 
-        writers.ShouldBe(["XDrishti.Infrastructure/Learning/CellStatsStore.cs", "XDrishti.Infrastructure/Learning/TradeFeatureStore.cs", "XDrishti.Infrastructure/Learning/TrainingSetStore.cs", "XDrishti.Infrastructure/Research/ExitSelectionStore.cs", "XDrishti.Infrastructure/Research/RunStore.Comparisons.cs", "XDrishti.Infrastructure/Research/RunStore.Legs.cs", "XDrishti.Infrastructure/Research/RunStore.Write.cs"]);
+        writers.ShouldBe(["XDrishti.Infrastructure/Learning/CellStatsStore.cs", "XDrishti.Infrastructure/Learning/ModelRegistry.cs", "XDrishti.Infrastructure/Learning/TradeFeatureStore.cs", "XDrishti.Infrastructure/Learning/TrainingSetStore.cs", "XDrishti.Infrastructure/Research/ExitSelectionStore.cs", "XDrishti.Infrastructure/Research/RunStore.Comparisons.cs", "XDrishti.Infrastructure/Research/RunStore.Legs.cs", "XDrishti.Infrastructure/Research/RunStore.Write.cs"]);
         WritesResearch().IsMatch("INSERT INTO research.sim_runs (a) VALUES (1)").ShouldBeTrue("the scan does see a write");
         WritesResearch().IsMatch("COPY research.sim_trades (a) FROM STDIN").ShouldBeTrue();
         WritesResearch().IsMatch("DELETE FROM research.sim_runs").ShouldBeTrue();

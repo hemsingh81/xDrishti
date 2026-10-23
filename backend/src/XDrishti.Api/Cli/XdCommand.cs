@@ -54,6 +54,16 @@ internal static class XdCommand
             return await LearnTrainingSetCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "model")
+        {
+            return await LearnModelCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "designate")
+        {
+            return await LearnDesignateCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "learn" && args[1] == "windows")
         {
             return await LearnWindowsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

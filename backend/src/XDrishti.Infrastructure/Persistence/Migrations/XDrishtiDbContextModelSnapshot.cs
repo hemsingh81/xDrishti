@@ -3295,6 +3295,218 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<long>("ModelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("model_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.HasKey("Id")
+                        .HasName("pk_model_designations");
+
+                    b.HasIndex("ModelId", "Id")
+                        .HasDatabaseName("ix_model_designations_model_id_id");
+
+                    b.ToTable("model_designations", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_model_designations_role", "role IN ('challenger', 'champion', 'retired')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelVersionRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ArtifactBytes")
+                        .HasColumnType("integer")
+                        .HasColumnName("artifact_bytes");
+
+                    b.Property<int>("CalibrationRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("calibration_rows");
+
+                    b.PrimitiveCollection<double[]>("CalibrationScores")
+                        .IsRequired()
+                        .HasColumnType("double precision[]")
+                        .HasColumnName("calibration_scores");
+
+                    b.PrimitiveCollection<double[]>("CalibrationValues")
+                        .IsRequired()
+                        .HasColumnType("double precision[]")
+                        .HasColumnName("calibration_values");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("FeatureVersion")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("feature_version");
+
+                    b.Property<int>("FeatureWidth")
+                        .HasColumnType("integer")
+                        .HasColumnName("feature_width");
+
+                    b.Property<int>("FitRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("fit_rows");
+
+                    b.Property<int>("FoldsBeatingBoth")
+                        .HasColumnType("integer")
+                        .HasColumnName("folds_beating_both");
+
+                    b.Property<int>("FoldsNeeded")
+                        .HasColumnType("integer")
+                        .HasColumnName("folds_needed");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<DateOnly?>("HoldOutStart")
+                        .HasColumnType("date")
+                        .HasColumnName("hold_out_start");
+
+                    b.PrimitiveCollection<double[]>("Importance")
+                        .IsRequired()
+                        .HasColumnType("double precision[]")
+                        .HasColumnName("importance");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Parameters")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("parameters");
+
+                    b.Property<bool>("PooledBeatsBoth")
+                        .HasColumnType("boolean")
+                        .HasColumnName("pooled_beats_both");
+
+                    b.Property<double>("PooledBrier")
+                        .HasColumnType("double precision")
+                        .HasColumnName("pooled_brier");
+
+                    b.Property<double>("PooledEcePp")
+                        .HasColumnType("double precision")
+                        .HasColumnName("pooled_ece_pp");
+
+                    b.Property<double>("PooledLogLoss")
+                        .HasColumnType("double precision")
+                        .HasColumnName("pooled_log_loss");
+
+                    b.Property<string>("Reasons")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reasons");
+
+                    b.Property<string>("ReportText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("report_text");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.Property<int>("TrainRows")
+                        .HasColumnType("integer")
+                        .HasColumnName("train_rows");
+
+                    b.Property<string>("Trainer")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("trainer");
+
+                    b.Property<string>("TrainingSetId")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("training_set_id");
+
+                    b.Property<int>("UsedFolds")
+                        .HasColumnType("integer")
+                        .HasColumnName("used_folds");
+
+                    b.Property<string>("Verdict")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("verdict");
+
+                    b.Property<string>("VersionKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("version_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_model_versions");
+
+                    b.HasIndex("Sha256")
+                        .HasDatabaseName("ix_model_versions_sha256");
+
+                    b.HasIndex("TrainingSetId")
+                        .HasDatabaseName("ix_model_versions_training_set_id");
+
+                    b.HasIndex("VersionKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_model_versions_version_key");
+
+                    b.ToTable("model_versions", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_model_versions_shape", "sha256 ~ '^[0-9a-f]{64}$' AND version_key ~ '^[0-9a-f]{64}$' AND training_set_id ~ '^[0-9a-f]{64}$' AND verdict IN ('Eligible', 'CannotBeatBaselines', 'Inconclusive') AND artifact_bytes > 0 AND feature_width > 0 AND cardinality(calibration_scores) > 0 AND cardinality(calibration_scores) = cardinality(calibration_values) AND cardinality(importance) = feature_width AND train_rows > 0 AND fit_rows >= 0 AND calibration_rows >= 0 AND used_folds >= 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.TradeFeatureRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -5686,6 +5898,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_broker_secrets_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Learning.ModelVersionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_model_designations_model_versions_model_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Market.Bars.BarCoverageRecord", b =>
