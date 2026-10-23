@@ -1,0 +1,38 @@
+strategy:
+  schema: 1
+  id: PDH_PDL_BREAK
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    rr: 2
+  trigger:
+    all:
+      - "close > prev_day.high and close[1] <= prev_day.high"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 3
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    trigger:
+      all:
+        - "close < prev_day.low and close[1] >= prev_day.low"
+    entry:
+      type: at_close
+    stop:
+      type: swing_high
+      lookback: 3
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "10:00"
+    last_entry: "13:30"
+    square_off: "15:15"

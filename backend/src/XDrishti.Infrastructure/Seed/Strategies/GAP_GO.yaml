@@ -1,0 +1,46 @@
+strategy:
+  schema: 1
+  id: GAP_GO
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    gap_min: 0.5
+    or_min: 15
+    rr: 2
+  setup:
+    all:
+      - "gap_pct >= gap_min"
+  trigger:
+    all:
+      - "close > or_high(or_min) and close[1] <= or_high(or_min)"
+  entry:
+    type: at_close
+  stop:
+    type: or_opposite
+    minutes: or_min
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    setup:
+      all:
+        - "gap_pct <= -gap_min"
+    trigger:
+      all:
+        - "close < or_low(or_min) and close[1] >= or_low(or_min)"
+    entry:
+      type: at_close
+    stop:
+      type: or_opposite
+      minutes: or_min
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "09:30"
+    last_entry: "11:00"
+    square_off: "15:15"

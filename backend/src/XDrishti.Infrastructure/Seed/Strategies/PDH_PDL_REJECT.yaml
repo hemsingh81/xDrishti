@@ -1,0 +1,38 @@
+strategy:
+  schema: 1
+  id: PDH_PDL_REJECT
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    rr: 2
+  trigger:
+    all:
+      - "low < prev_day.low and close > prev_day.low and close > open"
+      - "close[1] >= prev_day.low"
+  entry:
+    type: at_close
+  stop:
+    type: bar_low
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    trigger:
+      all:
+        - "high > prev_day.high and close < prev_day.high and close < open"
+        - "close[1] <= prev_day.high"
+    entry:
+      type: at_close
+    stop:
+      type: bar_high
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "09:30"
+    last_entry: "14:30"
+    square_off: "15:15"

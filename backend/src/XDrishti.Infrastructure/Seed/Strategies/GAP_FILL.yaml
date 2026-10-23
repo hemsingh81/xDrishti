@@ -1,0 +1,46 @@
+strategy:
+  schema: 1
+  id: GAP_FILL
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    gap_min: 0.5
+    gap_max: 3
+    rr: 2
+  setup:
+    all:
+      - "gap_pct <= -gap_min and gap_pct >= -gap_max"
+  trigger:
+    all:
+      - "close > today.open and close[1] <= today.open"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 3
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    setup:
+      all:
+        - "gap_pct >= gap_min and gap_pct <= gap_max"
+    trigger:
+      all:
+        - "close < today.open and close[1] >= today.open"
+    entry:
+      type: at_close
+    stop:
+      type: swing_high
+      lookback: 3
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "10:00"
+    last_entry: "12:00"
+    square_off: "15:15"

@@ -1,0 +1,45 @@
+strategy:
+  schema: 1
+  id: MEAN_REV_BANDS
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    adx_max: 25
+    rr: 1.5
+  setup:
+    all:
+      - "adx(14) < adx_max"
+  trigger:
+    all:
+      - "crosses_above(close, bb_lower(20, 2)) and close > open"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 3
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    setup:
+      all:
+        - "adx(14) < adx_max"
+    trigger:
+      all:
+        - "crosses_below(close, bb_upper(20, 2)) and close < open"
+    entry:
+      type: at_close
+    stop:
+      type: swing_high
+      lookback: 3
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "10:00"
+    last_entry: "14:30"
+    square_off: "15:15"
