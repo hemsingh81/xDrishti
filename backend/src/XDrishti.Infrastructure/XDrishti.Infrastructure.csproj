@@ -3,6 +3,8 @@
   <ItemGroup>
     <ProjectReference Include="..\XDrishti.Application\XDrishti.Application.csproj" />
     <ProjectReference Include="..\XDrishti.Simulation\XDrishti.Simulation.csproj" />
+    <!-- the ML.NET adapter (P6-07, ADR 0070): the only way to the Microsoft.ML packages; Infrastructure implements the model ports over it -->
+    <ProjectReference Include="..\XDrishti.Learning.MlNet\XDrishti.Learning.MlNet.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />

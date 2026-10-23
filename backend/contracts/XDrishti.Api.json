@@ -8631,6 +8631,99 @@
           }
         }
       }
+    },
+    "/api/models": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The registered models, newest first (limit 1 to 200, default 50; role challenger, champion or retired filters on the current role): hash, the training set, the validation verdict against the baselines (Eligible, CannotBeatBaselines or Inconclusive) with its reasons and pooled numbers, and the role. Advisory: nothing uses a model until P7. Empty before the first registration. 422 learning.invalid",
+        "operationId": "ListModels",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{id}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "One model with its parameters, the full validation report with its honest limits, the calibration table, the feature importance (path-based, not exact, not SHAP) and every designation. No model bytes. 404 models.not_found",
+        "operationId": "GetModel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelDetailView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11289,6 +11382,26 @@
         },
         "description": "The trading calendar. `days`: the confirmed holidays and special sessions from `from` to `to` (India dates, both included; default today and a\nyear on), by date. `proposals`: every proposed day, whatever its date, waiting for Confirm or Dismiss (including proposals that lie next to a confirmed day, marked `replaces`). `nextHoliday`: the first confirmed holiday\ntoday or later (null when none is known)."
       },
+      "CalibrationPoint": {
+        "required": [
+          "score",
+          "probability"
+        ],
+        "type": "object",
+        "properties": {
+          "score": {
+            "type": "number",
+            "description": "The raw score of the trees.",
+            "format": "double"
+          },
+          "probability": {
+            "type": "number",
+            "description": "The calibrated probability.",
+            "format": "double"
+          }
+        },
+        "description": "One point of the calibration table of a model: a raw score and the probability it maps to."
+      },
       "CellStatsView": {
         "required": [
           "cellKey",
@@ -13492,6 +13605,41 @@
         },
         "description": "An open holding of the account that the statement does not list."
       },
+      "DesignationView": {
+        "required": [
+          "id",
+          "role",
+          "reason",
+          "createdAt",
+          "createdBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row id.",
+            "format": "int64"
+          },
+          "role": {
+            "type": "string",
+            "description": "challenger, champion or retired."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Who."
+          }
+        },
+        "description": "One designation of a model."
+      },
       "DetectionResult": {
         "required": [
           "instruments",
@@ -14959,6 +15107,25 @@
           }
         },
         "description": "A filter value and how many active instruments have it."
+      },
+      "FeatureImportanceView": {
+        "required": [
+          "feature",
+          "meanAbsContribution"
+        ],
+        "type": "object",
+        "properties": {
+          "feature": {
+            "type": "string",
+            "description": "The feature name, or `f&lt;index&gt;` when the catalog of the model is not the current one."
+          },
+          "meanAbsContribution": {
+            "type": "number",
+            "description": "For a model the mean absolute contribution over its training rows; for one score the signed contribution.",
+            "format": "double"
+          }
+        },
+        "description": "The weight of one feature in a model or in one score: a path-based contribution in raw-score units (not exact, not SHAP)."
       },
       "FirstImportInput": {
         "required": [
@@ -18447,6 +18614,217 @@
           }
         },
         "description": "A missing minute: the India date and the minute (`HH:mm`)."
+      },
+      "ModelDetailView": {
+        "required": [
+          "model",
+          "parameters",
+          "reportText",
+          "calibration",
+          "importance",
+          "designations",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "model": {
+            "description": "The model.",
+            "$ref": "#/components/schemas/ModelView"
+          },
+          "parameters": {
+            "type": "string",
+            "description": "The trainer and validation settings."
+          },
+          "reportText": {
+            "type": "string",
+            "description": "The validation report with its honest limits."
+          },
+          "calibration": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalibrationPoint"
+            },
+            "description": "The calibration table."
+          },
+          "importance": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeatureImportanceView"
+            },
+            "description": "The features by weight, largest first."
+          },
+          "designations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DesignationView"
+            },
+            "description": "Every designation, oldest first."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The sentences that must be read with the model."
+          }
+        },
+        "description": "A model with everything the registry keeps about it (P6-07)."
+      },
+      "ModelView": {
+        "required": [
+          "id",
+          "sha256",
+          "createdAt",
+          "createdBy",
+          "trainingSetId",
+          "featureVersion",
+          "trainer",
+          "note",
+          "fitRows",
+          "calibrationRows",
+          "trainRows",
+          "from",
+          "to",
+          "holdOutStart",
+          "verdict",
+          "usedFolds",
+          "foldsBeatingBoth",
+          "foldsNeeded",
+          "pooledBeatsBoth",
+          "pooledEcePp",
+          "pooledLogLoss",
+          "pooledBrier",
+          "reasons",
+          "role",
+          "mayBeChampion"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The registry id.",
+            "format": "int64"
+          },
+          "sha256": {
+            "type": "string",
+            "description": "The hash of the model file."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was registered.",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Who registered it."
+          },
+          "trainingSetId": {
+            "type": "string",
+            "description": "The training set it was made from."
+          },
+          "featureVersion": {
+            "type": "string",
+            "description": "The feature catalog version."
+          },
+          "trainer": {
+            "type": "string",
+            "description": "FastTree or LightGbm."
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What a reader must know about the fit, or null."
+          },
+          "fitRows": {
+            "type": "integer",
+            "description": "Rows the trees were fitted on.",
+            "format": "int32"
+          },
+          "calibrationRows": {
+            "type": "integer",
+            "description": "Rows the calibration was fitted on.",
+            "format": "int32"
+          },
+          "trainRows": {
+            "type": "integer",
+            "description": "Development rows it was trained on.",
+            "format": "int32"
+          },
+          "from": {
+            "type": "string",
+            "description": "Earliest trade date among them.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "Latest trade date among them.",
+            "format": "date"
+          },
+          "holdOutStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "First day of the hold-out that was not read, or null when none was kept.",
+            "format": "date"
+          },
+          "verdict": {
+            "type": "string",
+            "description": "Eligible, CannotBeatBaselines or Inconclusive."
+          },
+          "usedFolds": {
+            "type": "integer",
+            "description": "Folds used.",
+            "format": "int32"
+          },
+          "foldsBeatingBoth": {
+            "type": "integer",
+            "description": "Folds in which it beat both baselines.",
+            "format": "int32"
+          },
+          "foldsNeeded": {
+            "type": "integer",
+            "description": "Folds it had to win.",
+            "format": "int32"
+          },
+          "pooledBeatsBoth": {
+            "type": "boolean",
+            "description": "It beat both baselines pooled."
+          },
+          "pooledEcePp": {
+            "type": "number",
+            "description": "Pooled expected calibration error in percentage points.",
+            "format": "double"
+          },
+          "pooledLogLoss": {
+            "type": "number",
+            "description": "Pooled out-of-sample log loss.",
+            "format": "double"
+          },
+          "pooledBrier": {
+            "type": "number",
+            "description": "Pooled out-of-sample Brier score.",
+            "format": "double"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why it is not eligible; empty when eligible."
+          },
+          "role": {
+            "type": "string",
+            "description": "The current role: challenger, champion or retired."
+          },
+          "mayBeChampion": {
+            "type": "boolean",
+            "description": "The verdict allows the role champion."
+          }
+        },
+        "description": "A registered model as the API shows it (P6-07, ADR 0070): what made it, what the harness said about it and its current role. No model bytes."
       },
       "MonteCarloView": {
         "required": [

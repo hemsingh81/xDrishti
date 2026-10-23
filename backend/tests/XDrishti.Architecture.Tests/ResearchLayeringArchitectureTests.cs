@@ -72,7 +72,7 @@ public sealed class ResearchLayeringArchitectureTests
     {
         var references = RepositoryFiles.ProjectReferences(Project("XDrishti.Infrastructure"));
 
-        references.Order().ShouldBe(["XDrishti.Application", "XDrishti.Simulation"]);
+        references.Order().ShouldBe(["XDrishti.Application", "XDrishti.Learning.MlNet", "XDrishti.Simulation"]); // the ML.NET adapter is the one other reference (P6-07, ADR 0070): Infrastructure implements the model ports over it
         references.ShouldNotContain("XDrishti.Strategies", "the compiler warm-up rule looks for a direct reference to the Strategies library; the adapter reaches it through the located problem only");
         references.ShouldNotContain("XDrishti.Indicators");
     }

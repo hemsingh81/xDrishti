@@ -25,6 +25,8 @@ public sealed class TrainingSetStoreTests(ApiFactory factory) : DataTestBase(fac
         await base.InitializeAsync();
         await using var connection = await OpenAsync();
         await ExecuteAsync(connection, "DELETE FROM research.trade_features");
+        await ExecuteAsync(connection, "DELETE FROM research.model_designations");
+        await ExecuteAsync(connection, "DELETE FROM research.model_versions");
         await ExecuteAsync(connection, "DELETE FROM research.training_sets");
     }
 

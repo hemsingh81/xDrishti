@@ -11,6 +11,8 @@ BrokerVault__Key="$(security find-generic-password -a xdrishti -s xdrishti/broke
 export BrokerVault__Key
 # The 1-minute CSV files (ADR 0016) are read from the repository's data folder.
 export Data__CsvFolder="$ROOT/data/Stocks_CSV"
+# The model files (P6-07, ADR 0070), named by their SHA-256.
+export Models__Folder="$ROOT/data/models"
 export Serilog__WriteTo__1__Name=Seq Serilog__WriteTo__1__Args__serverUrl=http://localhost:5341
 cd "$ROOT/backend"
 exec dotnet watch --project src/XDrishti.Api/XDrishti.Api.csproj

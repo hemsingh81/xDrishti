@@ -37,10 +37,26 @@ public sealed class MlNetArchitectureTests
 
         others.ShouldNotBeEmpty();
         others.Where(p => MlPackages(p).Count > 0).ShouldBeEmpty();
-        foreach (var assembly in new[] { typeof(XDrishti.Domain.Common.Result).Assembly, typeof(XDrishti.Application.DependencyInjection).Assembly, typeof(XDrishti.Infrastructure.DependencyInjection).Assembly, typeof(XDrishti.Simulation.SimulationEngine).Assembly })
+        foreach (var assembly in new[] { typeof(XDrishti.Domain.Common.Result).Assembly, typeof(XDrishti.Application.DependencyInjection).Assembly, typeof(XDrishti.Simulation.SimulationEngine).Assembly })
         {
             assembly.GetReferencedAssemblies().Select(a => a.Name ?? string.Empty).Where(n => IsMlNetPackage(n) || n == "XDrishti.Learning.MlNet").ShouldBeEmpty(assembly.GetName().Name);
         }
+
+        // Infrastructure implements the model ports over the adapter (P6-07, ADR 0070): it may reach the adapter, never the packages.
+        typeof(XDrishti.Infrastructure.DependencyInjection).Assembly.GetReferencedAssemblies().Select(a => a.Name ?? string.Empty).Where(IsMlNetPackage).ShouldBeEmpty("Infrastructure reaches ML.NET only through the adapter");
+    }
+
+    [Fact]
+    public void Only_infrastructure_among_the_libraries_references_the_adapter_project()
+    {
+        var users = SourceProjects()
+            .Where(p => RepositoryFiles.ProjectReferences(XDocument.Load(p)).Contains("XDrishti.Learning.MlNet"))
+            .Select(Path.GetFileNameWithoutExtension)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        users.ShouldBe(["XDrishti.Infrastructure"]);
+        typeof(XDrishti.Application.DependencyInjection).Assembly.GetReferencedAssemblies().Select(a => a.Name).ShouldNotContain("XDrishti.Learning.MlNet");
     }
 
     [Fact]
