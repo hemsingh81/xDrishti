@@ -1,0 +1,27 @@
+strategy:
+  schema: 1
+  id: NR7_ID_BO
+  style: swing
+  timeframes:
+    - 1D
+  sides:
+    - BUY
+  params:
+    rr: 2
+  setup:
+    all:
+      - "inside_bar[1] == 1"
+      - "high[1] - low[1] < min(min(high[3] - low[3], high[4] - low[4]), min(min(high[5] - low[5], high[6] - low[6]), high[7] - low[7]))"
+  trigger:
+    all:
+      - "close > high[1]"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 2
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  time_rules:
+    max_hold_sessions: 5

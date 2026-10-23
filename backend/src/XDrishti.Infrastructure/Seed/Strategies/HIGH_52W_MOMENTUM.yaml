@@ -1,0 +1,25 @@
+strategy:
+  schema: 1
+  id: HIGH_52W_MOMENTUM
+  style: swing
+  timeframes:
+    - 1D
+  sides:
+    - BUY
+  params:
+    high_len: 252
+    rr: 2
+  trigger:
+    all:
+      - "close >= highest(high_len, source=close)"
+      - "close > close[1]"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 5
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  time_rules:
+    max_hold_sessions: 5
