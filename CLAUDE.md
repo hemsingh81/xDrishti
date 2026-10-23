@@ -27,6 +27,11 @@ the roadmap phases in `docs/design/18-roadmap.md`. Engineering standards: `docs/
 - Deploy (`deploy/xd-up.sh`) after every such merge.
 - Go as fast as safely possible; keep going in a loop through the roadmap, slice after slice, without waiting
   between slices. Still stop for a genuine owner decision, a red `scripts/check.sh`, or a reviewer blocker.
+- **Approvals have an auto option (owner, 2026-10-23).** Anything that needs manual approval must also be able to run
+  automatically, controlled by a setting: setting ON = no manual approval needed, setting OFF = manual approval. The
+  setting defaults to OFF (manual). Turning it on is an owner act (authenticated, password-protected as designed), the
+  auto decision is recorded as auto (never as an owner approval) with the setting snapshot, `unavailable` inputs never
+  count as a pass, and no setting ever allows an order to be placed (P7 places none).
 - This authorises commit + merge to `main` + deploy for these slices; push to a remote still needs an explicit ask.
 
 ## Non-negotiables
