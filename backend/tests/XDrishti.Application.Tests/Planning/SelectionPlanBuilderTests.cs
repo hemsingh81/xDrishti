@@ -90,6 +90,25 @@ public sealed class SelectionPlanBuilderTests
     }
 
     [Fact]
+    public async Task A_duplicate_ticket_from_the_source_is_ignored_not_an_exception()
+    {
+        var a = Candidate("AAA", "S1");
+
+        var result = await Builder([a, a with { }], Loose).BuildAsync(Request, CancellationToken.None);
+
+        Assert.Single(result.Value.Items);
+    }
+
+    [Fact]
+    public async Task Every_item_says_the_stats_may_belong_to_an_older_strategy_version()
+    {
+        var result = await Builder([Candidate("AAA", "S1")], Loose).BuildAsync(Request, CancellationToken.None);
+
+        Assert.Contains(SelectionPlanBuilder.StatsVersionCaveat, result.Value.Items[0].Evidence.Unavailable);
+        Assert.Equal("stats may belong to an older strategy version", SelectionPlanBuilder.StatsVersionCaveat);
+    }
+
+    [Fact]
     public async Task A_source_failure_is_a_failed_result()
     {
         var source = Substitute.For<ITicketSource>();

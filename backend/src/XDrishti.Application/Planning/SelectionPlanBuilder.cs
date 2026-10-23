@@ -24,7 +24,10 @@ internal sealed class SelectionPlanBuilder(ITicketSource source, ILogger<Selecti
 
     public const string Basis = "cell statistics only (shrunk replayed-history estimates); tickets are conditional on tomorrow's bars; portfolio fill, checklist and smart rules not applied";
 
-    private static readonly string[] NotApplied = ["portfolio_fill", "checklist", "smart_rules", "basket_styles_and_sides", "cost", "events", "fno_ban", "surveillance"];
+    /// <summary>The cell statistics were replayed on some version of the strategy; the ticket uses the latest stored version (P7-04).</summary>
+    public const string StatsVersionCaveat = "stats may belong to an older strategy version";
+
+    private static readonly string[] NotApplied = ["portfolio_fill", "checklist", "smart_rules", "basket_styles_and_sides", StatsVersionCaveat, "cost", "events", "fno_ban", "surveillance"];
 
     public string Id => BuilderId;
 
@@ -39,8 +42,15 @@ internal sealed class SelectionPlanBuilder(ITicketSource source, ILogger<Selecti
         }
 
         var found = read.Value;
-        var drafts = found.Candidates.ToDictionary(c => (c.Draft.Symbol, c.Cell.Key), c => c.Draft);
-        var candidates = found.Candidates.Select(c => new PlanCandidate(
+        // One ticket per (symbol, cell): a duplicate from the source is ignored, never an exception.
+        var drafts = new Dictionary<(string, string), TicketDraft>();
+        foreach (var c in found.Candidates)
+        {
+            drafts.TryAdd((c.Draft.Symbol, c.Cell.Key), c.Draft);
+        }
+
+        var seen = new HashSet<(string, string)>();
+        var candidates = found.Candidates.Where(c => seen.Add((c.Draft.Symbol, c.Cell.Key))).Select(c => new PlanCandidate(
             c.Draft.Symbol, c.Cell, c.State, c.Stats, request.ForDate, PlannedRewardRisk: c.Draft.RewardRisk, AverageDailyTurnover: c.Draft.AverageDailyTurnover)).ToList();
         var selection = CandidateSelector.Select(candidates, rules ?? new SelectionRules());
 

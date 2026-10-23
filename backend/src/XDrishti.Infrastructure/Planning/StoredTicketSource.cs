@@ -42,12 +42,13 @@ internal sealed class StoredTicketSource(
         }
 
         var cut = new DateTimeOffset(forDate.ToDateTime(TimeOnly.MinValue), IndiaOffset);
-        var cells = new List<(StoredCellStats Stored, CellState? State, StoredVersion Version, Timeframe Timeframe, Side Side)>();
+        var cells = new List<(StoredCellStats Stored, CellState? State, PreparedTicketStrategy Strategy)>();
         var versions = new Dictionary<string, StoredVersion?>(StringComparer.Ordinal);
         var reasons = new SortedSet<string>(StringComparer.Ordinal);
         var unavailable = 0;
         foreach (var stored in rows.OrderBy(r => r.Row.Cell.Key, StringComparer.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var cell = stored.Row.Cell;
             if (!versions.TryGetValue(cell.Strategy, out var version))
             {
@@ -58,12 +59,21 @@ internal sealed class StoredTicketSource(
             if (version is null || !Timeframes.TryParse(cell.Timeframe, out var timeframe) || !TrySide(cell.Side, out var side))
             {
                 unavailable++;
-                reasons.Add("strategy or cell not usable: " + cell.Strategy);
+                AddReason(reasons, "strategy or cell not usable: " + cell.Strategy);
+                continue;
+            }
+
+            // Read, hash-checked and compiled once for the cell, then used for every instrument.
+            var prepared = PreparedTicketStrategy.Prepare(version.SourceText, version.Hash, timeframe, side, cell.Style, cell.Exit);
+            if (prepared.Problem is { } problem)
+            {
+                unavailable++;
+                AddReason(reasons, problem);
                 continue;
             }
 
             var history = await changelog.HistoryAsync(cell.Key, cancellationToken);
-            cells.Add((stored, CellStateAsOf.Of(history, cut), version, timeframe, side));
+            cells.Add((stored, CellStateAsOf.Of(history, cut), prepared));
         }
 
         var members = await MembersAsync(cancellationToken);
@@ -74,10 +84,13 @@ internal sealed class StoredTicketSource(
         var rejected = 0;
         foreach (var (id, symbol) in members)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var minutes = await bars.ReadAsync(id, from, to, cancellationToken);
-            foreach (var (stored, state, version, timeframe, side) in cells)
+            var prepared = TicketBars.Prepare(minutes, session, calendar); // truncated and sorted once for every cell of the instrument
+            foreach (var (stored, state, strategy) in cells)
             {
-                var draft = TicketBuilder.Classify(version.SourceText, version.Hash, timeframe, side, symbol, session, forDate, minutes, calendar);
+                cancellationToken.ThrowIfCancellationRequested();
+                var draft = TicketBuilder.Build(strategy, prepared, symbol, session, forDate, calendar);
                 switch (draft.Verdict)
                 {
                     case TicketVerdict.Conditional:
@@ -88,10 +101,7 @@ internal sealed class StoredTicketSource(
                         break;
                     default:
                         unavailable++;
-                        if (reasons.Count < MaxReasons)
-                        {
-                            reasons.Add(Generic(draft.Reason));
-                        }
+                        AddReason(reasons, Generic(draft.Reason));
 
                         break;
                 }
@@ -116,6 +126,14 @@ internal sealed class StoredTicketSource(
         }
 
         return [.. result.OrderBy(p => p.Value, StringComparer.Ordinal).Select(p => (p.Key, p.Value))];
+    }
+
+    private static void AddReason(SortedSet<string> reasons, string reason)
+    {
+        if (reasons.Count < MaxReasons)
+        {
+            reasons.Add(reason);
+        }
     }
 
     private static bool TrySide(string text, out Side side)
