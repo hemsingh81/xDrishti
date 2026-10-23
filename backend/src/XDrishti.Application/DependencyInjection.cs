@@ -443,6 +443,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>, ExtractTradeFeaturesHandler>(); // decision-time features of a stored run (P6-04, ADR 0066)
         services.AddScoped<ICommandHandler<BuildTrainingSetCommand, TrainingSetOutcome>, BuildTrainingSetHandler>(); // the training set: labels joined to features (P6-04)
         services.AddScoped<IQueryHandler<ProposeEntryWindowsQuery, Result<EntryWindowReport>>, ProposeEntryWindowsHandler>(); // learned entry windows, proposal only (P6-14, ADR 0069)
+        services.AddScoped<IQueryHandler<ReplayDriftQuery, Result<DriftReport>>, ReplayDriftHandler>(); // drift monitors over replayed history, read-only (P6-09, ADR 0074)
         services.AddScoped<IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>>, AnalyzeLossTagsHandler>(); // automatic loss tags, read-only (P6-15, ADR 0071)
         services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
         services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
