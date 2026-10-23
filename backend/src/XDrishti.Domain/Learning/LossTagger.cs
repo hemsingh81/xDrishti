@@ -11,9 +11,9 @@ namespace XDrishti.Domain.Learning;
 public static class LossTagger
 {
     /// <summary>The version of the rules; changing any rule or default raises it.</summary>
-    public const string RuleVersion = "lt-1";
+    public const string RuleVersion = "lt-2";
 
-    /// <summary>The tags of a trade, in the order of <see cref="LossTagKind"/>; the caller decides what a loss is (R below 0).</summary>
+    /// <summary>The tags of a trade, in the order of <see cref="LossTagKind"/>; the caller decides what a loss is (R below 0). A stop-out that is a loss only after costs (exact R not below 0) gets no NormalVariance and is untagged unless another rule fits.</summary>
     public static IReadOnlyList<LossTag> Tag(SimTrade trade, LossTagOptions options)
     {
         ArgumentNullException.ThrowIfNull(trade);
@@ -22,6 +22,7 @@ public static class LossTagger
         var c = CultureInfo.InvariantCulture;
         var risk = Math.Abs(trade.EntryPrice - trade.StopPrice);
         var stopped = trade.ExitReason == ExitReason.Stop;
+        // The gap rule measures against the initial StopPrice: a stop trailed above it that fills at the trailed level is not a gap, so it gets no tag.
 
         if (stopped && risk > 0)
         {
@@ -43,10 +44,13 @@ public static class LossTagger
             tags.Add(new LossTag(LossTagKind.HighSlippage, -trade.SlippageR, options.HighSlippageR, string.Create(c, $"fills cost {-trade.SlippageR:F2} R against the exact prices; threshold {options.HighSlippageR:F2} R")));
         }
 
-        var decisionMinute = SessionClock.MinuteOfDay(trade.DecisionEpochSeconds);
-        if (trade.SessionsHeld == 1 && decisionMinute >= options.LateAfterMinute)
+        // Decision-minute convention of SimTrade.Key and EntryWindowLearner: the minute that closed the evaluation bar. A fill on a later date than the decision (an order that rested overnight) is not a late entry.
+        var decisionInstant = trade.DecisionEpochSeconds - 60;
+        var decisionMinute = SessionClock.MinuteOfDay(decisionInstant);
+        var sameDate = SessionClock.DateOf(decisionInstant) == SessionClock.DateOf(trade.EntryEpochSeconds);
+        if (trade.SessionsHeld == 1 && sameDate && decisionMinute >= options.LateAfterMinute)
         {
-            tags.Add(new LossTag(LossTagKind.LateEntry, decisionMinute, options.LateAfterMinute, string.Create(c, $"decided at {Clock(decisionMinute)}, a trade that left on its entry date; late from {Clock(options.LateAfterMinute)}")));
+            tags.Add(new LossTag(LossTagKind.LateEntry, decisionMinute, options.LateAfterMinute, string.Create(c, $"bar closed at {Clock(decisionMinute)}, a trade that left on its entry date; late from {Clock(options.LateAfterMinute)}")));
         }
 
         var heldMinutes = (trade.ExitEpochSeconds - trade.EntryEpochSeconds) / 60.0;
@@ -61,7 +65,7 @@ public static class LossTagger
             tags.Add(new LossTag(LossTagKind.WideStop, fraction, options.WideStopFraction, string.Create(c, $"stop {fraction:P2} of the entry price away; threshold {options.WideStopFraction:P2}")));
         }
 
-        if (tags.Count == 0 && stopped && trade.RExact >= -options.NormalVarianceMaxLossR)
+        if (tags.Count == 0 && stopped && trade.RExact < 0 && trade.RExact >= -options.NormalVarianceMaxLossR)
         {
             tags.Add(new LossTag(LossTagKind.NormalVariance, trade.RExact, -options.NormalVarianceMaxLossR, string.Create(c, $"stopped out at {trade.RExact:F2} R with none of the other signatures; the ordinary cost of the strategy")));
         }

@@ -90,11 +90,37 @@ public sealed class LossTaggerTests
 
         var tag = LossTagger.Tag(late, Options).Single(x => x.Kind == LossTagKind.LateEntry);
 
-        tag.Value.ShouldBe(879);
-        tag.Detail.ShouldContain("14:39");
+        tag.Value.ShouldBe(878);
+        tag.Detail.ShouldContain("14:38");
         Kinds(late with { SessionsHeld = 2 }).ShouldNotContain(LossTagKind.LateEntry);
+        Kinds(late with { EntryEpochSeconds = late.EntryEpochSeconds + 86400 }).ShouldNotContain(LossTagKind.LateEntry);
         var early = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, FabricatedRun.Monday, ExitReason.SquareOff, entryMinute: 870, entry: 100, stop: 99, target: null, exitPrice: 99.5, rExact: -0.5, rFilled: -0.5);
         Kinds(early).ShouldNotContain(LossTagKind.LateEntry);
+    }
+
+    [Theory]
+    [InlineData(869, false)]
+    [InlineData(870, true)]
+    public void Late_entry_uses_the_minute_that_closed_the_bar_as_the_decision_minute(int closingMinute, bool tagged)
+    {
+        var t = FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, FabricatedRun.Monday, ExitReason.SquareOff, entryMinute: 875, entry: 100, stop: 99, target: null, exitPrice: 99.5, rExact: -0.5, rFilled: -0.5) with { MfeR = 0.1 };
+        // The bar of closingMinute ends one minute later: that instant is the decision.
+        var decided = t with { DecisionEpochSeconds = Day.Epoch(FabricatedRun.Monday, closingMinute + 1) };
+
+        Kinds(decided).Contains(LossTagKind.LateEntry).ShouldBe(tagged);
+    }
+
+    [Fact]
+    public void A_stop_trailed_above_the_initial_stop_is_not_a_gap()
+    {
+        // Sold at the trailed level 99.5, above the initial stop 99: the gap rule compares with the initial StopPrice, so nothing is beyond it.
+        Kinds(Plain() with { ExitPrice = 99.5 }).ShouldNotContain(LossTagKind.GapThroughStop);
+    }
+
+    [Fact]
+    public void A_stop_out_that_loses_only_the_costs_is_not_normal_variance()
+    {
+        Kinds(Plain() with { RExact = 0.05, RFilled = -0.02 }).ShouldNotContain(LossTagKind.NormalVariance);
     }
 
     [Theory]

@@ -11,6 +11,9 @@ public static class LossTagAnalyzer
     /// <summary>Failure code for bad options or input.</summary>
     public const string InvalidCode = "loss_tags.invalid";
 
+    /// <summary>A rough share of comparisons that flag by chance alone (a rough planning figure, not a test); the report prints comparisons times this.</summary>
+    private const double ChanceFlagRate = 0.05;
+
     /// <summary>Tags the losses of <paramref name="inputs"/>; fails on bad options, no trades, a repeated trade key or a non-finite R.</summary>
     public static Result<LossTagReport> Analyze(IReadOnlyList<LossTagInput> inputs, LossTagOptions options)
     {
@@ -76,11 +79,12 @@ public static class LossTagAnalyzer
 
         var worst = allLosses.OrderBy(l => l.R).ThenBy(l => l.Key, StringComparer.Ordinal).Take(options.ShowWorst).ToList();
         var c = CultureInfo.InvariantCulture;
+        var expected = comparisons * ChanceFlagRate;
         var limits = new List<string>
         {
             "Tags describe closed trades after the fact, with the numbers shown; they are not features and must not be used at decision time.",
             "A loss can carry several tags; NormalVariance is given only when no other tag fits, and untagged losses are counted as such.",
-            string.Create(c, $"The growing-tag detector compared {comparisons} cell and tag pairs; with that many comparisons some flags will be chance. A flag is a question for a lesson, not a finding."),
+            string.Create(c, $"The growing-tag detector compared {comparisons} cell and tag pairs, counting only cells with at least {2 * options.GrowingWindow} losses; at an assumed 5 per cent chance per comparison about {expected:F1} flags are expected by luck alone. A flag is a question for a lesson, not a finding."),
             "Replayed history with modelled fills: slippage and gap figures are as good as the fill model.",
         };
         return Result.Success(new LossTagReport(options, inputs.Count, allLosses.Count, cells, worst, comparisons, limits));

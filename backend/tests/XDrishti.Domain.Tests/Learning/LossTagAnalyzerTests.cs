@@ -65,6 +65,7 @@ public sealed class LossTagAnalyzerTests
         (growing.Kind, growing.EarlierCount, growing.RecentCount).ShouldBe((LossTagKind.GaveBackProfit, 0, 6));
         growing.RecentShare.ShouldBe(0.6);
         report.Comparisons.ShouldBe(6);
+        report.Limits.ShouldContain(l => l.Contains("6 cell and tag pairs") && l.Contains("at least 20 losses") && l.Contains("0.3 flags"));
         report.ToText().ShouldContain("growing: GaveBackProfit 0/10 -> 6/10");
     }
 

@@ -8,7 +8,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="QuickStopMinutes">A stop hit within this many minutes of the fill is quick.</param>
 /// <param name="QuickStopMaxMfeR">...if the favourable excursion stayed below this many R.</param>
 /// <param name="WideStopFraction">A stop distance of at least this share of the entry price is wide (0.015 is 1.5 per cent).</param>
-/// <param name="NormalVarianceMaxLossR">A stop-out whose exact R is not below minus this is the ordinary cost of the strategy.</param>
+/// <param name="NormalVarianceMaxLossR">A stop-out whose exact R is a loss (below 0) and not below minus this is the ordinary cost of the strategy.</param>
 /// <param name="GrowingWindow">Losses in each of the two windows the detector compares (the latest and the one before).</param>
 /// <param name="GrowingMinCount">The latest window must hold at least this many losses with the tag.</param>
 /// <param name="GrowingMinRise">...and its share of losses with the tag must exceed the earlier window's by at least this much (absolute).</param>
@@ -24,7 +24,7 @@ public sealed record LossTagOptions(
     double NormalVarianceMaxLossR = 1.25,
     int GrowingWindow = 30,
     int GrowingMinCount = 5,
-    double GrowingMinRise = 0.15,
+    double GrowingMinRise = 0.2,
     int ShowWorst = 10)
 {
     /// <summary>The problems of the values, empty when they are usable.</summary>
