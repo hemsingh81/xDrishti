@@ -8724,6 +8724,146 @@
           }
         }
       }
+    },
+    "/api/changelog": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The learning changelog, newest first (limit 1 to 200, default 50; subjectKind cell or model; subject one cell key or model:ID): what changed, by whom or what, why, before and after references and evidence ids. Rows are never changed; a revert is a row that points at the one it reverts. Empty before the first record. 422 learning.invalid",
+        "operationId": "ListChangelog",
+        "parameters": [
+          {
+            "name": "subjectKind",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChangelogEntryView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/changelog/cell-state": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Where a cell is (query cell=strategy|tf|side|style|exit|regime), replayed from its changelog rows, with the moves the lifecycle allows next. A record only: nothing acts on a cell's state before paper data and live exist. 422 learning.invalid",
+        "operationId": "GetCellState",
+        "parameters": [
+          {
+            "name": "cell",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CellStateView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/changelog/{id}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "One changelog row. 404 changelog.not_found",
+        "operationId": "GetChangelogEntry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangelogEntryView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -11402,6 +11542,57 @@
         },
         "description": "One point of the calibration table of a model: a raw score and the probability it maps to."
       },
+      "CellStateView": {
+        "required": [
+          "cell",
+          "state",
+          "legalNext",
+          "rows",
+          "problems",
+          "paperDaysBeforeActive",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "cell": {
+            "type": "string",
+            "description": "The cell key."
+          },
+          "state": {
+            "type": "string",
+            "description": "The state after the last row (research without rows)."
+          },
+          "legalNext": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The states it may move to."
+          },
+          "rows": {
+            "type": "integer",
+            "description": "How many rows were replayed.",
+            "format": "int32"
+          },
+          "problems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Rows that do not add up; empty when consistent."
+          },
+          "paperDaysBeforeActive": {
+            "type": "integer",
+            "description": "Paper days needed before Active (doc 16).",
+            "format": "int32"
+          },
+          "note": {
+            "type": "string",
+            "description": "What a reader must know: the state is a record; nothing acts on it before paper data and live exist."
+          }
+        },
+        "description": "Where a cell is, replayed from its changelog rows (P6-08)."
+      },
       "CellStatsView": {
         "required": [
           "cellKey",
@@ -11696,6 +11887,103 @@
           }
         },
         "description": "Body of `POST /api/auth/change-password`."
+      },
+      "ChangelogEntryView": {
+        "required": [
+          "id",
+          "kind",
+          "subjectKind",
+          "subject",
+          "fromState",
+          "toState",
+          "reason",
+          "actor",
+          "evidenceIds",
+          "beforeRef",
+          "afterRef",
+          "paperDays",
+          "revertsId",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row id.",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "transition, designation or revert."
+          },
+          "subjectKind": {
+            "type": "string",
+            "description": "cell or model."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The cell key, or model:ID."
+          },
+          "fromState": {
+            "type": "string",
+            "description": "The state or role before."
+          },
+          "toState": {
+            "type": "string",
+            "description": "The state or role after."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who or what."
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Evidence ids."
+          },
+          "beforeRef": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Reference to the thing before, or null."
+          },
+          "afterRef": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Reference to the thing after, or null."
+          },
+          "paperDays": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Paper days stated, or null.",
+            "format": "int32"
+          },
+          "revertsId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The reverted row, or null.",
+            "format": "int64"
+          },
+          "at": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "A changelog row as the API shows it (P6-08): what changed, by whom, why, before and after, and the evidence. A revert has long? ChangelogEntryView.RevertsId."
       },
       "CloneStrategyRequest": {
         "type": "object",

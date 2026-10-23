@@ -451,5 +451,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();
         services.AddScoped<IQueryHandler<ScoreWithModelQuery, Result<ModelScoreView>>, ScoreWithModelHandler>(); // for experiments and P7 (advisory)
+        services.AddScoped<ICommandHandler<RecordCellTransitionCommand, ChangelogOutcome>, RecordCellTransitionHandler>(); // a cell move of doc 09 section 7, as a changelog row (P6-08, ADR 0073)
+        services.AddScoped<ICommandHandler<RevertChangelogCommand, ChangelogOutcome>, RevertChangelogHandler>(); // a revert is a new row (P6-08)
+        services.AddScoped<IQueryHandler<ListChangelogQuery, Result<IReadOnlyList<ChangelogEntryView>>>, ListChangelogHandler>();
+        services.AddScoped<IQueryHandler<GetChangelogEntryQuery, Result<ChangelogEntryView>>, GetChangelogEntryHandler>();
+        services.AddScoped<IQueryHandler<GetCellStateQuery, Result<CellStateView>>, GetCellStateHandler>();
     }
 }

@@ -122,6 +122,7 @@ public static class DependencyInjection
         services.AddScoped<ITradeFeatureStore, TradeFeatureStore>(); // the decision-time features of trades (spec P6-04)
         services.AddScoped<ITrainingSetStore, TrainingSetStore>(); // the training-set records (spec P6-04)
         services.AddOptions<ModelStoreOptions>().Bind(configuration.GetSection(ModelStoreOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddScoped<ILearningChangelog, LearningChangelog>(); // the insert-only learning changelog (spec P6-08)
         services.AddScoped<IModelRegistry, ModelRegistry>(); // the registered models and their designations (spec P6-07)
         services.AddSingleton<IModelFiles, ModelFiles>(); // the model files under data/models, named by hash (spec P6-07)
         services.AddSingleton<IModelTrainer, MlNetModelTrainer>(); // the ML.NET adapter behind its port (ADR 0070): stateless
