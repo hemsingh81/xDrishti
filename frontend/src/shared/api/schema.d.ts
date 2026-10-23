@@ -2486,6 +2486,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/learning/overview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the learning engine holds: rows in the newest cell snapshot and its date; and for models, experiments, hypotheses, lessons and the changelog the count of the newest 200 (flagged when there may be more), the split by role, outcome or state, and the newest record with its stored verdict. Nothing is computed or scored; the limits (about 2.1 years, few folds, modelled fills) are listed. Empty before the first record. */
+    get: operations['GetLearningOverview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/cells': {
     parameters: {
       query?: never;
@@ -6029,6 +6046,31 @@ export interface components {
       dhan: null | components['schemas']['DataJobView'];
       aggregate: null | components['schemas']['DataJobView'];
     };
+    /** @description What the Learning screen needs first (P6-18, ADR 0080): counts and the newest verdicts of the stored learning records. Read from the stores; no statistic is computed and no model is scored. */
+    LearningOverviewView: {
+      /**
+       * Format: int32
+       * @description Rows in the newest cell-statistics snapshot (all windows).
+       */
+      cellRows: number;
+      /**
+       * Format: date
+       * @description The as-of date of that snapshot, or null before the first computation.
+       */
+      cellsAsOf: null | string;
+      /** @description The registered models. */
+      models: components['schemas']['OverviewSection'];
+      /** @description The recorded experiments. */
+      experiments: components['schemas']['OverviewSection'];
+      /** @description The hypotheses (newest view of each). */
+      hypotheses: components['schemas']['OverviewSection'];
+      /** @description The lessons (newest view of each). */
+      lessons: components['schemas']['OverviewSection'];
+      /** @description The changelog rows. */
+      changelog: components['schemas']['OverviewSection'];
+      /** @description What the numbers are not. */
+      limits: string[];
+    };
     /** @description The entries of one class in the period and their signed total. */
     LedgerClassTotal: {
       class: string;
@@ -6457,6 +6499,49 @@ export interface components {
       before: null | number;
       /** Format: int64 */
       after: null | number;
+    };
+    /** @description A name and how many records carry it (P6-18). */
+    OverviewCount: {
+      /** @description A role, outcome or state. */
+      name: string;
+      /**
+       * Format: int32
+       * @description How many of the newest records have it.
+       */
+      count: number;
+    };
+    /** @description The newest record of one kind, as the overview shows it (P6-18): what it is, the verdict that was stored and one line of the stored numbers. Nothing here is computed. */
+    OverviewHeadline: {
+      /**
+       * Format: int64
+       * @description The record id.
+       */
+      id: number;
+      /** @description Role of a model, knob of an experiment, kind of a changelog row. */
+      label: string;
+      /** @description The stored verdict, outcome or state after. */
+      verdict: string;
+      /** @description One line of the stored numbers. */
+      detail: string;
+      /**
+       * Format: date-time
+       * @description When it was recorded.
+       */
+      at: string;
+    };
+    /** @description One kind of learning record in the overview (P6-18): how many were counted, the split by role, outcome or state, and the newest record. */
+    OverviewSection: {
+      /**
+       * Format: int32
+       * @description Records counted: at most the newest int GetLearningOverviewHandler.CountLimit.
+       */
+      counted: number;
+      /** @description True when there may be more records than were counted. */
+      truncated: boolean;
+      /** @description The count by role (models), outcome (experiments) or state (hypotheses, lessons); only names that occur. */
+      split: components['schemas']['OverviewCount'][];
+      newest: null | components['schemas']['OverviewHeadline'];
+      champion: null | components['schemas']['OverviewHeadline'];
     };
     /** @description The sweep of one parameter and its judgement (`stable`, `fragile`, `no_base_edge`, `inconclusive`). */
     ParameterSensitivityView: {
@@ -14473,6 +14558,26 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLearningOverview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LearningOverviewView'];
         };
       };
     };

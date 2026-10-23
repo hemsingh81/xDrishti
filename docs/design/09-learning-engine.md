@@ -203,6 +203,8 @@ Built (P6-16, [ADR 0078](../adr/0078-lessons-a-finding-a-linked-fix-and-a-result
 | **Tweak & re-run** | Change a learning knob and replay (§12) |
 | **Autonomy** | How much the system decides alone; change log with revert (§13) |
 
+Built (P6-18, [ADR 0080](../adr/0080-the-phase-check-exit-criteria-from-stored-records-and-never-met-on-thin-data.md)): the first read for this screen is `GET /api/learning/overview` (counts and newest stored verdicts, nothing computed), and the phase's exit criteria are judged by `xd learn phase-check` from stored records as MET, NOT MET or NOT EVALUABLE with the limits printed; MET needs the champion record, 6 folds and a replay time, so on 2.1 years most answers are NOT EVALUABLE. The Journey view and the screen itself are P8.
+
 The frozen-model line is what makes progress honest: improvement is measured against "what would have happened
 if the system had stopped learning", on the same days and instruments.
 

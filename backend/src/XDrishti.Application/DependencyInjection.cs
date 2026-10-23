@@ -451,6 +451,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<EvaluateMetaPolicyQuery, Result<MetaPolicyReport>>, EvaluateMetaPolicyHandler>(); // meta-labelling policy of the champion, evidence only (P6-13, ADR 0075)
         services.AddScoped<ICommandHandler<TrainModelCommand, TrainModelOutcome>, TrainModelHandler>(); // train, validate and register a model (P6-07, ADR 0070)
         services.AddScoped<ICommandHandler<DesignateModelCommand, DesignationOutcome>, DesignateModelHandler>(); // champion / challenger / retired, appended (P6-07)
+        services.AddScoped<IQueryHandler<GetLearningOverviewQuery, Result<LearningOverviewView>>, GetLearningOverviewHandler>(); // counts and newest stored verdicts for the Learning screen (P6-18, ADR 0080)
+        services.AddScoped<IQueryHandler<EvaluatePhaseCheckQuery, Result<PhaseCheckView>>, EvaluatePhaseCheckHandler>(); // the P6 exit criteria from stored records (P6-18, ADR 0080)
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();
         services.AddScoped<IQueryHandler<ScoreWithModelQuery, Result<ModelScoreView>>, ScoreWithModelHandler>(); // for experiments and P7 (advisory)
