@@ -10,7 +10,8 @@
 3. **Unknown input = unavailable = blocks** (lesson of the P7-01 reviews). No book, nothing taken.
 4. **Defaults:** the design's table; per-trade risk 1 %, `max_plan_items` 5, `reserve_size` 3 are assumptions (home: Q14).
 5. **Trigger mode** checks the other limits as if all listed tickets trigger (safe side).
-6. No verb: it would need sector, risk and correlation data nothing stores yet.
+6. **Correlation in the direction of the bets** (effective = corr x side x side, hedges pass, negative-correlated opposite sides block); ticket risk must be positive, an open position may have 0; trigger mode does not check `MaxEntriesPerDay`, plan mode ignores entries already opened today (shortcuts); names compare ignoring case.
+7. No verb: it would need sector, risk and correlation data nothing stores yet.
 
 ## Goal
 From the ranked candidates, the open book and the limits, say what goes on the plan, what waits in reserve and what is rejected, each with the code and numbers.
@@ -30,7 +31,7 @@ From the ranked candidates, the open book and the limits, say what goes on the p
 No API, data, UI, CLI or log ids.
 
 ## Test plan
-`PortfolioFillerTests` (31 facts) as above. Architecture tests unchanged.
+`PortfolioFillerTests` (40 tests) as above. Architecture tests unchanged.
 
 ## Open questions
 None blocking. The assumed numbers (assumption 4) are the owner's to confirm.

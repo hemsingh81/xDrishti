@@ -5,6 +5,7 @@ namespace XDrishti.Domain.Selection;
 /// <summary>
 /// Greedy portfolio fill (doc 10 section 5, spec P7-02, ADR 0084). Walks the ranked candidates best first; a candidate is taken only when every constraint still holds with it added to the open book and the picks so far, so each pick re-checks all constraints.
 /// A constraint whose input is not known is <see cref="FilterOutcome.Unavailable"/> and blocks like a fail. Pure and deterministic: the walk order is the rank, then symbol, side and cell key (ordinal), whatever order the input arrives in. Inputs are never changed.
+/// Shortcuts: in trigger mode <c>MaxEntriesPerDay</c> is not checked (it applies when tickets trigger); in plan mode entries already opened today are not known and not counted. A reserve may share a symbol with a primary (its stand-in); nothing links them, so a promotion needs a fresh check.
 /// Reserve: not taken, but admissible on its own against the open book (so a pick that falls away can be replaced, after a fresh check); the first <c>ReserveSize</c> in rank order. Everything else not taken is rejected.
 /// </summary>
 public static class PortfolioFiller
@@ -39,7 +40,7 @@ public static class PortfolioFiller
             return new FillResult([], [], [.. ordered.Select(c => new FillDecision(c, FillStatus.Rejected, unknown))]);
         }
 
-        var bookHoldings = book.Select(b => new Holding(b.Symbol, b.Side, b.Style, Finite(b.RiskPct), b.Sector, b.Baskets)).ToList();
+        var bookHoldings = book.Select(b => new Holding(b.Symbol, b.Side, b.Style, FiniteOrZero(b.RiskPct), b.Sector, b.Baskets)).ToList();
         var held = new List<Holding>(bookHoldings);
         var primary = new List<FillDecision>();
         var notTaken = new List<(FillCandidate Candidate, IReadOnlyList<FillCheck> Checks)>();
@@ -83,7 +84,12 @@ public static class PortfolioFiller
 
     private static Holding ToHolding(FillCandidate c) => new(c.Symbol, c.Side, c.Style, Finite(c.RiskPct), c.Sector, c.Baskets);
 
+    // A ticket must carry a positive risk (zero would be a free trade nobody can size). An open position may carry 0 (breakeven or locked stop): that is a known figure, not a gap.
     private static double? Finite(double? v) => v is { } x && double.IsFinite(x) && x > 0 ? x : null;
+
+    private static double? FiniteOrZero(double? v) => v is { } x && double.IsFinite(x) && x >= 0 ? x : null;
+
+    private static int Sign(string side) => side switch { "BUY" => 1, "SELL" => -1, _ => 0 };
 
     private static List<FillCheck> Evaluate(FillCandidate c, List<Holding> held, int picked, CorrelationMatrix? correlations, FillConstraints k)
     {
@@ -119,6 +125,9 @@ public static class PortfolioFiller
         return checks;
     }
 
+    // Symbols, sectors and baskets compare ignoring case and surrounding blanks ("Banks" and "banks" are one sector).
+    private static bool Same(string? a, string? b) => string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
+
     private static string N(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static FillCheck Limit(string code, int value, int limit, string what) =>
@@ -133,7 +142,7 @@ public static class PortfolioFiller
             return Unavailable(FillCodes.OnePerSymbol, "the candidate has no instrument yet");
         }
 
-        var clash = held.Count(h => string.Equals(h.Symbol, c.Symbol, StringComparison.Ordinal));
+        var clash = held.Count(h => Same(h.Symbol, c.Symbol));
         return new FillCheck(FillCodes.OnePerSymbol, clash == 0 ? FilterOutcome.Pass : FilterOutcome.Fail, clash + 1, 1, clash == 0 ? c.Symbol + " is not yet in the book or the plan" : c.Symbol + " is already in the book or the plan");
     }
 
@@ -161,9 +170,9 @@ public static class PortfolioFiller
 
     private static FillCheck Net(FillCandidate c, double? risk, List<Holding> held, FillConstraints k)
     {
-        if (risk is not { } r || held.Any(h => h.Risk is null) || (c.Side != "BUY" && c.Side != "SELL"))
+        if (risk is not { } r || held.Any(h => h.Risk is null) || Sign(c.Side) == 0 || held.Any(h => Sign(h.Side) == 0))
         {
-            return Unavailable(FillCodes.NetExposure, "a risk figure or the side is not known");
+            return Unavailable(FillCodes.NetExposure, "a risk figure or a side is not known");
         }
 
         var net = held.Sum(h => h.Side == "SELL" ? -h.Risk!.Value : h.Risk!.Value) + (c.Side == "SELL" ? -r : r);
@@ -180,7 +189,7 @@ public static class PortfolioFiller
             return Unavailable(FillCodes.Sector, "the sector of " + c.Symbol + " is not known");
         }
 
-        var count = held.Count(h => string.Equals(h.Sector, c.Sector, StringComparison.Ordinal)) + 1;
+        var count = held.Count(h => Same(h.Sector, c.Sector)) + 1;
         var check = Limit(FillCodes.Sector, count, k.MaxPerSector, "positions in " + c.Sector);
         return check.Outcome == FilterOutcome.Pass && held.Any(h => string.IsNullOrWhiteSpace(h.Sector))
             ? Unavailable(FillCodes.Sector, "the sector of an open position is not known")
@@ -213,7 +222,7 @@ public static class PortfolioFiller
         FillCheck? worst = null;
         foreach (var (basket, max) in k.BasketLimits.OrderBy(b => b.Key, StringComparer.Ordinal))
         {
-            if (!c.Baskets.Contains(basket, StringComparer.Ordinal))
+            if (!c.Baskets.Contains(basket, StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -223,7 +232,7 @@ public static class PortfolioFiller
                 return Unavailable(FillCodes.Basket, "the baskets of an open position are not known");
             }
 
-            var count = held.Count(h => h.Baskets!.Contains(basket, StringComparer.Ordinal)) + 1;
+            var count = held.Count(h => h.Baskets!.Contains(basket, StringComparer.OrdinalIgnoreCase)) + 1;
             var check = Limit(FillCodes.Basket, count, max, "positions from " + basket);
             if (check.Outcome != FilterOutcome.Pass)
             {
@@ -236,9 +245,10 @@ public static class PortfolioFiller
         return worst ?? new FillCheck(FillCodes.Basket, FilterOutcome.Pass, null, null, "in no limited basket");
     }
 
+    // The correlation that matters is the one of the two bets: corr * side(candidate) * side(held). Opposite sides of positively correlated names are a hedge (effective negative); opposite sides of negatively correlated names are one concentrated bet (effective positive).
     private static FillCheck Correlation(FillCandidate c, List<Holding> held, CorrelationMatrix? matrix, FillConstraints k)
     {
-        var others = held.Where(h => !string.Equals(h.Symbol, c.Symbol, StringComparison.Ordinal)).Select(h => h.Symbol).Distinct(StringComparer.Ordinal).ToList();
+        var others = held.Where(h => !Same(h.Symbol, c.Symbol)).ToList();
         if (others.Count == 0)
         {
             return new FillCheck(FillCodes.Correlation, FilterOutcome.Pass, null, k.MaxPairCorrelation, "nothing to correlate with");
@@ -249,25 +259,29 @@ public static class PortfolioFiller
         string? at = null;
         foreach (var other in others)
         {
-            var value = matrix?.Get(c.Symbol, other);
-            if (value is null)
+            var raw = matrix?.Get(c.Symbol, other.Symbol);
+            var sides = Sign(c.Side) * Sign(other.Side);
+            if (raw is null || sides == 0)
             {
-                missing ??= other;
+                missing ??= other.Symbol;
+                continue;
             }
-            else if (highest is null || value > highest)
+
+            var value = raw.Value * sides;
+            if (highest is null || value > highest)
             {
                 highest = value;
-                at = other;
+                at = other.Symbol;
             }
         }
 
         if (highest is { } h && Math.Round(h, 9) > k.MaxPairCorrelation)
         {
-            return new FillCheck(FillCodes.Correlation, FilterOutcome.Fail, h, k.MaxPairCorrelation, "correlation with " + at + " is " + N(h) + ", limit " + N(k.MaxPairCorrelation));
+            return new FillCheck(FillCodes.Correlation, FilterOutcome.Fail, h, k.MaxPairCorrelation, "same-direction correlation with " + at + " is " + N(h) + ", limit " + N(k.MaxPairCorrelation));
         }
 
         return missing is not null
-            ? new FillCheck(FillCodes.Correlation, FilterOutcome.Unavailable, highest, k.MaxPairCorrelation, "correlation of " + c.Symbol + " with " + missing + " is not known")
-            : new FillCheck(FillCodes.Correlation, FilterOutcome.Pass, highest, k.MaxPairCorrelation, "highest correlation " + N(highest!.Value) + ", limit " + N(k.MaxPairCorrelation));
+            ? new FillCheck(FillCodes.Correlation, FilterOutcome.Unavailable, highest, k.MaxPairCorrelation, "correlation of " + c.Symbol + " with " + missing + " (or a side) is not known")
+            : new FillCheck(FillCodes.Correlation, FilterOutcome.Pass, highest, k.MaxPairCorrelation, "highest same-direction correlation " + N(highest!.Value) + ", limit " + N(k.MaxPairCorrelation));
     }
 }
