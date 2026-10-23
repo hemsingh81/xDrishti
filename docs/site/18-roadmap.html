@@ -831,11 +831,11 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P7-07</td>
-<td><strong>Per-account allocation and sizing</strong> over Trading-role accounts (replicate or distribute, cross-account limits). <strong>SAFETY for the wiring to real accounts (owner Q2).</strong></td>
+<td><strong>Per-account allocation and sizing</strong> over Trading-role accounts. <strong>Built 2026-10-23 (<a href="../adr/0089-per-account-allocation-a-pure-split-of-the-ticket-by-each-paper-accounts-own-limits-and-unavailable-allocating-nothing.html">ADR 0089</a>)</strong>: pure split of a ticket&#39;s quantity across <strong>paper-mode</strong> Trading accounts by each account&#39;s own risk, capital, funds and headroom limits and lots; live or non-Trading accounts excluded with a reason, unavailable inputs allocate nothing; read-only <code>xd plan allocate</code>; replicate/distribute and cross-account caps not built; wiring is P7-09.</td>
 <td>P7</td>
 <td>3 d</td>
-<td>Draft (plan)</td>
-<td><a href="../specs/P7-00-selection-accounts-and-nightly-plan.html">plan</a></td>
+<td>Built 2026-10-23 (branch feature/p7-07-allocation)</td>
+<td><a href="../specs/P7-07-per-account-allocation.html">spec</a>, <a href="../adr/0089-per-account-allocation-a-pure-split-of-the-ticket-by-each-paper-accounts-own-limits-and-unavailable-allocating-nothing.html">ADR 0089</a></td>
 <td>Role and profile respected; total risk within limit</td>
 </tr>
 <tr>
@@ -1268,7 +1268,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 16:03</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 16:17</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
