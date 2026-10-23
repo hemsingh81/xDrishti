@@ -446,6 +446,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<AnalyzeLossTagsQuery, Result<LossTagReport>>, AnalyzeLossTagsHandler>(); // automatic loss tags, read-only (P6-15, ADR 0071)
         services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
         services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
+        services.AddScoped<IQueryHandler<EvaluateMetaPolicyQuery, Result<MetaPolicyReport>>, EvaluateMetaPolicyHandler>(); // meta-labelling policy of the champion, evidence only (P6-13, ADR 0075)
         services.AddScoped<ICommandHandler<TrainModelCommand, TrainModelOutcome>, TrainModelHandler>(); // train, validate and register a model (P6-07, ADR 0070)
         services.AddScoped<ICommandHandler<DesignateModelCommand, DesignationOutcome>, DesignateModelHandler>(); // champion / challenger / retired, appended (P6-07)
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();

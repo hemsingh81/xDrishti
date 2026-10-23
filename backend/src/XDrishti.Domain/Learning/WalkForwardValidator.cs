@@ -121,7 +121,7 @@ public static class WalkForwardValidator
         return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes, noted, fits)));
     }
 
-    private static (ValidationFold Fold, ValidationRow[] Train) Cut(int index, DateOnly start, DateOnly end, ValidationRow[] before, ValidationRow[] test, ValidationOptions options)
+    internal static (ValidationFold Fold, ValidationRow[] Train) Cut(int index, DateOnly start, DateOnly end, ValidationRow[] before, ValidationRow[] test, ValidationOptions options)
     {
         if (test.Length == 0)
         {
@@ -138,7 +138,7 @@ public static class WalkForwardValidator
         return (new ValidationFold(index, start, end, train.Length, test.Length, purged, embargoed.Length, reason), train);
     }
 
-    private static Error? CheckRows(IReadOnlyList<ValidationRow> rows, ValidationOptions options)
+    internal static Error? CheckRows(IReadOnlyList<ValidationRow> rows, ValidationOptions options)
     {
         if (rows.Count == 0)
         {
