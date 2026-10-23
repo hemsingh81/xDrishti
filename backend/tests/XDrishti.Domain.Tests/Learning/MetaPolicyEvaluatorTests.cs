@@ -14,9 +14,9 @@ public sealed class MetaPolicyEvaluatorTests
 
     private static long Epoch(DateOnly d) => new DateTimeOffset(d.Year, d.Month, d.Day, 4, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
 
-    private static ValidationRow Make(int i, double score, double r, string cell = "S|15m|BUY|intraday|X|*")
+    private static ValidationRow Make(int i, double score, double r, string cell = "S|15m|BUY|intraday|X|*", int step = 3)
     {
-        var date = Start.AddDays(i * 3);
+        var date = Start.AddDays(i * step);
         return new ValidationRow("k" + i.ToString("D4", CultureInfo.InvariantCulture), r > 0 ? 1 : 0, r, date, Epoch(date), Epoch(date) + 3600, cell, [score]);
     }
 
@@ -135,23 +135,102 @@ public sealed class MetaPolicyEvaluatorTests
         text.ShouldContain("limit:");
     }
 
-    [Fact]
-    public void A_folds_threshold_does_not_depend_on_its_own_or_later_labels_scores_or_R()
+    /// <summary>Captures the rows each fit is given, in fold order.</summary>
+    private sealed class Recording : IScorerFactory
     {
-        var plain = Run(Separable(400));
-        var cut = Start.AddDays(260 * 3);
-        var changed = Run(Separable(400, i => i >= 260));
+        public List<ValidationRow[]> Fits { get; } = [];
 
-        changed.Folds.Count.ShouldBe(plain.Folds.Count);
-        var affected = plain.Folds.Where(f => f.Fold.TestStart >= cut.AddDays(-80)).Select(f => f.Fold.Index).ToList();
-        var first = plain.Folds.First(f => f.Fold.TestEnd >= cut).Fold.Index;
-        first.ShouldBeGreaterThan(1);
-        foreach (var f in plain.Folds.Where(f => f.Fold.Index <= first))
+        public string Name => "rec";
+
+        public IRowScorer Fit(IReadOnlyList<ValidationRow> train)
         {
-            changed.Folds[f.Fold.Index - 1].Thresholds.ShouldBe(f.Thresholds);
+            Fits.Add([.. train]);
+            return new Read();
         }
 
-        affected.ShouldNotBeEmpty();
+        private sealed class Read : IRowScorer
+        {
+            public double Score(ValidationRow row) => row.Features[0];
+        }
+    }
+
+    private static (MetaPolicyReport Report, Recording Recorder) RunRecorded(IReadOnlyList<ValidationRow> rows)
+    {
+        var recorder = new Recording();
+        return (MetaPolicyEvaluator.Evaluate(rows, recorder, Policy, Folds).Value, recorder);
+    }
+
+    private static long FirstDecision(IReadOnlyList<ValidationRow> rows, ValidationFold fold) =>
+        rows.Where(r => r.TradeDate >= fold.TestStart && r.TradeDate <= fold.TestEnd).Min(r => r.DecisionEpochSeconds);
+
+    [Fact]
+    public void Every_row_a_fit_sees_is_before_the_embargo_and_resolved_before_the_first_decision_of_the_test_window()
+    {
+        var rows = Separable(400).Select(r => r with { ResolvedEpochSeconds = r.ResolvedEpochSeconds + (86400L * 20) }).ToList();
+
+        var (report, recorder) = RunRecorded(rows);
+
+        recorder.Fits.Count.ShouldBe(report.Folds.Count);
+        for (var f = 0; f < report.Folds.Count; f++)
+        {
+            var fold = report.Folds[f].Fold;
+            var first = FirstDecision(rows, fold);
+            recorder.Fits[f].ShouldNotBeEmpty();
+            recorder.Fits[f].ShouldAllBe(r => r.TradeDate < fold.TestStart.AddDays(-Folds.EmbargoDays) && r.ResolvedEpochSeconds + HoldOut.BarSeconds < first);
+        }
+
+        report.Folds.ShouldContain(f => f.Fold.Purged > 0);
+    }
+
+    [Fact]
+    public void A_train_row_on_the_embargo_date_is_excluded_and_the_day_before_it_is_kept()
+    {
+        var rows = Enumerable.Range(0, 480).Select(i => Make(i, i % 5 < 3 ? 0.8 : 0.2, i % 5 < 3 ? 1.5 : -1, step: 1)).ToList();
+
+        var (report, recorder) = RunRecorded(rows);
+
+        for (var f = 0; f < report.Folds.Count; f++)
+        {
+            var edge = report.Folds[f].Fold.TestStart.AddDays(-Folds.EmbargoDays);
+            rows.ShouldContain(r => r.TradeDate == edge);
+            recorder.Fits[f].ShouldNotContain(r => r.TradeDate >= edge);
+            recorder.Fits[f].ShouldContain(r => r.TradeDate == edge.AddDays(-1));
+        }
+    }
+
+    [Fact]
+    public void Changing_a_folds_own_and_later_labels_leaves_its_train_rows_and_threshold_alone_but_changes_its_totals_and_later_thresholds()
+    {
+        var (plain, plainFits) = RunRecorded(Separable(400));
+        var cut = Start.AddDays(260 * 3);
+        var (changed, changedFits) = RunRecorded(Separable(400, i => i >= 260));
+
+        changed.Folds.Count.ShouldBe(plain.Folds.Count);
+        var first = plain.Folds.First(f => f.Fold.TestEnd >= cut).Fold.Index;
+        first.ShouldBeGreaterThan(1);
+        var affectedFolds = 0;
+        for (var i = 0; i < plain.Folds.Count; i++)
+        {
+            var p = plain.Folds[i];
+            var c = changed.Folds[i];
+            if (p.Fold.Index <= first)
+            {
+                c.Thresholds.ShouldBe(p.Thresholds);
+                changedFits.Fits[i].Select(r => (r.Key, r.Label, r.R)).ShouldBe(plainFits.Fits[i].Select(r => (r.Key, r.Label, r.R)));
+            }
+
+            if (p.Fold.Index == first)
+            {
+                c.Totals.ShouldNotBe(p.Totals);
+            }
+
+            if (p.Fold.Index > first && p.Evaluable && !c.Thresholds.SequenceEqual(p.Thresholds))
+            {
+                affectedFolds++;
+            }
+        }
+
+        affectedFolds.ShouldBeGreaterThan(0);
     }
 
     [Fact]
@@ -164,6 +243,100 @@ public sealed class MetaPolicyEvaluatorTests
         var report = Run(longHorizon);
 
         report.Folds.Count(f => f.Evaluable).ShouldBeLessThan(plain.Folds.Count(f => f.Evaluable));
+    }
+
+    private static List<ValidationRow> NegativeNoSkill(int count)
+    {
+        var random = new Random(11);
+        return Enumerable.Range(0, count).Select(i => Make(i, random.NextDouble(), i % 5 == 0 ? 1.5 : -1)).ToList();
+    }
+
+    [Fact]
+    public void A_no_skill_score_on_a_losing_book_does_not_help_though_skipping_any_share_raises_R_per_candidate()
+    {
+        var report = Run(NegativeNoSkill(500));
+
+        report.Pooled.BaselinePerCandidate.ShouldBeLessThan(0);
+        report.Pooled.Lift.ShouldBeGreaterThan(Policy.MinLiftR);
+        report.Pooled.ExcessLift.ShouldBeLessThan(Policy.MinLiftR);
+        report.Outcome.ShouldBe(MetaPolicyOutcome.DoesNotHelp);
+    }
+
+    [Fact]
+    public void The_random_skip_lift_is_minus_the_skipped_share_times_the_take_everything_mean()
+    {
+        var t = new MetaPolicyTotals(6, 4, 3, -8);
+
+        t.BaselinePerCandidate.ShouldBe(-0.5, 1e-12);
+        t.RandomLift.ShouldBe(0.2, 1e-12);
+        t.Lift.ShouldBe(0.8, 1e-12);
+        t.ExcessLift.ShouldBe(0.6, 1e-12);
+        t.Skill.ShouldNotBeNull().ShouldBe(2.5, 1e-12);
+    }
+
+    [Fact]
+    public void The_skill_standard_error_uses_the_sample_variance_of_each_side()
+    {
+        var t = MetaPolicyTotals.One(true, 1).Plus(MetaPolicyTotals.One(true, 3)).Plus(MetaPolicyTotals.One(false, -1)).Plus(MetaPolicyTotals.One(false, -3));
+
+        t.SkillStandardError.ShouldNotBeNull().ShouldBe(Math.Sqrt(2), 1e-12);
+        MetaPolicyTotals.One(true, 1).SkillStandardError.ShouldBeNull();
+    }
+
+    [Fact]
+    public void More_trials_widen_the_margins_until_a_real_but_modest_edge_no_longer_passes()
+    {
+        var rows = Separable(400);
+        var knobs = Policy with { MinSkillR = 0.5 };
+
+        Run(rows, knobs).Outcome.ShouldBe(MetaPolicyOutcome.Helps);
+        var many = Run(rows, knobs with { Trials = 1 << 20 });
+
+        many.Outcome.ShouldBe(MetaPolicyOutcome.DoesNotHelp);
+        many.ToText().ShouldContain("trials 1048576");
+        many.Limits.ShouldContain(l => l.Contains("more trials", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_difference_within_the_standard_error_bound_does_not_help_even_when_it_clears_the_margins()
+    {
+        var random = new Random(5);
+        var rows = Enumerable.Range(0, 800).Select(i =>
+        {
+            var high = random.NextDouble() < 0.65;
+            var win = random.NextDouble() < (high ? 0.65 : 0.35);
+            return Make(i, high ? 0.8 : 0.2, win ? 1.5 : -1);
+        }).ToList();
+
+        var loose = Folds with { FoldsBetterShare = 0.01 };
+
+        Run(rows, v: loose).Outcome.ShouldBe(MetaPolicyOutcome.Helps, Run(rows, v: loose).ToText());
+        var strict = Run(rows, Policy with { SignificanceZ = 10 }, loose);
+
+        strict.Outcome.ShouldBe(MetaPolicyOutcome.DoesNotHelp);
+        strict.Reasons.ShouldContain(r => r.Contains("standard error", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_fold_where_every_group_takes_everything_is_not_evaluable_and_says_why()
+    {
+        var rows = Enumerable.Range(0, 700).Select(i => Make(i, i % 5 < 3 ? 0.8 : 0.2, i % 5 < 3 ? 1.5 : -1, string.Create(CultureInfo.InvariantCulture, $"S|15m|S{i % 40}|intraday|X|*"), step: 1)).ToList();
+
+        var report = Run(rows, Policy with { Split = MetaSplit.Side });
+
+        report.Folds.ShouldAllBe(f => !f.Evaluable);
+        report.Folds.Skip(1).ShouldAllBe(f => f.Reason!.Contains("takes everything", StringComparison.Ordinal));
+        report.Outcome.ShouldBe(MetaPolicyOutcome.NotEnoughEvidence);
+        report.ToText().ShouldContain("nothing was tested");
+    }
+
+    [Fact]
+    public void A_cell_key_that_cannot_be_read_fails_with_a_code_when_a_split_needs_it_and_not_otherwise()
+    {
+        var rows = Separable(400).Select((r, i) => i == 5 ? r with { CellKey = "garbage" } : r).ToList();
+
+        MetaPolicyEvaluator.Evaluate(rows, new FeatureScorer(), Policy with { Split = MetaSplit.Side }, Folds).Error.Code.ShouldBe("policy.cell_key");
+        MetaPolicyEvaluator.Evaluate(rows, new FeatureScorer(), Policy, Folds).IsSuccess.ShouldBeTrue();
     }
 
     [Fact]

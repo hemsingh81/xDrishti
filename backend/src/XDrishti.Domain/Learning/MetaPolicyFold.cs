@@ -5,4 +5,5 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Evaluable">Enough earlier scores to choose a threshold.</param>
 /// <param name="Thresholds">The thresholds used (empty when not evaluable).</param>
 /// <param name="Totals">Kept and skipped R in the fold; empty when not evaluable.</param>
-public sealed record MetaPolicyFold(ValidationFold Fold, bool Evaluable, IReadOnlyList<MetaPolicyThreshold> Thresholds, MetaPolicyTotals Totals);
+/// <param name="Reason">Why the fold is not evaluable; null when it is.</param>
+public sealed record MetaPolicyFold(ValidationFold Fold, bool Evaluable, IReadOnlyList<MetaPolicyThreshold> Thresholds, MetaPolicyTotals Totals, string? Reason = null);

@@ -4,11 +4,14 @@ namespace XDrishti.Domain.Learning;
 /// <param name="MinKeptShare">A threshold must keep at least this share of the candidates (doc 09 section 14: more than half removed is flagged).</param>
 /// <param name="ThresholdStep">The grid of thresholds: 0, step, 2 x step ... below 1.</param>
 /// <param name="MinThresholdRows">Earlier out-of-fold scores needed to choose a threshold (per group).</param>
-/// <param name="MinLiftR">The policy must raise net R per candidate by more than this (R) in a fold and pooled.</param>
+/// <param name="MinLiftR">The policy must raise net R per candidate by more than this (R), and by more than a random skip of the same share would, in a fold and pooled (times the multiple-testing factor).</param>
 /// <param name="MinEvaluableFolds">Fewer evaluable folds than this leave the answer at not enough evidence.</param>
 /// <param name="LastTrades">The recent evaluated trades on which kept and skipped are compared (doc 09 section 14: the last 100).</param>
 /// <param name="MinSideTrades">The last-trades check needs this many on both sides.</param>
 /// <param name="Split">How the threshold is split.</param>
+/// <param name="MinSkillR">The kept trades' mean R must exceed the skipped trades' by more than this (R) in a fold and pooled (times the multiple-testing factor).</param>
+/// <param name="SignificanceZ">The pooled kept-minus-skipped difference must exceed this many standard errors (times the multiple-testing factor).</param>
+/// <param name="Trials">How many models, splits and settings have been looked at; the margins widen with <c>MultipleTesting.Factor</c>. Re-running with other splits or knobs counts as more trials.</param>
 public sealed record MetaPolicyOptions(
     double MinKeptShare = 0.5,
     double ThresholdStep = 0.05,
@@ -17,7 +20,10 @@ public sealed record MetaPolicyOptions(
     int MinEvaluableFolds = 2,
     int LastTrades = 100,
     int MinSideTrades = 5,
-    MetaSplit Split = MetaSplit.None)
+    MetaSplit Split = MetaSplit.None,
+    double MinSkillR = 0.1,
+    double SignificanceZ = 1.645,
+    int Trials = 1)
 {
     /// <summary>The problems of the values, empty when they are usable.</summary>
     public IReadOnlyList<string> Problems()
@@ -51,6 +57,21 @@ public sealed record MetaPolicyOptions(
         if (LastTrades is < 2 or > 100000 || MinSideTrades is < 1 or > 100000)
         {
             problems.Add("last_trades must be 2 to 100000 and min_side_trades 1 to 100000");
+        }
+
+        if (!double.IsFinite(MinSkillR) || MinSkillR is < 0 or > 10)
+        {
+            problems.Add("min_skill_r must be 0 to 10");
+        }
+
+        if (!double.IsFinite(SignificanceZ) || SignificanceZ is < 0 or > 10)
+        {
+            problems.Add("significance_z must be 0 to 10");
+        }
+
+        if (Trials < 1)
+        {
+            problems.Add("trials must be at least 1");
         }
 
         if (!Enum.IsDefined(Split))

@@ -41,7 +41,7 @@ public static class WalkForwardValidator
         var ordered = rows.OrderBy(r => r.TradeDate).ThenBy(r => r.DecisionEpochSeconds).ThenBy(r => r.Key, StringComparer.Ordinal).ToArray();
         var from = ordered[0].TradeDate;
         var to = ordered[^1].TradeDate;
-        var (windows, dropped) = ExitSelector.Windows(from, to, new SelectionOptions(options.MinTrainMonths, options.TestMonths));
+        var (cuts, dropped) = Cuts(ordered, options);
 
         var folds = new List<ValidationFold>();
         var results = new List<FoldResult>();
@@ -52,17 +52,15 @@ public static class WalkForwardValidator
         var noted = 0;
         var fits = 0;
         var comparisons = candidates.Select(_ => new List<BaselineComparison>()).ToArray();
-        for (var i = 0; i < windows.Count; i++)
+        foreach (var fold in cuts)
         {
-            var (start, end) = windows[i];
-            var test = ordered.Where(r => r.TradeDate >= start && r.TradeDate <= end).ToArray();
-            var before = ordered.Where(r => r.TradeDate < start).ToArray();
-            var fold = Cut(i + 1, start, end, before, test, options);
             folds.Add(fold.Fold);
             if (!fold.Fold.Usable)
             {
                 continue;
             }
+
+            var test = fold.Test;
 
             var labels = test.Select(r => r.Label).ToArray();
             var metrics = new List<ScorerFoldResult>();
@@ -107,7 +105,7 @@ public static class WalkForwardValidator
         if (results.Count == 0)
         {
             var c = CultureInfo.InvariantCulture;
-            return Fail("validation.no_folds", string.Create(c, $"No usable fold in {from:yyyy-MM-dd} to {to:yyyy-MM-dd}: {windows.Count} windows after {options.MinTrainMonths} months of training, {dropped} short final window dropped, {folds.Count(f => !f.Usable)} skipped."));
+            return Fail("validation.no_folds", string.Create(c, $"No usable fold in {from:yyyy-MM-dd} to {to:yyyy-MM-dd}: {cuts.Count} windows after {options.MinTrainMonths} months of training, {dropped} short final window dropped, {folds.Count(f => !f.Usable)} skipped."));
         }
 
         var pooled = scorers.Select((s, i) => new ScorerFoldResult(s.Name, MetricsCalculator.Compute(pooledScores[i], pooledLabels, options.CalibrationBins))).ToArray();
@@ -121,7 +119,27 @@ public static class WalkForwardValidator
         return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes, noted, fits)));
     }
 
-    internal static (ValidationFold Fold, ValidationRow[] Train) Cut(int index, DateOnly start, DateOnly end, ValidationRow[] before, ValidationRow[] test, ValidationOptions options)
+    /// <summary>One fold of the walk-forward geometry: the fold facts with its train rows (purged and embargoed) and test rows.</summary>
+    internal sealed record FoldCut(ValidationFold Fold, ValidationRow[] Train, ValidationRow[] Test);
+
+    /// <summary>The one place the folds are cut (ADR 0054, 0067): every window of the exit choice with its train and test rows; <c>Fold.Usable</c> says which can be used. <paramref name="ordered"/> is sorted by date, decision time, key and not empty.</summary>
+    internal static (List<FoldCut> Cuts, int Dropped) Cuts(ValidationRow[] ordered, ValidationOptions options)
+    {
+        var (windows, dropped) = ExitSelector.Windows(ordered[0].TradeDate, ordered[^1].TradeDate, new SelectionOptions(options.MinTrainMonths, options.TestMonths));
+        var cuts = new List<FoldCut>(windows.Count);
+        for (var i = 0; i < windows.Count; i++)
+        {
+            var (start, end) = windows[i];
+            var test = ordered.Where(r => r.TradeDate >= start && r.TradeDate <= end).ToArray();
+            var before = ordered.Where(r => r.TradeDate < start).ToArray();
+            var (fold, train) = Cut(i + 1, start, end, before, test, options);
+            cuts.Add(new FoldCut(fold, train, test));
+        }
+
+        return (cuts, dropped);
+    }
+
+    private static (ValidationFold Fold, ValidationRow[] Train) Cut(int index, DateOnly start, DateOnly end, ValidationRow[] before, ValidationRow[] test, ValidationOptions options)
     {
         if (test.Length == 0)
         {

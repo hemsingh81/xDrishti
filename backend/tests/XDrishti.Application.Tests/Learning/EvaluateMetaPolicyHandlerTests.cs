@@ -60,10 +60,13 @@ public sealed class EvaluateMetaPolicyHandlerTests
     private static EvaluateMetaPolicyQuery Query(int holdOutMonths = 0) =>
         new([new CellSource(Key, "intraday", "FIXED_RR")], new CellStatsOptions(PriorStrength: 2, MinTrades: 2), ["cell_n", "rsi14"], new ValidationOptions(MinTrainMonths: 1, TestMonths: 1, MinTrainTrades: 5, MinFoldsForVerdict: 1), new MetaPolicyOptions(MinThresholdRows: 5), holdOutMonths);
 
-    private static StoredModel Champion(string trainingSetId, string parameters = "trainer: fake; validation: x") =>
+    private static string Params(int holdOutMonths = 0, string fold = "min_train_months=1 test_months=1 embargo_days=7 min_train_trades=5") =>
+        $"trainer: fake; validation: {fold} min_folds_for_verdict=1 trials=1; hold_out_months={holdOutMonths}; cell: half_life_days=90";
+
+    private static StoredModel Champion(string trainingSetId, string? parameters = null, int requiredTrials = 1) =>
         new(7, ModelRole.Champion, new ModelToRegister(
             new string('f', 64), new string('e', 64), 3, "FastTree", null, trainingSetId, "tf-1", 3, 30, 10, 40, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), null, ValidationOutcome.Eligible, 6, 4, 4, true, 2, 0.6, 0.2,
-            string.Empty, "report", parameters, [0, 1], [0.4, 0.6], [0.1, 0.1, 0.1], 1, 0, DateTimeOffset.UnixEpoch, "t"), 1);
+            string.Empty, "report", parameters ?? Params(), [0, 1], [0.4, 0.6], [0.1, 0.1, 0.1], 1, 0, DateTimeOffset.UnixEpoch, "t"), requiredTrials);
 
     private async Task<string> TrainingSetId()
     {
@@ -114,7 +117,7 @@ public sealed class EvaluateMetaPolicyHandlerTests
     public async Task A_matching_champion_is_evaluated_after_the_hold_out_is_cut_and_stated()
     {
         Run(60);
-        var champion = Champion(await TrainingSetId());
+        var champion = Champion(await TrainingSetId(), Params(holdOutMonths: 2));
         _registry.ListAsync(ModelRole.Champion, 1, Ct).Returns([champion]);
         _registry.FindAsync(7, Ct).Returns(champion);
 
@@ -124,6 +127,36 @@ public sealed class EvaluateMetaPolicyHandlerTests
         result.Value.Outcome.ShouldNotBe(MetaPolicyOutcome.NoPolicy);
         result.Value.Limits.ShouldContain(l => l.Contains("held out", StringComparison.Ordinal));
         result.Value.Limits.ShouldContain(l => l.Contains("Champion: model 7", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(3, "min_train_months=1 test_months=1 embargo_days=7 min_train_trades=5", "hold-out")]
+    [InlineData(0, "min_train_months=9 test_months=3 embargo_days=7 min_train_trades=30", "fold settings")]
+    public async Task A_champion_made_with_another_hold_out_or_fold_settings_gives_no_policy_with_the_reason(int champHold, string fold, string reason)
+    {
+        Run(60);
+        var champion = Champion(await TrainingSetId(), Params(champHold, fold));
+        _registry.ListAsync(ModelRole.Champion, 1, Ct).Returns([champion]);
+        _registry.FindAsync(7, Ct).Returns(champion);
+
+        var result = await Handler().HandleAsync(Query(), Ct);
+
+        result.Value.Outcome.ShouldBe(MetaPolicyOutcome.NoPolicy);
+        result.Value.Reasons.Single().ShouldContain(reason);
+    }
+
+    [Fact]
+    public async Task The_registry_trial_count_widens_the_margins_when_larger_than_the_request()
+    {
+        Run(60);
+        var champion = Champion(await TrainingSetId(), requiredTrials: 8);
+        _registry.ListAsync(ModelRole.Champion, 1, Ct).Returns([champion]);
+        _registry.FindAsync(7, Ct).Returns(champion);
+
+        var result = await Handler().HandleAsync(Query(), Ct);
+
+        result.Value.Options.Trials.ShouldBe(8);
+        result.Value.Limits.ShouldContain(l => l.Contains("8 trials", StringComparison.Ordinal));
     }
 
     [Fact]

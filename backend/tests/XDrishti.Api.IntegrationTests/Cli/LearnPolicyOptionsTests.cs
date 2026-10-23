@@ -23,11 +23,13 @@ public sealed class LearnPolicyOptionsTests
     [Fact]
     public void The_knobs_can_be_set()
     {
-        var (options, _) = LearnPolicyOptions.Parse(["--run", $"{Key}:swing:X", "--split", "style-side", "--min-kept-share", "0.6", "--min-lift-r", "0.1", "--hold-out-months", "0"]);
+        var (options, _) = LearnPolicyOptions.Parse(["--run", $"{Key}:swing:X", "--split", "style-side", "--min-kept-share", "0.6", "--min-lift-r", "0.1", "--min-skill-r", "0.2", "--trials", "5", "--hold-out-months", "0"]);
 
         options!.Policy.Split.ShouldBe(MetaSplit.StyleSide);
         options.Policy.MinKeptShare.ShouldBe(0.6);
         options.Policy.MinLiftR.ShouldBe(0.1);
+        options.Policy.MinSkillR.ShouldBe(0.2);
+        options.Policy.Trials.ShouldBe(5);
         options.HoldOutMonths.ShouldBe(0);
     }
 
@@ -36,6 +38,8 @@ public sealed class LearnPolicyOptionsTests
     [InlineData("--min-kept-share", "x")]
     [InlineData("--min-lift-r", "NaN")]
     [InlineData("--hold-out-months", "x")]
+    [InlineData("--trials", "x")]
+    [InlineData("--min-skill-r", "NaN")]
     [InlineData("--nope", "1")]
     public void A_bad_line_is_listed_not_guessed(string flag, string value)
     {

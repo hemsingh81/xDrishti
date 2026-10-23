@@ -60,6 +60,13 @@ internal sealed class EvaluateMetaPolicyHandler(
             return NoPolicy(policy, $"The champion (model {champion.Id}) was made with other trainer settings than the running trainer; the policy would judge a different model.");
         }
 
+        var mismatch = ParameterMismatch(champion.Model.Parameters, query, validation);
+        if (mismatch is not null)
+        {
+            return NoPolicy(policy, $"The champion (model {champion.Id}) was made with {mismatch}; the policy would judge a different model.");
+        }
+
+        policy = policy with { Trials = Math.Max(policy.Trials, champion.RequiredTrials) };
         var loaded = await TrainingDataLoader.LoadAsync(runs, features, query.Sources, query.Options, query.Required, cancellationToken);
         if (loaded.IsFailure)
         {
@@ -105,6 +112,19 @@ internal sealed class EvaluateMetaPolicyHandler(
         var outcome = report.Outcome.ToString();
         MetaPolicyLog.Completed(logger, outcome, report.Rows, report.UsedFolds, champion.Id, elapsedMs);
         return Result.Success(report);
+    }
+
+    /// <summary>Compares what the champion was trained with (the stored parameter text of P6-07) with this request: hold-out months and the fold geometry; null when they agree.</summary>
+    private static string? ParameterMismatch(string parameters, EvaluateMetaPolicyQuery query, ValidationOptions v)
+    {
+        var fold = $"min_train_months={v.MinTrainMonths} test_months={v.TestMonths} embargo_days={v.EmbargoDays} min_train_trades={v.MinTrainTrades} ";
+        if (!parameters.Contains(fold, StringComparison.Ordinal))
+        {
+            return $"other fold settings than this request ({fold.Trim()})";
+        }
+
+        var hold = $"; hold_out_months={query.HoldOutMonths}; ";
+        return parameters.Contains(hold, StringComparison.Ordinal) ? null : $"another hold-out than this request ({query.HoldOutMonths} months)";
     }
 
     private Result<MetaPolicyReport> NoPolicy(MetaPolicyOptions policy, string reason)

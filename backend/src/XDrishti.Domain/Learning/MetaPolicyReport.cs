@@ -46,7 +46,7 @@ public sealed record MetaPolicyReport(
         else
         {
             sb.AppendLine(string.Create(c, $"meta-labelling policy: {Outcome}, {Rows} trades, {From:yyyy-MM-dd} to {To:yyyy-MM-dd}, {UsedFolds} usable folds, split {Options.Split}"));
-            sb.AppendLine(string.Create(c, $"knobs: min_kept_share {Options.MinKeptShare:R}, threshold_step {Options.ThresholdStep:R}, min_threshold_rows {Options.MinThresholdRows}, min_lift_r {Options.MinLiftR:R}"));
+            sb.AppendLine(string.Create(c, $"knobs: min_kept_share {Options.MinKeptShare:R}, threshold_step {Options.ThresholdStep:R}, min_threshold_rows {Options.MinThresholdRows}, min_lift_r {Options.MinLiftR:R}, min_skill_r {Options.MinSkillR:R}, significance_z {Options.SignificanceZ:R}, trials {Options.Trials}"));
         }
 
         foreach (var reason in Reasons)
@@ -59,7 +59,7 @@ public sealed record MetaPolicyReport(
             var v = f.Fold;
             if (!f.Evaluable)
             {
-                sb.AppendLine(string.Create(c, $"fold {v.Index} {v.TestStart:yyyy-MM-dd}..{v.TestEnd:yyyy-MM-dd}: not evaluable (too few earlier scores to choose a threshold)"));
+                sb.AppendLine(string.Create(c, $"fold {v.Index} {v.TestStart:yyyy-MM-dd}..{v.TestEnd:yyyy-MM-dd}: not evaluable ({f.Reason ?? "too few earlier scores to choose a threshold"})"));
                 continue;
             }
 
@@ -89,7 +89,7 @@ public sealed record MetaPolicyReport(
     private static string Line(MetaPolicyTotals t)
     {
         var c = CultureInfo.InvariantCulture;
-        return string.Create(c, $"{t.Candidates} candidates, kept {t.Kept} ({t.KeptShare:P0}) mean R {Fmt(t.MeanKept)}, skipped {t.Skipped} mean R {Fmt(t.MeanSkipped)}, take-everything {t.BaselinePerCandidate:F3} R, policy {t.PolicyPerCandidate:F3} R per candidate, lift {t.Lift:F3}");
+        return string.Create(c, $"{t.Candidates} candidates, kept {t.Kept} ({t.KeptShare:P0}) mean R {Fmt(t.MeanKept)}, skipped {t.Skipped} mean R {Fmt(t.MeanSkipped)}, take-everything {t.BaselinePerCandidate:F3} R, policy {t.PolicyPerCandidate:F3} R per candidate, lift {t.Lift:F3}, random-skip lift {t.RandomLift:F3}");
     }
 
     private static string Fmt(double? v) => v is { } x ? x.ToString("F3", CultureInfo.InvariantCulture) : "n/a";

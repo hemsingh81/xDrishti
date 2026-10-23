@@ -10,15 +10,16 @@ internal sealed record LearnPolicyOptions(IReadOnlyList<CellSource> Sources, Met
 {
     public const string Usage = """
         usage:
-          xd learn policy --run RUNKEY:STYLE:EXIT [--run ...] [--split none|style|side|style-side] [--min-kept-share X] [--min-lift-r X] [--hold-out-months N]
+          xd learn policy --run RUNKEY:STYLE:EXIT [--run ...] [--split none|style|side|style-side] [--min-kept-share X] [--min-lift-r X] [--min-skill-r X] [--trials N] [--hold-out-months N]
             needs a champion model (xd learn designate) made from the same runs; judges take or skip by the model's probability against taking everything, out of sample
+            --trials is a floor on the models, splits and settings looked at, which widen the margins (default 1; the champion's registry count is used if larger); a re-run with other knobs or splits is another trial
             --hold-out-months keeps the last N months out of the search (default 6; 0 keeps none)
             prints the evidence; nothing is stored or applied
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
 
-    private static readonly string[] Known = ["--run", "--split", "--min-kept-share", "--min-lift-r", "--hold-out-months"];
+    private static readonly string[] Known = ["--run", "--split", "--min-kept-share", "--min-lift-r", "--min-skill-r", "--trials", "--hold-out-months"];
 
     /// <summary>Parses the arguments after <c>learn policy</c>; the errors are listed when the options are null.</summary>
     public static (LearnPolicyOptions? Options, IReadOnlyList<string> Errors) Parse(IReadOnlyList<string> args)
@@ -85,7 +86,14 @@ internal sealed record LearnPolicyOptions(IReadOnlyList<CellSource> Sources, Met
             }
         }
 
-        var policy = d with { Split = split, MinKeptShare = Number(values, "--min-kept-share", d.MinKeptShare, errors), MinLiftR = Number(values, "--min-lift-r", d.MinLiftR, errors) };
+        var policy = d with { Split = split, MinKeptShare = Number(values, "--min-kept-share", d.MinKeptShare, errors), MinLiftR = Number(values, "--min-lift-r", d.MinLiftR, errors), MinSkillR = Number(values, "--min-skill-r", d.MinSkillR, errors) };
+        var trials = d.Trials;
+        if (values.TryGetValue("--trials", out var tr) && !int.TryParse(tr, NumberStyles.Integer, CultureInfo.InvariantCulture, out trials))
+        {
+            errors.Add("--trials must be a whole number");
+        }
+
+        policy = policy with { Trials = trials };
         var hold = 6;
         if (values.TryGetValue("--hold-out-months", out var h) && !int.TryParse(h, NumberStyles.Integer, CultureInfo.InvariantCulture, out hold))
         {
