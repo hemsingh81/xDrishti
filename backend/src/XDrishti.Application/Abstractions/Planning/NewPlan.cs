@@ -5,6 +5,7 @@ namespace XDrishti.Application.Abstractions.Planning;
 /// <summary>A plan to publish (spec P7-03, ADR 0083). Immutable once stored; a different input is a new version, never an edit.</summary>
 /// <param name="PlanKey">The idempotency key: the same key published twice stores one plan.</param>
 /// <param name="ForDate">The session the plan is for.</param>
+/// <param name="ReviewCutoff">The review cutoff of the session, derived by the pipeline from the session calendar. An owner approval or modification at or after it is refused by the store and the database.</param>
 /// <param name="Version">1 for the first plan of the date, then 2, 3 for a different input.</param>
 /// <param name="InputHash">SHA-256 (hex) of the inputs the plan was built from.</param>
 /// <param name="Basis">What the numbers rest on, for example "cell statistics only".</param>
@@ -12,7 +13,7 @@ namespace XDrishti.Application.Abstractions.Planning;
 /// <param name="CreatedBy">Who or what built it.</param>
 /// <param name="CreatedAt">When.</param>
 /// <param name="Items">The candidates: primary, reserve and rejected.</param>
-public sealed record NewPlan(string PlanKey, DateOnly ForDate, int Version, string InputHash, string Basis, bool Provisional, string CreatedBy, DateTimeOffset CreatedAt, IReadOnlyList<NewPlanItem> Items)
+public sealed record NewPlan(string PlanKey, DateOnly ForDate, DateTimeOffset ReviewCutoff, int Version, string InputHash, string Basis, bool Provisional, string CreatedBy, DateTimeOffset CreatedAt, IReadOnlyList<NewPlanItem> Items)
 {
     /// <summary>The sentence that armed is not an order, stored with the plan.</summary>
     public string Notice { get; init; } = PlanWording.NoOrder;

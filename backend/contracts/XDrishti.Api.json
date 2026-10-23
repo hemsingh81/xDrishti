@@ -20654,6 +20654,7 @@
           "id",
           "planKey",
           "forDate",
+          "reviewCutoff",
           "version",
           "state",
           "nextStates",
@@ -20684,6 +20685,11 @@
             "type": "string",
             "description": "The session.",
             "format": "date"
+          },
+          "reviewCutoff": {
+            "type": "string",
+            "description": "After this an owner approval or modification is refused; undecided tickets lapse.",
+            "format": "date-time"
           },
           "version": {
             "type": "integer",

@@ -15,6 +15,7 @@ internal sealed class PlanRecordConfiguration : IEntityTypeConfiguration<PlanRec
         builder.HasKey(x => x.Id).HasName("pk_plans");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.PlanKey).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.ReviewCutoff).IsRequired();
         builder.Property(x => x.InputHash).HasMaxLength(64).IsRequired();
         builder.Property(x => x.Basis).HasMaxLength(500).IsRequired();
         builder.Property(x => x.Notice).HasMaxLength(500).IsRequired();
@@ -86,6 +87,9 @@ internal sealed class PlanEventRecordConfiguration : IEntityTypeConfiguration<Pl
         {
             t.HasCheckConstraint("ck_plan_events_legal", LegalPairs);
             t.HasCheckConstraint("ck_plan_events_shape", "length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
+
+            // The database enforces owner-only itself: a ticket event into approved, modified or rejected names an approval row, and no other event does (the approval row is `owner` by its own checks).
+            t.HasCheckConstraint("ck_plan_events_approval", "(item_id IS NULL AND approval_id IS NULL) OR (item_id IS NOT NULL AND ((to_state IN ('approved', 'modified', 'rejected')) = (approval_id IS NOT NULL)))");
         });
         builder.HasKey(x => x.Id).HasName("pk_plan_events");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
@@ -98,6 +102,10 @@ internal sealed class PlanEventRecordConfiguration : IEntityTypeConfiguration<Pl
         builder.HasOne<ApprovalRecord>().WithMany().HasForeignKey(x => x.ApprovalId).HasConstraintName("fk_plan_events_approvals_approval_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.PlanId, x.Id }).HasDatabaseName("ix_plan_events_plan_id_id");
         builder.HasIndex(x => new { x.ItemId, x.Id }).HasDatabaseName("ix_plan_events_item_id_id");
+
+        // Continuity: a state is left at most once, so the trail of an item or plan is one chain even without the lock.
+        builder.HasIndex(x => new { x.ItemId, x.FromState }).IsUnique().HasFilter("item_id IS NOT NULL").HasDatabaseName("uq_plan_events_item_from");
+        builder.HasIndex(x => new { x.PlanId, x.FromState }).IsUnique().HasFilter("item_id IS NULL").HasDatabaseName("uq_plan_events_plan_from");
     }
 }
 
@@ -109,7 +117,7 @@ internal sealed class ApprovalRecordConfiguration : IEntityTypeConfiguration<App
         builder.ToTable("approvals", Schemas.Workflow, t =>
         {
             t.HasCheckConstraint("ck_approvals_kind", "kind = 'owner'");
-            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
+            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND actor LIKE 'owner:%' AND length(btrim(reason)) > 0 AND (decision = 'reject' OR decided_at < cutoff)");
         });
         builder.HasKey(x => x.Id).HasName("pk_approvals");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();

@@ -34,7 +34,12 @@ internal sealed class MovePlanHandler(IPlanStore store, TimeProvider time, ILogg
         var status = await store.MovePlanAsync(new PlanMove(command.PlanId, plan.State, command.To, command.Actor, command.Reason, time.GetUtcNow()), cancellationToken);
         if (status != MoveStatus.Created)
         {
-            return Refuse(status == MoveStatus.NotFound ? PlanErrors.NotFound(command.PlanId) : PlanErrors.Stale());
+            return Refuse(status switch
+            {
+                MoveStatus.NotFound => PlanErrors.NotFound(command.PlanId),
+                MoveStatus.Refused => PlanErrors.MoveRefused(["The tickets of the plan no longer support this move."]),
+                _ => PlanErrors.Stale(),
+            });
         }
 
         var fromCode = plan.State.Code();

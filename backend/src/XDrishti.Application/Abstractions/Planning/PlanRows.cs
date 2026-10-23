@@ -33,8 +33,7 @@ public sealed record PlanEventRow(long Id, long? ItemId, string From, string To,
 /// <param name="Decision">Approve, modify or reject.</param>
 /// <param name="Modifications">What was edited; required for modify.</param>
 /// <param name="ConfirmReason">The reason given to approve despite a failed check.</param>
-/// <param name="Cutoff">The review cutoff the decision was made before.</param>
-public sealed record ApprovalInput(ApprovalDecision Decision, string? Modifications, string? ConfirmReason, DateTimeOffset? Cutoff);
+public sealed record ApprovalInput(ApprovalDecision Decision, string? Modifications, string? ConfirmReason);
 
 /// <summary>A ticket move to write; <c>Approval</c> is set exactly when the owner decides.</summary>
 /// <param name="ItemId">The item.</param>
@@ -43,7 +42,7 @@ public sealed record ApprovalInput(ApprovalDecision Decision, string? Modificati
 /// <param name="Actor">Who.</param>
 /// <param name="Reason">Why.</param>
 /// <param name="At">When.</param>
-/// <param name="Approval">The owner's decision, or null for a service move.</param>
+/// <param name="Approval">The owner's decision: set exactly when <c>To</c> is approved, modified or rejected, and its decision must match <c>To</c>; the store throws otherwise.</param>
 public sealed record ItemMove(long ItemId, TicketState From, TicketState To, string Actor, string Reason, DateTimeOffset At, ApprovalInput? Approval);
 
 /// <summary>A plan move to write.</summary>
@@ -66,6 +65,12 @@ public enum MoveStatus
 
     /// <summary>The plan or item does not exist; nothing was written.</summary>
     NotFound,
+
+    /// <summary>The tickets or the plan no longer support the move (computed in the store under the plan lock); nothing was written.</summary>
+    Refused,
+
+    /// <summary>An owner approval or modification at or after the plan's review cutoff; nothing was written.</summary>
+    AfterCutoff,
 }
 
 /// <summary>What a publish did.</summary>

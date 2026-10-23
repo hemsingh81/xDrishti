@@ -27,6 +27,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityAlwaysColumn),
                     plan_key = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     for_date = table.Column<DateOnly>(type: "date", nullable: false),
+                    review_cutoff = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     version = table.Column<int>(type: "integer", nullable: false),
                     input_hash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
                     basis = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
@@ -129,14 +130,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     reason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     confirm_reason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     modifications = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    cutoff = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    cutoff = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     decided_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_approvals", x => x.id);
                     table.CheckConstraint("ck_approvals_kind", "kind = 'owner'");
-                    table.CheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
+                    table.CheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND actor LIKE 'owner:%' AND length(btrim(reason)) > 0 AND (decision = 'reject' OR decided_at < cutoff)");
                     table.ForeignKey(
                         name: "fk_approvals_plan_items_item_id",
                         column: x => x.item_id,
@@ -204,6 +205,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_plan_events", x => x.id);
+                    table.CheckConstraint("ck_plan_events_approval", "(item_id IS NULL AND approval_id IS NULL) OR (item_id IS NOT NULL AND ((to_state IN ('approved', 'modified', 'rejected')) = (approval_id IS NOT NULL)))");
                     table.CheckConstraint("ck_plan_events_legal", "(item_id IS NOT NULL AND (from_state, to_state) IN (('proposed', 'approved'), ('proposed', 'modified'), ('proposed', 'rejected'), ('proposed', 'lapsed'), ('modified', 'approved'), ('modified', 'rejected'), ('modified', 'lapsed'), ('approved', 'armed'), ('approved', 'invalidated'), ('approved', 'expired'), ('armed', 'triggered'), ('armed', 'expired'), ('triggered', 'closed'))) OR (item_id IS NULL AND (from_state, to_state) IN (('draft', 'published'), ('published', 'inreview'), ('published', 'approved'), ('published', 'rejected'), ('published', 'lapsed'), ('inreview', 'approved'), ('inreview', 'rejected'), ('inreview', 'lapsed'), ('approved', 'armed'), ('approved', 'expired'), ('armed', 'expired')))");
                     table.CheckConstraint("ck_plan_events_shape", "length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
                     table.ForeignKey(
@@ -260,6 +262,22 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 columns: new[] { "plan_id", "id" });
 
             migrationBuilder.CreateIndex(
+                name: "uq_plan_events_item_from",
+                schema: "trading",
+                table: "plan_events",
+                columns: new[] { "item_id", "from_state" },
+                unique: true,
+                filter: "item_id IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "uq_plan_events_plan_from",
+                schema: "trading",
+                table: "plan_events",
+                columns: new[] { "plan_id", "from_state" },
+                unique: true,
+                filter: "item_id IS NULL");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_plan_item_allocations_account_id",
                 schema: "trading",
                 table: "plan_item_allocations",
@@ -305,7 +323,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 column: "plan_key",
                 unique: true);
 
+            // Composite keys (spec P7-03 review): an event, an approval and the item they name belong to the same plan, and an owner-decision event names an approval of the same item and plan.
+            migrationBuilder.Sql("ALTER TABLE trading.plan_items ADD CONSTRAINT uq_plan_items_plan_id_id UNIQUE (plan_id, id)");
+            migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD CONSTRAINT uq_approvals_id_plan_item UNIQUE (id, plan_id, item_id)");
+            migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD CONSTRAINT fk_approvals_item_in_plan FOREIGN KEY (plan_id, item_id) REFERENCES trading.plan_items (plan_id, id) ON DELETE RESTRICT");
+            migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD CONSTRAINT fk_plan_events_item_in_plan FOREIGN KEY (plan_id, item_id) REFERENCES trading.plan_items (plan_id, id) ON DELETE RESTRICT");
+            migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD CONSTRAINT fk_plan_events_approval_of_item FOREIGN KEY (approval_id, plan_id, item_id) REFERENCES workflow.approvals (id, plan_id, item_id) ON DELETE RESTRICT");
+
             // Insert-only for the runtime role (spec P7-03, ADR 0083): a state change is a new plan_events row, a decision a new approvals row.
+            // A later migration must NOT call GrantSchemaUsageToAppRole for trading or workflow (it would give UPDATE and DELETE back); to add a table here, grant that table and make it append-only. PlanGrantsTests and an architecture test enforce it.
             migrationBuilder.GrantSchemaUsageToAppRole(Schemas.Trading);
             migrationBuilder.GrantSchemaUsageToAppRole(Schemas.Workflow);
             foreach (var table in new[] { "plans", "plan_items", "plan_item_allocations", "plan_events", "plan_runs" })

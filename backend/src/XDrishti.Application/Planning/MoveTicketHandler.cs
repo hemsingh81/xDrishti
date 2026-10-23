@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
-using XDrishti.Application.Learning;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Planning;
 
@@ -49,7 +48,7 @@ internal sealed class MoveTicketHandler(IPlanStore store, TimeProvider time, ILo
             return Refuse(PlanErrors.ItemNotFound(command.ItemId));
         }
 
-        var owner = HypothesisRows.IsOwner(command.Actor);
+        var owner = PlanActors.IsOwner(command.Actor);
         var refusals = TicketLifecycle.Refusals(item.State, command.To, new TicketFacts(owner ? MoveActor.Owner : MoveActor.System, item.Item.Group));
         if (refusals.Count > 0)
         {
@@ -57,12 +56,18 @@ internal sealed class MoveTicketHandler(IPlanStore store, TimeProvider time, ILo
         }
 
         ApprovalInput? approval = TicketLifecycle.IsOwnerDecision(command.To)
-            ? new ApprovalInput(DecisionOf(command.To), command.Modifications, command.ConfirmReason, command.Cutoff)
+            ? new ApprovalInput(DecisionOf(command.To), command.Modifications, command.ConfirmReason)
             : null;
         var status = await store.MoveItemAsync(new ItemMove(command.ItemId, item.State, command.To, command.Actor, command.Reason, time.GetUtcNow(), approval), cancellationToken);
         if (status != MoveStatus.Created)
         {
-            return Refuse(status == MoveStatus.NotFound ? PlanErrors.ItemNotFound(command.ItemId) : PlanErrors.Stale());
+            return Refuse(status switch
+            {
+                MoveStatus.NotFound => PlanErrors.ItemNotFound(command.ItemId),
+                MoveStatus.AfterCutoff => PlanErrors.MoveRefused(["The review cutoff of the plan has passed; an owner approval or modification is refused."]),
+                MoveStatus.Refused => PlanErrors.MoveRefused(["The plan is not open for decisions."]),
+                _ => PlanErrors.Stale(),
+            });
         }
 
         var fromCode = item.State.Code();

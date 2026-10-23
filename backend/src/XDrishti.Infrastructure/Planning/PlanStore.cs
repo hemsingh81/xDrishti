@@ -18,7 +18,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
     private const string ItemStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.item_id = i.id ORDER BY e.id DESC LIMIT 1), 'proposed')";
 
     private const string PlanColumns = $"""
-        p.id, p.plan_key, p.for_date, p.version, p.input_hash, p.basis, p.provisional, p.notice, p.limits, p.created_by, p.created_at, {PlanStateSql},
+        p.id, p.plan_key, p.for_date, p.version, p.input_hash, p.basis, p.provisional, p.notice, p.limits, p.created_by, p.created_at, p.review_cutoff, {PlanStateSql},
         (SELECT count(*) FROM trading.plan_items x WHERE x.plan_id = p.id AND x.item_group = 'primary'),
         (SELECT count(*) FROM trading.plan_items x WHERE x.plan_id = p.id AND x.item_group = 'reserve'),
         (SELECT count(*) FROM trading.plan_items x WHERE x.plan_id = p.id AND x.item_group = 'rejected')
@@ -48,13 +48,14 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
 
         long planId;
         await using (var insert = new NpgsqlCommand("""
-            INSERT INTO trading.plans (plan_key, for_date, version, input_hash, basis, provisional, notice, limits, created_by, created_at)
-            VALUES (@key, @date, @version, @hash, @basis, @prov, @notice, @limits, @by, @at) RETURNING id
+            INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at)
+            VALUES (@key, @date, @cutoff, @version, @hash, @basis, @prov, @notice, @limits, @by, @at) RETURNING id
             """, connection, transaction))
         {
             var p = insert.Parameters;
             p.AddWithValue("key", NpgsqlDbType.Varchar, plan.PlanKey);
             p.AddWithValue("date", NpgsqlDbType.Date, plan.ForDate);
+            p.AddWithValue("cutoff", NpgsqlDbType.TimestampTz, plan.ReviewCutoff);
             p.AddWithValue("version", NpgsqlDbType.Integer, plan.Version);
             p.AddWithValue("hash", NpgsqlDbType.Varchar, plan.InputHash);
             p.AddWithValue("basis", NpgsqlDbType.Varchar, plan.Basis);
@@ -140,27 +141,64 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
     public async ValueTask<MoveStatus> MoveItemAsync(ItemMove move, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(move);
+
+        // The owner decides, the services do the rest: the approval is present exactly for the three owner decisions and says the same thing as the move.
+        if (TicketLifecycle.IsOwnerDecision(move.To) != (move.Approval is not null))
+        {
+            throw new ArgumentException("An approval goes with an owner decision (approved, modified, rejected) and with no other move.", nameof(move));
+        }
+
+        if (move.Approval is { } given && given.Decision.Target() != move.To)
+        {
+            throw new ArgumentException("The approval's decision must be the state moved to.", nameof(move));
+        }
+
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await LockAsync(connection, transaction, "trading.plan_items:" + move.ItemId.ToString(CultureInfo.InvariantCulture), cancellationToken);
 
         long planId;
-        await using (var item = new NpgsqlCommand($"SELECT i.plan_id, i.item_group, {ItemStateSql} FROM trading.plan_items i WHERE i.id = @id", connection, transaction))
+        await using (var owner = new NpgsqlCommand("SELECT plan_id FROM trading.plan_items WHERE id = @id", connection, transaction))
         {
-            item.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, move.ItemId);
-            await using var reader = await item.ExecuteReaderAsync(cancellationToken);
-            if (!await reader.ReadAsync(cancellationToken))
+            owner.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, move.ItemId);
+            if (await owner.ExecuteScalarAsync(cancellationToken) is not long found)
             {
                 return MoveStatus.NotFound;
             }
 
+            planId = found;
+        }
+
+        // Always the plan lock first, then the item lock: a ticket move and a plan move on the same plan never interleave.
+        await LockAsync(connection, transaction, "trading.plans:" + planId.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await LockAsync(connection, transaction, "trading.plan_items:" + move.ItemId.ToString(CultureInfo.InvariantCulture), cancellationToken);
+
+        DateTimeOffset cutoff;
+        await using (var state = new NpgsqlCommand($"SELECT i.item_group, {ItemStateSql}, (SELECT {PlanStateSql} FROM trading.plans p WHERE p.id = i.plan_id), (SELECT p.review_cutoff FROM trading.plans p WHERE p.id = i.plan_id) FROM trading.plan_items i WHERE i.id = @id", connection, transaction))
+        {
+            state.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, move.ItemId);
+            await using var reader = await state.ExecuteReaderAsync(cancellationToken);
+            await reader.ReadAsync(cancellationToken);
+
             // A rejected candidate is not a ticket: it never gets a state row. A state other than the one the caller saw means another move won.
-            if (reader.GetString(1) == TicketGroup.Rejected.Code() || reader.GetString(2) != move.From.Code())
+            if (reader.GetString(0) == TicketGroup.Rejected.Code() || reader.GetString(1) != move.From.Code())
             {
                 return MoveStatus.Stale;
             }
 
-            planId = reader.GetInt64(0);
+            cutoff = reader.GetFieldValue<DateTimeOffset>(3);
+            if (TicketLifecycle.IsOwnerDecision(move.To))
+            {
+                // A decision is taken while the plan is open for review, and approving or modifying only before the cutoff of the plan's session.
+                if (reader.GetString(2) is not ("published" or "inreview"))
+                {
+                    return MoveStatus.Refused;
+                }
+
+                if (move.To != TicketState.Rejected && move.At >= cutoff)
+                {
+                    return MoveStatus.AfterCutoff;
+                }
+            }
         }
 
         long? approvalId = null;
@@ -178,7 +216,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
             p.AddWithValue("reason", NpgsqlDbType.Varchar, move.Reason);
             p.Add(new NpgsqlParameter("confirm", NpgsqlDbType.Varchar) { Value = (object?)approval.ConfirmReason ?? DBNull.Value });
             p.Add(new NpgsqlParameter("mods", NpgsqlDbType.Varchar) { Value = (object?)approval.Modifications ?? DBNull.Value });
-            p.Add(new NpgsqlParameter("cutoff", NpgsqlDbType.TimestampTz) { Value = approval.Cutoff is { } c ? c : DBNull.Value });
+            p.AddWithValue("cutoff", NpgsqlDbType.TimestampTz, cutoff);
             p.AddWithValue("at", NpgsqlDbType.TimestampTz, move.At);
             approvalId = (long)(await insertApproval.ExecuteScalarAsync(cancellationToken))!;
         }
@@ -207,6 +245,24 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
             {
                 return MoveStatus.Stale;
             }
+        }
+
+        // The facts are recomputed here, under the plan lock, from the newest event of each ticket (ticket moves take the same lock first): a plan is never approved or armed without a live approved or armed ticket.
+        PlanFacts facts;
+        await using (var count = new NpgsqlCommand($"""
+            SELECT count(*) FILTER (WHERE st IN ('proposed', 'modified')), count(*) FILTER (WHERE st = 'approved'), count(*) FILTER (WHERE st = 'armed'), count(*) FILTER (WHERE st = 'rejected')
+            FROM (SELECT {ItemStateSql} AS st FROM trading.plan_items i WHERE i.plan_id = @id AND i.item_group <> 'rejected') x
+            """, connection, transaction))
+        {
+            count.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, move.PlanId);
+            await using var reader = await count.ExecuteReaderAsync(cancellationToken);
+            await reader.ReadAsync(cancellationToken);
+            facts = new PlanFacts((int)reader.GetInt64(0), (int)reader.GetInt64(1), (int)reader.GetInt64(2), (int)reader.GetInt64(3));
+        }
+
+        if (PlanLifecycle.Refusals(move.From, move.To, facts).Count > 0)
+        {
+            return MoveStatus.Refused;
         }
 
         await InsertEventAsync(connection, transaction, move.PlanId, null, move.From.Code(), move.To.Code(), move.Actor, move.Reason, null, move.At, cancellationToken);
@@ -351,12 +407,12 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
         var rows = new List<PlanRow>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            var plan = new NewPlan(reader.GetString(1), reader.GetFieldValue<DateOnly>(2), reader.GetInt32(3), reader.GetString(4), reader.GetString(5), reader.GetBoolean(6), reader.GetString(9), reader.GetFieldValue<DateTimeOffset>(10), [])
+            var plan = new NewPlan(reader.GetString(1), reader.GetFieldValue<DateOnly>(2), reader.GetFieldValue<DateTimeOffset>(11), reader.GetInt32(3), reader.GetString(4), reader.GetString(5), reader.GetBoolean(6), reader.GetString(9), reader.GetFieldValue<DateTimeOffset>(10), [])
             {
                 Notice = reader.GetString(7),
                 Limits = reader.GetString(8),
             };
-            rows.Add(new PlanRow(reader.GetInt64(0), plan, PlanStateText.TryParse(reader.GetString(11)) ?? PlanState.Draft, (int)reader.GetInt64(12), (int)reader.GetInt64(13), (int)reader.GetInt64(14)));
+            rows.Add(new PlanRow(reader.GetInt64(0), plan, PlanStateText.TryParse(reader.GetString(12)) ?? PlanState.Draft, (int)reader.GetInt64(13), (int)reader.GetInt64(14), (int)reader.GetInt64(15)));
         }
 
         return rows;

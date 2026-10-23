@@ -9,6 +9,8 @@ internal sealed class PlanRecord
 
     public DateOnly ForDate { get; set; }
 
+    public DateTimeOffset ReviewCutoff { get; set; }
+
     public int Version { get; set; }
 
     public string InputHash { get; set; } = string.Empty;
@@ -129,7 +131,7 @@ internal sealed class ApprovalRecord
 
     public string? Modifications { get; set; }
 
-    public DateTimeOffset? Cutoff { get; set; }
+    public DateTimeOffset Cutoff { get; set; }
 
     public DateTimeOffset DecidedAt { get; set; }
 }

@@ -7,6 +7,7 @@ namespace XDrishti.Application.Planning;
 /// <param name="Id">The plan id.</param>
 /// <param name="PlanKey">The idempotency key.</param>
 /// <param name="ForDate">The session.</param>
+/// <param name="ReviewCutoff">After this an owner approval or modification is refused; undecided tickets lapse.</param>
 /// <param name="Version">Version within the date.</param>
 /// <param name="State">draft, published, inreview, approved, rejected, lapsed, armed or expired.</param>
 /// <param name="NextStates">The states the plan may move to.</param>
@@ -25,6 +26,7 @@ public sealed record PlanView(
     long Id,
     string PlanKey,
     DateOnly ForDate,
+    DateTimeOffset ReviewCutoff,
     int Version,
     string State,
     IReadOnlyList<string> NextStates,
@@ -45,7 +47,7 @@ public sealed record PlanView(
     {
         ArgumentNullException.ThrowIfNull(row);
         var p = row.Plan;
-        return new PlanView(row.Id, p.PlanKey, p.ForDate, p.Version, row.State.Code(), [.. PlanLifecycle.Next(row.State).Select(s => s.Code())], p.Basis, p.Provisional, p.Notice, p.Limits, p.CreatedAt, p.CreatedBy, row.Primary, row.Reserve, row.Rejected, items, history);
+        return new PlanView(row.Id, p.PlanKey, p.ForDate, p.ReviewCutoff, p.Version, row.State.Code(), [.. PlanLifecycle.Next(row.State).Select(s => s.Code())], p.Basis, p.Provisional, p.Notice, p.Limits, p.CreatedAt, p.CreatedBy, row.Primary, row.Reserve, row.Rejected, items, history);
     }
 }
 

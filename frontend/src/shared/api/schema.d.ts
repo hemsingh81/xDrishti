@@ -6728,6 +6728,11 @@ export interface components {
        */
       forDate: string;
       /**
+       * Format: date-time
+       * @description After this an owner approval or modification is refused; undecided tickets lapse.
+       */
+      reviewCutoff: string;
+      /**
        * Format: int32
        * @description Version within the date.
        */

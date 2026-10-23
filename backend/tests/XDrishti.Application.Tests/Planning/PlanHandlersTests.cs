@@ -22,7 +22,7 @@ public sealed class PlanHandlersTests
         new(id, 1, new NewPlanItem((int)id, group, "ABC", "BUY", "ORB", new string('a', 64), "t", "s", "g", "v", group == TicketGroup.Primary ? [] : ["why"], new PlanEvidence("c", 30, "r", "b", null, null, [], null), []), state);
 
     private static PlanRow Plan(PlanState state) =>
-        new(1, new NewPlan("k", new DateOnly(2026, 10, 26), 1, new string('b', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);
+        new(1, new NewPlan("k", new DateOnly(2026, 10, 26), Cutoff, 1, new string('b', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);
 
     private MoveTicketHandler Ticket() => new(_store, _time, NullLogger<MoveTicketHandler>.Instance);
 
@@ -40,6 +40,44 @@ public sealed class PlanHandlersTests
 
         result.IsSuccess.ShouldBeTrue();
         await _store.Received(1).MoveItemAsync(Arg.Is<ItemMove>(m => m.From == TicketState.Proposed && m.To == TicketState.Approved && m.Approval!.Decision == ApprovalDecision.Approve && m.Approval.ConfirmReason == "known gap"), Ct);
+    }
+
+    [Fact]
+    public async Task An_approval_after_the_plans_cutoff_is_refused_by_the_store_and_the_handler_says_so()
+    {
+        _store.FindItemAsync(7, Ct).Returns(Item(7, TicketState.Proposed));
+        _store.MoveItemAsync(Arg.Any<ItemMove>(), Ct).Returns(MoveStatus.AfterCutoff);
+
+        var result = await Ticket().HandleAsync(new MoveTicketCommand(7, TicketState.Approved, "owner:me", "late"), Ct);
+
+        result.Error.Code.ShouldBe(PlanErrors.MoveRefusedCode);
+        result.Error.Message.ShouldContain("cutoff");
+    }
+
+    [Theory]
+    [InlineData("cli:xd")]
+    [InlineData("system:nightly")]
+    [InlineData("ownerx")]
+    public async Task Only_an_owner_prefixed_actor_decides(string actor)
+    {
+        _store.FindItemAsync(7, Ct).Returns(Item(7, TicketState.Proposed));
+
+        var result = await Ticket().HandleAsync(new MoveTicketCommand(7, TicketState.Approved, actor, "x"), Ct);
+
+        result.Error.Code.ShouldBe(PlanErrors.MoveRefusedCode);
+        await _store.DidNotReceive().MoveItemAsync(Arg.Any<ItemMove>(), Ct);
+    }
+
+    [Fact]
+    public async Task A_plan_move_the_store_finds_unsupported_by_the_tickets_is_refused()
+    {
+        _store.FindAsync(1, Ct).Returns(Plan(PlanState.InReview));
+        _store.ItemsAsync(1, Ct).Returns([Item(1, TicketState.Approved)]);
+        _store.MovePlanAsync(Arg.Any<PlanMove>(), Ct).Returns(MoveStatus.Refused);
+
+        var result = await PlanMove().HandleAsync(new MovePlanCommand(1, PlanState.Approved, "system:review", "done"), Ct);
+
+        result.Error.Code.ShouldBe(PlanErrors.MoveRefusedCode);
     }
 
     [Fact]
@@ -112,7 +150,7 @@ public sealed class PlanHandlersTests
         _store.MoveItemAsync(Arg.Any<ItemMove>(), Ct).Returns(MoveStatus.Created);
         _store.MovePlanAsync(Arg.Any<PlanMove>(), Ct).Returns(MoveStatus.Created);
 
-        var result = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, Cutoff, "system:cutoff"), Ct);
+        var result = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, "system:cutoff"), Ct);
 
         result.Value.ShouldBe(new PlanMoveOutcome(1, "lapsed", 2));
         await _store.Received(2).MoveItemAsync(Arg.Is<ItemMove>(m => m.To == TicketState.Lapsed && m.Approval == null), Ct);
@@ -129,7 +167,7 @@ public sealed class PlanHandlersTests
         _store.MoveItemAsync(Arg.Any<ItemMove>(), Ct).Returns(MoveStatus.Created);
         _store.MovePlanAsync(Arg.Any<PlanMove>(), Ct).Returns(MoveStatus.Created);
 
-        var result = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, Cutoff, "system:cutoff"), Ct);
+        var result = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, "system:cutoff"), Ct);
 
         result.Value.ShouldBe(new PlanMoveOutcome(1, "approved", 1));
         await _store.DidNotReceive().MoveItemAsync(Arg.Is<ItemMove>(m => m.To == TicketState.Approved || m.To == TicketState.Armed), Ct);
@@ -143,9 +181,9 @@ public sealed class PlanHandlersTests
         _store.MovePlanAsync(Arg.Any<PlanMove>(), Ct).Returns(MoveStatus.Created);
         _time = new FakeTimeProvider(Cutoff.AddSeconds(-1));
 
-        var before = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, Cutoff, "system:cutoff"), Ct);
+        var before = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, "system:cutoff"), Ct);
         _time.Advance(TimeSpan.FromSeconds(1));
-        var at = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, Cutoff, "system:cutoff"), Ct);
+        var at = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, "system:cutoff"), Ct);
 
         before.Error.Code.ShouldBe(PlanErrors.MoveRefusedCode);
         at.IsSuccess.ShouldBeTrue();
@@ -156,8 +194,8 @@ public sealed class PlanHandlersTests
     {
         _store.FindAsync(1, Ct).Returns(Plan(PlanState.Armed));
 
-        var owner = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, Cutoff, "owner:me"), Ct);
-        var armed = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, Cutoff, "system:cutoff"), Ct);
+        var owner = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, "owner:me"), Ct);
+        var armed = await Cutoffs().HandleAsync(new ApplyReviewCutoffCommand(1, "system:cutoff"), Ct);
 
         owner.Error.Code.ShouldBe(PlanErrors.InvalidCode);
         armed.Error.Code.ShouldBe(PlanErrors.MoveRefusedCode);

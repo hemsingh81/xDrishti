@@ -28,7 +28,7 @@ internal sealed class ApplyReviewCutoffHandler(IPlanStore store, TimeProvider ti
             return Refuse(PlanErrors.NotFound(command.PlanId));
         }
 
-        if (time.GetUtcNow() < command.Cutoff)
+        if (time.GetUtcNow() < plan.Plan.ReviewCutoff)
         {
             return Refuse(PlanErrors.MoveRefused(["The review cutoff has not passed."]));
         }
@@ -65,7 +65,7 @@ internal sealed class ApplyReviewCutoffHandler(IPlanStore store, TimeProvider ti
         var moved = await store.MovePlanAsync(new PlanMove(command.PlanId, plan.State, after.Plan, command.Actor, Reason, time.GetUtcNow()), cancellationToken);
         if (moved != MoveStatus.Created)
         {
-            return Refuse(PlanErrors.Stale());
+            return Refuse(moved == MoveStatus.Refused ? PlanErrors.MoveRefused(["The tickets of the plan no longer support this move."]) : PlanErrors.Stale());
         }
 
         var planCode = after.Plan.Code();
@@ -73,7 +73,7 @@ internal sealed class ApplyReviewCutoffHandler(IPlanStore store, TimeProvider ti
         return Result.Success(new PlanMoveOutcome(command.PlanId, after.Plan.Code(), lapsed));
     }
 
-    private static bool NotAServiceActor(string actor) => string.IsNullOrWhiteSpace(actor) || actor.Length > 100 || XDrishti.Application.Learning.HypothesisRows.IsOwner(actor);
+    private static bool NotAServiceActor(string actor) => string.IsNullOrWhiteSpace(actor) || actor.Length > 100 || PlanActors.IsOwner(actor);
 
     private Result<PlanMoveOutcome> Refuse(Error error)
     {

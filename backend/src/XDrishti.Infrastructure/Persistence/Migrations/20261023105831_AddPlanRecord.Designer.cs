@@ -12,7 +12,7 @@ using XDrishti.Infrastructure.Persistence;
 namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(XDrishtiDbContext))]
-    [Migration("20261023102010_AddPlanRecord")]
+    [Migration("20261023105831_AddPlanRecord")]
     partial class AddPlanRecord
     {
         /// <inheritdoc />
@@ -4700,7 +4700,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("confirm_reason");
 
-                    b.Property<DateTimeOffset?>("Cutoff")
+                    b.Property<DateTimeOffset>("Cutoff")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("cutoff");
 
@@ -4752,7 +4752,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_approvals_kind", "kind = 'owner'");
 
-                            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
+                            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND actor LIKE 'owner:%' AND length(btrim(reason)) > 0 AND (decision = 'reject' OR decided_at < cutoff)");
                         });
                 });
 
@@ -4811,14 +4811,26 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasIndex("ApprovalId")
                         .HasDatabaseName("ix_plan_events_approval_id");
 
+                    b.HasIndex("ItemId", "FromState")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_events_item_from")
+                        .HasFilter("item_id IS NOT NULL");
+
                     b.HasIndex("ItemId", "Id")
                         .HasDatabaseName("ix_plan_events_item_id_id");
+
+                    b.HasIndex("PlanId", "FromState")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_events_plan_from")
+                        .HasFilter("item_id IS NULL");
 
                     b.HasIndex("PlanId", "Id")
                         .HasDatabaseName("ix_plan_events_plan_id_id");
 
                     b.ToTable("plan_events", "trading", t =>
                         {
+                            t.HasCheckConstraint("ck_plan_events_approval", "(item_id IS NULL AND approval_id IS NULL) OR (item_id IS NOT NULL AND ((to_state IN ('approved', 'modified', 'rejected')) = (approval_id IS NOT NULL)))");
+
                             t.HasCheckConstraint("ck_plan_events_legal", "(item_id IS NOT NULL AND (from_state, to_state) IN (('proposed', 'approved'), ('proposed', 'modified'), ('proposed', 'rejected'), ('proposed', 'lapsed'), ('modified', 'approved'), ('modified', 'rejected'), ('modified', 'lapsed'), ('approved', 'armed'), ('approved', 'invalidated'), ('approved', 'expired'), ('armed', 'triggered'), ('armed', 'expired'), ('triggered', 'closed'))) OR (item_id IS NULL AND (from_state, to_state) IN (('draft', 'published'), ('published', 'inreview'), ('published', 'approved'), ('published', 'rejected'), ('published', 'lapsed'), ('inreview', 'approved'), ('inreview', 'rejected'), ('inreview', 'lapsed'), ('approved', 'armed'), ('approved', 'expired'), ('armed', 'expired')))");
 
                             t.HasCheckConstraint("ck_plan_events_shape", "length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
@@ -5055,6 +5067,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Provisional")
                         .HasColumnType("boolean")
                         .HasColumnName("provisional");
+
+                    b.Property<DateTimeOffset>("ReviewCutoff")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("review_cutoff");
 
                     b.Property<int>("Version")
                         .HasColumnType("integer")
