@@ -86,6 +86,8 @@ once 3 trigger, the rest are cancelled. `plan` mode limits the plan itself to 3.
    **Default: `replicate`** (decision Q4, 2026-10-09).
 4. Cross-account limits: max accounts per symbol, max total risk across all accounts.
 
+**As built (P7-07, [ADR 0089](../adr/0089-per-account-allocation-a-pure-split-of-the-ticket-by-each-paper-accounts-own-limits-and-unavailable-allocating-nothing.md)):** tickets go to **paper-mode** Trading accounts only (owner Q2, 2026-10-23); the ticket's quantity is a pool split by each account's own risk, capital, funds and open-risk headroom limits, in whole lots; `replicate`/`distribute` and the cross-account caps are not built yet; a missing input allocates nothing.
+
 ## 6b. Pre-trade checklist
 
 Each proposed ticket carries automatic checks — data quality, conflict with your holdings (e.g. a SELL on a stock

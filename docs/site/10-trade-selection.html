@@ -215,6 +215,7 @@ Mode <code>distribute</code>: ranked tickets are spread across accounts, no symb
 <strong>Default: <code>replicate</code></strong> (decision Q4, 2026-10-09).</li>
 <li>Cross-account limits: max accounts per symbol, max total risk across all accounts.</li>
 </ol>
+<p><strong>As built (P7-07, <a href="../adr/0089-per-account-allocation-a-pure-split-of-the-ticket-by-each-paper-accounts-own-limits-and-unavailable-allocating-nothing.html">ADR 0089</a>):</strong> tickets go to <strong>paper-mode</strong> Trading accounts only (owner Q2, 2026-10-23); the ticket&#39;s quantity is a pool split by each account&#39;s own risk, capital, funds and open-risk headroom limits, in whole lots; <code>replicate</code>/<code>distribute</code> and the cross-account caps are not built yet; a missing input allocates nothing.</p>
 <h2 id="6b-pre-trade-checklist">6b. Pre-trade checklist<a class="hash" href="#6b-pre-trade-checklist" aria-label="Link to this section">#</a></h2>
 <p>Each proposed ticket carries automatic checks — data quality, conflict with your holdings (e.g. a SELL on a stock
 you hold long-term), sector exposure, <strong>correlation with open trades and approved tickets</strong>, results within 3 days — shown on the ticket in Plan review
@@ -246,7 +247,7 @@ system proposed.</p>
     <a class="prev" href="09-learning-engine.html"><small>← Previous  [</small>09 · Learning engine</a>
     <a class="next" href="11-strategy-lab.html"><small>Next  ] →</small>11 · Strategy Lab</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-23 16:03</footer>
+  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-23 16:17</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-pipeline" class="d2">1. Pipeline</a>
 <a href="#smart-rules-learned-doc-09-14" class="d3">Smart rules (learned, doc 09 §14)</a>
