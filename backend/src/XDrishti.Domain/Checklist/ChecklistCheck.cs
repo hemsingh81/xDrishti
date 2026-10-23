@@ -11,6 +11,6 @@ namespace XDrishti.Domain.Checklist;
 /// <param name="Detail">One line in words.</param>
 public sealed record ChecklistCheck(string Code, FilterOutcome Outcome, CheckPolicy Policy, double? Value, double? Limit, string Detail)
 {
-    /// <summary>Whether approval needs the owner's confirmation for this check: any unavailable, or a fail whose policy blocks.</summary>
-    public bool NeedsConfirmation => Outcome == FilterOutcome.Unavailable || (Outcome == FilterOutcome.Fail && Policy == CheckPolicy.BlockWithConfirm);
+    /// <summary>Whether approval needs the owner's confirmation for this check: any unavailable, or a fail whose policy is not exactly warn (so an undefined policy value blocks).</summary>
+    public bool NeedsConfirmation => Outcome == FilterOutcome.Unavailable || (Outcome == FilterOutcome.Fail && Policy != CheckPolicy.Warn);
 }

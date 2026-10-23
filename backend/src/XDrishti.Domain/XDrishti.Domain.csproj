@@ -1,3 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- Pure domain model: no package or project references allowed (enforced by architecture tests). -->
+  <ItemGroup>
+    <!-- The checklist result and review can only be built by PreTradeChecklist; its tests build incomplete ones by hand. -->
+    <InternalsVisibleTo Include="XDrishti.Domain.Tests" />
+  </ItemGroup>
 </Project>

@@ -24,7 +24,7 @@ public static class ChecklistCodes
     /// <summary>SELL against a long holding, or an open trade already exists.</summary>
     public const string HoldingsConflict = "holdings_conflict";
 
-    /// <summary>Open trades plus approved tickets in the sector against the account's limit.</summary>
+    /// <summary>Open trades plus approved tickets in the sector against the account's limit. Doc 16 calls the policy key <c>sector_limit</c>; the code and the policy key used here are both <c>sector_exposure</c> (doc 15's name).</summary>
     public const string SectorExposure = "sector_exposure";
 
     /// <summary>Quarterly results within the configured number of days.</summary>
@@ -44,4 +44,14 @@ public static class ChecklistCodes
 
     /// <summary>Correlation with open trades and approved tickets.</summary>
     public const string Correlation = "correlation";
+
+    /// <summary>Every check of an evaluated ticket, in the fixed order. <see cref="AccountPaper"/> is first.</summary>
+    public static readonly IReadOnlyList<string> All =
+    [
+        AccountPaper, RiskProfile, CapitalHeadroom, ExposureHeadroom, DailyLoss, DataQuality, HoldingsConflict,
+        SectorExposure, ResultsWithinDays, FnoBan, Surveillance, PriceBand, Liquidity, Correlation,
+    ];
+
+    /// <summary>Whether the code is one the owner can approve despite (every check but the account gate).</summary>
+    public static bool IsConfirmable(string code) => code != AccountPaper && All.Contains(code);
 }

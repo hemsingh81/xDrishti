@@ -42,6 +42,34 @@ public sealed class PlanHandlersTests
         await _store.Received(1).MoveItemAsync(Arg.Is<ItemMove>(m => m.From == TicketState.Proposed && m.To == TicketState.Approved && m.Approval!.Decision == ApprovalDecision.Approve && m.Approval.ConfirmReason == "known gap"), Ct);
     }
 
+    [Theory]
+    [InlineData("   ")]
+    [InlineData("\t\n")]
+    public async Task A_blank_confirmation_reason_is_refused_before_the_store_is_called(string reason)
+    {
+        var result = await Ticket().HandleAsync(new MoveTicketCommand(7, TicketState.Approved, "owner:me", "ok", ConfirmReason: reason), Ct);
+
+        result.IsFailure.ShouldBeTrue();
+        await _store.DidNotReceive().MoveItemAsync(Arg.Any<ItemMove>(), Ct);
+    }
+
+    [Fact]
+    public async Task A_confirmation_reason_is_trimmed_before_it_is_stored()
+    {
+        _store.FindItemAsync(7, Ct).Returns(Item(7, TicketState.Proposed));
+        _store.MoveItemAsync(Arg.Any<ItemMove>(), Ct).Returns(MoveStatus.Created);
+
+        await Ticket().HandleAsync(new MoveTicketCommand(7, TicketState.Approved, "owner:me", "ok", ConfirmReason: "  known gap  "), Ct);
+
+        await _store.Received(1).MoveItemAsync(Arg.Is<ItemMove>(m => m.Approval!.ConfirmReason == "known gap"), Ct);
+    }
+
+    [Fact]
+    public void The_owner_prefix_of_the_plan_record_is_the_one_the_checklist_uses()
+    {
+        PlanActors.OwnerPrefix.ShouldBe(XDrishti.Domain.Checklist.OwnerConfirmation.OwnerPrefix);
+    }
+
     [Fact]
     public async Task An_approval_after_the_plans_cutoff_is_refused_by_the_store_and_the_handler_says_so()
     {

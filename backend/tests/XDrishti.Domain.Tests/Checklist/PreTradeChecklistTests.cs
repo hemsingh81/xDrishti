@@ -6,8 +6,8 @@ namespace XDrishti.Domain.Tests.Checklist;
 
 public sealed class PreTradeChecklistTests
 {
-    private static readonly ChecklistLimits Limits = new();
-    private static readonly ChecklistPolicy Policy = new();
+    private static readonly ChecklistLimits Limits = ChecklistLimits.Default;
+    private static readonly ChecklistPolicy Policy = ChecklistPolicy.Default;
 
     private static ChecklistTicket Ticket(string side = "BUY", double? price = 100, double? qty = 10, double? risk = 0.5, string? sector = "IT") =>
         new("AAA", side, price, qty, risk, sector);
@@ -30,6 +30,8 @@ public sealed class PreTradeChecklistTests
 
     private static ChecklistResult Run(ChecklistTicket? t = null, ChecklistAccount? a = null, ChecklistFacts? f = null) =>
         PreTradeChecklist.Evaluate(t ?? Ticket(), a ?? Account(), f ?? Facts(), Limits, Policy);
+
+    private static OwnerConfirmation Confirm(params string[] codes) => OwnerConfirmation.Create("owner:hem", "checked by hand", "acc-1", "AAA", codes).Value;
 
     private static ChecklistCheck Of(ChecklistResult r, string code) => r.Checks.Single(c => c.Code == code);
 
@@ -261,7 +263,7 @@ public sealed class PreTradeChecklistTests
     [Fact]
     public void A_confirmation_never_overrides_a_refused_account()
     {
-        var confirm = OwnerConfirmation.Create("owner:hem", "I know").Value;
+        var confirm = Confirm(ChecklistCodes.RiskProfile);
 
         var review = Run(a: Account(mode: TradingMode.ManualLive)).Review(confirm);
 
@@ -296,7 +298,7 @@ public sealed class PreTradeChecklistTests
     [Fact]
     public void A_policy_override_can_make_a_warn_check_block()
     {
-        var policy = new ChecklistPolicy(new Dictionary<string, CheckPolicy> { [ChecklistCodes.HoldingsConflict] = CheckPolicy.BlockWithConfirm });
+        var policy = ChecklistPolicy.Create(new Dictionary<string, CheckPolicy> { [ChecklistCodes.HoldingsConflict] = CheckPolicy.BlockWithConfirm }).Value;
 
         var r = PreTradeChecklist.Evaluate(Ticket("SELL"), Account(), Facts() with { HeldLongAnyAccount = true }, Limits, policy);
 
@@ -307,7 +309,7 @@ public sealed class PreTradeChecklistTests
     public void A_confirmation_allows_approval_but_shows_confirmed_despite_and_keeps_the_outcome()
     {
         var r = Run(f: Facts() with { InFnoBan = null });
-        var confirm = OwnerConfirmation.Create("owner:hem", "  ban list not wired; checked NSE site  ").Value;
+        var confirm = OwnerConfirmation.Create("owner:hem", "  ban list not wired; checked NSE site  ", "acc-1", "AAA", [ChecklistCodes.FnoBan]).Value;
 
         var review = r.Review(confirm);
 
@@ -323,7 +325,7 @@ public sealed class PreTradeChecklistTests
     [Fact]
     public void A_confirmation_that_nothing_needs_is_not_recorded()
     {
-        var confirm = OwnerConfirmation.Create("owner:hem", "just in case").Value;
+        var confirm = Confirm(ChecklistCodes.FnoBan);
 
         var review = Run().Review(confirm);
 
@@ -341,7 +343,7 @@ public sealed class PreTradeChecklistTests
     [InlineData("owner:   ", "reason")]
     public void Only_an_owner_actor_can_confirm(string? actor, string reason)
     {
-        var made = OwnerConfirmation.Create(actor, reason);
+        var made = OwnerConfirmation.Create(actor, reason, "acc-1", "AAA", [ChecklistCodes.FnoBan]);
 
         made.IsFailure.ShouldBeTrue();
         made.Error.Code.ShouldBe("checklist.owner_only");
@@ -353,7 +355,7 @@ public sealed class PreTradeChecklistTests
     [InlineData("   ")]
     public void A_confirmation_needs_a_reason(string? reason)
     {
-        var made = OwnerConfirmation.Create("owner:hem", reason);
+        var made = OwnerConfirmation.Create("owner:hem", reason, "acc-1", "AAA", [ChecklistCodes.FnoBan]);
 
         made.IsFailure.ShouldBeTrue();
         made.Error.Code.ShouldBe("checklist.reason_required");
@@ -362,8 +364,8 @@ public sealed class PreTradeChecklistTests
     [Fact]
     public void A_reason_over_the_limit_is_refused_and_one_at_the_limit_is_kept()
     {
-        OwnerConfirmation.Create("owner:hem", new string('x', 501)).Error.Code.ShouldBe("checklist.reason_too_long");
-        OwnerConfirmation.Create("owner:hem", new string('x', 500)).IsSuccess.ShouldBeTrue();
+        OwnerConfirmation.Create("owner:hem", new string('x', 201), "acc-1", "AAA", [ChecklistCodes.FnoBan]).Error.Code.ShouldBe("checklist.reason_too_long");
+        OwnerConfirmation.Create("owner:hem", new string('x', 200), "acc-1", "AAA", [ChecklistCodes.FnoBan]).IsSuccess.ShouldBeTrue();
     }
 
     [Fact]

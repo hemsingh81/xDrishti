@@ -47,6 +47,13 @@ public static class PreTradeChecklist
         return new ChecklistResult(account.AccountId, ticket.Symbol, checks);
     }
 
+    // "At the limit passes" must survive floating-point sums such as 1.0 + 1.5 + 0.5 against 3.0 (error about 1e-16). The tolerance is far above that and far below any real step (0.001 % of capital).
+    private const double Epsilon = 1e-9;
+
+    private static bool AtMost(double value, double limit) => value <= limit + Epsilon;
+
+    private static bool Below(double value, double limit) => value < limit - Epsilon;
+
     private static string N(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static double? Pos(double? v) => v is { } x && double.IsFinite(x) && x > 0 ? x : null;
@@ -65,7 +72,7 @@ public static class PreTradeChecklist
             return Unavailable(ChecklistCodes.RiskProfile, p, "ticket risk or the account's per-trade limit is not known");
         }
 
-        return Judge(ChecklistCodes.RiskProfile, p, Math.Round(risk, 9) <= max, risk, max, "risk of the trade " + N(risk) + "%, account limit " + N(max) + "%");
+        return Judge(ChecklistCodes.RiskProfile, p, AtMost(risk, max), risk, max, "risk of the trade " + N(risk) + "%, account limit " + N(max) + "%");
     }
 
     private static ChecklistCheck Capital(ChecklistTicket t, ChecklistAccount a, ChecklistPolicy p)
@@ -76,7 +83,7 @@ public static class PreTradeChecklist
         }
 
         var cost = price * qty;
-        return Judge(ChecklistCodes.CapitalHeadroom, p, Math.Round(cost, 9) <= funds, cost, funds, "cost " + N(cost) + ", funds available " + N(funds));
+        return Judge(ChecklistCodes.CapitalHeadroom, p, AtMost(cost, funds), cost, funds, "cost " + N(cost) + ", funds available " + N(funds));
     }
 
     private static ChecklistCheck Exposure(ChecklistTicket t, ChecklistAccount a, ChecklistPolicy p)
@@ -87,7 +94,7 @@ public static class PreTradeChecklist
         }
 
         var total = open + risk;
-        return Judge(ChecklistCodes.ExposureHeadroom, p, Math.Round(total, 9) <= max, total, max, "total open risk would be " + N(total) + "%, limit " + N(max) + "%");
+        return Judge(ChecklistCodes.ExposureHeadroom, p, AtMost(total, max), total, max, "total open risk would be " + N(total) + "%, limit " + N(max) + "%");
     }
 
     private static ChecklistCheck DailyLoss(ChecklistAccount a, ChecklistPolicy p)
@@ -97,7 +104,7 @@ public static class PreTradeChecklist
             return Unavailable(ChecklistCodes.DailyLoss, p, "today's loss or the daily loss limit is not known");
         }
 
-        return Judge(ChecklistCodes.DailyLoss, p, Math.Round(loss, 9) < max, loss, max, "loss today " + N(loss) + "%, daily limit " + N(max) + "% (reaching it stops new tickets)");
+        return Judge(ChecklistCodes.DailyLoss, p, Below(loss, max), loss, max, "loss today " + N(loss) + "%, daily limit " + N(max) + "% (reaching it stops new tickets)");
     }
 
     private static ChecklistCheck DataQuality(ChecklistFacts f, ChecklistPolicy p) => f.DataQualityOk switch
@@ -171,6 +178,7 @@ public static class PreTradeChecklist
 
     private static ChecklistCheck Band(ChecklistTicket t, ChecklistFacts f, ChecklistPolicy p)
     {
+        // Shortcut (ADR 0087): no band is supplied for instruments without a daily price band (for example F&O underlyings with dynamic bands), and that reads as unavailable, so the owner confirms. It is never assumed to pass.
         if (Pos(t.EntryPrice) is not { } price || Pos(f.PriceBandLower) is not { } lo || Pos(f.PriceBandUpper) is not { } hi || lo >= hi)
         {
             return Unavailable(ChecklistCodes.PriceBand, p, "entry price or the price band is not known");
@@ -188,7 +196,7 @@ public static class PreTradeChecklist
         }
 
         var pct = qty / adv * 100;
-        return Judge(ChecklistCodes.Liquidity, p, Math.Round(pct, 9) <= l.MaxPctOfAverageDailyVolume, pct, l.MaxPctOfAverageDailyVolume, "quantity is " + N(pct) + "% of the average daily volume, limit " + N(l.MaxPctOfAverageDailyVolume) + "%");
+        return Judge(ChecklistCodes.Liquidity, p, AtMost(pct, l.MaxPctOfAverageDailyVolume), pct, l.MaxPctOfAverageDailyVolume, "quantity is " + N(pct) + "% of the average daily volume, limit " + N(l.MaxPctOfAverageDailyVolume) + "%");
     }
 
     private static ChecklistCheck Correlation(ChecklistFacts f, ChecklistLimits l, ChecklistPolicy p)
@@ -198,6 +206,6 @@ public static class PreTradeChecklist
             return Unavailable(ChecklistCodes.Correlation, p, "correlation with the book is not computed yet (P7-06)");
         }
 
-        return Judge(ChecklistCodes.Correlation, p, Math.Round(c, 9) <= l.MaxCorrelation, c, l.MaxCorrelation, "highest correlation " + N(c) + ", limit " + N(l.MaxCorrelation));
+        return Judge(ChecklistCodes.Correlation, p, AtMost(c, l.MaxCorrelation), c, l.MaxCorrelation, "highest correlation " + N(c) + ", limit " + N(l.MaxCorrelation));
     }
 }
