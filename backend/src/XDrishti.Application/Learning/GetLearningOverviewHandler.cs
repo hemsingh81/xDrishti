@@ -24,6 +24,7 @@ internal sealed class GetLearningOverviewHandler(ICellStatsStore cells, IModelRe
     public async ValueTask<Result<LearningOverviewView>> HandleAsync(GetLearningOverviewQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
+        // Shortcut: this loads every latest cell row only to count them and take the newest date; a count/max query on ICellStatsStore would avoid that if the table grows.
         var cellRows = await cells.ListLatestAsync(null, null, cancellationToken);
         var modelRows = await models.ListAsync(null, CountLimit, cancellationToken);
         var champions = await models.ListAsync(ModelRole.Champion, 1, cancellationToken);

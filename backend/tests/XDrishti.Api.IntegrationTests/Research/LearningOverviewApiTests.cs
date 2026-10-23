@@ -39,6 +39,16 @@ public sealed class LearningOverviewApiTests(ApiFactory factory) : DataTestBase(
     }
 
     [Fact]
+    public async Task The_overview_needs_a_signed_in_owner()
+    {
+        using var anonymous = Factory.CreateClient();
+
+        using var response = await anonymous.GetAsync(new Uri("/api/learning/overview", UriKind.Relative), Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task With_no_experiment_stored_the_phase_check_does_not_call_the_timing()
     {
         using var scope = Factory.Services.CreateScope();

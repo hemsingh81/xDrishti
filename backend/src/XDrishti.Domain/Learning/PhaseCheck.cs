@@ -11,6 +11,9 @@ public static class PhaseCheck
     /// <summary>The replay-and-compare budget of the roadmap exit, in seconds.</summary>
     public const double ReplayBudgetSeconds = 600;
 
+    /// <summary>What a MET on criterion 3 rests on: the replay time is the owner's word.</summary>
+    public const string ReplaySuppliedCaveat = "replay time supplied, not verified";
+
     /// <summary>The usable folds the roadmap's 2.1 years leave, as stated in the limits.</summary>
     public const string UsableFoldsText = "about 3";
 
@@ -35,6 +38,11 @@ public static class PhaseCheck
         }
 
         var facts = string.Create(c, $"model {m.Id} ({m.Selection}): stored verdict {m.Verdict}, beat both baselines in {m.FoldsBeatingBoth} of {m.UsedFolds} folds ({m.FoldsNeeded} needed), pooled beats both: {(m.PooledBeatsBoth ? "yes" : "no")}, hold-out {HoldOut(m)}");
+        if (m.Verdict == ValidationOutcome.Eligible && (m.FoldsBeatingBoth < m.FoldsNeeded || !m.PooledBeatsBoth))
+        {
+            return new PhaseCriterion(1, name, PhaseVerdict.NotEvaluable, facts + "; the stored verdict is Eligible but its own fold counts contradict it: stored record inconsistent.");
+        }
+
         return m.Verdict switch
         {
             ValidationOutcome.CannotBeatBaselines => new PhaseCriterion(1, name, PhaseVerdict.NotMet, facts + "; " + Join(m.Reasons) + "."),
@@ -100,7 +108,7 @@ public static class PhaseCheck
         }
 
         return string.Equals(r.StoredOutcome, r.MeasuredOutcome, StringComparison.Ordinal)
-            ? new PhaseCriterion(3, name, PhaseVerdict.Met, timed + $"; judging again gave the stored outcome ({r.StoredOutcome}).")
+            ? new PhaseCriterion(3, name, PhaseVerdict.Met, timed + $"; judging again gave the stored outcome ({r.StoredOutcome}).", ReplaySuppliedCaveat)
             : new PhaseCriterion(3, name, PhaseVerdict.NotEvaluable, timed + $"; judging again gave {r.MeasuredOutcome}, not the stored {r.StoredOutcome}: the comparison was not reproduced.");
     }
 
@@ -121,6 +129,8 @@ public static class PhaseCheck
                 : string.Create(c, $"the model was trained on trades from {m.From:yyyy-MM-dd} to {m.To:yyyy-MM-dd}."),
             "folds are out-of-sample inside data that has been seen, so beating baselines on them is not evidence about future data; fills are modelled (ISS-18).",
             "the full Lab replay on 214 instruments is not measured by this check; only the comparison of two stored runs is.",
+            "criterion 1 trusts the stored verdict (checked only against its own stored fold counts) and cannot see margins that were loosened on the command line when the model was judged.",
+            "the re-judge of the stored experiment keeps trades with a trade date before the hold-out start, while the experiment run itself used the hold-out reserve set; the two can differ, which may give 'not reproduced' but never a false MET.",
             "this check reads stored records only, computes no new statistic and tunes nothing; the model is advisory until P7.",
         ];
     }

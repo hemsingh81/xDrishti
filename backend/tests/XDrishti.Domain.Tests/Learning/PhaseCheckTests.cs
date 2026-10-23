@@ -139,4 +139,28 @@ public sealed class PhaseCheckTests
         text.ShouldNotContain(". MET");
         text.ShouldContain("0 met, 0 not met, 3 not evaluable");
     }
+
+    [Theory]
+    [InlineData(3, 4, true)]
+    [InlineData(5, 4, false)]
+    public void An_eligible_verdict_that_its_own_fold_counts_contradict_is_not_evaluable(int beating, int needed, bool pooled)
+    {
+        var model = Model() with { FoldsBeatingBoth = beating, FoldsNeeded = needed, PooledBeatsBoth = pooled };
+
+        var report = PhaseCheck.Evaluate(model, null);
+
+        V(report, 1).ShouldBe(PhaseVerdict.NotEvaluable);
+        report.Criteria[0].Detail.ShouldContain("stored record inconsistent");
+    }
+
+    [Fact]
+    public void A_met_timing_says_the_replay_time_was_not_verified_and_the_new_limits_are_printed()
+    {
+        var text = PhaseCheck.Evaluate(Model(), Replay(supplied: 300)).ToText();
+
+        text.ShouldContain("3. MET (replay time supplied, not verified)");
+        text.ShouldContain("3 met (criterion 3: replay time supplied, not verified)");
+        text.ShouldContain("cannot see margins that were loosened");
+        text.ShouldContain("hold-out reserve set");
+    }
 }
