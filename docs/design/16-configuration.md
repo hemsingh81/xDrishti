@@ -222,7 +222,7 @@ learning:
   paper_days_before_active: 20
   drift: { window_trades: 20, below_band_checks: 3, action: pause }
   hypothesis_loop: { enabled: true, trigger: { schedule: weekly, min_new_trades_per_cell: 30, on_drift: true },
-                     one_variable_only: true, max_open_hypotheses: 3, require_approval: per_autonomy }
+                     one_variable_only: true, max_open_hypotheses: 3, require_approval: per_autonomy }   # built in P6-10 (ADR 0076): one_variable_only and max_open_hypotheses are fixed in code (not read); require_approval = owner approves unless autonomy.level is autonomous (not stored yet); the weekly schedule waits for P7
   execution_feedback: { labels_from: fills, slippage_model: per_liquidity_bucket, reestimate: weekly,
                         min_turnover_cr: 50, capacity_score: true }                       # doc 09 §9
   lessons: { monitors: [drawdown_band, cusum_drift, calibration, execution_gap, decision_drag, tail_loss, data_quality] }

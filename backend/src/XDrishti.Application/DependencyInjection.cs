@@ -460,6 +460,14 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RevertChangelogCommand, ChangelogOutcome>, RevertChangelogHandler>(); // a revert is a new row (P6-08)
         services.AddScoped<IQueryHandler<ListChangelogQuery, Result<IReadOnlyList<ChangelogEntryView>>>, ListChangelogHandler>();
         services.AddScoped<IQueryHandler<GetChangelogEntryQuery, Result<ChangelogEntryView>>, GetChangelogEntryHandler>();
+        services.AddScoped<ICommandHandler<ProposeHypothesisCommand, HypothesisMoveOutcome>, ProposeHypothesisHandler>(); // a hypothesis written down: one knob, owner or grid (P6-10, ADR 0076)
+        services.AddScoped<ICommandHandler<MoveHypothesisCommand, HypothesisMoveOutcome>, MoveHypothesisHandler>(); // approve, reject, expire, accept by the state table
+        services.AddScoped<ICommandHandler<StartHypothesisCommand, HypothesisMoveOutcome>, StartHypothesisHandler>(); // attach the candidate run after the one-variable check
+        services.AddScoped<ICommandHandler<JudgeHypothesisCommand, HypothesisMoveOutcome>, JudgeHypothesisHandler>(); // judge with the P6-11 experiment (a trial)
+        services.AddScoped<IQueryHandler<ListHypothesesQuery, Result<IReadOnlyList<HypothesisView>>>, ListHypothesesHandler>();
+        services.AddScoped<IQueryHandler<GetHypothesisQuery, Result<HypothesisView>>, GetHypothesisHandler>();
+        services.AddScoped<IQueryHandler<GridHypothesesQuery, Result<GridHypothesesView>>, GridHypothesesHandler>(); // the deterministic grid source
+        services.AddScoped<IQueryHandler<EvaluateHypothesisTriggersQuery, Result<HypothesisTriggersView>>, EvaluateHypothesisTriggersHandler>(); // triggers on replayed data, proposals only
         services.AddScoped<IQueryHandler<GetCellStateQuery, Result<CellStateView>>, GetCellStateHandler>();
     }
 }

@@ -104,6 +104,8 @@ an LLM. Record example:
  "backtest":{"oos_trades":212,"exp_R_champion":0.21,"exp_R_challenger":0.26}}
 ```
 
+Built (P6-10, [ADR 0076](../adr/0076-the-hypothesis-loop-one-knob-checked-on-stored-runs-a-state-table-and-nothing-applied.md)): a hypothesis is one knob from the owner or a deterministic grid (no LLM until P9), kept in the insert-only `research.hypotheses` with the states proposed, approved, running, judged, accepted, rejected, expired (at most 3 open; only the owner approves unless the autonomy level is `autonomous`, which nothing passes yet). "One variable" is checked on the two stored runs (parameters, exits, fill rules), the test is the P6-11 experiment and counts as a trial, and accepting records the verdict only: applying a change is the owner's own act (a changelog row). Triggers (30 new trades in a cell, a drift alarm) are computed on replayed data and returned as proposals. The record example above is the intended shape; the stored one carries a stored baseline run instead of the `backtest` summary. Shadow and paper stages wait for P10 and the weekly trigger for P7.
+
 ## 6. Overfitting guards
 
 1. Out-of-sample only for decisions.

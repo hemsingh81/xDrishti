@@ -687,11 +687,11 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P6-10</td>
-<td><strong>Hypothesis loop</strong> (one variable, owner and grid sources; no LLM until P9).</td>
+<td><strong>Hypothesis loop, built 2026-10-23 (<a href="../adr/0076-the-hypothesis-loop-one-knob-checked-on-stored-runs-a-state-table-and-nothing-applied.html">ADR 0076</a>)</strong>: one knob from the owner or a deterministic grid, the one-variable rule checked on the two stored runs&#39; parameters, exits and fill rules, a pure state table (proposed, approved, running, judged, accepted, rejected, expired; owner approval per autonomy; at most 3 open), judged by the P6-11 experiment as a trial, accepting records the verdict and applies nothing, triggers (new trades, drift) returned as proposals on replayed data, insert-only <code>research.hypotheses</code>, <code>xd learn hypothesis</code>, <code>GET /api/hypotheses</code>. No LLM source (P9), no weekly schedule (P7).</td>
 <td>P6</td>
 <td>3 d</td>
-<td>Draft (plan)</td>
-<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Done (check on the report)</td>
+<td><a href="../specs/P6-10-hypothesis-loop.html">spec</a></td>
 <td>One-variable rule; state machine table</td>
 </tr>
 <tr>
@@ -1096,7 +1096,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 05:47</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 06:17</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

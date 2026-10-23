@@ -68,6 +68,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(ModelDetailView))]
 [JsonSerializable(typeof(ExperimentView))]
 [JsonSerializable(typeof(IReadOnlyList<ExperimentView>))]
+[JsonSerializable(typeof(HypothesisView))]
+[JsonSerializable(typeof(IReadOnlyList<HypothesisView>))]
 [JsonSerializable(typeof(ChangelogEntryView))]
 [JsonSerializable(typeof(IReadOnlyList<ChangelogEntryView>))]
 [JsonSerializable(typeof(CellStateView))]

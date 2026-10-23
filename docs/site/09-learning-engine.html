@@ -169,6 +169,7 @@ an LLM. Record example:</p>
 <div class="code"><pre><code class="language-json">{&quot;id&quot;:&quot;H-2026-10-18-01&quot;,&quot;cell&quot;:&quot;ORB|15m|BUY|INTRADAY|*&quot;,&quot;variable&quot;:&quot;exits.FIXED_RR.rr&quot;,&quot;from&quot;:2.0,&quot;to&quot;:2.5,
  &quot;rationale&quot;:&quot;Median MFE 2.7R over 120 OOS trades&quot;,&quot;status&quot;:&quot;shadow&quot;,
  &quot;backtest&quot;:{&quot;oos_trades&quot;:212,&quot;exp_R_champion&quot;:0.21,&quot;exp_R_challenger&quot;:0.26}}</code></pre></div>
+<p>Built (P6-10, <a href="../adr/0076-the-hypothesis-loop-one-knob-checked-on-stored-runs-a-state-table-and-nothing-applied.html">ADR 0076</a>): a hypothesis is one knob from the owner or a deterministic grid (no LLM until P9), kept in the insert-only <code>research.hypotheses</code> with the states proposed, approved, running, judged, accepted, rejected, expired (at most 3 open; only the owner approves unless the autonomy level is <code>autonomous</code>, which nothing passes yet). &quot;One variable&quot; is checked on the two stored runs (parameters, exits, fill rules), the test is the P6-11 experiment and counts as a trial, and accepting records the verdict only: applying a change is the owner&#39;s own act (a changelog row). Triggers (30 new trades in a cell, a drift alarm) are computed on replayed data and returned as proposals. The record example above is the intended shape; the stored one carries a stored baseline run instead of the <code>backtest</code> summary. Shadow and paper stages wait for P10 and the weekly trigger for P7.</p>
 <h2 id="6-overfitting-guards">6. Overfitting guards<a class="hash" href="#6-overfitting-guards" aria-label="Link to this section">#</a></h2>
 <ol>
 <li>Out-of-sample only for decisions.</li>
@@ -514,7 +515,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-23 05:47</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-23 06:17</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>
