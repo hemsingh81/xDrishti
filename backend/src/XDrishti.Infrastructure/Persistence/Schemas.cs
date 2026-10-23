@@ -18,4 +18,10 @@ public static class Schemas
 
     /// <summary>Stored strategies (spec P3-02d, ADR 0056): <c>strategies</c> and <c>strategy_versions</c>, insert-only for the runtime role.</summary>
     public const string Lab = "lab";
+
+    /// <summary>The plan record (spec P7-03, ADR 0083): plans, items, allocations, state events and runs, all insert-only for the runtime role.</summary>
+    public const string Trading = "trading";
+
+    /// <summary>Decisions (spec P7-03): <c>approvals</c>, insert-only for the runtime role, owner decisions only.</summary>
+    public const string Workflow = "workflow";
 }

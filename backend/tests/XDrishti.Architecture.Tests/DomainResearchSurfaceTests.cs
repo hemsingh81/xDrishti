@@ -11,7 +11,7 @@ public sealed class DomainResearchSurfaceTests
 
     private static readonly string[] Namespaces =
     [
-        "XDrishti.Domain.Accounts", "XDrishti.Domain.Auth", "XDrishti.Domain.Common", "XDrishti.Domain.Lab", "XDrishti.Domain.Learning", "XDrishti.Domain.Market", "XDrishti.Domain.Market.Actions", "XDrishti.Domain.Market.Bars", "XDrishti.Domain.Market.Baskets",
+        "XDrishti.Domain.Accounts", "XDrishti.Domain.Auth", "XDrishti.Domain.Common", "XDrishti.Domain.Lab", "XDrishti.Domain.Learning", "XDrishti.Domain.Planning", "XDrishti.Domain.Market", "XDrishti.Domain.Market.Actions", "XDrishti.Domain.Market.Bars", "XDrishti.Domain.Market.Baskets",
         "XDrishti.Domain.Market.Calendar", "XDrishti.Domain.Market.Quality", "XDrishti.Domain.Platform", "XDrishti.Domain.Platform.Services", "XDrishti.Domain.Portfolio", "XDrishti.Domain.Research",
     ];
 

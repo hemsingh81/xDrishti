@@ -14,6 +14,7 @@ using XDrishti.Application.Abstractions.Market.Actions;
 using XDrishti.Application.Abstractions.Market.Bars;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Market.Quality;
+using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Application.Abstractions.Research;
@@ -30,6 +31,7 @@ using XDrishti.Infrastructure.Market.Calendar;
 using XDrishti.Infrastructure.Market.Live;
 using XDrishti.Infrastructure.Market.Quality;
 using XDrishti.Infrastructure.Persistence;
+using XDrishti.Infrastructure.Planning;
 using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
 using XDrishti.Infrastructure.Research;
@@ -127,6 +129,7 @@ public static class DependencyInjection
         services.AddScoped<IExperimentLedger, ExperimentLedger>(); // the experiment ledger: insert-only, its 30-day count is the trials (spec P6-11)
         services.AddScoped<IHypothesisLog, HypothesisLogStore>(); // the insert-only hypothesis log (spec P6-10)
         services.AddScoped<ILessonLog, LessonLogStore>(); // the insert-only lesson log (spec P6-16)
+        services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
         services.AddSingleton<IModelFiles, ModelFiles>(); // the model files under data/models, named by hash (spec P6-07)
         services.AddSingleton<IModelTrainer, MlNetModelTrainer>(); // the ML.NET adapter behind its port (ADR 0070): stateless
         services.AddSingleton<IModelScorerLoader, MlNetScorerLoader>();

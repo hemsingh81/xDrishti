@@ -1,0 +1,61 @@
+# P7-03 — Plan record and state machines
+
+- **Status:** Approved (under the owner's standing run instruction of 2026-10-22; every non-SAFETY open question taken as recommended; the slice touches no order, no credential, no auto-approval path and no real money, so no SAFETY stop applies). Built 2026-10-23.
+- **Phase / roadmap row:** P7 — Selection, accounts & nightly plan, slice P7-03 of [P7-00](P7-00-selection-accounts-and-nightly-plan.md), 3 d
+- **Design refs:** docs/design/04-accounts-access-and-operations.md §4.1, §4.2, §5 · 10-trade-selection.md §5, §6c, §8 · 12 (plan trades) · 15 · 16 (`approvals`) · 19-risks-and-compliance.md §4, §5 · 03-target-architecture.md §4 to §6 · ADR 0083 · ADRs 0073 (the log is the state), 0078 (append-only record, lock per subject)
+
+## Assumptions (taken as recommended)
+1. **Safe by construction.** No order is placed, modified or cancelled by any type; no credential is read; no approval can be made by anything but the owner. The `approvals.kind` column accepts only `owner` (a check); the `ApprovalKind` enum has one member. There is no `system`, `rule` or `auto` kind. Raising that is the owner's decision (P7-00 Q3, Q4) and a new migration.
+2. **The state is the newest row.** No state column exists. `trading.plan_events` holds every state change of a plan (`item_id` null) or a ticket; the first state (plan `draft`, ticket `proposed`) has no row; `published` is written in the same transaction as the plan. A move takes a transaction advisory lock per plan or item, re-reads the newest state, and writes only if it is still the one the caller saw (else `stale`): of two concurrent moves one wins.
+3. **Tickets** (10 states, doc 04 §4.2): Proposed, Modified, Approved, Rejected, Lapsed, Armed, Invalidated, Expired, Triggered, Closed. Thirteen moves: the diagram plus Modified to Rejected, Modified to Lapsed (an edited ticket can still be turned down or left unreviewed) and Approved to Expired (the window ended before arming). Approved, Modified and Rejected are the owner's moves only; every other move is a service's. A reserve ticket reaches Armed only through Approved (no promotion). The group (primary, reserve, rejected) is fixed at publish time; a **rejected candidate is not a ticket**, has no state rows and no moves (the store and the table refuse it).
+4. **Plans** (8 states): Draft, Published, InReview, Approved, Rejected, Lapsed, Armed, Expired; eleven moves. A plan is Approved only when no ticket is open and at least one is approved; Rejected or Lapsed only when none is open and none approved; Armed only with an armed ticket; InReview only after a decision. The plan can never say more than its tickets.
+5. **The default at the review cutoff is lapse.** `ReviewCutoff.Decide` (pure) lapses every Proposed or Modified ticket (reserve included) and sets the plan to Approved only if the owner approved a ticket, else Rejected (all rejected, none lapsed) or Lapsed. `ApplyReviewCutoffHandler` is refused before the cutoff time, for an owner actor, and for a plan that is not Published or InReview. There is no `arm_top_n`, no promotion from reserve, no option that approves.
+6. **Allocations are paper-only for now**: `plan_item_allocations.mode` has a check `= 'paper'` (P7-00 Q2: paper first; a manual-live account gets nothing until the owner decides, by a later migration).
+7. **Plans are immutable.** A plan is stored once by `plan_key` (idempotent, concurrent publishes store one); a different input is a new `version` of the date, never an edit. Notice ("no order is placed by this system; armed means watched") and honest-limits sentences are stored on every plan as data (`PlanWording`, pinned by a test); each item carries its evidence block (cell, trades, data range, P(win) basis, conservative expectancy, unavailable inputs, advisory note) as columns.
+8. **No pipeline, no write endpoint, no screen.** Tests build plans from fixtures through the store. The write use cases (`MoveTicketHandler`, `MovePlanHandler`, `ApplyReviewCutoffHandler`) exist for P7-10/P7-11 and are not exposed over HTTP. The API is read only.
+9. **`plan_runs`** records one row per pipeline attempt (outcome `published` with its plan, `failed_closed` with the failing gate, or `dry_run`; a `manual` flag for the phase check). Written by the P7-08 pipeline; here only the table and the port method.
+10. **Naming.** Schemas `trading` and `workflow` are new (the existing accounts live in `accounts`; doc 03's `trading.accounts` is not moved). Log ids 4650 to 4653. ADR 0083. Migration `AddPlanRecord`.
+11. **The architecture rule** `NoOrderPlacementArchitectureTests` scans every type and member name (any casing, underscores ignored) of the shipped assemblies for `placeorder`, `submitorder`, `modifyorder`, `cancelorder`, and is proved by a planted member and a planted type in the test assembly itself. (The spec of P7-00 said Application, Domain, Infrastructure; the rule also covers Hosting, Api, Worker and Feed.)
+
+## Goal
+The plan, its tickets and every decision about them are permanent, insert-only records with exhaustive, tested state tables whose default at the cutoff is to lapse, readable over the API, with a build rule that no code can place, modify or cancel an order.
+
+## Scope
+**In:** Domain `Planning` (`TicketState`, `TicketGroup`, `TicketLifecycle`, `PlanState`, `PlanLifecycle`, `PlanFacts`, `ReviewCutoff`, `MoveReplay`, `ApprovalKind`, `PlanWording`); Application port `IPlanStore` and records, handlers (list, get, move ticket, move plan, apply cutoff); Infrastructure `PlanStore`, six record types and configurations; migration `AddPlanRecord` (`trading.plans`, `plan_items`, `plan_item_allocations`, `plan_events`, `plan_runs`, `workflow.approvals`, all insert-only for `xd_app`, with `Down`); `GET /api/plans`, `GET /api/plans/{id}`; the architecture rule; ADR 0083; docs; contract regenerated.
+**Out:** the pipeline and its gates (P7-08), selection and ranking (P7-01, P7-02), the review endpoints and screen (P7-10, P7-17), pre-open arming and the active-set provider (P7-11), autonomy and any auto-approval (P7-12, owner decision), grading, journal, suggestions, any order of any kind (P12).
+
+## Acceptance criteria
+1. The ticket table has exactly the 13 moves; for every one of the 100 pairs a move outside the table is refused naming the legal moves (or "final"); final states have no moves. *`TicketLifecycleTests`.*
+2. Approving, modifying and rejecting are refused to a service; every other move is refused to the owner as a hand move; no state can be approved by a service; a reserve ticket cannot reach Armed except through Approved; a rejected candidate has no moves. *`TicketLifecycleTests`, `PlanHandlersTests`.*
+3. The plan table has exactly the 11 moves with the fact rules of assumption 4. *`PlanLifecycleTests`.*
+4. The cutoff default is lapse and never approval for every ticket state; a plan is Approved at the cutoff only with an owner-approved ticket; refused a second before the cutoff and for an owner actor. *`PlanLifecycleTests`, `PlanHandlersTests`, `PlanRecordApiTests`.*
+5. A plan is stored once per key under concurrency; its items, allocations and Published row are one transaction. *`PlanRecordApiTests`.*
+6. Concurrent decisions on one ticket: one wins, the others are stale or refused; an owner decision writes exactly one `owner` approval row that the trail points at; a service attempt writes nothing. *`PlanRecordApiTests`.*
+7. The database agrees with both tables on every pair (events check), refuses an approval kind other than `owner`, a modify without modifications, a manual-live allocation, a published run without a plan, a failed-closed run without a gate, a reserve item without reasons. *`PlanRecordApiTests`.*
+8. `xd_app` can SELECT and INSERT but not UPDATE, DELETE or TRUNCATE on every table of `trading` and `workflow`, and cannot create or alter objects there. *`PlanGrantsTests`.*
+9. `GET /api/plans` (date, account, limit 1 to 200; 422 `plans.invalid`) and `/{id}` (404 `plans.not_found`) show state, next states, tickets with evidence, size per account, notice and the trail. *`PlanRecordApiTests`.*
+10. The build fails on any type or member named for placing, modifying or cancelling an order; the rule is shown to fail on a planted example. *`NoOrderPlacementArchitectureTests`.*
+11. Handlers are internal sealed and registered; log ids 4650 to 4653 are unique; `scripts/gen-api.sh` run; `scripts/check.sh` green.
+
+## Contract
+- **API:** `GET /api/plans?date=&account=&limit=` -> `PlanView[]` (items and history empty in a list); `GET /api/plans/{id}` -> `PlanView`. Errors: 422 `plans.invalid`, 404 `plans.not_found`. Internal (no HTTP): `plans.item_not_found`, `plans.move_refused`, `plans.stale`.
+- **Data:** the six tables above; keys and foreign keys (items to plans, allocations to items and `accounts.broker_accounts`, events to plans/items/approvals, approvals to plans/items, runs to plans); unique `plan_key`, `(for_date, version)`, `(plan_id, item_rank)`, `(item_id, account_id)`; checks as in the tests. Migration `AddPlanRecord` with `Down`.
+- **UI:** none (P7-17).
+- **Events/jobs:** none.
+
+## Non-functional
+Plan read: one query per plan plus items and trail (a few dozen rows). Logs carry ids, state codes and error codes only (4650 to 4653), never a reason, a modification or an account. Time through `TimeProvider`. No broker, credential or network code is reachable from this slice.
+
+## Test plan
+Unit (exhaustive tables, cutoff, replay, wording), Application with a fake store (refusals before any write, owner-only decisions, cutoff), integration on a real database (publish idempotency, concurrency, approval rows, cutoff, events check against both tables, constraint refusals, runs, endpoints), grants as `xd_app` on a dedicated server, architecture (no-order rule with planted violation, Domain namespace list, log ids).
+
+## Honest limits
+Records and tables only: nothing proposes a plan yet and no screen shows one. The concurrency guarantee is per ticket or plan (two different tickets move independently). The plan state is moved by a handler that reads the ticket states first; a ticket decided between that read and the plan write is not re-checked in the same lock (the next move sees it). The no-order rule is by name: it stops the obvious, not a determined bypass; the real barrier is that no broker write endpoint is on the allow-list and no order-capable credential is held.
+
+## Open questions
+None blocking. (Q2 paper-only allocations and Q3/Q4 no auto-approval are kept as the safe defaults.)
+
+## Done when
+- [x] All acceptance criteria have evidence
+- [ ] `scripts/check.sh` green
+- [x] Contract regenerated; migration added; ADR 0083; docs and roadmap updated

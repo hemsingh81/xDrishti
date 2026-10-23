@@ -2724,6 +2724,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The plans, newest session first, each in its current state; optional session date and account filters, limit 1 to 200 (default 50). Empty before the first. No order is placed by any plan. 422 plans.invalid */
+    get: operations['ListPlans'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One plan with its tickets (primary, reserve, rejected with reasons and evidence), size per account, the states they may move to and the trail of every state change. Armed means watched, never an order. 404 plans.not_found */
+    get: operations['GetPlan'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6563,6 +6597,179 @@ export interface components {
       default: components['schemas']['JsonElement'];
       description: null | string;
       unit: null | string;
+    };
+    /** @description Size for one account. */
+    PlanAllocationView: {
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /** @description Its trading mode. */
+      mode: string;
+      /**
+       * Format: int32
+       * @description The quantity.
+       */
+      quantity: number;
+    };
+    /** @description One step of the trail. */
+    PlanEventView: {
+      /**
+       * Format: int64
+       * @description The row id.
+       */
+      id: number;
+      /**
+       * Format: int64
+       * @description The item, or null for the plan.
+       */
+      itemId: null | number;
+      /** @description State before. */
+      from: string;
+      /** @description State after. */
+      to: string;
+      /** @description Who. */
+      actor: string;
+      /** @description Why. */
+      reason: string;
+      /**
+       * Format: int64
+       * @description The approval row of an owner decision.
+       */
+      approvalId: null | number;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      at: string;
+    };
+    /** @description The evidence of a ticket, with its limits. */
+    PlanEvidenceView: {
+      /** @description The cell. */
+      cellKey: string;
+      /**
+       * Format: int32
+       * @description Trades in the cell.
+       */
+      trades: number;
+      /** @description Data range and caveats. */
+      dataRange: string;
+      /** @description What the probability rests on. */
+      pWinBasis: string;
+      /**
+       * Format: double
+       * @description Probability, or null.
+       */
+      pWin: null | number;
+      /**
+       * Format: double
+       * @description Conservative expectancy in R, or null.
+       */
+      conservativeExpectancyR: null | number;
+      /** @description Missing inputs. */
+      unavailable: string[];
+      /** @description A model's figure, labelled advisory, or null. */
+      advisoryNote: null | string;
+    };
+    /** @description One candidate of a plan. */
+    PlanItemView: {
+      /**
+       * Format: int64
+       * @description The item id.
+       */
+      id: number;
+      /**
+       * Format: int32
+       * @description Order in the plan.
+       */
+      rank: number;
+      /** @description primary, reserve or rejected. */
+      group: string;
+      /** @description The ticket state; null for a rejected candidate, which is not a ticket. */
+      state: null | string;
+      /** @description States the ticket may move to; empty for a rejected candidate. */
+      nextStates: string[];
+      /** @description Instrument. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /** @description Strategy. */
+      strategyId: string;
+      /** @description Strategy version. */
+      strategyVersionHash: string;
+      /** @description Conditions left to check live. */
+      trigger: string;
+      /** @description Stop rule and level. */
+      stop: string;
+      /** @description Target rule and level. */
+      target: string;
+      /** @description Validity window. */
+      validity: string;
+      /** @description Reason codes. */
+      reasons: string[];
+      /** @description The evidence block. */
+      evidence: components['schemas']['PlanEvidenceView'];
+      /** @description Size per account. */
+      allocations: components['schemas']['PlanAllocationView'][];
+    };
+    /** @description A plan as the API shows it (P7-03, ADR 0083): header, current state, the sentences it carries as data, and for one plan the tickets and the trail. */
+    PlanView: {
+      /**
+       * Format: int64
+       * @description The plan id.
+       */
+      id: number;
+      /** @description The idempotency key. */
+      planKey: string;
+      /**
+       * Format: date
+       * @description The session.
+       */
+      forDate: string;
+      /**
+       * Format: int32
+       * @description Version within the date.
+       */
+      version: number;
+      /** @description draft, published, inreview, approved, rejected, lapsed, armed or expired. */
+      state: string;
+      /** @description The states the plan may move to. */
+      nextStates: string[];
+      /** @description What the numbers rest on. */
+      basis: string;
+      /** @description Whether cells were not yet paper-proven. */
+      provisional: boolean;
+      /** @description Armed is not an order. */
+      notice: string;
+      /** @description The honest limits. */
+      limits: string;
+      /**
+       * Format: date-time
+       * @description When built.
+       */
+      createdAt: string;
+      /** @description By whom. */
+      createdBy: string;
+      /**
+       * Format: int32
+       * @description Primary tickets.
+       */
+      primary: number;
+      /**
+       * Format: int32
+       * @description Reserve tickets.
+       */
+      reserve: number;
+      /**
+       * Format: int32
+       * @description Rejected candidates.
+       */
+      rejected: number;
+      /** @description The candidates; empty in a list. */
+      items: components['schemas']['PlanItemView'][];
+      /** @description The trail, oldest first; empty in a list. */
+      history: components['schemas']['PlanEventView'][];
     };
     /**
      * @description The value history of a scope (all accounts that count in totals, one account, one bucket). `Points` are in date order at `Resolution` (`day`, `week` or `month`: the last trading day of the period); `Value` is what the
@@ -14978,6 +15185,70 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LessonView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPlans: {
+    parameters: {
+      query?: {
+        date?: string;
+        account?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlan: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanView'];
         };
       };
       /** @description Not Found */

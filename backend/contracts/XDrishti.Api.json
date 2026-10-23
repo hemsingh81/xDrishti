@@ -9157,6 +9157,108 @@
           }
         }
       }
+    },
+    "/api/plans": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "The plans, newest session first, each in its current state; optional session date and account filters, limit 1 to 200 (default 50). Empty before the first. No order is placed by any plan. 422 plans.invalid",
+        "operationId": "ListPlans",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlanView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{id}": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "One plan with its tickets (primary, reserve, rejected with reasons and evidence), size per account, the states they may move to and the trail of every state change. Armed means watched, never an order. 404 plans.not_found",
+        "operationId": "GetPlan",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -20299,6 +20401,363 @@
         },
         "description": "A parameter of a service with its schema: `kind` integer · number · boolean, the bounds of a number, the current value and the default."
       },
+      "PlanAllocationView": {
+        "required": [
+          "accountId",
+          "mode",
+          "quantity"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Its trading mode."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "The quantity.",
+            "format": "int32"
+          }
+        },
+        "description": "Size for one account."
+      },
+      "PlanEventView": {
+        "required": [
+          "id",
+          "itemId",
+          "from",
+          "to",
+          "actor",
+          "reason",
+          "approvalId",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row id.",
+            "format": "int64"
+          },
+          "itemId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The item, or null for the plan.",
+            "format": "int64"
+          },
+          "from": {
+            "type": "string",
+            "description": "State before."
+          },
+          "to": {
+            "type": "string",
+            "description": "State after."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "approvalId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The approval row of an owner decision.",
+            "format": "int64"
+          },
+          "at": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "One step of the trail."
+      },
+      "PlanEvidenceView": {
+        "required": [
+          "cellKey",
+          "trades",
+          "dataRange",
+          "pWinBasis",
+          "pWin",
+          "conservativeExpectancyR",
+          "unavailable",
+          "advisoryNote"
+        ],
+        "type": "object",
+        "properties": {
+          "cellKey": {
+            "type": "string",
+            "description": "The cell."
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Trades in the cell.",
+            "format": "int32"
+          },
+          "dataRange": {
+            "type": "string",
+            "description": "Data range and caveats."
+          },
+          "pWinBasis": {
+            "type": "string",
+            "description": "What the probability rests on."
+          },
+          "pWin": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Probability, or null.",
+            "format": "double"
+          },
+          "conservativeExpectancyR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Conservative expectancy in R, or null.",
+            "format": "double"
+          },
+          "unavailable": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Missing inputs."
+          },
+          "advisoryNote": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A model's figure, labelled advisory, or null."
+          }
+        },
+        "description": "The evidence of a ticket, with its limits."
+      },
+      "PlanItemView": {
+        "required": [
+          "id",
+          "rank",
+          "group",
+          "state",
+          "nextStates",
+          "symbol",
+          "side",
+          "strategyId",
+          "strategyVersionHash",
+          "trigger",
+          "stop",
+          "target",
+          "validity",
+          "reasons",
+          "evidence",
+          "allocations"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The item id.",
+            "format": "int64"
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Order in the plan.",
+            "format": "int32"
+          },
+          "group": {
+            "type": "string",
+            "description": "primary, reserve or rejected."
+          },
+          "state": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The ticket state; null for a rejected candidate, which is not a ticket."
+          },
+          "nextStates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "States the ticket may move to; empty for a rejected candidate."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Instrument."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "strategyId": {
+            "type": "string",
+            "description": "Strategy."
+          },
+          "strategyVersionHash": {
+            "type": "string",
+            "description": "Strategy version."
+          },
+          "trigger": {
+            "type": "string",
+            "description": "Conditions left to check live."
+          },
+          "stop": {
+            "type": "string",
+            "description": "Stop rule and level."
+          },
+          "target": {
+            "type": "string",
+            "description": "Target rule and level."
+          },
+          "validity": {
+            "type": "string",
+            "description": "Validity window."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Reason codes."
+          },
+          "evidence": {
+            "description": "The evidence block.",
+            "$ref": "#/components/schemas/PlanEvidenceView"
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanAllocationView"
+            },
+            "description": "Size per account."
+          }
+        },
+        "description": "One candidate of a plan."
+      },
+      "PlanView": {
+        "required": [
+          "id",
+          "planKey",
+          "forDate",
+          "version",
+          "state",
+          "nextStates",
+          "basis",
+          "provisional",
+          "notice",
+          "limits",
+          "createdAt",
+          "createdBy",
+          "primary",
+          "reserve",
+          "rejected",
+          "items",
+          "history"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The plan id.",
+            "format": "int64"
+          },
+          "planKey": {
+            "type": "string",
+            "description": "The idempotency key."
+          },
+          "forDate": {
+            "type": "string",
+            "description": "The session.",
+            "format": "date"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Version within the date.",
+            "format": "int32"
+          },
+          "state": {
+            "type": "string",
+            "description": "draft, published, inreview, approved, rejected, lapsed, armed or expired."
+          },
+          "nextStates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The states the plan may move to."
+          },
+          "basis": {
+            "type": "string",
+            "description": "What the numbers rest on."
+          },
+          "provisional": {
+            "type": "boolean",
+            "description": "Whether cells were not yet paper-proven."
+          },
+          "notice": {
+            "type": "string",
+            "description": "Armed is not an order."
+          },
+          "limits": {
+            "type": "string",
+            "description": "The honest limits."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When built.",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "By whom."
+          },
+          "primary": {
+            "type": "integer",
+            "description": "Primary tickets.",
+            "format": "int32"
+          },
+          "reserve": {
+            "type": "integer",
+            "description": "Reserve tickets.",
+            "format": "int32"
+          },
+          "rejected": {
+            "type": "integer",
+            "description": "Rejected candidates.",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanItemView"
+            },
+            "description": "The candidates; empty in a list."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanEventView"
+            },
+            "description": "The trail, oldest first; empty in a list."
+          }
+        },
+        "description": "A plan as the API shows it (P7-03, ADR 0083): header, current state, the sentences it carries as data, and for one plan the tickets and the trail."
+      },
       "PortfolioHistory": {
         "required": [
           "points",
@@ -25815,6 +26274,9 @@
     },
     {
       "name": "Learning"
+    },
+    {
+      "name": "Plans"
     }
   ],
   "x-xdrishti-hubs": {

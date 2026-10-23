@@ -15,6 +15,7 @@ using XDrishti.Infrastructure.Learning;
 using XDrishti.Infrastructure.Market;
 using XDrishti.Infrastructure.Market.Bars;
 using XDrishti.Infrastructure.Market.Live;
+using XDrishti.Infrastructure.Planning;
 using XDrishti.Infrastructure.Research;
 
 namespace XDrishti.Infrastructure.Persistence;
@@ -167,6 +168,18 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<HypothesisRecord> Hypotheses => Set<HypothesisRecord>();
 
     internal DbSet<LessonRecord> Lessons => Set<LessonRecord>();
+
+    internal DbSet<PlanRecord> Plans => Set<PlanRecord>();
+
+    internal DbSet<PlanItemRecord> PlanItems => Set<PlanItemRecord>();
+
+    internal DbSet<PlanItemAllocationRecord> PlanItemAllocations => Set<PlanItemAllocationRecord>();
+
+    internal DbSet<PlanEventRecord> PlanEvents => Set<PlanEventRecord>();
+
+    internal DbSet<ApprovalRecord> Approvals => Set<ApprovalRecord>();
+
+    internal DbSet<PlanRunRecord> PlanRuns => Set<PlanRunRecord>();
 
     /// <summary>The verdicts of full tests (spec P5-04).</summary>
     internal DbSet<LabResultRow> LabResults => Set<LabResultRow>();

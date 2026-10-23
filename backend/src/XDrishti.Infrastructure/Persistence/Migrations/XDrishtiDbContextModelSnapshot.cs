@@ -4677,6 +4677,469 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.ApprovalRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("ConfirmReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("confirm_reason");
+
+                    b.Property<DateTimeOffset?>("Cutoff")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cutoff");
+
+                    b.Property<DateTimeOffset>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("Decision")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("decision");
+
+                    b.Property<long?>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Modifications")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("modifications");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approvals");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_approvals_item_id");
+
+                    b.HasIndex("PlanId", "Id")
+                        .HasDatabaseName("ix_approvals_plan_id_id");
+
+                    b.ToTable("approvals", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_approvals_kind", "kind = 'owner'");
+
+                            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanEventRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<long?>("ApprovalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approval_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FromState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("from_state");
+
+                    b.Property<long?>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ToState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("to_state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plan_events");
+
+                    b.HasIndex("ApprovalId")
+                        .HasDatabaseName("ix_plan_events_approval_id");
+
+                    b.HasIndex("ItemId", "Id")
+                        .HasDatabaseName("ix_plan_events_item_id_id");
+
+                    b.HasIndex("PlanId", "Id")
+                        .HasDatabaseName("ix_plan_events_plan_id_id");
+
+                    b.ToTable("plan_events", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_plan_events_legal", "(item_id IS NOT NULL AND (from_state, to_state) IN (('proposed', 'approved'), ('proposed', 'modified'), ('proposed', 'rejected'), ('proposed', 'lapsed'), ('modified', 'approved'), ('modified', 'rejected'), ('modified', 'lapsed'), ('approved', 'armed'), ('approved', 'invalidated'), ('approved', 'expired'), ('armed', 'triggered'), ('armed', 'expired'), ('triggered', 'closed'))) OR (item_id IS NULL AND (from_state, to_state) IN (('draft', 'published'), ('published', 'inreview'), ('published', 'approved'), ('published', 'rejected'), ('published', 'lapsed'), ('inreview', 'approved'), ('inreview', 'rejected'), ('inreview', 'lapsed'), ('approved', 'armed'), ('approved', 'expired'), ('armed', 'expired')))");
+
+                            t.HasCheckConstraint("ck_plan_events_shape", "length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanItemAllocationRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("mode");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plan_item_allocations");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_plan_item_allocations_account_id");
+
+                    b.HasIndex("ItemId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_item_allocations_item_account");
+
+                    b.ToTable("plan_item_allocations", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_plan_item_allocations_shape", "quantity > 0 AND mode = 'paper'");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanItemRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AdvisoryNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("advisory_note");
+
+                    b.Property<string>("CellKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("cell_key");
+
+                    b.Property<double?>("ConservativeExpectancyR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("conservative_expectancy_r");
+
+                    b.Property<string>("DataRange")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("data_range");
+
+                    b.Property<string>("ItemGroup")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("item_group");
+
+                    b.Property<int>("ItemRank")
+                        .HasColumnType("integer")
+                        .HasColumnName("item_rank");
+
+                    b.Property<double?>("PWin")
+                        .HasColumnType("double precision")
+                        .HasColumnName("p_win");
+
+                    b.Property<string>("PWinBasis")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("p_win_basis");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.PrimitiveCollection<string[]>("Reasons")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("reasons");
+
+                    b.Property<string>("Side")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("character varying(4)")
+                        .HasColumnName("side");
+
+                    b.Property<string>("StopText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("stop_text");
+
+                    b.Property<string>("StrategyId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("strategy_id");
+
+                    b.Property<string>("StrategyVersionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("strategy_version_hash");
+
+                    b.Property<string>("Symbol")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("symbol");
+
+                    b.Property<string>("TargetText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("target_text");
+
+                    b.Property<int>("Trades")
+                        .HasColumnType("integer")
+                        .HasColumnName("trades");
+
+                    b.Property<string>("TriggerText")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("trigger_text");
+
+                    b.PrimitiveCollection<string[]>("Unavailable")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("unavailable");
+
+                    b.Property<string>("ValidityText")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("validity_text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plan_items");
+
+                    b.HasIndex("PlanId", "ItemRank")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_items_plan_rank");
+
+                    b.ToTable("plan_items", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_plan_items_group", "item_group IN ('primary', 'reserve', 'rejected') AND (item_group = 'primary' OR cardinality(reasons) > 0)");
+
+                            t.HasCheckConstraint("ck_plan_items_shape", "item_rank >= 1 AND side IN ('BUY', 'SELL') AND trades >= 0 AND (p_win IS NULL OR (p_win >= 0 AND p_win <= 1))");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("basis");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateOnly>("ForDate")
+                        .HasColumnType("date")
+                        .HasColumnName("for_date");
+
+                    b.Property<string>("InputHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_hash");
+
+                    b.Property<string>("Limits")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("limits");
+
+                    b.Property<string>("Notice")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notice");
+
+                    b.Property<string>("PlanKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("plan_key");
+
+                    b.Property<bool>("Provisional")
+                        .HasColumnType("boolean")
+                        .HasColumnName("provisional");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plans");
+
+                    b.HasIndex("PlanKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plans_plan_key");
+
+                    b.HasIndex("ForDate", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plans_for_date_version");
+
+                    b.ToTable("plans", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanRunRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("FailedGate")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("failed_gate");
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<DateOnly>("ForDate")
+                        .HasColumnType("date")
+                        .HasColumnName("for_date");
+
+                    b.Property<bool>("Manual")
+                        .HasColumnType("boolean")
+                        .HasColumnName("manual");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<long?>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("PlanKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("plan_key");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_plan_runs");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_plan_runs_plan_id");
+
+                    b.HasIndex("ForDate", "Id")
+                        .HasDatabaseName("ix_plan_runs_for_date_id");
+
+                    b.ToTable("plan_runs", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_plan_runs_outcome", "outcome IN ('published', 'failed_closed', 'dry_run') AND (outcome = 'published') = (plan_id IS NOT NULL) AND (outcome = 'failed_closed') = (failed_gate IS NOT NULL) AND finished_at >= started_at");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
                 {
                     b.Property<long>("SelectionId")
@@ -6477,6 +6940,80 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.ApprovalRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_approvals_plan_items_item_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_approvals_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanEventRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.ApprovalRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ApprovalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_plan_events_approvals_approval_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_plan_events_plan_items_item_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_plan_events_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanItemAllocationRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_plan_item_allocations_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_plan_item_allocations_plan_items_item_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanItemRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_plan_items_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanRunRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_plan_runs_plans_plan_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
