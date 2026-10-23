@@ -40,9 +40,9 @@ public sealed class ModelRegistryApiTests(ApiFactory factory) : DataTestBase(fac
         await ExecuteAsync(connection, "DELETE FROM research.training_sets WHERE set_id = @id", ("id", SetId));
     }
 
-    private static ModelToRegister Model(char key, ValidationOutcome verdict, int width = 3) =>
-        new(new string(key, 64), new string('e', 64), 100, "FastTree", null, SetId, "tf-1", width, 30, 10, 40, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 1), verdict, 6, 5, 4, true, 3.5, 0.65, 0.23,
-            verdict == ValidationOutcome.Eligible ? string.Empty : "does not beat the baselines", "report text", "params", [-1.0, 0.0, 1.0], [0.3, 0.5, 0.7], [.. Enumerable.Repeat(0.25, width)], DateTimeOffset.UtcNow, "test");
+    private static ModelToRegister Model(char key, ValidationOutcome verdict, int width = 3, char sha = 'e', int trials = 1) =>
+        new(new string(key, 64), new string(sha, 64), 100, "FastTree", null, SetId, "tf-1", width, 30, 10, 40, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 1), verdict, 6, 5, 4, true, 3.5, 0.65, 0.23,
+            verdict == ValidationOutcome.Eligible ? string.Empty : "does not beat the baselines", "report text", "params", [-1.0, 0.0, 1.0], [0.3, 0.5, 0.7], [.. Enumerable.Repeat(0.25, width)], trials, 4, DateTimeOffset.UtcNow, "test");
 
     private async Task<long> RegisterAsync(ModelToRegister model)
     {
@@ -112,6 +112,48 @@ public sealed class ModelRegistryApiTests(ApiFactory factory) : DataTestBase(fac
         (await retired.Content.ReadFromJsonAsync<JsonElement>(Ct))[0].GetProperty("id").GetInt64().ShouldBe(first);
         using var history = await Client.GetAsync(new Uri("/api/models/" + first, UriKind.Relative), Ct);
         (await history.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetProperty("designations").EnumerateArray().Select(d => d.GetProperty("role").GetString()).ShouldBe(["challenger", "champion", "retired"]);
+    }
+
+    [Fact]
+    public async Task A_model_judged_with_fewer_trials_than_the_models_registered_up_to_it_cannot_be_champion()
+    {
+        var one = await RegisterAsync(Model('1', ValidationOutcome.Eligible, sha: 'a', trials: 1));
+        var rushed = await RegisterAsync(Model('2', ValidationOutcome.Eligible, sha: 'b', trials: 1));
+        var careful = await RegisterAsync(Model('3', ValidationOutcome.Eligible, sha: 'c', trials: 3));
+        using var scope = Factory.Services.CreateScope();
+        var registry = scope.ServiceProvider.GetRequiredService<IModelRegistry>();
+
+        var others = await registry.CountOtherModelsAsync("tf-1", new string('a', 64), Ct);
+        var stored = await registry.FindAsync(rushed, Ct);
+
+        others.ShouldBe(2);
+        stored!.RequiredTrials.ShouldBe(2);
+        (await DesignateAsync(one, ModelRole.Champion)).IsSuccess.ShouldBeTrue();
+        (await DesignateAsync(rushed, ModelRole.Champion)).Error.Code.ShouldBe(ModelErrors.NotEligibleCode);
+        (await DesignateAsync(careful, ModelRole.Champion)).IsSuccess.ShouldBeTrue();
+        using var list = await Client.GetAsync(new Uri("/api/models", UriKind.Relative), Ct);
+        var rows = await list.Content.ReadFromJsonAsync<JsonElement>(Ct);
+        rows.EnumerateArray().Single(r => r.GetProperty("id").GetInt64() == rushed).GetProperty("mayBeChampion").GetBoolean().ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_list_leaves_out_the_report_and_the_arrays_and_a_repeated_designation_writes_nothing()
+    {
+        var id = await RegisterAsync(Model('4', ValidationOutcome.Eligible));
+        using var scope = Factory.Services.CreateScope();
+        var registry = scope.ServiceProvider.GetRequiredService<IModelRegistry>();
+
+        var listed = (await registry.ListAsync(null, 10, Ct)).Single();
+        var first = await registry.DesignateAsync(id, ModelRole.Champion, "r", "t", DateTimeOffset.UtcNow, Ct);
+        var second = await registry.DesignateAsync(id, ModelRole.Champion, "r", "t", DateTimeOffset.UtcNow, Ct);
+
+        listed.Model.ReportText.ShouldBeEmpty();
+        listed.Model.Parameters.ShouldBeEmpty();
+        listed.Model.Importance.ShouldBeEmpty();
+        listed.Model.Reasons.ShouldBeEmpty();
+        first.ShouldBeTrue();
+        second.ShouldBeFalse();
+        (await registry.DesignationsAsync(id, Ct)).Count.ShouldBe(2);
     }
 
     [Fact]

@@ -115,6 +115,36 @@ public sealed class TrainModelHandlerTests
     }
 
     [Fact]
+    public async Task The_trials_come_from_the_registry_and_the_command_line_can_only_raise_them()
+    {
+        Run(60);
+        var handler = Handler();
+        _registry.CountOtherModelsAsync("tf-1", new string('e', 64), Ct).Returns(4);
+
+        await handler.HandleAsync(Command(), Ct);
+        var derived = _registered.ShouldNotBeNull();
+        await handler.HandleAsync(Command() with { Validation = Command().Validation! with { Trials = 9 } }, Ct);
+        var floor = _registered.ShouldNotBeNull();
+
+        derived.Trials.ShouldBe(5);
+        derived.Parameters.ShouldContain("trials=5");
+        derived.ReportText.ShouldContain("Trials allowed for: 5");
+        floor.Trials.ShouldBe(9);
+    }
+
+    [Fact]
+    public async Task The_purged_development_rows_are_in_the_report_and_the_record()
+    {
+        Run(60);
+
+        await Handler().HandleAsync(Command(holdOutMonths: 2), Ct);
+
+        var m = _registered.ShouldNotBeNull();
+        m.PurgedRows.ShouldBeGreaterThanOrEqualTo(0);
+        m.ReportText.ShouldContain($"{m.PurgedRows} development trades were purged");
+    }
+
+    [Fact]
     public async Task The_same_inputs_give_the_same_registration_key_and_a_second_registration_says_so()
     {
         Run(60);

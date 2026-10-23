@@ -3439,6 +3439,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("double precision")
                         .HasColumnName("pooled_log_loss");
 
+                    b.Property<int>("PurgedRows")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("purged_rows");
+
                     b.Property<string>("Reasons")
                         .IsRequired()
                         .HasColumnType("text")
@@ -3473,6 +3479,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character(64)")
                         .HasColumnName("training_set_id");
 
+                    b.Property<int>("Trials")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("trials");
+
                     b.Property<int>("UsedFolds")
                         .HasColumnType("integer")
                         .HasColumnName("used_folds");
@@ -3503,7 +3515,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("model_versions", "research", t =>
                         {
-                            t.HasCheckConstraint("ck_model_versions_shape", "sha256 ~ '^[0-9a-f]{64}$' AND version_key ~ '^[0-9a-f]{64}$' AND training_set_id ~ '^[0-9a-f]{64}$' AND verdict IN ('Eligible', 'CannotBeatBaselines', 'Inconclusive') AND artifact_bytes > 0 AND feature_width > 0 AND cardinality(calibration_scores) > 0 AND cardinality(calibration_scores) = cardinality(calibration_values) AND cardinality(importance) = feature_width AND train_rows > 0 AND fit_rows >= 0 AND calibration_rows >= 0 AND used_folds >= 0");
+                            t.HasCheckConstraint("ck_model_versions_shape", "sha256 ~ '^[0-9a-f]{64}$' AND version_key ~ '^[0-9a-f]{64}$' AND training_set_id ~ '^[0-9a-f]{64}$' AND verdict IN ('Eligible', 'CannotBeatBaselines', 'Inconclusive') AND artifact_bytes > 0 AND feature_width > 0 AND cardinality(calibration_scores) > 0 AND cardinality(calibration_scores) = cardinality(calibration_values) AND cardinality(importance) = feature_width AND train_rows > 0 AND fit_rows >= 0 AND calibration_rows >= 0 AND used_folds >= 0 AND trials >= 1 AND purged_rows >= 0");
                         });
                 });
 

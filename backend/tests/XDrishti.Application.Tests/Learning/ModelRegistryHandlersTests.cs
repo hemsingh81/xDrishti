@@ -19,12 +19,17 @@ public sealed class ModelRegistryHandlersTests
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero));
 
-    private static StoredModel Stored(ValidationOutcome verdict, ModelRole role = ModelRole.Challenger, string? note = null, int width = 3) =>
+    private static StoredModel Stored(ValidationOutcome verdict, ModelRole role = ModelRole.Challenger, string? note = null, int width = 3, int folds = 6, int trials = 1, int required = 1, bool heldOut = true) =>
         new(7, role, new ModelToRegister(
-            new string('f', 64), Hash, 3, "FastTree", note, new string('a', 64), "tf-1", width, 30, 10, 40, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), new DateOnly(2026, 7, 1), verdict, 6, 2, 4, false, 7.5, 0.7, 0.25,
-            verdict == ValidationOutcome.Eligible ? string.Empty : "does not beat\nnot calibrated", "report", "params", [0, 1], [0.4, 0.6], [.. Enumerable.Repeat(0.5, width)], DateTimeOffset.UnixEpoch, "t"));
+            new string('f', 64), Hash, 3, "FastTree", note, new string('a', 64), "tf-1", width, 30, 10, 40, new DateOnly(2026, 1, 1), new DateOnly(2026, 6, 1), heldOut ? new DateOnly(2026, 7, 1) : null, verdict, folds, 2, 4, false, 7.5, 0.7, 0.25,
+            verdict == ValidationOutcome.Eligible ? string.Empty : "does not beat\nnot calibrated", "report", "params", [0, 1], [0.4, 0.6], [.. Enumerable.Repeat(0.5, width)], trials, 3, DateTimeOffset.UnixEpoch, "t"),
+            required);
 
-    private DesignateModelHandler Designate() => new(_registry, _time, NullLogger<DesignateModelHandler>.Instance);
+    private DesignateModelHandler Designate()
+    {
+        _registry.DesignateAsync(default, default, default!, default!, default, default).ReturnsForAnyArgs(true);
+        return new(_registry, _time, NullLogger<DesignateModelHandler>.Instance);
+    }
 
     [Theory]
     [InlineData(ValidationOutcome.CannotBeatBaselines)]
@@ -38,6 +43,33 @@ public sealed class ModelRegistryHandlersTests
         result.Error.Code.ShouldBe(ModelErrors.NotEligibleCode);
         result.Error.Kind.ShouldBe(ErrorKind.Conflict);
         await _registry.DidNotReceiveWithAnyArgs().DesignateAsync(default, default, default!, default!, default, Ct);
+    }
+
+    [Theory]
+    [InlineData(false, 6, 1, 1, "hold-out")]
+    [InlineData(true, 5, 1, 1, "5 folds")]
+    [InlineData(true, 6, 1, 3, "3 models")]
+    public async Task An_eligible_verdict_is_not_enough_for_champion_without_a_hold_out_enough_folds_and_the_registry_trials(bool heldOut, int folds, int trials, int required, string reason)
+    {
+        _registry.FindAsync(7, Ct).Returns(Stored(ValidationOutcome.Eligible, folds: folds, trials: trials, required: required, heldOut: heldOut));
+
+        var result = await Designate().HandleAsync(new DesignateModelCommand(7, ModelRole.Champion, "best", "test"), Ct);
+
+        result.Error.Code.ShouldBe(ModelErrors.NotEligibleCode);
+        result.Error.Message.ShouldContain(reason);
+        await _registry.DidNotReceiveWithAnyArgs().DesignateAsync(default, default, default!, default!, default, Ct);
+    }
+
+    [Fact]
+    public async Task A_designation_that_lost_a_race_for_the_same_role_reports_no_change()
+    {
+        _registry.FindAsync(7, Ct).Returns(Stored(ValidationOutcome.Eligible));
+        var handler = Designate();
+        _registry.DesignateAsync(7, ModelRole.Champion, "x", "test", Arg.Any<DateTimeOffset>(), Ct).Returns(false);
+
+        var result = await handler.HandleAsync(new DesignateModelCommand(7, ModelRole.Champion, "x", "test"), Ct);
+
+        result.Value.Changed.ShouldBeFalse();
     }
 
     [Fact]

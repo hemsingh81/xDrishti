@@ -71,6 +71,7 @@ internal sealed class TrainModelHandler(
             .ToList();
         var validation = command.Validation ?? new ValidationOptions();
         DateOnly? holdOutStart = null;
+        var purged = 0;
         if (command.HoldOutMonths > 0)
         {
             var split = HoldOut.Reserve(rows, command.HoldOutMonths);
@@ -81,9 +82,20 @@ internal sealed class TrainModelHandler(
 
             rows = [.. split.Value.Development];
             holdOutStart = split.Value.Start;
+            purged = split.Value.Purged;
             validation = validation with { HoldOutStart = holdOutStart };
         }
 
+        // The model is made first: its hash tells which registered models are other trials. The trials are what the registry already holds for this feature version plus this model; the command line can only raise them.
+        var trained = trainer.Train(rows);
+        if (trained.IsFailure)
+        {
+            return Refuse<TrainModelOutcome>(trained.Error);
+        }
+
+        var model = trained.Value;
+        var others = await registry.CountOtherModelsAsync(data.FeatureVersion, model.Sha256, cancellationToken);
+        validation = validation with { Trials = Math.Max(validation.Trials, others + 1) };
         var compared = WalkForwardValidator.Compare(rows, [trainer.Candidate], validation);
         if (compared.IsFailure)
         {
@@ -93,16 +105,19 @@ internal sealed class TrainModelHandler(
         var report = compared.Value;
         var verdict = report.Verdicts.Single(v => v.Name == trainer.Candidate.Name);
         var pooled = report.Pooled.Single(p => p.Name == trainer.Candidate.Name).Metrics;
-        var trained = trainer.Train(rows);
-        if (trained.IsFailure)
+        var outcomeVerdict = verdict.Outcome;
+        var reasons = verdict.Reasons.ToList();
+        if (outcomeVerdict == ValidationOutcome.Eligible && validation.MinFoldsForVerdict < ValidationOptions.DefaultMinFolds)
         {
-            return Refuse<TrainModelOutcome>(trained.Error);
+            outcomeVerdict = ValidationOutcome.Inconclusive;
+            reasons.Add(string.Create(CultureInfo.InvariantCulture, $"The verdict was asked for with {validation.MinFoldsForVerdict} folds as the minimum; below {ValidationOptions.DefaultMinFolds} it cannot be Eligible."));
         }
 
-        var model = trained.Value;
         var reportText = report.ToText() + (holdOutStart is { } h
-            ? string.Create(CultureInfo.InvariantCulture, $"The last {command.HoldOutMonths} months (from {h:yyyy-MM-dd}) are held out: neither the verdict nor the model has seen them.\n")
-            : "No hold-out was kept: every trade was used in the verdict and in the model.\n");
+            ? string.Create(CultureInfo.InvariantCulture, $"The last {command.HoldOutMonths} months (from {h:yyyy-MM-dd}) are held out: neither the verdict nor the model has seen them. {purged} development trades were purged because their label horizon reaches into the hold-out.\n")
+            : "No hold-out was kept: every trade was used in the verdict and in the model.\n")
+            + string.Create(CultureInfo.InvariantCulture, $"Trials allowed for: {validation.Trials} (the models of this feature version in the registry, this one included, or the number given, if larger).\n")
+            + (outcomeVerdict == verdict.Outcome ? string.Empty : "The verdict was capped at Inconclusive: the minimum number of folds asked for is below the floor.\n");
         var parameters = Describe(trainer.Parameters, validation, command);
         var registration = new ModelToRegister(
             VersionKey(model.Sha256, data.Id, parameters, reportText),
@@ -119,7 +134,7 @@ internal sealed class TrainModelHandler(
             rows.Min(r => r.TradeDate),
             rows.Max(r => r.TradeDate),
             holdOutStart,
-            verdict.Outcome,
+            outcomeVerdict,
             verdict.UsedFolds,
             verdict.FoldsBeatingBoth,
             verdict.FoldsNeeded,
@@ -127,12 +142,14 @@ internal sealed class TrainModelHandler(
             verdict.PooledEcePp,
             pooled.LogLoss,
             pooled.Brier,
-            string.Join('\n', verdict.Reasons),
+            string.Join('\n', reasons),
             reportText,
             parameters,
             model.CalibrationScores,
             model.CalibrationValues,
             model.Importance,
+            validation.Trials,
+            purged,
             now,
             command.Actor);
 
@@ -154,11 +171,11 @@ internal sealed class TrainModelHandler(
         }
 
         var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
-        var outcome = verdict.Outcome.ToString();
+        var outcome = outcomeVerdict.ToString();
         var hash = model.Sha256[..12];
         var what = registered.Created ? "registered" : "already registered";
         ModelLog.Registered(logger, registered.Id, hash, outcome, rows.Count, what, elapsedMs);
-        return Result.Success(new TrainModelOutcome(registered.Id, model.Sha256, !registered.Created, data.Id, outcome, verdict.Reasons, reportText, model.Trainer, model.Note, rows.Count, holdOutStart));
+        return Result.Success(new TrainModelOutcome(registered.Id, model.Sha256, !registered.Created, data.Id, outcome, reasons, reportText, model.Trainer, model.Note, rows.Count, holdOutStart));
     }
 
     private Result<T> Refuse<T>(Error error)

@@ -28,7 +28,7 @@ namespace XDrishti.Application.Learning;
 /// <param name="PooledBrier">Pooled out-of-sample Brier score.</param>
 /// <param name="Reasons">Why it is not eligible; empty when eligible.</param>
 /// <param name="Role">The current role: challenger, champion or retired.</param>
-/// <param name="MayBeChampion">The verdict allows the role champion.</param>
+/// <param name="MayBeChampion">The record allows the role champion: an Eligible verdict, a hold-out kept, enough folds and the trials of the registry.</param>
 public sealed record ModelView(
     long Id,
     string Sha256,
@@ -62,6 +62,6 @@ public sealed record ModelView(
         var m = stored.Model;
         return new ModelView(
             stored.Id, m.Sha256, m.CreatedAt, m.CreatedBy, m.TrainingSetId, m.FeatureVersion, m.Trainer, m.Note, m.FitRows, m.CalibrationRows, m.TrainRows, m.FromDate, m.ToDate, m.HoldOutStart, m.Verdict.ToString(), m.UsedFolds,
-            m.FoldsBeatingBoth, m.FoldsNeeded, m.PooledBeatsBoth, m.PooledEcePp, m.PooledLogLoss, m.PooledBrier, m.Reasons.Length == 0 ? [] : m.Reasons.Split('\n'), stored.Role.Code(), ChampionRule.MayBeChampion(m.Verdict));
+            m.FoldsBeatingBoth, m.FoldsNeeded, m.PooledBeatsBoth, m.PooledEcePp, m.PooledLogLoss, m.PooledBrier, m.Reasons.Length == 0 ? [] : m.Reasons.Split('\n'), stored.Role.Code(), ChampionRule.MayBeChampion(m.Verdict, m.HoldOutStart, m.UsedFolds, m.Trials, stored.RequiredTrials));
     }
 }

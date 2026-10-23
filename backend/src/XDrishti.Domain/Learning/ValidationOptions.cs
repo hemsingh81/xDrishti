@@ -20,7 +20,7 @@ public sealed record ValidationOptions(
     int TestMonths = 3,
     int EmbargoDays = 7,
     int MinTrainTrades = 30,
-    int MinFoldsForVerdict = 6,
+    int MinFoldsForVerdict = ValidationOptions.DefaultMinFolds,
     double FoldsBetterShare = 2.0 / 3.0,
     double LogLossMargin = 0.005,
     double BrierMargin = 0.002,
@@ -29,6 +29,9 @@ public sealed record ValidationOptions(
     int Trials = 1,
     DateOnly? HoldOutStart = null)
 {
+    /// <summary>The fewest folds a verdict is worth; a model judged on fewer cannot be champion (<see cref="ChampionRule"/>).</summary>
+    public const int DefaultMinFolds = 6;
+
     /// <summary>The problems of the values, empty when they are usable.</summary>
     public IReadOnlyList<string> Problems()
     {

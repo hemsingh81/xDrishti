@@ -1,5 +1,4 @@
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Learning;
 
 namespace XDrishti.Application.Learning;
 
@@ -22,8 +21,8 @@ public static class ModelErrors
     public static Error NotFound(long id) => Error.NotFound(NotFoundCode, $"No model {id} is registered.");
 
     /// <summary>Only an eligible model may be champion.</summary>
-    public static Error NotEligible(long id, ValidationOutcome verdict) =>
-        Error.Conflict(NotEligibleCode, $"Model {id} has the verdict {verdict}; only an Eligible model may be named champion.");
+    public static Error NotEligible(long id, IReadOnlyList<string> reasons) =>
+        Error.Conflict(NotEligibleCode, $"Model {id} may not be named champion: {string.Join(" ", reasons)}");
 
     /// <summary>The file of a model is missing.</summary>
     public static Error FileMissing(string sha256) => Error.NotFound(FileMissingCode, $"The file of model {Short(sha256)} is missing.");

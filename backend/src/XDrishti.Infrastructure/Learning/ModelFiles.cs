@@ -30,11 +30,17 @@ internal sealed class ModelFiles(IOptions<ModelStoreOptions> options) : IModelFi
             return Result.Success();
         }
 
-        Directory.CreateDirectory(folder);
+        // Shortcut: no fsync before the rename. A crash can leave a short file under the final name; the next read or write sees that it does not hash to its name and refuses it (write) or rewrites it.
+        CreateFolder(folder);
+        RemoveStaleTemps(folder, sha256);
         var temp = Path.Combine(folder, sha256 + "." + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
-            await File.WriteAllBytesAsync(temp, bytes, cancellationToken);
+            await using (var stream = new FileStream(temp, WriteOptions()))
+            {
+                await stream.WriteAsync(bytes, cancellationToken);
+            }
+
             File.Move(temp, path, overwrite: true);
         }
         finally
@@ -56,22 +62,93 @@ internal sealed class ModelFiles(IOptions<ModelStoreOptions> options) : IModelFi
         }
 
         var path = Path.Combine(Path.GetFullPath(options.Value.Folder), sha256);
-        if (!File.Exists(path))
+        var bytes = await ReadCappedAsync(path, cancellationToken);
+        if (bytes is null)
         {
             return Result.Failure<byte[]>(ModelErrors.FileMissing(sha256));
         }
 
-        if (new FileInfo(path).Length > MaxBytes)
+        return bytes.Length is > 0 and <= (int)MaxBytes && Hashes(bytes, sha256) ? Result.Success(bytes) : Result.Failure<byte[]>(ModelErrors.FileCorrupt(sha256));
+    }
+
+    private static FileStreamOptions WriteOptions()
+    {
+        var o = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None, Options = FileOptions.Asynchronous };
+        if (!OperatingSystem.IsWindows())
         {
-            return Result.Failure<byte[]>(ModelErrors.FileCorrupt(sha256));
+            o.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         }
 
-        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
-        return Hashes(bytes, sha256) ? Result.Success(bytes) : Result.Failure<byte[]>(ModelErrors.FileCorrupt(sha256));
+        return o;
+    }
+
+    private static void CreateFolder(string folder)
+    {
+        if (Directory.Exists(folder))
+        {
+            return;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            Directory.CreateDirectory(folder);
+        }
+        else
+        {
+            Directory.CreateDirectory(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
+    // A temporary file of this hash left by a crashed write; others in the folder are not touched.
+    private static void RemoveStaleTemps(string folder, string sha256)
+    {
+        foreach (var stale in Directory.EnumerateFiles(folder, sha256 + ".*.tmp"))
+        {
+            try
+            {
+                File.Delete(stale);
+            }
+            catch (IOException)
+            {
+                // Another writer of the same model may be using it; it cleans up its own.
+            }
+        }
+    }
+
+    /// <summary>The bytes of the file through one handle (so the length checked is the length read), never more than its length plus one; empty when it is over <see cref="MaxBytes"/>; null when there is no file.</summary>
+    private static async Task<byte[]?> ReadCappedAsync(string path, CancellationToken cancellationToken)
+    {
+        FileStream stream;
+        try
+        {
+            stream = new FileStream(path, new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.Read, Options = FileOptions.Asynchronous });
+        }
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return null;
+        }
+
+        await using (stream)
+        {
+            if (stream.Length > MaxBytes)
+            {
+                return [];
+            }
+
+            var buffer = new byte[(int)stream.Length + 1];
+            var read = 0;
+            int n;
+            while (read < buffer.Length && (n = await stream.ReadAsync(buffer.AsMemory(read), cancellationToken)) > 0)
+            {
+                read += n;
+            }
+
+            return read == buffer.Length ? buffer : buffer[..read];
+        }
     }
 
     private static async Task<bool> IntactAsync(string path, string sha256, CancellationToken cancellationToken) =>
-        new FileInfo(path).Length <= MaxBytes && Hashes(await File.ReadAllBytesAsync(path, cancellationToken), sha256);
+        await ReadCappedAsync(path, cancellationToken) is { Length: > 0 and <= (int)MaxBytes } bytes && Hashes(bytes, sha256);
 
     private static bool Hashes(byte[] bytes, string sha256) => string.Equals(Convert.ToHexStringLower(SHA256.HashData(bytes)), sha256, StringComparison.Ordinal);
 

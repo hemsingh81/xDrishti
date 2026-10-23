@@ -5913,7 +5913,7 @@ export interface components {
       reasons: string[];
       /** @description The current role: challenger, champion or retired. */
       role: string;
-      /** @description The verdict allows the role champion. */
+      /** @description The record allows the role champion: an Eligible verdict, a hold-out kept, enough folds and the trials of the registry. */
       mayBeChampion: boolean;
     };
     /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). */

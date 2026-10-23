@@ -42,6 +42,26 @@ public sealed class ModelFilesTests : IDisposable
     }
 
     [Fact]
+    public async Task A_stale_temporary_file_of_the_hash_is_cleaned_at_write_and_the_files_are_owner_only()
+    {
+        var (bytes, hash) = Model(1);
+        Directory.CreateDirectory(_folder);
+        var stale = Path.Combine(_folder, hash + ".0123.tmp");
+        var other = Path.Combine(_folder, "other.tmp");
+        await File.WriteAllBytesAsync(stale, [1], Ct);
+        await File.WriteAllBytesAsync(other, [1], Ct);
+
+        await Files().WriteAsync(hash, bytes, Ct);
+
+        File.Exists(stale).ShouldBeFalse();
+        File.Exists(other).ShouldBeTrue();
+        if (!OperatingSystem.IsWindows())
+        {
+            File.GetUnixFileMode(Path.Combine(_folder, hash)).ShouldBe(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
+    [Fact]
     public async Task Writing_the_same_file_twice_leaves_it_untouched()
     {
         var (bytes, hash) = Model(1);

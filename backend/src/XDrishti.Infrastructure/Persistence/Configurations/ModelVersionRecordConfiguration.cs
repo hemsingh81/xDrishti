@@ -15,7 +15,7 @@ internal sealed class ModelVersionRecordConfiguration : IEntityTypeConfiguration
         builder.ToTable("model_versions", Schemas.Research, t => t.HasCheckConstraint(
             "ck_model_versions_shape",
             "sha256 ~ '^[0-9a-f]{64}$' AND version_key ~ '^[0-9a-f]{64}$' AND training_set_id ~ '^[0-9a-f]{64}$' AND verdict IN ('Eligible', 'CannotBeatBaselines', 'Inconclusive') AND artifact_bytes > 0 AND feature_width > 0 " +
-            "AND cardinality(calibration_scores) > 0 AND cardinality(calibration_scores) = cardinality(calibration_values) AND cardinality(importance) = feature_width AND train_rows > 0 AND fit_rows >= 0 AND calibration_rows >= 0 AND used_folds >= 0"));
+            "AND cardinality(calibration_scores) > 0 AND cardinality(calibration_scores) = cardinality(calibration_values) AND cardinality(importance) = feature_width AND train_rows > 0 AND fit_rows >= 0 AND calibration_rows >= 0 AND used_folds >= 0 AND trials >= 1 AND purged_rows >= 0"));
         builder.HasKey(x => x.Id).HasName("pk_model_versions");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.VersionKey).HasColumnType("character(64)").IsRequired();
@@ -34,6 +34,8 @@ internal sealed class ModelVersionRecordConfiguration : IEntityTypeConfiguration
         builder.Property(x => x.CalibrationScores).HasColumnType("double precision[]").IsRequired();
         builder.Property(x => x.CalibrationValues).HasColumnType("double precision[]").IsRequired();
         builder.Property(x => x.Importance).HasColumnType("double precision[]").IsRequired();
+        builder.Property(x => x.Trials).HasDefaultValue(1);
+        builder.Property(x => x.PurgedRows).HasDefaultValue(0);
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired();
         builder.HasIndex(x => x.VersionKey).IsUnique().HasDatabaseName("uq_model_versions_version_key");

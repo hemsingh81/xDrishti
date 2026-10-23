@@ -6,7 +6,7 @@ using XDrishti.Domain.Learning;
 
 namespace XDrishti.Application.Learning;
 
-/// <summary>Gives a model a role (spec P6-07, ADR 0070): the designation is appended, never changed. The champion rule (<see cref="ChampionRule"/>) is checked here; the verdict of a model is fixed at registration, so there is nothing to race.</summary>
+/// <summary>Gives a model a role (spec P6-07, ADR 0070): the designation is appended, never changed. The champion rule (<see cref="ChampionRule"/>) is checked here; what the rule reads is fixed at registration, so there is nothing to race. The "already has this role" no-op is checked again inside the designation transaction.</summary>
 internal sealed class DesignateModelHandler(IModelRegistry registry, TimeProvider time, ILogger<DesignateModelHandler> logger) : ICommandHandler<DesignateModelCommand, DesignationOutcome>
 {
     public async ValueTask<Result<DesignationOutcome>> HandleAsync(DesignateModelCommand command, CancellationToken cancellationToken)
@@ -41,10 +41,12 @@ internal sealed class DesignateModelHandler(IModelRegistry registry, TimeProvide
             return Result.Failure<DesignationOutcome>(ModelErrors.NotFound(command.ModelId));
         }
 
-        if (!ChampionRule.Allows(command.Role, model.Model.Verdict))
+        var m = model.Model;
+        var refusals = ChampionRule.Refusals(command.Role, m.Verdict, m.HoldOutStart, m.UsedFolds, m.Trials, model.RequiredTrials);
+        if (refusals.Count > 0)
         {
             ModelLog.Refused(logger, ModelErrors.NotEligibleCode);
-            return Result.Failure<DesignationOutcome>(ModelErrors.NotEligible(command.ModelId, model.Model.Verdict));
+            return Result.Failure<DesignationOutcome>(ModelErrors.NotEligible(command.ModelId, refusals));
         }
 
         if (model.Role == command.Role)
@@ -52,9 +54,13 @@ internal sealed class DesignateModelHandler(IModelRegistry registry, TimeProvide
             return Result.Success(new DesignationOutcome(command.ModelId, command.Role.Code(), false));
         }
 
-        await registry.DesignateAsync(command.ModelId, command.Role, command.Reason.Trim(), command.Actor, time.GetUtcNow(), cancellationToken);
+        var changed = await registry.DesignateAsync(command.ModelId, command.Role, command.Reason.Trim(), command.Actor, time.GetUtcNow(), cancellationToken);
         var code = command.Role.Code();
-        ModelLog.Designated(logger, command.ModelId, code);
-        return Result.Success(new DesignationOutcome(command.ModelId, code, true));
+        if (changed)
+        {
+            ModelLog.Designated(logger, command.ModelId, code);
+        }
+
+        return Result.Success(new DesignationOutcome(command.ModelId, code, changed));
     }
 }

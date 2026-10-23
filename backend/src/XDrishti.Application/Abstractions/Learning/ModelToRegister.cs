@@ -33,6 +33,8 @@ namespace XDrishti.Application.Abstractions.Learning;
 /// <param name="CalibrationScores">The calibration table, raw scores.</param>
 /// <param name="CalibrationValues">The calibration table, probabilities.</param>
 /// <param name="Importance">The mean absolute contribution per feature, in feature order.</param>
+/// <param name="Trials">The trials the verdict was widened for: the larger of the command line and the models of this feature version the registry already had, plus this one.</param>
+/// <param name="PurgedRows">Development rows dropped because their label horizon reaches into the hold-out (0 when none was kept).</param>
 /// <param name="CreatedAt">When.</param>
 /// <param name="CreatedBy">Who.</param>
 public sealed record ModelToRegister(
@@ -64,5 +66,7 @@ public sealed record ModelToRegister(
     IReadOnlyList<double> CalibrationScores,
     IReadOnlyList<double> CalibrationValues,
     IReadOnlyList<double> Importance,
+    int Trials,
+    int PurgedRows,
     DateTimeOffset CreatedAt,
     string CreatedBy);

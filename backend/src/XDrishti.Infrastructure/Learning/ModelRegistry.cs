@@ -13,10 +13,25 @@ namespace XDrishti.Infrastructure.Learning;
 /// </summary>
 internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistry
 {
-    private const string Columns = """
+    // The distinct models (by file hash) of a feature version registered up to each row: the trials a champion's verdict must allow for (ChampionRule).
+    private const string RequiredTrials = """
+        WITH firsts AS (
+            SELECT id, feature_version, (ROW_NUMBER() OVER (PARTITION BY feature_version, sha256 ORDER BY id) = 1)::int AS first FROM research.model_versions),
+        req AS (SELECT id, (SUM(first) OVER (PARTITION BY feature_version ORDER BY id))::int AS required_trials FROM firsts)
+        """;
+
+    // Columns 0 to 32 are the registration; 33 is the role and 34 the required trials. A list leaves the heavy ones empty.
+    private const string Head = """
         v.id, v.version_key, v.sha256, v.artifact_bytes, v.trainer, v.note, v.training_set_id, v.feature_version, v.feature_width, v.fit_rows, v.calibration_rows, v.train_rows, v.from_date, v.to_date, v.hold_out_start, v.verdict, v.used_folds,
-        v.folds_beating_both, v.folds_needed, v.pooled_beats_both, v.pooled_ece_pp, v.pooled_log_loss, v.pooled_brier, v.reasons, v.report_text, v.parameters, v.calibration_scores, v.calibration_values, v.importance, v.created_at, v.created_by,
-        COALESCE((SELECT d.role FROM research.model_designations d WHERE d.model_id = v.id ORDER BY d.id DESC LIMIT 1), 'challenger') AS current_role
+        v.folds_beating_both, v.folds_needed, v.pooled_beats_both, v.pooled_ece_pp, v.pooled_log_loss, v.pooled_brier, v.reasons,
+        """;
+
+    private const string Full = Head + """
+         v.report_text, v.parameters, v.calibration_scores, v.calibration_values, v.importance, v.trials, v.purged_rows, v.created_at, v.created_by
+        """;
+
+    private const string Light = Head + """
+         ''::text AS report_text, ''::text AS parameters, ARRAY[]::double precision[] AS calibration_scores, ARRAY[]::double precision[] AS calibration_values, ARRAY[]::double precision[] AS importance, v.trials, v.purged_rows, v.created_at, v.created_by
         """;
 
     public async ValueTask<RegisteredModel> RegisterAsync(ModelToRegister model, CancellationToken cancellationToken)
@@ -42,9 +57,9 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
         long id;
         await using (var insert = new NpgsqlCommand("""
             INSERT INTO research.model_versions (version_key, sha256, artifact_bytes, trainer, note, training_set_id, feature_version, feature_width, fit_rows, calibration_rows, train_rows, from_date, to_date, hold_out_start, verdict, used_folds,
-                folds_beating_both, folds_needed, pooled_beats_both, pooled_ece_pp, pooled_log_loss, pooled_brier, reasons, report_text, parameters, calibration_scores, calibration_values, importance, created_at, created_by)
+                folds_beating_both, folds_needed, pooled_beats_both, pooled_ece_pp, pooled_log_loss, pooled_brier, reasons, report_text, parameters, calibration_scores, calibration_values, importance, trials, purged_rows, created_at, created_by)
             VALUES (@version_key, @sha256, @bytes, @trainer, @note, @set, @feature_version, @width, @fit, @calibration, @train, @from, @to, @hold_out, @verdict, @used,
-                @beating, @needed, @pooled_beats, @ece, @log_loss, @brier, @reasons, @report, @parameters, @cal_scores, @cal_values, @importance, @created_at, @created_by)
+                @beating, @needed, @pooled_beats, @ece, @log_loss, @brier, @reasons, @report, @parameters, @cal_scores, @cal_values, @importance, @trials, @purged, @created_at, @created_by)
             RETURNING id
             """, connection, transaction))
         {
@@ -77,6 +92,8 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
             p.AddWithValue("cal_scores", NpgsqlDbType.Array | NpgsqlDbType.Double, model.CalibrationScores.ToArray());
             p.AddWithValue("cal_values", NpgsqlDbType.Array | NpgsqlDbType.Double, model.CalibrationValues.ToArray());
             p.AddWithValue("importance", NpgsqlDbType.Array | NpgsqlDbType.Double, model.Importance.ToArray());
+            p.AddWithValue("trials", NpgsqlDbType.Integer, model.Trials);
+            p.AddWithValue("purged", NpgsqlDbType.Integer, model.PurgedRows);
             p.AddWithValue("created_at", NpgsqlDbType.TimestampTz, model.CreatedAt);
             p.AddWithValue("created_by", NpgsqlDbType.Varchar, model.CreatedBy);
             id = (long)(await insert.ExecuteScalarAsync(cancellationToken))!;
@@ -87,9 +104,17 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
         return new RegisteredModel(id, true);
     }
 
+    public async ValueTask<int> CountOtherModelsAsync(string featureVersion, string sha256, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("SELECT COUNT(DISTINCT sha256)::int FROM research.model_versions WHERE feature_version = @f AND sha256 <> @s");
+        select.Parameters.AddWithValue("f", NpgsqlDbType.Varchar, featureVersion);
+        select.Parameters.AddWithValue("s", NpgsqlDbType.Char, sha256);
+        return (int)(await select.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async ValueTask<StoredModel?> FindAsync(long id, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM research.model_versions v WHERE v.id = @id");
+        await using var select = dataSource.CreateCommand($"{RequiredTrials} SELECT {Full}, COALESCE((SELECT d.role FROM research.model_designations d WHERE d.model_id = v.id ORDER BY d.id DESC LIMIT 1), 'challenger') AS current_role, r.required_trials FROM research.model_versions v JOIN req r ON r.id = v.id WHERE v.id = @id");
         select.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? Read(reader) : null;
@@ -97,7 +122,15 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
 
     public async ValueTask<IReadOnlyList<StoredModel>> ListAsync(ModelRole? role, int limit, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand($"SELECT * FROM (SELECT {Columns} FROM research.model_versions v) m WHERE (@role::text IS NULL OR m.current_role = @role::text) ORDER BY m.id DESC LIMIT @limit");
+        await using var select = dataSource.CreateCommand($"""
+            {RequiredTrials}
+            SELECT {Light}, COALESCE(c.role, 'challenger') AS current_role, r.required_trials
+            FROM research.model_versions v
+            JOIN req r ON r.id = v.id
+            LEFT JOIN (SELECT DISTINCT ON (model_id) model_id, role FROM research.model_designations ORDER BY model_id, id DESC) c ON c.model_id = v.id
+            WHERE (@role::text IS NULL OR COALESCE(c.role, 'challenger') = @role::text)
+            ORDER BY v.id DESC LIMIT @limit
+            """);
         select.Parameters.Add(new NpgsqlParameter("role", NpgsqlDbType.Text) { Value = role is { } r ? r.Code() : DBNull.Value });
         select.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
@@ -124,13 +157,24 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
         return rows;
     }
 
-    public async ValueTask DesignateAsync(long id, ModelRole role, string reason, string actor, DateTimeOffset at, CancellationToken cancellationToken)
+    public async ValueTask<bool> DesignateAsync(long id, ModelRole role, string reason, string actor, DateTimeOffset at, CancellationToken cancellationToken)
     {
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await using (var advisory = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtext('research.model_designations'))", connection, transaction))
         {
             await advisory.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Checked again under the lock: a second designation of the same role that raced the first writes nothing.
+        await using (var current = new NpgsqlCommand("SELECT role FROM research.model_designations WHERE model_id = @id ORDER BY id DESC LIMIT 1", connection, transaction))
+        {
+            current.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, id);
+            var now = await current.ExecuteScalarAsync(cancellationToken) as string ?? ModelRole.Challenger.Code();
+            if (now == role.Code())
+            {
+                return false;
+            }
         }
 
         if (role == ModelRole.Champion)
@@ -150,6 +194,7 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
 
         await AppendAsync(connection, transaction, id, role, reason, actor, at, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     private static async Task AppendAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long id, ModelRole role, string reason, string actor, DateTimeOffset at, CancellationToken cancellationToken)
@@ -194,8 +239,10 @@ internal sealed class ModelRegistry(NpgsqlDataSource dataSource) : IModelRegistr
             CalibrationScores: r.GetFieldValue<double[]>(26),
             CalibrationValues: r.GetFieldValue<double[]>(27),
             Importance: r.GetFieldValue<double[]>(28),
-            CreatedAt: r.GetFieldValue<DateTimeOffset>(29),
-            CreatedBy: r.GetString(30));
-        return new StoredModel(r.GetInt64(0), ModelRoleExtensions.Parse(r.GetString(31)) ?? ModelRole.Challenger, model);
+            Trials: r.GetInt32(29),
+            PurgedRows: r.GetInt32(30),
+            CreatedAt: r.GetFieldValue<DateTimeOffset>(31),
+            CreatedBy: r.GetString(32));
+        return new StoredModel(r.GetInt64(0), ModelRoleExtensions.Parse(r.GetString(33)) ?? ModelRole.Challenger, model, r.GetInt32(34));
     }
 }

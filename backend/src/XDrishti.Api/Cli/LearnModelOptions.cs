@@ -15,7 +15,8 @@ internal sealed record LearnModelOptions(IReadOnlyList<CellSource> Sources, IRea
             builds and keeps the training set, judges the model against the baselines on purged walk-forward folds, trains the final model on the development rows,
             writes its file under data/models and registers it as a challenger whatever the verdict; only an Eligible model can be named champion (xd learn designate)
             --hold-out-months keeps the last N months out of the verdict and the model (default 6; 0 keeps none)
-            --trials counts the models and settings looked at, which widens the margins (default 1); --min-folds is the fewest folds for a verdict (default 6)
+            --trials is a floor on the models and settings looked at, which widen the margins (default 1; the registry's own count of models of this feature version is used if larger)
+            --min-folds is the fewest folds for a verdict (default 6; below 6 the model cannot be Eligible)
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;

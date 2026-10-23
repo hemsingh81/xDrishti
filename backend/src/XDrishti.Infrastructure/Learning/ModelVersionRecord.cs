@@ -61,6 +61,10 @@ internal sealed class ModelVersionRecord
 
     public double[] Importance { get; set; } = [];
 
+    public int Trials { get; set; } = 1;
+
+    public int PurgedRows { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public string CreatedBy { get; set; } = string.Empty;

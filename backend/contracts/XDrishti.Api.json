@@ -18821,7 +18821,7 @@
           },
           "mayBeChampion": {
             "type": "boolean",
-            "description": "The verdict allows the role champion."
+            "description": "The record allows the role champion: an Eligible verdict, a hold-out kept, enough folds and the trials of the registry."
           }
         },
         "description": "A registered model as the API shows it (P6-07, ADR 0070): what made it, what the harness said about it and its current role. No model bytes."
