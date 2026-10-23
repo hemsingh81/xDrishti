@@ -12,6 +12,8 @@
     <ProjectReference Include="..\XDrishti.SimOracle\XDrishti.SimOracle.csproj" />
     <!-- The chart reader (P3-09c): loaded here only to inspect its references. -->
     <ProjectReference Include="..\..\src\XDrishti.SimReader\XDrishti.SimReader.csproj" />
+    <!-- The ML.NET adapter (P6-06): loaded here only to inspect its references. -->
+    <ProjectReference Include="..\..\src\XDrishti.Learning.MlNet\XDrishti.Learning.MlNet.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />

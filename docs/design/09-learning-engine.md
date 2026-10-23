@@ -51,6 +51,8 @@ Only test windows count. Gap ≥ max holding (5 sessions). Tuning only inside tr
 
 Built (P6-05, [ADR 0067](../adr/0067-validation-harness-and-baselines-purged-folds-and-an-honest-eligibility-rule.md)): quarterly folds (first test 9 months in) with train rows purged by label horizon, scored against base-rate, cell-rate and logistic baselines; a model is eligible only if it beats both of the last two by a margin in 2/3 of the folds and pooled, with calibration error within 5 pp; fewer than 6 folds is "inconclusive"; the last 6 months are a hold-out used once.
 
+Built (P6-06, [ADR 0068](../adr/0068-the-ml-net-trainer-adapter-pav-calibration-on-a-held-back-slice-and-honest-explanations.md)): the model is a candidate behind the same port as the baselines; trees are fitted on the early 75 % of a fold's train rows, the PAV calibration map on the latest 25 % (never on test rows), LightGBM falls back to FastTree when its native library cannot load (and the model says so), every score can carry its top feature contributions, and the model bytes have a SHA-256. It can lose: on pure noise it is `CannotBeatBaselines`.
+
 ## 3. Daily feedback loop
 
 1. Grade yesterday's primary, reserve and rejected items against actual data.

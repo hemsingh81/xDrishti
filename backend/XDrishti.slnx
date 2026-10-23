@@ -14,6 +14,7 @@
     <Project Path="src/XDrishti.Simulation/XDrishti.Simulation.csproj" />
     <Project Path="src/XDrishti.SimExport/XDrishti.SimExport.csproj" />
     <Project Path="src/XDrishti.SimReader/XDrishti.SimReader.csproj" />
+    <Project Path="src/XDrishti.Learning.MlNet/XDrishti.Learning.MlNet.csproj" />
     <Project Path="src/XDrishti.Infrastructure/XDrishti.Infrastructure.csproj" />
     <Project Path="src/XDrishti.Hosting/XDrishti.Hosting.csproj" />
     <Project Path="src/XDrishti.Api/XDrishti.Api.csproj" />
@@ -30,6 +31,7 @@
     <Project Path="tests/XDrishti.SimOracle/XDrishti.SimOracle.csproj" />
     <Project Path="tests/XDrishti.SimExport.Tests/XDrishti.SimExport.Tests.csproj" />
     <Project Path="tests/XDrishti.SimReader.Tests/XDrishti.SimReader.Tests.csproj" />
+    <Project Path="tests/XDrishti.Learning.MlNet.Tests/XDrishti.Learning.MlNet.Tests.csproj" />
     <Project Path="tests/XDrishti.Infrastructure.Tests/XDrishti.Infrastructure.Tests.csproj" />
     <Project Path="tests/XDrishti.Feed.Tests/XDrishti.Feed.Tests.csproj" />
     <Project Path="tests/XDrishti.Architecture.Tests/XDrishti.Architecture.Tests.csproj" />
