@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>A ranked candidate a smart rule moved to the reserve, with the reason and the numbers.</summary>
 /// <param name="Ranked">The candidate with its original rank.</param>

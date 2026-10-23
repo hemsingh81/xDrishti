@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>Market gate mode (doc 09 section 14).</summary>
 public enum GateMode

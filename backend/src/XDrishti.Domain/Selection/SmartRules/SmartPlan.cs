@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>The ranked list after the smart rules (spec P7-06).</summary>
 /// <param name="Primary">Candidates that stay primary, in rank order.</param>

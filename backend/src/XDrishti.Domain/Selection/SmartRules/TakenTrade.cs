@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>A trade the system really took (not a simulated one), closed with a result in R.</summary>
 /// <param name="TradeId">Stable id; the order of equal dates.</param>

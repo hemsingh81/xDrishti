@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>An open trade or holding the new tickets must not duplicate.</summary>
 /// <param name="Symbol">The instrument.</param>

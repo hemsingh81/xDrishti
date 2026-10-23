@@ -82,12 +82,18 @@ public sealed class AttackTests
     public void Reading_the_example_is_fast()
     {
         StrategyFile.Read(Example.Text);
-        var clock = Stopwatch.StartNew();
-        for (var i = 0; i < 200; i++)
+        var best = double.MaxValue;
+        for (var round = 0; round < 3; round++) // best of three: a busy machine must not fail a loose guard
         {
-            StrategyFile.Read(Example.Text);
+            var clock = Stopwatch.StartNew();
+            for (var i = 0; i < 200; i++)
+            {
+                StrategyFile.Read(Example.Text);
+            }
+
+            best = Math.Min(best, clock.Elapsed.TotalMilliseconds / 200);
         }
 
-        (clock.Elapsed.TotalMilliseconds / 200).ShouldBeLessThan(5, "the target is 1 ms (criterion 10, measured by the explicit benchmark); this is a loose guard");
+        best.ShouldBeLessThan(5, "the target is 1 ms (criterion 10, measured by the explicit benchmark); this is a loose guard");
     }
 }

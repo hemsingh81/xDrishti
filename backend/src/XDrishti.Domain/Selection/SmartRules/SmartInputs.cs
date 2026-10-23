@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>Everything the smart rules read besides the ranked list. A null part means the data does not exist.</summary>
 /// <param name="Gate">Market figures before the decision date.</param>

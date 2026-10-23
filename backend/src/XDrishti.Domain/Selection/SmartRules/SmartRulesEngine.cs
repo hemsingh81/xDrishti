@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>
 /// Applies the smart rules to a ranked list, in this order (doc 09 section 14): market gate, correlation-aware selection, equity-curve throttle.
@@ -15,6 +15,11 @@ public static class SmartRulesEngine
         ArgumentNullException.ThrowIfNull(ranked);
         ArgumentNullException.ThrowIfNull(inputs);
         ArgumentNullException.ThrowIfNull(options);
+        if (options.Problems() is { Count: > 0 } problems)
+        {
+            throw new ArgumentException("Invalid smart rule options: " + string.Join("; ", problems), nameof(options));
+        }
+
         var list = ranked.OrderBy(r => r.Rank).ThenBy(r => r.Merged.Winner.Candidate.Symbol, StringComparer.Ordinal).ToList();
         var reserve = new List<ReservedCandidate>();
         var flags = new List<PlanFlag>();
@@ -128,12 +133,22 @@ public static class SmartRulesEngine
     {
         double best = double.NegativeInfinity;
         string? reason = null;
+        var mine = SideSign.Of(c.Side);
+        var mySymbol = CorrelationMatrix.Normalize(c.Symbol);
         foreach (var (symbol, side) in others)
         {
-            var sameSide = string.Equals(side, c.Side, StringComparison.Ordinal);
+            // A side that is not exactly BUY or SELL is unknown: the pair is not checked and is counted, never a pass.
+            var theirs = SideSign.Of(side);
+            if (mine == 0 || theirs == 0)
+            {
+                unavailable++;
+                continue;
+            }
+
+            var sameSide = mine == theirs;
             double effective;
             string text;
-            if (string.Equals(symbol, c.Symbol, StringComparison.Ordinal))
+            if (string.Equals(mySymbol, CorrelationMatrix.Normalize(symbol), StringComparison.Ordinal))
             {
                 if (!sameSide)
                 {
@@ -143,14 +158,19 @@ public static class SmartRulesEngine
                 effective = 1;
                 text = $"same bet as {label} {symbol} (same instrument and side)";
             }
-            else if (sameSide && table.SameUnderlying(c.Symbol, symbol))
+            else if (table.SameUnderlying(c.Symbol, symbol))
             {
+                if (!sameSide)
+                {
+                    continue; // opposite sides of one underlying are a hedge
+                }
+
                 effective = 1;
                 text = $"same bet as {label} {symbol} (same underlying)";
             }
             else if (table.Get(c.Symbol, symbol) is { } corr)
             {
-                effective = sameSide ? corr : -corr;
+                effective = mine * theirs * corr;
                 if (Math.Round(effective, 9) <= Math.Round(options.CorrelationMax, 9))
                 {
                     continue;

@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>The stable codes of the smart rules (spec P7-06). Stored and shown as they are; never rename one.</summary>
 public static class SmartRuleCodes

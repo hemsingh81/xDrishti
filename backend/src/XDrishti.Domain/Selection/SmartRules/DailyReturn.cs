@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>A daily close-to-close return of one instrument.</summary>
 /// <param name="Date">The session.</param>

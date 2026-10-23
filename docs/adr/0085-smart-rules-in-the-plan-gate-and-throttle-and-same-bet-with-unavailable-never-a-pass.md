@@ -14,7 +14,8 @@ Doc 09 section 14 puts a market gate, a correlation check and an equity-curve th
 4. **Throttle** cuts risk to x0.5 while the cumulative R of real taken trades is below the average of its last 20 points; with fewer than 20 real trades it is inactive, says why, and risk stays x1. It never removes tickets.
 5. **Same bet:** same instrument/side, same underlying group, or side-adjusted 60-session return correlation above 0.60 with an open trade or a better kept ticket; the weaker goes to reserve with the number. No table or a pair without a figure is flagged, not passed.
 6. **Honesty flag** when a rule removes half or more of what it saw. The comparison of skipped against taken trades waits for graded reserve outcomes (P7-13).
-7. **Not applied:** the meta size multiplier (annotation only) and the entry window.
+7. **Sides and data hygiene:** a side other than exactly BUY or SELL is unknown (shared helper with the fill); such a pair is counted unavailable and flagged, never a hedge. Gate figures older than 4 calendar days read unavailable. The correlation table sits on the fill's `CorrelationMatrix`; return series with conflicting duplicates drop that date. Honesty flag is per plan (docs 09/10 amended).
+8. **Not applied:** the meta size multiplier (annotation only) and the entry window.
 
 ## Consequences
 - Today only the correlation rule can act; the gate and throttle report unavailable and say why.

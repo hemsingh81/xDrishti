@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>
 /// The equity-curve throttle (doc 09 section 14, spec P7-06): equity is the running sum of R of the real taken trades; while the latest equity is below the average of its last N points, risk is multiplied by <c>ThrottleCut</c>.

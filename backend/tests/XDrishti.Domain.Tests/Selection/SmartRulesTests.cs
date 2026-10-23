@@ -1,4 +1,5 @@
 using XDrishti.Domain.Selection;
+using XDrishti.Domain.Selection.SmartRules;
 
 namespace XDrishti.Domain.Tests.Selection;
 
@@ -270,11 +271,127 @@ public sealed class SmartRulesTests
         var short5 = a.Take(5).ToList();
         var table = CorrelationTable.FromReturns(
             new Dictionary<string, IReadOnlyList<DailyReturn>> { ["A"] = future, ["B"] = same, ["C"] = inverse, ["D"] = short5 },
-            Day);
+            Day,
+            ["A", "B", "C", "d"]);
 
         table.Get("A", "B").ShouldNotBeNull().ShouldBe(1, 1e-9);
         table.Get("B", "A").ShouldNotBeNull().ShouldBe(1, 1e-9);
         table.Get("A", "C").ShouldNotBeNull().ShouldBe(-1, 1e-9);
         table.Get("A", "D").ShouldBeNull();
+    }
+
+    [Fact]
+    public void Correlation_from_returns_drops_dates_with_conflicting_duplicates_whatever_the_input_order()
+    {
+        var days = Enumerable.Range(1, 70).Select(i => Before.AddDays(-i)).ToList();
+        var a = days.Select((d, i) => new DailyReturn(d, Math.Sin(i))).ToList();
+        var b = days.Select((d, i) => new DailyReturn(d, Math.Sin(i))).ToList();
+        var dup = a.Append(new DailyReturn(days[0], 5)).ToList();
+        var reversed = Enumerable.Reverse(dup).ToList();
+
+        double? Of(List<DailyReturn> x) => CorrelationTable.FromReturns(new Dictionary<string, IReadOnlyList<DailyReturn>> { ["A"] = x, ["B"] = b }, Day, ["A"], ["B"]).Get("A", "B");
+
+        Of(dup).ShouldBe(Of(reversed));
+        Of(dup).ShouldNotBeNull().ShouldBe(1, 1e-9);
+    }
+
+    [Fact]
+    public void Correlation_from_returns_computes_only_the_pairs_the_plan_needs()
+    {
+        var days = Enumerable.Range(1, 70).Select(i => Before.AddDays(-i)).ToList();
+        IReadOnlyList<DailyReturn> R(double k) => [.. days.Select((d, i) => new DailyReturn(d, Math.Sin(i * k)))];
+        var table = CorrelationTable.FromReturns(
+            new Dictionary<string, IReadOnlyList<DailyReturn>> { ["A"] = R(1), ["B"] = R(1), ["X"] = R(1), ["Y"] = R(1) }, Day, ["A"], ["b"]);
+
+        table.Get("A", "B").ShouldNotBeNull();
+        table.Get("X", "Y").ShouldBeNull();
+        table.Get("A", "X").ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("Buy")]
+    [InlineData("B")]
+    [InlineData("")]
+    [InlineData("LONG")]
+    public void An_open_position_with_a_side_that_is_not_BUY_or_SELL_is_never_a_hedge_and_is_flagged(string side)
+    {
+        var table = new CorrelationTable([("AAA", "OPEN", 0.95)]);
+        var plan = SmartRulesEngine.Apply(Ranked(("AAA", 0.5, "BUY")), Day, Full(table: table, open: [new OpenPosition("OPEN", side)]), Opt);
+
+        plan.CorrelationUnavailablePairs.ShouldBe(1);
+        plan.Flags.ShouldContain(f => f.Code == SmartRuleCodes.CorrelationPartial);
+        plan.Reserve.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_candidate_with_an_unknown_side_is_not_screened_and_is_flagged()
+    {
+        var table = new CorrelationTable([("AAA", "BBB", 0.95)]);
+        var plan = SmartRulesEngine.Apply(Ranked(("AAA", 0.5, "BUY"), ("BBB", 0.4, "buy")), Day, Full(table: table), Opt);
+
+        plan.CorrelationUnavailablePairs.ShouldBe(1);
+        plan.Primary.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Stale_gate_figures_read_unavailable()
+    {
+        MarketGate.Evaluate(Gate(vix: 30, asOf: Day.AddDays(-4)), Day, Opt).Mode.ShouldBe(GateMode.NoTrade);
+        MarketGate.Evaluate(Gate(asOf: Day.AddDays(-5)), Day, Opt).Mode.ShouldBe(GateMode.Unavailable);
+        MarketGate.Evaluate(Gate(vix: 30, asOf: Day.AddDays(-90)), Day, Opt).Mode.ShouldBe(GateMode.Unavailable);
+    }
+
+    [Fact]
+    public void Two_symbols_of_one_underlying_on_opposite_sides_are_a_hedge()
+    {
+        var table = new CorrelationTable([], new Dictionary<string, string> { ["AAA"] = "U", ["BBB"] = "U" });
+        var plan = SmartRulesEngine.Apply(Ranked(("AAA", 0.5, "BUY"), ("BBB", 0.4, "SELL")), Day, Full(table: table), Opt);
+
+        plan.Primary.Count.ShouldBe(2);
+        plan.CorrelationUnavailablePairs.ShouldBe(0);
+    }
+
+    [Fact]
+    public void An_open_trade_hit_takes_precedence_over_a_better_ticket_hit()
+    {
+        var table = new CorrelationTable([("BBB", "AAA", 0.9), ("BBB", "OPEN", 0.7)]);
+        var plan = SmartRulesEngine.Apply(Ranked(("AAA", 0.5, "BUY"), ("BBB", 0.4, "BUY")), Day, Full(table: table, open: [new OpenPosition("OPEN", "BUY")]), Opt);
+
+        var r = plan.Reserve.ShouldHaveSingleItem();
+        r.Code.ShouldBe(SmartRuleCodes.SameBetOpenTrade);
+        r.Reason.ShouldContain("OPEN");
+    }
+
+    [Fact]
+    public void A_no_trade_gate_still_reports_the_correlation_rule_with_no_pairs_to_check()
+    {
+        var plan = SmartRulesEngine.Apply(Four(), Day, Full(Gate(vix: 25), new CorrelationTable([])), Opt);
+
+        plan.Primary.ShouldBeEmpty();
+        plan.Correlation.ShouldBe(RuleStatus.Applied);
+        plan.CorrelationUnavailablePairs.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Honesty_boundary_exactly_half_flags_and_just_under_does_not()
+    {
+        // 1 of 2 removed is exactly half: flagged. 1 of 3 is not.
+        var two = SmartRulesEngine.Apply(Ranked(("AAA", 0.5, "BUY"), ("BBB", 0.4, "BUY")), Day, Full(table: new CorrelationTable([("AAA", "BBB", 0.9)])), Opt);
+        two.Flags.ShouldContain(f => f.Code == SmartRuleCodes.RuleRemovedHalf);
+        var three = SmartRulesEngine.Apply(Four().Take(3).ToList(), Day, Full(table: new CorrelationTable([("AAA", "BBB", 0.9), ("AAA", "CCC", 0.1), ("BBB", "CCC", 0.1)])), Opt);
+        three.Flags.ShouldNotContain(f => f.Code == SmartRuleCodes.RuleRemovedHalf);
+    }
+
+    [Fact]
+    public void Invalid_options_are_listed_and_refused()
+    {
+        new SmartRulesOptions().Problems().ShouldBeEmpty();
+        (Opt with { VixReduce = 23 }).Problems().ShouldNotBeEmpty();
+        (Opt with { ReducedItemsFactor = 0 }).Problems().ShouldNotBeEmpty();
+        (Opt with { ReducedItemsFactor = 1.5 }).Problems().ShouldNotBeEmpty();
+        (Opt with { ThrottleCut = 0 }).Problems().ShouldNotBeEmpty();
+        (Opt with { HonestyFraction = double.NaN }).Problems().ShouldNotBeEmpty();
+        (Opt with { GateMaxAgeDays = 0 }).Problems().ShouldNotBeEmpty();
+        Should.Throw<ArgumentException>(() => SmartRulesEngine.Apply(Four(), Day, new SmartInputs(), Opt with { ThrottleCut = 2 }));
     }
 }

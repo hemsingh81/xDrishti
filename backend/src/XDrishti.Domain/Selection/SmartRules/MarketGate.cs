@@ -1,11 +1,11 @@
 using System.Globalization;
 
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>
 /// The market gate (doc 09 section 14, spec P7-06). VIX at or above <c>VixNoTrade</c> is no-trade; VIX at or above <c>VixReduce</c>, breadth below <c>BreadthMin</c> or a high-impact event is reduced; else normal.
 /// A limit that trips on a known figure counts even when another figure is missing (it can only make the plan safer). Normal needs all three figures: a missing one with nothing tripped is <see cref="GateMode.Unavailable"/>, never a pass.
-/// Figures dated on or after the decision date are not known (no look-ahead).
+/// Figures dated on or after the decision date are not known (no look-ahead), and figures older than <c>GateMaxAgeDays</c> are stale: both read unavailable.
 /// </summary>
 public static class MarketGate
 {
@@ -18,7 +18,7 @@ public static class MarketGate
             return new GateResult(GateMode.Normal, RuleStatus.Off, SmartRuleCodes.GateOff, null, null, [], []);
         }
 
-        var known = input is not null && input.AsOf < decisionDate;
+        var known = input is not null && input.AsOf < decisionDate && input.AsOf >= decisionDate.AddDays(-options.GateMaxAgeDays);
         var vix = known ? Finite(input!.Vix) : null;
         var breadth = known ? Finite(input!.Breadth) : null;
         var evt = known ? input!.HighImpactEventToday : null;

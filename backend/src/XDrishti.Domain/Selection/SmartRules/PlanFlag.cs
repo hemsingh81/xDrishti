@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>A visible flag on the plan (banner line).</summary>
 /// <param name="Code">Stable code from <see cref="SmartRuleCodes"/>.</param>

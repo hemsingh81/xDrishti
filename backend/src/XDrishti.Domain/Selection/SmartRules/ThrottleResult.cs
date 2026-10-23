@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>The equity-curve throttle's answer with its numbers (spec P7-06).</summary>
 /// <param name="Status">Applied, unavailable or off.</param>

@@ -1,4 +1,4 @@
-namespace XDrishti.Domain.Selection;
+namespace XDrishti.Domain.Selection.SmartRules;
 
 /// <summary>The market gate's answer with its numbers (spec P7-06).</summary>
 /// <param name="Mode">The mode.</param>
