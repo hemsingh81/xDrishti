@@ -5,7 +5,8 @@ Static page — no build step. Open `index.html`, or run the stack and visit htt
 
 - **Data:** `plan-data-1.js` (meta, epics P0–P6) and `plan-data-2.js` (P7–P15, operations track, success criteria,
   open questions, risks, decisions). Derived from `docs/design/18-roadmap.md` and the requirements; keep them in sync.
-- **App:** `plan-app.js` — views Overview, Roadmap, Flow, Backlog, Board, Sprints, Risks & decisions, How we work.
+- **Progress (what is really built):** `plan-progress.js` — phases and slices with status, ADR numbers, "Needs you" and honest limits; first tab. Update it (slice status, `asOf`) whenever a slice lands. The Backlog/Board story ticks are the original product plan and are not updated per slice.
+- **App:** `plan-app.js` — views Progress, Overview, Roadmap, Flow, Backlog, Board, Sprints, Risks & decisions, How we work.
 - **Your changes** (status, notes, acceptance ticks, answers, custom stories) are stored in this browser's
   localStorage; export them from the menu. To make a change permanent, edit the data files.
 - **Effort:** 1 pt ≈ 1 focused hour of the owner's time (agents write the code); capacity ≈ 11 pts/week.
