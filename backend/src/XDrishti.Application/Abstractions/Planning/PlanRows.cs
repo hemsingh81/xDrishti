@@ -87,3 +87,9 @@ public sealed record PlanPublished(long Id, bool Created);
 /// <param name="StartedAt">Start.</param>
 /// <param name="FinishedAt">End.</param>
 public sealed record NewPlanRun(DateOnly ForDate, string? PlanKey, string Outcome, string? FailedGate, string Reason, long? PlanId, bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt);
+
+/// <summary>One stored attempt of the nightly pipeline (spec P7-08).</summary>
+/// <param name="Id">The row id.</param>
+/// <param name="Attempt">1 for the first row of the planned session, then 2, 3 (counted by id).</param>
+/// <param name="Run">What was stored.</param>
+public sealed record PlanRunRow(long Id, int Attempt, NewPlanRun Run);

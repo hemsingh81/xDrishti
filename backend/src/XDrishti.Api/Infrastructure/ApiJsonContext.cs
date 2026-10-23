@@ -76,6 +76,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<LessonView>))]
 [JsonSerializable(typeof(PlanView))]
 [JsonSerializable(typeof(IReadOnlyList<PlanView>))]
+[JsonSerializable(typeof(PlanRunView))]
+[JsonSerializable(typeof(IReadOnlyList<PlanRunView>))]
 [JsonSerializable(typeof(ChangelogEntryView))]
 [JsonSerializable(typeof(IReadOnlyList<ChangelogEntryView>))]
 [JsonSerializable(typeof(CellStateView))]

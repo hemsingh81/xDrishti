@@ -32,4 +32,7 @@ public interface IPlanStore
 
     /// <summary>Records one attempt of the pipeline.</summary>
     ValueTask RecordRunAsync(NewPlanRun run, CancellationToken cancellationToken);
+
+    /// <summary>The recorded attempts, newest session and attempt first, optionally of one planned session only (spec P7-08). Read only.</summary>
+    ValueTask<IReadOnlyList<PlanRunRow>> ListRunsAsync(DateOnly? forDate, int limit, CancellationToken cancellationToken);
 }

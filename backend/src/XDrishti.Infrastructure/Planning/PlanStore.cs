@@ -299,6 +299,28 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         await insert.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    public async ValueTask<IReadOnlyList<PlanRunRow>> ListRunsAsync(DateOnly? forDate, int limit, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("""
+            SELECT id, attempt, for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, started_at, finished_at FROM (
+                SELECT r.*, row_number() OVER (PARTITION BY for_date ORDER BY id) AS attempt FROM trading.plan_runs r
+            ) x WHERE (@date::date IS NULL OR for_date = @date) ORDER BY for_date DESC, id DESC LIMIT @limit
+            """);
+        select.Parameters.Add(new NpgsqlParameter("date", NpgsqlDbType.Date) { Value = forDate is { } d ? d : DBNull.Value });
+        select.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
+        var rows = new List<PlanRunRow>();
+        await using var r = await select.ExecuteReaderAsync(cancellationToken);
+        while (await r.ReadAsync(cancellationToken))
+        {
+            rows.Add(new PlanRunRow(
+                r.GetInt64(0),
+                (int)r.GetInt64(1),
+                new NewPlanRun(r.GetFieldValue<DateOnly>(2), Text(r, 3), r.GetString(4), Text(r, 5), r.GetString(6), Whole(r, 7), r.GetBoolean(8), r.GetFieldValue<DateTimeOffset>(9), r.GetFieldValue<DateTimeOffset>(10))));
+        }
+
+        return rows;
+    }
+
     // The lock keys are 32-bit hashtext values: two different keys can collide and then wait for each other, which is harmless (only slower); the continuity indexes and checks of the migration do not rely on the lock.
     private static async Task LockAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string key, CancellationToken cancellationToken)
     {
