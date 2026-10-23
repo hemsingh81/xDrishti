@@ -1,0 +1,38 @@
+strategy:
+  schema: 1
+  id: INSIDE_BAR_BO
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    rr: 2
+  trigger:
+    all:
+      - "inside_bar[1] == 1 and close > high[2]"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 3
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    trigger:
+      all:
+        - "inside_bar[1] == 1 and close < low[2]"
+    entry:
+      type: at_close
+    stop:
+      type: swing_high
+      lookback: 3
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "10:00"
+    last_entry: "14:00"
+    square_off: "15:15"

@@ -14,6 +14,10 @@
     <Content Include="Golden\*.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
+    <!-- The stored texts of the built-in strategies (ADR 0056, 0079): the tests of the YAML-only strategies read the very files the seed embeds. -->
+    <Content Include="..\..\src\XDrishti.Infrastructure\Seed\Strategies\*.yaml" Link="Seed\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- The dry-read table and the disagreement log of P3-08 (docs/research): the field-coverage and log tests read them next to the binaries, as the golden files are read. -->
     <Content Include="..\..\..\docs\research\p3-08-*.md" Link="Oracle\Docs\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

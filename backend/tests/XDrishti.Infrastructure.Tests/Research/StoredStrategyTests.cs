@@ -69,9 +69,11 @@ public sealed class StoredStrategyTests
     private static Dictionary<string, double> Params(params (string Name, double Value)[] values) => values.ToDictionary(v => v.Name, v => v.Value);
 
     [Fact]
-    public void The_three_built_ins_are_embedded_as_text()
+    public void The_three_first_built_ins_are_still_embedded_as_text()
     {
-        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldBe(["BASE_BREAKOUT.yaml", "ORB.yaml", "VWAP_PULLBACK.yaml"]);
+        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldContain("BASE_BREAKOUT.yaml");
+        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldContain("ORB.yaml");
+        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldContain("VWAP_PULLBACK.yaml");
     }
 
     [Theory]
@@ -221,7 +223,7 @@ public sealed class StoredStrategyTests
         var seeder = new StrategySeeder(store, Engine, Microsoft.Extensions.Logging.Abstractions.NullLogger<StrategySeeder>.Instance);
 
         (await seeder.SeedAsync(StrategySeeder.EmbeddedTexts(), TestContext.Current.CancellationToken)).ShouldBe(0);
-        store.Appended.Count.ShouldBe(3);
+        store.Appended.Count.ShouldBe(11);
     }
 
     private sealed class RecordingStore : IStrategyStore

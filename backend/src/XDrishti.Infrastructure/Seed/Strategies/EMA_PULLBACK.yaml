@@ -1,0 +1,46 @@
+strategy:
+  schema: 1
+  id: EMA_PULLBACK
+  style: intraday
+  timeframes:
+    - 15m
+  sides:
+    - BUY
+    - SELL
+  params:
+    rr: 2
+  setup:
+    all:
+      - "ema(9) > ema(21)"
+      - "tf(\"1h\").close > tf(\"1h\").ema(21)"
+  trigger:
+    all:
+      - "low <= ema(21)"
+      - "close > ema(9) and close > open"
+  entry:
+    type: at_close
+  stop:
+    type: bar_low
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  sell:
+    setup:
+      all:
+        - "ema(9) < ema(21)"
+        - "tf(\"1h\").close < tf(\"1h\").ema(21)"
+    trigger:
+      all:
+        - "high >= ema(21)"
+        - "close < ema(9) and close < open"
+    entry:
+      type: at_close
+    stop:
+      type: bar_high
+    exits:
+      - policy: FIXED_RR
+        rr: [rr]
+  time_rules:
+    first_entry: "09:45"
+    last_entry: "14:30"
+    square_off: "15:15"

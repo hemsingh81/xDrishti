@@ -123,7 +123,10 @@ public sealed class StoredStrategyVerbTests(ApiFactory factory) : DataTestBase(f
         hash.Error.ShouldContain("simulation.unknown_strategy_hash");
         id.Exit.ShouldBe(SimulateCommand.Refused);
         id.Error.ShouldContain("simulation.unknown_strategy");
-        id.Error.ShouldContain("`BASE_BREAKOUT`, `ORB`, `VWAP_PULLBACK`");
+        foreach (var known in new[] { "BASE_BREAKOUT", "EMA_PULLBACK", "GAP_FILL", "GAP_GO", "INSIDE_BAR_BO", "MEAN_REV_BANDS", "ORB", "PDH_PDL_BREAK", "PDH_PDL_REJECT", "VWAP_PULLBACK", "VWAP_RECLAIM" })
+        {
+            id.Error.ShouldContain("`" + known + "`");
+        }
         Directory.Exists(Path.Combine(temp.Root, "sim")).ShouldBeFalse("a refusal writes no export");
     }
 

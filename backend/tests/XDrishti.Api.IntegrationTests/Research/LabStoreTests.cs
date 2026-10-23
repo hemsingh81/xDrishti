@@ -277,18 +277,21 @@ public sealed class LabStoreTests(ApiFactory factory, ResearchGrantsTests.Dedica
     // criterion 3
 
     [Fact]
-    public async Task The_seed_stores_three_built_in_families_at_version_one_and_a_second_run_writes_nothing()
+    public async Task The_seed_stores_the_eleven_built_in_families_at_version_one_and_a_second_run_writes_nothing()
     {
         await ResetAsync();
         await using var host = Host();
 
-        (await StrategySeeding.SeedAsync(host.Services, Ct)).ShouldBe(3);
+        (await StrategySeeding.SeedAsync(host.Services, Ct)).ShouldBe(11);
         var before = await ReadRowsAsync();
-        (await StrategySeeding.SeedAsync(host.Services, Ct)).ShouldBe(3);
+        (await StrategySeeding.SeedAsync(host.Services, Ct)).ShouldBe(11);
         var after = await ReadRowsAsync();
 
-        before.Count.ShouldBe(3);
-        before.Select(r => r.Split('|')[0]).ShouldBe(["BASE_BREAKOUT", "ORB", "VWAP_PULLBACK"]);
+        before.Count.ShouldBe(11);
+        before.Select(r => r.Split('|')[0]).Order(StringComparer.Ordinal).ShouldBe(
+        [
+            "BASE_BREAKOUT", "EMA_PULLBACK", "GAP_FILL", "GAP_GO", "INSIDE_BAR_BO", "MEAN_REV_BANDS", "ORB", "PDH_PDL_BREAK", "PDH_PDL_REJECT", "VWAP_PULLBACK", "VWAP_RECLAIM",
+        ]);
         before.Select(r => r.Split('|')[1] + "|" + r.Split('|')[2] + "|" + r.Split('|')[3]).Distinct().ShouldBe(["true|1|"], "built in, version 1, no parent");
         after.ShouldBe(before, "a restart changes nothing, not even a created_at");
         using var scope = host.Services.CreateScope();
