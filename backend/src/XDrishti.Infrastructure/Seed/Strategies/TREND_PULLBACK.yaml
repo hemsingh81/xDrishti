@@ -1,0 +1,30 @@
+strategy:
+  schema: 1
+  id: TREND_PULLBACK
+  style: swing
+  timeframes:
+    - 1D
+  sides:
+    - BUY
+  params:
+    ema_len: 20
+    trend_len: 50
+    rr: 2
+  setup:
+    all:
+      - "ema(ema_len) > sma(trend_len)"
+  trigger:
+    all:
+      - "low <= ema(ema_len)"
+      - "close > ema(ema_len)"
+      - "close > open"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 3
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  time_rules:
+    max_hold_sessions: 5

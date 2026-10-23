@@ -1,0 +1,28 @@
+strategy:
+  schema: 1
+  id: RSI2_REVERSION
+  style: swing
+  timeframes:
+    - 1D
+  sides:
+    - BUY
+  params:
+    trend_len: 200
+    rsi_max: 10
+    rr: 2
+  setup:
+    all:
+      - "close > sma(trend_len)"
+  trigger:
+    all:
+      - "rsi(2) < rsi_max"
+  entry:
+    type: at_close
+  stop:
+    type: swing_low
+    lookback: 3
+  exits:
+    - policy: FIXED_RR
+      rr: [rr]
+  time_rules:
+    max_hold_sessions: 5
