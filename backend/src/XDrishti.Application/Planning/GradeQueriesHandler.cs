@@ -31,9 +31,10 @@ internal sealed class GetPlanGradeHandler(IPlanStore plans, IGradeStore grades) 
 }
 
 /// <summary>The decisions report over the graded plans of a date range (spec P7-13, doc 10 section 8). Read only.</summary>
-internal sealed class GetDecisionsReportHandler(IPlanStore plans, IGradeStore grades) : IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>
+internal sealed class GetDecisionsReportHandler(IGradeStore grades) : IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>
 {
-    private const int MaxPlans = 200;
+    /// <summary>The most graded tickets one report reads; more is flagged as truncated in the notes.</summary>
+    public const int MaxTickets = 5000;
 
     public async ValueTask<Result<GradeReportData>> HandleAsync(GetDecisionsReportQuery query, CancellationToken cancellationToken)
     {
@@ -43,16 +44,9 @@ internal sealed class GetDecisionsReportHandler(IPlanStore plans, IGradeStore gr
             return Result.Failure<GradeReportData>(PlanErrors.Invalid([new FieldError("from", "From is after to.")]));
         }
 
-        var rows = (await plans.ListAsync(null, null, MaxPlans, cancellationToken))
-            .Where(r => (query.From is null || r.Plan.ForDate >= query.From) && (query.To is null || r.Plan.ForDate <= query.To)).ToList();
-        var stored = await grades.ForPlansAsync([.. rows.Select(r => r.Id)], cancellationToken);
-        var all = new List<GradedItem>();
-        foreach (var row in rows)
-        {
-            all.AddRange(GradedItems.Of(row.Plan.ForDate, row.Id, await plans.ItemsAsync(row.Id, cancellationToken), stored));
-        }
-
-        return Result.Success(GradeReport.Build(all));
+        // The range is in the query, one read for the whole report, the newest plan version of each date only.
+        var page = await grades.ReportItemsAsync(query.From, query.To, MaxTickets, cancellationToken);
+        return Result.Success(GradeReport.Build(page.Items, page.Truncated));
     }
 }
 

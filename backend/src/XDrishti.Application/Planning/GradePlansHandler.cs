@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
@@ -7,6 +8,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Research;
 
@@ -24,6 +26,7 @@ internal sealed class GradePlansHandler(
     IStrategyStore strategies,
     IBasketQueries baskets,
     ICostSheetStore costSheets,
+    ITradingCalendar calendars,
     IQueryHandler<RunSimulationQuery, Result<SimulationRun>> simulation,
     TimeProvider time,
     ILogger<GradePlansHandler> logger) : ICommandHandler<GradePlansCommand, GradeOutcome>
@@ -44,6 +47,13 @@ internal sealed class GradePlansHandler(
         var due = rows.Where(r => r.Plan.ForDate < today).OrderBy(r => r.Plan.ForDate).ThenBy(r => r.Id).ToList();
         var instruments = new Lazy<Task<Dictionary<string, Guid>>>(() => InstrumentsAsync(cancellationToken));
         var costs = await CostsAsync(cancellationToken);
+        if (costs.IsFailure)
+        {
+            return Result.Failure<GradeOutcome>(costs.Error);
+        }
+
+        var calendar = await calendars.GetAsync(cancellationToken);
+        var lastClosed = calendar.LastClosedSession(now);
         int graded = 0, notTriggered = 0, notGradable = 0, pending = 0, already = 0;
         foreach (var plan in due)
         {
@@ -59,7 +69,7 @@ internal sealed class GradePlansHandler(
                     continue;
                 }
 
-                var (grade, runKey, why) = await GradeAsync(plan.Plan.ForDate, today, item.Item, costs, instruments, cancellationToken);
+                var (grade, runKey, why) = await GradeAsync(plan.Plan.ForDate, lastClosed, calendar, item.Item, costs.Value, instruments, cancellationToken);
                 if (grade is null)
                 {
                     pending++;
@@ -84,7 +94,7 @@ internal sealed class GradePlansHandler(
     }
 
     private async Task<(TicketGrade? Grade, string? RunKey, string? Pending)> GradeAsync(
-        DateOnly forDate, DateOnly today, NewPlanItem item, CostChoice costs, Lazy<Task<Dictionary<string, Guid>>> instruments, CancellationToken cancellationToken)
+        DateOnly forDate, DateOnly lastClosed, TradingCalendar calendar, NewPlanItem item, CostChoice costs, Lazy<Task<Dictionary<string, Guid>>> instruments, CancellationToken cancellationToken)
     {
         if (CellId.TryParse(item.Evidence.CellKey) is not { } cell || (item.Side != "BUY" && item.Side != "SELL"))
         {
@@ -102,34 +112,59 @@ internal sealed class GradePlansHandler(
             return (TicketGrader.NotGradable("the strategy version of the ticket is not stored"), null, null);
         }
 
+        // Shortcut: the symbol is mapped to an instrument through the non-archived baskets, first match wins (the plan item stores no instrument id). An instrument that has left every basket is pending, not final.
         if (!(await instruments.Value).TryGetValue(item.Symbol, out var instrumentId))
         {
-            return (TicketGrader.NotGradable("the symbol `" + item.Symbol + "` is in no basket, so its instrument is unknown"), null, null);
+            return (null, null, "the symbol `" + item.Symbol + "` is in no basket now, so its instrument is unknown");
         }
 
+        // The window starts on D, the session the ticket was built on, because the engine cuts trades by the day of the decision: a daily trigger decided at the close of D fills at the open of F. The grader then keeps only the trades the
+        // ticket could know (decided on F, or at the close of D on a daily-or-longer trigger). An intraday ticket is read to F; a swing ticket to the last closed session. Nothing after the last closed session is ever read.
+        var information = Before(calendar, forDate);
         var swing = string.Equals(cell.Style, "swing", StringComparison.OrdinalIgnoreCase);
-        var last = today.AddDays(-1);
-        var to = swing && last > forDate ? last : forDate;
-        var request = new SimulationRequest(stored.StrategyId, null, cell.Timeframe, forDate, to, [instrumentId], null, costs, StrategyHash: stored.Hash, Exits: exit);
+        var to = swing && lastClosed > forDate ? lastClosed : forDate;
+        var request = new SimulationRequest(stored.StrategyId, null, cell.Timeframe, information, to, [instrumentId], null, costs, StrategyHash: stored.Hash, Exits: exit);
         var run = await simulation.HandleAsync(new RunSimulationQuery(request), cancellationToken);
         if (run.IsFailure)
         {
-            return (TicketGrader.NotGradable("the simulator refused the ticket: " + Clip(run.Error.Code + " " + run.Error.Message)), null, null);
+            // A refusal (a sheet not in force yet, a missing instrument row, a strategy that does not compile now) may be mended later: pending, not a final grade.
+            return (null, null, "the simulator refused the ticket: " + Clip(run.Error.Code + " " + run.Error.Message));
         }
 
-        var result = TicketGrader.Grade(run.Value, item.Side == "BUY" ? Side.Buy : Side.Sell, forDate);
+        var result = TicketGrader.Grade(run.Value, item.Side == "BUY" ? Side.Buy : Side.Sell, forDate, information);
         return (result.Grade, result.Grade is null ? null : run.Value.RunKey, result.PendingReason);
     }
 
-    private async Task<CostChoice> CostsAsync(CancellationToken cancellationToken)
+    /// <summary>Gross when no sheet is configured; a configured sheet that cannot be found fails the run (no silent gross fallback).</summary>
+    private async Task<Result<CostChoice>> CostsAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(settings.CostSheetId))
         {
-            return CostChoice.Gross;
+            return Result.Success(CostChoice.Gross);
         }
 
         var sheet = await costSheets.FindAsync(settings.CostSheetId, cancellationToken);
-        return sheet.IsSuccess ? CostChoice.Sheet(sheet.Value.Id, settings.Capital) : CostChoice.Gross;
+        if (sheet.IsFailure)
+        {
+            GradeLog.SheetMissing(logger, settings.CostSheetId);
+            return Result.Failure<CostChoice>(PlanErrors.GradingSheetMissing(settings.CostSheetId));
+        }
+
+        return Result.Success(CostChoice.Sheet(sheet.Value.Id, settings.Capital));
+    }
+
+    /// <summary>The trading session before <paramref name="forDate"/> (the session the ticket was built on); the day before when the calendar knows none within ten days.</summary>
+    private static DateOnly Before(TradingCalendar calendar, DateOnly forDate)
+    {
+        for (var i = 1; i <= 10; i++)
+        {
+            if (calendar.IsTradingDay(forDate.AddDays(-i)))
+            {
+                return forDate.AddDays(-i);
+            }
+        }
+
+        return forDate.AddDays(-1);
     }
 
     private async Task<Dictionary<string, Guid>> InstrumentsAsync(CancellationToken cancellationToken)

@@ -20,6 +20,13 @@ public static class PlanErrors
     /// <summary>The state moved while the request was handled.</summary>
     public const string StaleCode = "plans.stale";
 
+    /// <summary>The configured grading charge sheet is not stored.</summary>
+    public const string GradingSheetMissingCode = "plans.grading_sheet_missing";
+
+    /// <summary>A charge sheet is configured for grading but cannot be read: nothing is graded, there is no silent gross fallback.</summary>
+    public static Error GradingSheetMissing(string sheetId) =>
+        Error.Conflict(GradingSheetMissingCode, $"Planning:Grading:CostSheetId names the charge sheet `{sheetId}`, which is not stored; no ticket was graded. Store the sheet or unset the setting to grade gross.");
+
     /// <summary>The problems found before anything was read.</summary>
     public static Error Invalid(IReadOnlyList<FieldError> fields)
     {

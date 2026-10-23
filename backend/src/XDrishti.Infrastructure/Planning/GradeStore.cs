@@ -53,6 +53,35 @@ internal sealed class GradeStore(NpgsqlDataSource dataSource) : IGradeStore
         return written;
     }
 
+    public async ValueTask<GradedPage> ReportItemsAsync(DateOnly? from, DateOnly? to, int limit, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("""
+            SELECT p.id, p.for_date, i.item_rank, i.item_group,
+                   COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.item_id = i.id ORDER BY e.id DESC LIMIT 1), 'proposed'),
+                   g.status, g.r, g.mae_r, g.mfe_r, g.exit_reason, g.entry_price, g.exit_price, g.cost_basis, g.detail
+            FROM trading.grades g
+            JOIN trading.plan_items i ON i.id = g.item_id
+            JOIN trading.plans p ON p.id = g.plan_id
+            WHERE (@from IS NULL OR p.for_date >= @from) AND (@to IS NULL OR p.for_date <= @to)
+              AND p.version = (SELECT max(q.version) FROM trading.plans q WHERE q.for_date = p.for_date)
+            ORDER BY p.for_date DESC, p.id, i.item_rank
+            LIMIT @limit
+            """);
+        select.Parameters.AddWithValue("from", NpgsqlDbType.Date, (object?)from ?? DBNull.Value);
+        select.Parameters.AddWithValue("to", NpgsqlDbType.Date, (object?)to ?? DBNull.Value);
+        select.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit + 1);
+        var items = new List<GradedItem>();
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            double? D(int i) => reader.IsDBNull(i) ? null : reader.GetDouble(i);
+            var grade = new TicketGrade(GradeStatusText.TryParse(reader.GetString(5)) ?? GradeStatus.NotGradable, D(6), D(7), D(8), reader.IsDBNull(9) ? null : reader.GetString(9), D(10), D(11), reader.GetString(12), reader.GetString(13));
+            items.Add(new GradedItem(reader.GetInt64(0), DateOnly.FromDateTime(reader.GetDateTime(1)), reader.GetInt32(2), TicketGroupText.TryParse(reader.GetString(3)) ?? TicketGroup.Rejected, TicketStateText.TryParse(reader.GetString(4)) ?? TicketState.Proposed, grade));
+        }
+
+        return new GradedPage(items.Count > limit ? items.Take(limit).ToList() : items, items.Count > limit);
+    }
+
     public async ValueTask<IReadOnlyDictionary<long, StoredGrade>> ForPlansAsync(IReadOnlyList<long> planIds, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(planIds);

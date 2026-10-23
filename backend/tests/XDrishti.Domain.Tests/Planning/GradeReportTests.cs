@@ -130,6 +130,17 @@ public sealed class GradeReportTests
     }
 
     [Fact]
+    public void The_notes_give_the_not_gradable_share_with_the_top_reasons_the_default_fill_rules_and_a_truncation_flag()
+    {
+        var report = GradeReport.Build(Fixture, truncated: true);
+
+        report.Notes.ShouldContain(n => n.StartsWith("Not gradable: 1 of 10 tickets; top reasons: 1 x x", StringComparison.Ordinal));
+        report.Notes.ShouldContain(n => n.Contains("default fill rules", StringComparison.Ordinal) && n.Contains("original plan prices", StringComparison.Ordinal));
+        report.Notes.ShouldContain(n => n.StartsWith("TRUNCATED", StringComparison.Ordinal));
+        GradeReport.Build(Fixture).Notes.ShouldNotContain(n => n.StartsWith("TRUNCATED", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void A_ticket_state_maps_to_one_decision_group()
     {
         DecisionGroups.Of(TicketState.Armed).ShouldBe(DecisionGroup.Approved);

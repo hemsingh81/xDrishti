@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Market;
+using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Research;
@@ -10,6 +11,7 @@ using XDrishti.Application.Planning;
 using XDrishti.Application.Research;
 using XDrishti.Application.Tests.Research;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Research;
 using XDrishti.Tests.Shared;
@@ -20,6 +22,8 @@ namespace XDrishti.Application.Tests.Planning;
 public sealed class GradePlansHandlerTests
 {
     private static readonly DateOnly F = new(2026, 3, 3);
+
+    private static readonly DateOnly D = new(2026, 3, 2);
 
     private static readonly Guid Instrument = Guid.Parse("00000000-0000-0000-0000-0000000000aa");
 
@@ -39,6 +43,8 @@ public sealed class GradePlansHandlerTests
 
     private readonly ICostSheetStore _sheets = Substitute.For<ICostSheetStore>();
 
+    private readonly ITradingCalendar _calendar = Substitute.For<ITradingCalendar>();
+
     private readonly IQueryHandler<RunSimulationQuery, Result<SimulationRun>> _simulation = Substitute.For<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>();
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 3, 10, 12, 0, 0, TimeSpan.Zero));
@@ -52,6 +58,7 @@ public sealed class GradePlansHandlerTests
         _baskets.ListAsync(false, Ct).Returns([new BasketView(basket, "B", "#000", "p", null, 0, 1, DateTimeOffset.UnixEpoch, null, "manual", false, null, null)]);
         var member = new BasketMemberView(Guid.NewGuid(), RunFixture.Summary(Instrument, "NSE:AAA", null, false), 0, DateTimeOffset.UnixEpoch, null, null, "owner", null, null);
         _baskets.MembersAsync(basket, null, null, Ct).Returns(new BasketMembers(basket, "B", null, null, 1, [member]));
+        _calendar.GetAsync(Ct).Returns(new TradingCalendar());
         _grades.ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns(new Dictionary<long, StoredGrade>());
         _plans.ListAsync(Arg.Any<DateOnly?>(), null, Arg.Any<int>(), Ct).Returns([new PlanRow(1, Plan(), PlanState.Published, 1, 0, 0)]);
     }
@@ -61,14 +68,14 @@ public sealed class GradePlansHandlerTests
     private static PlanItemRow Item(long id, TicketGroup group, string symbol = "NSE:AAA", string cell = Cell) =>
         new(id, 1, new NewPlanItem((int)id, group, symbol, "BUY", "ORB", Hash, "t", "s", "g", "v", group == TicketGroup.Primary ? [] : ["why"], new PlanEvidence(cell, 30, "r", "b", null, null, [], null), []), TicketState.Proposed);
 
-    private GradePlansHandler Handler() => new(_plans, _grades, _settings, _strategies, _baskets, _sheets, _simulation, _time, NullLogger<GradePlansHandler>.Instance);
+    private GradePlansHandler Handler() => new(_plans, _grades, _settings, _strategies, _baskets, _sheets, _calendar, _simulation, _time, NullLogger<GradePlansHandler>.Instance);
 
     private void Replay(IReadOnlyList<SimTrade> trades, DateOnly? last = null) =>
         _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Ct).Returns(Result.Success(FabricatedRun.Assemble(
             FabricatedRun.List((Instrument, "NSE:AAA")), [FabricatedRun.Ran(Instrument, "NSE:AAA", F.AddDays(-30), last ?? F)], trades, from: F, to: F)));
 
     [Fact]
-    public async Task Each_ticket_is_replayed_over_exactly_its_session_with_its_stored_version_and_exit_and_written_once()
+    public async Task Each_ticket_is_replayed_from_the_session_it_was_built_on_to_its_own_with_its_stored_version_and_exit_and_written_once()
     {
         _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketGroup.Primary)]);
         Replay([FabricatedRun.Trade(Instrument, "NSE:AAA", Side.Buy, F, rFilled: 1.5)]);
@@ -77,7 +84,7 @@ public sealed class GradePlansHandlerTests
 
         result.Value.ShouldBe(new GradeOutcome(1, 1, 0, 0, 0, 0));
         await _simulation.Received(1).HandleAsync(
-            Arg.Is<RunSimulationQuery>(q => q.Request.From == F && q.Request.To == F && q.Request.StrategyHash == Hash && q.Request.InstrumentIds!.Single() == Instrument
+            Arg.Is<RunSimulationQuery>(q => q.Request.From == D && q.Request.To == F && q.Request.StrategyHash == Hash && q.Request.InstrumentIds!.Single() == Instrument
                 && q.Request.Exits!.Candidates.Single().Id == "FIXED_RR{rr=2}" && q.Request.Costs == CostChoice.Gross && q.Request.EvaluationTimeframe == "15m"), Ct);
         await _grades.Received(1).InsertAsync(Arg.Is<IReadOnlyList<NewGrade>>(g => g.Count == 1 && g[0].ItemId == 11 && g[0].Grade.R == 1.5 && g[0].Grade.Status == GradeStatus.Graded), Ct);
     }
@@ -89,7 +96,7 @@ public sealed class GradePlansHandlerTests
             Item(11, TicketGroup.Primary),
             Item(12, TicketGroup.Reserve),
             Item(13, TicketGroup.Rejected, cell: "ORB|15m|BUY|intraday|FIXED_RR|*"),
-            Item(14, TicketGroup.Rejected, symbol: "NSE:ZZZ")]);
+            Item(14, TicketGroup.Rejected, cell: "ORB|15m|BUY|intraday|PARTIAL_BE|*")]);
         Replay([FabricatedRun.Trade(Instrument, "NSE:AAA", Side.Buy, F, rFilled: 1)]);
 
         var result = await Handler().HandleAsync(new GradePlansCommand(F), Ct);
@@ -97,7 +104,7 @@ public sealed class GradePlansHandlerTests
         result.Value.Graded.ShouldBe(2);
         result.Value.NotGradable.ShouldBe(2);
         await _grades.Received(1).InsertAsync(
-            Arg.Is<IReadOnlyList<NewGrade>>(g => g.Count == 4 && g.Single(x => x.ItemId == 13).Grade.Detail.Contains("exit label", StringComparison.Ordinal) && g.Single(x => x.ItemId == 14).Grade.Detail.Contains("NSE:ZZZ", StringComparison.Ordinal)), Ct);
+            Arg.Is<IReadOnlyList<NewGrade>>(g => g.Count == 4 && g.Single(x => x.ItemId == 13).Grade.Detail.Contains("exit label", StringComparison.Ordinal) && g.Single(x => x.ItemId == 14).Grade.Detail.Contains("exit label", StringComparison.Ordinal)), Ct);
         await _simulation.Received(2).HandleAsync(Arg.Any<RunSimulationQuery>(), Ct);
     }
 
@@ -145,20 +152,33 @@ public sealed class GradePlansHandlerTests
 
         await Handler().HandleAsync(new GradePlansCommand(F), Ct);
 
-        await _simulation.Received(1).HandleAsync(Arg.Is<RunSimulationQuery>(q => q.Request.From == F && q.Request.To == new DateOnly(2026, 3, 9)), Ct);
+        await _simulation.Received(1).HandleAsync(Arg.Is<RunSimulationQuery>(q => q.Request.From == D && q.Request.To == new DateOnly(2026, 3, 10)), Ct);
     }
 
     [Fact]
-    public async Task A_configured_sheet_that_is_stored_costs_the_replay_and_a_missing_one_leaves_it_gross()
+    public async Task A_configured_sheet_that_is_not_stored_fails_the_run_with_no_silent_gross_fallback()
     {
         _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketGroup.Primary)]);
         _settings.CostSheetId.Returns("nse-test");
-        _settings.Capital.Returns(500_000m);
-        _sheets.FindAsync("nse-test", Ct).Returns(Result.Failure<XDrishti.Domain.Research.CostSheet>(Error.NotFound("x", "none")));
-        Replay([]);
+        _sheets.FindAsync("nse-test", Ct).Returns(Result.Failure<CostSheet>(Error.NotFound("x", "none")));
 
-        await Handler().HandleAsync(new GradePlansCommand(F), Ct);
+        var result = await Handler().HandleAsync(new GradePlansCommand(F), Ct);
 
-        await _simulation.Received(1).HandleAsync(Arg.Is<RunSimulationQuery>(q => q.Request.Costs == CostChoice.Gross), Ct);
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe(PlanErrors.GradingSheetMissingCode);
+        await _simulation.DidNotReceive().HandleAsync(Arg.Any<RunSimulationQuery>(), Ct);
+        await _grades.DidNotReceive().InsertAsync(Arg.Any<IReadOnlyList<NewGrade>>(), Ct);
+    }
+
+    [Fact]
+    public async Task A_refused_replay_and_a_symbol_that_left_every_basket_are_pending_not_final()
+    {
+        _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketGroup.Primary), Item(12, TicketGroup.Reserve, symbol: "NSE:ZZZ")]);
+        _simulation.HandleAsync(Arg.Any<RunSimulationQuery>(), Ct).Returns(Result.Failure<SimulationRun>(Error.Conflict("simulation.cost_sheet_not_effective", "not in force")));
+
+        var result = await Handler().HandleAsync(new GradePlansCommand(F), Ct);
+
+        result.Value.Pending.ShouldBe(2);
+        await _grades.DidNotReceive().InsertAsync(Arg.Any<IReadOnlyList<NewGrade>>(), Ct);
     }
 }

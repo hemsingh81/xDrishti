@@ -14,7 +14,7 @@ public static class GradeReport
     private static readonly int?[] Ks = [1, 3, 5, null];
 
     /// <summary>Builds the report.</summary>
-    public static GradeReportData Build(IReadOnlyList<GradedItem> items)
+    public static GradeReportData Build(IReadOnlyList<GradedItem> items, bool truncated = false)
     {
         ArgumentNullException.ThrowIfNull(items);
         var ranked = items.Where(i => i.Group != TicketGroup.Rejected).ToList();
@@ -31,13 +31,20 @@ public static class GradeReport
             Compare("Did the lapses help (approved minus lapsed)?", approved, decisions.Single(d => d.Name == "lapsed")),
         };
         var plans = items.Select(i => i.PlanId).Distinct().Count();
+        var notGradable = items.Where(i => i.Grade.Status == GradeStatus.NotGradable).ToList();
         List<string> notes =
         [
-            "Every figure is " + TicketGrade.Basis + ": a re-simulation with the simulator's fill rules, not an execution.",
+            "Every figure is " + TicketGrade.Basis + ": a re-simulation with the default fill rules and replay options (not the options of the run a cell's statistics came from), not an execution. Ticket levels and the owner's modifications are not replayed: a modified ticket is graded at the original plan prices.",
+            string.Create(CultureInfo.InvariantCulture, $"Not gradable: {notGradable.Count} of {items.Count} tickets") + (notGradable.Count == 0 ? "." : "; top reasons: " + string.Join("; ", notGradable.GroupBy(i => i.Grade.Detail).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Take(3).Select(g => g.Count().ToString(CultureInfo.InvariantCulture) + " x " + g.Key)) + ". They are left out of every sum."),
             "A ticket that did not trigger or cannot be graded adds 0 R and is counted apart; R is summed over triggered tickets only.",
             "Fewer than " + IndicativeBelow.ToString(CultureInfo.InvariantCulture) + " triggered tickets in a set is indicative only; a difference is never a significance claim.",
             "A ticket modified and then approved counts as approved. There is no auto-approved group: nothing approves for the owner.",
         ];
+        if (truncated)
+        {
+            notes.Add("TRUNCATED: more graded tickets matched than the report reads; the newest sessions are shown and the older ones are left out. Narrow the date range.");
+        }
+
         return new GradeReportData(TicketGrade.Basis, plans, curves, groups, decisions, comparisons, notes);
     }
 
