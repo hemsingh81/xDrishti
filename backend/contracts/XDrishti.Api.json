@@ -8538,6 +8538,27 @@
         }
       }
     },
+    "/api/learning/overview": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "What the learning engine holds: rows in the newest cell snapshot and its date; and for models, experiments, hypotheses, lessons and the changelog the count of the newest 200 (flagged when there may be more), the split by role, outcome or state, and the newest record with its stored verdict. Nothing is computed or scored; the limits (about 2.1 years, few folds, modelled fills) are listed. Empty before the first record.",
+        "operationId": "GetLearningOverview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningOverviewView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cells": {
       "get": {
         "tags": [
@@ -18986,6 +19007,62 @@
         },
         "description": "The latest job in which each phase ran to an end (null when none did yet)."
       },
+      "LearningOverviewView": {
+        "required": [
+          "cellRows",
+          "cellsAsOf",
+          "models",
+          "experiments",
+          "hypotheses",
+          "lessons",
+          "changelog",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "cellRows": {
+            "type": "integer",
+            "description": "Rows in the newest cell-statistics snapshot (all windows).",
+            "format": "int32"
+          },
+          "cellsAsOf": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The as-of date of that snapshot, or null before the first computation.",
+            "format": "date"
+          },
+          "models": {
+            "description": "The registered models.",
+            "$ref": "#/components/schemas/OverviewSection"
+          },
+          "experiments": {
+            "description": "The recorded experiments.",
+            "$ref": "#/components/schemas/OverviewSection"
+          },
+          "hypotheses": {
+            "description": "The hypotheses (newest view of each).",
+            "$ref": "#/components/schemas/OverviewSection"
+          },
+          "lessons": {
+            "description": "The lessons (newest view of each).",
+            "$ref": "#/components/schemas/OverviewSection"
+          },
+          "changelog": {
+            "description": "The changelog rows.",
+            "$ref": "#/components/schemas/OverviewSection"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the numbers are not."
+          }
+        },
+        "description": "What the Learning screen needs first (P6-18, ADR 0080): counts and the newest verdicts of the stored learning records. Read from the stores; no statistic is computed and no model is scored."
+      },
       "LedgerClassTotal": {
         "required": [
           "class",
@@ -20037,6 +20114,111 @@
           }
         },
         "description": "The quantity the lots count as opening (the shares the trades do not explain): now, and after the rebuild. Null where it cannot be told (no holding, or a quantity that is not whole after a split or bonus)."
+      },
+      "OverviewCount": {
+        "required": [
+          "name",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "A role, outcome or state."
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many of the newest records have it.",
+            "format": "int32"
+          }
+        },
+        "description": "A name and how many records carry it (P6-18)."
+      },
+      "OverviewHeadline": {
+        "required": [
+          "id",
+          "label",
+          "verdict",
+          "detail",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The record id.",
+            "format": "int64"
+          },
+          "label": {
+            "type": "string",
+            "description": "Role of a model, knob of an experiment, kind of a changelog row."
+          },
+          "verdict": {
+            "type": "string",
+            "description": "The stored verdict, outcome or state after."
+          },
+          "detail": {
+            "type": "string",
+            "description": "One line of the stored numbers."
+          },
+          "at": {
+            "type": "string",
+            "description": "When it was recorded.",
+            "format": "date-time"
+          }
+        },
+        "description": "The newest record of one kind, as the overview shows it (P6-18): what it is, the verdict that was stored and one line of the stored numbers. Nothing here is computed."
+      },
+      "OverviewSection": {
+        "required": [
+          "counted",
+          "truncated",
+          "split",
+          "newest",
+          "champion"
+        ],
+        "type": "object",
+        "properties": {
+          "counted": {
+            "type": "integer",
+            "description": "Records counted: at most the newest int GetLearningOverviewHandler.CountLimit.",
+            "format": "int32"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when there may be more records than were counted."
+          },
+          "split": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewCount"
+            },
+            "description": "The count by role (models), outcome (experiments) or state (hypotheses, lessons); only names that occur."
+          },
+          "newest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The newest record, or null when none is stored.",
+                "$ref": "#/components/schemas/OverviewHeadline"
+              }
+            ]
+          },
+          "champion": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "For models, the current champion; null otherwise or when there is none.",
+                "$ref": "#/components/schemas/OverviewHeadline"
+              }
+            ]
+          }
+        },
+        "description": "One kind of learning record in the overview (P6-18): how many were counted, the split by role, outcome or state, and the newest record."
       },
       "ParameterSensitivityView": {
         "required": [

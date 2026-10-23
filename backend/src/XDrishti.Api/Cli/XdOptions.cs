@@ -39,6 +39,7 @@ internal sealed record XdOptions(
           xd strategy test FILE.yaml (--symbols 'A,B' | --basket-id GUID) [--method quick|full] [--from YYYY-MM-DD --to YYYY-MM-DD] [--note TEXT] [--timeout-minutes N]
           xd learn cells --as-of YYYY-MM-DD --run RUNKEY:STYLE:EXIT [--run ...] [--half-life-days N] [--prior-strength N] [--min-trades N]
           xd learn features --run RUNKEY [--run ...]
+          xd learn phase-check [--replay-seconds X]
           xd learn training-set --run RUNKEY:STYLE:EXIT [--run ...] [--require NAME,NAME,...] [--half-life-days N] [--prior-strength N] [--min-trades N]
           xd lab runs [--strategy ID] [--state queued|running|succeeded|failed|cancelled|interrupted] [--limit 1..200]
         exit codes: 0 done (a full test: verdict PASS), 1 refused (located problems on stderr), 2 wrong command line, 3 failure or timeout, 4 full test finished with verdict MARGINAL or FAIL, 130 cancelled

@@ -6,8 +6,6 @@ using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
-using XDrishti.Domain.Market.Bars;
-using XDrishti.Domain.Research;
 
 namespace XDrishti.Application.Learning;
 
@@ -19,8 +17,6 @@ namespace XDrishti.Application.Learning;
 internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger ledger, TimeProvider time, ILogger<RunExperimentHandler> logger) : ICommandHandler<RunExperimentCommand, RunExperimentOutcome>
 {
     private const int MaxAttempts = 5;
-
-    private sealed record Seen(DateOnly TradeDate, double R, long DecisionEpochSeconds, long ExitEpochSeconds, bool Costed);
 
     public async ValueTask<Result<RunExperimentOutcome>> HandleAsync(RunExperimentCommand command, CancellationToken cancellationToken)
     {
@@ -240,22 +236,8 @@ internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger led
         return null;
     }
 
-    private async ValueTask<Result<Dictionary<string, Seen>>> ReadAsync(string runKey, CancellationToken cancellationToken)
-    {
-        var seen = new Dictionary<string, Seen>(StringComparer.Ordinal);
-        await foreach (var runTrade in runs.StreamTradesAsync(runKey, false, cancellationToken))
-        {
-            var t = runTrade.Trade;
-            var costed = t.Costs == CostBasis.Charged && t.Costing is not null;
-            var trade = new Seen(SessionClock.DateOf(t.DecisionEpochSeconds - HoldOut.BarSeconds), costed ? t.Costing!.RNet : t.RFilled, t.DecisionEpochSeconds, t.ExitEpochSeconds, costed);
-            if (!seen.TryAdd(t.Key, trade))
-            {
-                return Result.Failure<Dictionary<string, Seen>>(ExperimentErrors.DuplicateTrade(runKey));
-            }
-        }
-
-        return Result.Success(seen);
-    }
+    private ValueTask<Result<Dictionary<string, ExperimentRunReader.Seen>>> ReadAsync(string runKey, CancellationToken cancellationToken) =>
+        ExperimentRunReader.ReadAsync(runs, runKey, cancellationToken);
 
     private Result<RunExperimentOutcome> Refuse(Error error)
     {

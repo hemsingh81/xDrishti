@@ -8,6 +8,7 @@
 #   scripts/xd.sh learn model --run RUNKEY:intraday:FIXED_RR   (P6-07, ADR 0070: train, validate against the baselines, register; files in data/models)
 #   scripts/xd.sh learn designate --model 1 --role champion --reason "..."   (only an Eligible model can be champion)
 #   scripts/xd.sh learn experiment --baseline RUNKEY --candidate RUNKEY --knob NAME --kind slippage --from 8 --to 12   (P6-11, ADR 0072: judge a knob change between two stored runs, recorded)
+#   scripts/xd.sh learn phase-check [--replay-seconds X]   (P6-18, ADR 0080: the P6 exit criteria from stored records, MET / NOT MET / NOT EVALUABLE, limits printed)
 #   scripts/xd.sh lab runs [--strategy ID] [--state succeeded] [--limit 20]
 # Exit codes: 0 done (a full test: PASS), 1 refused (located problems on stderr), 2 wrong command line or configuration, 3 failure or timeout,
 # 4 a full test with verdict MARGINAL or FAIL, 130 cancelled. A test needs the stack running (deploy/xd-up.sh): xd-api carries the run out; this command stores
