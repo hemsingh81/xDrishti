@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\XDrishti.Learning.MlNet\XDrishti.Learning.MlNet.csproj" />
+  </ItemGroup>
+  <PropertyGroup>
+    <EnableMLUnsupportedPlatformTargetCheck>false</EnableMLUnsupportedPlatformTargetCheck>
+    <EnableLightGBMUnsupportedPlatformTargetCheck>false</EnableLightGBMUnsupportedPlatformTargetCheck>
+  </PropertyGroup>
+  <Import Project="..\Tests.props" />
+</Project>
