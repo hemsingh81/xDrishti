@@ -9302,6 +9302,48 @@
         }
       }
     },
+    "/api/plans/{id}/journal": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "The auto-journal of a plan: each approved ticket's fills the portfolio sync stored (matched by account, instrument, side and day), the fill grade ('realised fills, not simulated') beside the plan-price grade ('simulated on plan prices'), and the day's discretionary fills apart. Fills are only read; nothing is an order. 404 plans.not_found",
+        "operationId": "GetPlanJournal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanJournalView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reports/decisions": {
       "get": {
         "tags": [
@@ -16415,6 +16457,108 @@
         },
         "description": "The weight of one feature in a model or in one score: a path-based contribution in raw-score units (not exact, not SHAP)."
       },
+      "FillGrade": {
+        "required": [
+          "status",
+          "qty",
+          "entryPrice",
+          "exitPrice",
+          "planEntryPrice",
+          "planStopPrice",
+          "planR",
+          "slippagePrice",
+          "slippageR",
+          "grossPnl",
+          "charges",
+          "r",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "`graded` (R measured against the plan's level) or `no_plan_levels` (the round trip is real but the plan grade has no entry or stop to measure it against; R is then empty)."
+          },
+          "qty": {
+            "type": "integer",
+            "description": "Shares entered and left.",
+            "format": "int64"
+          },
+          "entryPrice": {
+            "type": "number",
+            "description": "Volume-weighted entry price of the fills.",
+            "format": "double"
+          },
+          "exitPrice": {
+            "type": "number",
+            "description": "Volume-weighted exit price of the fills.",
+            "format": "double"
+          },
+          "planEntryPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The plan grade's simulated entry; null when none.",
+            "format": "double"
+          },
+          "planStopPrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The plan grade's simulated initial stop; null when none.",
+            "format": "double"
+          },
+          "planR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The plan grade's R beside it; null when the ticket was not graded as a trade.",
+            "format": "double"
+          },
+          "slippagePrice": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Entry price paid minus the plan entry, signed so that positive is worse for the owner; null without a plan entry.",
+            "format": "double"
+          },
+          "slippageR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The same in R (divided by the planned risk per share); null without plan levels.",
+            "format": "double"
+          },
+          "grossPnl": {
+            "type": "number",
+            "description": "Realised profit before charges, rupees.",
+            "format": "double"
+          },
+          "charges": {
+            "type": "number",
+            "description": "The charges the sync recorded for the fills used, rupees.",
+            "format": "double"
+          },
+          "r": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Realised result in R after the recorded charges; null without plan levels.",
+            "format": "double"
+          },
+          "detail": {
+            "type": "string",
+            "description": "Why, in a sentence."
+          }
+        },
+        "description": "The grade of what the owner's fills did on a ticket (P7-14, ADR 0093), stored beside the plan-price grade. A realised result, never a simulation: the label is always string FillGrade.Basis."
+      },
       "FirstImportInput": {
         "required": [
           "rows"
@@ -19096,6 +19240,142 @@
           }
         }
       },
+      "JournalEntryView": {
+        "required": [
+          "itemId",
+          "rank",
+          "symbol",
+          "side",
+          "accountId",
+          "state",
+          "fills",
+          "status",
+          "fill",
+          "planStatus",
+          "planR"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "description": "The ticket.",
+            "format": "int64"
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Rank in the plan.",
+            "format": "int32"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "description": "The ticket's newest state."
+          },
+          "fills": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalFillView"
+            },
+            "description": "Its entry and exit fills."
+          },
+          "status": {
+            "type": "string",
+            "description": "open (not finished), pending (finished, plan grade not there yet), graded or no_plan_levels."
+          },
+          "fill": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The fill grade, labelled `realised fills, not simulated`; null until graded.",
+                "$ref": "#/components/schemas/FillGrade"
+              }
+            ]
+          },
+          "planStatus": {
+            "type": "string",
+            "description": "The plan-price grade's status, or pending."
+          },
+          "planR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The plan-price grade's R, labelled `simulated on plan prices`.",
+            "format": "double"
+          }
+        },
+        "description": "One ticket's journal line: plan grade and fill grade side by side."
+      },
+      "JournalFillView": {
+        "required": [
+          "transactionId",
+          "role",
+          "symbol",
+          "side",
+          "date",
+          "time",
+          "qty",
+          "price"
+        ],
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "string",
+            "description": "The stored trade.",
+            "format": "uuid"
+          },
+          "role": {
+            "type": "string",
+            "description": "entry, exit or discretionary."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Symbol."
+          },
+          "side": {
+            "type": "string",
+            "description": "buy or sell."
+          },
+          "date": {
+            "type": "string",
+            "description": "India date.",
+            "format": "date"
+          },
+          "time": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "India time, when known.",
+            "format": "time"
+          },
+          "qty": {
+            "type": "integer",
+            "description": "Shares of the role.",
+            "format": "int64"
+          },
+          "price": {
+            "type": "number",
+            "description": "Fill price.",
+            "format": "double"
+          }
+        },
+        "description": "A fill as the API shows it."
+      },
       "JsonElement": { },
       "LabCounts": {
         "required": [
@@ -21305,6 +21585,58 @@
           }
         },
         "description": "One candidate of a plan."
+      },
+      "PlanJournalView": {
+        "required": [
+          "planId",
+          "forDate",
+          "fillBasis",
+          "planBasis",
+          "entries",
+          "discretionary",
+          "ticketsWithoutFills"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "integer",
+            "description": "The plan.",
+            "format": "int64"
+          },
+          "forDate": {
+            "type": "string",
+            "description": "The planned session.",
+            "format": "date"
+          },
+          "fillBasis": {
+            "type": "string",
+            "description": "Always `realised fills, not simulated`."
+          },
+          "planBasis": {
+            "type": "string",
+            "description": "Always `simulated on plan prices`."
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalEntryView"
+            },
+            "description": "Tickets with fills."
+          },
+          "discretionary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JournalFillView"
+            },
+            "description": "The day's fills with no ticket, reported separately."
+          },
+          "ticketsWithoutFills": {
+            "type": "integer",
+            "description": "Approved tickets that no fill was matched to.",
+            "format": "int32"
+          }
+        },
+        "description": "The journal of one plan."
       },
       "PlanRunView": {
         "required": [

@@ -25,8 +25,8 @@ internal sealed class GradeStore(NpgsqlDataSource dataSource) : IGradeStore
         foreach (var g in grades)
         {
             await using var insert = new NpgsqlCommand("""
-                INSERT INTO trading.grades (plan_id, item_id, for_date, status, r, mae_r, mfe_r, exit_reason, entry_price, exit_price, cost_basis, detail, basis, run_key, graded_at)
-                VALUES (@plan, @item, @date, @status, @r, @mae, @mfe, @exit, @entry, @out, @cost, @detail, @basis, @run, @at)
+                INSERT INTO trading.grades (plan_id, item_id, for_date, status, r, mae_r, mfe_r, exit_reason, entry_price, exit_price, cost_basis, detail, basis, run_key, graded_at, stop_price)
+                VALUES (@plan, @item, @date, @status, @r, @mae, @mfe, @exit, @entry, @out, @cost, @detail, @basis, @run, @at, @stop)
                 ON CONFLICT (item_id) DO NOTHING
                 """, connection, transaction);
             var p = insert.Parameters;
@@ -46,6 +46,7 @@ internal sealed class GradeStore(NpgsqlDataSource dataSource) : IGradeStore
             p.AddWithValue("basis", NpgsqlDbType.Varchar, TicketGrade.Basis);
             p.AddWithValue("run", NpgsqlDbType.Varchar, (object?)g.RunKey ?? DBNull.Value);
             p.AddWithValue("at", NpgsqlDbType.TimestampTz, g.GradedAt);
+            p.AddWithValue("stop", NpgsqlDbType.Double, (object?)t.StopPrice ?? DBNull.Value);
             written += await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -92,7 +93,7 @@ internal sealed class GradeStore(NpgsqlDataSource dataSource) : IGradeStore
         }
 
         await using var select = dataSource.CreateCommand("""
-            SELECT id, plan_id, item_id, for_date, status, r, mae_r, mfe_r, exit_reason, entry_price, exit_price, cost_basis, detail, run_key, graded_at
+            SELECT id, plan_id, item_id, for_date, status, r, mae_r, mfe_r, exit_reason, entry_price, exit_price, cost_basis, detail, run_key, graded_at, stop_price
             FROM trading.grades WHERE plan_id = ANY(@plans) ORDER BY id
             """);
         select.Parameters.AddWithValue("plans", NpgsqlDbType.Array | NpgsqlDbType.Bigint, planIds.ToArray());
@@ -101,7 +102,7 @@ internal sealed class GradeStore(NpgsqlDataSource dataSource) : IGradeStore
         {
             var status = GradeStatusText.TryParse(reader.GetString(4)) ?? GradeStatus.NotGradable;
             double? D(int i) => reader.IsDBNull(i) ? null : reader.GetDouble(i);
-            var grade = new TicketGrade(status, D(5), D(6), D(7), reader.IsDBNull(8) ? null : reader.GetString(8), D(9), D(10), reader.GetString(11), reader.GetString(12));
+            var grade = new TicketGrade(status, D(5), D(6), D(7), reader.IsDBNull(8) ? null : reader.GetString(8), D(9), D(10), reader.GetString(11), reader.GetString(12), D(15));
             var itemId = reader.GetInt64(2);
             result[itemId] = new StoredGrade(reader.GetInt64(0), new NewGrade(reader.GetInt64(1), itemId, DateOnly.FromDateTime(reader.GetDateTime(3)), grade, reader.IsDBNull(13) ? null : reader.GetString(13), reader.GetFieldValue<DateTimeOffset>(14)));
         }

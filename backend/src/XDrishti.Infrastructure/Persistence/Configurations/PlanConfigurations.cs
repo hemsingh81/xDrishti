@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Planning;
+using XDrishti.Domain.Portfolio;
 using XDrishti.Infrastructure.Planning;
 
 namespace XDrishti.Infrastructure.Persistence.Configurations;
@@ -180,10 +181,63 @@ internal sealed class GradeRecordConfiguration : IEntityTypeConfiguration<GradeR
         builder.Property(x => x.Detail).HasMaxLength(500).IsRequired();
         builder.Property(x => x.Basis).HasMaxLength(40).IsRequired();
         builder.Property(x => x.RunKey).HasMaxLength(64);
+        builder.Property(x => x.StopPrice);
         builder.HasIndex(x => x.ItemId).IsUnique().HasDatabaseName("uq_grades_item_id"); // one grade per ticket; the second insert is skipped
         builder.HasIndex(x => new { x.ForDate, x.PlanId }).HasDatabaseName("ix_grades_for_date_plan_id");
         builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_grades_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlanItemRecord>().WithMany().HasForeignKey(x => x.ItemId).HasConstraintName("fk_grades_plan_items_item_id").OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary><c>trading.journal_entries</c> (spec P7-14, ADR 0093): a ticket-on-an-account the owner's fills were matched to. Insert-only; one per ticket and account, tied to a real allocation.</summary>
+internal sealed class JournalEntryRecordConfiguration : IEntityTypeConfiguration<JournalEntryRecord>
+{
+    public void Configure(EntityTypeBuilder<JournalEntryRecord> builder)
+    {
+        builder.ToTable("journal_entries", Schemas.Trading);
+        builder.HasKey(x => x.Id).HasName("pk_journal_entries");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.HasIndex(x => new { x.ItemId, x.AccountId }).IsUnique().HasDatabaseName("uq_journal_entries_item_account");
+        builder.HasIndex(x => x.PlanId).HasDatabaseName("ix_journal_entries_plan_id");
+        builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_journal_entries_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<PlanItemRecord>().WithMany().HasForeignKey(x => x.ItemId).HasConstraintName("fk_journal_entries_plan_items_item_id").OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<BrokerAccount>().WithMany().HasForeignKey(x => x.AccountId).HasConstraintName("fk_journal_entries_broker_accounts_account_id").OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary><c>trading.journal_fills</c>: a stored trade (<c>portfolio.transactions</c>, read only) and its role. A trade is journaled once (unique), so it matches at most one ticket; a discretionary fill has no entry.</summary>
+internal sealed class JournalFillRecordConfiguration : IEntityTypeConfiguration<JournalFillRecord>
+{
+    public void Configure(EntityTypeBuilder<JournalFillRecord> builder)
+    {
+        builder.ToTable("journal_fills", Schemas.Trading, t => t.HasCheckConstraint("ck_journal_fills_shape", "role IN ('entry', 'exit', 'discretionary') AND (role = 'discretionary') = (entry_id IS NULL) AND qty > 0 AND length(reason) > 0"));
+        builder.HasKey(x => x.Id).HasName("pk_journal_fills");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.Role).HasMaxLength(16).IsRequired();
+        builder.Property(x => x.Reason).HasMaxLength(300).IsRequired();
+        builder.HasIndex(x => x.TransactionId).IsUnique().HasDatabaseName("uq_journal_fills_transaction_id");
+        builder.HasIndex(x => x.EntryId).HasDatabaseName("ix_journal_fills_entry_id");
+        builder.HasIndex(x => x.ForDate).HasDatabaseName("ix_journal_fills_for_date");
+        builder.HasOne<Transaction>().WithMany().HasForeignKey(x => x.TransactionId).HasConstraintName("fk_journal_fills_transactions_transaction_id").OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<JournalEntryRecord>().WithMany().HasForeignKey(x => x.EntryId).HasConstraintName("fk_journal_fills_journal_entries_entry_id").OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+/// <summary><c>trading.fill_grades</c>: the grade of realised fills beside the plan grade. One per entry, insert-only, always labelled <c>realised fills, not simulated</c>.</summary>
+internal sealed class FillGradeRecordConfiguration : IEntityTypeConfiguration<FillGradeRecord>
+{
+    public void Configure(EntityTypeBuilder<FillGradeRecord> builder)
+    {
+        builder.ToTable("fill_grades", Schemas.Trading, t => t.HasCheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0"));
+        builder.HasKey(x => x.Id).HasName("pk_fill_grades");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.Status).HasMaxLength(16).IsRequired();
+        builder.Property(x => x.GrossPnl).HasPrecision(18, 2);
+        builder.Property(x => x.Charges).HasPrecision(18, 2);
+        builder.Property(x => x.Basis).HasMaxLength(40).IsRequired();
+        builder.Property(x => x.Detail).HasMaxLength(500).IsRequired();
+        builder.HasIndex(x => x.EntryId).IsUnique().HasDatabaseName("uq_fill_grades_entry_id");
+        builder.HasOne<JournalEntryRecord>().WithMany().HasForeignKey(x => x.EntryId).HasConstraintName("fk_fill_grades_journal_entries_entry_id").OnDelete(DeleteBehavior.Restrict);
     }
 }
 

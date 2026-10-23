@@ -2775,6 +2775,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans/{id}/journal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The auto-journal of a plan: each approved ticket's fills the portfolio sync stored (matched by account, instrument, side and day), the fill grade ('realised fills, not simulated') beside the plan-price grade ('simulated on plan prices'), and the day's discretionary fills apart. Fills are only read; nothing is an order. 404 plans.not_found */
+    get: operations['GetPlanJournal'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/reports/decisions': {
     parameters: {
       query?: never;
@@ -5277,6 +5294,68 @@ export interface components {
        */
       meanAbsContribution: number;
     };
+    /** @description The grade of what the owner's fills did on a ticket (P7-14, ADR 0093), stored beside the plan-price grade. A realised result, never a simulation: the label is always string FillGrade.Basis. */
+    FillGrade: {
+      /** @description `graded` (R measured against the plan's level) or `no_plan_levels` (the round trip is real but the plan grade has no entry or stop to measure it against; R is then empty). */
+      status: string;
+      /**
+       * Format: int64
+       * @description Shares entered and left.
+       */
+      qty: number;
+      /**
+       * Format: double
+       * @description Volume-weighted entry price of the fills.
+       */
+      entryPrice: number;
+      /**
+       * Format: double
+       * @description Volume-weighted exit price of the fills.
+       */
+      exitPrice: number;
+      /**
+       * Format: double
+       * @description The plan grade's simulated entry; null when none.
+       */
+      planEntryPrice: null | number;
+      /**
+       * Format: double
+       * @description The plan grade's simulated initial stop; null when none.
+       */
+      planStopPrice: null | number;
+      /**
+       * Format: double
+       * @description The plan grade's R beside it; null when the ticket was not graded as a trade.
+       */
+      planR: null | number;
+      /**
+       * Format: double
+       * @description Entry price paid minus the plan entry, signed so that positive is worse for the owner; null without a plan entry.
+       */
+      slippagePrice: null | number;
+      /**
+       * Format: double
+       * @description The same in R (divided by the planned risk per share); null without plan levels.
+       */
+      slippageR: null | number;
+      /**
+       * Format: double
+       * @description Realised profit before charges, rupees.
+       */
+      grossPnl: number;
+      /**
+       * Format: double
+       * @description The charges the sync recorded for the fills used, rupees.
+       */
+      charges: number;
+      /**
+       * Format: double
+       * @description Realised result in R after the recorded charges; null without plan levels.
+       */
+      r: null | number;
+      /** @description Why, in a sentence. */
+      detail: string;
+    };
     /**
      * @description Optional per-holding dates for the first import that happens when the portfolio settings are saved (ADR 0013). Without rows, every holding Dhan lists is
      *     imported dated with the first import date (flagged default-date); a row (key from `holdings/preview`, acquisition date) overrides the date of its holding.
@@ -6181,6 +6260,76 @@ export interface components {
       swingBuy: string[];
       swingSell: string[];
     };
+    /** @description One ticket's journal line: plan grade and fill grade side by side. */
+    JournalEntryView: {
+      /**
+       * Format: int64
+       * @description The ticket.
+       */
+      itemId: number;
+      /**
+       * Format: int32
+       * @description Rank in the plan.
+       */
+      rank: number;
+      /** @description Symbol. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /** @description The ticket's newest state. */
+      state: string;
+      /** @description Its entry and exit fills. */
+      fills: components['schemas']['JournalFillView'][];
+      /** @description open (not finished), pending (finished, plan grade not there yet), graded or no_plan_levels. */
+      status: string;
+      fill: null | components['schemas']['FillGrade'];
+      /** @description The plan-price grade's status, or pending. */
+      planStatus: string;
+      /**
+       * Format: double
+       * @description The plan-price grade's R, labelled `simulated on plan prices`.
+       */
+      planR: null | number;
+    };
+    /** @description A fill as the API shows it. */
+    JournalFillView: {
+      /**
+       * Format: uuid
+       * @description The stored trade.
+       */
+      transactionId: string;
+      /** @description entry, exit or discretionary. */
+      role: string;
+      /** @description Symbol. */
+      symbol: string;
+      /** @description buy or sell. */
+      side: string;
+      /**
+       * Format: date
+       * @description India date.
+       */
+      date: string;
+      /**
+       * Format: time
+       * @description India time, when known.
+       */
+      time: null | string;
+      /**
+       * Format: int64
+       * @description Shares of the role.
+       */
+      qty: number;
+      /**
+       * Format: double
+       * @description Fill price.
+       */
+      price: number;
+    };
     JsonElement: unknown;
     /** @description The counts of a finished run: the instruments asked for and replayed, the ones skipped, and the trades (closed and open at the end of the data). */
     LabCounts: {
@@ -7009,6 +7158,32 @@ export interface components {
       evidence: components['schemas']['PlanEvidenceView'];
       /** @description Size per account. */
       allocations: components['schemas']['PlanAllocationView'][];
+    };
+    /** @description The journal of one plan. */
+    PlanJournalView: {
+      /**
+       * Format: int64
+       * @description The plan.
+       */
+      planId: number;
+      /**
+       * Format: date
+       * @description The planned session.
+       */
+      forDate: string;
+      /** @description Always `realised fills, not simulated`. */
+      fillBasis: string;
+      /** @description Always `simulated on plan prices`. */
+      planBasis: string;
+      /** @description Tickets with fills. */
+      entries: components['schemas']['JournalEntryView'][];
+      /** @description The day's fills with no ticket, reported separately. */
+      discretionary: components['schemas']['JournalFillView'][];
+      /**
+       * Format: int32
+       * @description Approved tickets that no fill was matched to.
+       */
+      ticketsWithoutFills: number;
     };
     /** @description One recorded attempt. */
     PlanRunView: {
@@ -15671,6 +15846,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PlanGradeView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanJournal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanJournalView'];
         };
       };
       /** @description Not Found */

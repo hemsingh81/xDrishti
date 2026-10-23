@@ -132,6 +132,7 @@ public static class DependencyInjection
         services.AddScoped<ILessonLog, LessonLogStore>(); // the insert-only lesson log (spec P6-16)
         services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
         services.AddScoped<IGradeStore, GradeStore>(); // insert-only grades of tickets (P7-13, ADR 0090)
+        services.AddScoped<IJournalStore, JournalStore>(); // insert-only journal of the stored fills (P7-14, ADR 0093)
         services.AddSingleton<IGradeSettings, GradeSettings>();
         services.AddScoped<IAutoApprovalStore>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-12: the automatic approval is written by the same store, in the same lock order as an owner's decision
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)

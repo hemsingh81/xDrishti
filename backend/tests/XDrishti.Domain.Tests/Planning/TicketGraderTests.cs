@@ -47,6 +47,8 @@ public sealed class TicketGraderTests
         result.Grade.R.ShouldBe(1.8);
         result.Grade.CostBasis.ShouldBe("gross, no charges");
         result.Grade.ExitReason.ShouldBe("Target");
+        result.Grade.EntryPrice.ShouldBe(100.5);
+        result.Grade.StopPrice.ShouldBe(98); // kept so that the fill grade (P7-14) measures the same 1R
         TicketGrade.Basis.ShouldBe("simulated on plan prices");
     }
 
