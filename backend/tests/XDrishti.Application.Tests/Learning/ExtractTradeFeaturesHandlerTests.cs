@@ -77,7 +77,7 @@ public sealed class ExtractTradeFeaturesHandlerTests
         _extractor.Extract(Arg.Any<IReadOnlyList<Bar>>(), Arg.Any<AdjustmentFactors>(), Arg.Any<TradingCalendar>(), Arg.Do<IReadOnlyList<TradeFeatureDecision>>(d => told = d))
             .Returns(new Dictionary<string, double[]> { [trade.Key] = Values() });
 
-        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key, "test"), Ct);
+        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.ShouldBe(new TradeFeaturesOutcome(1, 1, 0));
@@ -96,7 +96,7 @@ public sealed class ExtractTradeFeaturesHandlerTests
         Run(FabricatedRun.Trade(FabricatedRun.IdA, "NSE:A", Side.Buy, Day));
         _bars.ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct).Returns(Array.Empty<Bar>());
 
-        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key, "test"), Ct);
+        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
 
         result.Value.ShouldBe(new TradeFeaturesOutcome(1, 0, 1));
         _written.ShouldNotBeNull().ShouldBeEmpty();
@@ -114,7 +114,7 @@ public sealed class ExtractTradeFeaturesHandlerTests
         _extractor.Extract(Arg.Any<IReadOnlyList<Bar>>(), Arg.Any<AdjustmentFactors>(), Arg.Any<TradingCalendar>(), Arg.Any<IReadOnlyList<TradeFeatureDecision>>())
             .Returns(ci => ci.ArgAt<IReadOnlyList<TradeFeatureDecision>>(3).ToDictionary(d => d.TradeKey, _ => Values()));
 
-        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key, "test"), Ct);
+        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
 
         result.Value.ShouldBe(new TradeFeaturesOutcome(3, 3, 0));
         await _bars.Received(1).ReadAsync(FabricatedRun.IdA, Arg.Any<DateTimeOffset>(), Arg.Any<DateTimeOffset>(), Ct);
@@ -124,7 +124,7 @@ public sealed class ExtractTradeFeaturesHandlerTests
     [Fact]
     public async Task A_bad_run_key_or_actor_is_refused_before_anything_is_read()
     {
-        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand("not-a-key", " "), Ct);
+        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand("not-a-key"), Ct);
 
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(LearningErrors.InvalidCode);
@@ -137,7 +137,7 @@ public sealed class ExtractTradeFeaturesHandlerTests
     {
         _runs.FindAsync(Key, Ct).Returns((StoredRunHeader?)null);
 
-        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key, "test"), Ct);
+        var result = await Handler().HandleAsync(new ExtractTradeFeaturesCommand(Key), Ct);
 
         result.Error.Code.ShouldBe(LearningErrors.RunNotFoundCode);
     }

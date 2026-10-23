@@ -84,6 +84,7 @@ public static class TradeFeatureExtractor
             H("regime", frameTf: Timeframe.M1, needsContext: true),
         };
 
+        // Shortcut: each timeframe re-walks every stored bar of the instrument with its own frame (time and memory grow with timeframes x bars); fine for one instrument at a time, share one pass if it shows in a profile.
         var created = FeatureFrame.Create(specs, new FrameOptions(calendar, 1, context, expiry));
         if (created.IsFailure)
         {
@@ -160,6 +161,7 @@ public static class TradeFeatureExtractor
 
             v[32] = SessionClock.MinuteOfDay(d.DecisionEpochSeconds);
             v[33] = d.Side == Side.Buy ? 1 : -1;
+            // Shortcut: close is adjusted with today's factors while the stop and target are the run's prices; the plan features (34, 35) are exact only when no corporate action was applied since the run (stated in ADR 0066).
             var risk = Math.Abs(c - d.StopPrice);
             v[34] = Ratio(risk, c);
             v[35] = d.TargetPrice is { } target && risk > 0 ? Math.Abs(target - c) / risk : double.NaN;

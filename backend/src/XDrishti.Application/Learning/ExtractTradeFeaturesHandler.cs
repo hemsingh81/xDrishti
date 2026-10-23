@@ -35,11 +35,6 @@ internal sealed class ExtractTradeFeaturesHandler(
             problems.Add(new FieldError("runKey", "A run key is 64 lower-case hex characters."));
         }
 
-        if (string.IsNullOrWhiteSpace(command.Actor) || command.Actor.Length > 100)
-        {
-            problems.Add(new FieldError("actor", "The actor is required and at most 100 characters."));
-        }
-
         if (problems.Count > 0)
         {
             FeatureLog.Refused(logger, LearningErrors.InvalidCode);

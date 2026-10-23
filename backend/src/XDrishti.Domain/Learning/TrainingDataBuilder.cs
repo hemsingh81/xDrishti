@@ -7,7 +7,7 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Domain.Learning;
 
 /// <summary>
-/// Joins the labels of a <see cref="TrainingSet"/> to the stored decision-time features and the point-in-time cell features (P6-04, ADR 0066). The rule for unknowns: a labelled trade without a feature row, or with a required feature unknown (NaN), is
+/// Joins the labels of a <see cref="TrainingSet"/> to the stored decision-time features and the point-in-time cell features (P6-04, ADR 0066). The rule for unknowns: a labelled trade without a feature row, or with a required feature unknown (NaN or infinite), is
 /// dropped and counted, never filled. Pure and deterministic.
 /// </summary>
 public static class TrainingDataBuilder
@@ -17,7 +17,8 @@ public static class TrainingDataBuilder
     /// <param name="stored">The stored feature rows of the runs of the set (values in catalog order, <see cref="TradeFeatureCatalog.StoredCount"/> each).</param>
     /// <param name="cells">The cell features by trade key (<see cref="TradeFeatureCatalog.CellCount"/> values each), from <see cref="PointInTimeCells"/>.</param>
     /// <param name="required">The names a row must have known; null means <see cref="TradeFeatureCatalog.DefaultRequired"/>.</param>
-    public static Result<TrainingData> Build(TrainingSet set, IReadOnlyList<TradeFeatureRow> stored, IReadOnlyDictionary<string, double[]> cells, IReadOnlyList<string>? required = null)
+    /// <param name="provenance">Text that is part of the id besides the data: the sources and the cell-statistics options, so the same rows built with other knobs are another set.</param>
+    public static Result<TrainingData> Build(TrainingSet set, IReadOnlyList<TradeFeatureRow> stored, IReadOnlyDictionary<string, double[]> cells, IReadOnlyList<string>? required = null, string? provenance = null)
     {
         ArgumentNullException.ThrowIfNull(set);
         ArgumentNullException.ThrowIfNull(stored);
@@ -73,7 +74,7 @@ public static class TrainingDataBuilder
             var complete = true;
             for (var i = 0; i < names.Length; i++)
             {
-                if (double.IsNaN(values[requiredIndex[i]]))
+                if (!double.IsFinite(values[requiredIndex[i]]))
                 {
                     unknown[names[i]]++;
                     complete = false;
@@ -96,14 +97,14 @@ public static class TrainingDataBuilder
             return Result.Failure<TrainingData>(Error.Validation("training_data.empty", "No labelled trade has all its required features known (" + noFeatures.ToString(CultureInfo.InvariantCulture) + " without features, " + droppedUnknown.ToString(CultureInfo.InvariantCulture) + " with one unknown)."));
         }
 
-        var id = IdOf(set, names, rows);
+        var id = IdOf(set, names, rows, provenance);
         return Result.Success(new TrainingData(id, set.Id, TradeFeatureCatalog.Version, set.RuleVersion, set.Basis, set.RunKeys, names, from.Value, to.Value, rows, set.Labels.Count, noFeatures, droppedUnknown, unknown));
     }
 
-    private static string IdOf(TrainingSet set, string[] names, List<TrainingRow> rows)
+    private static string IdOf(TrainingSet set, string[] names, List<TrainingRow> rows, string? provenance)
     {
         var text = new StringBuilder();
-        text.Append("training-data/1\n").Append(set.Id).Append('\n').Append(TradeFeatureCatalog.Version).Append('\n');
+        text.Append("training-data/1\n").Append(set.Id).Append('\n').Append(TradeFeatureCatalog.Version).Append('\n').Append(provenance).Append('\n');
         foreach (var name in names)
         {
             text.Append(name).Append(',');

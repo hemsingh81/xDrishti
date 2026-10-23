@@ -63,7 +63,12 @@ internal sealed record LearnTrainingSetOptions(IReadOnlyList<CellSource> Sources
         var defaults = new CellStatsOptions();
         var half = Number(values, "--half-life-days", defaults.RecencyHalfLifeDays, errors);
         var strength = Number(values, "--prior-strength", defaults.PriorStrength, errors);
-        var min = (int)Number(values, "--min-trades", defaults.MinTrades, errors);
+        var min = defaults.MinTrades;
+        if (values.TryGetValue("--min-trades", out var minText) && !int.TryParse(minText, NumberStyles.Integer, CultureInfo.InvariantCulture, out min))
+        {
+            errors.Add("--min-trades must be a whole number");
+        }
+
         IReadOnlyList<string>? required = values.TryGetValue("--require", out var list) ? [.. list.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)] : null;
         return errors.Count > 0 ? (null, errors) : (new LearnTrainingSetOptions(runs, new CellStatsOptions(half, strength, min), required), errors);
     }

@@ -40,6 +40,17 @@ public sealed class LearnFeaturesOptionsTests
         options.Options.PriorStrength.ShouldBe(20);
     }
 
+    [Theory]
+    [InlineData("abc")]
+    [InlineData("1.5")]
+    public void A_min_trades_that_is_not_a_whole_number_is_refused(string value)
+    {
+        var (options, errors) = LearnTrainingSetOptions.Parse(["--run", $"{Key}:swing:ATR", "--min-trades", value]);
+
+        options.ShouldBeNull();
+        errors.ShouldContain(e => e.Contains("--min-trades", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Without_a_require_list_the_catalog_default_applies()
     {

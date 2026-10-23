@@ -110,6 +110,30 @@ public sealed class TrainingDataBuilderTests
     }
 
     [Fact]
+    public void An_infinite_required_value_counts_as_unknown()
+    {
+        var rsi = TradeFeatureCatalog.IndexOf("rsi14");
+        var values = Stored("t2").Values.ToArray();
+        values[rsi] = double.NegativeInfinity;
+        var inf = Stored("t2") with { Values = values };
+
+        var data = TrainingDataBuilder.Build(Set(Label("t1", 1), Label("t2", 0)), [Stored("t1"), inf], Cells("t1", "t2")).Value;
+
+        data.Rows.Count.ShouldBe(1);
+        data.UnknownByFeature["rsi14"].ShouldBe(1);
+    }
+
+    [Fact]
+    public void The_id_changes_with_the_provenance()
+    {
+        var set = Set(Label("t1", 1));
+        var a = TrainingDataBuilder.Build(set, [Stored("t1")], Cells("t1"), null, "x").Value;
+
+        TrainingDataBuilder.Build(set, [Stored("t1")], Cells("t1"), null, "y").Value.Id.ShouldNotBe(a.Id);
+        TrainingDataBuilder.Build(set, [Stored("t1")], Cells("t1"), null, "x").Value.Id.ShouldBe(a.Id);
+    }
+
+    [Fact]
     public void The_id_is_stable_and_follows_the_order_of_nothing_but_changes_with_any_value_or_the_required_set()
     {
         var set = Set(Label("t1", 1), Label("t2", 0));

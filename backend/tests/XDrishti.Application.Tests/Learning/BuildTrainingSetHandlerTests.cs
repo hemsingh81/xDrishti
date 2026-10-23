@@ -96,6 +96,20 @@ public sealed class BuildTrainingSetHandlerTests
     }
 
     [Fact]
+    public async Task A_stored_row_with_another_decision_instant_is_dropped_and_counted()
+    {
+        var trades = Run(Trade(0, ExitReason.Target, 2), Trade(1, ExitReason.Stop, -1));
+        var rows = trades.Select(Row).ToList();
+        rows[1] = rows[1] with { DecisionEpochSeconds = rows[1].DecisionEpochSeconds + 60 };
+        _features.ReadAsync(Arg.Any<IReadOnlyList<string>>(), "tf-1", Ct).Returns(rows);
+
+        var result = await Handler().HandleAsync(Command(), Ct);
+
+        result.Value.Rows.ShouldBe(1);
+        result.Value.DroppedNoFeatures.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task A_second_identical_build_writes_nothing_and_says_so()
     {
         var trades = Run(Trade(0, ExitReason.Target, 2));

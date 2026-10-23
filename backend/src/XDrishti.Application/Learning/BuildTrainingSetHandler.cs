@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Messaging;
@@ -45,7 +46,12 @@ internal sealed class BuildTrainingSetHandler(IRunStore runs, ITradeFeatureStore
         var asks = set.Value.Labels.Select(l => new CellAsk(l.Key, cellOf[l.Key].CellKey, cellOf[l.Key].Date)).ToList();
         var cells = PointInTimeCells.Compute(read.Value.Cells, asks, command.Options);
         var stored = await features.ReadAsync(runKeys, TradeFeatureCatalog.Version, cancellationToken);
-        var data = TrainingDataBuilder.Build(set.Value, stored, cells, command.Required);
+        var sources = string.Join(',', command.Sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}"));
+        var o = command.Options;
+        var provenance = string.Create(CultureInfo.InvariantCulture, $"{sources};{o.RecencyHalfLifeDays:R};{o.PriorStrength:R};{o.MinTrades};{o.CredibleLevel:R}");
+        var decisionOf = read.Value.Trades.ToDictionary(t => t.Trade.Key, t => t.Trade.DecisionEpochSeconds, StringComparer.Ordinal);
+        var matching = stored.Where(f => decisionOf.TryGetValue(f.TradeKey, out var at) && at == f.DecisionEpochSeconds).ToList();
+        var data = TrainingDataBuilder.Build(set.Value, matching, cells, command.Required, provenance);
         if (data.IsFailure)
         {
             FeatureLog.TrainingSetRefused(logger, data.Error.Code);
@@ -53,7 +59,6 @@ internal sealed class BuildTrainingSetHandler(IRunStore runs, ITradeFeatureStore
         }
 
         var d = data.Value;
-        var sources = string.Join(',', command.Sources.OrderBy(s => s.RunKey, StringComparer.Ordinal).Select(s => $"{s.RunKey}:{s.Style}:{s.Exit}"));
         bool written;
         try
         {

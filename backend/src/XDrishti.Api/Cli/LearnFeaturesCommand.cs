@@ -28,7 +28,7 @@ internal static class LearnFeaturesCommand
             {
                 await using var scope = services.CreateAsyncScope();
                 var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>>()
-                    .HandleAsync(new ExtractTradeFeaturesCommand(runKey, "cli:xd"), cancellationToken);
+                    .HandleAsync(new ExtractTradeFeaturesCommand(runKey), cancellationToken);
                 if (result.IsFailure)
                 {
                     await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));

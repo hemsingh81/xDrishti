@@ -19,6 +19,7 @@ internal sealed class TradeFeatureStore(NpgsqlDataSource dataSource) : ITradeFea
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var added = 0;
+        // Shortcut: one INSERT per row in a single transaction is fine below ~100k rows; beyond that COPY into a temp table and INSERT .. SELECT .. ON CONFLICT DO NOTHING.
         foreach (var row in rows)
         {
             await using var insert = new NpgsqlCommand("""
