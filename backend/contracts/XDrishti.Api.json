@@ -9043,6 +9043,99 @@
           }
         }
       }
+    },
+    "/api/lessons": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The lessons (a problem a replayed monitor found, the fix linked and the stored result), newest first, each in its current state (open, linked, closed, dismissed); optional state filter, limit 1 to 200 (default 50). Empty before the first. 422 learning.invalid",
+        "operationId": "ListLessons",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LessonView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lessons/{id}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "One lesson with its history, the states it may move to and the before and after numbers of its closing. Linking or closing applies nothing. 404 lessons.not_found",
+        "operationId": "GetLesson",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LessonView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -19113,6 +19206,193 @@
           }
         },
         "description": "The window of a run."
+      },
+      "LessonStepView": {
+        "required": [
+          "rowId",
+          "state",
+          "reason",
+          "actor",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "rowId": {
+            "type": "integer",
+            "description": "The log row id.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "The state after the row."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who."
+          },
+          "at": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "One row of a lesson's history."
+      },
+      "LessonView": {
+        "required": [
+          "id",
+          "state",
+          "monitorKind",
+          "subject",
+          "evidenceKey",
+          "problem",
+          "hypothesisRef",
+          "experimentId",
+          "result",
+          "experimentOutcome",
+          "beforeMeanR",
+          "afterMeanR",
+          "beforeTotalR",
+          "afterTotalR",
+          "reason",
+          "actor",
+          "createdAt",
+          "updatedAt",
+          "nextStates",
+          "history",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The lesson id.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "open, linked, closed or dismissed."
+          },
+          "monitorKind": {
+            "type": "string",
+            "description": "growing_tag, rolling_band, cusum or calibration."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The cell key or model."
+          },
+          "evidenceKey": {
+            "type": "string",
+            "description": "Identifies the finding."
+          },
+          "problem": {
+            "type": "string",
+            "description": "The problem with its numbers."
+          },
+          "hypothesisRef": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The linked hypothesis, or null.",
+            "format": "int64"
+          },
+          "experimentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The linked or resolved experiment, or null.",
+            "format": "int64"
+          },
+          "result": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "improved or no_measurable_change once closed."
+          },
+          "experimentOutcome": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Outcome of the experiment the result was read from."
+          },
+          "beforeMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Pooled mean R before (baseline), or null.",
+            "format": "double"
+          },
+          "afterMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Pooled mean R after (candidate), or null.",
+            "format": "double"
+          },
+          "beforeTotalR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Total R before.",
+            "format": "double"
+          },
+          "afterTotalR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Total R after.",
+            "format": "double"
+          },
+          "reason": {
+            "type": "string",
+            "description": "The reason of the newest move."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who made the newest move."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was opened.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it last moved.",
+            "format": "date-time"
+          },
+          "nextStates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The states it may move to."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LessonStepView"
+            },
+            "description": "Every step, oldest first; empty in a list."
+          },
+          "note": {
+            "type": "string",
+            "description": "What a lesson does and does not do."
+          }
+        },
+        "description": "A lesson as the API shows it (P6-16, ADR 0078): the newest row of its log, with the legal next states and, for one lesson, its history."
       },
       "LiveFeedStatus": {
         "required": [

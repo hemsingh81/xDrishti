@@ -469,6 +469,12 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetHypothesisQuery, Result<HypothesisView>>, GetHypothesisHandler>();
         services.AddScoped<IQueryHandler<GridHypothesesQuery, Result<GridHypothesesView>>, GridHypothesesHandler>(); // the deterministic grid source
         services.AddScoped<IQueryHandler<EvaluateHypothesisTriggersQuery, Result<HypothesisTriggersView>>, EvaluateHypothesisTriggersHandler>(); // triggers on replayed data, proposals only
+        services.AddScoped<ICommandHandler<OpenLessonsCommand, LessonScanOutcome>, OpenLessonsHandler>(); // lessons opened from the replayed monitors, idempotent (P6-16, ADR 0078)
+        services.AddScoped<ICommandHandler<LinkLessonCommand, LessonMoveOutcome>, LinkLessonHandler>(); // link a hypothesis or an experiment
+        services.AddScoped<ICommandHandler<CloseLessonCommand, LessonMoveOutcome>, CloseLessonHandler>(); // close with the stored experiment's before and after
+        services.AddScoped<ICommandHandler<DismissLessonCommand, LessonMoveOutcome>, DismissLessonHandler>();
+        services.AddScoped<IQueryHandler<ListLessonsQuery, Result<IReadOnlyList<LessonView>>>, ListLessonsHandler>();
+        services.AddScoped<IQueryHandler<GetLessonQuery, Result<LessonView>>, GetLessonHandler>();
         services.AddScoped<IQueryHandler<GetCellStateQuery, Result<CellStateView>>, GetCellStateHandler>();
     }
 }

@@ -291,6 +291,7 @@ decision drag, tail losses, data-quality failures.</p>
  &quot;result&quot;:{&quot;metric&quot;:&quot;exp_R&quot;,&quot;before&quot;:-0.21,&quot;after&quot;:0.17,&quot;trades_after&quot;:60},&quot;status&quot;:&quot;resolved&quot;}</code></pre></div>
 <p>Lessons are kept forever and shown on the Learning screen with a before/after chart, the walk-forward evidence
 and two actions: <strong>Revert</strong> and <strong>Re-run with a different value</strong> (opens §12 pre-filled).</p>
+<p>Built (P6-16, <a href="../adr/0078-lessons-a-finding-a-linked-fix-and-a-result-read-from-the-stored-experiment.html">ADR 0078</a>): a lesson is a monitor finding from replayed history (growing loss tag, rolling expectancy below the band, CUSUM, calibration), opened once per finding (monitor, subject, evidence key), optionally linked to a hypothesis or experiment, and closed with the before and after numbers read from that fix&#39;s stored experiment (<code>improved</code> only when it was Better, otherwise <code>no measurable change</code>, which is a legitimate result). States open, linked, closed, dismissed; all moves are the owner&#39;s; nothing is applied. Stored in the insert-only <code>research.lessons</code>; <code>xd learn lesson</code>, <code>GET /api/lessons</code>. Not built: <code>execution_gap</code> and <code>decision_drag</code> (need real fills and decisions, P10/P11), <code>data_quality</code>, drawdown beyond the Monte Carlo band, tail losses, generated diagnoses (P9), the Learning screen chart (P8). The JSON example above is the intended shape; the stored lesson carries the finding text, the fix link and the experiment numbers instead of <code>diagnosis</code> and <code>fix.how</code>.</p>
 <h2 id="11-making-learning-visible-learning-screen">11. Making learning visible (Learning screen)<a class="hash" href="#11-making-learning-visible-learning-screen" aria-label="Link to this section">#</a></h2>
 <table>
 <thead>
@@ -516,7 +517,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-23 07:07</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-23 07:34</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

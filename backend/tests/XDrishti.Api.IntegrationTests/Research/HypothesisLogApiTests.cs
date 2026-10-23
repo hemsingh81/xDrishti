@@ -21,6 +21,7 @@ public sealed class HypothesisLogApiTests(ApiFactory factory) : DataTestBase(fac
     {
         await base.InitializeAsync();
         await using var connection = await OpenAsync();
+        await ExecuteAsync(connection, "DELETE FROM research.lessons");
         await ExecuteAsync(connection, "DELETE FROM research.hypotheses");
         await ExecuteAsync(connection, "DELETE FROM research.experiments");
     }
