@@ -113,3 +113,6 @@ system proposed.
 
 ## 9. As built (P7-01, [ADR 0082](../adr/0082-selection-core-filters-with-unavailable-merge-and-a-deterministic-rank.md))
 Sections 2 to 4 exist as pure code (`XDrishti.Domain.Selection`): each filter answers pass, fail or unavailable with a stable code; unavailable is never a pass. Minimum cell state is Candidate until paper days exist and such plans are labelled provisional. The model is advisory and is not used in filters, merge or rank. `xd select cells --date D` shows the stored cells through the filters.
+
+## 10. As built (P7-06, [ADR 0085](../adr/0085-smart-rules-in-the-plan-gate-and-throttle-and-same-bet-with-unavailable-never-a-pass.md))
+The smart rules exist as pure code (`XDrishti.Domain.Selection.SmartRules`), applied in the order gate, correlation, throttle. The market gate reads `unavailable` until VIX, breadth and events exist (P3-01d/e, P15): the plan then carries "market gate unavailable" and is never treated as a normal day. The throttle cuts risk only and is inactive below 20 real taken trades. A rule that removes half or more of the candidates raises a flag. The meta size multiplier is not applied.
