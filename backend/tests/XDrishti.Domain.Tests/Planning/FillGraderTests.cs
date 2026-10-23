@@ -109,4 +109,32 @@ public sealed class FillGraderTests
         FillGrader.Grade(Side.Buy, entries, exits, Plan()).ShouldBe(FillGrader.Grade(Side.Buy, entries, exits, Plan()));
         FillGrade.Basis.ShouldBe("realised fills, not simulated");
     }
+
+    [Fact]
+    public void A_pre_existing_position_gives_the_rupee_result_and_no_r()
+    {
+        var entries = new[] { Link(JournalRole.Entry, Side.Buy, 10, 100m) };
+        var exits = new[] { Link(JournalRole.Exit, Side.Sell, 10, 104m, hour: 13) };
+
+        var grade = FillGrader.Grade(Side.Buy, entries, exits, Plan(), "uncertain: pre-existing position (net 5)")!;
+
+        grade.Status.ShouldBe(FillGrade.Uncertain);
+        grade.R.ShouldBeNull();
+        grade.SlippageR.ShouldBeNull();
+        grade.GrossPnl.ShouldBe(40m);
+        grade.Detail.ShouldContain("pre-existing position");
+    }
+
+    [Fact]
+    public void An_exit_fill_larger_than_the_entry_is_uncertain()
+    {
+        var entries = new[] { Link(JournalRole.Entry, Side.Buy, 10, 100m) };
+        var exits = new[] { Link(JournalRole.Exit, Side.Sell, 25, 104m, used: 10, hour: 13) };
+
+        var grade = FillGrader.Grade(Side.Buy, entries, exits, Plan())!;
+
+        grade.Status.ShouldBe(FillGrade.Uncertain);
+        grade.R.ShouldBeNull();
+        grade.Detail.ShouldContain("larger than the quantity entered");
+    }
 }

@@ -5296,7 +5296,7 @@ export interface components {
     };
     /** @description The grade of what the owner's fills did on a ticket (P7-14, ADR 0093), stored beside the plan-price grade. A realised result, never a simulation: the label is always string FillGrade.Basis. */
     FillGrade: {
-      /** @description `graded` (R measured against the plan's level) or `no_plan_levels` (the round trip is real but the plan grade has no entry or stop to measure it against; R is then empty). */
+      /** @description `graded` (R measured against the plan's level) or `uncertain` (a pre-existing position or an oversized exit: no R), or `no_plan_levels` (the round trip is real but the plan grade has no entry or stop to measure it against; R is then empty). */
       status: string;
       /**
        * Format: int64
@@ -6285,7 +6285,7 @@ export interface components {
       state: string;
       /** @description Its entry and exit fills. */
       fills: components['schemas']['JournalFillView'][];
-      /** @description open (not finished), pending (finished, plan grade not there yet), graded or no_plan_levels. */
+      /** @description open (not finished), pending (finished, plan grade not there yet), graded, no_plan_levels or uncertain (no R). */
       status: string;
       fill: null | components['schemas']['FillGrade'];
       /** @description The plan-price grade's status, or pending. */
@@ -6295,6 +6295,8 @@ export interface components {
        * @description The plan-price grade's R, labelled `simulated on plan prices`.
        */
       planR: null | number;
+      /** @description Why the round trip may not be the ticket's alone (shares held before it); no R is written then. */
+      uncertain?: null | string;
     };
     /** @description A fill as the API shows it. */
     JournalFillView: {

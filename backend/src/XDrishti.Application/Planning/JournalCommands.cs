@@ -22,14 +22,16 @@ public sealed record UnmatchedFill(DateOnly Date, string Symbol, string Side, lo
 /// <summary>What a journal run did.</summary>
 /// <param name="Plans">Plans looked at.</param>
 /// <param name="Tickets">Approved ticket-account pairs fills could match.</param>
-/// <param name="Entries">Entry fills matched.</param>
-/// <param name="Exits">Exit fills matched.</param>
-/// <param name="Discretionary">Fills tagged discretionary.</param>
-/// <param name="Written">New rows stored (entries and fill links).</param>
+/// <param name="Entries">Entry fills matched this run (matched, whether or not already stored).</param>
+/// <param name="Exits">Exit fills matched this run.</param>
+/// <param name="Discretionary">Fills tagged discretionary this run.</param>
+/// <param name="Written">NEW rows stored (entries and fill links); rows already stored by an earlier run are matched again but not written.</param>
 /// <param name="GradesWritten">Fill grades stored.</param>
 /// <param name="GradesPending">Finished or open entries without a fill grade (position open, or plan grade not there yet).</param>
 /// <param name="Unmatched">Ambiguous fills, left unmatched.</param>
-public sealed record JournalOutcome(int Plans, int Tickets, int Entries, int Exits, int Discretionary, int Written, int GradesWritten, int GradesPending, IReadOnlyList<UnmatchedFill> Unmatched);
+/// <param name="GradesUncertain">Of the fill grades written, how many are uncertain (pre-existing position or oversized exit: no R).</param>
+/// <param name="OpenTruncated">More open entries than one run grades: the oldest are left for a later run.</param>
+public sealed record JournalOutcome(int Plans, int Tickets, int Entries, int Exits, int Discretionary, int Written, int GradesWritten, int GradesPending, IReadOnlyList<UnmatchedFill> Unmatched, int GradesUncertain = 0, bool OpenTruncated = false);
 
 /// <summary>The journal of one plan (P7-14). Read only.</summary>
 /// <param name="PlanId">The plan.</param>
@@ -54,11 +56,12 @@ public sealed record JournalFillView(Guid TransactionId, string Role, string Sym
 /// <param name="AccountId">The account.</param>
 /// <param name="State">The ticket's newest state.</param>
 /// <param name="Fills">Its entry and exit fills.</param>
-/// <param name="Status">open (not finished), pending (finished, plan grade not there yet), graded or no_plan_levels.</param>
+/// <param name="Status">open (not finished), pending (finished, plan grade not there yet), graded, no_plan_levels or uncertain (no R).</param>
 /// <param name="Fill">The fill grade, labelled <c>realised fills, not simulated</c>; null until graded.</param>
 /// <param name="PlanStatus">The plan-price grade's status, or pending.</param>
 /// <param name="PlanR">The plan-price grade's R, labelled <c>simulated on plan prices</c>.</param>
-public sealed record JournalEntryView(long ItemId, int Rank, string Symbol, string Side, Guid AccountId, string State, IReadOnlyList<JournalFillView> Fills, string Status, FillGrade? Fill, string PlanStatus, double? PlanR);
+/// <param name="Uncertain">Why the round trip may not be the ticket's alone (shares held before it); no R is written then.</param>
+public sealed record JournalEntryView(long ItemId, int Rank, string Symbol, string Side, Guid AccountId, string State, IReadOnlyList<JournalFillView> Fills, string Status, FillGrade? Fill, string PlanStatus, double? PlanR, string? Uncertain = null);
 
 /// <summary>The journal of one plan.</summary>
 /// <param name="PlanId">The plan.</param>

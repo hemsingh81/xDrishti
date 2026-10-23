@@ -195,6 +195,7 @@ internal sealed class JournalEntryRecordConfiguration : IEntityTypeConfiguration
     public void Configure(EntityTypeBuilder<JournalEntryRecord> builder)
     {
         builder.ToTable("journal_entries", Schemas.Trading);
+        builder.Property(x => x.UncertainReason).HasMaxLength(300);
         builder.HasKey(x => x.Id).HasName("pk_journal_entries");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.HasIndex(x => new { x.ItemId, x.AccountId }).IsUnique().HasDatabaseName("uq_journal_entries_item_account");
@@ -228,7 +229,7 @@ internal sealed class FillGradeRecordConfiguration : IEntityTypeConfiguration<Fi
 {
     public void Configure(EntityTypeBuilder<FillGradeRecord> builder)
     {
-        builder.ToTable("fill_grades", Schemas.Trading, t => t.HasCheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0"));
+        builder.ToTable("fill_grades", Schemas.Trading, t => t.HasCheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels', 'uncertain') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0"));
         builder.HasKey(x => x.Id).HasName("pk_fill_grades");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.Status).HasMaxLength(16).IsRequired();

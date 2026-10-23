@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Abstractions.Planning;
@@ -43,34 +44,42 @@ internal sealed class JournalPlansHandler(
             .Select(g => g.OrderByDescending(r => r.Plan.Version).ThenByDescending(r => r.Id).First())
             .OrderBy(r => r.Plan.ForDate)
             .ToList();
-        int tickets = 0, entries = 0, exits = 0, discretionary = 0, written = 0;
-        var unmatched = new List<UnmatchedFill>();
+        // One pass over every session: all entries are matched before any exit, so a fill that is a later session's entry is never an earlier session's exit.
+        var tickets = new List<JournalTicket>();
         foreach (var plan in rows)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var date = plan.Plan.ForDate;
-            var mine = await TicketsAsync(plan, cancellationToken);
-            tickets += mine.Count;
-            var last = date.AddDays(JournalMatcher.MaxExitDays) < today ? date.AddDays(JournalMatcher.MaxExitDays) : today;
-            var fills = await journal.FillsAsync(date, last, cancellationToken);
-            var result = JournalMatcher.Match(date, mine, fills);
-            var planOf = mine.ToDictionary(t => t.ItemId, t => t.PlanId);
-            var links = result.Links.Select(l => new NewJournalLink(l.ItemId is { } id && planOf.TryGetValue(id, out var p) ? p : 0, date, l)).ToList();
-            var saved = await journal.SaveAsync(links, now, cancellationToken);
-            written += saved.Entries + saved.Fills;
-            entries += result.Links.Count(l => l.Role == JournalRole.Entry);
-            exits += result.Links.Count(l => l.Role == JournalRole.Exit);
-            discretionary += result.Links.Count(l => l.Role == JournalRole.Discretionary);
-            unmatched.AddRange(result.Unmatched.Select(u => new UnmatchedFill(u.Fill.Date, u.Fill.Symbol, u.Fill.Side == Side.Buy ? "buy" : "sell", u.Fill.Qty, u.Reason)));
-            if (result.Unmatched.Count > 0)
-            {
-                JournalLog.Unmatched(logger, plan.Id, result.Unmatched.Count);
-            }
+            tickets.AddRange(await TicketsAsync(plan, cancellationToken));
         }
 
-        var (graded, pending) = await GradeAsync(now, cancellationToken);
-        JournalLog.Done(logger, rows.Count, tickets, entries, exits, discretionary, unmatched.Count, written, graded);
-        return Result.Success(new JournalOutcome(rows.Count, tickets, entries, exits, discretionary, written, graded, pending, unmatched));
+        var dates = rows.Select(r => r.Plan.ForDate).ToList();
+        var fills = dates.Count == 0 ? [] : await journal.FillsAsync(dates.Min(), Last(dates.Max(), today), cancellationToken);
+        var result = JournalMatcher.Match(dates, tickets, fills);
+        var byItem = tickets.GroupBy(t => t.ItemId).ToDictionary(g => g.Key, g => g.First());
+        var entryKeys = result.Links.Where(l => l.Role == JournalRole.Entry).Select(l => (Item: l.ItemId!.Value, l.AccountId)).Distinct().ToList();
+        var positions = await journal.PositionsBeforeAsync([.. entryKeys.Select(k => (k.AccountId, byItem[k.Item].Symbol, byItem[k.Item].ForDate))], cancellationToken);
+        var uncertain = entryKeys.ToDictionary(k => k, k =>
+            positions.GetValueOrDefault((k.AccountId, byItem[k.Item].Symbol, byItem[k.Item].ForDate)) is var held && held != 0
+                ? "uncertain: pre-existing position (the account's earlier trades leave a net " + held.ToString(CultureInfo.InvariantCulture) + " shares of " + byItem[k.Item].Symbol + " open before this entry)"
+                : null);
+        var links = result.Links.Select(l => l.ItemId is { } id
+            ? new NewJournalLink(byItem[id].PlanId, byItem[id].ForDate, l, l.Role == JournalRole.Entry ? uncertain[(id, l.AccountId)] : null)
+            : new NewJournalLink(0, l.Fill.Date, l)).ToList();
+        var saved = await journal.SaveAsync(links, now, cancellationToken);
+        var unmatched = result.Unmatched.Select(u => new UnmatchedFill(u.Fill.Date, u.Fill.Symbol, u.Fill.Side == Side.Buy ? "buy" : "sell", u.Fill.Qty, u.Reason)).ToList();
+        if (unmatched.Count > 0)
+        {
+            JournalLog.Unmatched(logger, rows.Count, unmatched.Count);
+        }
+
+        var entries = result.Links.Count(l => l.Role == JournalRole.Entry);
+        var exits = result.Links.Count(l => l.Role == JournalRole.Exit);
+        var discretionary = result.Links.Count(l => l.Role == JournalRole.Discretionary);
+        var written = saved.Entries + saved.Fills;
+        var ticketCount = tickets.Count;
+        var (graded, pending, uncertainGrades, truncated) = await GradeAsync(now, cancellationToken);
+        JournalLog.Done(logger, rows.Count, ticketCount, entries, exits, discretionary, unmatched.Count, written, graded);
+        return Result.Success(new JournalOutcome(rows.Count, ticketCount, entries, exits, discretionary, written, graded, pending, unmatched, uncertainGrades, truncated));
     }
 
     /// <summary>One ticket per approved item and paper allocation. Reserve tickets count when the owner approved them; a rejected candidate has no decision.</summary>
@@ -98,12 +107,17 @@ internal sealed class JournalPlansHandler(
         return result;
     }
 
-    private async Task<(int Graded, int Pending)> GradeAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    /// <summary>Fills are read from the first session to the earlier of today and the exit window after the last session.</summary>
+    private static DateOnly Last(DateOnly lastSession, DateOnly today) => lastSession.AddDays(JournalMatcher.MaxExitDays) < today ? lastSession.AddDays(JournalMatcher.MaxExitDays) : today;
+
+    private async Task<(int Graded, int Pending, int Uncertain, bool Truncated)> GradeAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var open = await journal.OpenEntriesAsync(MaxOpenEntries, cancellationToken);
+        var fetched = await journal.OpenEntriesAsync(MaxOpenEntries + 1, cancellationToken);
+        var truncated = fetched.Count > MaxOpenEntries;
+        var open = truncated ? [.. fetched.TakeLast(MaxOpenEntries)] : fetched; // newest first was fetched; the oldest extra one is left for a later run
         if (open.Count == 0)
         {
-            return (0, 0);
+            return (0, 0, 0, false);
         }
 
         var planGrades = await grades.ForPlansAsync([.. open.Select(e => e.PlanId).Distinct()], cancellationToken);
@@ -127,7 +141,7 @@ internal sealed class JournalPlansHandler(
             }
 
             var links = entry.Fills.Select(f => new JournalLink(Fill(f), JournalRoleText.TryParse(f.Role) ?? JournalRole.Discretionary, entry.ItemId, f.AccountId, f.Qty, f.Reason)).ToList();
-            var grade = FillGrader.Grade(side, [.. links.Where(l => l.Role == JournalRole.Entry)], [.. links.Where(l => l.Role == JournalRole.Exit)], stored.Grade.Grade);
+            var grade = FillGrader.Grade(side, [.. links.Where(l => l.Role == JournalRole.Entry)], [.. links.Where(l => l.Role == JournalRole.Exit)], stored.Grade.Grade, entry.Uncertain);
             if (grade is null)
             {
                 pending++;
@@ -139,7 +153,7 @@ internal sealed class JournalPlansHandler(
         }
 
         var written = batch.Count > 0 ? await journal.InsertGradesAsync(batch, cancellationToken) : 0;
-        return (written, pending);
+        return (written, pending, batch.Count(g => g.Grade.Status == FillGrade.Uncertain), truncated);
     }
 
     internal static JournalFill Fill(StoredFill f) =>

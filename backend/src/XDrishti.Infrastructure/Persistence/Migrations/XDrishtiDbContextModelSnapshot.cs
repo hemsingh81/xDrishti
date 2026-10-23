@@ -4918,7 +4918,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("fill_grades", "trading", t =>
                         {
-                            t.HasCheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0");
+                            t.HasCheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels', 'uncertain') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0");
                         });
                 });
 
@@ -5052,6 +5052,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.Property<long>("PlanId")
                         .HasColumnType("bigint")
                         .HasColumnName("plan_id");
+
+                    b.Property<string>("UncertainReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("uncertain_reason");
 
                     b.HasKey("Id")
                         .HasName("pk_journal_entries");

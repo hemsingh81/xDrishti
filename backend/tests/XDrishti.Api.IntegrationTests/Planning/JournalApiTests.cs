@@ -125,7 +125,7 @@ public sealed class JournalApiTests(ApiFactory factory) : DataTestBase(factory)
         await FillAsync(Other, "RELIANCE", "buy", 10, 3, 100m); // another account, which has an allocation but not for this symbol
         await FillAsync(Paper, "RELIANCE", "buy", 11, 99, 100m, source: "manual"); // typed in, not from the sync
         await FillAsync(Paper, "RELIANCE", "buy", 12, 98, 100m, voided: true); // voided
-        await FillAsync(Paper, "RELIANCE", "buy", 12, 97, 100m, date: Session.AddDays(-1)); // another day
+        await FillAsync(Paper, "INFY", "buy", 12, 97, 100m, date: Session.AddDays(-1)); // another day, another symbol
     }
 
     [Fact]
@@ -267,7 +267,84 @@ public sealed class JournalApiTests(ApiFactory factory) : DataTestBase(factory)
         (await StateOfAsync("INSERT INTO trading.journal_entries (plan_id, item_id, account_id, for_date, created_at) VALUES (@p, @i, @a, @d, now())", ("p", plan), ("i", tcs), ("a", Other), ("d", Session))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
         (await StateOfAsync("INSERT INTO trading.journal_entries (plan_id, item_id, account_id, for_date, created_at) VALUES (@p, @i, @a, @d, now())", ("p", plan + 1000), ("i", infy), ("a", Paper), ("d", Session))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
 
+        // A fill is linked to an entry of its own account only (trigger).
+        var foreign = Guid.NewGuid();
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "INSERT INTO portfolio.transactions (id, account_id, trading_symbol, exchange, side, trade_date, qty, price, charges, source, seq, external_id, created_by, created_at) VALUES (@id, @a, 'X', 'NSE', 'buy', @d, 1, 1, 0, 'broker', 1, 'foreign', 't', now())", ("id", foreign), ("a", Other), ("d", Session));
+        }
+
+        (await StateOfAsync("INSERT INTO trading.journal_fills (transaction_id, entry_id, role, qty, reason, for_date, journaled_at) VALUES (@t, @e, 'entry', 1, 'x', @d, now())", ("t", foreign), ("e", entry), ("d", Session))).ShouldBe(PostgresErrorCodes.CheckViolation);
+
         // A fill grade carries its label and an R exactly when it was measured.
         (await StateOfAsync("INSERT INTO trading.fill_grades (entry_id, status, qty, entry_price, exit_price, gross_pnl, charges, basis, detail, graded_at) VALUES (@e, 'graded', 1, 1, 1, 0, 0, 'simulated on plan prices', 'x', now())", ("e", entry))).ShouldNotBeNull();
+    }
+
+    private static readonly DateOnly Session2 = new(2099, 3, 6);
+
+    [Fact]
+    public async Task One_sale_after_two_sessions_is_one_row_for_the_first_ticket_and_the_second_stays_open_and_the_counts_match_the_rows()
+    {
+        var (_, reliance, _, _) = await StoredPlanAsync();
+        var plan2 = await WithAsync(p => p.GetRequiredService<IPlanStore>().PublishAsync(
+            new NewPlan("plan-2099-03-06-journal", Session2, new DateTimeOffset(2099, 3, 6, 3, 35, 0, TimeSpan.Zero), 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, [Item(1, TicketGroup.Primary, "RELIANCE", "BUY", Paper)]), Ct).AsTask());
+        var second = (await WithAsync(p => p.GetRequiredService<IPlanStore>().ItemsAsync(plan2.Id, Ct).AsTask()))[0].Id;
+        (await WithAsync(p => p.GetRequiredService<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>>().HandleAsync(new MoveTicketCommand(second, TicketState.Approved, "owner:me", "ok"), Ct).AsTask())).IsSuccess.ShouldBeTrue();
+        await FillAsync(Paper, "RELIANCE", "buy", 10, 10, 100m);
+        await FillAsync(Paper, "RELIANCE", "buy", 10, 10, 101m, date: Session2);
+        await FillAsync(Paper, "RELIANCE", "sell", 13, 20, 104m, date: Session2);
+        Factory.Clock.Pin(new DateTimeOffset(2099, 3, 6, 16, 0, 0, TimeSpan.Zero));
+
+        var run = await WithAsync(p => p.GetRequiredService<ICommandHandler<JournalPlansCommand, JournalOutcome>>().HandleAsync(new JournalPlansCommand(null), Ct).AsTask());
+        var again = await WithAsync(p => p.GetRequiredService<ICommandHandler<JournalPlansCommand, JournalOutcome>>().HandleAsync(new JournalPlansCommand(null), Ct).AsTask());
+
+        run.IsSuccess.ShouldBeTrue();
+        run.Value.Exits.ShouldBe(1);
+        run.Value.Written.ShouldBe(2 + 3); // two entries, three fills: nothing matched is lost
+        (await CountAsync("trading.journal_fills")).ShouldBe(3);
+        (await ScalarAsync<long>($"SELECT count(*) FROM trading.journal_fills f JOIN trading.journal_entries e ON e.id = f.entry_id WHERE f.role = 'exit' AND e.item_id = {reliance}")).ShouldBe(1);
+        (await ScalarAsync<long>($"SELECT qty FROM trading.journal_fills WHERE role = 'exit'")).ShouldBe(10);
+        again.Value.Written.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task An_entry_on_top_of_shares_bought_earlier_is_uncertain_and_gets_no_r()
+    {
+        var (plan, reliance, _, _) = await StoredPlanAsync();
+        await FillAsync(Paper, "RELIANCE", "buy", 10, 5, 90m, date: Session.AddDays(-3)); // already held
+        await FillAsync(Paper, "RELIANCE", "buy", 10, 10, 100.5m);
+        await FillAsync(Paper, "RELIANCE", "sell", 13, 10, 104m);
+        await GradePlanAsync(plan, reliance, 100, 98);
+
+        var outcome = await JournalAsync();
+        await ResignInAsync();
+        var view = await Client.GetFromJsonAsync<JsonElement>(new Uri($"/api/plans/{plan}/journal", UriKind.Relative), Ct);
+
+        outcome.GradesUncertain.ShouldBe(1);
+        (await ScalarAsync<string>("SELECT status FROM trading.fill_grades")).ShouldBe("uncertain");
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.fill_grades WHERE r IS NULL AND slippage_r IS NULL")).ShouldBe(1);
+        (await ScalarAsync<decimal>("SELECT gross_pnl FROM trading.fill_grades")).ShouldBe(35m);
+        var entry = view.GetProperty("entries").EnumerateArray().Single();
+        entry.GetProperty("status").GetString().ShouldBe("uncertain");
+        entry.GetProperty("uncertain").GetString().ShouldNotBeNull().ShouldContain("pre-existing position");
+    }
+
+    [Fact]
+    public async Task A_fill_voided_after_it_was_journaled_no_longer_counts_and_the_round_trip_is_open_again()
+    {
+        var (plan, reliance, _, _) = await StoredPlanAsync();
+        await FillAsync(Paper, "RELIANCE", "buy", 10, 10, 100.5m);
+        await FillAsync(Paper, "RELIANCE", "sell", 13, 10, 104m);
+        await JournalAsync(); // no plan grade yet: waits
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "UPDATE portfolio.transactions SET voided_at = now(), voided_by = 'test' WHERE side = 'sell'");
+        }
+
+        await GradePlanAsync(plan, reliance, 100, 98);
+        var outcome = await JournalAsync();
+
+        outcome.GradesWritten.ShouldBe(0);
+        (await CountAsync("trading.fill_grades")).ShouldBe(0);
     }
 }

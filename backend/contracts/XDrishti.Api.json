@@ -16477,7 +16477,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "description": "`graded` (R measured against the plan's level) or `no_plan_levels` (the round trip is real but the plan grade has no entry or stop to measure it against; R is then empty)."
+            "description": "`graded` (R measured against the plan's level) or `uncertain` (a pre-existing position or an oversized exit: no R), or `no_plan_levels` (the round trip is real but the plan grade has no entry or stop to measure it against; R is then empty)."
           },
           "qty": {
             "type": "integer",
@@ -19292,7 +19292,7 @@
           },
           "status": {
             "type": "string",
-            "description": "open (not finished), pending (finished, plan grade not there yet), graded or no_plan_levels."
+            "description": "open (not finished), pending (finished, plan grade not there yet), graded, no_plan_levels or uncertain (no R)."
           },
           "fill": {
             "oneOf": [
@@ -19316,6 +19316,13 @@
             ],
             "description": "The plan-price grade's R, labelled `simulated on plan prices`.",
             "format": "double"
+          },
+          "uncertain": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the round trip may not be the ticket's alone (shares held before it); no R is written then."
           }
         },
         "description": "One ticket's journal line: plan grade and fill grade side by side."

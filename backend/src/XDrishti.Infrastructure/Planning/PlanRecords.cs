@@ -244,6 +244,8 @@ internal sealed class JournalEntryRecord
     public DateOnly ForDate { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    public string? UncertainReason { get; set; }
 }
 
 /// <summary>A row of <c>trading.journal_fills</c>: one stored trade and what the journal made of it (P7-14). Insert-only; a trade has one row.</summary>

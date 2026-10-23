@@ -30,6 +30,7 @@ public sealed class JournalPlansHandlerTests
         _plans.HistoryAsync(1, Ct).Returns([new PlanEventRow(1, 11, "proposed", "approved", "owner:me", "ok", 1, new DateTimeOffset(2026, 3, 2, 12, 0, 0, TimeSpan.Zero))]);
         _journal.SaveAsync(Arg.Do<IReadOnlyList<NewJournalLink>>(l => _saved = l), Arg.Any<DateTimeOffset>(), Ct).Returns(new JournalSaved(1, 1));
         _journal.OpenEntriesAsync(Arg.Any<int>(), Ct).Returns([]);
+        _journal.PositionsBeforeAsync(Arg.Any<IReadOnlyList<(Guid, string, DateOnly)>>(), Ct).Returns(new Dictionary<(Guid, string, DateOnly), long>());
         _journal.FillsAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns([]);
         _grades.ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns(new Dictionary<long, StoredGrade>());
     }
@@ -173,5 +174,37 @@ public sealed class JournalPlansHandlerTests
         await Handler().HandleAsync(new JournalPlansCommand(F), Ct);
 
         _saved.ShouldBe(first);
+    }
+
+    [Fact]
+    public async Task An_entry_on_top_of_an_earlier_position_is_stored_as_uncertain()
+    {
+        _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketState.Armed)]);
+        _journal.FillsAsync(F, Arg.Any<DateOnly>(), Ct).Returns([Fill()]);
+        _journal.PositionsBeforeAsync(Arg.Any<IReadOnlyList<(Guid, string, DateOnly)>>(), Ct).Returns(new Dictionary<(Guid, string, DateOnly), long> { [(Account, "RELIANCE", F)] = 25 });
+
+        await Handler().HandleAsync(new JournalPlansCommand(F), Ct);
+
+        _saved.Single(l => l.Link.Role == JournalRole.Entry).Uncertain.ShouldNotBeNull().ShouldContain("pre-existing position");
+    }
+
+    [Fact]
+    public async Task An_uncertain_entry_is_graded_without_an_r()
+    {
+        _plans.ItemsAsync(1, Ct).Returns([]);
+        var item = Item(11, TicketState.Closed);
+        _plans.FindItemAsync(11, Ct).Returns(item);
+        StoredFill Leg(string role, string side, int hour, decimal price) => new(Guid.NewGuid(), Account, "RELIANCE", side, F, new TimeOnly(hour, 0), 10, price, 0m, role, 10, "x");
+        _journal.OpenEntriesAsync(Arg.Any<int>(), Ct).Returns([new StoredEntry(1, 1, 11, Account, F, [Leg("entry", "buy", 10, 100m), Leg("exit", "sell", 13, 104m)], null, "uncertain: pre-existing position (test)")]);
+        _grades.ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns(new Dictionary<long, StoredGrade> { [11] = new(1, new NewGrade(1, 11, F, new TicketGrade(GradeStatus.Graded, 2, 0.5, 2.5, "Target", 100, 104, "gross, no charges", "x", 98), null, DateTimeOffset.UnixEpoch)) });
+        IReadOnlyList<NewFillGrade> written = [];
+        _journal.InsertGradesAsync(Arg.Do<IReadOnlyList<NewFillGrade>>(g => written = g), Ct).Returns(1);
+
+        var result = await Handler().HandleAsync(new JournalPlansCommand(F), Ct);
+
+        written.Single().Grade.Status.ShouldBe(FillGrade.Uncertain);
+        written.Single().Grade.R.ShouldBeNull();
+        written.Single().Grade.GrossPnl.ShouldBe(40m);
+        result.Value.GradesUncertain.ShouldBe(1);
     }
 }

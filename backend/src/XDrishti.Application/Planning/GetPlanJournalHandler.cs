@@ -27,7 +27,7 @@ internal sealed class GetPlanJournalHandler(IPlanStore plans, IJournalStore jour
             var status = e.Grade?.Status ?? (e.Fills.Where(f => f.Role == "exit").Sum(f => f.Qty) >= e.Fills.Where(f => f.Role == "entry").Sum(f => f.Qty) ? "pending" : "open");
             return new JournalEntryView(
                 e.ItemId, item.Item.Rank, item.Item.Symbol, item.Item.Side, e.AccountId, item.State.Code(),
-                [.. e.Fills.Select(View)], status, e.Grade, g?.Status.Code() ?? "pending", g?.R);
+                [.. e.Fills.Select(View)], status, e.Grade, g?.Status.Code() ?? "pending", g?.R, e.Uncertain);
         }).OrderBy(l => l.Rank).ThenBy(l => l.AccountId).ToList();
         var discretionary = (await journal.DiscretionaryAsync(plan.Plan.ForDate, cancellationToken)).Select(View).ToList();
         var withFills = lines.Select(l => (l.ItemId, l.AccountId)).ToHashSet();

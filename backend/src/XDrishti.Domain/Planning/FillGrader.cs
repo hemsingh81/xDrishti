@@ -14,7 +14,8 @@ public static class FillGrader
     /// <param name="entries">The entry links.</param>
     /// <param name="exits">The exit links.</param>
     /// <param name="plan">The plan-price grade of the ticket, or null when there is none yet.</param>
-    public static FillGrade? Grade(Side side, IReadOnlyList<JournalLink> entries, IReadOnlyList<JournalLink> exits, TicketGrade? plan)
+    /// <param name="preExisting">Why the position was already open before the entry (an <c>uncertain:</c> sentence), or null.</param>
+    public static FillGrade? Grade(Side side, IReadOnlyList<JournalLink> entries, IReadOnlyList<JournalLink> exits, TicketGrade? plan, string? preExisting = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(exits);
@@ -29,6 +30,12 @@ public static class FillGrader
         var direction = side == Side.Buy ? 1m : -1m;
         var gross = Math.Round(direction * (exit - entry) * qty, 2);
         var charges = Math.Round(Charges(entries, entries.Sum(l => l.Qty)) + Charges(exits, qty), 2);
+        var doubt = preExisting ?? (exits.Any(l => l.Fill.Qty > l.Qty) ? "uncertain: an exit fill is larger than the quantity entered (the shares sold may have been held before the ticket)" : null);
+        if (doubt is not null)
+        {
+            return new FillGrade(FillGrade.Uncertain, qty, (double)entry, (double)exit, plan?.EntryPrice, plan?.StopPrice, plan?.R, null, null, gross, charges, null, Describe(qty, entry, exit, doubt + "; rupee result only, no R"));
+        }
+
         double? planEntry = plan?.EntryPrice;
         double? planStop = plan?.StopPrice;
         var risk = planEntry is { } pe && planStop is { } ps ? Math.Abs(pe - ps) : 0d;

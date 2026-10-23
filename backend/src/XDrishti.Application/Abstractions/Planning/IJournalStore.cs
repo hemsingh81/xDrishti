@@ -6,7 +6,8 @@ namespace XDrishti.Application.Abstractions.Planning;
 /// <param name="PlanId">The plan of the ticket; 0 for a discretionary fill.</param>
 /// <param name="ForDate">The session the journal run was for.</param>
 /// <param name="Link">The link.</param>
-public sealed record NewJournalLink(long PlanId, DateOnly ForDate, JournalLink Link);
+/// <param name="Uncertain">For an entry: why the position was already open before it (stored on the journal entry), else null.</param>
+public sealed record NewJournalLink(long PlanId, DateOnly ForDate, JournalLink Link, string? Uncertain = null);
 
 /// <summary>What a save wrote (rows that were already there are not counted).</summary>
 /// <param name="Entries">New journal entries.</param>
@@ -36,7 +37,8 @@ public sealed record StoredFill(Guid TransactionId, Guid AccountId, string Symbo
 /// <param name="ForDate">The planned session.</param>
 /// <param name="Fills">The entry and exit fills.</param>
 /// <param name="Grade">The fill grade, or null while the position is open or the plan grade is not there yet.</param>
-public sealed record StoredEntry(long Id, long PlanId, long ItemId, Guid AccountId, DateOnly ForDate, IReadOnlyList<StoredFill> Fills, FillGrade? Grade);
+/// <param name="Uncertain">Set when the account already held the instrument before the entry: no R is written for this round trip.</param>
+public sealed record StoredEntry(long Id, long PlanId, long ItemId, Guid AccountId, DateOnly ForDate, IReadOnlyList<StoredFill> Fills, FillGrade? Grade, string? Uncertain = null);
 
 /// <summary>A fill grade to store.</summary>
 /// <param name="EntryId">The journal entry.</param>
@@ -56,7 +58,10 @@ public interface IJournalStore
     /// <summary>Stores entries and fill links in one transaction; an entry or a fill that is already linked keeps its first link and is skipped (idempotent).</summary>
     ValueTask<JournalSaved> SaveAsync(IReadOnlyList<NewJournalLink> links, DateTimeOffset at, CancellationToken cancellationToken);
 
-    /// <summary>Entries without a fill grade, oldest session first, at most <paramref name="limit"/>.</summary>
+    /// <summary>The account's net position (buys minus sells, any source, not voided) in each instrument before the given day, for each key. Missing keys are 0.</summary>
+    ValueTask<IReadOnlyDictionary<(Guid Account, string Symbol, DateOnly Before), long>> PositionsBeforeAsync(IReadOnlyList<(Guid Account, string Symbol, DateOnly Before)> keys, CancellationToken cancellationToken);
+
+    /// <summary>Entries without a fill grade, the NEWEST sessions first (so entries stuck for good cannot starve newer ones), at most <paramref name="limit"/>; returned oldest first.</summary>
     ValueTask<IReadOnlyList<StoredEntry>> OpenEntriesAsync(int limit, CancellationToken cancellationToken);
 
     /// <summary>Stores fill grades; an entry that has one keeps it. Returns how many rows were written.</summary>

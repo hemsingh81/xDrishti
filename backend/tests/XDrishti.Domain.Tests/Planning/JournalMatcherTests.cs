@@ -149,6 +149,41 @@ public sealed class JournalMatcherTests
         result.Links.ShouldAllBe(l => l.Role == JournalRole.Discretionary && l.ItemId == null);
     }
 
+    [Fact]
+    public void One_sale_shared_by_two_tickets_goes_whole_to_the_first_and_the_second_stays_open()
+    {
+        var day2 = Day.AddDays(1);
+        var t1 = Ticket(1);
+        var t2 = new JournalTicket(2, 1, 1, Paper, "RELIANCE", Side.Buy, day2, Approved);
+        var buy1 = Fill(hour: 10, qty: 10);
+        var buy2 = Fill(date: day2, hour: 10, qty: 10);
+        var sale = Fill(side: Side.Sell, date: day2, hour: 13, qty: 20);
+
+        var result = JournalMatcher.Match([Day, day2], [t1, t2], [buy1, buy2, sale]);
+
+        var exits = result.Links.Where(l => l.Role == JournalRole.Exit).ToList();
+        exits.Count.ShouldBe(1);
+        exits[0].ItemId.ShouldBe(1L);
+        exits[0].Qty.ShouldBe(10);
+        result.Links.Select(l => l.Fill.TransactionId).Distinct().Count().ShouldBe(result.Links.Count); // one trade, one link
+    }
+
+    [Fact]
+    public void A_fill_that_is_a_later_sessions_entry_is_never_an_earlier_sessions_exit()
+    {
+        var day2 = Day.AddDays(1);
+        var long1 = Ticket(1);
+        var short2 = new JournalTicket(2, 1, 1, Paper, "RELIANCE", Side.Sell, day2, Approved);
+        var buy = Fill(hour: 10, qty: 10);
+        var sellEntryNextDay = Fill(side: Side.Sell, date: day2, hour: 10, qty: 10);
+
+        var result = JournalMatcher.Match([Day, day2], [long1, short2], [buy, sellEntryNextDay]);
+
+        result.Links.Single(l => l.Fill.TransactionId == sellEntryNextDay.TransactionId).Role.ShouldBe(JournalRole.Entry);
+        result.Links.Single(l => l.Fill.TransactionId == sellEntryNextDay.TransactionId).ItemId.ShouldBe(2L);
+        result.Links.ShouldNotContain(l => l.Role == JournalRole.Exit);
+    }
+
     private static List<(Guid Fill, long Item)> Entries(JournalResult r) => [.. r.Links.Where(l => l.Role == JournalRole.Entry).Select(l => (l.Fill.TransactionId, l.ItemId!.Value))];
 
     private static List<Guid> Discretionary(JournalResult r) => [.. r.Links.Where(l => l.Role == JournalRole.Discretionary).Select(l => l.Fill.TransactionId)];

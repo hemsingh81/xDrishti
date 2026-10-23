@@ -34,7 +34,8 @@ internal static class PlanJournalCommand
             }
 
             var o = result.Value;
-            await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"{o.Plans} plan(s), {o.Tickets} approved ticket(s): {o.Entries} entry fill(s) and {o.Exits} exit fill(s) matched, {o.Discretionary} discretionary, {o.Unmatched.Count} unmatched (ambiguous), {o.Written} row(s) written; fill grades {o.GradesWritten} written, {o.GradesPending} waiting (position open or plan grade not there yet); basis: realised fills, not simulated"));
+            await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"{o.Plans} plan(s), {o.Tickets} approved ticket(s); matched this run: {o.Entries} entry fill(s), {o.Exits} exit fill(s), {o.Discretionary} discretionary, {o.Unmatched.Count} unmatched (ambiguous); newly written: {o.Written} row(s) (rows stored by an earlier run are matched again, not written again)"));
+            await console.Out.WriteLineAsync(string.Create(CultureInfo.InvariantCulture, $"fill grades: {o.GradesWritten} written ({o.GradesUncertain} uncertain: pre-existing position or oversized exit, rupee result only, no R), {o.GradesPending} waiting (position open or plan grade not there yet){(o.OpenTruncated ? "; more open entries than one run grades, the oldest wait for a later run" : string.Empty)}; basis: realised fills, not simulated"));
             foreach (var u in o.Unmatched)
             {
                 await console.Out.WriteLineAsync(SimulateOptions.Show(string.Create(CultureInfo.InvariantCulture, $"  unmatched {u.Date:yyyy-MM-dd} {u.Side} {u.Qty} {u.Symbol}: {u.Reason}")));

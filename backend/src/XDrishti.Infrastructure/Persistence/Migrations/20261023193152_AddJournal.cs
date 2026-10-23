@@ -30,7 +30,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     item_id = table.Column<long>(type: "bigint", nullable: false),
                     account_id = table.Column<Guid>(type: "uuid", nullable: false),
                     for_date = table.Column<DateOnly>(type: "date", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    uncertain_reason = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -85,7 +86,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_fill_grades", x => x.id);
-                    table.CheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0");
+                    table.CheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels', 'uncertain') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0");
                     table.ForeignKey(
                         name: "fk_fill_grades_journal_entries_entry_id",
                         column: x => x.entry_id,
@@ -179,6 +180,18 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
             migrationBuilder.Sql("ALTER TABLE trading.journal_entries ADD CONSTRAINT fk_journal_entries_item_in_plan FOREIGN KEY (plan_id, item_id) REFERENCES trading.plan_items (plan_id, id) ON DELETE RESTRICT");
             migrationBuilder.Sql("ALTER TABLE trading.journal_entries ADD CONSTRAINT fk_journal_entries_allocation FOREIGN KEY (item_id, account_id) REFERENCES trading.plan_item_allocations (item_id, account_id) ON DELETE RESTRICT");
 
+            // Defence in depth: a fill is linked to an entry of its OWN account (the portfolio table is not ours to add a key to, so a trigger checks it).
+            migrationBuilder.Sql("""
+                CREATE FUNCTION trading.journal_fill_same_account() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.entry_id IS NOT NULL AND (SELECT account_id FROM trading.journal_entries WHERE id = NEW.entry_id) IS DISTINCT FROM (SELECT account_id FROM portfolio.transactions WHERE id = NEW.transaction_id) THEN
+                        RAISE EXCEPTION 'a journal fill must belong to the account of its entry' USING ERRCODE = 'check_violation';
+                    END IF;
+                    RETURN NEW;
+                END $$;
+                """);
+            migrationBuilder.Sql("CREATE TRIGGER trg_journal_fills_same_account BEFORE INSERT ON trading.journal_fills FOR EACH ROW EXECUTE FUNCTION trading.journal_fill_same_account()");
+
             // Insert-only for the runtime role (ADR 0093): a link or a grade is written once and never changed. Granted per table, never by re-granting the schema (ADR 0083, 6a).
             // The new column of trading.grades is covered by the table-level grants of AddGrades (insert and select only).
             foreach (var table in new[] { "journal_entries", "journal_fills", "fill_grades" })
@@ -191,6 +204,9 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trg_journal_fills_same_account ON trading.journal_fills");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS trading.journal_fill_same_account()");
+
             migrationBuilder.DropTable(
                 name: "fill_grades",
                 schema: "trading");
