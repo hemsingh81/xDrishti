@@ -57,6 +57,8 @@ Built (P6-07, [ADR 0070](../adr/0070-model-registry-content-addressed-files-and-
 
 Built (P6-15, [ADR 0071](../adr/0071-automatic-loss-tags-pure-rules-over-the-closed-trade.md)): automatic loss tags are pure descriptions of a closed losing trade (gap through stop, gave back profit, high slippage, late entry, quick stop, wide stop, normal variance), each with the numbers behind it; a loss that fits none is untagged. Tags are never features. Against regime, news/results, execution gap and decision drag are not built (they need P6-02, P15, real fills); a growing tag is reported as a candidate lesson and none is opened until P6-16.
 
+Built (P6-11, [ADR 0072](../adr/0072-experiments-same-entries-purged-folds-an-honest-rule-and-an-append-only-ledger.md)): an experiment judges two stored runs made on the same entries with one knob changed (the candidate may skip entries, never add one; cost assumptions must match), by the fold windows of the exit choice scaled to the data: better needs 2/3 of the used folds, at least 6 used folds (fewer is inconclusive), a gain above `0.02 + 0.006 sqrt(trials)` R per trade, total R within 10 % after an assumed live gap, and a cheaper slippage cannot win. Every experiment is recorded in the insert-only `research.experiments`, whose 30-day count is the trials (`xd learn experiment`, `GET /api/experiments`). The replay time is not measured; the 10-minute target is not claimed.
+
 ## 3. Daily feedback loop
 
 1. Grade yesterday's primary, reserve and rejected items against actual data.

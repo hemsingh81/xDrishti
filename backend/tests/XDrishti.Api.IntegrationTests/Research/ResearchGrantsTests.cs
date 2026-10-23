@@ -100,7 +100,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             }
         }
 
-        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
+        names.Order(StringComparer.Ordinal).ShouldBe(["cell_stats", "exit_selection_folds", "exit_selections", "experiments", "model_designations", "model_versions", "sim_comparisons", "sim_runs", "sim_trade_leg_charges", "sim_trade_legs", "sim_trades", "trade_features", "training_sets"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -138,6 +138,9 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             "UPDATE research.trade_features SET strategy = 'X' WHERE false",
             "DELETE FROM research.trade_features WHERE false",
             "TRUNCATE research.trade_features",
+            "UPDATE research.experiments SET created_by = 'X' WHERE false",
+            "DELETE FROM research.experiments WHERE false",
+            "TRUNCATE research.experiments",
             "UPDATE research.model_versions SET created_by = 'X' WHERE false",
             "DELETE FROM research.model_versions WHERE false",
             "TRUNCATE research.model_versions",
@@ -191,7 +194,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
             (await SqlStateAsync(_app, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(12);
+        (await StoreKit.CountAsync(_owner, "SELECT count(*) FROM pg_tables WHERE schemaname = 'research'", Ct)).ShouldBe(13);
     }
 
     [Fact]
@@ -241,6 +244,7 @@ public sealed class ResearchGrantsTests(ApiFactory factory, ResearchGrantsTests.
     [InlineData("AddCellStats", new[] { "cell_stats" })]
     [InlineData("AddTradeFeaturesAndTrainingSets", new[] { "trade_features", "training_sets" })]
     [InlineData("AddModelRegistry", new[] { "model_versions", "model_designations" })]
+    [InlineData("AddExperiments", new[] { "experiments" })]
     public void The_later_research_migrations_make_each_of_their_tables_append_only(string migration, string[] tables)
     {
         var migrations = Path.GetFullPath(Path.Combine(ThisDirectory(), "..", "..", "..", "src", "XDrishti.Infrastructure", "Persistence", "Migrations"));

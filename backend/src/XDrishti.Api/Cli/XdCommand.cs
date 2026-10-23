@@ -69,6 +69,11 @@ internal static class XdCommand
             return await LearnWindowsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "experiment")
+        {
+            return await LearnExperimentCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "learn" && args[1] == "loss-tags")
         {
             return await LearnLossTagsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

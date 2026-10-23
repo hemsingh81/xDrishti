@@ -451,5 +451,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();
         services.AddScoped<IQueryHandler<ScoreWithModelQuery, Result<ModelScoreView>>, ScoreWithModelHandler>(); // for experiments and P7 (advisory)
+        services.AddScoped<ICommandHandler<RunExperimentCommand, RunExperimentOutcome>, RunExperimentHandler>(); // judge a knob change and record it (P6-11, ADR 0072)
+        services.AddScoped<IQueryHandler<ListExperimentsQuery, Result<IReadOnlyList<ExperimentView>>>, ListExperimentsHandler>();
+        services.AddScoped<IQueryHandler<GetExperimentQuery, Result<ExperimentView>>, GetExperimentHandler>();
     }
 }

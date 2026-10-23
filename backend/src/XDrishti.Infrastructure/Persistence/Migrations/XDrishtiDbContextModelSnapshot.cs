@@ -3295,6 +3295,165 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.ExperimentRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BaselineRunKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("baseline_run_key");
+
+                    b.Property<double>("BaselineTotalR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("baseline_total_r");
+
+                    b.Property<int>("BaselineTrades")
+                        .HasColumnType("integer")
+                        .HasColumnName("baseline_trades");
+
+                    b.Property<string>("BaselineValue")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("baseline_value");
+
+                    b.Property<string>("CandidateRunKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("candidate_run_key");
+
+                    b.Property<double>("CandidateTotalR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("candidate_total_r");
+
+                    b.Property<int>("CandidateTrades")
+                        .HasColumnType("integer")
+                        .HasColumnName("candidate_trades");
+
+                    b.Property<string>("CandidateValue")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("candidate_value");
+
+                    b.Property<long>("CompareMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("compare_ms");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<double>("ExpectedLiveGapR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("expected_live_gap_r");
+
+                    b.Property<string>("ExperimentKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("experiment_key");
+
+                    b.Property<int>("FoldsBetter")
+                        .HasColumnType("integer")
+                        .HasColumnName("folds_better");
+
+                    b.Property<int>("FoldsNeeded")
+                        .HasColumnType("integer")
+                        .HasColumnName("folds_needed");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<DateOnly?>("HoldOutStart")
+                        .HasColumnType("date")
+                        .HasColumnName("hold_out_start");
+
+                    b.Property<string>("KnobKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("knob_kind");
+
+                    b.Property<string>("KnobName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("knob_name");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("Parameters")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("parameters");
+
+                    b.Property<double?>("PooledBaselineMeanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("pooled_baseline_mean_r");
+
+                    b.Property<double?>("PooledCandidateMeanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("pooled_candidate_mean_r");
+
+                    b.Property<string>("Reasons")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reasons");
+
+                    b.Property<string>("ReportText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("report_text");
+
+                    b.Property<double>("RequiredImprovementR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("required_improvement_r");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.Property<int>("Trials")
+                        .HasColumnType("integer")
+                        .HasColumnName("trials");
+
+                    b.Property<int>("UsedFolds")
+                        .HasColumnType("integer")
+                        .HasColumnName("used_folds");
+
+                    b.HasKey("Id")
+                        .HasName("pk_experiments");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_experiments_created_at");
+
+                    b.HasIndex("ExperimentKey")
+                        .IsUnique()
+                        .HasDatabaseName("uq_experiments_experiment_key");
+
+                    b.ToTable("experiments", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_experiments_shape", "experiment_key ~ '^[0-9a-f]{64}$' AND baseline_run_key ~ '^[0-9a-f]{64}$' AND candidate_run_key ~ '^[0-9a-f]{64}$' AND baseline_run_key <> candidate_run_key AND knob_kind IN ('Parameter', 'Exit', 'Slippage') AND outcome IN ('Better', 'NotBetter', 'Inconclusive', 'CheaperAssumption') AND trials >= 1 AND used_folds >= 0 AND folds_better >= 0 AND folds_better <= used_folds AND folds_needed >= 0 AND baseline_trades > 0 AND candidate_trades >= 0 AND candidate_trades <= baseline_trades AND compare_ms >= 0 AND (outcome <> 'Better' OR used_folds >= 6)");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
                 {
                     b.Property<long>("Id")

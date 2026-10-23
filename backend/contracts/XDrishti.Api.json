@@ -8724,6 +8724,92 @@
           }
         }
       }
+    },
+    "/api/experiments": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The recorded experiments (knob changes judged against a baseline run), newest first (limit 1 to 200, default 50): the knob, the outcome (Better, NotBetter, Inconclusive or CheaperAssumption), folds better of folds used, the improvement required after the trials, totals after the expected live gap, and the measured time of the comparison. Empty before the first experiment. 422 learning.invalid",
+        "operationId": "ListExperiments",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExperimentView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/experiments/{id}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "One experiment with its full report, honest limits and the rules it was judged with. 404 experiments.not_found",
+        "operationId": "GetExperiment",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -15090,6 +15176,194 @@
           }
         },
         "description": "How a service is run: retries (0–5 after a failed attempt), the timeout of an attempt in minutes (1–240), whether a missed run is made up for when the application starts, and whether a failure raises a notice in the bell."
+      },
+      "ExperimentView": {
+        "required": [
+          "id",
+          "experimentKey",
+          "knobName",
+          "knobKind",
+          "baselineValue",
+          "candidateValue",
+          "baselineRunKey",
+          "candidateRunKey",
+          "from",
+          "to",
+          "holdOutStart",
+          "outcome",
+          "trials",
+          "usedFolds",
+          "foldsBetter",
+          "foldsNeeded",
+          "requiredImprovementR",
+          "baselineTrades",
+          "candidateTrades",
+          "pooledBaselineMeanR",
+          "pooledCandidateMeanR",
+          "baselineTotalR",
+          "candidateTotalR",
+          "expectedLiveGapR",
+          "compareMs",
+          "reasons",
+          "reportText",
+          "parameters",
+          "createdAt",
+          "createdBy"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The ledger id.",
+            "format": "int64"
+          },
+          "experimentKey": {
+            "type": "string",
+            "description": "The hash that identifies the experiment."
+          },
+          "knobName": {
+            "type": "string",
+            "description": "What was changed."
+          },
+          "knobKind": {
+            "type": "string",
+            "description": "Parameter, Exit or Slippage."
+          },
+          "baselineValue": {
+            "type": "string",
+            "description": "The baseline value."
+          },
+          "candidateValue": {
+            "type": "string",
+            "description": "The candidate value."
+          },
+          "baselineRunKey": {
+            "type": "string",
+            "description": "The baseline run."
+          },
+          "candidateRunKey": {
+            "type": "string",
+            "description": "The candidate run."
+          },
+          "from": {
+            "type": "string",
+            "description": "Earliest trade date.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "Latest trade date.",
+            "format": "date"
+          },
+          "holdOutStart": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "First day of the hold-out that was not read, or null when none was kept.",
+            "format": "date"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "Better, NotBetter, Inconclusive or CheaperAssumption."
+          },
+          "trials": {
+            "type": "integer",
+            "description": "The experiments of the last 30 days when it was judged, itself included.",
+            "format": "int32"
+          },
+          "usedFolds": {
+            "type": "integer",
+            "description": "Folds used.",
+            "format": "int32"
+          },
+          "foldsBetter": {
+            "type": "integer",
+            "description": "Folds better.",
+            "format": "int32"
+          },
+          "foldsNeeded": {
+            "type": "integer",
+            "description": "Folds needed.",
+            "format": "int32"
+          },
+          "requiredImprovementR": {
+            "type": "number",
+            "description": "The improvement required, mean R per trade.",
+            "format": "double"
+          },
+          "baselineTrades": {
+            "type": "integer",
+            "description": "Baseline trades.",
+            "format": "int32"
+          },
+          "candidateTrades": {
+            "type": "integer",
+            "description": "Candidate trades.",
+            "format": "int32"
+          },
+          "pooledBaselineMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Pooled mean R of the baseline over the used folds, or null.",
+            "format": "double"
+          },
+          "pooledCandidateMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "The same for the candidate.",
+            "format": "double"
+          },
+          "baselineTotalR": {
+            "type": "number",
+            "description": "Total R of the baseline after the live gap.",
+            "format": "double"
+          },
+          "candidateTotalR": {
+            "type": "number",
+            "description": "The same for the candidate.",
+            "format": "double"
+          },
+          "expectedLiveGapR": {
+            "type": "number",
+            "description": "The live gap assumed, R per trade.",
+            "format": "double"
+          },
+          "compareMs": {
+            "type": "integer",
+            "description": "Milliseconds spent reading both runs and judging them (measured); the replay is not included and not measured.",
+            "format": "int64"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why it is not better; empty when better."
+          },
+          "reportText": {
+            "type": "string",
+            "description": "The report with its honest limits; empty in a list."
+          },
+          "parameters": {
+            "type": "string",
+            "description": "The rules used; empty in a list."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was recorded.",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Who recorded it."
+          }
+        },
+        "description": "An experiment as the API shows it (P6-11, ADR 0072). The report text and the parameters are empty in a list and filled for one experiment."
       },
       "FacetCount": {
         "required": [
