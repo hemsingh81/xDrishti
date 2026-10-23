@@ -104,9 +104,55 @@ public sealed class NightlyPlanApiTests(ApiFactory factory) : DataTestBase(facto
         var second = await handler.HandleAsync(new RunNightlyPlanCommand(null, false, true, "test"), Ct);
 
         first.Value.Outcome.ShouldBe("failed_closed");
+        first.Value.FailedGate.ShouldBe(NightlyGateIds.Calendar); // the suite pins the clock at Monday 2026-10-12 before the close: the first gate stops it
         second.Value.Attempt.ShouldBe(2);
         (await ScalarAsync<long>("SELECT count(*) FROM trading.plans")).ShouldBe(0);
         (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_runs")).ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task The_registered_gates_are_the_gate_ids_in_the_order_they_are_read()
+    {
+        using var scope = Factory.Services.CreateScope();
+
+        var ids = scope.ServiceProvider.GetServices<INightlyGate>().Select(g => g.Id);
+
+        ids.ShouldBe([NightlyGateIds.Calendar, NightlyGateIds.Eod, NightlyGateIds.PortfolioSync, NightlyGateIds.FreshData, NightlyGateIds.Quality, NightlyGateIds.SelectionInputs]);
+    }
+
+    [Fact]
+    public async Task The_plan_and_its_run_row_are_one_transaction_a_run_row_the_database_refuses_leaves_no_plan()
+    {
+        var at = new DateTimeOffset(2099, 1, 2, 13, 0, 0, TimeSpan.Zero);
+        NewPlan Plan(string key, int version) => new(key, new DateOnly(2099, 1, 5), new DateTimeOffset(2099, 1, 5, 3, 35, 0, TimeSpan.Zero), version, new string('a', 64), "skeleton", true, "test", at, []);
+        using var scope = Factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IPlanStore>();
+        var first = await store.PublishWithRunAsync(Plan("k1", 1), new PublishRun(false, at, at, "first"), Ct);
+
+        // a second published run for the same planned session is refused by the unique index, and the plan written in the same transaction is rolled back with it
+        await Should.ThrowAsync<Npgsql.PostgresException>(async () => await store.PublishWithRunAsync(Plan("k2", 2), new PublishRun(false, at, at, "second"), Ct));
+
+        (first.Created, first.RunRecorded).ShouldBe((true, true));
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.plans")).ShouldBe(1);
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_runs WHERE outcome = 'published'")).ShouldBe(1);
+        var again = await store.PublishWithRunAsync(Plan("k1", 1), new PublishRun(false, at, at, "again"), Ct);
+        (again.Created, again.RunRecorded).ShouldBe((false, false));
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_runs")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_plan_stored_without_its_run_row_gets_the_row_in_the_next_publish()
+    {
+        var at = new DateTimeOffset(2099, 1, 2, 13, 0, 0, TimeSpan.Zero);
+        var plan = new NewPlan("k1", new DateOnly(2099, 1, 5), new DateTimeOffset(2099, 1, 5, 3, 35, 0, TimeSpan.Zero), 1, new string('a', 64), "skeleton", true, "test", at, []);
+        using var scope = Factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IPlanStore>();
+        await store.PublishAsync(plan, Ct); // the old two-step: a plan and no row
+
+        var result = await store.PublishWithRunAsync(plan, new PublishRun(false, at, at, "later"), Ct);
+
+        (result.Created, result.RunRecorded).ShouldBe((false, true));
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_runs WHERE outcome = 'published'")).ShouldBe(1);
     }
 
     [Fact]

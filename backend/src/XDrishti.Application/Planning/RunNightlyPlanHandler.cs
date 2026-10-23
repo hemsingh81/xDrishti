@@ -31,10 +31,17 @@ internal sealed class RunNightlyPlanHandler(
         var forDate = NightlyRules.NextSession(calendar, session) ?? session.AddDays(1);
 
         var earlier = await store.ListRunsAsync(forDate, HistoryRead, cancellationToken);
-        if (earlier.FirstOrDefault(r => r.Run.Outcome == NightlyOutcomes.Published) is { } done)
+        if (FirstPublished(earlier) is { } done)
         {
             NightlyLog.Repeat(logger, forDate, done.Run.PlanId ?? 0);
             return Result.Success(new NightlyRunView(session, forDate, NightlyOutcomes.Published, true, command.DryRun, done.Attempt, null, done.Run.Reason, done.Run.PlanId, []));
+        }
+
+        // A plan of the planned session counts as published even when no run row names it (a row lost by an older caller): the gates are not read again and no second plan is made.
+        if (await store.ListAsync(forDate, null, 1, cancellationToken) is [var existing, ..])
+        {
+            NightlyLog.Repeat(logger, forDate, existing.Id);
+            return Result.Success(new NightlyRunView(session, forDate, NightlyOutcomes.Published, true, command.DryRun, 0, null, $"A plan for {forDate:yyyy-MM-dd} is already stored (plan {existing.Id}); nothing was done.", existing.Id, []));
         }
 
         var attempt = earlier.Count + 1;
@@ -63,7 +70,7 @@ internal sealed class RunNightlyPlanHandler(
             var built = await builder.BuildAsync(new PlanBuildRequest(session, forDate, cutoff, started), cancellationToken);
             if (built.IsFailure)
             {
-                return await FailAsync(command, context, attempt, GateResult.Failed(NightlyGateIds.Builder, built.Error.Message), null, views, started, cancellationToken);
+                return await FailAsync(command, context, attempt, GateResult.Failed(NightlyGateIds.Builder, $"The plan builder refused to build a plan ({built.Error.Code})."), null, views, started, cancellationToken);
             }
 
             plan = built.Value;
@@ -86,10 +93,11 @@ internal sealed class RunNightlyPlanHandler(
             return Result.Success(new NightlyRunView(session, forDate, NightlyOutcomes.WouldPublish, false, true, attempt, null, $"All gates passed; the plan would be published ({plan.Items.Count} tickets): {plan.Basis}.", null, views));
         }
 
+        var publishReason = $"Published for {forDate:yyyy-MM-dd}: {plan.Basis}.";
         PlanPublished published;
         try
         {
-            published = await store.PublishAsync(plan, cancellationToken);
+            published = await store.PublishWithRunAsync(plan, new PublishRun(command.Manual, started, Later(started), Clip(publishReason)), cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -103,10 +111,16 @@ internal sealed class RunNightlyPlanHandler(
             return await FailAsync(command, context, attempt, GateResult.NotAvailable(NightlyGateIds.Publish, $"The plan could not be stored ({ex.GetType().Name})."), plan.PlanKey, views, started, cancellationToken);
         }
 
-        var reason = $"Published plan {published.Id} for {forDate:yyyy-MM-dd}: {plan.Basis}.";
-        await store.RecordRunAsync(new NewPlanRun(forDate, plan.PlanKey, NightlyOutcomes.Published, null, Clip(reason), published.Id, command.Manual, started, Later(started)), cancellationToken);
+        if (!published.Created && !published.RunRecorded)
+        {
+            // another run published the same plan between our check and our write: it has its row; ours is not written
+            var winner = FirstPublished(await store.ListRunsAsync(forDate, HistoryRead, cancellationToken));
+            NightlyLog.Repeat(logger, forDate, published.Id);
+            return Result.Success(new NightlyRunView(session, forDate, NightlyOutcomes.Published, true, false, winner?.Attempt ?? 0, null, $"Already published by another run (plan {published.Id}); nothing was done.", published.Id, views));
+        }
+
         NightlyLog.Published(logger, forDate, published.Id, attempt);
-        return Result.Success(new NightlyRunView(session, forDate, NightlyOutcomes.Published, false, false, attempt, null, reason, published.Id, views));
+        return Result.Success(new NightlyRunView(session, forDate, NightlyOutcomes.Published, false, false, attempt, null, publishReason, published.Id, views));
     }
 
     private async ValueTask<Result<NightlyRunView>> FailAsync(RunNightlyPlanCommand command, GateContext c, int attempt, GateResult blocked, string? planKey, List<NightlyGateView> views, DateTimeOffset started, CancellationToken cancellationToken)
@@ -142,6 +156,10 @@ internal sealed class RunNightlyPlanHandler(
             return GateResult.NotAvailable(gate.Id, $"The input of this gate could not be read ({ex.GetType().Name}).");
         }
     }
+
+    /// <summary>The first published row of the session: the lowest id, the one a repeat reports.</summary>
+    private static PlanRunRow? FirstPublished(IReadOnlyList<PlanRunRow> runs) =>
+        runs.Where(r => r.Run.Outcome == NightlyOutcomes.Published).MinBy(r => r.Id);
 
     private DateTimeOffset Later(DateTimeOffset started) => clock.GetUtcNow() is var now && now >= started ? now : started;
 

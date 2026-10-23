@@ -9,6 +9,12 @@ public interface IPlanStore
     /// <summary>Stores a plan with its items, allocations and its Published row in one transaction, unless the plan key is already stored.</summary>
     ValueTask<PlanPublished> PublishAsync(NewPlan plan, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Like <see cref="PublishAsync"/> plus the plan's published run row (<see cref="PublishRun"/>) in the SAME transaction, so a plan never exists without its row. If the key is stored already and no published run names that plan,
+    /// the row is written now; if one does, nothing is written. A different published run for the same planned date is refused by the database (unique index) and throws.
+    /// </summary>
+    ValueTask<PlanPublished> PublishWithRunAsync(NewPlan plan, PublishRun run, CancellationToken cancellationToken);
+
     /// <summary>One plan with its current state, or null.</summary>
     ValueTask<PlanRow?> FindAsync(long planId, CancellationToken cancellationToken);
 

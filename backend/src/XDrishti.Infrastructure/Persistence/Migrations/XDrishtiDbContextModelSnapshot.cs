@@ -5154,6 +5154,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_plan_runs");
 
+                    b.HasIndex("ForDate")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plan_runs_published_for_date")
+                        .HasFilter("outcome = 'published'");
+
                     b.HasIndex("PlanId")
                         .HasDatabaseName("ix_plan_runs_plan_id");
 

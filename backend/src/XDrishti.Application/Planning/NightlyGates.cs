@@ -162,7 +162,10 @@ internal sealed class PortfolioSyncGate(IServiceRunStore runs) : INightlyGate
         NightlyChecks.ServiceRan(Id, "The portfolio sync", await runs.ListAsync(PortfolioBrokerHistoryService.Id, 0, 20, cancellationToken), context, PortfolioBrokerHistoryService.NoAccountsMessage);
 }
 
-/// <summary>The stored bars reach the session for all but a small share of the instruments (spec P7-08).</summary>
+/// <summary>
+/// The stored bars reach the session for all but a small share of the instruments (spec P7-08). Limits: the newest bar of ANY instrument on or after the session is enough for the "reach" test (one early bar passes it); the share test
+/// is what catches a thin day. Instruments in the coverage table that are inactive or delisted count as behind or empty, so a large dead universe can fail this gate chronically (fail closed, visible in the row).
+/// </summary>
 internal sealed class FreshDataGate(IBarQueries bars) : INightlyGate
 {
     public string Id => NightlyGateIds.FreshData;
@@ -171,7 +174,10 @@ internal sealed class FreshDataGate(IBarQueries bars) : INightlyGate
         NightlyChecks.Fresh(await bars.GetBarTotalsAsync(new DateTimeOffset(context.Session.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset), cancellationToken), context);
 }
 
-/// <summary>The newest full data-quality run finished after the close and few instruments failed it (spec P7-08).</summary>
+/// <summary>
+/// The newest full data-quality run finished after the close and few instruments failed it (spec P7-08). Limit: it is NOT tied to the `eod` run's data job (eod's quality step runs inside its job, before the service run ends, so
+/// "started after eod finished" would never hold): any full quality run that finished after the close counts, a manual one too.
+/// </summary>
 internal sealed class QualityGate(IQualityQueries quality) : INightlyGate
 {
     public string Id => NightlyGateIds.Quality;
@@ -187,7 +193,6 @@ internal sealed class SelectionInputsGate(ICellStatsStore cells) : INightlyGate
 
     public async ValueTask<GateResult> CheckAsync(GateContext context, CancellationToken cancellationToken)
     {
-        var rows = await cells.ListLatestAsync(null, null, cancellationToken);
-        return NightlyChecks.Selection(rows.Count == 0 ? null : rows.Max(r => r.Row.AsOf), context);
+        return NightlyChecks.Selection(await cells.NewestAsOfAsync(cancellationToken), context);
     }
 }

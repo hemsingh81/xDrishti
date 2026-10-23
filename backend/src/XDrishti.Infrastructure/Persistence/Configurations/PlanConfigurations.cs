@@ -153,5 +153,6 @@ internal sealed class PlanRunRecordConfiguration : IEntityTypeConfiguration<Plan
         builder.Property(x => x.Reason).HasMaxLength(500).IsRequired();
         builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_plan_runs_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.ForDate, x.Id }).HasDatabaseName("ix_plan_runs_for_date_id");
+        builder.HasIndex(x => x.ForDate).IsUnique().HasFilter("outcome = 'published'").HasDatabaseName("uq_plan_runs_published_for_date"); // a planned session has at most one published run (P7-08)
     }
 }

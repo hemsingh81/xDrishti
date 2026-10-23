@@ -44,10 +44,16 @@ public sealed class NightlyPipelineTests
             _runs.Add(new PlanRunRow(_runs.Count + 1, _runs.Count(r => r.Run.ForDate == call.Arg<NewPlanRun>().ForDate) + 1, call.Arg<NewPlanRun>()));
             return ValueTask.CompletedTask;
         });
-        _store.PublishAsync(Arg.Any<NewPlan>(), Ct).Returns(call =>
+        _store.ListAsync(Arg.Any<DateOnly?>(), Arg.Any<Guid?>(), Arg.Any<int>(), Ct).Returns(call =>
+            ValueTask.FromResult<IReadOnlyList<PlanRow>>([.. _published.Where(p => p.ForDate == call.Arg<DateOnly?>()).Select((p, i) => new PlanRow(100 + i + 1, p, PlanState.Published, 0, 0, 0))]));
+        _store.PublishWithRunAsync(Arg.Any<NewPlan>(), Arg.Any<PublishRun>(), Ct).Returns(call =>
         {
-            _published.Add(call.Arg<NewPlan>());
-            return ValueTask.FromResult(new PlanPublished(100 + _published.Count, true));
+            var plan = call.Arg<NewPlan>();
+            var run = call.Arg<PublishRun>();
+            _published.Add(plan);
+            var id = 100 + _published.Count;
+            _runs.Add(new PlanRunRow(_runs.Count + 1, _runs.Count(r => r.Run.ForDate == plan.ForDate) + 1, new NewPlanRun(plan.ForDate, plan.PlanKey, "published", null, run.Reason, id, run.Manual, run.StartedAt, run.FinishedAt)));
+            return ValueTask.FromResult(new PlanPublished(id, true, true));
         });
     }
 
@@ -108,7 +114,7 @@ public sealed class NightlyPipelineTests
         result.Value.Outcome.ShouldBe("failed_closed");
         result.Value.FailedGate.ShouldBe(_ids[failAt]);
         _published.ShouldBeEmpty();
-        await _store.DidNotReceive().PublishAsync(Arg.Any<NewPlan>(), Ct);
+        await _store.DidNotReceive().PublishWithRunAsync(Arg.Any<NewPlan>(), Arg.Any<PublishRun>(), Ct);
         var row = _runs.ShouldHaveSingleItem().Run;
         (row.Outcome, row.FailedGate, row.PlanId, row.Reason).ShouldBe(("failed_closed", _ids[failAt], null, "because"));
         gates.Skip(failAt + 1).ShouldAllBe(g => g.Reads == 0); // a real run stops at the first gate that does not pass
@@ -171,7 +177,7 @@ public sealed class NightlyPipelineTests
         _runs.ShouldBeEmpty();
         _published.ShouldBeEmpty();
         await _store.DidNotReceive().RecordRunAsync(Arg.Any<NewPlanRun>(), Ct);
-        await _store.DidNotReceive().PublishAsync(Arg.Any<NewPlan>(), Ct);
+        await _store.DidNotReceive().PublishWithRunAsync(Arg.Any<NewPlan>(), Arg.Any<PublishRun>(), Ct);
     }
 
     [Fact]
@@ -184,7 +190,48 @@ public sealed class NightlyPipelineTests
 
         result.Value.FailedGate.ShouldBe(NightlyGateIds.Builder);
         _published.ShouldBeEmpty();
-        _runs.ShouldHaveSingleItem().Run.FailedGate.ShouldBe(NightlyGateIds.Builder);
+        var row = _runs.ShouldHaveSingleItem().Run;
+        row.FailedGate.ShouldBe(NightlyGateIds.Builder);
+        row.Reason.ShouldNotContain("candidates source"); // a fixed sentence and the error code, never the builder's own text
+        row.Reason.ShouldContain("x");
+    }
+
+    [Fact]
+    public async Task A_stored_plan_without_a_run_row_counts_as_published_and_no_gate_is_read()
+    {
+        _published.Add(new NewPlan("k", Monday, DateTimeOffset.UnixEpoch, 1, "h", "b", true, "t", DateTimeOffset.UnixEpoch, []));
+        var gates = Gates();
+
+        var result = await Handler(gates).HandleAsync(Run(), Ct);
+
+        (result.Value.Outcome, result.Value.Repeated, result.Value.PlanId).ShouldBe(("published", true, 101L));
+        gates.ShouldAllBe(g => g.Reads == 0);
+        _runs.ShouldBeEmpty();
+        await _store.DidNotReceive().PublishWithRunAsync(Arg.Any<NewPlan>(), Arg.Any<PublishRun>(), Ct);
+    }
+
+    [Fact]
+    public async Task A_concurrent_publish_that_won_the_race_is_reported_without_a_second_run_row()
+    {
+        _store.PublishWithRunAsync(Arg.Any<NewPlan>(), Arg.Any<PublishRun>(), Ct).Returns(new PlanPublished(55, false, false));
+
+        var result = await Handler(Gates()).HandleAsync(Run(), Ct);
+
+        (result.Value.Repeated, result.Value.PlanId).ShouldBe((true, 55L));
+        _runs.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_repeat_reports_the_first_published_row_the_lowest_id()
+    {
+        var plan = new NewPlan("k", Monday, DateTimeOffset.UnixEpoch, 1, "h", "b", true, "t", DateTimeOffset.UnixEpoch, []);
+        _runs.Add(new PlanRunRow(9, 2, new NewPlanRun(Monday, "k", "published", null, "second", 12, false, Evening, Evening)));
+        _runs.Add(new PlanRunRow(4, 1, new NewPlanRun(Monday, "k", "published", null, "first", 11, false, Evening, Evening)));
+        _published.Add(plan);
+
+        var result = await Handler(Gates()).HandleAsync(Run(), Ct);
+
+        (result.Value.Attempt, result.Value.PlanId, result.Value.Reason).ShouldBe((1, 11L, "first"));
     }
 
     [Fact]
@@ -203,12 +250,15 @@ public sealed class NightlyPipelineTests
     [Fact]
     public async Task A_store_that_fails_to_publish_is_recorded_as_a_failed_closed_run()
     {
-        _store.PublishAsync(Arg.Any<NewPlan>(), Ct).Returns<ValueTask<PlanPublished>>(_ => throw new InvalidOperationException("db down"));
+        // the plan and its run row are one store call: when it throws (the run row could not be written, the transaction rolled back) there is no plan and the failure is recorded
+        _store.PublishWithRunAsync(Arg.Any<NewPlan>(), Arg.Any<PublishRun>(), Ct).Returns<ValueTask<PlanPublished>>(_ => throw new InvalidOperationException("db down"));
 
         var result = await Handler(Gates()).HandleAsync(Run(), Ct);
 
         result.Value.FailedGate.ShouldBe(NightlyGateIds.Publish);
+        _published.ShouldBeEmpty();
         _runs.ShouldHaveSingleItem().Run.PlanId.ShouldBeNull();
+        _runs[0].Run.Reason.ShouldNotContain("db down");
     }
 
     [Fact]
