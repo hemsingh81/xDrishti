@@ -22,7 +22,6 @@ public sealed class LearnExperimentOptionsTests
         options!.HoldOutMonths.ShouldBe(6);
         options.Options.Trials.ShouldBe(1);
         options.Knob.Kind.ShouldBe(ExperimentKnobKind.Slippage);
-        options.Knob.IsCheaperAssumption.ShouldBeTrue();
     }
 
     [Fact]

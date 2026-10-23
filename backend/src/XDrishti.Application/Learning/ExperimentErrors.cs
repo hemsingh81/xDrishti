@@ -20,6 +20,12 @@ public static class ExperimentErrors
     /// <summary>A run holds the same trade key twice.</summary>
     public const string DuplicateTradeCode = "experiments.duplicate_trade";
 
+    /// <summary>The ledger kept changing while the experiment was judged.</summary>
+    public const string BusyCode = "experiments.busy";
+
+    /// <summary>The ledger could not settle the trial count after several tries.</summary>
+    public static Error Busy() => Error.Conflict(BusyCode, "Other experiments were recorded while this one was judged, repeatedly; run it again.");
+
     /// <summary>No experiment has this id.</summary>
     public static Error NotFound(long id) => Error.NotFound(NotFoundCode, $"No experiment {id} is recorded.");
 

@@ -7,10 +7,13 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Infrastructure.Learning;
 
 /// <summary>
-/// <c>research.experiments</c> behind <see cref="IExperimentLedger"/> (spec P6-11, ADR 0072): raw SQL, insert and select only (the runtime role has no more). An append checks the experiment key under an advisory lock, so a race writes once.
+/// <c>research.experiments</c> behind <see cref="IExperimentLedger"/> (spec P6-11, ADR 0072): raw SQL, insert and select only (the runtime role has no more). An append takes one global advisory lock, checks the experiment key and recounts the trials inside it, so a race writes once and trial numbers are never shared.
 /// </summary>
 internal sealed class ExperimentLedger(NpgsqlDataSource dataSource) : IExperimentLedger
 {
+    // One constant key for every append: the trial count is global, so appends are serialised (a personal system, a few a day).
+    private const long AppendLockKey = 7_864_011_072;
+
     private const string Columns = """
         id, experiment_key, knob_name, knob_kind, baseline_value, candidate_value, baseline_run_key, candidate_run_key, from_date, to_date, hold_out_start, outcome, trials, used_folds, folds_better, folds_needed, required_improvement_r,
         baseline_trades, candidate_trades, pooled_baseline_mean_r, pooled_candidate_mean_r, baseline_total_r, candidate_total_r, expected_live_gap_r, compare_ms, reasons, report_text, parameters, created_at, created_by
@@ -59,14 +62,14 @@ internal sealed class ExperimentLedger(NpgsqlDataSource dataSource) : IExperimen
         return rows;
     }
 
-    public async ValueTask<RecordedExperiment> AppendAsync(ExperimentToStore experiment, CancellationToken cancellationToken)
+    public async ValueTask<RecordedExperiment> AppendAsync(ExperimentToStore experiment, int askedTrials, DateTimeOffset since, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(experiment);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await using (var advisory = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtext(@k))", connection, transaction))
+        await using (var advisory = new NpgsqlCommand("SELECT pg_advisory_xact_lock(@k)", connection, transaction))
         {
-            advisory.Parameters.AddWithValue("k", NpgsqlDbType.Text, experiment.ExperimentKey);
+            advisory.Parameters.AddWithValue("k", NpgsqlDbType.Bigint, AppendLockKey);
             await advisory.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -76,6 +79,17 @@ internal sealed class ExperimentLedger(NpgsqlDataSource dataSource) : IExperimen
             if (await exists.ExecuteScalarAsync(cancellationToken) is long found)
             {
                 return new RecordedExperiment(found, false);
+            }
+        }
+
+        await using (var count = new NpgsqlCommand("SELECT COUNT(*)::int FROM research.experiments WHERE created_at >= @since AND experiment_key <> @k", connection, transaction))
+        {
+            count.Parameters.AddWithValue("since", NpgsqlDbType.TimestampTz, since);
+            count.Parameters.AddWithValue("k", NpgsqlDbType.Char, experiment.ExperimentKey);
+            var required = Math.Max(askedTrials, (int)(await count.ExecuteScalarAsync(cancellationToken))! + 1);
+            if (required != experiment.Trials)
+            {
+                return new RecordedExperiment(0, false, required);
             }
         }
 

@@ -25,8 +25,10 @@ public sealed class ExperimentLedgerApiTests(ApiFactory factory) : DataTestBase(
 
     private async Task<(string Base, string Cand)> StoreRunsAsync()
     {
-        var a = StoredRunFixtures.Run(to: RunStoreRoundTripTests.NextTo());
-        var b = StoredRunFixtures.Run(to: RunStoreRoundTripTests.NextTo());
+        // The same data and entries; the candidate assumes dearer slippage (a slippage experiment needs the stored fills to differ in slippage only).
+        var to = RunStoreRoundTripTests.NextTo();
+        var a = StoredRunFixtures.Run(to: to);
+        var b = StoredRunFixtures.Run(to: to, fills: XDrishti.Domain.Research.FillRules.Create(0.1, XDrishti.Domain.Research.SlippageConfig.Create(2, 0.05, 2).Value).Value);
         using var scope = Factory.Services.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<ICommandHandler<StoreRunCommand, XDrishti.Application.Abstractions.Research.StoreOutcome>>();
         foreach (var run in new[] { a, b })
@@ -41,7 +43,7 @@ public sealed class ExperimentLedgerApiTests(ApiFactory factory) : DataTestBase(
     {
         using var scope = Factory.Services.CreateScope();
         return await scope.ServiceProvider.GetRequiredService<ICommandHandler<RunExperimentCommand, RunExperimentOutcome>>()
-            .HandleAsync(new RunExperimentCommand(baseKey, candKey, new ExperimentKnob(knob, ExperimentKnobKind.Parameter, "1", "2"), new ExperimentOptions(), 0, "test"), Ct);
+            .HandleAsync(new RunExperimentCommand(baseKey, candKey, new ExperimentKnob(knob, ExperimentKnobKind.Slippage, "1", "2"), new ExperimentOptions(), 0, "test"), Ct);
     }
 
     [Fact]
@@ -79,6 +81,31 @@ public sealed class ExperimentLedgerApiTests(ApiFactory factory) : DataTestBase(
         var detail = await one.Content.ReadFromJsonAsync<JsonElement>(Ct);
         detail.GetProperty("outcome").GetString().ShouldBe(first.Value.Outcome);
         detail.GetProperty("reportText").GetString()!.ShouldContain("not measured");
+    }
+
+    [Fact]
+    public async Task Two_distinct_experiments_at_once_get_different_trial_numbers()
+    {
+        var (b, c) = await StoreRunsAsync();
+
+        var both = await Task.WhenAll(RunAsync(b, c, "stop-a"), RunAsync(b, c, "stop-b"));
+
+        both.ShouldAllBe(r => r.IsSuccess);
+        both.Select(r => r.Value.Trials).Order().ShouldBe([1, 2]);
+        both.Select(r => r.Value.Id).Distinct().Count().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task The_same_experiment_at_once_is_written_once_and_both_get_the_stored_answer()
+    {
+        var (b, c) = await StoreRunsAsync();
+
+        var both = await Task.WhenAll(RunAsync(b, c, "stop"), RunAsync(b, c, "stop"));
+
+        both.ShouldAllBe(r => r.IsSuccess);
+        both.Select(r => r.Value.Id).Distinct().Count().ShouldBe(1);
+        both.Count(r => r.Value.AlreadyRecorded).ShouldBe(1);
+        both[0].Value.ReportText.ShouldBe(both[1].Value.ReportText);
     }
 
     [Fact]

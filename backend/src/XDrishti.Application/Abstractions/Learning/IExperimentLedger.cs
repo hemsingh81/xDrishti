@@ -11,8 +11,11 @@ public interface IExperimentLedger
     /// <summary>The experiment with this key, in full, or null.</summary>
     ValueTask<StoredExperiment?> FindByKeyAsync(string experimentKey, CancellationToken cancellationToken);
 
-    /// <summary>Records the experiment; nothing is written when its key is stored already.</summary>
-    ValueTask<RecordedExperiment> AppendAsync(ExperimentToStore experiment, CancellationToken cancellationToken);
+    /// <summary>
+    /// Records the experiment under one global lock, so two experiments never get the same trial number. Inside the lock the key is checked (stored already: nothing is written and that row's id is returned, not created), and the trials are recounted
+    /// (experiments since <paramref name="since"/> other than this key, plus one, at least <paramref name="askedTrials"/>); when that differs from <c>experiment.Trials</c> nothing is written and <see cref="RecordedExperiment.RequiredTrials"/> says what to judge with.
+    /// </summary>
+    ValueTask<RecordedExperiment> AppendAsync(ExperimentToStore experiment, int askedTrials, DateTimeOffset since, CancellationToken cancellationToken);
 
     /// <summary>One experiment in full, or null.</summary>
     ValueTask<StoredExperiment?> FindAsync(long id, CancellationToken cancellationToken);

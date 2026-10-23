@@ -12,11 +12,14 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Application.Learning;
 
 /// <summary>
-/// Judges a knob change and records it (spec P6-11, ADR 0072). It reads the two stored runs, checks that they are on the same entries and the same cost assumptions (only the named knob may differ; a slippage run may differ in its fill basis), cuts the hold-out
+/// Judges a knob change and records it (spec P6-11, ADR 0072). It reads the two stored runs, checks that they were made on the same data (engine, window, universe, CSV acknowledgement, schema versions, strategy; the strategy definition too unless the knob is a
+/// parameter or exit knob, which changes it) and the same cost assumptions (a slippage knob may differ only in the <c>slippage.*</c> fill fields, and its direction is read from the stored fills, not the typed values), cuts the hold-out
 /// (P6-05), counts the experiments of the last 30 days in the ledger as the trials, judges with <see cref="ExperimentJudge"/> and appends the experiment, whatever the outcome: every look is a trial. The same experiment again is not judged twice.
 /// </summary>
 internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger ledger, TimeProvider time, ILogger<RunExperimentHandler> logger) : ICommandHandler<RunExperimentCommand, RunExperimentOutcome>
 {
+    private const int MaxAttempts = 5;
+
     private sealed record Seen(DateOnly TradeDate, double R, long DecisionEpochSeconds, long ExitEpochSeconds, bool Costed);
 
     public async ValueTask<Result<RunExperimentOutcome>> HandleAsync(RunExperimentCommand command, CancellationToken cancellationToken)
@@ -47,6 +50,18 @@ internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger led
         if (differs is not null)
         {
             return Refuse(ExperimentErrors.AssumptionsDiffer(differs));
+        }
+
+        var fillCost = FillCostChange.NotApplicable;
+        if (command.Knob.Kind == ExperimentKnobKind.Slippage)
+        {
+            var compared = FillCostComparison.Compare(baselineHeader.Fills, candidateHeader.Fills);
+            if (compared.IsFailure)
+            {
+                return Refuse(compared.Error);
+            }
+
+            fillCost = compared.Value;
         }
 
         var baseline = await ReadAsync(command.BaselineRunKey, cancellationToken);
@@ -92,68 +107,95 @@ internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger led
         }
         else
         {
-            holdNote = "No hold-out was kept: every trade was used.";
+            holdNote = "No hold-out was kept: every trade was used, so this cannot be called better.";
+            options = options with { NoHoldOut = true };
         }
 
         var now = time.GetUtcNow();
-        var others = await ledger.CountSinceAsync(now.AddDays(-ExperimentOptions.TrialWindowDays), key, cancellationToken);
-        options = options with { Trials = Math.Max(command.Options.Trials, others + 1) };
+        var since = now.AddDays(-ExperimentOptions.TrialWindowDays);
+        var others = await ledger.CountSinceAsync(since, key, cancellationToken);
+        var trials = Math.Max(command.Options.Trials, others + 1);
         var trades = baseline.Value
             .Where(b => development is null || development.Contains(b.Key))
             .Select(b => new ExperimentTrade(b.Key, b.Value.TradeDate, b.Value.R, candidate.Value.TryGetValue(b.Key, out var c) ? c.R : null))
             .ToList();
-        var judged = ExperimentJudge.Judge(command.Knob, trades, options);
-        if (judged.IsFailure)
+        for (var attempt = 0; attempt < MaxAttempts; attempt++)
         {
-            return Refuse(judged.Error);
+            var judged = ExperimentJudge.Judge(command.Knob, trades, options with { Trials = trials }, fillCost);
+            if (judged.IsFailure)
+            {
+                return Refuse(judged.Error);
+            }
+
+            var report = judged.Value;
+            var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
+            var text = report.ToText()
+                + "limit: " + holdNote + "\n"
+                + string.Create(CultureInfo.InvariantCulture, $"timing: reading both runs and judging them took {elapsedMs} ms (measured). The replay that made the candidate run is a separate step and was not measured here: the 10-minute target for a replay and comparison is not claimed (not measured).\n");
+            var stored = new ExperimentToStore(
+                key,
+                command.Knob,
+                command.BaselineRunKey,
+                command.CandidateRunKey,
+                report.From,
+                report.To,
+                options.HoldOutStart,
+                report.Outcome,
+                report.Options.Trials,
+                report.UsedFolds,
+                report.FoldsBetter,
+                report.FoldsNeeded,
+                report.RequiredImprovementR,
+                report.BaselineTrades,
+                report.CandidateTrades,
+                report.PooledBaselineMeanR,
+                report.PooledCandidateMeanR,
+                report.BaselineTotalR,
+                report.CandidateTotalR,
+                report.Options.ExpectedLiveGapR,
+                elapsedMs,
+                string.Join('\n', report.Reasons),
+                text,
+                ExperimentCanonical.Parameters(command.Options, command.HoldOutMonths),
+                now,
+                command.Actor);
+            RecordedExperiment recorded;
+            try
+            {
+                recorded = await ledger.AppendAsync(stored, command.Options.Trials, since, cancellationToken);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                ExperimentLog.Failed(logger);
+                throw;
+            }
+
+            if (recorded.RequiredTrials > 0)
+            {
+                // Another experiment was recorded since the count: judge again with the ledger's number.
+                trials = recorded.RequiredTrials;
+                continue;
+            }
+
+            if (!recorded.Created)
+            {
+                // A concurrent identical request won: answer with what is stored, not with this judgement.
+                var winner = await ledger.FindAsync(recorded.Id, cancellationToken);
+                if (winner is null)
+                {
+                    return Refuse(ExperimentErrors.Busy());
+                }
+
+                ExperimentLog.AlreadyRecorded(logger, winner.Id);
+                return Result.Success(Outcome(winner, true));
+            }
+
+            var outcomeName = report.Outcome.ToString();
+            ExperimentLog.Recorded(logger, recorded.Id, outcomeName, report.BaselineTrades, report.UsedFolds, report.Options.Trials, elapsedMs);
+            return Result.Success(new RunExperimentOutcome(recorded.Id, false, outcomeName, report.Options.Trials, report.Reasons, text, elapsedMs));
         }
 
-        var report = judged.Value;
-        var elapsedMs = (long)time.GetElapsedTime(started).TotalMilliseconds;
-        var text = report.ToText()
-            + "limit: " + holdNote + "\n"
-            + string.Create(CultureInfo.InvariantCulture, $"timing: reading both runs and judging them took {elapsedMs} ms (measured). The replay that made the candidate run is a separate step and was not measured here: the 10-minute target for a replay and comparison is not claimed (not measured).\n");
-        var stored = new ExperimentToStore(
-            key,
-            command.Knob,
-            command.BaselineRunKey,
-            command.CandidateRunKey,
-            report.From,
-            report.To,
-            options.HoldOutStart,
-            report.Outcome,
-            report.Options.Trials,
-            report.UsedFolds,
-            report.FoldsBetter,
-            report.FoldsNeeded,
-            report.RequiredImprovementR,
-            report.BaselineTrades,
-            report.CandidateTrades,
-            report.PooledBaselineMeanR,
-            report.PooledCandidateMeanR,
-            report.BaselineTotalR,
-            report.CandidateTotalR,
-            report.Options.ExpectedLiveGapR,
-            elapsedMs,
-            string.Join('\n', report.Reasons),
-            text,
-            ExperimentCanonical.Parameters(command.Options, command.HoldOutMonths),
-            now,
-            command.Actor);
-        RecordedExperiment recorded;
-        try
-        {
-            recorded = await ledger.AppendAsync(stored, cancellationToken);
-        }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            ExperimentLog.Failed(logger);
-            throw;
-        }
-
-        var outcomeName = report.Outcome.ToString();
-        ExperimentLog.Recorded(logger, recorded.Id, outcomeName, report.BaselineTrades, report.UsedFolds, report.Options.Trials, elapsedMs);
-        return Result.Success(new RunExperimentOutcome(recorded.Id, !recorded.Created, outcomeName, report.Options.Trials, report.Reasons, text, elapsedMs));
+        return Refuse(ExperimentErrors.Busy());
     }
 
     private static RunExperimentOutcome Outcome(StoredExperiment s, bool already)
@@ -162,12 +204,32 @@ internal sealed class RunExperimentHandler(IRunStore runs, IExperimentLedger led
         return new RunExperimentOutcome(s.Id, already, e.Outcome.ToString(), e.Trials, e.Reasons.Length == 0 ? [] : e.Reasons.Split('\n'), e.ReportText, e.CompareMs);
     }
 
-    // Only the named knob may differ. A slippage knob may change the fill basis; nothing may change the cost sheet. Any other knob keeps both.
+    // The two runs must be on the same data and the same costs. A parameter or exit knob changes the strategy definition (its hash may differ); nothing else may, and the strategy id never does. A slippage knob's fill rules are compared apart.
     private static string? Differs(StoredRunHeader a, StoredRunHeader b, ExperimentKnobKind kind)
     {
         if (!string.Equals(a.CostsSheetId, b.CostsSheetId, StringComparison.Ordinal) || !string.Equals(a.CostsRatesSha256, b.CostsRatesSha256, StringComparison.Ordinal))
         {
             return "the cost sheet";
+        }
+
+        if (!string.Equals(a.EngineVersion, b.EngineVersion, StringComparison.Ordinal) || a.RecordSchemaVersion != b.RecordSchemaVersion || a.TradeSchemaVersion != b.TradeSchemaVersion)
+        {
+            return "the engine or the record schema (the runs were not made by the same engine)";
+        }
+
+        if (a.From != b.From || a.To != b.To || !string.Equals(a.UniverseKind, b.UniverseKind, StringComparison.Ordinal) || !string.Equals(a.UniverseLabel, b.UniverseLabel, StringComparison.Ordinal) || a.AcknowledgeCsvAdjusted != b.AcknowledgeCsvAdjusted)
+        {
+            return "the data (window, universe or CSV acknowledgement): the runs were not made on the same data";
+        }
+
+        if (!string.Equals(a.StrategyId, b.StrategyId, StringComparison.Ordinal))
+        {
+            return "the strategy";
+        }
+
+        if (kind == ExperimentKnobKind.Slippage && !string.Equals(a.DefinitionSha256, b.DefinitionSha256, StringComparison.Ordinal))
+        {
+            return "the strategy definition (only a parameter or exit knob changes it)";
         }
 
         if (kind != ExperimentKnobKind.Slippage && !string.Equals(a.Fills, b.Fills, StringComparison.Ordinal))

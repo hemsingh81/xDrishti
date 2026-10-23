@@ -13,6 +13,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="MaxTotalRDrop">The candidate's total R, after the live gap, may fall at most this share below the baseline's (0.10).</param>
 /// <param name="ExpectedLiveGapR">What a trade is expected to lose live beyond the replay, in R per trade. An assumption until P10 measures it. Both sides are charged per trade, so a candidate that trades less is charged less.</param>
 /// <param name="Trials">The experiments tried in the last 30 days, this one included (the ledger count); the command line can only raise it.</param>
+/// <param name="NoHoldOut">True when no hold-out was kept for this experiment: it can then never be called better, at best inconclusive.</param>
 /// <param name="HoldOutStart">When set, any trade on or after this date is refused: the hold-out is not used in development.</param>
 public sealed record ExperimentOptions(
     int MinTrainMonths = 9,
@@ -25,8 +26,15 @@ public sealed record ExperimentOptions(
     double MaxTotalRDrop = 0.10,
     double ExpectedLiveGapR = 0.02,
     int Trials = 1,
-    DateOnly? HoldOutStart = null)
+    DateOnly? HoldOutStart = null,
+    bool NoHoldOut = false)
 {
+    /// <summary>The fewest trades a side may have in a fold; a command line can raise it, not lower it.</summary>
+    public const int MinFoldTradesFloor = 10;
+
+    /// <summary>The expected live gap in R per trade; a command line can raise it, not lower it (zero would flatter a candidate that trades more).</summary>
+    public const double LiveGapFloorR = 0.02;
+
     /// <summary>The days over which experiments are counted as trials (doc 09 §12 rule 5).</summary>
     public const int TrialWindowDays = 30;
 

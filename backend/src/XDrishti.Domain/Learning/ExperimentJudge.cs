@@ -16,7 +16,8 @@ public static class ExperimentJudge
     /// <param name="knob">The one knob that differs between the runs.</param>
     /// <param name="trades">The entries of the baseline run with the candidate's result for each; unique keys.</param>
     /// <param name="options">The rules.</param>
-    public static Result<ExperimentReport> Judge(ExperimentKnob knob, IReadOnlyList<ExperimentTrade> trades, ExperimentOptions options)
+    /// <param name="fillCost">For a slippage knob, how the stored fill rules of the two runs compare; it is required there and ignored for any other knob.</param>
+    public static Result<ExperimentReport> Judge(ExperimentKnob knob, IReadOnlyList<ExperimentTrade> trades, ExperimentOptions options, FillCostChange fillCost = FillCostChange.NotApplicable)
     {
         ArgumentNullException.ThrowIfNull(knob);
         ArgumentNullException.ThrowIfNull(trades);
@@ -27,6 +28,12 @@ public static class ExperimentJudge
             return Fail("experiment.options", string.Join("; ", problems));
         }
 
+        if (knob.Kind == ExperimentKnobKind.Slippage && fillCost == FillCostChange.NotApplicable)
+        {
+            return Fail("experiment.options", "a slippage knob needs the comparison of the stored fill rules of the two runs");
+        }
+
+        var cheaper = knob.Kind == ExperimentKnobKind.Slippage && fillCost is (FillCostChange.Cheaper or FillCostChange.Mixed);
         var check = Check(trades, options);
         if (check is not null)
         {
@@ -35,7 +42,12 @@ public static class ExperimentJudge
 
         var c = CultureInfo.InvariantCulture;
         var minFolds = Math.Max(options.MinFolds, ValidationOptions.DefaultMinFolds);
-        var rules = options with { MinFolds = minFolds };
+        var rules = options with
+        {
+            MinFolds = minFolds,
+            MinFoldTrades = Math.Max(options.MinFoldTrades, ExperimentOptions.MinFoldTradesFloor),
+            ExpectedLiveGapR = Math.Max(options.ExpectedLiveGapR, ExperimentOptions.LiveGapFloorR),
+        };
         var required = rules.RequiredImprovementR;
         var ordered = trades.OrderBy(t => t.TradeDate).ThenBy(t => t.Key, StringComparer.Ordinal).ToArray();
         var from = ordered[0].TradeDate;
@@ -53,9 +65,9 @@ public static class ExperimentJudge
             var inside = ordered.Where(t => t.TradeDate >= start && t.TradeDate <= end).ToArray();
             var baseline = inside.Select(t => t.BaselineR).ToArray();
             var candidate = inside.Where(t => t.CandidateR is not null).Select(t => t.CandidateR!.Value).ToArray();
-            if (baseline.Length < options.MinFoldTrades || candidate.Length < options.MinFoldTrades)
+            if (baseline.Length < rules.MinFoldTrades || candidate.Length < rules.MinFoldTrades)
             {
-                var reason = string.Create(c, $"{baseline.Length} baseline and {candidate.Length} candidate trades, {options.MinFoldTrades} needed on each side");
+                var reason = string.Create(c, $"{baseline.Length} baseline and {candidate.Length} candidate trades, {rules.MinFoldTrades} needed on each side");
                 folds.Add(new ExperimentFold(i + 1, start, end, baseline.Length, candidate.Length, Mean(baseline), Mean(candidate), reason, false));
                 continue;
             }
@@ -76,18 +88,20 @@ public static class ExperimentJudge
         double? pooledCand = candCount > 0 ? candSum / candCount : null;
 
         var candidateTrades = ordered.Count(t => t.CandidateR is not null);
-        var baseTotal = ordered.Sum(t => t.BaselineR - options.ExpectedLiveGapR);
-        var candTotal = ordered.Where(t => t.CandidateR is not null).Sum(t => t.CandidateR!.Value - options.ExpectedLiveGapR);
+        var baseTotal = ordered.Sum(t => t.BaselineR - rules.ExpectedLiveGapR);
+        var candTotal = ordered.Where(t => t.CandidateR is not null).Sum(t => t.CandidateR!.Value - rules.ExpectedLiveGapR);
 
         var reasons = new List<string>();
-        if (knob.IsCheaperAssumption)
+        if (cheaper)
         {
-            reasons.Add(string.Create(c, $"the candidate assumes slippage of {knob.CandidateValue} bps against the baseline's {knob.BaselineValue} bps: a cheaper assumption cannot win, whatever the numbers"));
+            reasons.Add(fillCost == FillCostChange.Mixed
+                ? "the stored fill rules of the two runs differ in slippage components in both directions, so they cannot be ordered: a cheaper assumption cannot win, whatever the numbers"
+                : "the stored fill rules show the candidate assumes less slippage than the baseline (read from the runs, not from the typed values): a cheaper assumption cannot win, whatever the numbers");
         }
 
         if (used == 0)
         {
-            reasons.Add(string.Create(c, $"no fold is usable: {windows.Count} windows after {options.MinTrainMonths} months, {dropped} short final window dropped, {options.MinFoldTrades} trades needed on each side"));
+            reasons.Add(string.Create(c, $"no fold is usable: {windows.Count} windows after {options.MinTrainMonths} months, {dropped} short final window dropped, {rules.MinFoldTrades} trades needed on each side"));
         }
         else
         {
@@ -109,7 +123,7 @@ public static class ExperimentJudge
         }
 
         ExperimentOutcome outcome;
-        if (knob.IsCheaperAssumption)
+        if (cheaper)
         {
             outcome = ExperimentOutcome.CheaperAssumption;
         }
@@ -125,6 +139,11 @@ public static class ExperimentJudge
         {
             outcome = ExperimentOutcome.Inconclusive;
             reasons.Add(string.Create(c, $"only {used} used folds, {minFolds} needed to call it better"));
+        }
+        else if (options.NoHoldOut)
+        {
+            outcome = ExperimentOutcome.Inconclusive;
+            reasons.Add("no hold-out was kept for this experiment: with every trade looked at, no change can be called better");
         }
         else
         {
@@ -181,6 +200,17 @@ public static class ExperimentJudge
             limits.Add(string.Create(c, $"Fewer than {minFolds} folds: no change can be called better, at best inconclusive."));
         }
 
+        if (asked.MinFoldTrades < rules.MinFoldTrades)
+        {
+            limits.Add(string.Create(c, $"The minimum of {asked.MinFoldTrades} trades per side in a fold was raised to the floor of {rules.MinFoldTrades}."));
+        }
+
+        if (asked.ExpectedLiveGapR < rules.ExpectedLiveGapR)
+        {
+            limits.Add(string.Create(c, $"The expected live gap of {asked.ExpectedLiveGapR:F3} R was raised to the floor of {rules.ExpectedLiveGapR:F3} R: a lower gap would flatter a candidate that trades more."));
+        }
+
+        limits.Add("An experiment that is refused or fails before it is judged is not recorded and does not count as a trial, though it may have been looked at.");
         if (asked.MinFolds < minFolds)
         {
             limits.Add(string.Create(c, $"The minimum of {asked.MinFolds} folds was raised to the floor of {minFolds}."));

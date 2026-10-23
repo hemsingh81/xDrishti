@@ -27,8 +27,11 @@ public sealed class RunExperimentHandlerTests
 
     private RunExperimentHandler Handler() => new(_runs, _ledger, _time, NullLogger<RunExperimentHandler>.Instance);
 
+    private static string Fills(double ticks = 1, double frac = 0.1, double extra = 1, double entry = 0.1) =>
+        string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{{\"entry_limit_percent\":{entry},\"slippage\":{{\"ticks\":{ticks},\"bar_range_frac\":{frac},\"stop_exit_extra_ticks\":{extra},\"gap_fill\":\"at_open\"}}}}");
+
     private static StoredRunHeader Header(string key) =>
-        new(1, key, "sim", 5, 5, "ORB", new string('c', 64), new DateOnly(2022, 1, 1), new DateOnly(2024, 12, 31), "basket", "x", 1, 1, 0, 0, 0, 0, false, "{}", null, null, 0, new string('d', 64), new string('e', 64), DateTimeOffset.UnixEpoch, "t");
+        new(1, key, "sim", 5, 5, "ORB", new string('c', 64), new DateOnly(2022, 1, 1), new DateOnly(2024, 12, 31), "basket", "x", 1, 1, 0, 0, 0, 0, false, Fills(), null, null, 0, new string('d', 64), new string('e', 64), DateTimeOffset.UnixEpoch, "t");
 
     private static async IAsyncEnumerable<RunTrade> Stream(SimTrade[] trades)
     {
@@ -66,7 +69,7 @@ public sealed class RunExperimentHandlerTests
         _runs.StreamTradesAsync(Cand, false, Ct).Returns(_ => Stream(candidate));
     }
 
-    private static RunExperimentCommand Command(string knob = "stop", ExperimentKnobKind kind = ExperimentKnobKind.Parameter, string from = "1.2", string to = "1.0", int holdOut = 0, string? candidate = null) =>
+    private static RunExperimentCommand Command(string knob = "stop", ExperimentKnobKind kind = ExperimentKnobKind.Parameter, string from = "1.2", string to = "1.0", int holdOut = 6, string? candidate = null) =>
         new(Base, candidate ?? Cand, new ExperimentKnob(knob, kind, from, to), new ExperimentOptions(), holdOut, "cli:xd");
 
     [Fact]
@@ -81,7 +84,6 @@ public sealed class RunExperimentHandlerTests
         result.Value.AlreadyRecorded.ShouldBeFalse();
         result.Value.Trials.ShouldBe(1);
         result.Value.ReportText.ShouldContain("not measured");
-        result.Value.ReportText.ShouldContain("No hold-out was kept");
         _ledger.Rows.Count.ShouldBe(1);
         _ledger.Rows[0].Experiment.ReportText.ShouldBe(result.Value.ReportText);
         _ledger.Rows[0].Experiment.CreatedBy.ShouldBe("cli:xd");
@@ -135,12 +137,43 @@ public sealed class RunExperimentHandlerTests
     [Fact]
     public async Task A_cheaper_slippage_is_recorded_as_such_and_never_better()
     {
-        Stored(Trades(0.1), Trades(0.5));
+        Stored(Trades(0.1), Trades(0.5), Header(Cand) with { Fills = Fills(ticks: 0) });
 
-        var result = await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "4"), Ct);
+        var result = await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "12"), Ct);
 
         result.Value.Outcome.ShouldBe("CheaperAssumption");
         _ledger.Rows.Single().Experiment.Outcome.ShouldBe(ExperimentOutcome.CheaperAssumption);
+    }
+
+    [Fact]
+    public async Task A_slippage_typed_as_cheaper_that_the_runs_show_dearer_is_judged_on_the_numbers()
+    {
+        Stored(Trades(0.1), Trades(0.5), Header(Cand) with { Fills = Fills(ticks: 2) });
+
+        var result = await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "4"), Ct);
+
+        result.Value.Outcome.ShouldBe("Better");
+    }
+
+    [Fact]
+    public async Task Slippage_components_that_cannot_be_ordered_are_cheaper_and_a_slippage_that_did_not_change_is_refused()
+    {
+        Stored(Trades(0.1), Trades(0.5), Header(Cand) with { Fills = Fills(ticks: 2, frac: 0.05) });
+        (await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "12"), Ct)).Value.Outcome.ShouldBe("CheaperAssumption");
+
+        Stored(Trades(0.1), Trades(0.5));
+        (await Handler().HandleAsync(Command("slippage_ticks", ExperimentKnobKind.Slippage, "8", "12"), Ct)).Error.Code.ShouldBe(ExperimentErrors.AssumptionsDifferCode);
+    }
+
+    [Fact]
+    public async Task Without_a_hold_out_the_outcome_is_labelled_and_never_better()
+    {
+        Stored(Trades(0.1), Trades(0.3));
+
+        var result = await Handler().HandleAsync(Command(holdOut: 0), Ct);
+
+        result.Value.Outcome.ShouldBe("Inconclusive");
+        result.Value.ReportText.ShouldContain("No hold-out was kept");
     }
 
     [Fact]
@@ -174,7 +207,7 @@ public sealed class RunExperimentHandlerTests
         var result = await Handler().HandleAsync(Command(), Ct);
 
         result.IsSuccess.ShouldBeTrue();
-        _ledger.Rows.Single().Experiment.CandidateTrades.ShouldBe(36 * 12);
+        _ledger.Rows.Single().Experiment.CandidateTrades.ShouldBeLessThan(36 * 12);
     }
 
     [Fact]
@@ -187,12 +220,95 @@ public sealed class RunExperimentHandlerTests
     }
 
     [Fact]
-    public async Task A_changed_fill_basis_is_refused_unless_the_knob_is_the_slippage()
+    public async Task A_changed_fill_basis_is_refused_unless_only_the_slippage_of_a_slippage_knob_changed()
     {
-        Stored(Trades(0.1), Trades(0.3), Header(Cand) with { Fills = "{\"slippage\":12}" });
+        Stored(Trades(0.1), Trades(0.3), Header(Cand) with { Fills = Fills(ticks: 2) });
 
         (await Handler().HandleAsync(Command(), Ct)).Error.Code.ShouldBe(ExperimentErrors.AssumptionsDifferCode);
         (await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "12"), Ct)).IsSuccess.ShouldBeTrue();
+
+        Stored(Trades(0.1), Trades(0.3), Header(Cand) with { Fills = Fills(ticks: 2, entry: 0.2) });
+        (await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "13"), Ct)).Error.Code.ShouldBe(ExperimentErrors.AssumptionsDifferCode);
+    }
+
+    public static TheoryData<string> DataChanges => new()
+    {
+        "engine", "record", "trade", "from", "to", "kind", "label", "csv", "strategy",
+    };
+
+    [Theory]
+    [MemberData(nameof(DataChanges))]
+    public async Task Runs_not_made_on_the_same_data_are_refused_for_every_knob(string what)
+    {
+        var h = Header(Cand);
+        var changed = what switch
+        {
+            "engine" => h with { EngineVersion = "other" },
+            "record" => h with { RecordSchemaVersion = 6 },
+            "trade" => h with { TradeSchemaVersion = 6 },
+            "from" => h with { From = h.From.AddDays(1) },
+            "to" => h with { To = h.To.AddDays(-1) },
+            "kind" => h with { UniverseKind = "index" },
+            "label" => h with { UniverseLabel = "y" },
+            "csv" => h with { AcknowledgeCsvAdjusted = true },
+            _ => h with { StrategyId = "OTHER" },
+        };
+        Stored(Trades(0.1), Trades(0.3), changed);
+
+        (await Handler().HandleAsync(Command(), Ct)).Error.Code.ShouldBe(ExperimentErrors.AssumptionsDifferCode);
+        (await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "12"), Ct)).Error.Code.ShouldBe(ExperimentErrors.AssumptionsDifferCode);
+        _ledger.Rows.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_changed_strategy_definition_is_allowed_for_a_parameter_or_exit_knob_only()
+    {
+        Stored(Trades(0.1), Trades(0.3), Header(Cand) with { DefinitionSha256 = new string('f', 64) });
+
+        (await Handler().HandleAsync(Command(), Ct)).IsSuccess.ShouldBeTrue();
+        (await Handler().HandleAsync(Command("exit_policy", ExperimentKnobKind.Exit, "a", "b"), Ct)).IsSuccess.ShouldBeTrue();
+        (await Handler().HandleAsync(Command("slippage_bps", ExperimentKnobKind.Slippage, "8", "12"), Ct)).Error.Code.ShouldBe(ExperimentErrors.AssumptionsDifferCode);
+    }
+
+    [Fact]
+    public async Task The_same_number_typed_differently_is_the_same_experiment_and_no_change()
+    {
+        Stored(Trades(0.1), Trades(0.3));
+        var first = await Handler().HandleAsync(Command(from: "1.2", to: "1"), Ct);
+
+        var again = await Handler().HandleAsync(Command(from: "1.20", to: "1.0"), Ct);
+        var none = await Handler().HandleAsync(Command(from: "4", to: "4.0"), Ct);
+
+        again.Value.AlreadyRecorded.ShouldBeTrue();
+        again.Value.Id.ShouldBe(first.Value.Id);
+        none.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+    }
+
+    [Fact]
+    public async Task An_experiment_recorded_meanwhile_makes_the_judgement_run_again_with_the_ledger_trial_number()
+    {
+        Stored(Trades(0.1), Trades(0.135));
+        _ledger.BeforeAppend = e => e with { ExperimentKey = new string('9', 64), Knob = e.Knob with { Name = "rival" } };
+
+        var result = await Handler().HandleAsync(Command(), Ct);
+
+        result.Value.Trials.ShouldBe(2);
+        _ledger.Rows.Select(r => r.Experiment.Trials).ShouldBe([1, 2]);
+        result.Value.AlreadyRecorded.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_loser_of_a_race_on_the_same_experiment_gets_the_stored_text_and_outcome()
+    {
+        Stored(Trades(0.1), Trades(0.3));
+        _ledger.BeforeAppend = e => e with { Outcome = ExperimentOutcome.NotBetter, ReportText = "winner text" };
+
+        var result = await Handler().HandleAsync(Command(), Ct);
+
+        result.Value.AlreadyRecorded.ShouldBeTrue();
+        result.Value.Outcome.ShouldBe("NotBetter");
+        result.Value.ReportText.ShouldBe("winner text");
+        _ledger.Rows.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -228,8 +344,28 @@ public sealed class RunExperimentHandlerTests
         public ValueTask<StoredExperiment?> FindByKeyAsync(string experimentKey, CancellationToken cancellationToken) =>
             ValueTask.FromResult(Rows.FirstOrDefault(r => r.Experiment.ExperimentKey == experimentKey));
 
-        public ValueTask<RecordedExperiment> AppendAsync(ExperimentToStore experiment, CancellationToken cancellationToken)
+        public Func<ExperimentToStore, ExperimentToStore>? BeforeAppend { get; set; }
+
+        public ValueTask<RecordedExperiment> AppendAsync(ExperimentToStore experiment, int askedTrials, DateTimeOffset since, CancellationToken cancellationToken)
         {
+            if (BeforeAppend is { } rival)
+            {
+                // Another request commits first, once.
+                BeforeAppend = null;
+                Rows.Add(new StoredExperiment(Rows.Count + 1, rival(experiment) with { Trials = 1 }));
+            }
+
+            if (Rows.FirstOrDefault(r => r.Experiment.ExperimentKey == experiment.ExperimentKey) is { } existing)
+            {
+                return ValueTask.FromResult(new RecordedExperiment(existing.Id, false));
+            }
+
+            var required = Math.Max(askedTrials, Rows.Count(r => r.Experiment.CreatedAt >= since) + 1);
+            if (required != experiment.Trials)
+            {
+                return ValueTask.FromResult(new RecordedExperiment(0, false, required));
+            }
+
             var row = new StoredExperiment(Rows.Count + 1, experiment);
             Rows.Add(row);
             return ValueTask.FromResult(new RecordedExperiment(row.Id, true));

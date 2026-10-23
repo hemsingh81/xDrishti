@@ -10,8 +10,8 @@ internal sealed record LearnExperimentOptions(string BaselineRunKey, string Cand
     public const string Usage = """
         usage:
           xd learn experiment --baseline RUNKEY --candidate RUNKEY --knob NAME --kind parameter|exit|slippage --from VALUE --to VALUE [--hold-out-months N] [--min-fold-trades N] [--live-gap-r X] [--trials N]
-            the two runs are stored runs made on the same data with the same entries; they differ only in the knob (--from is the baseline value, --to the candidate value; slippage is in basis points)
-            a cheaper slippage than the baseline cannot win; fewer than 6 used folds is at best inconclusive; every look is recorded and widens the next one
+            the two runs are stored runs made on the same data (engine, window, universe, strategy) with the same entries; they differ only in the knob (a slippage knob: only in the slippage fill fields) (--from is the baseline value, --to the candidate value; slippage is in basis points)
+            a cheaper slippage than the baseline cannot win (read from the stored fills of the two runs, not from --from/--to, which are only labels); fewer than 6 used folds is at best inconclusive; every look is recorded and widens the next one
             the replay that makes the candidate run is a separate step (the Lab or xd simulate) and is not timed here
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
