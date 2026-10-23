@@ -2588,6 +2588,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/changelog': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The learning changelog, newest first (limit 1 to 200, default 50; subjectKind cell or model; subject one cell key or model:ID): what changed, by whom or what, why, before and after references and evidence ids. Rows are never changed; a revert is a row that points at the one it reverts. Empty before the first record. 422 learning.invalid */
+    get: operations['ListChangelog'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/changelog/cell-state': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Where a cell is (query cell=strategy|tf|side|style|exit|regime), replayed from its changelog rows, with the moves the lifecycle allows next. A record only: nothing acts on a cell's state before paper data and live exist. 422 learning.invalid */
+    get: operations['GetCellState'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/changelog/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One changelog row. 404 changelog.not_found */
+    get: operations['GetChangelogEntry'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3520,6 +3571,29 @@ export interface components {
        */
       probability: number;
     };
+    /** @description Where a cell is, replayed from its changelog rows (P6-08). */
+    CellStateView: {
+      /** @description The cell key. */
+      cell: string;
+      /** @description The state after the last row (research without rows). */
+      state: string;
+      /** @description The states it may move to. */
+      legalNext: string[];
+      /**
+       * Format: int32
+       * @description How many rows were replayed.
+       */
+      rows: number;
+      /** @description Rows that do not add up; empty when consistent. */
+      problems: string[];
+      /**
+       * Format: int32
+       * @description Paper days needed before Active (doc 16).
+       */
+      paperDaysBeforeActive: number;
+      /** @description What a reader must know: the state is a record; nothing acts on it before paper data and live exist. */
+      note: string;
+    };
     /** @description One row of the cell statistics as the API shows it (P6-01), with the facts a reader needs to judge it (spec honest limits: the basis, the knobs, the evidence flag and the limits text). */
     CellStatsView: {
       cellKey: string;
@@ -3607,6 +3681,49 @@ export interface components {
     ChangePasswordRequest: {
       currentPassword: string;
       newPassword: string;
+    };
+    /** @description A changelog row as the API shows it (P6-08): what changed, by whom, why, before and after, and the evidence. A revert has long? ChangelogEntryView.RevertsId. */
+    ChangelogEntryView: {
+      /**
+       * Format: int64
+       * @description The row id.
+       */
+      id: number;
+      /** @description transition, designation or revert. */
+      kind: string;
+      /** @description cell or model. */
+      subjectKind: string;
+      /** @description The cell key, or model:ID. */
+      subject: string;
+      /** @description The state or role before. */
+      fromState: string;
+      /** @description The state or role after. */
+      toState: string;
+      /** @description Why. */
+      reason: string;
+      /** @description Who or what. */
+      actor: string;
+      /** @description Evidence ids. */
+      evidenceIds: string[];
+      /** @description Reference to the thing before, or null. */
+      beforeRef: null | string;
+      /** @description Reference to the thing after, or null. */
+      afterRef: null | string;
+      /**
+       * Format: int32
+       * @description Paper days stated, or null.
+       */
+      paperDays: null | number;
+      /**
+       * Format: int64
+       * @description The reverted row, or null.
+       */
+      revertsId: null | number;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      at: string;
     };
     /** @description Body of the clone endpoint: the id of the new strategy; omitted keeps the id (a built-in gets `&lt;ID&gt;_COPY`). */
     CloneStrategyRequest: {
@@ -14304,6 +14421,101 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ExperimentView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListChangelog: {
+    parameters: {
+      query?: {
+        subjectKind?: string;
+        subject?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChangelogEntryView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetCellState: {
+    parameters: {
+      query?: {
+        cell?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CellStateView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetChangelogEntry: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChangelogEntryView'];
         };
       };
       /** @description Not Found */

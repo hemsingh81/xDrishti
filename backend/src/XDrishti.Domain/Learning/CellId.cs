@@ -17,6 +17,19 @@ public sealed record CellId(string Strategy, string Timeframe, string Side, stri
     /// <summary><c>strategy|tf|side|style|exit|regime</c>.</summary>
     public string Key => string.Join('|', Strategy, Timeframe, Side, Style, Exit, Regime);
 
+    /// <summary>Reads <c>strategy|tf|side|style|exit|regime</c> back; null when it is not six valid parts.</summary>
+    public static CellId? TryParse(string? key)
+    {
+        var parts = key?.Split('|');
+        if (parts is not { Length: 6 })
+        {
+            return null;
+        }
+
+        var id = new CellId(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]);
+        return id.Problems().Count == 0 ? id : null;
+    }
+
     /// <summary>The problems of the parts: each is required, short and free of the separator.</summary>
     public IReadOnlyList<string> Problems()
     {

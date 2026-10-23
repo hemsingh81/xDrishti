@@ -3454,6 +3454,107 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.LearningChangelogRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("AfterRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("after_ref");
+
+                    b.Property<string>("BeforeRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("before_ref");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.PrimitiveCollection<string[]>("EvidenceIds")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("evidence_ids");
+
+                    b.Property<string>("FromState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("from_state");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("kind");
+
+                    b.Property<int?>("PaperDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("paper_days");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long?>("RevertsId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reverts_id");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("SubjectKind")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("subject_kind");
+
+                    b.Property<string>("ToState")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("to_state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_learning_changelog");
+
+                    b.HasIndex("RevertsId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_learning_changelog_reverts_id")
+                        .HasFilter("reverts_id IS NOT NULL");
+
+                    b.HasIndex("Subject", "Id")
+                        .HasDatabaseName("ix_learning_changelog_subject_id");
+
+                    b.ToTable("learning_changelog", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_learning_changelog_evidence", "cardinality(evidence_ids) <= 20 AND (paper_days IS NULL OR paper_days >= 0)");
+
+                            t.HasCheckConstraint("ck_learning_changelog_kind", "kind IN ('transition', 'designation', 'revert') AND subject_kind IN ('cell', 'model')");
+
+                            t.HasCheckConstraint("ck_learning_changelog_revert", "(kind = 'revert') = (reverts_id IS NOT NULL) AND (kind <> 'revert' OR subject_kind = 'cell')");
+
+                            t.HasCheckConstraint("ck_learning_changelog_states", "from_state <> to_state AND (subject_kind <> 'cell' OR (from_state IN ('research', 'candidate', 'paper', 'active', 'paused', 'retired') AND to_state IN ('research', 'candidate', 'paper', 'active', 'paused', 'retired'))) AND (subject_kind <> 'model' OR (from_state IN ('challenger', 'champion', 'retired') AND to_state IN ('challenger', 'champion', 'retired')))");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -6069,6 +6170,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_broker_secrets_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.LearningChangelogRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Learning.LearningChangelogRecord", null)
+                        .WithMany()
+                        .HasForeignKey("RevertsId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_learning_changelog_learning_changelog_reverts_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
