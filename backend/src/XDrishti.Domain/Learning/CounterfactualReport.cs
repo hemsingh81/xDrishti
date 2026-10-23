@@ -69,7 +69,7 @@ public sealed record CounterfactualReport(
     private static string Line(CounterfactualPooled p)
     {
         var c = CultureInfo.InvariantCulture;
-        return string.Create(c, $"{p.Rows} trades; frozen log loss {p.Frozen.Metrics.LogLoss:F4} Brier {p.Frozen.Metrics.Brier:F4} AUC {Fmt(p.Frozen.Metrics.Auc)} take-R {p.Frozen.Policy.PolicyPerCandidate:F3} (kept {p.Frozen.Policy.Kept}, skipped mean R {Fmt(p.Frozen.Policy.MeanSkipped)}); retrained log loss {p.Retrained.Metrics.LogLoss:F4} Brier {p.Retrained.Metrics.Brier:F4} AUC {Fmt(p.Retrained.Metrics.Auc)} take-R {p.Retrained.Policy.PolicyPerCandidate:F3} (kept {p.Retrained.Policy.Kept}, skipped mean R {Fmt(p.Retrained.Policy.MeanSkipped)}); take-everything {p.Frozen.Policy.BaselinePerCandidate:F3} R; gain of retraining {p.MeanGain:F4} log loss (standard error {Fmt(p.GainStandardError)})");
+        return string.Create(c, $"{p.Rows} trades; frozen log loss {p.Frozen.Metrics.LogLoss:F4} Brier {p.Frozen.Metrics.Brier:F4} AUC {Fmt(p.Frozen.Metrics.Auc)} take-R {p.Frozen.Policy.PolicyPerCandidate:F3} (kept {p.Frozen.Policy.Kept}, skipped mean R {Fmt(p.Frozen.Policy.MeanSkipped)}); retrained log loss {p.Retrained.Metrics.LogLoss:F4} Brier {p.Retrained.Metrics.Brier:F4} AUC {Fmt(p.Retrained.Metrics.Auc)} take-R {p.Retrained.Policy.PolicyPerCandidate:F3} (kept {p.Retrained.Policy.Kept}, skipped mean R {Fmt(p.Retrained.Policy.MeanSkipped)}); take-everything {p.Frozen.Policy.BaselinePerCandidate:F3} R; gain of retraining {p.MeanGain:F4} log loss (standard error clustered by day {Fmt(p.GainStandardError)})");
     }
 
     private static string Fmt(double? v) => v is { } x ? x.ToString("F3", CultureInfo.InvariantCulture) : "n/a";

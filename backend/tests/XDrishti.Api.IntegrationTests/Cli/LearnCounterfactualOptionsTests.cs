@@ -31,11 +31,27 @@ public sealed class LearnCounterfactualOptionsTests
         options.HoldOutMonths.ShouldBe(0);
     }
 
+    [Fact]
+    public void The_judgement_knobs_can_only_be_made_stricter()
+    {
+        var (loose, _) = LearnCounterfactualOptions.Parse(["--run", $"{Key}:a:b", "--min-judged-windows", "1", "--min-window-rows", "2", "--significance-z", "0.5"]);
+        var (strict, _) = LearnCounterfactualOptions.Parse(["--run", $"{Key}:a:b", "--min-judged-windows", "5", "--min-window-rows", "40", "--significance-z", "2.5"]);
+
+        loose!.Counterfactual.MinJudgedWindows.ShouldBe(3);
+        loose.Counterfactual.MinWindowRows.ShouldBe(10);
+        loose.Counterfactual.SignificanceZ.ShouldBe(1.645);
+        strict!.Counterfactual.MinJudgedWindows.ShouldBe(5);
+        strict.Counterfactual.MinWindowRows.ShouldBe(40);
+        strict.Counterfactual.SignificanceZ.ShouldBe(2.5);
+    }
+
     [Theory]
     [InlineData("--frozen-months", "x")]
     [InlineData("--retrain-months", "1.5")]
     [InlineData("--min-gain", "NaN")]
     [InlineData("--trials", "x")]
+    [InlineData("--min-judged-windows", "x")]
+    [InlineData("--significance-z", "NaN")]
     [InlineData("--hold-out-months", "x")]
     [InlineData("--bogus", "1")]
     public void Bad_values_are_listed(string flag, string value)

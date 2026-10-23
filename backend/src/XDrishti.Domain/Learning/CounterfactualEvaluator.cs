@@ -12,6 +12,9 @@ namespace XDrishti.Domain.Learning;
 /// </summary>
 public static class CounterfactualEvaluator
 {
+    /// <summary>Below this many judged windows a verdict is labelled weak.</summary>
+    public const int WeakBelowWindows = 6;
+
     /// <summary>Evaluates the counterfactual of one model recipe.</summary>
     /// <param name="rows">Development rows (not the hold-out), unique keys, labels 0 or 1, with the features the model needs.</param>
     /// <param name="model">The recipe: fits on train rows only.</param>
@@ -52,14 +55,14 @@ public static class CounterfactualEvaluator
         var windows = Windows(cut, last, options.RetrainMonths);
         if (windows.Count == 0)
         {
-            return Inconclusive(options, validation, last, null, 0, 0, [], string.Create(c, $"The history ({first:yyyy-MM-dd} to {last:yyyy-MM-dd}) is too short: {validation.MinTrainMonths} months of training must come first, and nothing is left to test after {earliest:yyyy-MM-dd}."));
+            return Inconclusive(options, validation, first, last, null, 0, 0, [], string.Create(c, $"The history ({first:yyyy-MM-dd} to {last:yyyy-MM-dd}) is too short: {validation.MinTrainMonths} months of training must come first, and nothing is left to test after {earliest:yyyy-MM-dd}."));
         }
 
         var periodEnd = windows[^1].End;
         var test = ordered.Where(r => r.TradeDate >= cut && r.TradeDate <= periodEnd).ToArray();
         if (test.Length == 0)
         {
-            return Inconclusive(options, validation, last, cut, 0, 0, [], "No trades fall in the period after the cut.");
+            return Inconclusive(options, validation, first, last, cut, 0, 0, [], "No trades fall in the period after the cut.");
         }
 
         var embargoFrom = cut.AddDays(-validation.EmbargoDays);
@@ -68,7 +71,12 @@ public static class CounterfactualEvaluator
         var ageMonths = MonthsBetween(cut, last);
         if (frozenTrain.Length < validation.MinTrainTrades)
         {
-            return Inconclusive(options, validation, last, cut, ageMonths, frozenTrain.Length, [], string.Create(c, $"Only {frozenTrain.Length} trades were known before the cut {cut:yyyy-MM-dd}, {validation.MinTrainTrades} needed to train the frozen model."));
+            return Inconclusive(options, validation, first, last, cut, ageMonths, frozenTrain.Length, [], string.Create(c, $"Only {frozenTrain.Length} trades were known before the cut {cut:yyyy-MM-dd}, {validation.MinTrainTrades} needed to train the frozen model."));
+        }
+
+        if (OneClass(frozenTrain))
+        {
+            return Inconclusive(options, validation, first, last, cut, ageMonths, frozenTrain.Length, [], "The trades known before the cut are all winners or all losers: a model cannot be fitted on one class.");
         }
 
         var frozen = new FittedSide(model.Fit(frozenTrain), Rate(frozenTrain));
@@ -90,6 +98,11 @@ public static class CounterfactualEvaluator
             var decision = rowsOfWindow.Min(r => r.DecisionEpochSeconds);
             var train = ordered.Where(r => r.TradeDate < from && r.ResolvedEpochSeconds + HoldOut.BarSeconds < decision).ToArray();
             var informative = train.Length > frozenTrain.Length;
+            if (informative && OneClass(train))
+            {
+                return Inconclusive(options, validation, first, last, cut, ageMonths, frozenTrain.Length, results, string.Create(c, $"The trades known before window {i + 1} are all winners or all losers: a model cannot be fitted on one class."));
+            }
+
             var retrained = informative ? new FittedSide(model.Fit(train), Rate(train)) : frozen;
             var window = new Accumulator();
             foreach (var row in rowsOfWindow)
@@ -137,32 +150,33 @@ public static class CounterfactualEvaluator
         var retrainWins = judged.Count(w => w.Pooled.MeanGain > margin);
         var frozenWins = judged.Count(w => w.Pooled.MeanGain < -margin);
         var significant = pooled.GainStandardError is { } se && Math.Abs(pooled.MeanGain) > o.SignificanceZ * factor * se;
+        var weak = judged.Count < WeakBelowWindows ? string.Create(c, $" Verdict: weak ({judged.Count} windows): the standard error is clustered by trade date and the bound is required, but few windows is thin evidence.") : string.Empty;
         var policyGap = pooled.Retrained.Policy.PolicyPerCandidate - pooled.Frozen.Policy.PolicyPerCandidate;
         if (retrainWins >= needed && pooled.MeanGain > margin && significant)
         {
-            if (policyGap < 0)
+            if (policyGap < -o.PolicyTolerance)
             {
                 reasons.Add(string.Create(c, $"Retraining scored better in {retrainWins} of {judged.Count} judged windows, but taking what the retrained model scores high earned {-policyGap:F3} R per candidate less than the frozen one: the two measures disagree."));
                 return (CounterfactualOutcome.Inconclusive, reasons);
             }
 
-            reasons.Add(string.Create(c, $"Retraining scored better in {retrainWins} of {judged.Count} judged windows and pooled: log loss gain {pooled.MeanGain:F4} per trade (above {margin:F4} and {o.SignificanceZ * factor:F2} standard errors, {o.Trials} trials); the realised R of its takes was {policyGap:F3} R per candidate higher."));
+            reasons.Add(string.Create(c, $"Retraining scored better in {retrainWins} of {judged.Count} judged windows and pooled: log loss gain {pooled.MeanGain:F4} per trade (above {margin:F4} and {o.SignificanceZ * factor:F2} standard errors on clustered days, {o.Trials} trials); the realised R of its takes was {policyGap:F3} R per candidate higher. The standard error bound is on days (trades clustered by trade date).{weak}"));
             return (CounterfactualOutcome.RetrainingHelps, reasons);
         }
 
         if (frozenWins >= needed && pooled.MeanGain < -margin && significant)
         {
-            if (policyGap > 0)
+            if (policyGap > o.PolicyTolerance)
             {
                 reasons.Add(string.Create(c, $"The frozen model scored better in {frozenWins} of {judged.Count} judged windows, but taking what the retrained model scores high earned {policyGap:F3} R per candidate more: the two measures disagree."));
                 return (CounterfactualOutcome.Inconclusive, reasons);
             }
 
-            reasons.Add(string.Create(c, $"The frozen model scored better in {frozenWins} of {judged.Count} judged windows and pooled: log loss gain of retraining {pooled.MeanGain:F4} per trade (below minus {margin:F4}, beyond {o.SignificanceZ * factor:F2} standard errors, {o.Trials} trials)."));
+            reasons.Add(string.Create(c, $"The frozen model scored better in {frozenWins} of {judged.Count} judged windows and pooled: log loss gain of retraining {pooled.MeanGain:F4} per trade (below minus {margin:F4}, beyond {o.SignificanceZ * factor:F2} standard errors on clustered days, {o.Trials} trials). The standard error bound is on days (trades clustered by trade date).{weak}"));
             return (CounterfactualOutcome.FrozenBetter, reasons);
         }
 
-        reasons.Add(string.Create(c, $"The two sides are not told apart: retraining was better in {retrainWins} and worse in {frozenWins} of {judged.Count} judged windows; pooled log loss gain {pooled.MeanGain:F4} per trade (standard error {(pooled.GainStandardError is { } e ? e.ToString("F4", c) : "n/a")}; {margin:F4} and {o.SignificanceZ * factor:F2} standard errors needed, {o.Trials} trials). Continued learning did not measurably help or hurt on this data."));
+        reasons.Add(string.Create(c, $"The two sides are not told apart: retraining was better in {retrainWins} and worse in {frozenWins} of {judged.Count} judged windows; pooled log loss gain {pooled.MeanGain:F4} per trade (standard error clustered by trade date {(pooled.GainStandardError is { } e ? e.ToString("F4", c) : "n/a")}; {margin:F4} and {o.SignificanceZ * factor:F2} standard errors needed, {o.Trials} trials). Continued learning did not measurably help or hurt on this data."));
         return (CounterfactualOutcome.NoDifference, reasons);
     }
 
@@ -173,7 +187,7 @@ public static class CounterfactualEvaluator
         while (start <= last)
         {
             var next = start.AddMonths(months);
-            if (next > last.AddDays(1) && last.AddDays(1) < start.AddMonths(1))
+            if (next > last.AddDays(1))
             {
                 break;
             }
@@ -193,12 +207,46 @@ public static class CounterfactualEvaluator
         return parts.Length > 1 ? parts[1] : key;
     }
 
+    private static bool OneClass(ValidationRow[] train) => train.Length == 0 || train.All(r => r.Label == train[0].Label);
+
+    /// <summary>The standard error of the mean of per-trade gains with the trades clustered by trade date (the ratio estimator over day sums, with a D/(D-1) correction); null with fewer than two days.</summary>
+    public static double? ClusteredStandardError(IEnumerable<(DateOnly Day, double Gain)> gains)
+    {
+        ArgumentNullException.ThrowIfNull(gains);
+        var days = new SortedDictionary<DateOnly, (double Sum, int Count)>();
+        foreach (var (day, gain) in gains)
+        {
+            days[day] = days.TryGetValue(day, out var d) ? (d.Sum + gain, d.Count + 1) : (gain, 1);
+        }
+
+        return ClusteredStandardError(days);
+    }
+
+    private static double? ClusteredStandardError(SortedDictionary<DateOnly, (double Sum, int Count)> days)
+    {
+        if (days.Count < 2)
+        {
+            return null;
+        }
+
+        var n = days.Values.Sum(d => d.Count);
+        var mean = days.Values.Sum(d => d.Sum) / n;
+        var ss = 0.0;
+        foreach (var (sum, count) in days.Values)
+        {
+            var e = sum - (mean * count);
+            ss += e * e;
+        }
+
+        return Math.Sqrt(days.Count / (days.Count - 1.0) * ss) / n;
+    }
+
     private static double Rate(ValidationRow[] train) => train.Length == 0 ? 0 : train.Count(r => r.Label == 1) / (double)train.Length;
 
     private static bool IsProbability(double p) => double.IsFinite(p) && p is >= 0 and <= 1;
 
-    private static Result<CounterfactualReport> Inconclusive(CounterfactualOptions options, ValidationOptions validation, DateOnly last, DateOnly? cut, int age, int trainRows, List<CounterfactualWindow> windows, string reason) =>
-        Result.Success(new CounterfactualReport(CounterfactualOutcome.Inconclusive, [reason], options, cut, last, age, trainRows, windows, null, null, Limits(options, validation, last, last, cut, age, windows, [], 0)));
+    private static Result<CounterfactualReport> Inconclusive(CounterfactualOptions options, ValidationOptions validation, DateOnly first, DateOnly last, DateOnly? cut, int age, int trainRows, List<CounterfactualWindow> windows, string reason) =>
+        Result.Success(new CounterfactualReport(CounterfactualOutcome.Inconclusive, [reason], options, cut, last, age, trainRows, windows, null, null, Limits(options, validation, first, last, cut, age, windows, [], 0)));
 
     private static List<string> Limits(CounterfactualOptions o, ValidationOptions v, DateOnly first, DateOnly last, DateOnly? cut, int age, List<CounterfactualWindow> windows, List<string> skipped, int unused)
     {
@@ -208,7 +256,7 @@ public static class CounterfactualEvaluator
             cut is { } at
                 ? string.Create(c, $"The period of stopped learning is {age} months ({at:yyyy-MM-dd} to {last:yyyy-MM-dd}), what this data allow (about two years in all, a hold-out and {v.MinTrainMonths} months of training first), and at most {o.FrozenMonths} were asked for. It says nothing about longer.")
                 : string.Create(c, $"No period of stopped learning could be made from {first:yyyy-MM-dd} to {last:yyyy-MM-dd}."),
-            string.Create(c, $"{windows.Count(w => w.Informative)} judged windows of {o.RetrainMonths} months; the first window has the same model on both sides and is not judged. Few windows, and trades within a window are correlated, so the standard error is optimistic."),
+            string.Create(c, $"{windows.Count(w => w.Informative)} judged windows of {o.RetrainMonths} months; the first window has the same model on both sides and is not judged. Few windows, and trades within a window are correlated, so the standard error is clustered by trade date; only windows of full length count."),
             "Both sides score exactly the same trades (same days, same instruments); the frozen side never sees a label resolved after the period's first decision; the retrained side sees only labels resolved before each window.",
             v.HoldOutStart is { } h ? string.Create(c, $"The hold-out from {h:yyyy-MM-dd} was not read.") : "No hold-out was reserved for this evaluation.",
             "Replayed history with modelled fills; the data have been seen before (ISS-19). Take-R takes a trade when the score is at or above the base rate of the side's own train set; that is not a tuned threshold.",
@@ -218,7 +266,7 @@ public static class CounterfactualEvaluator
         limits.AddRange(skipped);
         if (unused > 0)
         {
-            limits.Add(string.Create(c, $"{unused} trades after the last full window were not used by either side."));
+            limits.Add(string.Create(c, $"{unused} trades after the last window were not used by either side."));
         }
 
         return limits;
@@ -234,7 +282,7 @@ public static class CounterfactualEvaluator
         private MetaPolicyTotals _frozenPolicy = MetaPolicyTotals.Empty;
         private MetaPolicyTotals _retrainedPolicy = MetaPolicyTotals.Empty;
         private double _gainSum;
-        private double _gainSq;
+        private readonly SortedDictionary<DateOnly, (double Sum, int Count)> _days = [];
 
         public int Rows => _labels.Count;
 
@@ -247,7 +295,7 @@ public static class CounterfactualEvaluator
             _retrainedPolicy = _retrainedPolicy.Plus(MetaPolicyTotals.One(retrainedScore >= retrainedRate, row.R));
             var gain = Loss(frozenScore, row.Label) - Loss(retrainedScore, row.Label);
             _gainSum += gain;
-            _gainSq += gain * gain;
+            _days[row.TradeDate] = _days.TryGetValue(row.TradeDate, out var d) ? (d.Sum + gain, d.Count + 1) : (gain, 1);
         }
 
         public void Merge(Accumulator other)
@@ -258,25 +306,21 @@ public static class CounterfactualEvaluator
             _frozenPolicy = _frozenPolicy.Plus(other._frozenPolicy);
             _retrainedPolicy = _retrainedPolicy.Plus(other._retrainedPolicy);
             _gainSum += other._gainSum;
-            _gainSq += other._gainSq;
+            foreach (var (day, (sum, count)) in other._days)
+            {
+                _days[day] = _days.TryGetValue(day, out var d) ? (d.Sum + sum, d.Count + count) : (sum, count);
+            }
         }
 
         public CounterfactualPooled Pool(int bins)
         {
             var n = _labels.Count;
-            double? se = null;
-            if (n >= 2)
-            {
-                var variance = Math.Max(0, (_gainSq - (_gainSum * _gainSum / n)) / (n - 1));
-                se = Math.Sqrt(variance / n);
-            }
-
             return new CounterfactualPooled(
                 n,
                 new CounterfactualSide(MetricsCalculator.Compute(_frozenScores, _labels, bins), _frozenPolicy),
                 new CounterfactualSide(MetricsCalculator.Compute(_retrainedScores, _labels, bins), _retrainedPolicy),
                 n == 0 ? 0 : _gainSum / n,
-                se);
+                ClusteredStandardError(_days));
         }
 
         private static double Loss(double score, int label)

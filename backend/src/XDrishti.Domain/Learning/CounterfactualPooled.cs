@@ -5,5 +5,5 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Frozen">The frozen side.</param>
 /// <param name="Retrained">The retrained side.</param>
 /// <param name="MeanGain">Mean paired log loss gain.</param>
-/// <param name="GainStandardError">Standard error of the mean gain (sample variance); null with fewer than two rows.</param>
+/// <param name="GainStandardError">Standard error of the mean gain with the rows clustered by trade date (trades of one day share the market, so they are not independent); null with fewer than two days.</param>
 public sealed record CounterfactualPooled(int Rows, CounterfactualSide Frozen, CounterfactualSide Retrained, double MeanGain, double? GainStandardError);

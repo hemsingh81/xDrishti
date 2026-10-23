@@ -7,6 +7,7 @@ namespace XDrishti.Domain.Learning;
 /// <param name="MinJudgedWindows">Fewer judged windows than this give inconclusive. Judged windows are those in which the retrained model has seen labels the frozen one has not, so the first window never counts.</param>
 /// <param name="MinGainLogLoss">The log loss gain of retraining (frozen minus retrained, per row) must exceed this, in the windows and pooled (times the multiple-testing factor); the same in the other direction for "frozen is better".</param>
 /// <param name="SignificanceZ">The pooled paired gain must exceed this many standard errors (times the multiple-testing factor).</param>
+/// <param name="PolicyTolerance">A realised-R gap (per candidate) smaller than this against the log loss verdict is negligible and does not cap the outcome.</param>
 /// <param name="Trials">How many settings have been looked at; the margins widen with <c>MultipleTesting.Factor</c>.</param>
 public sealed record CounterfactualOptions(
     int FrozenMonths = 12,
@@ -15,7 +16,8 @@ public sealed record CounterfactualOptions(
     int MinJudgedWindows = 3,
     double MinGainLogLoss = 0.005,
     double SignificanceZ = 1.645,
-    int Trials = 1)
+    int Trials = 1,
+    double PolicyTolerance = 0.01)
 {
     /// <summary>The problems of the values, empty when they are usable.</summary>
     public IReadOnlyList<string> Problems()
@@ -49,6 +51,11 @@ public sealed record CounterfactualOptions(
         if (!double.IsFinite(SignificanceZ) || SignificanceZ is < 0 or > 10)
         {
             problems.Add("significance_z must be 0 to 10");
+        }
+
+        if (!double.IsFinite(PolicyTolerance) || PolicyTolerance is < 0 or > 10)
+        {
+            problems.Add("policy_tolerance must be 0 to 10");
         }
 
         if (Trials < 1)

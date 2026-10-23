@@ -10,18 +10,19 @@ internal sealed record LearnCounterfactualOptions(IReadOnlyList<CellSource> Sour
 {
     public const string Usage = """
         usage:
-          xd learn counterfactual --run RUNKEY:STYLE:EXIT [--run ...] [--frozen-months N] [--retrain-months N] [--min-gain X] [--trials N] [--hold-out-months N]
+          xd learn counterfactual --run RUNKEY:STYLE:EXIT [--run ...] [--frozen-months N] [--retrain-months N] [--min-gain X] [--min-judged-windows N] [--min-window-rows N] [--significance-z X] [--trials N] [--hold-out-months N]
             does continued learning help? a model frozen at a cut date (never refitted) against the same recipe refitted every --retrain-months, scoring the same later trades, out of sample
             --frozen-months is the stopped-learning age asked for, 1 to 12 (default 12; shortened to what the history allows, and printed)
             --min-gain is the log loss gain per trade retraining must show (default 0.005)
-            --trials is a floor on the settings looked at, which widen the margins (default 1; another period or schedule is another trial)
+            --min-judged-windows (default 3, never below 3), --min-window-rows (default 10, never below 10) and --significance-z (default 1.645, never below 1.645) can only be made stricter
+            --trials is a floor on the settings looked at, which widen the margins (default 1). EVERY re-run with a different --retrain-months or --frozen-months is another trial: count it, and raise --trials by one each time, or the verdict is flattered
             --hold-out-months keeps the last N months out (default 6; 0 keeps none)
             prints the evidence; nothing is stored or applied
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
 
-    private static readonly string[] Known = ["--run", "--frozen-months", "--retrain-months", "--min-gain", "--trials", "--hold-out-months"];
+    private static readonly string[] Known = ["--run", "--frozen-months", "--retrain-months", "--min-gain", "--min-judged-windows", "--min-window-rows", "--significance-z", "--trials", "--hold-out-months"];
 
     /// <summary>Parses the arguments after <c>learn counterfactual</c>; the errors are listed when the options are null.</summary>
     public static (LearnCounterfactualOptions? Options, IReadOnlyList<string> Errors) Parse(IReadOnlyList<string> args)
@@ -70,6 +71,9 @@ internal sealed record LearnCounterfactualOptions(IReadOnlyList<CellSource> Sour
             FrozenMonths = Whole(values, "--frozen-months", d.FrozenMonths, errors),
             RetrainMonths = Whole(values, "--retrain-months", d.RetrainMonths, errors),
             MinGainLogLoss = Number(values, "--min-gain", d.MinGainLogLoss, errors),
+            MinJudgedWindows = Math.Max(d.MinJudgedWindows, Whole(values, "--min-judged-windows", d.MinJudgedWindows, errors)),
+            MinWindowRows = Math.Max(d.MinWindowRows, Whole(values, "--min-window-rows", d.MinWindowRows, errors)),
+            SignificanceZ = Math.Max(d.SignificanceZ, Number(values, "--significance-z", d.SignificanceZ, errors)),
             Trials = Whole(values, "--trials", d.Trials, errors),
         };
         var hold = Whole(values, "--hold-out-months", 6, errors);

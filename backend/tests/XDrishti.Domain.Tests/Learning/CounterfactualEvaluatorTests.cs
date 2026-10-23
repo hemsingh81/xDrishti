@@ -306,6 +306,103 @@ public sealed class CounterfactualEvaluatorTests
         new CounterfactualOptions(FrozenMonths: months).Problems().ShouldNotBeEmpty();
     }
 
+    /// <summary>Retraining predicts the labels well (better log loss) while the frozen side is a constant that takes nothing; the realised R of the labelled winners is set by the caller.</summary>
+    private sealed class Oracle : IScorerFactory
+    {
+        private int? _first;
+
+        public string Name => "oracle";
+
+        public IRowScorer Fit(IReadOnlyList<ValidationRow> train)
+        {
+            _first ??= train.Count;
+            return train.Count <= _first ? new Scorer(false) : new Scorer(true);
+        }
+
+        private sealed class Scorer(bool good) : IRowScorer
+        {
+            public double Score(ValidationRow row) => good ? (row.Features[0] > 0.5 ? 0.9 : 0.1) : 0.3;
+        }
+    }
+
+    private static List<ValidationRow> WinnersPay(double r) =>
+        Regime(340, flip: new DateOnly(2100, 1, 1)).Select(x => x with { R = x.Label == 1 ? r : -r }).ToList();
+
+    [Fact]
+    public void A_better_log_loss_with_a_worse_realised_r_is_capped_at_inconclusive()
+    {
+        var report = Run(WinnersPay(-1), new Oracle());
+
+        report.Judged!.MeanGain.ShouldBeGreaterThan(0.1);
+        report.Judged.Retrained.Policy.PolicyPerCandidate.ShouldBeLessThan(report.Judged.Frozen.Policy.PolicyPerCandidate);
+        report.Outcome.ShouldBe(CounterfactualOutcome.Inconclusive);
+        report.Reasons.Single().ShouldContain("disagree");
+    }
+
+    [Fact]
+    public void A_negligible_realised_r_gap_does_not_cap_the_outcome()
+    {
+        var report = Run(WinnersPay(-0.001), new Oracle());
+
+        report.Outcome.ShouldBe(CounterfactualOutcome.RetrainingHelps);
+    }
+
+    [Fact]
+    public void A_verdict_on_fewer_than_six_judged_windows_is_labelled_weak()
+    {
+        var report = Run(Regime(340));
+
+        report.Outcome.ShouldBe(CounterfactualOutcome.RetrainingHelps);
+        report.Reasons.Single().ShouldContain("weak (3 windows)");
+        report.Reasons.Single().ShouldContain("clustered");
+    }
+
+    [Fact]
+    public void Trades_of_the_same_day_move_together_so_the_clustered_error_exceeds_the_independent_one()
+    {
+        var start = new DateOnly(2025, 1, 1);
+        var gains = Enumerable.Range(0, 20).SelectMany(d => Enumerable.Repeat((start.AddDays(d), d % 2 == 0 ? 0.3 : -0.1), 10)).ToList();
+        var mean = gains.Average(g => g.Item2);
+        var independent = Math.Sqrt(gains.Sum(g => (g.Item2 - mean) * (g.Item2 - mean)) / (gains.Count - 1) / gains.Count);
+
+        var clustered = CounterfactualEvaluator.ClusteredStandardError(gains).ShouldNotBeNull();
+
+        clustered.ShouldBeGreaterThan(independent * 2.5);
+        CounterfactualEvaluator.ClusteredStandardError(gains.Take(10)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Only_a_window_of_full_length_counts()
+    {
+        var report = Run(Regime(340));
+
+        report.Windows.ShouldAllBe(w => w.End == w.Start.AddMonths(3).AddDays(-1));
+        report.Limits.ShouldContain(l => l.Contains("after the last window", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_limits_of_a_short_history_say_from_the_first_to_the_last_day()
+    {
+        var rows = Regime(60);
+
+        var report = Run(rows);
+
+        report.Limits.ShouldContain(l => l.Contains($"from {rows.Min(r => r.TradeDate):yyyy-MM-dd} to {rows.Max(r => r.TradeDate):yyyy-MM-dd}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_train_set_of_one_class_is_inconclusive_without_fitting()
+    {
+        var log = new List<Fit>();
+        var rows = Enumerable.Range(0, 340).Select(i => Make(i, true, Feature(i))).ToList();
+
+        var report = Run(rows, new Recent(log));
+
+        report.Outcome.ShouldBe(CounterfactualOutcome.Inconclusive);
+        report.Reasons.Single().ShouldContain("one class");
+        log.ShouldBeEmpty();
+    }
+
     [Fact]
     public void The_text_prints_the_period_the_windows_and_the_trials()
     {
