@@ -26,7 +26,7 @@ public sealed class DriftDetectorsTests
 
         band.Mean.ShouldBe(0.3, 1e-9);
         band.Sd.ShouldBe(1.0127, 1e-3);
-        band.Lower.ShouldBe(0.3 - (1.645 * band.Sd / Math.Sqrt(20)), 1e-9);
+        band.Lower.ShouldBe(0.3 - (1.645 * band.Sd * Math.Sqrt((1.0 / 20) + (1.0 / 40))), 1e-9);
         band.ClearLevel.ShouldBe((band.Mean + band.Lower) / 2, 1e-9);
     }
 
@@ -82,7 +82,7 @@ public sealed class DriftDetectorsTests
 
         events.Count.ShouldBe(2);
         events[0].Fired.ShouldBeTrue();
-        events[0].Check.ShouldBeInRange(25, 32);
+        events[0].Check.ShouldBeInRange(31, 38);
         events[0].AtEpochSeconds.ShouldBeLessThan(Cut(80));
         events[1].Fired.ShouldBeFalse();
         events[1].AtEpochSeconds.ShouldBeGreaterThan(Cut(80));
@@ -165,33 +165,39 @@ public sealed class DriftDetectorsTests
         Replay(shuffled).ShouldBe(Replay(all));
     }
 
-    [Fact]
-    public void Stationary_series_rarely_alarm_with_the_default_settings()
+    [Theory]
+    [InlineData(false, 30, 120, 0.05, 0.07)]
+    [InlineData(false, 60, 120, 0.05, 0.07)]
+    [InlineData(true, 30, 120, 0.05, 0.07)]
+    [InlineData(true, 60, 120, 0.05, 0.07)]
+    [InlineData(false, 30, 500, 0.07, 0.14)]
+    [InlineData(true, 30, 500, 0.07, 0.14)]
+    [InlineData(false, 60, 500, 0.07, 0.14)]
+    [InlineData(true, 60, 500, 0.07, 0.14)]
+    public void Stationary_series_rarely_alarm_with_the_default_settings(bool skewed, int referenceTrades, int monitoredTrades, double maxBandRate, double maxCusumRate)
     {
-        // 300 seeded series: 60 reference trades and 120 monitored, all from one distribution (mean 0.2 R, sd 1.2 R, a little skewed by a heavy loss).
-        var rare = 0;
-        var cusum = 0;
+        // Seeded stationary series, Gaussian (mean 0.2 R, sd 1.2 R) or skewed (42 % win +1.5 R, 56 % loss -1 R, 2 % gap loss -2 R). The measured rates are in ADR 0074; the limits here leave room for the seed noise of 400 series.
+        const int Runs = 400;
         var bandAlarms = 0;
-        for (var seed = 1; seed <= 300; seed++)
+        var cusumAlarms = 0;
+        for (var seed = 1; seed <= Runs; seed++)
         {
             var rng = new Random(seed);
-            var all = Series(180, _ => Draw(rng));
-            var band = RollingBandDetector.MakeBand(all.Take(60).ToList(), Options).Value;
-            if (RollingBandDetector.Run("c", all, Cut(60), band, Options).Any(e => e.Fired))
+            var all = Series(referenceTrades + monitoredTrades, _ => skewed ? DrawSkewed(rng) : DrawGaussian(rng));
+            var band = RollingBandDetector.MakeBand(all.Take(referenceTrades).ToList(), Options).Value;
+            if (RollingBandDetector.Run("c", all, Cut(referenceTrades), band, Options).Any(e => e.Fired))
             {
                 bandAlarms++;
             }
 
-            if (CusumDetector.Run("c", all, Cut(60), band, Options).Any(e => e.Fired))
+            if (CusumDetector.Run("c", all, Cut(referenceTrades), band, Options).Any(e => e.Fired))
             {
-                cusum++;
+                cusumAlarms++;
             }
-
-            rare++;
         }
 
-        (bandAlarms / (double)rare).ShouldBeLessThan(0.03);
-        (cusum / (double)rare).ShouldBeLessThan(0.08);
+        (bandAlarms / (double)Runs).ShouldBeLessThan(maxBandRate);
+        (cusumAlarms / (double)Runs).ShouldBeLessThan(maxCusumRate);
     }
 
     [Fact]
@@ -217,7 +223,13 @@ public sealed class DriftDetectorsTests
         (alarms / 200.0).ShouldBeLessThan(0.03);
     }
 
-    private static double Draw(Random rng)
+    private static double DrawSkewed(Random rng)
+    {
+        var u = rng.NextDouble();
+        return u < 0.42 ? 1.5 : u < 0.98 ? -1 : -2;
+    }
+
+    private static double DrawGaussian(Random rng)
     {
         var u1 = 1 - rng.NextDouble();
         var z = Math.Sqrt(-2 * Math.Log(u1)) * Math.Cos(2 * Math.PI * rng.NextDouble());

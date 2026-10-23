@@ -102,6 +102,7 @@ internal sealed class ReplayDriftHandler(
             return Result.Failure<(string, IReadOnlyList<CalibrationObservation>, string)>(scorer.Error);
         }
 
+        // The runs are read a second time here (the cells above read them for the cell monitors); simple over fast, as the verb is occasional.
         var loaded = await TrainingDataLoader.LoadAsync(runs, features, query.Sources, query.CellOptions, query.Required, cancellationToken);
         if (loaded.IsFailure)
         {
@@ -124,7 +125,7 @@ internal sealed class ReplayDriftHandler(
             .ToList();
         var note = string.Create(
             CultureInfo.InvariantCulture,
-            $"Only trades dated after {m.ToDate:yyyy-MM-dd}, the last day the model trained on, are read ({unseen.Count} of {data.Rows.Count}); older trades would be scored in-sample and hide drift.{(m.HoldOutStart is null ? " The model kept no hold-out." : string.Empty)}");
+            $"Only trades dated after {m.ToDate:yyyy-MM-dd}, the last day the model trained on, are read ({unseen.Count} of {data.Rows.Count}); older trades would be scored in-sample and hide drift. This ignores --monitor-months: the unseen outcomes can reach back before the monitored period and include the model's hold-out rows.{(m.HoldOutStart is null ? " The model kept no hold-out." : string.Empty)}");
         return Result.Success<(string, IReadOnlyList<CalibrationObservation>, string)>(("model:" + id.ToString(CultureInfo.InvariantCulture), outcomes, note));
     }
 

@@ -38,7 +38,8 @@ public static class RollingBandDetector
             return Result.Failure<ExpectancyBand>(Error.Validation(NoBandCode, "the reference trades all have the same R, so there is no spread to measure a band by"));
         }
 
-        var lower = mean - (options.BandZ * sd / Math.Sqrt(options.WindowTrades));
+        // The window mean differs from the reference mean by the window's own error and by the error of the estimated reference mean.
+        var lower = mean - (options.BandZ * sd * Math.Sqrt((1.0 / options.WindowTrades) + (1.0 / n)));
         return Result.Success(new ExpectancyBand(n, mean, sd, lower, (mean + lower) / 2));
     }
 

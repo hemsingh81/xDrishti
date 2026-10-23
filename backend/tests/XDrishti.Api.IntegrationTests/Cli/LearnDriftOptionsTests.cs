@@ -22,20 +22,21 @@ public sealed class LearnDriftOptionsTests
     [Fact]
     public void The_knobs_and_a_model_can_be_set()
     {
-        var (options, _) = LearnDriftOptions.Parse(["--run", $"{Key}:swing:X", "--monitor-months", "3", "--model", "7", "--require", "a,b", "--window-trades", "30", "--below-band-checks", "2", "--clear-checks", "4", "--check-every", "10", "--band-z", "2", "--cusum-allowance", "0.4", "--cusum-threshold", "9", "--calibration-window", "80", "--max-calibration-gap-pp", "6"]);
+        var (options, _) = LearnDriftOptions.Parse(["--run", $"{Key}:swing:X", "--monitor-months", "3", "--model", "7", "--require", "a,b", "--window-trades", "30", "--below-band-checks", "2", "--max-calibration-gap-pp", "6"]);
 
         options!.MonitorMonths.ShouldBe(3);
         options.ModelId.ShouldBe(7);
         options.Required.ShouldBe(["a", "b"]);
         options.Options.WindowTrades.ShouldBe(30);
-        options.Options.CusumThreshold.ShouldBe(9);
+        options.Options.BelowBandChecks.ShouldBe(2);
         options.Options.MaxCalibrationGapPp.ShouldBe(6);
     }
 
     [Theory]
     [InlineData("--run", "k:swing")]
     [InlineData("--window-trades", "x")]
-    [InlineData("--band-z", "NaN")]
+    [InlineData("--max-calibration-gap-pp", "NaN")]
+    [InlineData("--cusum-threshold", "9")]
     [InlineData("--model", "1.5")]
     [InlineData("--require", "a")]
     [InlineData("--nope", "1")]
@@ -56,6 +57,6 @@ public sealed class LearnDriftOptionsTests
     public void A_run_is_required_and_a_flag_twice_is_refused()
     {
         LearnDriftOptions.Parse([]).Options.ShouldBeNull();
-        LearnDriftOptions.Parse(["--run", $"{Key}:swing:X", "--band-z", "1", "--band-z", "2"]).Options.ShouldBeNull();
+        LearnDriftOptions.Parse(["--run", $"{Key}:swing:X", "--window-trades", "1", "--window-trades", "2"]).Options.ShouldBeNull();
     }
 }

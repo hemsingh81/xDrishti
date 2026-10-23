@@ -53,7 +53,7 @@ public static class DriftReplay
 
             var events = RollingBandDetector.Run(cell.CellKey, cell.Trades, monitorFromEpochSeconds, band.Value, options)
                 .Concat(CusumDetector.Run(cell.CellKey, cell.Trades, monitorFromEpochSeconds, band.Value, options))
-                .OrderBy(e => e.AtEpochSeconds).ThenBy(e => e.Detector)
+                .OrderBy(e => e.AtEpochSeconds).ThenByDescending(e => e.Fired).ThenBy(e => e.Detector)
                 .ToList();
             results.Add(new CellDrift(cell.CellKey, reference.Count, monitored, band.Value, null, events));
             var active = 0;
@@ -70,6 +70,9 @@ public static class DriftReplay
                 }
             }
         }
+
+        // Fires are read before clears at one instant, so a hand-over between monitors is not a recovery followed by a pause.
+        proposals = [.. proposals.OrderBy(p => p.AtEpochSeconds).ThenBy(p => p.CellKey, StringComparer.Ordinal)];
 
         CalibrationDrift? calibration = null;
         if (outcomes is not null)
@@ -90,7 +93,8 @@ public static class DriftReplay
         {
             "Replayed history: the monitored period is the held-back tail of stored runs with modelled fills, not live trading (live data starts at P10).",
             string.Create(c, $"The band comes from the trades known before the monitored period and does not move; a cell with fewer than {options.MinReferenceTrades} of them is not monitored ({results.Count - monitoredCells} of {results.Count} were not)."),
-            "The band treats the mean of a window as normal with the reference spread; R is skewed and fat-tailed, so the false-alarm rate is only approximately the stated level.",
+            "The band treats the mean of a window as normal with the reference spread; R is skewed and fat-tailed, so the false-alarm rate is only approximately the stated level (measured rates are in ADR 0074).",
+            "A cell chosen because its backtest looked good tends to do worse afterwards (regression to the mean), and the three consecutive checks share the one error of the reference mean: a band alarm on such a cell can be the backtest being lucky, not the edge decaying.",
             "Several cells and three monitors are watched at once, so some alarms are chance; an alarm is a reason to look, and a proposal is a line in this report: nothing is recorded in the changelog and the cell's state is not read.",
             "Calibration alarms have no cell transition: the fix for a model that drifted is to recalibrate or retrain, which is a decision (P6-10).",
         };

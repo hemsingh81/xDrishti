@@ -10,8 +10,7 @@ internal sealed record LearnDriftOptions(IReadOnlyList<CellSource> Sources, Drif
 {
     public const string Usage = """
         usage:
-          xd learn drift --run RUNKEY:STYLE:EXIT [--run ...] [--monitor-months N] [--model ID [--require NAME,NAME,...]] [--window-trades N] [--below-band-checks N] [--clear-checks N] [--check-every N]
-                         [--band-z X] [--cusum-allowance X] [--cusum-threshold X] [--calibration-window N] [--max-calibration-gap-pp X]
+          xd learn drift --run RUNKEY:STYLE:EXIT [--run ...] [--monitor-months N] [--model ID [--require NAME,NAME,...]] [--window-trades N] [--below-band-checks N] [--max-calibration-gap-pp X]
             RUNKEY is the 64-hex key of a stored run, STYLE is intraday or swing, EXIT labels the exit policy the run used (no '|')
             replays the last N months (default 6) of the stored runs as the monitored period against the band of the earlier trades: rolling expectancy, CUSUM and, with --model, the calibration of a registered model
             (--model also needs the runs to have features, xd learn features); prints the alarms and the transitions they would suggest; nothing is recorded and no cell changes state
@@ -21,7 +20,7 @@ internal sealed record LearnDriftOptions(IReadOnlyList<CellSource> Sources, Drif
 
     private static readonly string[] Known =
     [
-        "--run", "--monitor-months", "--model", "--require", "--window-trades", "--below-band-checks", "--clear-checks", "--check-every", "--band-z", "--cusum-allowance", "--cusum-threshold", "--calibration-window", "--max-calibration-gap-pp",
+        "--run", "--monitor-months", "--model", "--require", "--window-trades", "--below-band-checks", "--max-calibration-gap-pp",
     ];
 
     /// <summary>Parses the arguments after <c>learn drift</c>; the errors are listed when the options are null.</summary>
@@ -75,12 +74,6 @@ internal sealed record LearnDriftOptions(IReadOnlyList<CellSource> Sources, Drif
         {
             WindowTrades = Whole(values, "--window-trades", d.WindowTrades, errors),
             BelowBandChecks = Whole(values, "--below-band-checks", d.BelowBandChecks, errors),
-            ClearChecks = Whole(values, "--clear-checks", d.ClearChecks, errors),
-            CheckEveryTrades = Whole(values, "--check-every", d.CheckEveryTrades, errors),
-            BandZ = Number(values, "--band-z", d.BandZ, errors),
-            CusumAllowance = Number(values, "--cusum-allowance", d.CusumAllowance, errors),
-            CusumThreshold = Number(values, "--cusum-threshold", d.CusumThreshold, errors),
-            CalibrationWindow = Whole(values, "--calibration-window", d.CalibrationWindow, errors),
             MaxCalibrationGapPp = Number(values, "--max-calibration-gap-pp", d.MaxCalibrationGapPp, errors),
         };
         var months = Whole(values, "--monitor-months", 6, errors);

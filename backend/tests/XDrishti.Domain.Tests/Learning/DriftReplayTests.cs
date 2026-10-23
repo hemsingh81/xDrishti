@@ -74,4 +74,16 @@ public sealed class DriftReplayTests
         report.Calibration!.Outcomes.ShouldBe(120);
         report.ToText().ShouldContain("model:7: 120 outcomes read. only unseen trades");
     }
+
+    [Fact]
+    public void Proposals_are_ordered_by_time_then_cell()
+    {
+        var late = new DriftCellInput("a|15m|BUY|intraday|X|*", Series(300, i => i < 100 ? Alternating(i) : i < 160 ? -1.0 : Alternating(i)));
+        var early = new DriftCellInput("b|15m|BUY|intraday|X|*", Series(300, i => i < 40 ? Alternating(i) : i < 100 ? -1.0 : Alternating(i)));
+
+        var report = DriftReplay.Run([late, early], 40 * Day, new DriftOptions()).Value;
+
+        report.Proposals.Select(p => p.AtEpochSeconds).ShouldBe(report.Proposals.Select(p => p.AtEpochSeconds).Order());
+        report.Proposals[0].CellKey.ShouldStartWith("b");
+    }
 }
