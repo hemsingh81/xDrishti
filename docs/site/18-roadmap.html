@@ -741,11 +741,11 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P6-16</td>
-<td><strong>Lessons</strong> (monitors that can run on replayed history; execution gap and decision drag wait for P10/P11).</td>
+<td><strong>Lessons, built 2026-10-23 (<a href="../adr/0078-lessons-a-finding-a-linked-fix-and-a-result-read-from-the-stored-experiment.html">ADR 0078</a>)</strong>: a lesson opened once per replayed monitor finding (growing loss tag, band, CUSUM, calibration), a pure state table (open, linked, closed, dismissed; owner moves), linked to a hypothesis or experiment, closed with the before and after read from the stored experiment (&quot;no measurable change&quot; is legitimate), nothing applied, insert-only <code>research.lessons</code>, <code>xd learn lesson</code>, <code>GET /api/lessons</code>. Execution gap, decision drag, data quality, drawdown beyond band and tail losses not built.</td>
 <td>P6</td>
 <td>3 d</td>
-<td>Draft (plan)</td>
-<td><a href="../specs/P6-00-learning-engine-and-ml-plan.html">plan</a></td>
+<td>Done (check on the report)</td>
+<td><a href="../specs/P6-16-lessons.html">spec</a></td>
 <td>Open, link, close with before/after</td>
 </tr>
 <tr>
@@ -1096,7 +1096,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 07:07</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 07:34</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

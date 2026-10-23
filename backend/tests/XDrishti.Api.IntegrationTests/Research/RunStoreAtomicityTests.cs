@@ -82,7 +82,7 @@ public sealed class RunStoreAtomicityTests(ApiFactory factory)
     {
         var run = StoredRunFixtures.Run(to: RunStoreRoundTripTests.NextTo());
         await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_atomic_missing_probe", Ct);
-        await StoreKit.ExecuteAsync(scratch.ConnectionString, "DROP TABLE research.hypotheses; DROP TABLE research.experiments; DROP TABLE research.exit_selection_folds; DROP TABLE research.exit_selections; DROP TABLE research.sim_comparisons; DROP TABLE research.sim_trade_leg_charges; DROP TABLE research.sim_trade_legs; DROP TABLE research.sim_trades; DROP TABLE research.sim_runs", Ct);
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, "DROP TABLE research.lessons; DROP TABLE research.hypotheses; DROP TABLE research.experiments; DROP TABLE research.exit_selection_folds; DROP TABLE research.exit_selections; DROP TABLE research.sim_comparisons; DROP TABLE research.sim_trade_leg_charges; DROP TABLE research.sim_trade_legs; DROP TABLE research.sim_trades; DROP TABLE research.sim_runs", Ct);
 
         var failed = await StoreKit.WithStoreAsync(scratch.Host.Services, s => s.StoreAsync(StoreKit.ToStore(run), Ct).AsTask());
 
@@ -109,7 +109,7 @@ public sealed class RunStoreAtomicityTests(ApiFactory factory)
 
         (await Handle(run, record)).IsSuccess.ShouldBeTrue();
         (await Handle(run, new RunRecordText(record.Json, record.RecordSha256, new string('9', 64)))).Error.Code.ShouldBe("store.run_conflict");
-        await StoreKit.ExecuteAsync(scratch.ConnectionString, "DROP TABLE research.hypotheses; DROP TABLE research.experiments; DROP TABLE research.exit_selection_folds; DROP TABLE research.exit_selections; DROP TABLE research.sim_comparisons; DROP TABLE research.sim_trade_leg_charges; DROP TABLE research.sim_trade_legs; DROP TABLE research.sim_trades; DROP TABLE research.sim_runs", Ct);
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, "DROP TABLE research.lessons; DROP TABLE research.hypotheses; DROP TABLE research.experiments; DROP TABLE research.exit_selection_folds; DROP TABLE research.exit_selections; DROP TABLE research.sim_comparisons; DROP TABLE research.sim_trade_leg_charges; DROP TABLE research.sim_trade_legs; DROP TABLE research.sim_trades; DROP TABLE research.sim_runs", Ct);
         (await Handle(other, StoreKit.Record(other))).Error.Code.ShouldBe("store.write_failed");
 
         var lines = factory.Logs.All.Where(l => l.Contains(run.RunKey[..12], StringComparison.Ordinal) || l.Contains(other.RunKey[..12], StringComparison.Ordinal)).ToList();

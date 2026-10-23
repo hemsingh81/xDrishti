@@ -3668,6 +3668,122 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.LessonRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<double?>("AfterMeanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("after_mean_r");
+
+                    b.Property<double?>("AfterTotalR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("after_total_r");
+
+                    b.Property<double?>("BeforeMeanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("before_mean_r");
+
+                    b.Property<double?>("BeforeTotalR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("before_total_r");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("EvidenceKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("evidence_key");
+
+                    b.Property<long?>("ExperimentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("experiment_id");
+
+                    b.Property<string>("ExperimentOutcome")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("experiment_outcome");
+
+                    b.Property<string>("FromState")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("from_state");
+
+                    b.Property<long?>("HypothesisRef")
+                        .HasColumnType("bigint")
+                        .HasColumnName("hypothesis_ref");
+
+                    b.Property<long?>("LessonId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lesson_id");
+
+                    b.Property<string>("MonitorKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("monitor_kind");
+
+                    b.Property<string>("Problem")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("problem");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("result");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("subject");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lessons");
+
+                    b.HasIndex("LessonId", "Id")
+                        .HasDatabaseName("ix_lessons_lesson_id_id");
+
+                    b.ToTable("lessons", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_lessons_links", "(state <> 'open' OR (hypothesis_ref IS NULL AND experiment_id IS NULL)) AND (state <> 'linked' OR (hypothesis_ref IS NOT NULL) <> (experiment_id IS NOT NULL)) AND (state <> 'closed' OR experiment_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_lessons_result", "(state = 'closed') = (result IS NOT NULL) AND (result IS NULL OR result IN ('improved', 'no_measurable_change')) AND (state = 'closed' OR (experiment_outcome IS NULL AND before_total_r IS NULL AND after_total_r IS NULL AND before_mean_r IS NULL AND after_mean_r IS NULL))");
+
+                            t.HasCheckConstraint("ck_lessons_shape", "monitor_kind IN ('growing_tag', 'rolling_band', 'cusum', 'calibration')");
+
+                            t.HasCheckConstraint("ck_lessons_state", "state IN ('open', 'linked', 'closed', 'dismissed') AND (from_state IS NULL OR from_state IN ('open', 'linked', 'closed', 'dismissed')) AND (state = 'open') = (from_state IS NULL) AND (state = 'open') = (lesson_id IS NULL) AND state IS DISTINCT FROM from_state");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -6301,6 +6417,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RevertsId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_learning_changelog_learning_changelog_reverts_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.LessonRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Learning.LessonRecord", null)
+                        .WithMany()
+                        .HasForeignKey("LessonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_lessons_lessons_lesson_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.ModelDesignationRecord", b =>

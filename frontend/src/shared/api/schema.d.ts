@@ -2673,6 +2673,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/lessons': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The lessons (a problem a replayed monitor found, the fix linked and the stored result), newest first, each in its current state (open, linked, closed, dismissed); optional state filter, limit 1 to 200 (default 50). Empty before the first. 422 learning.invalid */
+    get: operations['ListLessons'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/lessons/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One lesson with its history, the states it may move to and the before and after numbers of its closing. Linking or closing applies nothing. 404 lessons.not_found */
+    get: operations['GetLesson'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6070,6 +6104,97 @@ export interface components {
       from: string;
       /** Format: date */
       to: string;
+    };
+    /** @description One row of a lesson's history. */
+    LessonStepView: {
+      /**
+       * Format: int64
+       * @description The log row id.
+       */
+      rowId: number;
+      /** @description The state after the row. */
+      state: string;
+      /** @description Why. */
+      reason: string;
+      /** @description Who. */
+      actor: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      at: string;
+    };
+    /** @description A lesson as the API shows it (P6-16, ADR 0078): the newest row of its log, with the legal next states and, for one lesson, its history. */
+    LessonView: {
+      /**
+       * Format: int64
+       * @description The lesson id.
+       */
+      id: number;
+      /** @description open, linked, closed or dismissed. */
+      state: string;
+      /** @description growing_tag, rolling_band, cusum or calibration. */
+      monitorKind: string;
+      /** @description The cell key or model. */
+      subject: string;
+      /** @description Identifies the finding. */
+      evidenceKey: string;
+      /** @description The problem with its numbers. */
+      problem: string;
+      /**
+       * Format: int64
+       * @description The linked hypothesis, or null.
+       */
+      hypothesisRef: null | number;
+      /**
+       * Format: int64
+       * @description The linked or resolved experiment, or null.
+       */
+      experimentId: null | number;
+      /** @description improved or no_measurable_change once closed. */
+      result: null | string;
+      /** @description Outcome of the experiment the result was read from. */
+      experimentOutcome: null | string;
+      /**
+       * Format: double
+       * @description Pooled mean R before (baseline), or null.
+       */
+      beforeMeanR: null | number;
+      /**
+       * Format: double
+       * @description Pooled mean R after (candidate), or null.
+       */
+      afterMeanR: null | number;
+      /**
+       * Format: double
+       * @description Total R before.
+       */
+      beforeTotalR: null | number;
+      /**
+       * Format: double
+       * @description Total R after.
+       */
+      afterTotalR: null | number;
+      /** @description The reason of the newest move. */
+      reason: string;
+      /** @description Who made the newest move. */
+      actor: string;
+      /**
+       * Format: date-time
+       * @description When it was opened.
+       */
+      createdAt: string;
+      /**
+       * Format: date-time
+       * @description When it last moved.
+       */
+      updatedAt: string;
+      /** @description The states it may move to. */
+      nextStates: string[];
+      /** @description Every step, oldest first; empty in a list. */
+      history: components['schemas']['LessonStepView'][];
+      /** @description What a lesson does and does not do. */
+      note: string;
     };
     /**
      * @description The state of the live feed as the screen needs it: hub event `feedStatus` (pushed on connect, on a change of `state` or `subscribed`, and every 15 seconds) and the body of `GET /api/live/status` (the fallback when the hub is not connected).
@@ -14685,6 +14810,69 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['HypothesisView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLessons: {
+    parameters: {
+      query?: {
+        state?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LessonView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLesson: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LessonView'];
         };
       };
       /** @description Not Found */
