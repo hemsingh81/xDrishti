@@ -6,7 +6,7 @@ using XDrishti.Domain.Autonomy;
 namespace XDrishti.Infrastructure.Planning;
 
 /// <summary>
-/// The autonomy settings behind <see cref="IAutonomySettingsStore"/> (spec P7-12, ADR 0091): raw SQL, insert and select only. A change is a new row; the newest (by the database's own time, then id) is current. The hash and the time are stamped by a trigger,
+/// The autonomy settings behind <see cref="IAutonomySettingsStore"/> (spec P7-12, ADR 0091): raw SQL, insert and select only. A change is a new row; the newest (the highest id, which the insert trigger draws under the exclusive lock, so id order is commit order and no clock step can reorder it) is current. The hash and the time are stamped by a trigger,
 /// which also takes the lock that automatic approvals share. No row means the defaults, everything OFF.
 /// </summary>
 internal sealed class AutonomySettingsStore(NpgsqlDataSource dataSource) : IAutonomySettingsStore
@@ -15,7 +15,7 @@ internal sealed class AutonomySettingsStore(NpgsqlDataSource dataSource) : IAuto
 
     public async ValueTask<AutonomySettings> CurrentAsync(CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM workflow.autonomy_settings ORDER BY changed_at DESC, id DESC LIMIT 1");
+        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM workflow.autonomy_settings ORDER BY id DESC LIMIT 1");
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
@@ -28,7 +28,7 @@ internal sealed class AutonomySettingsStore(NpgsqlDataSource dataSource) : IAuto
 
     public async ValueTask<IReadOnlyList<AutonomyChangeRow>> HistoryAsync(int limit, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM workflow.autonomy_settings ORDER BY changed_at DESC, id DESC LIMIT @limit");
+        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM workflow.autonomy_settings ORDER BY id DESC LIMIT @limit");
         select.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, Math.Clamp(limit, 1, 200));
         var rows = new List<AutonomyChangeRow>();
         await using var reader = await select.ExecuteReaderAsync(cancellationToken);
@@ -52,7 +52,7 @@ internal sealed class AutonomySettingsStore(NpgsqlDataSource dataSource) : IAuto
             await advisory.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await using (var newest = new NpgsqlCommand("SELECT id FROM workflow.autonomy_settings ORDER BY changed_at DESC, id DESC LIMIT 1", connection, transaction))
+        await using (var newest = new NpgsqlCommand("SELECT id FROM workflow.autonomy_settings ORDER BY id DESC LIMIT 1", connection, transaction))
         {
             long? current = await newest.ExecuteScalarAsync(cancellationToken) is long id ? id : null;
             if (current != expectedCurrentId)

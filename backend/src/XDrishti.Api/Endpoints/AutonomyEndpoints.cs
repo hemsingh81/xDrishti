@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Auth;
 using XDrishti.Application.Autonomy;
 using XDrishti.Domain.Checklist;
 
@@ -21,9 +22,8 @@ internal sealed class AutonomyEndpoints : IEndpointModule
             .WithSummary("The autonomy settings in force (automatic approval and reserve promotion, both OFF = manual approval by default) with the history of changes. No order is placed in any setting");
 
         group.MapPut("/settings", ChangeAsync)
-            .RequireStepUp()
             .WithName("ChangeAutonomySettings")
-            .WithSummary("Change the autonomy settings as the owner; appends an audited row. Needs step-up. 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale")
+            .WithSummary("Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale")
             .ProducesRejections(conflict: true, notFound: false);
     }
 
@@ -33,9 +33,23 @@ internal sealed class AutonomyEndpoints : IEndpointModule
     private static async Task<Results<Ok<AutonomySettingsView>, ProblemHttpResult>> ChangeAsync(
         ChangeAutonomyRequest request,
         HttpContext http,
+        ICommandHandler<StepUpCommand, StepUpResult> passwordCheck,
         ICommandHandler<ChangeAutonomySettingsCommand, AutonomySettingsView> handler,
         CancellationToken cancellationToken)
     {
+        // A fresh password for this change: verified here with the sign-in lockout rules and audit, without opening or using the 5-minute step-up window.
+        var session = http.GetVerifiedSession();
+        if (session is null)
+        {
+            return ProblemResults.From(AuthErrors.Unauthenticated, http);
+        }
+
+        var confirmed = await passwordCheck.HandleAsync(new StepUpCommand(session.SessionId, request.Password, http.GetClientInfo(), Elevate: false), cancellationToken);
+        if (confirmed.IsFailure)
+        {
+            return ProblemResults.From(confirmed.Error, http);
+        }
+
         // The owner is the signed-in session's e-mail address; with no verified session there is no owner and the handler refuses.
         var email = http.GetVerifiedSession()?.Info.User.Email;
         var actor = string.IsNullOrWhiteSpace(email) ? string.Empty : OwnerConfirmation.OwnerPrefix + email;

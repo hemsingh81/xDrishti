@@ -2784,7 +2784,7 @@ export interface paths {
     };
     /** The autonomy settings in force (automatic approval and reserve promotion, both OFF = manual approval by default) with the history of changes. No order is placed in any setting */
     get: operations['GetAutonomySettings'];
-    /** Change the autonomy settings as the owner; appends an audited row. Needs step-up. 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale */
+    /** Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale */
     put: operations['ChangeAutonomySettings'];
     post?: never;
     delete?: never;
@@ -3910,6 +3910,8 @@ export interface components {
       maxAutoPerDay: number;
       /** @description Why, 1 to 500 characters. */
       reason: string;
+      /** @description The owner's password, re-entered for THIS change. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
+      password: null | string;
     };
     /** @description Body of `POST /api/auth/change-password`. */
     ChangePasswordRequest: {
@@ -15506,15 +15508,6 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
-        };
-      };
-      /** @description Forbidden */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Conflict */

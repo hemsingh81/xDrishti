@@ -103,11 +103,12 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
             // 1. An auto approval names the settings row it rests on (id and hash together).
             migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD CONSTRAINT fk_approvals_settings FOREIGN KEY (settings_id, settings_hash) REFERENCES workflow.autonomy_settings (id, snapshot_hash) ON DELETE RESTRICT");
 
-            // 2. A settings row is stamped by the database: the time, and the hash of its canonical text (so a direct insert cannot choose either). The exclusive lock makes a change wait for in-flight automatic approvals and the other way round.
+            // 2. A settings row is stamped by the database: its id (drawn AFTER the exclusive lock, so id order is commit order and the newest row is the highest id whatever the clock does), the time, and the hash of its canonical text (so a direct insert cannot choose either). The exclusive lock makes a change wait for in-flight automatic approvals and the other way round.
             migrationBuilder.Sql("""
                 CREATE FUNCTION workflow.stamp_autonomy_setting() RETURNS trigger LANGUAGE plpgsql AS $fn$
                 BEGIN
                     PERFORM pg_advisory_xact_lock(hashtextextended('workflow.autonomy_settings', 0));
+                    NEW.id := nextval(pg_get_serial_sequence('workflow.autonomy_settings', 'id'));
                     NEW.changed_at := clock_timestamp();
                     NEW.snapshot_hash := encode(sha256(convert_to(format('autonomy:v1|auto=%s|reserve=%s|min_p_win=%s|max_per_day=%s', NEW.auto_approve_tickets::text, NEW.promote_from_reserve::text, to_char(NEW.min_p_win, 'FM0.000'), NEW.max_auto_per_day::text), 'UTF8')), 'hex');
                     RETURN NEW;
@@ -124,13 +125,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     cur record;
                     grp text;
                     plan_state text;
+                    item_state text;
                     session date;
                     used bigint;
                 BEGIN
                     NEW.decided_at := clock_timestamp();
                     IF NEW.kind = 'auto' THEN
                         PERFORM pg_advisory_xact_lock_shared(hashtextextended('workflow.autonomy_settings', 0));
-                        SELECT id, auto_approve_tickets, max_auto_per_day INTO cur FROM workflow.autonomy_settings ORDER BY changed_at DESC, id DESC LIMIT 1;
+                        SELECT id, auto_approve_tickets, max_auto_per_day INTO cur FROM workflow.autonomy_settings ORDER BY id DESC LIMIT 1;
                         IF NOT FOUND OR cur.id IS DISTINCT FROM NEW.settings_id OR NOT cur.auto_approve_tickets THEN
                             RAISE EXCEPTION 'An automatic approval needs the current settings row, with automatic approval switched on' USING ERRCODE = '23514';
                         END IF;
@@ -138,6 +140,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         SELECT item_group INTO grp FROM trading.plan_items WHERE id = NEW.item_id AND plan_id = NEW.plan_id;
                         IF grp IS DISTINCT FROM 'primary' THEN
                             RAISE EXCEPTION 'An automatic approval is for a primary ticket only' USING ERRCODE = '23514';
+                        END IF;
+
+                        SELECT COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.item_id = NEW.item_id ORDER BY e.id DESC LIMIT 1), 'proposed') INTO item_state;
+                        IF item_state <> 'proposed' THEN
+                            RAISE EXCEPTION 'An automatic approval is for a proposed ticket only' USING ERRCODE = '23514';
                         END IF;
 
                         SELECT COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.plan_id = NEW.plan_id AND e.item_id IS NULL ORDER BY e.id DESC LIMIT 1), 'draft') INTO plan_state;

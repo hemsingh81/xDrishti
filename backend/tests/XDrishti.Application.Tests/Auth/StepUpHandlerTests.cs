@@ -32,6 +32,33 @@ public sealed class StepUpHandlerTests
     }
 
     [Fact]
+    public async Task A_one_off_confirmation_checks_the_password_and_audits_but_does_not_open_the_window()
+    {
+        var session = await SignedInSessionAsync();
+
+        var confirmed = await _fx.StepUp().HandleAsync(new StepUpCommand(session.Id, AuthFixture.OwnerPassword, AuthFixture.Client, Elevate: false), CancellationToken.None);
+        var wrong = await _fx.StepUp().HandleAsync(new StepUpCommand(session.Id, "wrong", AuthFixture.Client, Elevate: false), CancellationToken.None);
+
+        confirmed.IsSuccess.ShouldBeTrue();
+        wrong.IsFailure.ShouldBeTrue();
+        session.IsElevated(AuthFixture.Start).ShouldBeFalse();
+        session.ElevatedUntil.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_one_off_confirmation_leaves_an_open_window_exactly_as_it_was()
+    {
+        var session = await SignedInSessionAsync();
+        await StepUpAsync(session, AuthFixture.OwnerPassword);
+        var until = session.ElevatedUntil;
+        _fx.Clock.Advance(TimeSpan.FromMinutes(2));
+
+        await _fx.StepUp().HandleAsync(new StepUpCommand(session.Id, AuthFixture.OwnerPassword, AuthFixture.Client, Elevate: false), CancellationToken.None);
+
+        session.ElevatedUntil.ShouldBe(until);
+    }
+
+    [Fact]
     public async Task The_window_ends_after_five_minutes()
     {
         var session = await SignedInSessionAsync();

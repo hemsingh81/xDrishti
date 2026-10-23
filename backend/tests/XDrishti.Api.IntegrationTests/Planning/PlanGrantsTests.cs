@@ -150,4 +150,49 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             (await SqlStateAsync(server.App, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
     }
+
+    [Fact]
+    public async Task As_xd_app_an_auto_approval_follows_the_newest_settings_row_and_every_other_refusal_holds()
+    {
+        const string Plan = "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at) VALUES ('grants-auto', '2099-02-02', '2099-02-02 03:35:00+00', 7, repeat('c', 64), 'b', true, 'n', 'l', 'probe', now())";
+        const string Published = "INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, created_at) SELECT id, NULL, 'draft', 'published', 'a', 'r', now() FROM trading.plans WHERE plan_key = 'grants-auto'";
+        const string Item = "INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) SELECT id, @rank, @grp, 's', 'BUY', 'x', 'h', 't', 's', 't', 'v', @reasons, 'c', 1, 'd', 'b', '{}' FROM trading.plans WHERE plan_key = 'grants-auto'";
+        const string Setting = "INSERT INTO workflow.autonomy_settings (auto_approve_tickets, promote_from_reserve, min_p_win, max_auto_per_day, snapshot_hash, actor, reason, changed_at) VALUES (@on, false, 0.58, 5, 'x', @actor, 'r', now())";
+        const string Auto = "INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at, settings_id, settings_hash, policy_version) SELECT p.id, i.id, 'auto', 'approve', @actor, 'r', p.review_cutoff, now(), s.id, s.snapshot_hash, 'v' FROM trading.plans p JOIN trading.plan_items i ON i.plan_id = p.id AND i.item_rank = @rank, (SELECT id, snapshot_hash FROM workflow.autonomy_settings ORDER BY id DESC LIMIT 1) s WHERE p.plan_key = 'grants-auto'";
+
+        await using var connection = new NpgsqlConnection(server.App);
+        await connection.OpenAsync(Ct);
+
+        async Task<string?> RunAsync(string sql, params (string Name, object Value)[] parameters)
+        {
+            await using var command = new NpgsqlCommand(sql, connection);
+            foreach (var (name, value) in parameters)
+            {
+                command.Parameters.AddWithValue(name, value);
+            }
+
+            try
+            {
+                await command.ExecuteNonQueryAsync(Ct);
+                return null;
+            }
+            catch (PostgresException failure)
+            {
+                return failure.SqlState;
+            }
+        }
+
+        (await RunAsync(Plan)).ShouldBeNull();
+        (await RunAsync(Published)).ShouldBeNull();
+        (await RunAsync(Item, ("rank", 1), ("grp", "primary"), ("reasons", Array.Empty<string>()))).ShouldBeNull();
+        (await RunAsync(Item, ("rank", 2), ("grp", "reserve"), ("reasons", RejectedReasons))).ShouldBeNull();
+
+        (await RunAsync(Setting, ("on", true), ("actor", "rule:autonomy"))).ShouldBe(PostgresErrorCodes.CheckViolation); // only an owner actor writes a setting
+        (await RunAsync(Setting, ("on", true), ("actor", "owner:a"))).ShouldBeNull();
+        (await RunAsync(Auto, ("actor", "owner:a"), ("rank", 1))).ShouldBe(PostgresErrorCodes.CheckViolation); // an auto row never carries an owner actor
+        (await RunAsync(Auto, ("actor", "rule:autonomy"), ("rank", 2))).ShouldBe(PostgresErrorCodes.CheckViolation); // a reserve item
+        (await RunAsync(Auto, ("actor", "rule:autonomy"), ("rank", 1))).ShouldBeNull(); // the newest row has the switch on
+        (await RunAsync(Setting, ("on", false), ("actor", "owner:a"))).ShouldBeNull();
+        (await RunAsync(Auto, ("actor", "rule:autonomy"), ("rank", 1))).ShouldBe(PostgresErrorCodes.CheckViolation); // now the newest row is off
+    }
 }

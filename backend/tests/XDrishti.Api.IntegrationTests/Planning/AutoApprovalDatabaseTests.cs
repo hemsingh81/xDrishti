@@ -54,7 +54,7 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
             [new NewAllocation(AccountId, "paper", 10)]);
 
     private static NewPlan Plan(string key, params NewPlanItem[] items) =>
-        new(key, Session, ReviewCutoff, 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, items);
+        new(key, Session, ReviewCutoff, key.EndsWith("-b", StringComparison.Ordinal) ? 2 : 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, items);
 
     private async Task<TResult> WithAsync<TResult>(Func<IServiceProvider, Task<TResult>> work)
     {
@@ -292,44 +292,9 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
 
         (await AutoAsync(items[0])).ShouldBe(MoveStatus.Stale);
 
-        // A direct approval row would still be accepted by the approvals table; the event that would use it is what the database refuses (from modified).
-        var settings = await CurrentAsync();
-        await using var connection = await OpenAsync();
-        await using var transaction = await connection.BeginTransactionAsync(Ct);
-        await using (var insert = new NpgsqlCommand(InsertAuto, connection, transaction))
-        {
-            insert.Parameters.AddWithValue("item", items[0]);
-            insert.Parameters.AddWithValue("kind", "auto");
-            insert.Parameters.AddWithValue("decision", "approve");
-            insert.Parameters.AddWithValue("actor", "rule:autonomy");
-            insert.Parameters.AddWithValue("sid", settings.Id!.Value);
-            insert.Parameters.AddWithValue("sh", settings.Hash!);
-            insert.Parameters.AddWithValue("pv", "v");
-            insert.Parameters.AddWithValue("mods", DBNull.Value);
-            await insert.ExecuteNonQueryAsync(Ct);
-        }
-
-        var state = await StateOfEventAsync(connection, transaction, items[0]);
-        state.ShouldBe(PostgresErrorCodes.CheckViolation);
-    }
-
-    private static async Task<string?> StateOfEventAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long item)
-    {
-        await using var command = new NpgsqlCommand(
-            """
-            INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, approval_id, prev_event_id, created_at)
-            SELECT i.plan_id, i.id, 'modified', 'approved', 'rule:autonomy', 'r', (SELECT max(id) FROM workflow.approvals), (SELECT max(id) FROM trading.plan_events e WHERE e.item_id = i.id), now() FROM trading.plan_items i WHERE i.id = @i
-            """, connection, transaction);
-        command.Parameters.AddWithValue("i", item);
-        try
-        {
-            await command.ExecuteNonQueryAsync(Ct);
-            return null;
-        }
-        catch (PostgresException failure)
-        {
-            return failure.SqlState;
-        }
+        // The database itself refuses an auto approval for an item that is not (any more) proposed.
+        (await DirectAutoAsync(items[0])).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.approvals WHERE kind = 'auto'")).ShouldBe(0);
     }
 
     [Fact]
@@ -354,13 +319,13 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
         var (_, items) = await PlanStoredAsync("auto-dup", Item(1, TicketGroup.Primary));
         await ChangeAsync(on: true);
         (await AutoAsync(items[0])).ShouldBe(MoveStatus.Created);
-        (await DirectAutoAsync(items[0])).ShouldBeNull(); // the approvals table alone accepts another row ...
+        (await DirectAutoAsync(items[0])).ShouldBe(PostgresErrorCodes.CheckViolation); // the approval trigger refuses an item that is no longer proposed ...
 
         await using var connection = await OpenAsync();
         await using var transaction = await connection.BeginTransactionAsync(Ct);
         var state = await DuplicateEventAsync(connection, transaction, items[0]);
 
-        state.ShouldBe(PostgresErrorCodes.UniqueViolation); // ... but a second move out of proposed cannot be written
+        state.ShouldBe(PostgresErrorCodes.UniqueViolation); // ... and a second move out of proposed cannot be written either
     }
 
     private static async Task<string?> DuplicateEventAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long item)
@@ -400,38 +365,231 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
         (await ScalarAsync<bool>("SELECT changed_at > '2020-01-01' FROM workflow.autonomy_settings WHERE id = @i", ("i", newest.Id!.Value))).ShouldBeTrue();
     }
 
+    private static object Body(bool on, string? password, double min = 0.6, string reason = "go") =>
+        new { autoApproveTickets = on, promoteFromReserve = false, minPWin = min, maxAutoPerDay = 2, reason, password, actor = "owner:someone-else" };
+
+    private static readonly Uri SettingsUri = new("/api/autonomy/settings", UriKind.Relative);
+
     [Fact]
-    public async Task The_endpoint_needs_step_up_takes_the_actor_from_the_session_and_every_change_is_a_new_row()
+    public async Task Every_change_needs_the_password_again_also_inside_an_open_step_up_window_and_the_actor_is_the_session()
     {
-        var plain = await Client.PutAsJsonAsync(new Uri("/api/autonomy/settings", UriKind.Relative), new { autoApproveTickets = true, promoteFromReserve = false, minPWin = 0.58, maxAutoPerDay = 3, reason = "go" }, Ct);
-        plain.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
-        (await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/autonomy/settings", UriKind.Relative), Ct)).GetProperty("autoApproveTickets").GetBoolean().ShouldBeFalse();
-
         var elevated = await Factory.SignInElevatedAsync(Ct);
-        var body = new { autoApproveTickets = true, promoteFromReserve = false, minPWin = 0.6, maxAutoPerDay = 2, reason = "go", actor = "owner:someone-else" };
-        using var ok = await elevated.Client.PutAsJsonAsync(new Uri("/api/autonomy/settings", UriKind.Relative), body, Ct);
-        using var bad = await elevated.Client.PutAsJsonAsync(new Uri("/api/autonomy/settings", UriKind.Relative), new { autoApproveTickets = true, promoteFromReserve = false, minPWin = 0.1, maxAutoPerDay = 2, reason = "go" }, Ct);
-        using var noReason = await elevated.Client.PutAsJsonAsync(new Uri("/api/autonomy/settings", UriKind.Relative), new { autoApproveTickets = true, promoteFromReserve = false, minPWin = 0.6, maxAutoPerDay = 2, reason = " " }, Ct);
 
+        using var none = await elevated.Client.PutAsJsonAsync(SettingsUri, Body(true, null), Ct);
+        using var wrong = await elevated.Client.PutAsJsonAsync(SettingsUri, Body(true, "not-the-password"), Ct);
+        using var ok = await elevated.Client.PutAsJsonAsync(SettingsUri, Body(true, Factory.OwnerPassword), Ct);
+        using var second = await elevated.Client.PutAsJsonAsync(SettingsUri, Body(false, null), Ct);
+        using var third = await elevated.Client.PutAsJsonAsync(SettingsUri, Body(false, Factory.OwnerPassword), Ct);
+
+        none.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        wrong.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         ok.StatusCode.ShouldBe(HttpStatusCode.OK);
-        bad.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        noReason.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        second.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        third.StatusCode.ShouldBe(HttpStatusCode.OK);
         var view = await ok.Content.ReadFromJsonAsync<JsonElement>(Ct);
         view.GetProperty("autoApproveTickets").GetBoolean().ShouldBeTrue();
         view.GetProperty("minPWin").GetDouble().ShouldBe(0.6);
         var actor = view.GetProperty("history")[0].GetProperty("actor").GetString();
         actor.ShouldStartWith("owner:");
         actor.ShouldNotContain("someone-else");
-        (await ScalarAsync<long>("SELECT count(*) FROM workflow.autonomy_settings")).ShouldBe(1);
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.autonomy_settings")).ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_signed_in_session_that_never_stepped_up_can_change_with_the_password_and_the_change_does_not_open_the_step_up_window()
+    {
+        var plainSession = await Factory.SignInAsync(Ct);
+        using var probeBefore = await plainSession.Client.PostAsJsonAsync(new Uri("/api/risk-profiles", UriKind.Relative), new { }, Ct);
+
+        using var changed = await plainSession.Client.PutAsJsonAsync(SettingsUri, Body(true, Factory.OwnerPassword), Ct);
+        using var probeAfter = await plainSession.Client.PostAsJsonAsync(new Uri("/api/risk-profiles", UriKind.Relative), new { }, Ct);
+
+        changed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        probeBefore.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+        probeAfter.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task An_open_step_up_window_is_neither_closed_nor_extended_by_a_change()
+    {
+        var elevated = await Factory.SignInElevatedAsync(Ct);
+        var before = await ScalarAsync<DateTime>("SELECT elevated_until FROM auth.sessions WHERE elevated_until IS NOT NULL ORDER BY elevated_until DESC LIMIT 1");
+
+        using var changed = await elevated.Client.PutAsJsonAsync(SettingsUri, Body(true, Factory.OwnerPassword), Ct);
+        using var probe = await elevated.Client.PostAsJsonAsync(new Uri("/api/risk-profiles", UriKind.Relative), new { }, Ct);
+
+        changed.StatusCode.ShouldBe(HttpStatusCode.OK);
+        probe.StatusCode.ShouldNotBe(HttpStatusCode.Forbidden); // still elevated for the other sensitive actions
+        (await ScalarAsync<DateTime>("SELECT elevated_until FROM auth.sessions WHERE elevated_until IS NOT NULL ORDER BY elevated_until DESC LIMIT 1")).ShouldBe(before);
+    }
+
+    [Fact]
+    public async Task A_bad_value_or_a_blank_reason_with_the_right_password_is_a_bad_request()
+    {
+        var signedIn = await Factory.SignInAsync(Ct);
+
+        using var bad = await signedIn.Client.PutAsJsonAsync(SettingsUri, Body(true, Factory.OwnerPassword, min: 0.1), Ct);
+        using var noReason = await signedIn.Client.PutAsJsonAsync(SettingsUri, Body(true, Factory.OwnerPassword, reason: " "), Ct);
+
+        bad.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        noReason.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.autonomy_settings")).ShouldBe(0);
     }
 
     [Fact]
     public async Task Without_a_session_the_settings_cannot_be_read_or_changed()
     {
         using var read = await Factory.CreateAnonymousClient().GetAsync(new Uri("/api/autonomy/settings", UriKind.Relative), Ct);
-        using var write = await Factory.CreateAnonymousClient().PutAsJsonAsync(new Uri("/api/autonomy/settings", UriKind.Relative), new { autoApproveTickets = true, promoteFromReserve = false, minPWin = 0.6, maxAutoPerDay = 2, reason = "go" }, Ct);
+        using var write = await Factory.CreateAnonymousClient().PutAsJsonAsync(new Uri("/api/autonomy/settings", UriKind.Relative), new { autoApproveTickets = true, promoteFromReserve = false, minPWin = 0.6, maxAutoPerDay = 2, reason = "go", password = "x" }, Ct);
 
         read.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         write.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task The_newest_row_is_the_highest_id_so_an_off_row_with_an_earlier_stamp_still_wins()
+    {
+        var (_, items) = await PlanStoredAsync("auto-clock", Item(1, TicketGroup.Primary));
+        await ChangeAsync(on: true);
+        var wasOn = await CurrentAsync();
+
+        // Simulates a clock that stepped back: the later OFF row carries a stamp from the year 2000 (written with the triggers off, as the owner role could).
+        await using (var connection = await OpenAsync())
+        {
+            await using var transaction = await connection.BeginTransactionAsync(Ct);
+            await using var set = new NpgsqlCommand("SET LOCAL session_replication_role = replica", connection, transaction);
+            await set.ExecuteNonQueryAsync(Ct);
+            await using var insert = new NpgsqlCommand("INSERT INTO workflow.autonomy_settings (auto_approve_tickets, promote_from_reserve, min_p_win, max_auto_per_day, snapshot_hash, actor, reason, changed_at) VALUES (false, false, 0.58, 3, repeat('e', 64), 'owner:a', 'r', '2000-01-01')", connection, transaction);
+            await insert.ExecuteNonQueryAsync(Ct);
+            await transaction.CommitAsync(Ct);
+        }
+
+        var current = await CurrentAsync();
+
+        current.AutoApproveTickets.ShouldBeFalse();
+        current.Id!.Value.ShouldBeGreaterThan(wasOn.Id!.Value);
+        (await AutoAsync(items[0], wasOn)).ShouldBe(MoveStatus.Refused);
+        (await DirectAutoAsync(items[0], sid: wasOn.Id, hash: wasOn.Hash)).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.approvals")).ShouldBe(0);
+    }
+
+    private async Task WaitForAdvisoryWaiterAsync()
+    {
+        // Polls the lock table (bounded) until a backend waits for an advisory lock.
+        for (var i = 0; i < 200; i++)
+        {
+            if (await ScalarAsync<long>("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted") > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(25, Ct);
+        }
+
+        throw new InvalidOperationException("Nobody waited for the advisory lock.");
+    }
+
+    [Fact]
+    public async Task A_settings_change_to_off_waits_for_an_auto_approval_in_flight_and_then_both_stand_in_order()
+    {
+        var (_, items) = await PlanStoredAsync("auto-lock-a", Item(1, TicketGroup.Primary));
+        await ChangeAsync(on: true);
+        var on = await CurrentAsync();
+        await using var holder = await OpenAsync();
+        await using var transaction = await holder.BeginTransactionAsync(Ct);
+        await using (var insert = new NpgsqlCommand(InsertAuto, holder, transaction))
+        {
+            insert.Parameters.AddWithValue("item", items[0]);
+            insert.Parameters.AddWithValue("kind", "auto");
+            insert.Parameters.AddWithValue("decision", "approve");
+            insert.Parameters.AddWithValue("actor", "rule:autonomy");
+            insert.Parameters.AddWithValue("sid", on.Id!.Value);
+            insert.Parameters.AddWithValue("sh", on.Hash!);
+            insert.Parameters.AddWithValue("pv", "v");
+            insert.Parameters.AddWithValue("mods", DBNull.Value);
+            await insert.ExecuteNonQueryAsync(Ct); // accepted, not yet committed: holds the shared lock
+        }
+
+        var off = ChangeAsync(on: false);
+        await WaitForAdvisoryWaiterAsync();
+        off.IsCompleted.ShouldBeFalse();
+        await transaction.CommitAsync(Ct);
+        var result = await off;
+
+        result.IsSuccess.ShouldBeTrue();
+        (await CurrentAsync()).AutoApproveTickets.ShouldBeFalse();
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.approvals WHERE kind = 'auto'")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task An_auto_approval_waits_for_a_settings_change_in_flight_then_sees_off_and_is_refused()
+    {
+        var (_, items) = await PlanStoredAsync("auto-lock-b", Item(1, TicketGroup.Primary));
+        await ChangeAsync(on: true);
+        var on = await CurrentAsync();
+        await using var holder = await OpenAsync();
+        await using var transaction = await holder.BeginTransactionAsync(Ct);
+        await using (var insert = new NpgsqlCommand("INSERT INTO workflow.autonomy_settings (auto_approve_tickets, promote_from_reserve, min_p_win, max_auto_per_day, snapshot_hash, actor, reason, changed_at) VALUES (false, false, 0.58, 3, 'x', 'owner:a', 'off', now())", holder, transaction))
+        {
+            await insert.ExecuteNonQueryAsync(Ct); // holds the exclusive lock, not yet committed
+        }
+
+        var auto = AutoAsync(items[0], on);
+        await WaitForAdvisoryWaiterAsync();
+        auto.IsCompleted.ShouldBeFalse();
+        await transaction.CommitAsync(Ct);
+        var status = await auto;
+
+        status.ShouldBe(MoveStatus.Refused);
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.approvals")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task An_item_of_another_plan_a_draft_plan_and_a_closed_plan_are_refused()
+    {
+        var (_, items) = await PlanStoredAsync("auto-plan-a", Item(1, TicketGroup.Primary));
+        var (otherPlan, _) = await PlanStoredAsync("auto-plan-b", Item(1, TicketGroup.Primary));
+        await ChangeAsync(on: true);
+        var s = await CurrentAsync();
+        const string Direct = "INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at, settings_id, settings_hash, policy_version) SELECT p.id, @item, 'auto', 'approve', 'rule:autonomy', 'r', p.review_cutoff, now(), @sid, @sh, 'v' FROM trading.plans p WHERE p.id = @plan";
+
+        // the item belongs to plan A, the approval names plan B
+        (await SqlStateAsync(Direct, ("item", items[0]), ("plan", otherPlan), ("sid", s.Id!.Value), ("sh", s.Hash!))).ShouldNotBeNull();
+
+        // a draft plan: a plan row and an item with no state row at all
+        await using (var connection = await OpenAsync())
+        {
+            await ExecuteAsync(connection, "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at) VALUES ('auto-draft', '2099-01-07', '2099-01-07 03:35:00+00', 1, repeat('d', 64), 'b', true, 'n', 'l', 'probe', now())");
+            await ExecuteAsync(connection, "INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) SELECT id, 1, 'primary', 's', 'BUY', 'x', 'h', 't', 's', 't', 'v', '{}', 'c', 1, 'd', 'b', '{}' FROM trading.plans WHERE plan_key = 'auto-draft'");
+        }
+
+        var draftPlan = await ScalarAsync<long>("SELECT id FROM trading.plans WHERE plan_key = 'auto-draft'");
+        var draftItem = await ScalarAsync<long>("SELECT id FROM trading.plan_items WHERE plan_id = @p", ("p", draftPlan));
+        (await SqlStateAsync(Direct, ("item", draftItem), ("plan", draftPlan), ("sid", s.Id!.Value), ("sh", s.Hash!))).ShouldBe(PostgresErrorCodes.CheckViolation);
+
+        // a plan that is no longer open: its items lapsed at the cutoff
+        Factory.Clock.Pin(ReviewCutoff.AddMinutes(1));
+        var cutoff = await WithAsync(p => p.GetRequiredService<ICommandHandler<ApplyReviewCutoffCommand, PlanMoveOutcome>>().HandleAsync(new ApplyReviewCutoffCommand(otherPlan, "system:cutoff"), Ct).AsTask());
+        cutoff.Value.State.ShouldBe("lapsed");
+        Factory.Clock.Pin(ReviewCutoff.AddMinutes(-5));
+        var otherItem = await ScalarAsync<long>("SELECT id FROM trading.plan_items WHERE plan_id = @p", ("p", otherPlan));
+        (await AutoAsync(otherItem)).ShouldNotBe(MoveStatus.Created);
+        (await SqlStateAsync(Direct, ("item", otherItem), ("plan", otherPlan), ("sid", s.Id!.Value), ("sh", s.Hash!))).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.approvals")).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task With_the_switch_on_but_nothing_qualifying_the_cutoff_still_lapses_everything()
+    {
+        var (plan, _) = await PlanStoredAsync("auto-on-lapse", Item(1, TicketGroup.Primary), Item(2, TicketGroup.Reserve));
+        await ChangeAsync(on: true);
+        Factory.Clock.Pin(ReviewCutoff.AddMinutes(-5));
+        await WithAsync(p => p.GetRequiredService<ICommandHandler<AutoApprovePlanCommand, AutoApprovalOutcome>>().HandleAsync(new AutoApprovePlanCommand(plan), Ct).AsTask());
+        Factory.Clock.Pin(ReviewCutoff.AddMinutes(1));
+
+        var cutoff = await WithAsync(p => p.GetRequiredService<ICommandHandler<ApplyReviewCutoffCommand, PlanMoveOutcome>>().HandleAsync(new ApplyReviewCutoffCommand(plan, "system:cutoff"), Ct).AsTask());
+
+        cutoff.Value.ShouldBe(new PlanMoveOutcome(plan, "lapsed", 2));
+        (await ScalarAsync<long>("SELECT count(*) FROM workflow.approvals")).ShouldBe(0);
     }
 }

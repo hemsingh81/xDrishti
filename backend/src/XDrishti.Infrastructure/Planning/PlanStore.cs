@@ -351,8 +351,15 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         }
         catch (PostgresException failure) when (failure.SqlState == PostgresErrorCodes.CheckViolation)
         {
-            // The shape check holds the cutoff (the database clock); the trigger holds the switch, the group, the plan state and the cap.
-            return failure.ConstraintName == "ck_approvals_shape" ? MoveStatus.AfterCutoff : MoveStatus.Refused;
+            // The shape check holds the cutoff (the database clock) among other things; the trigger holds the switch, the group, the item and plan state and the cap. Only a cutoff that the database clock says has passed is reported as AfterCutoff.
+            if (failure.ConstraintName == "ck_approvals_shape")
+            {
+                await using var clock = dataSource.CreateCommand("SELECT clock_timestamp() >= @cutoff");
+                clock.Parameters.AddWithValue("cutoff", NpgsqlDbType.TimestampTz, cutoff);
+                return (bool)(await clock.ExecuteScalarAsync(cancellationToken))! ? MoveStatus.AfterCutoff : MoveStatus.Refused;
+            }
+
+            return MoveStatus.Refused;
         }
         catch (PostgresException failure) when (failure.SqlState == PostgresErrorCodes.ForeignKeyViolation)
         {
