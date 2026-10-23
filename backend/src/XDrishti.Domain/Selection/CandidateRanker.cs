@@ -25,7 +25,8 @@ public static class CandidateRanker
         var gaps = new List<string>();
         var regime = Input(c.RegimeFit, "regime_fit", gaps);
         var corr = Input(c.CorrelationWithBook, "correlation_with_book", gaps);
-        var evt = Input(c.EventRisk, "event_risk", gaps);
+        // Event risk comes from the same data as the event filter: when that filter is unavailable the figure is not trusted, counts 0 and is listed.
+        var evt = m.Winner.Results.Any(r => r.Code == FilterCodes.Event && r.Outcome == FilterOutcome.Unavailable) ? Input(null, "event_risk", gaps) : Input(c.EventRisk, "event_risk", gaps);
         missing = gaps.AsReadOnly();
         return m.Winner.ConservativeExpectancyR!.Value
             + (rules.ConfluenceWeight * m.Confluence)

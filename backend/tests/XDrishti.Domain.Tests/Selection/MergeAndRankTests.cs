@@ -146,6 +146,28 @@ public sealed class MergeAndRankTests
 
         withModel.Ranked.Select(x => x.Merged.Winner.Candidate.Symbol).ShouldBe(plain.Ranked.Select(x => x.Merged.Winner.Candidate.Symbol));
         withModel.Ranked[1].AdvisoryPWin.ShouldBe(0.99);
+        withModel.Ranked.Select(x => x.Merged.Winner.Candidate.Cell.Key).ShouldBe(plain.Ranked.Select(x => x.Merged.Winner.Candidate.Cell.Key));
+        withModel.NotEligible.Count.ShouldBe(plain.NotEligible.Count);
+    }
+
+    [Fact]
+    public void A_missing_event_filter_lists_event_risk_as_missing_and_counts_it_as_zero()
+    {
+        var loose = new SelectionRules(OptionalFilters: [FilterCodes.Event]);
+        var r = CandidateSelector.Select([Candidates.Good("AAA", eventBlock: null, eventRisk: 0.9, regime: 0.5, corr: 0.1)], loose).Ranked[0];
+
+        r.MissingInputs.ShouldBe(["event_risk"]);
+        r.Caveats.ShouldBe([FilterCodes.Event]);
+        r.Explanation.ShouldContain("event_risk");
+        r.Score.ShouldBe(0.5 + (0.05 * 0.5) - (0.10 * 0.1), 1e-9);
+    }
+
+    [Fact]
+    public void The_placeholder_symbol_cannot_be_merged()
+    {
+        var cell = EligibilityFilters.Evaluate(Candidates.Good("*"), Rules);
+
+        Should.Throw<ArgumentException>(() => CandidateMerger.Merge([cell], Rules));
     }
 
     [Fact]

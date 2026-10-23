@@ -57,9 +57,10 @@
       e.stories = [...src.stories.map((s) => ({ ...s })), ...custom];
       e.stories.forEach((s) => {
         s.epic = e.id;
-        s.st = state.st[s.id] ?? s.st;
-        s.note = state.note[s.id] ?? s.note;
-        s.done = s.st === "done" ? state.done[s.id] ?? s.done ?? iso(today) : undefined;
+        const o = (window.XDP && window.XDP.storyStatus && window.XDP.storyStatus[s.id]) || [];
+        s.st = state.st[s.id] ?? o[0] ?? s.st;
+        s.note = state.note[s.id] ?? o[2] ?? s.note;
+        s.done = s.st === "done" ? state.done[s.id] ?? o[1] ?? s.done ?? iso(today) : undefined;
         stories.push(s);
       });
     });
@@ -131,8 +132,8 @@
     return `
     <section class="hero"><h2>Where we are — ${esc(P.asOf)}</h2><p class="lead">${esc(P.now)}</p></section>
     <div class="tiles">
-      <div class="tile"><div class="k">Phases built</div><div class="v">${built}<small class="dim"> / ${phases.length}</small></div><div class="s">P0–P5 built, P6 in progress</div></div>
-      <div class="tile"><div class="k">Tracked slices built</div><div class="v">${sBuilt}<small class="dim"> / ${sBuilt + sOpen.length}</small></div><div class="s">P3–P6 slices listed below</div></div>
+      <div class="tile"><div class="k">Phases built</div><div class="v">${built}<small class="dim"> / ${phases.length}</small></div><div class="s">P0–P5 built · P6 built bar regime labels · P7 started</div></div>
+      <div class="tile"><div class="k">Tracked slices built</div><div class="v">${sBuilt}<small class="dim"> / ${sBuilt + sOpen.length}</small></div><div class="s">P3–P7 slices listed below</div></div>
       <div class="tile"><div class="k">Open or blocked</div><div class="v">${sOpen.length}</div><div class="s">${sOpen.map((x) => x[0]).join(", ")}</div></div>
     </div>
     <div class="card" style="margin:14px 0"><h2>Needs you</h2><ul style="padding-left:18px">${P.owner.map((t) => `<li style="margin:4px 0">${esc(t)}</li>`).join("")}</ul></div>
@@ -370,6 +371,11 @@
   views.process = () => `
     <div class="card" style="margin-bottom:16px"><h2>The loop</h2><div class="steps-flow"><span class="s">1 · Spec</span><span class="a">→</span><span class="s">2 · Plan</span><span class="a">→</span><span class="s">3 · Agent builds a slice</span><span class="a">→</span><span class="s">4 · scripts/check.sh</span><span class="a">→</span><span class="s">5 · Independent review</span><span class="a">→</span><span class="s">6 · You approve &amp; commit</span></div>
       <p class="muted" style="margin-top:12px;max-width:80ch">Every story here becomes one spec in <code>docs/specs/</code>. Open a story and use <b>Copy spec</b> to start from a pre-filled file, then <b>Copy agent prompt</b> once the spec is Approved.</p></div>
+    <div class="card" style="margin-bottom:16px"><h2>How the build actually runs now (since 2026-10-22)</h2><div class="prose"><ul>
+      <li><b>Slice cycle:</b> spec (recommended answers, assumptions listed) → agent builds on a work branch in its own worktree → <code>scripts/check.sh</code> green → independent <code>reviewer</code> pass → fixes → merge to <code>main</code> → <code>deploy/xd-up.sh</code>. Independent slices run in parallel; two writers never share files.</li>
+      <li><b>Standing run instruction:</b> commit, merge and deploy are authorised; push to a remote is not. Safety-relevant decisions (allocation to real accounts, autonomy, reserve promotion, depth recording) stop for you.</li>
+      <li><b>Honesty rules:</b> nothing is called Eligible, Better or MET on thin data; every report prints its limits; proposals are never applied automatically.</li>
+      <li><b>Where to look:</b> the Progress tab (what is built and what needs you), <code>docs/design/18-roadmap.md</code> (rows and statuses), <code>docs/adr/</code> (decisions), <code>docs/specs/</code> (one spec per slice).</li></ul></div></div>
     <div class="grid g2">
       <div class="card"><h2>Who does what</h2><div class="prose"><ul>
         <li><b>You</b> — answer questions, approve specs and plans, review results, decide go/no-go at each exit gate, commit.</li>

@@ -34,7 +34,7 @@ public sealed class ShowSelectionHandlerTests
     {
         var a = Row("A", new DateOnly(2026, 10, 23));
         var b = Row("B", new DateOnly(2026, 10, 23));
-        _stats.ListLatestAsync(null, "all", Ct).Returns([a, b]);
+        _stats.ListLatestBeforeAsync(Date, null, "all", Ct).Returns([a, b]);
         _log.HistoryAsync(a.Row.Cell.Key, Ct).Returns([ToCandidate(a.Row.Cell.Key)]);
         _log.HistoryAsync(b.Row.Cell.Key, Ct).Returns([]);
 
@@ -47,6 +47,8 @@ public sealed class ShowSelectionHandlerTests
         result.Value.Text.ShouldContain("reward_risk unavailable");
         result.Value.Text.ShouldContain("cell_state fail");
         result.Value.Text.ShouldContain("limits:");
+        result.Value.Text.ShouldContain("held " + a.Row.Cell.Key);
+        result.Value.Text.ShouldContain("provisional");
         await _stats.DidNotReceiveWithAnyArgs().StoreAsync(default!, Ct);
     }
 
@@ -54,7 +56,7 @@ public sealed class ShowSelectionHandlerTests
     public async Task Statistics_from_the_decision_date_are_not_used()
     {
         var a = Row("A", Date);
-        _stats.ListLatestAsync(null, "all", Ct).Returns([a]);
+        _stats.ListLatestBeforeAsync(Date, null, "all", Ct).Returns([a]);
         _log.HistoryAsync(a.Row.Cell.Key, Ct).Returns([ToCandidate(a.Row.Cell.Key)]);
 
         var result = await Handler().HandleAsync(new ShowSelectionQuery(Date, CellState.Candidate), Ct);
@@ -66,7 +68,7 @@ public sealed class ShowSelectionHandlerTests
     [Fact]
     public async Task Nothing_stored_prints_no_cells()
     {
-        _stats.ListLatestAsync(null, "all", Ct).Returns([]);
+        _stats.ListLatestBeforeAsync(Date, null, "all", Ct).Returns([]);
 
         var result = await Handler().HandleAsync(new ShowSelectionQuery(Date, CellState.Candidate), Ct);
 
@@ -80,5 +82,19 @@ public sealed class ShowSelectionHandlerTests
         var result = await Handler().HandleAsync(new ShowSelectionQuery(Date, CellState.Research), Ct);
 
         result.IsFailure.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task State_is_the_changelog_as_it_stood_before_the_decision_day()
+    {
+        var a = Row("A", new DateOnly(2026, 10, 23));
+        _stats.ListLatestBeforeAsync(Date, null, "all", Ct).Returns([a]);
+        var later = new ChangelogEntry(2, new NewChangelogEntry("transition", "cell", a.Row.Cell.Key, "candidate", "paper", "x", "owner", [], null, null, null, null, new DateTimeOffset(2026, 10, 26, 10, 0, 0, TimeSpan.FromHours(5.5))));
+        var early = ToCandidate(a.Row.Cell.Key) with { Entry = ToCandidate(a.Row.Cell.Key).Entry with { At = new DateTimeOffset(2026, 10, 25, 20, 0, 0, TimeSpan.FromHours(5.5)) } };
+        _log.HistoryAsync(a.Row.Cell.Key, Ct).Returns([early, later]);
+
+        var result = await Handler().HandleAsync(new ShowSelectionQuery(Date, CellState.Paper), Ct);
+
+        result.Value.Text.ShouldContain("cell_state fail");
     }
 }

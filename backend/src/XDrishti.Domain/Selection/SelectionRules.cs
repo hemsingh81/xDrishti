@@ -14,7 +14,7 @@ namespace XDrishti.Domain.Selection;
 /// <param name="MinSample">Fewest trades in the cell's statistics.</param>
 /// <param name="MaxCostR">Most cost in R.</param>
 /// <param name="MinDailyTurnover">Least average daily turnover in rupees.</param>
-/// <param name="OptionalFilters">Codes whose unavailable answer does not hold a candidate back (it stays a caveat). A fail on any filter always rejects. Null means <see cref="DefaultOptionalFilters"/>.</param>
+/// <param name="OptionalFilters">Codes whose unavailable answer the owner has chosen not to hold a candidate back for (it stays a caveat on the ranked candidate). A fail on any filter always rejects. Null or empty (the default): every filter is required, so a candidate with no event, F&amp;O ban or surveillance data is held until the data exists (P15).</param>
 /// <param name="ConfluenceWeight">Weight of the confluence count in the rank score.</param>
 /// <param name="RegimeWeight">Weight of the regime fit (0 to 1).</param>
 /// <param name="CorrelationWeight">Weight of the correlation with the book (subtracted).</param>
@@ -39,11 +39,8 @@ public sealed record SelectionRules(
     ConflictPolicy ConflictPolicy = ConflictPolicy.KeepStrongerOrDropBoth,
     double ConflictMargin = 0.05)
 {
-    /// <summary>The filters whose data does not exist yet (events, F&amp;O ban, surveillance: P15); unavailable on them is shown, not blocking.</summary>
-    public static IReadOnlyList<string> DefaultOptionalFilters { get; } = [FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance];
-
-    /// <summary>The optional filters in force.</summary>
-    public IReadOnlyList<string> Optional => OptionalFilters ?? DefaultOptionalFilters;
+    /// <summary>The optional filters in force; none by default.</summary>
+    public IReadOnlyList<string> Optional => OptionalFilters ?? [];
 
     /// <summary>The problems of the values; empty when the rules can be used.</summary>
     public IReadOnlyList<string> Problems()

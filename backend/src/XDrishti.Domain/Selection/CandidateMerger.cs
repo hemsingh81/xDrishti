@@ -14,10 +14,15 @@ public static class CandidateMerger
     {
         ArgumentNullException.ThrowIfNull(evaluated);
         ArgumentNullException.ThrowIfNull(rules);
+        var eligible = evaluated.Where(e => e.Verdict == EligibilityVerdict.Eligible && e.ConservativeExpectancyR is not null).ToList();
+        if (eligible.Any(e => e.Candidate.Symbol == "*"))
+        {
+            throw new ArgumentException("The placeholder symbol '*' stands for a cell, not an instrument, and cannot be merged.", nameof(evaluated));
+        }
+
         var dropped = new List<DroppedCandidate>();
         var winners = new List<MergedCandidate>();
-        var groups = evaluated
-            .Where(e => e.Verdict == EligibilityVerdict.Eligible && e.ConservativeExpectancyR is not null)
+        var groups = eligible
             .GroupBy(e => (e.Candidate.Symbol, e.Candidate.Side));
         foreach (var group in groups)
         {
@@ -43,6 +48,7 @@ public static class CandidateMerger
                 continue;
             }
 
+            // Shortcut: a stronger opposite side that was Held or Rejected is not in `winners`, so it takes no part here; an eligible side can survive against a held one. Revisit when P15 data makes holds rare.
             Resolve(sides, rules, kept, dropped);
         }
 

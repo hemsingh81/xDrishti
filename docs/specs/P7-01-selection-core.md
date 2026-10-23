@@ -11,7 +11,7 @@
 4. **P(win) means the shrunk posterior mean** of the stored cell statistics (all-time window). The conservative expectancy is `pLower * avgWinR + (1 - pLower) * avgLossR` with the lower credible bound `pLower`; statistics that are gross subtract the ticket's cost in R (unavailable without it).
 5. **"Min OOS sample 30"** reads the cell's trade count `N` (the stored statistics hold no separate out-of-sample count). Stated limit, not a hold-out.
 6. **Stated defaults beyond the design:** liquidity floor 10 million rupees average daily turnover; rank weights `w_conf` 0.05, `w_regime` 0.05, `w_corr` 0.10, `w_event` 0.10; confluence capped at 2; conflict margin 0.05 R. Reversible; their home is P7-00 Q14 (settings), not decided here.
-7. **Events, F&O ban and surveillance are optional filters** (data does not exist until P15): unavailable shows as a caveat and does not hold the candidate; a known exclusion always rejects. The owner can make any filter required through `OptionalFilters`. Every other filter is required: unavailable holds the candidate.
+7. **Every filter is required by default**, including events, F&O ban and surveillance (data does not exist until P15): unavailable holds the candidate, a known exclusion rejects. The owner can loosen a filter through `OptionalFilters`; an unavailable loosened filter is a caveat on the ranked candidate, printed by the verb, and a missing event filter lists `event_risk` as a missing rank input. A cell with zero wins or zero losses has no average, so its expectancy is unavailable and it is held.
 8. **No persistence.** The read-only verb needs none.
 
 ## Goal
@@ -19,6 +19,7 @@ Given plain candidates, say which are eligible and why not otherwise, merge dupl
 
 ## Scope
 **In:** Domain `Selection` (filters, rules, merger, ranker, selector), `ShowSelectionHandler` (`xd select cells --date D [--min-state ...]`), log ids 4640 to 4641, ADR 0082, tests.  
+**Notes:** the placeholder symbol `*` is the verb's only; the merger refuses it. The provisional label is printed for ranked and held cells. A Held stronger opposite side does not take part in conflict resolution (shortcut).  
 **Out:** candidates from a strategy and a symbol (ticket builder, P7-04), portfolio fill (P7-02), smart rules (P7-06), plan records and tables (P7-03), any endpoint, any migration.
 
 ## Acceptance criteria
@@ -27,7 +28,7 @@ Given plain candidates, say which are eligible and why not otherwise, merge dupl
 3. Merge: same symbol and side keeps the highest conservative expectancy (ties: shrunk win rate, trades, cell key ordinal); confluence counts other independent strategies (not timeframes), capped; opposite sides keep the stronger only when it leads by more than the margin, otherwise both are dropped; policy `DropBoth` drops both. Every dropped candidate has a code.
 4. Rank: `score = expLower + wConf*confluence + wRegime*regimeFit - wCorr*correlation - wEvent*eventRisk`; a missing input counts 0 and is listed; ties fall to a stated total order; any input order gives the same output.
 5. The advisory value changes no verdict, no merge, no rank.
-6. The verb reads stored statistics and changelog states, writes nothing, prints the limits, and exits 0/1/2/3/130 as the other verbs.
+6. The verb is as-of its `--date` (newest snapshot with as-of before it; changelog rows before that day, India time), reads stored statistics and changelog states, writes nothing, prints the limits, and exits 0/1/2/3/130 as the other verbs.
 
 ## Contract
 - **API:** none. **Data:** none. **UI:** none. **CLI:** `xd select cells --date YYYY-MM-DD [--min-state candidate|paper|active]`.

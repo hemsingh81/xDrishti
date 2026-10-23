@@ -10,7 +10,7 @@ internal sealed record SelectCellsOptions(DateOnly Date, CellState MinState)
     public const string Usage = """
         usage:
           xd select cells --date YYYY-MM-DD [--min-state candidate|paper|active]
-            runs the stored cells through the eligibility filters and the ranker as if planning for that date: only statistics with an as-of date before it are used, each filter shows pass, fail or unavailable with its code and numbers
+            runs the stored cells through the eligibility filters and the ranker as of that date: the newest statistics snapshot with an as-of date before it and each cell's state as the changelog stood before that day are used, each filter shows pass, fail or unavailable with its code and numbers
             read-only; a cell is not a ticket, so instrument-level inputs are unavailable and the limits are printed with the list
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 

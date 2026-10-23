@@ -13,7 +13,7 @@ public sealed record Eligibility(PlanCandidate Candidate, EligibilityVerdict Ver
     /// <summary>The results that are not a pass, in filter order: the reasons.</summary>
     public IReadOnlyList<FilterResult> Reasons => [.. Results.Where(r => r.Outcome != FilterOutcome.Pass)];
 
-    /// <summary>Codes of unavailable optional filters on an eligible candidate: shown on the ticket, never a pass.</summary>
+    /// <summary>Codes of filters that were unavailable on an eligible candidate, which can only be filters the owner loosened through <c>OptionalFilters</c>: shown on the ticket and the list, never a pass.</summary>
     public IReadOnlyList<string> Caveats => Verdict == EligibilityVerdict.Eligible
         ? [.. Results.Where(r => r.Outcome == FilterOutcome.Unavailable).Select(r => r.Code)]
         : [];

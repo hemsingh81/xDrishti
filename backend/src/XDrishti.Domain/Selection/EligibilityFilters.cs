@@ -48,7 +48,7 @@ public static class EligibilityFilters
         return new Eligibility(candidate, verdict, results.AsReadOnly(), expectancy);
     }
 
-    /// <summary>The conservative expectancy in R; null when the win or loss average is missing, or the statistics are gross and the cost is unknown.</summary>
+    /// <summary>The conservative expectancy in R; null when the win or loss average is missing (a cell with zero wins or zero losses has no such average, so its expectancy is unavailable and the cell is held, not passed), or the statistics are gross and the cost is unknown.</summary>
     public static double? ConservativeExpectancy(CellStatsRow stats, double? costR)
     {
         ArgumentNullException.ThrowIfNull(stats);

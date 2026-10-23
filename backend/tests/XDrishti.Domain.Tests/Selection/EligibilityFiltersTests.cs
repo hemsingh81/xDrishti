@@ -158,23 +158,27 @@ public sealed class EligibilityFiltersTests
     [InlineData(FilterCodes.Event)]
     [InlineData(FilterCodes.FnoBan)]
     [InlineData(FilterCodes.Surveillance)]
-    public void Unknown_event_ban_and_surveillance_are_unavailable_caveats_not_blockers_by_default(string code)
+    public void Unknown_event_ban_and_surveillance_hold_the_candidate_by_default(string code)
     {
         var c = Candidates.Good(eventBlock: null, ban: null, surveillance: null);
 
         var e = EligibilityFilters.Evaluate(c, Rules);
 
         e.Results.Single(r => r.Code == code).Outcome.ShouldBe(FilterOutcome.Unavailable);
-        e.Verdict.ShouldBe(EligibilityVerdict.Eligible);
-        e.Caveats.ShouldBe([FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance]);
+        e.Verdict.ShouldBe(EligibilityVerdict.Held);
+        e.Caveats.ShouldBeEmpty();
     }
 
     [Fact]
-    public void An_owner_can_make_the_unavailable_ban_filter_required()
+    public void An_owner_can_loosen_the_filters_and_the_unavailable_ones_stay_as_caveats()
     {
-        var rules = new SelectionRules(OptionalFilters: [FilterCodes.Event]);
+        var rules = new SelectionRules(OptionalFilters: [FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance]);
 
-        EligibilityFilters.Evaluate(Candidates.Good(ban: null), rules).Verdict.ShouldBe(EligibilityVerdict.Held);
+        var e = EligibilityFilters.Evaluate(Candidates.Good(eventBlock: null, ban: null, surveillance: null), rules);
+
+        e.Verdict.ShouldBe(EligibilityVerdict.Eligible);
+        e.Caveats.ShouldBe([FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance]);
+        EligibilityFilters.Evaluate(Candidates.Good(ban: null), new SelectionRules(OptionalFilters: [FilterCodes.Event])).Verdict.ShouldBe(EligibilityVerdict.Held);
     }
 
     [Theory]

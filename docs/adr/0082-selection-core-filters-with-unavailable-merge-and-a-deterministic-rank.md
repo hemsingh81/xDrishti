@@ -11,11 +11,11 @@ Doc 10 sections 2 to 4 describe filters, a merge and a rank. Three facts shape t
 1. **Filters are a pure function** returning pass, fail or unavailable per filter with a stable code (`cell_state`, `stats_as_of`, `sample`, `win_rate`, `expectancy`, `reward_risk`, `cost`, `liquidity`, `event`, `fno_ban`, `surveillance`) and the numbers. Verdict: any fail rejects; else a required filter unavailable holds; else eligible. Unavailable is never a pass.
 2. **Minimum state Candidate, plans provisional** below Active (P7-00 Q7).
 3. **No look-ahead:** statistics count only when their as-of date is before the decision date.
-4. **Optional filters** are those whose data is not built (events, ban, surveillance): their unavailable answer is a caveat shown on the candidate, not a pass and not a blocker; configurable.
-5. **Conservative expectancy** is computed from the lower credible bound of the win rate and the stored averages; comparisons round to 9 places so float noise never decides a boundary.
+4. **No filter is optional by default.** Events, F&O ban and surveillance have no data until P15, so with the defaults a candidate is held (unavailable) rather than passed on a guess. The owner can loosen any of them through `OptionalFilters`; a loosened filter that is unavailable stays a caveat on the ranked candidate and is printed. A missing event filter also lists `event_risk` as a missing rank input (counted 0, shown in the explanation).
+5. **Conservative expectancy** is computed from the lower credible bound of the win rate and the stored averages (a cell with zero wins or zero losses has no such average: unavailable, held); comparisons round to 9 places so float noise never decides a boundary.
 6. **Merge and rank are total orders** (expectancy, shrunk win rate, trades, symbol, side, cell key, all ordinal): the output does not depend on input order. Opposite sides survive only on a lead above the margin.
 7. **The model is advisory:** carried, never used.
-8. **One verb, no table:** `xd select cells`, over stored statistics and changelog states, at cell level (placeholder symbol `*`), so instrument-level filters read unavailable and cells are held. Log ids 4640 and 4641.
+8. **One verb, no table:** `xd select cells`, over stored statistics and changelog states, at cell level (placeholder symbol `*`), so instrument-level filters read unavailable and cells are held. The verb is truly as-of: `--date` selects the newest statistics snapshot with an as-of date before it and replays only changelog rows written before that day began (India time). Held cells are labelled provisional as well. The merger refuses the placeholder `*`; a Held or Rejected stronger opposite side takes no part in conflict resolution (shortcut). Log ids 4640 and 4641.
 
 ## Consequences
 - With the ticket builder missing, the verb ranks nothing; it shows which cells would pass the evidence filters and which input is missing. That is the honest state.
@@ -24,5 +24,5 @@ Doc 10 sections 2 to 4 describe filters, a merge and a rank. Three facts shape t
 
 ## Alternatives considered
 - **Treat unavailable optional data as a pass.** Rejected: it would claim a clear ban list nobody checked.
-- **Require every filter.** Rejected: with no events or ban data the plan would be empty forever.
+- **Make events, ban and surveillance optional by default.** Rejected (review): it would let a ticket through on a ban list nobody checked. The plan is empty until the data exists, which is the safe state; the owner may loosen it knowingly.
 - **Rank on the model's probability.** Rejected until the phase check reads MET on the owner's data.
