@@ -11,6 +11,8 @@ namespace XDrishti.Api.IntegrationTests.Planning;
 [Collection(ApiTestSuite.Name)]
 public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) : IClassFixture<ResearchGrantsTests.DedicatedServer>
 {
+    private static readonly string[] RejectedReasons = ["why"];
+
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static async Task<string?> SqlStateAsync(string connectionString, string sql)
@@ -84,7 +86,54 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             (await SqlStateAsync(server.App, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
 
-        (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM trading.plans", Ct)).ShouldBe(1);
+        (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM trading.plans WHERE plan_key = 'grants-probe'", Ct)).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task As_xd_app_the_plan_trigger_fires_and_cannot_be_replaced_dropped_or_disabled()
+    {
+        const string Plan = "INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at) VALUES ('grants-trigger', '2026-10-14', '2026-10-14 03:35:00+00', 2, repeat('b', 64), 'b', true, 'n', 'l', 'probe', now())";
+        const string Item = "INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) SELECT id, @rank, @grp, 's', 'BUY', 'x', 'h', 't', 's', 't', 'v', @reasons, 'c', 1, 'd', 'b', '{}' FROM trading.plans WHERE plan_key = 'grants-trigger'";
+        const string Event = "INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, created_at) SELECT plan_id, id, 'proposed', 'lapsed', 'a', 'r', now() FROM trading.plan_items WHERE item_rank = @rank AND plan_id = (SELECT id FROM trading.plans WHERE plan_key = 'grants-trigger')";
+
+        await using var connection = new NpgsqlConnection(server.App);
+        await connection.OpenAsync(Ct);
+
+        async Task<string?> RunAsync(string sql, params (string Name, object Value)[] parameters)
+        {
+            await using var command = new NpgsqlCommand(sql, connection);
+            foreach (var (name, value) in parameters)
+            {
+                command.Parameters.AddWithValue(name, value);
+            }
+
+            try
+            {
+                await command.ExecuteNonQueryAsync(Ct);
+                return null;
+            }
+            catch (PostgresException failure)
+            {
+                return failure.SqlState;
+            }
+        }
+
+        (await RunAsync(Plan)).ShouldBeNull();
+        (await RunAsync(Item, ("rank", 1), ("grp", "primary"), ("reasons", Array.Empty<string>()))).ShouldBeNull();
+        (await RunAsync(Item, ("rank", 2), ("grp", "rejected"), ("reasons", RejectedReasons))).ShouldBeNull();
+        (await RunAsync(Event, ("rank", 1))).ShouldBeNull("an event on a ticket is accepted");
+        (await RunAsync(Event, ("rank", 2))).ShouldBe(PostgresErrorCodes.CheckViolation, "the trigger refuses an event on a rejected candidate");
+        foreach (var statement in new[]
+        {
+            "CREATE OR REPLACE FUNCTION trading.check_plan_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$",
+            "DROP TRIGGER trg_plan_events_check ON trading.plan_events",
+            "ALTER TABLE trading.plan_events DISABLE TRIGGER trg_plan_events_check",
+            "ALTER TABLE workflow.approvals DISABLE TRIGGER trg_approvals_stamp",
+            "DROP TRIGGER trg_approvals_stamp ON workflow.approvals",
+        })
+        {
+            (await RunAsync(statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
+        }
     }
 
     [Fact]

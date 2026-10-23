@@ -219,7 +219,15 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             p.Add(new NpgsqlParameter("confirm", NpgsqlDbType.Varchar) { Value = (object?)approval.ConfirmReason ?? DBNull.Value });
             p.Add(new NpgsqlParameter("mods", NpgsqlDbType.Varchar) { Value = (object?)approval.Modifications ?? DBNull.Value });
             p.AddWithValue("cutoff", NpgsqlDbType.TimestampTz, cutoff);
-            approvalId = (long)(await insertApproval.ExecuteScalarAsync(cancellationToken))!;
+            try
+            {
+                approvalId = (long)(await insertApproval.ExecuteScalarAsync(cancellationToken))!;
+            }
+            catch (PostgresException failure) when (failure.SqlState == PostgresErrorCodes.CheckViolation)
+            {
+                // The database stamps the decision with its own clock and refuses an approval or modification at or after the plan's cutoff, also when the application clock read just before it.
+                return MoveStatus.AfterCutoff;
+            }
         }
 
         await InsertEventAsync(connection, transaction, planId, move.ItemId, move.From.Code(), move.To.Code(), move.Actor, move.Reason, approvalId, now, cancellationToken);

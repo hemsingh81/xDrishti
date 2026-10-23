@@ -223,7 +223,7 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
     }
 
     [Fact]
-    public async Task The_database_agrees_with_both_transition_tables_on_every_pair()
+    public async Task The_legal_pair_and_chain_checks_alone_agree_with_both_transition_tables_on_every_pair()
     {
         var (plan, primary, _, _) = await StoredAsync();
         await using var connection = await OpenAsync();
@@ -389,6 +389,30 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         (await StateOfAsync("INSERT INTO trading.plan_runs (for_date, outcome, reason, manual, started_at, finished_at) VALUES ('2099-01-05', 'published', 'r', false, now(), now())")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await StateOfAsync("INSERT INTO trading.plan_runs (for_date, outcome, reason, manual, started_at, finished_at) VALUES ('2099-01-05', 'failed_closed', 'r', false, now(), now())")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await StateOfAsync("INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) VALUES (@p, 9, 'reserve', 's', 'BUY', 'x', 'h', 't', 's', 't', 'v', '{}', 'c', 1, 'd', 'b', '{}')", ("p", plan))).ShouldBe(PostgresErrorCodes.CheckViolation);
+    }
+
+    [Fact]
+    public async Task A_direct_approval_back_dated_past_the_cutoff_is_stamped_now_and_refused_and_the_store_reports_it_as_after_the_cutoff()
+    {
+        var past = await PublishAsync(Plan("plan-past-stamp", 4, Item(1, TicketGroup.Primary, allocate: false)) with { ForDate = new DateOnly(2026, 10, 13), ReviewCutoff = PastCutoff });
+        var item = (await ItemsAsync(past.Id))[0].Id;
+        const string BackDated = "INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, modifications, cutoff, decided_at) VALUES (@p, @i, 'owner', @d, 'owner:t', 'r', @m, (SELECT review_cutoff FROM trading.plans WHERE id = @p), '2020-01-01 00:00:00+00')";
+
+        (await StateOfAsync(BackDated, ("p", past.Id), ("i", item), ("d", "approve"), ("m", DBNull.Value))).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await StateOfAsync(BackDated, ("p", past.Id), ("i", item), ("d", "modify"), ("m", "smaller"))).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await StateOfAsync(BackDated, ("p", past.Id), ("i", item), ("d", "reject"), ("m", DBNull.Value))).ShouldBeNull();
+        (await ScalarAsync<bool>("SELECT decided_at > now() - interval '1 minute' FROM workflow.approvals WHERE item_id = @i", ("i", item))).ShouldBeTrue("the database stamped its own time");
+
+        // The application clock is before the cutoff but the database clock is after it: the store answers "after the cutoff", not a failure.
+        var other = await PublishAsync(Plan("plan-past-store", 5, Item(1, TicketGroup.Primary, allocate: false)) with { ForDate = new DateOnly(2026, 10, 14), ReviewCutoff = PastCutoff.AddDays(1) });
+        var otherItem = (await ItemsAsync(other.Id))[0].Id;
+        Factory.Clock.Pin(PastCutoff.AddDays(1).AddMinutes(-1));
+
+        var result = await MoveAsync(new MoveTicketCommand(otherItem, TicketState.Approved, "owner:me", "late by the database clock"));
+
+        result.Error.Code.ShouldBe(PlanErrors.MoveRefusedCode);
+        result.Error.Message.ShouldContain("cutoff");
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_events WHERE item_id = @i", ("i", otherItem))).ShouldBe(0);
     }
 
     [Fact]

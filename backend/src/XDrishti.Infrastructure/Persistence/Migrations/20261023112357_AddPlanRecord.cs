@@ -386,6 +386,17 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 """);
             migrationBuilder.Sql("CREATE TRIGGER trg_plan_events_check BEFORE INSERT ON trading.plan_events FOR EACH ROW EXECUTE FUNCTION trading.check_plan_event()");
 
+            // 5. The time of a decision is the database's: a direct insert cannot back-date an approval to before the cutoff (the check on approvals runs after this trigger).
+            migrationBuilder.Sql("""
+                CREATE FUNCTION workflow.stamp_approval() RETURNS trigger LANGUAGE plpgsql AS $fn$
+                BEGIN
+                    NEW.decided_at := clock_timestamp();
+                    RETURN NEW;
+                END
+                $fn$
+                """);
+            migrationBuilder.Sql("CREATE TRIGGER trg_approvals_stamp BEFORE INSERT ON workflow.approvals FOR EACH ROW EXECUTE FUNCTION workflow.stamp_approval()");
+
             // Insert-only for the runtime role (spec P7-03, ADR 0083): a state change is a new plan_events row, a decision a new approvals row.
             // A later migration must NOT call GrantSchemaUsageToAppRole for trading or workflow (it would give UPDATE and DELETE back); to add a table here, grant that table and make it append-only. PlanGrantsTests and an architecture test enforce it.
             migrationBuilder.GrantSchemaUsageToAppRole(Schemas.Trading);
@@ -401,6 +412,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trg_approvals_stamp ON workflow.approvals");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS workflow.stamp_approval()");
             migrationBuilder.Sql("DROP TRIGGER IF EXISTS trg_plan_events_check ON trading.plan_events");
             migrationBuilder.Sql("DROP FUNCTION IF EXISTS trading.check_plan_event()");
             migrationBuilder.DropTable(
