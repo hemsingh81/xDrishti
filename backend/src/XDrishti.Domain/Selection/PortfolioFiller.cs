@@ -89,7 +89,7 @@ public static class PortfolioFiller
 
     private static double? FiniteOrZero(double? v) => v is { } x && double.IsFinite(x) && x >= 0 ? x : null;
 
-    private static int Sign(string side) => side switch { "BUY" => 1, "SELL" => -1, _ => 0 };
+    private static int Sign(string side) => SideSign.Of(side);
 
     private static List<FillCheck> Evaluate(FillCandidate c, List<Holding> held, int picked, CorrelationMatrix? correlations, FillConstraints k)
     {

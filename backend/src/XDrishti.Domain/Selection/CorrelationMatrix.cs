@@ -27,10 +27,13 @@ public sealed class CorrelationMatrix
     /// <summary>The correlation of two symbols; null when unknown.</summary>
     public double? Get(string a, string b) => _values.TryGetValue(Key(a, b), out var v) ? v : null;
 
+    /// <summary>The form in which symbols are compared: trimmed, upper case.</summary>
+    internal static string Normalize(string symbol) => symbol.Trim().ToUpperInvariant();
+
     private static (string, string) Key(string a, string b)
     {
-        var x = a.Trim().ToUpperInvariant();
-        var y = b.Trim().ToUpperInvariant();
+        var x = Normalize(a);
+        var y = Normalize(b);
         return string.CompareOrdinal(x, y) <= 0 ? (x, y) : (y, x);
     }
 }

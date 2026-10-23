@@ -277,5 +277,5 @@ flowchart LR
 | 10 | **Weekly learning digest** | Built by the weekly retrain service | One summary: progress vs frozen model, what changed automatically, what needs you, what is being watched, why trades lost, focus for next week |
 
 Honesty rules for these features: each rule's evidence (trade counts, R by bucket) is shown next to it; a rule
-that would remove more than half of all trades, or whose "skipped" trades are not worse than the "taken" ones over
+that would remove half or more of the candidates it saw in one plan (as built in P7-06, per plan; the same test over the last 100 trades needs graded reserve outcomes, P7-13), or whose "skipped" trades are not worse than the "taken" ones over
 the last 100 trades, is flagged for review instead of being trusted blindly.
