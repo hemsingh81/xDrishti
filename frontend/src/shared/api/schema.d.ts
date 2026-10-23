@@ -2639,6 +2639,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/hypotheses': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The hypotheses (one knob each, from the owner or the grid), newest first, each in its current state (proposed, approved, running, judged, accepted, rejected, expired); optional state filter, limit 1 to 200 (default 50). Empty before the first. 422 learning.invalid */
+    get: operations['ListHypotheses'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/hypotheses/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One hypothesis with its history, the states it may move to and the experiment that judged it. Accepting records a verdict only; applying a change is the owner's own act. 404 hypotheses.not_found */
+    get: operations['GetHypothesis'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5399,6 +5433,78 @@ export interface components {
        * @description Present on portfolio.confirmation_required: how many of them the sync would close because Dhan no longer lists them.
        */
       wouldClose?: number;
+    };
+    /** @description One row of a hypothesis's history. */
+    HypothesisStepView: {
+      /**
+       * Format: int64
+       * @description The log row id.
+       */
+      rowId: number;
+      /** @description The state after the row. */
+      state: string;
+      /** @description Why. */
+      reason: string;
+      /** @description Who. */
+      actor: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      at: string;
+    };
+    /** @description A hypothesis as the API shows it (P6-10, ADR 0076): the newest row of its log, with the legal next states and, for one hypothesis, its history. */
+    HypothesisView: {
+      /**
+       * Format: int64
+       * @description The hypothesis id.
+       */
+      id: number;
+      /** @description proposed, approved, running, judged, accepted, rejected or expired. */
+      state: string;
+      /** @description owner or grid. */
+      source: string;
+      /** @description The cell it is about, or null. */
+      cellKey: null | string;
+      /** @description The one knob. */
+      knobName: string;
+      /** @description Parameter, Exit or Slippage. */
+      knobKind: string;
+      /** @description The value in the baseline run. */
+      baselineValue: string;
+      /** @description The value to try. */
+      candidateValue: string;
+      /** @description Why it was proposed. */
+      rationale: string;
+      /** @description The stored baseline run. */
+      baselineRunKey: string;
+      /** @description The candidate run, once attached. */
+      candidateRunKey: null | string;
+      /**
+       * Format: int64
+       * @description The experiment that judged it, once judged.
+       */
+      experimentId: null | number;
+      /** @description The reason of the newest move. */
+      reason: string;
+      /** @description Who made the newest move. */
+      actor: string;
+      /**
+       * Format: date-time
+       * @description When it was proposed.
+       */
+      createdAt: string;
+      /**
+       * Format: date-time
+       * @description When it last moved.
+       */
+      updatedAt: string;
+      /** @description The states it may move to. */
+      nextStates: string[];
+      /** @description Every step, oldest first; empty in a list. */
+      history: components['schemas']['HypothesisStepView'][];
+      /** @description What an accepted hypothesis does and does not do. */
+      note: string;
     };
     /** Format: binary */
     IFormFile: string;
@@ -14516,6 +14622,69 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ChangelogEntryView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListHypotheses: {
+    parameters: {
+      query?: {
+        state?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HypothesisView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetHypothesis: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HypothesisView'];
         };
       };
       /** @description Not Found */

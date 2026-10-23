@@ -164,6 +164,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<ExperimentRecord> Experiments => Set<ExperimentRecord>();
 
+    internal DbSet<HypothesisRecord> Hypotheses => Set<HypothesisRecord>();
+
     /// <summary>The verdicts of full tests (spec P5-04).</summary>
     internal DbSet<LabResultRow> LabResults => Set<LabResultRow>();
 

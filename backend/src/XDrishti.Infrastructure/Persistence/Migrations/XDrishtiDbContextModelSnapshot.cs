@@ -3454,6 +3454,119 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.HypothesisRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("BaselineRunKey")
+                        .IsRequired()
+                        .HasColumnType("character(64)")
+                        .HasColumnName("baseline_run_key");
+
+                    b.Property<string>("BaselineValue")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("baseline_value");
+
+                    b.Property<string>("CandidateRunKey")
+                        .HasColumnType("character(64)")
+                        .HasColumnName("candidate_run_key");
+
+                    b.Property<string>("CandidateValue")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("candidate_value");
+
+                    b.Property<string>("CellKey")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("cell_key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long?>("ExperimentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("experiment_id");
+
+                    b.Property<string>("FromState")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("from_state");
+
+                    b.Property<long?>("HypothesisId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("hypothesis_id");
+
+                    b.Property<string>("KnobKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("knob_kind");
+
+                    b.Property<string>("KnobName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("knob_name");
+
+                    b.Property<string>("Rationale")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("rationale");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("state");
+
+                    b.HasKey("Id")
+                        .HasName("pk_hypotheses");
+
+                    b.HasIndex("ExperimentId")
+                        .HasDatabaseName("ix_hypotheses_experiment_id");
+
+                    b.HasIndex("HypothesisId", "Id")
+                        .HasDatabaseName("ix_hypotheses_hypothesis_id_id");
+
+                    b.ToTable("hypotheses", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_hypotheses_links", "(state NOT IN ('running', 'judged', 'accepted') OR candidate_run_key IS NOT NULL) AND (state NOT IN ('judged', 'accepted') OR experiment_id IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_hypotheses_shape", "source IN ('owner', 'grid') AND knob_kind IN ('Parameter', 'Exit', 'Slippage') AND baseline_run_key ~ '^[0-9a-f]{64}$' AND (candidate_run_key IS NULL OR (candidate_run_key ~ '^[0-9a-f]{64}$' AND candidate_run_key <> baseline_run_key))");
+
+                            t.HasCheckConstraint("ck_hypotheses_state", "state IN ('proposed', 'approved', 'running', 'judged', 'accepted', 'rejected', 'expired') AND (from_state IS NULL OR from_state IN ('proposed', 'approved', 'running', 'judged', 'accepted', 'rejected', 'expired')) AND (state = 'proposed') = (from_state IS NULL) AND (state = 'proposed') = (hypothesis_id IS NULL) AND state IS DISTINCT FROM from_state");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.LearningChangelogRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -6170,6 +6283,15 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_broker_secrets_broker_accounts_account_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.HypothesisRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Learning.HypothesisRecord", null)
+                        .WithMany()
+                        .HasForeignKey("HypothesisId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_hypotheses_hypotheses_hypothesis_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.LearningChangelogRecord", b =>

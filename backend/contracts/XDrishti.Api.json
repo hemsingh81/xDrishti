@@ -8950,6 +8950,99 @@
           }
         }
       }
+    },
+    "/api/hypotheses": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The hypotheses (one knob each, from the owner or the grid), newest first, each in its current state (proposed, approved, running, judged, accepted, rejected, expired); optional state filter, limit 1 to 200 (default 50). Empty before the first. 422 learning.invalid",
+        "operationId": "ListHypotheses",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/HypothesisView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/hypotheses/{id}": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "One hypothesis with its history, the states it may move to and the experiment that judged it. Accepting records a verdict only; applying a change is the owner's own act. 404 hypotheses.not_found",
+        "operationId": "GetHypothesis",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HypothesisView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -16914,6 +17007,163 @@
             "format": "int32"
           }
         }
+      },
+      "HypothesisStepView": {
+        "required": [
+          "rowId",
+          "state",
+          "reason",
+          "actor",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "rowId": {
+            "type": "integer",
+            "description": "The log row id.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "The state after the row."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who."
+          },
+          "at": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          }
+        },
+        "description": "One row of a hypothesis's history."
+      },
+      "HypothesisView": {
+        "required": [
+          "id",
+          "state",
+          "source",
+          "cellKey",
+          "knobName",
+          "knobKind",
+          "baselineValue",
+          "candidateValue",
+          "rationale",
+          "baselineRunKey",
+          "candidateRunKey",
+          "experimentId",
+          "reason",
+          "actor",
+          "createdAt",
+          "updatedAt",
+          "nextStates",
+          "history",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The hypothesis id.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "proposed, approved, running, judged, accepted, rejected or expired."
+          },
+          "source": {
+            "type": "string",
+            "description": "owner or grid."
+          },
+          "cellKey": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The cell it is about, or null."
+          },
+          "knobName": {
+            "type": "string",
+            "description": "The one knob."
+          },
+          "knobKind": {
+            "type": "string",
+            "description": "Parameter, Exit or Slippage."
+          },
+          "baselineValue": {
+            "type": "string",
+            "description": "The value in the baseline run."
+          },
+          "candidateValue": {
+            "type": "string",
+            "description": "The value to try."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why it was proposed."
+          },
+          "baselineRunKey": {
+            "type": "string",
+            "description": "The stored baseline run."
+          },
+          "candidateRunKey": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The candidate run, once attached."
+          },
+          "experimentId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The experiment that judged it, once judged.",
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string",
+            "description": "The reason of the newest move."
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who made the newest move."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was proposed.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "When it last moved.",
+            "format": "date-time"
+          },
+          "nextStates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The states it may move to."
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HypothesisStepView"
+            },
+            "description": "Every step, oldest first; empty in a list."
+          },
+          "note": {
+            "type": "string",
+            "description": "What an accepted hypothesis does and does not do."
+          }
+        },
+        "description": "A hypothesis as the API shows it (P6-10, ADR 0076): the newest row of its log, with the legal next states and, for one hypothesis, its history."
       },
       "IFormFile": {
         "type": "string",
