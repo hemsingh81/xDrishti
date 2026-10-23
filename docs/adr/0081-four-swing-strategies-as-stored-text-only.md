@@ -21,4 +21,6 @@ Doc 07 names eight swing strategies besides `BASE_BREAKOUT`. The owner's answer 
 ## Honest limits
 - The rules are proposals read from names; the fabricated series prove mechanics only. A 2 R target for a five-session hold with a stop at a 3 to 5 session low is far in places; the exit reasons of the first runs decide whether that should change (a new version).
 - Warm-up is long (50, 200 and 252 sessions); an instrument with less daily history is skipped as not ready. A daily bar is built from 1-minute bars, so a vendor chart can differ.
+- The below-200-day half of `RSI2_REVERSION` (the SELL, an overbought RSI(2) under the average) is not built: swing SELL is futures only (doc 07 §7) and a swing strategy cannot list SELL.
+- The pinned hashes are change detectors taken from the code's own output, not independently computed values.
 - `RSI2_REVERSION` classically exits on a close above a short average; only `FIXED_RR` runs, so it is held to the target, the stop or five sessions.

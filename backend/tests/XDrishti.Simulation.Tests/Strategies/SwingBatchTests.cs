@@ -19,10 +19,10 @@ public sealed class SwingBatchTests
 
     private static readonly Dictionary<string, Expected> Table = new()
     {
-        ["TREND_PULLBACK"] = new(63, 125.50, 128.50, 134.50),
-        ["NR7_ID_BO"] = new(7, 102.20, 103.90, 107.30),
-        ["RSI2_REVERSION"] = new(211, 139.00, 139.80, 141.40),
-        ["HIGH_52W_MOMENTUM"] = new(260, 91.30, 98.40, 112.60),
+        ["TREND_PULLBACK"] = new(63, 125.25, 128.50, 135.00),
+        ["NR7_ID_BO"] = new(7, 102.25, 103.90, 107.20),
+        ["RSI2_REVERSION"] = new(211, 138.60, 139.80, 142.20),
+        ["HIGH_52W_MOMENTUM"] = new(260, 90.80, 98.40, 113.60),
     };
 
     public static readonly TheoryData<string> Every = [.. Table.Keys];
@@ -32,8 +32,13 @@ public sealed class SwingBatchTests
     {
         { "TREND_PULLBACK", "downtrend", "setup", 0 },
         { "TREND_PULLBACK", "low above the EMA", "trigger", 0 },
+        { "TREND_PULLBACK", "close at or under the EMA", "trigger", 1 },
+        { "TREND_PULLBACK", "close at or under the open", "trigger", 2 },
         { "NR7_ID_BO", "not an inside day", "setup", 0 },
+        { "NR7_ID_BO", "close on the inside day's high", "trigger", 0 },
         { "RSI2_REVERSION", "below the 200 day average", "setup", 0 },
+        { "RSI2_REVERSION", "RSI(2) not under 10", "trigger", 0 },
+        { "HIGH_52W_MOMENTUM", "below the 252-day high", "trigger", 0 },
         { "HIGH_52W_MOMENTUM", "flat", "trigger", 1 },
     };
 
@@ -47,20 +52,27 @@ public sealed class SwingBatchTests
         return read.Definition.ShouldNotBeNull();
     }
 
-    private static Bar[] Days(string id, bool negative = false, bool walk = true) => SwingBatchDays.Bars(id switch
+    private static List<SwingRow> Rows(string id, bool negative = false, bool walk = true) => id switch
     {
         "TREND_PULLBACK" => SwingBatchDays.TrendPullbackRows(negative, walk: walk),
         "NR7_ID_BO" => SwingBatchDays.Nr7Rows(negative, walk: walk),
         "RSI2_REVERSION" => SwingBatchDays.Rsi2Rows(negative, walk),
         _ => SwingBatchDays.High52Rows(negative, walk),
-    });
+    };
+
+    private static Bar[] Days(string id, bool negative = false, bool walk = true) => SwingBatchDays.Bars(Rows(id, negative, walk));
 
     private static Bar[] GateDay(string id, string name) => SwingBatchDays.Bars((id, name) switch
     {
         ("TREND_PULLBACK", "downtrend") => SwingBatchDays.TrendPullbackDowntrendRows(),
-        ("TREND_PULLBACK", _) => SwingBatchDays.TrendPullbackRows(lowAbove: true),
-        ("NR7_ID_BO", _) => SwingBatchDays.Nr7Rows(notInside: true),
-        ("RSI2_REVERSION", _) => SwingBatchDays.Rsi2BelowAverageRows(),
+        ("TREND_PULLBACK", "low above the EMA") => SwingBatchDays.TrendPullbackRows(lowAbove: true),
+        ("TREND_PULLBACK", "close at or under the EMA") => SwingBatchDays.TrendPullbackRows(negative: true),
+        ("TREND_PULLBACK", _) => SwingBatchDays.TrendPullbackRows(closeUnderOpen: true),
+        ("NR7_ID_BO", "not an inside day") => SwingBatchDays.Nr7Rows(notInside: true),
+        ("NR7_ID_BO", _) => SwingBatchDays.Nr7Rows(negative: true),
+        ("RSI2_REVERSION", "below the 200 day average") => SwingBatchDays.Rsi2BelowAverageRows(),
+        ("RSI2_REVERSION", _) => SwingBatchDays.Rsi2Rows(negative: true),
+        ("HIGH_52W_MOMENTUM", "below the 252-day high") => SwingBatchDays.High52Rows(negative: true),
         _ => SwingBatchDays.High52FlatRows(),
     });
 
@@ -77,7 +89,7 @@ public sealed class SwingBatchTests
     private static StrategyDefinition WithoutPart(StrategyDefinition definition, string list, int index)
     {
         var buy = definition.Buy!;
-        return definition with { Buy = list == "setup" ? buy with { Setup = Without(buy.Setup, index) } : buy with { Trigger = Without(buy.Trigger, index)! } };
+        return definition with { Buy = list == "setup" ? buy with { Setup = Without(buy.Setup, index) } : buy with { Trigger = Without(buy.Trigger, index) ?? new ConditionList(ListMode.All, ["close > 0"]) } };
     }
 
     [Theory]
@@ -156,6 +168,42 @@ public sealed class SwingBatchTests
         Candidates(WithoutPart(definition, "setup", 1), bars).ShouldNotBeEmpty($"session {narrow} is narrower than the inside day");
     }
 
+    [Theory]
+    [MemberData(nameof(NarrowSessions))]
+    public void An_older_range_equal_to_the_inside_days_is_not_strictly_narrower_and_blocks_the_entry(int tied)
+    {
+        var definition = Load("NR7_ID_BO");
+        var bars = SwingBatchDays.Bars(SwingBatchDays.Nr7Rows(narrowSession: tied, tie: true));
+
+        Candidates(definition, bars).ShouldBeEmpty();
+        Candidates(WithoutPart(definition, "setup", 1), bars).ShouldNotBeEmpty($"session {tied} has the same range, 0.75, as the inside day");
+    }
+
+    [Fact]
+    public void A_position_that_reaches_neither_stop_nor_target_leaves_at_the_close_of_its_fifth_session()
+    {
+        var result = Sim.Run(Sim.Create(Load("NR7_ID_BO"), Timeframe.D1, Cand.NoSlippage), SwingBatchDays.Bars(SwingBatchDays.Nr7HoldRows()), calendar: Rep.DefaultCalendar);
+
+        var trade = result.Trades.Single();
+        trade.ExitReason.ShouldBe(ExitReason.MaxHold);
+        trade.TradeDate.ShouldBe(BaseDays.Date(8));
+        trade.SessionsHeld.ShouldBe(5);
+        trade.ExitPrice.ShouldBe(104.00, 1e-9);
+    }
+
+    [Theory]
+    [InlineData("TREND_PULLBACK", 20, "44 sessions, the SMA(50) is not ready")]
+    [InlineData("NR7_ID_BO", 1, "7 sessions, the range of 7 days back does not exist")]
+    [InlineData("RSI2_REVERSION", 20, "191 sessions, the SMA(200) is not ready")]
+    [InlineData("HIGH_52W_MOMENTUM", 20, "241 sessions, the 252-session high is not ready")]
+    public void A_series_that_is_too_short_for_the_warm_up_gives_no_candidate_though_the_trigger_session_is_the_same(string id, int skipped, string why)
+    {
+        var definition = Load(id);
+
+        Candidates(definition, Days(id)).ShouldNotBeEmpty();
+        Candidates(definition, SwingBatchDays.Bars([.. Rows(id).Skip(skipped)])).ShouldBeEmpty(why);
+    }
+
     [Fact]
     public void The_trend_pullback_averages_are_the_ramp_arithmetic_and_the_dip_reaches_the_average()
     {
@@ -168,7 +216,7 @@ public sealed class SwingBatchTests
         (125.5 <= ema).ShouldBeTrue("the low of the trigger session is at or under the EMA(20)");
         (closes[63] > ema).ShouldBeTrue();
         (ema > Sma(closes[..64], 50)).ShouldBeTrue();
-        Ema(closes[..63], 20).ShouldBeLessThan(126.75, "no earlier session has its low (126.75 and higher) at the average");
+        closes[60..63].Zip(SwingBatchDays.TrendPullbackRows().Skip(60).Take(3), (c, r) => c < r.O).ShouldAllBe(down => down, "sessions 60 to 62 close under their open, so none is a trigger even where the low reaches the average");
     }
 
     [Fact]

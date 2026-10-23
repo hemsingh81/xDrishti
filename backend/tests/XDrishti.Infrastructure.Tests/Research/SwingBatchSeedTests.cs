@@ -6,13 +6,13 @@ namespace XDrishti.Infrastructure.Tests.Research;
 
 /// <summary>
 /// The four swing strategies of P6-17b exist only as stored text (ADR 0081): each embedded seed reads, compiles on 1D with no problem, has a pinned hash and a declared parameter set. A changed text is a new hash and so a new version;
-/// this test is the place that makes the change visible. The hashes of the eleven earlier built-ins are pinned in their own tests and do not change.
+/// this test is the place that makes the change visible. The pinned values are change detectors, taken from the code's own output when the text was written (not computed independently). The hashes of the eleven earlier built-ins are pinned in their own tests and do not change.
 /// </summary>
 public sealed class SwingBatchSeedTests
 {
     public static readonly TheoryData<string, string> Pinned = new()
     {
-        { "TREND_PULLBACK", "396a48cb51d9886e99e9c0c387c901de2fea70a603cf775d57ed1bfff91cb7c2" },
+        { "TREND_PULLBACK", "85a1ba562934e1dc6e820171079ad097a9139223281d054d022faea26fb2c459" },
         { "NR7_ID_BO", "ae23a93709c78b1fca24570863a1d284f81c0460b6a6c7e5b34f11aa6f8d1380" },
         { "RSI2_REVERSION", "e36a6764df781dabc6f43d20e50a1b2633a58ca9fbd1695073ea5c07864f69d2" },
         { "HIGH_52W_MOMENTUM", "c3a11194789b1078bb268434ad1f65f636ffadc189fb55eebd255a39f7d17f20" },

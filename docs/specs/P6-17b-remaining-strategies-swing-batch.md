@@ -19,7 +19,7 @@ Four more swing strategies exist as stored, versioned text, run by `simulate --s
 
 | Id | Setup | Trigger | Stop |
 |----|-------|---------|------|
-| `TREND_PULLBACK` | `ema(20) > sma(50)` | the low is at or under `ema(20)`; the close is above `ema(20)` and above the open | lowest low of 3 sessions |
+| `TREND_PULLBACK` | `ema(20) > sma(50)` | three items: the low is at or under `ema(20)`; the close is above `ema(20)`; the close is above the open | lowest low of 3 sessions |
 | `NR7_ID_BO` | yesterday was an inside day (`inside_bar[1] == 1`) and its range is strictly the smallest of the 7 sessions ending yesterday (written out with `min` of the ranges of days 3 to 7 back; day 2 back is the mother bar, which an inside day implies is wider) | `close > high[1]` | lowest low of 2 sessions (the inside day and the trigger day) |
 | `RSI2_REVERSION` | `close > sma(200)` | `rsi(2) < rsi_max` (10) | lowest low of 3 sessions |
 | `HIGH_52W_MOMENTUM` | none | `close >= highest(252, source=close)` (a tie counts) and `close > close[1]` | lowest low of 5 sessions |
@@ -37,7 +37,7 @@ Four more swing strategies exist as stored, versioned text, run by `simulate --s
 1. Each seed reads, compiles on 1D BUY with no error and no warning, and the simulator accepts it (`SwingBatchTests`).
 2. On a fabricated daily series each fires exactly once at the close of the trigger session with the stop of the text, is filled at the open of the next session and walks to the target at 2 R, the numbers written beside the series in `SwingBatchDays`.
 3. A negative series for each gives no candidate.
-4. Every setup gate and trigger part that is not implied by another has a series on which the trigger holds and only that part is false (nothing fires), and the same series without the part gives a candidate; the five older ranges of the `NR7_ID_BO` range test each have such a series, so deleting any term of it turns a test red.
+4. Every setup gate and every trigger item (each is its own list item) has a series on which everything else holds and only that item is false (nothing fires), and the same series without the item gives a candidate (a trigger of one item is replaced by `close > 0`); the terms of the `NR7_ID_BO` range test also have a series where the older range is equal (a tie, binary-exact 0.75) and not only narrower, and a series too short for the warm-up gives no candidate; the five older ranges of the `NR7_ID_BO` range test each have such a series, so deleting any term of it turns a test red.
 5. No look-ahead: the candidate (with its trace values) is identical when the sessions after the decision are cut off and when they are replaced.
 6. The embedded seed list is the fifteen names; each new hash is pinned in `SwingBatchSeedTests`; the hashes of the eleven earlier built-ins are unchanged; the seed stores fifteen families at version 1 and a second run writes nothing.
 
@@ -48,7 +48,7 @@ Four more swing strategies exist as stored, versioned text, run by `simulate --s
 No secrets, no new log id (the seeder's 4433 to 4435 are reused).
 
 ## Test plan
-There is no C# oracle, by design (ADR 0056, 0079): the oracle is the hand-calculated daily series with its stop, entry and target written next to it, plus plain-arithmetic checks of the indicator values at the trigger (a perfect ramp makes the EMA(20) the close less 9.5 steps and the SMA(50) the close less 24.5 steps; Wilder RSI(2) of the climb and two falls is 16.67 then 6.25; the highest close of the 252 sessions is 98.30). `Simulation.Tests`: `SwingBatchTests` over `SwingBatchDays`. `Infrastructure.Tests`: `SwingBatchSeedTests`, the embedded list. `Api.IntegrationTests`: the seed row count in `LabStoreTests` and the known ids in `StoredStrategyVerbTests`. Edge cases: a close on the inside day's high (no break), a low above the average, a flat series that ties its own high, a pullback in a downtrend, a long-term-average gate.
+There is no C# oracle, by design (ADR 0056, 0079): the oracle is the hand-calculated daily series with its stop, entry and target written next to it, plus plain-arithmetic checks of the indicator values at the trigger (a perfect ramp makes the EMA(20) the close less 9.5 steps and the SMA(50) the close less 24.5 steps; Wilder RSI(2) of the climb and two falls is 16.67 then 6.25; the highest close of the 252 sessions is 98.30). `Simulation.Tests`: `SwingBatchTests` over `SwingBatchDays`. `Infrastructure.Tests`: `SwingBatchSeedTests`, the embedded list. `Api.IntegrationTests`: the seed row count in `LabStoreTests` and the known ids in `StoredStrategyVerbTests`. One case holds a position to the fifth session (`MaxHold`). In every series the lowest low of the stop window is the oldest session of it, so a shorter lookback would give another stop. Edge cases: a close on the inside day's high (no break), a low above the average, a flat series that ties its own high, a pullback in a downtrend, a long-term-average gate.
 
 ## Open questions
 None blocking. For the owner later: the definitions of `BB_SQUEEZE` and `FAILED_BREAKOUT`; whether any of the four should be dropped before the ledger counts them.

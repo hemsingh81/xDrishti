@@ -16,7 +16,8 @@ strategy:
   trigger:
     all:
       - "low <= ema(ema_len)"
-      - "close > ema(ema_len) and close > open"
+      - "close > ema(ema_len)"
+      - "close > open"
   entry:
     type: at_close
   stop:
