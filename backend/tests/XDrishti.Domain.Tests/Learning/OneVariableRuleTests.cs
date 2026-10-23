@@ -67,13 +67,28 @@ public sealed class OneVariableRuleTests
     }
 
     [Fact]
-    public void An_exit_knob_changes_only_the_exits()
+    public void An_exit_knob_changes_only_the_exits_and_its_values_are_named_in_the_stored_exits()
     {
         var knob = new ExperimentKnob("exit", ExperimentKnobKind.Exit, "fixed_rr", "partial_be");
+        var fixedRr = Base() with { Exits = "buy=[{\"policy\":\"fixed_rr\"}];sell=[];" };
+        var partial = Base() with { Exits = "buy=[{\"policy\":\"partial_be\"}];sell=[];" };
 
-        OneVariableRule.Problems(knob, Base(), Base() with { Exits = "buy=[1];sell=[];" }).ShouldBeEmpty();
-        OneVariableRule.Problems(knob, Base(), Base()).Single().ShouldContain("did not change");
-        OneVariableRule.Problems(knob, Base(), Def(exits: "buy=[1];sell=[];", parameters: [("or_min", 15), ("rr", 3)])).Single().ShouldContain("parameters differ (rr)");
+        OneVariableRule.Problems(knob, fixedRr, partial).ShouldBeEmpty();
+        OneVariableRule.Problems(knob, fixedRr, fixedRr).ShouldContain("the exits are the same: the knob did not change");
+        OneVariableRule.Problems(knob, fixedRr, partial with { Exits = "buy=[{\"policy\":\"other\"}];sell=[];" }).Single().ShouldContain("candidate run do not name 'partial_be'");
+        OneVariableRule.Problems(knob with { BaselineValue = "trail" }, fixedRr, partial).Single().ShouldContain("baseline run do not name 'trail'");
+        OneVariableRule.Problems(knob, fixedRr, Def(exits: partial.Exits, parameters: [("or_min", 15), ("rr", 3)])).Single().ShouldContain("parameters differ (rr)");
+        OneVariableRule.BaselineProblems(knob, Base()).Single().ShouldContain("do not name");
+        OneVariableRule.BaselineProblems(knob, fixedRr).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_candidate_without_the_knob_parameter_is_a_problem_not_an_exception()
+    {
+        var problems = OneVariableRule.Problems(Rr(), Base(), Def(parameters: [("or_min", 15)]));
+
+        problems.ShouldContain("the candidate run has no parameter 'rr'");
+        OneVariableRule.Problems(Rr(), Def(parameters: [("or_min", 15)]), Base()).ShouldContain("the baseline run has no parameter 'rr'");
     }
 
     [Fact]
@@ -99,6 +114,6 @@ public sealed class OneVariableRuleTests
         OneVariableRule.BaselineProblems(Rr(), Base()).ShouldBeEmpty();
         OneVariableRule.BaselineProblems(Rr("3", "4"), Base()).Single().ShouldContain("used 2");
         OneVariableRule.BaselineProblems(new ExperimentKnob("nope", ExperimentKnobKind.Parameter, "1", "2"), Base()).Single().ShouldContain("no parameter");
-        OneVariableRule.BaselineProblems(new ExperimentKnob("exit", ExperimentKnobKind.Exit, "a", "b"), Base()).ShouldBeEmpty();
+        OneVariableRule.BaselineProblems(new ExperimentKnob("slippage", ExperimentKnobKind.Slippage, "1", "2"), Base()).ShouldBeEmpty();
     }
 }

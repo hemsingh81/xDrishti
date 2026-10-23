@@ -117,6 +117,25 @@ public sealed class HypothesisLogApiTests(ApiFactory factory) : DataTestBase(fac
     }
 
     [Fact]
+    public async Task A_state_row_cannot_point_at_another_state_row_and_only_a_proposing_row_is_a_hypothesis()
+    {
+        var (b, _) = await StoreRunsAsync();
+        var id = (await SendAsync(Slippage(b))).Value.Id;
+        await SendAsync(new MoveHypothesisCommand(id, HypothesisState.Approved, "go", "cli:xd"));
+        await using var connection = await OpenAsync();
+        var stateRow = await new Npgsql.NpgsqlCommand($"SELECT max(id) FROM research.hypotheses WHERE hypothesis_id = {id}", connection).ExecuteScalarAsync(Ct);
+        var insert = $"INSERT INTO research.hypotheses (hypothesis_id, state, from_state, source, knob_name, knob_kind, baseline_value, candidate_value, rationale, baseline_run_key, reason, actor, created_at) VALUES ({stateRow}, 'rejected', 'approved', 'owner', 'k', 'Slippage', '1', '2', 'r', '{b}', 'r', 'a', now())";
+
+        var ex = await Should.ThrowAsync<Npgsql.PostgresException>(async () => await new Npgsql.NpgsqlCommand(insert, connection).ExecuteNonQueryAsync(Ct));
+        using var notSeed = await Client.GetAsync(new Uri($"/api/hypotheses/{stateRow}", UriKind.Relative), Ct);
+        using var numeric = await Client.GetAsync(new Uri("/api/hypotheses?state=1", UriKind.Relative), Ct);
+
+        ex.SqlState.ShouldBe("23503");
+        notSeed.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        numeric.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task At_most_three_stay_open_even_when_proposed_at_once()
     {
         var (b, _) = await StoreRunsAsync();

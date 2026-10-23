@@ -100,6 +100,29 @@ public sealed class HypothesisLifecycleTests
         HypothesisLifecycle.Refusals(HypothesisState.Judged, HypothesisState.Accepted, new HypothesisFacts(true, AutonomyLevel.Supervised)).Single().ShouldContain("Better");
     }
 
+    [Theory]
+    [InlineData(HypothesisState.Approved, HypothesisState.Running)]
+    [InlineData(HypothesisState.Running, HypothesisState.Judged)]
+    public void Only_the_owner_starts_and_judges_at_any_autonomy_level(HypothesisState from, HypothesisState to)
+    {
+        foreach (var level in Enum.GetValues<AutonomyLevel>())
+        {
+            HypothesisLifecycle.Refusals(from, to, new HypothesisFacts(false, level)).Single().ShouldContain("owner");
+            HypothesisLifecycle.Refusals(from, to, new HypothesisFacts(true, level)).ShouldBeEmpty();
+        }
+    }
+
+    [Theory]
+    [InlineData("proposed", true)]
+    [InlineData("PROPOSED", true)]
+    [InlineData("1", false)]
+    [InlineData("nope", false)]
+    [InlineData("", false)]
+    public void A_state_is_parsed_by_its_name_only(string text, bool known)
+    {
+        (HypothesisStateText.TryParse(text) is not null).ShouldBe(known);
+    }
+
     [Fact]
     public void Only_the_owner_rejects()
     {

@@ -56,7 +56,7 @@ internal sealed class HypothesisLogStore(NpgsqlDataSource dataSource) : IHypothe
             await advisory.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await using (var latest = new NpgsqlCommand("SELECT state FROM research.hypotheses WHERE id = @id OR hypothesis_id = @id ORDER BY id DESC LIMIT 1", connection, transaction))
+        await using (var latest = new NpgsqlCommand("SELECT state FROM research.hypotheses WHERE (id = @id AND hypothesis_id IS NULL) OR hypothesis_id = @id ORDER BY id DESC LIMIT 1", connection, transaction))
         {
             latest.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, hypothesisId);
             if (await latest.ExecuteScalarAsync(cancellationToken) is not string state || state != row.FromState)
@@ -72,7 +72,7 @@ internal sealed class HypothesisLogStore(NpgsqlDataSource dataSource) : IHypothe
 
     public async ValueTask<HypothesisRow?> FindAsync(long hypothesisId, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM research.hypotheses WHERE id = @id OR hypothesis_id = @id ORDER BY id DESC LIMIT 1");
+        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM research.hypotheses WHERE (id = @id AND hypothesis_id IS NULL) OR hypothesis_id = @id ORDER BY id DESC LIMIT 1");
         select.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, hypothesisId);
         var rows = await ReadAllAsync(select, cancellationToken);
         return rows.Count == 0 ? null : rows[0];
@@ -80,7 +80,7 @@ internal sealed class HypothesisLogStore(NpgsqlDataSource dataSource) : IHypothe
 
     public async ValueTask<IReadOnlyList<HypothesisRow>> HistoryAsync(long hypothesisId, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM research.hypotheses WHERE id = @id OR hypothesis_id = @id ORDER BY id");
+        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM research.hypotheses WHERE (id = @id AND hypothesis_id IS NULL) OR hypothesis_id = @id ORDER BY id");
         select.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, hypothesisId);
         return await ReadAllAsync(select, cancellationToken);
     }

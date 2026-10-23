@@ -14,20 +14,20 @@ internal static class LearnHypothesisCommand
 
     public static async Task<int> RunAsync(IReadOnlyList<string> args, IServiceProvider services, SimulateConsole console, CancellationToken cancellationToken)
     {
-        var (options, errors) = LearnHypothesisOptions.Parse(args);
-        if (options is null)
-        {
-            foreach (var error in errors)
-            {
-                await console.Error.WriteLineAsync(SimulateOptions.Show(error));
-            }
-
-            await console.Error.WriteAsync(LearnHypothesisOptions.Usage);
-            return XdCommand.UsageError;
-        }
-
         try
         {
+            var (options, errors) = LearnHypothesisOptions.Parse(args);
+            if (options is null)
+            {
+                foreach (var error in errors)
+                {
+                    await console.Error.WriteLineAsync(SimulateOptions.Show(error));
+                }
+
+                await console.Error.WriteAsync(LearnHypothesisOptions.Usage);
+                return XdCommand.UsageError;
+            }
+
             await using var scope = services.CreateAsyncScope();
             var p = scope.ServiceProvider;
             var outcome = options.Action switch

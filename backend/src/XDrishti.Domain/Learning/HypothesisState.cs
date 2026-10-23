@@ -33,5 +33,5 @@ public static class HypothesisStateText
 
     /// <summary>Reads a code back; null when unknown.</summary>
     public static HypothesisState? TryParse(string? code) =>
-        Enum.TryParse<HypothesisState>(code, true, out var s) && Enum.IsDefined(s) ? s : null;
+        code is not null && Enum.GetValues<HypothesisState>().Cast<HypothesisState?>().FirstOrDefault(s => string.Equals(s!.Value.Code(), code, StringComparison.OrdinalIgnoreCase)) is { } found ? found : null;
 }

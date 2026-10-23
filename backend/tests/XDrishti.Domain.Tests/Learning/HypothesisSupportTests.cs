@@ -88,11 +88,25 @@ public sealed class HypothesisSupportTests
         problem.ShouldBeNull();
         def!.StrategyId.ShouldBe("ORB");
         def.Parameters["rr"].ShouldBe(2);
-        def.Rest.ShouldNotContain("params");
+        def.Rest.ShouldContain("\"name\":\"rr\"");
+        def.Rest.ShouldNotContain("\"value\"");
         def.Rest.ShouldNotContain("fixed_rr");
         def.Rest.ShouldContain("trigger");
         def.Exits.ShouldContain("fixed_rr");
         def.Fills.ShouldBe("fills");
+    }
+
+    [Fact]
+    public void Property_order_does_not_matter_and_a_range_in_params_does()
+    {
+        string Rec(string definition) => "{\"strategy\":{\"id\":\"A\",\"parameters\":{},\"definition_json\":\"" + definition.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"}}";
+
+        var a = RunDefinition.TryRead(Rec("{\"id\":\"A\",\"params\":[{\"name\":\"rr\",\"value\":2,\"max\":5}]}"), "f", out _)!;
+        var reordered = RunDefinition.TryRead(Rec("{\"params\":[{\"max\":5,\"value\":3,\"name\":\"rr\"}],\"id\":\"A\"}"), "f", out _)!;
+        var wider = RunDefinition.TryRead(Rec("{\"id\":\"A\",\"params\":[{\"name\":\"rr\",\"value\":2,\"max\":9}]}"), "f", out _)!;
+
+        reordered.Rest.ShouldBe(a.Rest);
+        wider.Rest.ShouldNotBe(a.Rest);
     }
 
     [Theory]

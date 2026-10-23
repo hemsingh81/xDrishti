@@ -4,12 +4,12 @@ using System.Text.Json;
 namespace XDrishti.Domain.Learning;
 
 /// <summary>
-/// What a stored run says about the strategy and the fill rules, split so that a change can be pinned to one knob (spec P6-10, ADR 0076): the effective parameter values, the rest of the definition without its <c>params</c> and without the exits,
+/// What a stored run says about the strategy and the fill rules, split so that a change can be pinned to one knob (spec P6-10, ADR 0076): the effective parameter values, the rest of the definition (the names and any other fields of its <c>params</c> entries, but not their declared values) without the exits,
 /// the exits, and the fill rules. Read from the record text a run was stored with. Pure.
 /// </summary>
 /// <param name="StrategyId">The strategy id.</param>
 /// <param name="Parameters">The effective parameter values by name.</param>
-/// <param name="Rest">The canonical definition text without <c>params</c> and without the <c>exits</c> of either side.</param>
+/// <param name="Rest">The canonical definition text, properties in ordinal order, without the declared values of <c>params</c> and without the <c>exits</c> of either side.</param>
 /// <param name="Exits">The exits of the two sides as text.</param>
 /// <param name="Fills">The canonical fill rules text.</param>
 public sealed record RunDefinition(string StrategyId, IReadOnlyDictionary<string, double> Parameters, string Rest, string Exits, string Fills)
@@ -88,8 +88,21 @@ public sealed record RunDefinition(string StrategyId, IReadOnlyDictionary<string
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
+    // The definition without what a parameter run changes: the declared value of each entry of params (the effective values are compared on their own) and the exits of either side. Properties are written in ordinal order so that two spellings of one object are equal.
     private static void Write(Utf8JsonWriter writer, JsonElement element, string path)
     {
+        if (element.ValueKind == JsonValueKind.Array)
+        {
+            writer.WriteStartArray();
+            foreach (var item in element.EnumerateArray())
+            {
+                Write(writer, item, path + "[]");
+            }
+
+            writer.WriteEndArray();
+            return;
+        }
+
         if (element.ValueKind != JsonValueKind.Object)
         {
             element.WriteTo(writer);
@@ -97,9 +110,9 @@ public sealed record RunDefinition(string StrategyId, IReadOnlyDictionary<string
         }
 
         writer.WriteStartObject();
-        foreach (var p in element.EnumerateObject())
+        foreach (var p in element.EnumerateObject().OrderBy(x => x.Name, StringComparer.Ordinal))
         {
-            if ((path.Length == 0 && p.Name == "params") || (path is "buy" or "sell" && p.Name == "exits"))
+            if ((path is "buy" or "sell" && p.Name == "exits") || (path == "params[]" && p.Name == "value"))
             {
                 continue;
             }

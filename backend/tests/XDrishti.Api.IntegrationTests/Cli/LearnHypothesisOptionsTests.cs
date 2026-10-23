@@ -43,6 +43,15 @@ public sealed class LearnHypothesisOptionsTests
     }
 
     [Fact]
+    public void A_stray_knob_option_on_another_action_does_not_crash_the_parser()
+    {
+        var (options, errors) = LearnHypothesisOptions.Parse(["approve", "--id", "4", "--reason", "ok", "--knob", "rr"]);
+
+        errors.ShouldBeEmpty();
+        options!.Knob.ShouldBeNull();
+    }
+
+    [Fact]
     public void Triggers_take_runs_and_a_date()
     {
         var (options, errors) = LearnHypothesisOptions.Parse(["triggers", "--run", A + ":intraday:FIXED_RR", "--since", "2026-05-01", "--min-new-trades", "20"]);

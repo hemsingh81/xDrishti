@@ -2,7 +2,7 @@ namespace XDrishti.Domain.Learning;
 
 /// <summary>
 /// The hypothesis state machine as a pure table (spec P6-10, ADR 0076; doc 09 section 5): the legal moves and for each the facts the caller must state. No clock, no database. Approval is the owner's unless the autonomy level is
-/// <see cref="AutonomyLevel.Autonomous"/> (doc 16 <c>require_approval: per_autonomy</c>); accepting a verdict is always the owner's and needs a Better experiment; nothing here applies a change.
+/// <see cref="AutonomyLevel.Autonomous"/> (doc 16 <c>require_approval: per_autonomy</c>); starting, judging and accepting are always the owner's and needs a Better experiment; nothing here applies a change.
 /// </summary>
 public static class HypothesisLifecycle
 {
@@ -62,6 +62,12 @@ public static class HypothesisLifecycle
         {
             case (HypothesisState.Proposed, HypothesisState.Approved) when !facts.ByOwner && facts.Autonomy != AutonomyLevel.Autonomous:
                 reasons.Add($"At autonomy level {facts.Autonomy.ToString().ToLowerInvariant()} only the owner approves a hypothesis.");
+                break;
+            case (HypothesisState.Approved, HypothesisState.Running) when !facts.ByOwner:
+                reasons.Add("Only the owner attaches a candidate run.");
+                break;
+            case (HypothesisState.Running, HypothesisState.Judged) when !facts.ByOwner:
+                reasons.Add("Only the owner judges a hypothesis; a judgement is a trial that raises the bar.");
                 break;
             case (HypothesisState.Judged, HypothesisState.Accepted):
                 if (!facts.ByOwner)

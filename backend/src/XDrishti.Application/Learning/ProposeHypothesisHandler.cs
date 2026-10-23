@@ -88,6 +88,11 @@ internal sealed class ProposeHypothesisHandler(IRunStore runs, IHypothesisLog lo
         if (c.Source == HypothesisSource.Grid)
         {
             problems.AddRange(c.Grid.Problems().Select(p => new FieldError("grid", p)));
+            if (c.Grid != new HypothesisGrid())
+            {
+                problems.Add(new FieldError("grid", "A grid hypothesis uses the fixed coarse grid (10 percent, 2 steps); another grid is an owner hypothesis."));
+            }
+
             if (c.Knob.Kind != ExperimentKnobKind.Parameter)
             {
                 problems.Add(new FieldError("knob", "The grid proposes values for a parameter only."));

@@ -141,7 +141,7 @@ internal sealed record LearnHypothesisOptions(
             return (null, errors);
         }
 
-        ExperimentKnob? knob = values.TryGetValue("--knob", out var name) ? new ExperimentKnob(name, kind, values["--from"], values["--to"]) : null;
+        var knob = action == "propose" ? new ExperimentKnob(values["--knob"], kind, values["--from"], values["--to"]) : null;
         string? Get(string key) => values.GetValueOrDefault(key);
         return (new LearnHypothesisOptions(action, source, Get("--baseline"), Get("--candidate"), Get("--parameter"), Get("--cell"), knob, Get("--reason") ?? string.Empty, id, grid, experiment, hold, sources, since, minNew, monitor), errors);
     }

@@ -2,8 +2,8 @@ namespace XDrishti.Domain.Learning;
 
 /// <summary>
 /// The one-variable rule (doc 09 section 5, doc 16 <c>one_variable_only</c>, spec P6-10, ADR 0076): a candidate run may differ from its baseline in exactly the named knob and nothing else, checked against what the two stored runs say about their
-/// strategy and fill rules. A parameter knob: that one effective parameter differs, from and to the stated values; the exits, the rest of the definition and the fill rules are equal. An exit knob: only the exits differ. A slippage knob: only the
-/// <c>slippage.*</c> fill fields differ (judged by <see cref="FillCostComparison"/>). The data, window, universe and cost sheet are compared by the experiment (P6-11) that judges the pair. Pure.
+/// strategy and fill rules. A parameter knob: that one effective parameter differs, from and to the stated values; the exits, the rest of the definition and the fill rules are equal. An exit knob: only the exits differ, and each stated value is named in the stored exits of its run. A slippage knob: only the
+/// <c>slippage.*</c> fill fields differ (judged by <see cref="FillCostComparison"/>; its stated values are labels only, as in P6-11, because no single stored number is "the slippage"). The data, window, universe and cost sheet are compared by the experiment (P6-11) that judges the pair. Pure.
 /// </summary>
 public static class OneVariableRule
 {
@@ -12,6 +12,11 @@ public static class OneVariableRule
     {
         ArgumentNullException.ThrowIfNull(knob);
         ArgumentNullException.ThrowIfNull(baseline);
+        if (knob.Kind == ExperimentKnobKind.Exit)
+        {
+            return NamesIn(baseline.Exits, knob.BaselineValue) ? [] : [$"the exits of the baseline run do not name '{knob.BaselineValue}'"];
+        }
+
         if (knob.Kind != ExperimentKnobKind.Parameter)
         {
             return [];
@@ -72,6 +77,16 @@ public static class OneVariableRule
                     problems.Add("the exits are the same: the knob did not change");
                 }
 
+                if (!NamesIn(baseline.Exits, knob.BaselineValue))
+                {
+                    problems.Add($"the exits of the baseline run do not name '{knob.BaselineValue}'");
+                }
+
+                if (!NamesIn(candidate.Exits, knob.CandidateValue))
+                {
+                    problems.Add($"the exits of the candidate run do not name '{knob.CandidateValue}'");
+                }
+
                 if (!string.Equals(baseline.Fills, candidate.Fills, StringComparison.Ordinal))
                 {
                     problems.Add("the fill rules differ as well as the exits");
@@ -116,12 +131,20 @@ public static class OneVariableRule
         }
         else
         {
-            if (ExperimentKnob.Number(knob.BaselineValue) != Normal(baseline.Parameters[knob.Name]))
+            if (!baseline.Parameters.TryGetValue(knob.Name, out var baselineValue))
+            {
+                problems.Add($"the baseline run has no parameter '{knob.Name}'");
+            }
+            else if (ExperimentKnob.Number(knob.BaselineValue) != Normal(baselineValue))
             {
                 problems.Add($"the baseline run's '{knob.Name}' is not {knob.BaselineValue}");
             }
 
-            if (ExperimentKnob.Number(knob.CandidateValue) != Normal(candidate.Parameters[knob.Name]))
+            if (!candidate.Parameters.TryGetValue(knob.Name, out var candidateValue))
+            {
+                problems.Add($"the candidate run has no parameter '{knob.Name}'");
+            }
+            else if (ExperimentKnob.Number(knob.CandidateValue) != Normal(candidateValue))
             {
                 problems.Add($"the candidate run's '{knob.Name}' is not {knob.CandidateValue}");
             }
@@ -132,6 +155,9 @@ public static class OneVariableRule
     private static List<string> ChangedParameters(RunDefinition a, RunDefinition b) =>
         [.. a.Parameters.Keys.Concat(b.Parameters.Keys).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)
             .Where(k => !(a.Parameters.TryGetValue(k, out var x) && b.Parameters.TryGetValue(k, out var y) && x == y))];
+
+    // An exit value is the policy's name as the stored exits spell it (compared without case).
+    private static bool NamesIn(string exits, string value) => exits.Contains(value, StringComparison.OrdinalIgnoreCase);
 
     private static double Normal(double v) => v == 0 ? 0 : v;
 }

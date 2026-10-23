@@ -166,6 +166,39 @@ public sealed class HypothesisHandlersTests
     }
 
     [Fact]
+    public async Task The_system_cannot_start_or_judge_and_a_grid_hypothesis_cannot_use_another_grid()
+    {
+        var id = await ApprovedAsync();
+        var system = await Start().HandleAsync(new StartHypothesisCommand(id, Cand, "system:loop"), Ct);
+        var running = await RunningAsyncAfter(id);
+        var judge = await Judge().HandleAsync(new JudgeHypothesisCommand(running, new ExperimentOptions(), 6, "system:loop"), Ct);
+        var other = await Propose().HandleAsync(Proposal("2.1", HypothesisSource.Grid) with { Grid = new HypothesisGrid(5, 2) }, Ct);
+
+        system.Error.Code.ShouldBe(HypothesisErrors.MoveRefusedCode);
+        judge.Error.Code.ShouldBe(HypothesisErrors.MoveRefusedCode);
+        other.Error.Code.ShouldBe(LearningErrors.InvalidCode);
+        other.Error.Message.ShouldContain("fixed coarse grid");
+    }
+
+    [Fact]
+    public async Task A_candidate_without_the_parameter_is_refused_with_a_code_not_an_exception()
+    {
+        var id = await ApprovedAsync();
+        _runs.ReadRecordTextAsync(Cand, Arg.Any<CancellationToken>()).Returns("{\"strategy\":{\"id\":\"ORB\",\"parameters\":{\"or_min\":15},\"definition_json\":\"{}\"}}");
+
+        var started = await Start().HandleAsync(new StartHypothesisCommand(id, Cand, "cli:xd"), Ct);
+
+        started.Error.Code.ShouldBe(HypothesisErrors.NotOneVariableCode);
+        started.Error.Message.ShouldContain("candidate run has no parameter 'rr'");
+    }
+
+    private async Task<long> RunningAsyncAfter(long approved)
+    {
+        (await Start().HandleAsync(new StartHypothesisCommand(approved, Cand, "cli:xd"), Ct)).IsSuccess.ShouldBeTrue();
+        return approved;
+    }
+
+    [Fact]
     public async Task Start_attaches_a_candidate_that_differs_in_the_one_knob()
     {
         var id = await ApprovedAsync();

@@ -68,6 +68,11 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
             migrationBuilder.Sql("ALTER TABLE research.hypotheses ADD CONSTRAINT fk_hypotheses_sim_runs_candidate_run_key FOREIGN KEY (candidate_run_key) REFERENCES research.sim_runs (run_key) ON DELETE RESTRICT");
             migrationBuilder.Sql("ALTER TABLE research.hypotheses ADD CONSTRAINT fk_hypotheses_experiments_experiment_id FOREIGN KEY (experiment_id) REFERENCES research.experiments (id) ON DELETE RESTRICT");
 
+            // A state row must point at a proposing row (hypothesis_id null), never at another state row: the composite key (id, is_seed) is the target.
+            migrationBuilder.Sql("ALTER TABLE research.hypotheses ADD COLUMN is_seed boolean GENERATED ALWAYS AS (hypothesis_id IS NULL) STORED, ADD COLUMN points_at_seed boolean GENERATED ALWAYS AS (CASE WHEN hypothesis_id IS NULL THEN NULL ELSE true END) STORED");
+            migrationBuilder.Sql("ALTER TABLE research.hypotheses ADD CONSTRAINT uq_hypotheses_id_is_seed UNIQUE (id, is_seed)");
+            migrationBuilder.Sql("ALTER TABLE research.hypotheses ADD CONSTRAINT fk_hypotheses_seed FOREIGN KEY (hypothesis_id, points_at_seed) REFERENCES research.hypotheses (id, is_seed) ON DELETE RESTRICT");
+
             // Insert-only for the runtime role (spec P6-10, ADR 0076): a state change is a new row.
             migrationBuilder.MakeAppendOnlyForAppRole(Schemas.Research, "hypotheses");
         }
