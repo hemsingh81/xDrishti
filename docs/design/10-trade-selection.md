@@ -113,3 +113,6 @@ system proposed.
 
 ## 9. As built (P7-01, [ADR 0082](../adr/0082-selection-core-filters-with-unavailable-merge-and-a-deterministic-rank.md))
 Sections 2 to 4 exist as pure code (`XDrishti.Domain.Selection`): each filter answers pass, fail or unavailable with a stable code; unavailable is never a pass. Minimum cell state is Candidate until paper days exist and such plans are labelled provisional. The model is advisory and is not used in filters, merge or rank. `xd select cells --date D` shows the stored cells through the filters.
+
+## 10. As built (P7-02, [ADR 0084](../adr/0084-portfolio-fill-greedy-with-every-limit-rechecked-and-unavailable-blocking.md))
+Section 5 exists as pure code (`PortfolioFiller` in `XDrishti.Domain.Selection`): the ranked candidates are walked best first and one is taken only if every limit still holds with it added to the open book and the earlier picks. A limit whose input is not known (book, sector, risk, correlation pair, baskets, holding status) is `unavailable` and blocks like a fail. Output: primary, reserve (admissible alone, not taken, with the reason; first `reserve_size`) and rejected, each with the codes and numbers. Per-trade risk 1 %, `max_plan_items` 5 and `reserve_size` 3 are assumptions. No verb, table or order.
