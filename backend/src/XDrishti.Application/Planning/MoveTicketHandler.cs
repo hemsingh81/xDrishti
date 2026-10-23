@@ -32,7 +32,9 @@ internal sealed class MoveTicketHandler(IPlanStore store, ILogger<MoveTicketHand
             problems.Add(new FieldError("modifications", "Moving to modified needs what was edited (up to 1000 characters); no other move takes it."));
         }
 
-        if (command.ConfirmReason is not null && (command.To != TicketState.Approved || command.ConfirmReason.Length is 0 or > 500))
+        // Same semantics as OwnerConfirmation.Create: trimmed, not blank; the column holds 500 characters.
+        var confirmReason = command.ConfirmReason?.Trim();
+        if (command.ConfirmReason is not null && (command.To != TicketState.Approved || string.IsNullOrEmpty(confirmReason) || confirmReason.Length > 500))
         {
             problems.Add(new FieldError("confirmReason", "A confirmation reason (1 to 500 characters) goes only with an approval."));
         }
@@ -56,7 +58,7 @@ internal sealed class MoveTicketHandler(IPlanStore store, ILogger<MoveTicketHand
         }
 
         ApprovalInput? approval = TicketLifecycle.IsOwnerDecision(command.To)
-            ? new ApprovalInput(DecisionOf(command.To), command.Modifications, command.ConfirmReason)
+            ? new ApprovalInput(DecisionOf(command.To), command.Modifications, confirmReason)
             : null;
         var status = await store.MoveItemAsync(new ItemMove(command.ItemId, item.State, command.To, command.Actor, command.Reason, approval), cancellationToken);
         if (status != MoveStatus.Created)

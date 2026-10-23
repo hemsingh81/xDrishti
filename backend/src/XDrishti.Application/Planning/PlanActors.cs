@@ -4,7 +4,7 @@ namespace XDrishti.Application.Planning;
 internal static class PlanActors
 {
     /// <summary>The prefix of an owner actor.</summary>
-    public const string OwnerPrefix = "owner:";
+    public const string OwnerPrefix = Domain.Checklist.OwnerConfirmation.OwnerPrefix;
 
     /// <summary>Whether the actor is the owner.</summary>
     public static bool IsOwner(string actor) => actor.StartsWith(OwnerPrefix, StringComparison.Ordinal);

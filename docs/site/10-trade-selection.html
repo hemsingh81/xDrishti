@@ -236,13 +236,15 @@ system proposed.</p>
 <p>Sections 2 to 4 exist as pure code (<code>XDrishti.Domain.Selection</code>): each filter answers pass, fail or unavailable with a stable code; unavailable is never a pass. Minimum cell state is Candidate until paper days exist and such plans are labelled provisional. The model is advisory and is not used in filters, merge or rank. <code>xd select cells --date D</code> shows the stored cells through the filters.</p>
 <h2 id="10-as-built-p7-02-adr-0084">10. As built (P7-02, <a href="../adr/0084-portfolio-fill-greedy-with-every-limit-rechecked-and-unavailable-blocking.html">ADR 0084</a>)<a class="hash" href="#10-as-built-p7-02-adr-0084" aria-label="Link to this section">#</a></h2>
 <p>Section 5 exists as pure code (<code>PortfolioFiller</code> in <code>XDrishti.Domain.Selection</code>): the ranked candidates are walked best first and one is taken only if every limit still holds with it added to the open book and the earlier picks. A limit whose input is not known (book, sector, risk, correlation pair, baskets, holding status) is <code>unavailable</code> and blocks like a fail. Output: primary, reserve (admissible alone, not taken, with the reason; first <code>reserve_size</code>) and rejected, each with the codes and numbers. Pair correlation is judged in the direction of the bets (opposite sides of positively correlated names are a hedge, of negatively correlated names one bet). Per-trade risk 1 %, <code>max_plan_items</code> 5 and <code>reserve_size</code> 3 are assumptions. No verb, table or order.</p>
+<h2 id="10-as-built-p7-05-adr-0087">10. As built (P7-05, <a href="../adr/0087-pretrade-checklist-pure-unavailable-never-passes-and-an-owner-only-confirm-despite.html">ADR 0087</a>)<a class="hash" href="#10-as-built-p7-05-adr-0087" aria-label="Link to this section">#</a></h2>
+<p>Section 6b exists as pure code (<code>XDrishti.Domain.Checklist</code>): 13 checks per ticket and paper-mode Trading account plus an account gate (live accounts are refused). Each answers pass, fail or unavailable with a stable code and numbers; unavailable never passes. Approving despite needs an <code>owner:</code> actor and a reason, and shows as &quot;confirmed despite&quot;, never as a pass. Results dates, the F&amp;O ban list and correlation have no source yet, so they are unavailable. No table or verb; P7-10 stores the reason with the approval.</p>
 
   </article>
   <nav class="pager" aria-label="Previous and next document">
     <a class="prev" href="09-learning-engine.html"><small>← Previous  [</small>09 · Learning engine</a>
     <a class="next" href="11-strategy-lab.html"><small>Next  ] →</small>11 · Strategy Lab</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-23 12:41</footer>
+  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-23 13:32</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-pipeline" class="d2">1. Pipeline</a>
 <a href="#smart-rules-learned-doc-09-14" class="d3">Smart rules (learned, doc 09 §14)</a>
@@ -256,7 +258,8 @@ system proposed.</p>
 <a href="#7-day-level-guards" class="d2">7. Day-level guards</a>
 <a href="#8-proving-the-selector-and-your-overrides" class="d2">8. Proving the selector (and your overrides)</a>
 <a href="#9-as-built-p7-01-adr-0082" class="d2">9. As built (P7-01, ADR 0082)</a>
-<a href="#10-as-built-p7-02-adr-0084" class="d2">10. As built (P7-02, ADR 0084)</a></aside>
+<a href="#10-as-built-p7-02-adr-0084" class="d2">10. As built (P7-02, ADR 0084)</a>
+<a href="#10-as-built-p7-05-adr-0087" class="d2">10. As built (P7-05, ADR 0087)</a></aside>
 </div>
 <div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
 <script src="assets/search-index.js"></script>
