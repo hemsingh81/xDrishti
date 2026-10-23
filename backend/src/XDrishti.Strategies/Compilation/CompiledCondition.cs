@@ -62,6 +62,9 @@ public sealed class CompiledCondition
     /// <summary>The warnings of the compile (a constant condition, a redundant timeframe, a parameter that hides a name), in source order.</summary>
     public IReadOnlyList<Problem> Warnings { get; }
 
+    /// <summary>Whether the condition reads the clock (the <c>time</c> keyword). Such a condition, like one that reads an intraday feature, says nothing about tomorrow from the close of today (P7-04, ADR 0088).</summary>
+    public bool ReadsClock => XDrishti.Strategies.Binding.BoundTree.ReadsClock(_tree);
+
     /// <summary>The bound tree: every name resolved, every node typed.</summary>
     internal IBoundExpression Tree => _tree;
 
