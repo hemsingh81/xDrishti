@@ -2818,7 +2818,7 @@ export interface paths {
     };
     /** The autonomy settings in force (automatic approval and reserve promotion, both OFF = manual approval by default) with the history of changes. No order is placed in any setting */
     get: operations['GetAutonomySettings'];
-    /** Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale */
+    /** Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited */
     put: operations['ChangeAutonomySettings'];
     post?: never;
     delete?: never;

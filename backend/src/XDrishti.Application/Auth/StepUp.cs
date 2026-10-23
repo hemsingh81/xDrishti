@@ -82,7 +82,7 @@ internal sealed class StepUpHandler(
     {
         found.Owner.RegisterSuccess();
         var until = elevate ? found.Session.Elevate(now) : found.Session.ElevatedUntil ?? now;
-        audit.Record(AuditEvent.Record(AuditEventType.StepUpSucceeded, now, found.Owner.Email, client.Ip, client.UserAgent));
+        audit.Record(AuditEvent.Record(AuditEventType.StepUpSucceeded, now, found.Owner.Email, client.Ip, client.UserAgent, elevate ? null : "single-use confirmation, no window")); // a password-only confirmation must not read as an opened window
         if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
         {
             return null;

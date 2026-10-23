@@ -592,4 +592,32 @@ public sealed class AutoApprovalDatabaseTests(ApiFactory factory) : DataTestBase
         cutoff.Value.ShouldBe(new PlanMoveOutcome(plan, "lapsed", 2));
         (await ScalarAsync<long>("SELECT count(*) FROM workflow.approvals")).ShouldBe(0);
     }
+
+    private const string InsertSetting = "INSERT INTO workflow.autonomy_settings (auto_approve_tickets, promote_from_reserve, min_p_win, max_auto_per_day, snapshot_hash, actor, reason, changed_at) VALUES (true, false, 0.6, 3, 'x', 'owner:t@example.com', 'r', now()) RETURNING id";
+
+    [Fact]
+    public async Task A_settings_row_inserted_while_another_transaction_holds_the_lock_gets_a_higher_id_than_that_one()
+    {
+        await using var a = await OpenAsync();
+        await using var tx = await a.BeginTransactionAsync(Ct);
+        await using var first = new NpgsqlCommand(InsertSetting, a, tx);
+        var idA = (long)(await first.ExecuteScalarAsync(Ct))!; // A holds the settings lock, uncommitted
+
+        var blocked = Task.Run(async () => await ScalarAsync<long>(InsertSetting)); // B waits for A's lock before it draws its id
+        await Task.Delay(500, Ct);
+        blocked.IsCompleted.ShouldBeFalse();
+        await tx.CommitAsync(Ct);
+
+        (await blocked).ShouldBeGreaterThan(idA);
+    }
+
+    [Fact]
+    public async Task An_explicit_low_id_with_overriding_system_value_is_replaced_by_the_trigger_drawn_id()
+    {
+        var before = await ScalarAsync<long>(InsertSetting);
+
+        var stored = await ScalarAsync<long>(InsertSetting.Replace("(auto_approve_tickets", "(id, auto_approve_tickets", StringComparison.Ordinal).Replace("VALUES (true", "OVERRIDING SYSTEM VALUE VALUES (1, true", StringComparison.Ordinal));
+
+        stored.ShouldBeGreaterThan(before);
+    }
 }

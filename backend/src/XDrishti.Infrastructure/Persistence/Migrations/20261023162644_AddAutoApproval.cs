@@ -129,7 +129,6 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     session date;
                     used bigint;
                 BEGIN
-                    NEW.decided_at := clock_timestamp();
                     IF NEW.kind = 'auto' THEN
                         PERFORM pg_advisory_xact_lock_shared(hashtextextended('workflow.autonomy_settings', 0));
                         SELECT id, auto_approve_tickets, max_auto_per_day INTO cur FROM workflow.autonomy_settings ORDER BY id DESC LIMIT 1;
@@ -159,6 +158,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                             RAISE EXCEPTION 'The daily cap of automatic approvals is reached' USING ERRCODE = '23514';
                         END IF;
                     END IF;
+                    NEW.decided_at := clock_timestamp(); -- stamped after the lock waits above, so the time is when the decision took effect
                     RETURN NEW;
                 END
                 $fn$

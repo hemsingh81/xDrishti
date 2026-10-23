@@ -22,8 +22,9 @@ internal sealed class AutonomyEndpoints : IEndpointModule
             .WithSummary("The autonomy settings in force (automatic approval and reserve promotion, both OFF = manual approval by default) with the history of changes. No order is placed in any setting");
 
         group.MapPut("/settings", ChangeAsync)
+            .RequireRateLimiting(SessionAuthentication.LoginRateLimitPolicy) // a password is checked here, so the sign-in limit applies
             .WithName("ChangeAutonomySettings")
-            .WithSummary("Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale")
+            .WithSummary("Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale, 429 auth.rate_limited")
             .ProducesRejections(conflict: true, notFound: false);
     }
 
@@ -51,7 +52,7 @@ internal sealed class AutonomyEndpoints : IEndpointModule
         }
 
         // The owner is the signed-in session's e-mail address; with no verified session there is no owner and the handler refuses.
-        var email = http.GetVerifiedSession()?.Info.User.Email;
+        var email = session.Info.User.Email;
         var actor = string.IsNullOrWhiteSpace(email) ? string.Empty : OwnerConfirmation.OwnerPrefix + email;
         var result = await handler.HandleAsync(new ChangeAutonomySettingsCommand(actor, request.Reason, request.AutoApproveTickets, request.PromoteFromReserve, request.MinPWin, request.MaxAutoPerDay), cancellationToken);
         return result.IsFailure ? ProblemResults.From(result.Error, http) : TypedResults.Ok(result.Value);

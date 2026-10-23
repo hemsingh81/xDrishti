@@ -46,6 +46,16 @@ public sealed class StepUpHandlerTests
     }
 
     [Fact]
+    public async Task A_one_off_confirmation_is_audited_as_a_single_use_confirmation_not_as_an_opened_window()
+    {
+        var session = await SignedInSessionAsync();
+
+        await _fx.StepUp().HandleAsync(new StepUpCommand(session.Id, AuthFixture.OwnerPassword, AuthFixture.Client, Elevate: false), CancellationToken.None);
+
+        _fx.Data.Events.Last().Detail.ShouldBe("single-use confirmation, no window");
+    }
+
+    [Fact]
     public async Task A_one_off_confirmation_leaves_an_open_window_exactly_as_it_was()
     {
         var session = await SignedInSessionAsync();
