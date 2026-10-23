@@ -11,7 +11,7 @@ namespace XDrishti.Infrastructure.Planning;
 /// The plan record behind <see cref="IPlanStore"/> (spec P7-03, ADR 0083): raw SQL, insert and select only (the runtime role has no more). A state change is a new row in <c>trading.plan_events</c>, written under a transaction advisory lock
 /// per plan or item after checking that the newest state is still the one the caller saw. Nothing here talks to a broker.
 /// </summary>
-internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
+internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) : IPlanStore
 {
     private const string PlanStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.plan_id = p.id AND e.item_id IS NULL ORDER BY e.id DESC LIMIT 1), 'draft')";
 
@@ -172,6 +172,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
         await LockAsync(connection, transaction, "trading.plans:" + planId.ToString(CultureInfo.InvariantCulture), cancellationToken);
         await LockAsync(connection, transaction, "trading.plan_items:" + move.ItemId.ToString(CultureInfo.InvariantCulture), cancellationToken);
 
+        // The time is read after the locks, so a decision that waited for a lock is judged at the time it can be written.
+        var now = time.GetUtcNow();
         DateTimeOffset cutoff;
         await using (var state = new NpgsqlCommand($"SELECT i.item_group, {ItemStateSql}, (SELECT {PlanStateSql} FROM trading.plans p WHERE p.id = i.plan_id), (SELECT p.review_cutoff FROM trading.plans p WHERE p.id = i.plan_id) FROM trading.plan_items i WHERE i.id = @id", connection, transaction))
         {
@@ -194,7 +196,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
                     return MoveStatus.Refused;
                 }
 
-                if (move.To != TicketState.Rejected && move.At >= cutoff)
+                if (move.To != TicketState.Rejected && now >= cutoff)
                 {
                     return MoveStatus.AfterCutoff;
                 }
@@ -206,7 +208,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
         {
             await using var insertApproval = new NpgsqlCommand("""
                 INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, confirm_reason, modifications, cutoff, decided_at)
-                VALUES (@plan, @item, 'owner', @decision, @actor, @reason, @confirm, @mods, @cutoff, @at) RETURNING id
+                VALUES (@plan, @item, 'owner', @decision, @actor, @reason, @confirm, @mods, @cutoff, clock_timestamp()) RETURNING id
                 """, connection, transaction);
             var p = insertApproval.Parameters;
             p.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
@@ -217,11 +219,10 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
             p.Add(new NpgsqlParameter("confirm", NpgsqlDbType.Varchar) { Value = (object?)approval.ConfirmReason ?? DBNull.Value });
             p.Add(new NpgsqlParameter("mods", NpgsqlDbType.Varchar) { Value = (object?)approval.Modifications ?? DBNull.Value });
             p.AddWithValue("cutoff", NpgsqlDbType.TimestampTz, cutoff);
-            p.AddWithValue("at", NpgsqlDbType.TimestampTz, move.At);
             approvalId = (long)(await insertApproval.ExecuteScalarAsync(cancellationToken))!;
         }
 
-        await InsertEventAsync(connection, transaction, planId, move.ItemId, move.From.Code(), move.To.Code(), move.Actor, move.Reason, approvalId, move.At, cancellationToken);
+        await InsertEventAsync(connection, transaction, planId, move.ItemId, move.From.Code(), move.To.Code(), move.Actor, move.Reason, approvalId, now, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return MoveStatus.Created;
     }
@@ -265,7 +266,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
             return MoveStatus.Refused;
         }
 
-        await InsertEventAsync(connection, transaction, move.PlanId, null, move.From.Code(), move.To.Code(), move.Actor, move.Reason, null, move.At, cancellationToken);
+        await InsertEventAsync(connection, transaction, move.PlanId, null, move.From.Code(), move.To.Code(), move.Actor, move.Reason, null, time.GetUtcNow(), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return MoveStatus.Created;
     }
@@ -290,6 +291,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
         await insert.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    // The lock keys are 32-bit hashtext values: two different keys can collide and then wait for each other, which is harmless (only slower); the continuity indexes and checks of the migration do not rely on the lock.
     private static async Task LockAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string key, CancellationToken cancellationToken)
     {
         await using var advisory = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtext(@k))", connection, transaction);
@@ -299,11 +301,24 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource) : IPlanStore
 
     private static async Task InsertEventAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, long planId, long? itemId, string from, string to, string actor, string reason, long? approvalId, DateTimeOffset at, CancellationToken cancellationToken)
     {
+        // The previous event of the same plan or item (null for the first): the database checks that this event continues from its to_state.
+        object previous = DBNull.Value;
+        await using (var last = new NpgsqlCommand("SELECT id FROM trading.plan_events WHERE plan_id = @plan AND item_id IS NOT DISTINCT FROM @item ORDER BY id DESC LIMIT 1", connection, transaction))
+        {
+            last.Parameters.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
+            last.Parameters.Add(new NpgsqlParameter("item", NpgsqlDbType.Bigint) { Value = itemId is { } li ? li : DBNull.Value });
+            if (await last.ExecuteScalarAsync(cancellationToken) is long found)
+            {
+                previous = found;
+            }
+        }
+
         await using var insert = new NpgsqlCommand("""
-            INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, approval_id, created_at)
-            VALUES (@plan, @item, @from, @to, @actor, @reason, @approval, @at)
+            INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, approval_id, prev_event_id, created_at)
+            VALUES (@plan, @item, @from, @to, @actor, @reason, @approval, @prev, @at)
             """, connection, transaction);
         var p = insert.Parameters;
+        p.Add(new NpgsqlParameter("prev", NpgsqlDbType.Bigint) { Value = previous });
         p.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
         p.Add(new NpgsqlParameter("item", NpgsqlDbType.Bigint) { Value = itemId is { } i ? i : DBNull.Value });
         p.AddWithValue("from", NpgsqlDbType.Varchar, from);

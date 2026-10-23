@@ -40,7 +40,7 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_plans", x => x.id);
-                    table.CheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64");
+                    table.CheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64 AND (review_cutoff AT TIME ZONE 'Asia/Kolkata')::date = for_date");
                 });
 
             migrationBuilder.CreateTable(
@@ -200,12 +200,14 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     actor = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     reason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     approval_id = table.Column<long>(type: "bigint", nullable: true),
+                    prev_event_id = table.Column<long>(type: "bigint", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_plan_events", x => x.id);
                     table.CheckConstraint("ck_plan_events_approval", "(item_id IS NULL AND approval_id IS NULL) OR (item_id IS NOT NULL AND ((to_state IN ('approved', 'modified', 'rejected')) = (approval_id IS NOT NULL)))");
+                    table.CheckConstraint("ck_plan_events_chain", "(item_id IS NULL AND (prev_event_id IS NULL) = (from_state = 'draft')) OR (item_id IS NOT NULL AND (prev_event_id IS NULL) = (from_state = 'proposed'))");
                     table.CheckConstraint("ck_plan_events_legal", "(item_id IS NOT NULL AND (from_state, to_state) IN (('proposed', 'approved'), ('proposed', 'modified'), ('proposed', 'rejected'), ('proposed', 'lapsed'), ('modified', 'approved'), ('modified', 'rejected'), ('modified', 'lapsed'), ('approved', 'armed'), ('approved', 'invalidated'), ('approved', 'expired'), ('armed', 'triggered'), ('armed', 'expired'), ('triggered', 'closed'))) OR (item_id IS NULL AND (from_state, to_state) IN (('draft', 'published'), ('published', 'inreview'), ('published', 'approved'), ('published', 'rejected'), ('published', 'lapsed'), ('inreview', 'approved'), ('inreview', 'rejected'), ('inreview', 'lapsed'), ('approved', 'armed'), ('approved', 'expired'), ('armed', 'expired')))");
                     table.CheckConstraint("ck_plan_events_shape", "length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
                     table.ForeignKey(
@@ -317,18 +319,72 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "uq_plans_id_review_cutoff",
+                schema: "trading",
+                table: "plans",
+                columns: new[] { "id", "review_cutoff" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "uq_plans_plan_key",
                 schema: "trading",
                 table: "plans",
                 column: "plan_key",
                 unique: true);
 
-            // Composite keys (spec P7-03 review): an event, an approval and the item they name belong to the same plan, and an owner-decision event names an approval of the same item and plan.
+            // Composite keys (spec P7-03 safety reviews). Written in SQL; the EF model does not know the generated columns.
+            // 1. An approval says which state it backs (approve to approved, modify to modified, reject to rejected); an event's to_state must equal it, and the event, the approval and the item belong to the same plan.
+            migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD COLUMN state varchar(16) GENERATED ALWAYS AS (CASE decision WHEN 'approve' THEN 'approved' WHEN 'modify' THEN 'modified' ELSE 'rejected' END) STORED");
             migrationBuilder.Sql("ALTER TABLE trading.plan_items ADD CONSTRAINT uq_plan_items_plan_id_id UNIQUE (plan_id, id)");
-            migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD CONSTRAINT uq_approvals_id_plan_item UNIQUE (id, plan_id, item_id)");
+            migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD CONSTRAINT uq_approvals_id_plan_item_state UNIQUE (id, plan_id, item_id, state)");
             migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD CONSTRAINT fk_approvals_item_in_plan FOREIGN KEY (plan_id, item_id) REFERENCES trading.plan_items (plan_id, id) ON DELETE RESTRICT");
             migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD CONSTRAINT fk_plan_events_item_in_plan FOREIGN KEY (plan_id, item_id) REFERENCES trading.plan_items (plan_id, id) ON DELETE RESTRICT");
-            migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD CONSTRAINT fk_plan_events_approval_of_item FOREIGN KEY (approval_id, plan_id, item_id) REFERENCES workflow.approvals (id, plan_id, item_id) ON DELETE RESTRICT");
+            migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD CONSTRAINT fk_plan_events_approval_of_item FOREIGN KEY (approval_id, plan_id, item_id, to_state) REFERENCES workflow.approvals (id, plan_id, item_id, state) ON DELETE RESTRICT");
+
+            // 2. The cutoff of an approval is the cutoff of its plan, not a value the row makes up.
+            migrationBuilder.Sql("ALTER TABLE workflow.approvals ADD CONSTRAINT fk_approvals_plan_cutoff FOREIGN KEY (plan_id, cutoff) REFERENCES trading.plans (id, review_cutoff) ON DELETE RESTRICT");
+
+            // 3. Chain: prev_event_id names the previous event of the same plan or item (lane 0 is the plan), whose to_state is this event's from_state (ck_plan_events_chain makes exactly the first event start at proposed or draft with no previous event).
+            migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD COLUMN lane bigint GENERATED ALWAYS AS (COALESCE(item_id, 0)) STORED");
+            migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD CONSTRAINT uq_plan_events_chain UNIQUE (id, plan_id, lane, to_state)");
+            migrationBuilder.Sql("ALTER TABLE trading.plan_events ADD CONSTRAINT fk_plan_events_prev FOREIGN KEY (prev_event_id, plan_id, lane, from_state) REFERENCES trading.plan_events (id, plan_id, lane, to_state) ON DELETE RESTRICT");
+
+            // 4. Plan-level invariants and the rejected-candidate rule, in the database (the runtime role has INSERT only; the function belongs to the migration role). The same rules as PlanLifecycle.Refusals, from the newest event of each ticket.
+            migrationBuilder.Sql("""
+                CREATE FUNCTION trading.check_plan_event() RETURNS trigger LANGUAGE plpgsql AS $fn$
+                DECLARE
+                    grp text;
+                    open_n bigint;
+                    approved_n bigint;
+                    armed_n bigint;
+                    rejected_n bigint;
+                BEGIN
+                    IF NEW.item_id IS NOT NULL THEN
+                        SELECT item_group INTO grp FROM trading.plan_items WHERE id = NEW.item_id;
+                        IF grp = 'rejected' THEN
+                            RAISE EXCEPTION 'A rejected candidate is not a ticket and has no state rows' USING ERRCODE = '23514';
+                        END IF;
+                        RETURN NEW;
+                    END IF;
+
+                    IF NEW.to_state IN ('inreview', 'approved', 'rejected', 'lapsed', 'armed') THEN
+                        SELECT count(*) FILTER (WHERE st IN ('proposed', 'modified')), count(*) FILTER (WHERE st = 'approved'), count(*) FILTER (WHERE st = 'armed'), count(*) FILTER (WHERE st = 'rejected')
+                        INTO open_n, approved_n, armed_n, rejected_n
+                        FROM (SELECT COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.item_id = i.id ORDER BY e.id DESC LIMIT 1), 'proposed') AS st
+                              FROM trading.plan_items i WHERE i.plan_id = NEW.plan_id AND i.item_group <> 'rejected') x;
+                        IF (NEW.to_state = 'approved' AND (open_n > 0 OR approved_n = 0))
+                           OR (NEW.to_state IN ('rejected', 'lapsed') AND (open_n > 0 OR approved_n > 0))
+                           OR (NEW.to_state = 'armed' AND armed_n = 0)
+                           OR (NEW.to_state = 'inreview' AND approved_n + rejected_n = 0) THEN
+                            RAISE EXCEPTION 'The tickets of plan % do not support moving it to %', NEW.plan_id, NEW.to_state USING ERRCODE = '23514';
+                        END IF;
+                    END IF;
+
+                    RETURN NEW;
+                END
+                $fn$
+                """);
+            migrationBuilder.Sql("CREATE TRIGGER trg_plan_events_check BEFORE INSERT ON trading.plan_events FOR EACH ROW EXECUTE FUNCTION trading.check_plan_event()");
 
             // Insert-only for the runtime role (spec P7-03, ADR 0083): a state change is a new plan_events row, a decision a new approvals row.
             // A later migration must NOT call GrantSchemaUsageToAppRole for trading or workflow (it would give UPDATE and DELETE back); to add a table here, grant that table and make it append-only. PlanGrantsTests and an architecture test enforce it.
@@ -345,6 +401,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("DROP TRIGGER IF EXISTS trg_plan_events_check ON trading.plan_events");
+            migrationBuilder.Sql("DROP FUNCTION IF EXISTS trading.check_plan_event()");
             migrationBuilder.DropTable(
                 name: "plan_events",
                 schema: "trading");

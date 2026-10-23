@@ -45,7 +45,7 @@ internal sealed class ApplyReviewCutoffHandler(IPlanStore store, TimeProvider ti
         {
             var item = items[index];
             var to = TicketLifecycle.CutoffDefault(item.State)!.Value;
-            var status = await store.MoveItemAsync(new ItemMove(item.Id, item.State, to, command.Actor, Reason, time.GetUtcNow(), null), cancellationToken);
+            var status = await store.MoveItemAsync(new ItemMove(item.Id, item.State, to, command.Actor, Reason, null), cancellationToken);
             if (status == MoveStatus.Created)
             {
                 lapsed++;
@@ -62,7 +62,7 @@ internal sealed class ApplyReviewCutoffHandler(IPlanStore store, TimeProvider ti
             return Refuse(PlanErrors.MoveRefused(refusals));
         }
 
-        var moved = await store.MovePlanAsync(new PlanMove(command.PlanId, plan.State, after.Plan, command.Actor, Reason, time.GetUtcNow()), cancellationToken);
+        var moved = await store.MovePlanAsync(new PlanMove(command.PlanId, plan.State, after.Plan, command.Actor, Reason), cancellationToken);
         if (moved != MoveStatus.Created)
         {
             return Refuse(moved == MoveStatus.Refused ? PlanErrors.MoveRefused(["The tickets of the plan no longer support this move."]) : PlanErrors.Stale());

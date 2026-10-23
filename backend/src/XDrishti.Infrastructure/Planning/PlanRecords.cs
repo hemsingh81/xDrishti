@@ -107,6 +107,8 @@ internal sealed class PlanEventRecord
 
     public long? ApprovalId { get; set; }
 
+    public long? PrevEventId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }
 

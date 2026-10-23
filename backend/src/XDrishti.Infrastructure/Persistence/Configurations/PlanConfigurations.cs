@@ -11,7 +11,7 @@ internal sealed class PlanRecordConfiguration : IEntityTypeConfiguration<PlanRec
 {
     public void Configure(EntityTypeBuilder<PlanRecord> builder)
     {
-        builder.ToTable("plans", Schemas.Trading, t => t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64"));
+        builder.ToTable("plans", Schemas.Trading, t => t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64 AND (review_cutoff AT TIME ZONE 'Asia/Kolkata')::date = for_date"));
         builder.HasKey(x => x.Id).HasName("pk_plans");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
         builder.Property(x => x.PlanKey).HasMaxLength(100).IsRequired();
@@ -22,6 +22,7 @@ internal sealed class PlanRecordConfiguration : IEntityTypeConfiguration<PlanRec
         builder.Property(x => x.Limits).HasMaxLength(1000).IsRequired();
         builder.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
         builder.HasIndex(x => x.PlanKey).IsUnique().HasDatabaseName("uq_plans_plan_key");
+        builder.HasIndex(x => new { x.Id, x.ReviewCutoff }).IsUnique().HasDatabaseName("uq_plans_id_review_cutoff");
         builder.HasIndex(x => new { x.ForDate, x.Version }).IsUnique().HasDatabaseName("uq_plans_for_date_version");
     }
 }
@@ -89,6 +90,8 @@ internal sealed class PlanEventRecordConfiguration : IEntityTypeConfiguration<Pl
             t.HasCheckConstraint("ck_plan_events_shape", "length(btrim(actor)) > 0 AND length(btrim(reason)) > 0");
 
             // The database enforces owner-only itself: a ticket event into approved, modified or rejected names an approval row, and no other event does (the approval row is `owner` by its own checks).
+            // The first event of an item starts at proposed and of a plan at draft, and only the first event has no previous event; every later one continues from the to_state of the one before (composite foreign key in the migration).
+            t.HasCheckConstraint("ck_plan_events_chain", "(item_id IS NULL AND (prev_event_id IS NULL) = (from_state = 'draft')) OR (item_id IS NOT NULL AND (prev_event_id IS NULL) = (from_state = 'proposed'))");
             t.HasCheckConstraint("ck_plan_events_approval", "(item_id IS NULL AND approval_id IS NULL) OR (item_id IS NOT NULL AND ((to_state IN ('approved', 'modified', 'rejected')) = (approval_id IS NOT NULL)))");
         });
         builder.HasKey(x => x.Id).HasName("pk_plan_events");

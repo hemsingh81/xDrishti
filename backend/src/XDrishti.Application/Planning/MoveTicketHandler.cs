@@ -10,7 +10,7 @@ namespace XDrishti.Application.Planning;
 /// Moves a ticket along the table of <see cref="TicketLifecycle"/> (spec P7-03). An owner decision writes its approval row in the same transaction; of two concurrent moves from the same state one wins and the other is stale.
 /// The handler has no path to a broker and none that approves without the owner.
 /// </summary>
-internal sealed class MoveTicketHandler(IPlanStore store, TimeProvider time, ILogger<MoveTicketHandler> logger) : ICommandHandler<MoveTicketCommand, TicketMoveOutcome>
+internal sealed class MoveTicketHandler(IPlanStore store, ILogger<MoveTicketHandler> logger) : ICommandHandler<MoveTicketCommand, TicketMoveOutcome>
 {
     public async ValueTask<Result<TicketMoveOutcome>> HandleAsync(MoveTicketCommand command, CancellationToken cancellationToken)
     {
@@ -58,7 +58,7 @@ internal sealed class MoveTicketHandler(IPlanStore store, TimeProvider time, ILo
         ApprovalInput? approval = TicketLifecycle.IsOwnerDecision(command.To)
             ? new ApprovalInput(DecisionOf(command.To), command.Modifications, command.ConfirmReason)
             : null;
-        var status = await store.MoveItemAsync(new ItemMove(command.ItemId, item.State, command.To, command.Actor, command.Reason, time.GetUtcNow(), approval), cancellationToken);
+        var status = await store.MoveItemAsync(new ItemMove(command.ItemId, item.State, command.To, command.Actor, command.Reason, approval), cancellationToken);
         if (status != MoveStatus.Created)
         {
             return Refuse(status switch

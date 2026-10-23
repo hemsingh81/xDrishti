@@ -24,9 +24,9 @@ public sealed class PlanHandlersTests
     private static PlanRow Plan(PlanState state) =>
         new(1, new NewPlan("k", new DateOnly(2026, 10, 26), Cutoff, 1, new string('b', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);
 
-    private MoveTicketHandler Ticket() => new(_store, _time, NullLogger<MoveTicketHandler>.Instance);
+    private MoveTicketHandler Ticket() => new(_store, NullLogger<MoveTicketHandler>.Instance);
 
-    private MovePlanHandler PlanMove() => new(_store, _time, NullLogger<MovePlanHandler>.Instance);
+    private MovePlanHandler PlanMove() => new(_store, NullLogger<MovePlanHandler>.Instance);
 
     private ApplyReviewCutoffHandler Cutoffs() => new(_store, _time, NullLogger<ApplyReviewCutoffHandler>.Instance);
 

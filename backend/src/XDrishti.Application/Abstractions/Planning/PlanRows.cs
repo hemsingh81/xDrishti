@@ -41,9 +41,8 @@ public sealed record ApprovalInput(ApprovalDecision Decision, string? Modificati
 /// <param name="To">The state to move to.</param>
 /// <param name="Actor">Who.</param>
 /// <param name="Reason">Why.</param>
-/// <param name="At">When.</param>
 /// <param name="Approval">The owner's decision: set exactly when <c>To</c> is approved, modified or rejected, and its decision must match <c>To</c>; the store throws otherwise.</param>
-public sealed record ItemMove(long ItemId, TicketState From, TicketState To, string Actor, string Reason, DateTimeOffset At, ApprovalInput? Approval);
+public sealed record ItemMove(long ItemId, TicketState From, TicketState To, string Actor, string Reason, ApprovalInput? Approval);
 
 /// <summary>A plan move to write.</summary>
 /// <param name="PlanId">The plan.</param>
@@ -51,8 +50,7 @@ public sealed record ItemMove(long ItemId, TicketState From, TicketState To, str
 /// <param name="To">The state to move to.</param>
 /// <param name="Actor">Who.</param>
 /// <param name="Reason">Why.</param>
-/// <param name="At">When.</param>
-public sealed record PlanMove(long PlanId, PlanState From, PlanState To, string Actor, string Reason, DateTimeOffset At);
+public sealed record PlanMove(long PlanId, PlanState From, PlanState To, string Actor, string Reason);
 
 /// <summary>What a move write did.</summary>
 public enum MoveStatus

@@ -19,9 +19,12 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
 {
     private static readonly Guid AccountId = Guid.Parse("0b6f2a9e-7a52-4d7e-9c3a-5d0a7e0b7a01");
 
-    private static readonly DateOnly Session = new(2026, 10, 13);
+    private static readonly DateOnly Session = new(2099, 1, 5);
 
-    private static readonly DateTimeOffset ReviewCutoff = new(2026, 10, 13, 3, 35, 0, TimeSpan.Zero);
+    // A session far in the future: the database stamps a decision with its own clock and refuses an approval at or after the cutoff, so a plan whose cutoff is past could not be approved.
+    private static readonly DateTimeOffset ReviewCutoff = new(2099, 1, 5, 3, 35, 0, TimeSpan.Zero);
+
+    private static readonly DateTimeOffset PastCutoff = new(2026, 10, 13, 3, 35, 0, TimeSpan.Zero);
 
     public override async ValueTask InitializeAsync()
     {
@@ -43,7 +46,7 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
             new PlanEvidence("ORB|15m|BUY|intraday|FIXED_RR|*", 41, "about 2.1 years, replayed history, modelled fills, no hold-out", "cell statistics only", 0.52, 0.12, ["results_within_3_days"], null),
             allocate ? [new NewAllocation(AccountId, "paper", 10)] : []);
 
-    private static NewPlan Plan(string key = "plan-2026-10-13-v1", int version = 1, params NewPlanItem[] items) =>
+    private static NewPlan Plan(string key = "plan-2099-01-05-v1", int version = 1, params NewPlanItem[] items) =>
         new(key, Session, ReviewCutoff, version, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, items.Length == 0 ? [Item(1, TicketGroup.Primary), Item(2, TicketGroup.Reserve), Item(3, TicketGroup.Rejected, allocate: false)] : items);
 
     private async Task<TResult> WithAsync<TResult>(Func<IServiceProvider, Task<TResult>> work)
@@ -109,8 +112,8 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         async Task<JsonElement> GetAsync(string query) => await Client.GetFromJsonAsync<JsonElement>(new Uri("/api/plans" + query, UriKind.Relative), Ct);
 
         (await GetAsync(string.Empty)).GetArrayLength().ShouldBe(2);
-        (await GetAsync("?date=2026-10-13")).GetArrayLength().ShouldBe(2);
-        (await GetAsync("?date=2026-10-14")).GetArrayLength().ShouldBe(0);
+        (await GetAsync("?date=2099-01-05")).GetArrayLength().ShouldBe(2);
+        (await GetAsync("?date=2099-01-06")).GetArrayLength().ShouldBe(0);
         var byAccount = await GetAsync($"?account={AccountId}");
         byAccount.GetArrayLength().ShouldBe(1);
         byAccount[0].GetProperty("id").GetInt64().ShouldNotBe(other.Id);
@@ -185,7 +188,7 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
     {
         var (_, _, _, rejected) = await StoredAsync();
 
-        var status = await WithAsync(p => p.GetRequiredService<IPlanStore>().MoveItemAsync(new ItemMove(rejected, TicketState.Proposed, TicketState.Lapsed, "system:cutoff", "x", Now, null), Ct).AsTask());
+        var status = await WithAsync(p => p.GetRequiredService<IPlanStore>().MoveItemAsync(new ItemMove(rejected, TicketState.Proposed, TicketState.Lapsed, "system:cutoff", "x", null), Ct).AsTask());
 
         status.ShouldBe(MoveStatus.Stale);
         (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_events WHERE item_id = @i", ("i", rejected))).ShouldBe(0);
@@ -225,28 +228,23 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         var (plan, primary, _, _) = await StoredAsync();
         await using var connection = await OpenAsync();
 
-        // Each pair is tried in its own transaction that is rolled back, so the continuity index never sees two rows; owner decisions come with a matching approval row of the same plan and item.
+        // Each pair is tried in its own transaction that is rolled back. The foreign keys (approvals, previous event) and the plan trigger are switched off for the transaction, so what is tried here is the legal-pair check and the chain check alone;
+        // the other rules have their own tests.
         async Task<bool> TryAsync(long? item, string from, string to)
         {
             await using var transaction = await connection.BeginTransactionAsync(Ct);
             try
             {
-                object approval = DBNull.Value;
-                if (item is not null && to is "approved" or "modified" or "rejected")
-                {
-                    var decision = to == "approved" ? "approve" : to == "modified" ? "modify" : "reject";
-                    await using var insertApproval = new NpgsqlCommand($"INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, modifications, cutoff, decided_at) VALUES (@p, @i, 'owner', '{decision}', 'owner:t', 'r', {(decision == "modify" ? "'m'" : "NULL")}, now() + interval '1 hour', now()) RETURNING id", connection, transaction);
-                    insertApproval.Parameters.AddWithValue("p", plan);
-                    insertApproval.Parameters.AddWithValue("i", item.Value);
-                    approval = (await insertApproval.ExecuteScalarAsync(Ct))!;
-                }
-
-                await using var command = new NpgsqlCommand("INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, approval_id, created_at) VALUES (@p, @i, @f, @t, 'a', 'r', @a, now())", connection, transaction);
+                await ExecuteAsync(connection, "SET LOCAL session_replication_role = replica", transaction);
+                var needsApproval = item is not null && to is "approved" or "modified" or "rejected";
+                var initial = item is null ? "draft" : "proposed";
+                await using var command = new NpgsqlCommand("INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, approval_id, prev_event_id, created_at) VALUES (@p, @i, @f, @t, 'a', 'r', @a, @prev, now())", connection, transaction);
                 command.Parameters.AddWithValue("p", plan);
                 command.Parameters.AddWithValue("i", (object?)item ?? DBNull.Value);
                 command.Parameters.AddWithValue("f", from);
                 command.Parameters.AddWithValue("t", to);
-                command.Parameters.AddWithValue("a", approval);
+                command.Parameters.AddWithValue("a", needsApproval ? 999_999L : DBNull.Value);
+                command.Parameters.AddWithValue("prev", from == initial ? DBNull.Value : 999_999L);
                 await command.ExecuteNonQueryAsync(Ct);
                 return true;
             }
@@ -281,6 +279,12 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         }
     }
 
+    private static async Task ExecuteAsync(NpgsqlConnection connection, string sql, NpgsqlTransaction transaction)
+    {
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
     private async Task<string?> StateOfAsync(string sql, params (string Name, object Value)[] parameters)
     {
         await using var connection = await OpenAsync();
@@ -295,47 +299,95 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         }
     }
 
+    private const string ApprovalSql = "INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at) VALUES (@p, @i, 'owner', @d, 'owner:t', 'r', (SELECT review_cutoff FROM trading.plans WHERE id = @p), clock_timestamp()) RETURNING id";
+
+    private const string EventSql = "INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, approval_id, prev_event_id, created_at) VALUES (@p, @i, @f, @t, 'a', 'r', @a, @prev, now())";
+
     [Fact]
-    public async Task The_database_itself_refuses_an_owner_decision_event_with_no_approval_and_an_approval_of_another_item_or_plan()
+    public async Task The_database_itself_refuses_an_owner_decision_event_with_the_wrong_approval_and_a_first_event_that_skips_proposed()
     {
         var (plan, primary, reserve, _) = await StoredAsync();
         var other = await PublishAsync(Plan("plan-other-approval", 2, Item(1, TicketGroup.Primary, allocate: false)));
         var otherItem = (await ItemsAsync(other.Id))[0].Id;
-        const string Approval = "INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at) VALUES (@p, @i, 'owner', 'approve', 'owner:t', 'r', now() + interval '1 hour', now()) RETURNING id";
-        var approvalOfReserve = await ScalarAsync<long>(Approval, ("p", plan), ("i", reserve));
-        const string Event = "INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, approval_id, created_at) VALUES (@p, @i, @f, @t, 'a', 'r', @a, now())";
+        var approvalOfReserve = await ScalarAsync<long>(ApprovalSql, ("p", plan), ("i", reserve), ("d", "approve"));
+        var rejectOfPrimary = await ScalarAsync<long>(ApprovalSql, ("p", plan), ("i", primary), ("d", "reject"));
+        var approveOfPrimary = await ScalarAsync<long>(ApprovalSql, ("p", plan), ("i", primary), ("d", "approve"));
 
-        // No approval on a decision, an approval on a service move, an approval naming another item, and an item that belongs to another plan.
-        (await StateOfAsync(Event, ("p", plan), ("i", primary), ("f", "proposed"), ("t", "approved"), ("a", DBNull.Value))).ShouldBe(PostgresErrorCodes.CheckViolation);
-        (await StateOfAsync(Event, ("p", plan), ("i", primary), ("f", "proposed"), ("t", "lapsed"), ("a", approvalOfReserve))).ShouldBe(PostgresErrorCodes.CheckViolation);
-        (await StateOfAsync(Event, ("p", plan), ("i", primary), ("f", "proposed"), ("t", "approved"), ("a", approvalOfReserve))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
-        (await StateOfAsync(Event, ("p", plan), ("i", otherItem), ("f", "proposed"), ("t", "lapsed"), ("a", DBNull.Value))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
-        (await StateOfAsync(Approval, ("p", plan), ("i", otherItem))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
-        (await StateOfAsync(Event, ("p", plan), ("i", reserve), ("f", "proposed"), ("t", "approved"), ("a", approvalOfReserve))).ShouldBeNull();
-        (await StateOfAsync(Event, ("p", plan), ("i", reserve), ("f", "proposed"), ("t", "lapsed"), ("a", DBNull.Value))).ShouldBe(PostgresErrorCodes.UniqueViolation, "a state is left only once");
+        object None = DBNull.Value;
+        Task<string?> Event(long item, string from, string to, object approval, object? prev = null, long? planId = null) =>
+            StateOfAsync(EventSql, ("p", planId ?? plan), ("i", item), ("f", from), ("t", to), ("a", approval), ("prev", prev ?? None));
+
+        // No approval on a decision, an approval on a service move, and an approval of another item.
+        (await Event(primary, "proposed", "approved", None)).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await Event(primary, "proposed", "lapsed", approveOfPrimary)).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await Event(primary, "proposed", "approved", approvalOfReserve)).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
+
+        // A reject approval cannot back an approved event (the approval names the state it backs).
+        (await Event(primary, "proposed", "approved", rejectOfPrimary)).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
+        (await Event(primary, "proposed", "modified", approveOfPrimary)).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
+
+        // An item of another plan.
+        (await Event(otherItem, "proposed", "lapsed", None)).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
+        (await StateOfAsync(ApprovalSql, ("p", plan), ("i", otherItem), ("d", "approve"))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
+
+        // The first event of an item must start at proposed with no previous event; a later one must continue from the previous event's to_state.
+        (await Event(primary, "approved", "armed", None)).ShouldBe(PostgresErrorCodes.CheckViolation, "a first event that skips proposed");
+        (await Event(primary, "proposed", "approved", approveOfPrimary, prev: 1L)).ShouldBe(PostgresErrorCodes.CheckViolation, "proposed with a previous event");
+        (await Event(primary, "proposed", "approved", approveOfPrimary)).ShouldBeNull();
+        var first = await ScalarAsync<long>("SELECT id FROM trading.plan_events WHERE item_id = @i", ("i", primary));
+        (await Event(primary, "approved", "armed", None)).ShouldBe(PostgresErrorCodes.CheckViolation, "armed without a previous event");
+        (await Event(primary, "armed", "triggered", None, prev: first)).ShouldBe(PostgresErrorCodes.ForeignKeyViolation, "does not continue from approved");
+        (await Event(primary, "approved", "armed", None, prev: first)).ShouldBeNull();
+        (await Event(primary, "approved", "invalidated", None, prev: first)).ShouldBe(PostgresErrorCodes.UniqueViolation, "a state is left only once");
     }
 
     [Fact]
-    public async Task The_database_refuses_an_approval_that_is_not_the_owners_after_the_cutoff_a_manual_live_allocation_and_malformed_runs()
+    public async Task The_database_itself_refuses_a_plan_move_the_tickets_do_not_support_and_an_event_on_a_rejected_candidate()
+    {
+        var (plan, _, _, rejected) = await StoredAsync();
+        const string PlanEvent = "INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, prev_event_id, created_at) VALUES (@p, NULL, @f, @t, 'a', 'r', @prev, now())";
+        var published = await ScalarAsync<long>("SELECT id FROM trading.plan_events WHERE plan_id = @p AND item_id IS NULL", ("p", plan));
+
+        // Nothing is approved or armed, tickets are open: the plan cannot be approved, armed, rejected, lapsed or in review.
+        foreach (var to in new[] { "approved", "rejected", "lapsed", "inreview" })
+        {
+            (await StateOfAsync(PlanEvent, ("p", plan), ("f", "published"), ("t", to), ("prev", published))).ShouldBe(PostgresErrorCodes.CheckViolation, to);
+        }
+
+        // A rejected candidate takes no state row, by a direct insert too.
+        (await StateOfAsync(EventSql, ("p", plan), ("i", rejected), ("f", "proposed"), ("t", "lapsed"), ("a", DBNull.Value), ("prev", DBNull.Value))).ShouldBe(PostgresErrorCodes.CheckViolation);
+    }
+
+    [Fact]
+    public async Task The_database_refuses_an_approval_that_is_not_the_owners_after_the_cutoff_or_with_a_made_up_cutoff_a_manual_live_allocation_and_malformed_rows()
     {
         var (plan, primary, _, _) = await StoredAsync();
-        const string Insert = "INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at) VALUES (@p, @i, @kind, @decision, @actor, 'r', now() + interval '1 hour', @at)";
+        var past = await PublishAsync(Plan("plan-past", 3, Item(1, TicketGroup.Primary, allocate: false)) with { ForDate = new DateOnly(2026, 10, 13), ReviewCutoff = PastCutoff });
+        var pastItem = (await ItemsAsync(past.Id))[0].Id;
+        const string Insert = "INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at) VALUES (@p, @i, @kind, @decision, @actor, 'r', (SELECT review_cutoff FROM trading.plans WHERE id = @p), clock_timestamp())";
 
-        async Task<string?> ApprovalAsync(string kind, string decision, string actor, string at = "now()") =>
-            await StateOfAsync(Insert.Replace("@at", at, StringComparison.Ordinal), ("p", plan), ("i", primary), ("kind", kind), ("decision", decision), ("actor", actor));
+        async Task<string?> ApprovalAsync(string kind, string decision, string actor) =>
+            await StateOfAsync(Insert, ("p", plan), ("i", primary), ("kind", kind), ("decision", decision), ("actor", actor));
 
         (await ApprovalAsync("system", "approve", "owner:t")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await ApprovalAsync("rule", "approve", "owner:t")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await ApprovalAsync("owner", "approve", "system:nightly")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await ApprovalAsync("owner", "approve", "cli:xd")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await ApprovalAsync("owner", "modify", "owner:t")).ShouldBe(PostgresErrorCodes.CheckViolation);
-        (await ApprovalAsync("owner", "approve", "owner:t", "now() + interval '2 hours'")).ShouldBe(PostgresErrorCodes.CheckViolation);
-        (await ApprovalAsync("owner", "reject", "owner:t", "now() + interval '2 hours'")).ShouldBeNull();
         (await ApprovalAsync("owner", "approve", "owner:t")).ShouldBeNull();
+
+        // A cutoff the plan does not have, and an approval made after the plan's own (past) cutoff; a rejection after it is fine.
+        (await StateOfAsync("INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at) VALUES (@p, @i, 'owner', 'approve', 'owner:t', 'r', now() + interval '99 years', now())", ("p", plan), ("i", primary))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
+        (await StateOfAsync(Insert, ("p", past.Id), ("i", pastItem), ("kind", "owner"), ("decision", "approve"), ("actor", "owner:t"))).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await StateOfAsync(Insert, ("p", past.Id), ("i", pastItem), ("kind", "owner"), ("decision", "reject"), ("actor", "owner:t"))).ShouldBeNull();
+
+        // A cutoff on another day than the session.
+        (await StateOfAsync("INSERT INTO trading.plans (plan_key, for_date, review_cutoff, version, input_hash, basis, provisional, notice, limits, created_by, created_at) VALUES ('wrong-day', '2099-01-06', '2099-01-05 03:35:00+00', 9, repeat('a', 64), 'b', true, 'n', 'l', 'x', now())")).ShouldBe(PostgresErrorCodes.CheckViolation);
+
         (await StateOfAsync("INSERT INTO trading.plan_item_allocations (item_id, account_id, mode, quantity) VALUES (@i, '" + Guid.NewGuid() + "', 'paper', 1)", ("i", primary))).ShouldBe(PostgresErrorCodes.ForeignKeyViolation);
         (await StateOfAsync($"INSERT INTO trading.plan_item_allocations (item_id, account_id, mode, quantity) VALUES (@i, '{AccountId}', 'manual_live', 1)", ("i", primary))).ShouldBe(PostgresErrorCodes.CheckViolation);
-        (await StateOfAsync("INSERT INTO trading.plan_runs (for_date, outcome, reason, manual, started_at, finished_at) VALUES ('2026-10-13', 'published', 'r', false, now(), now())")).ShouldBe(PostgresErrorCodes.CheckViolation);
-        (await StateOfAsync("INSERT INTO trading.plan_runs (for_date, outcome, reason, manual, started_at, finished_at) VALUES ('2026-10-13', 'failed_closed', 'r', false, now(), now())")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await StateOfAsync("INSERT INTO trading.plan_runs (for_date, outcome, reason, manual, started_at, finished_at) VALUES ('2099-01-05', 'published', 'r', false, now(), now())")).ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await StateOfAsync("INSERT INTO trading.plan_runs (for_date, outcome, reason, manual, started_at, finished_at) VALUES ('2099-01-05', 'failed_closed', 'r', false, now(), now())")).ShouldBe(PostgresErrorCodes.CheckViolation);
         (await StateOfAsync("INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons, cell_key, trades, data_range, p_win_basis, unavailable) VALUES (@p, 9, 'reserve', 's', 'BUY', 'x', 'h', 't', 's', 't', 'v', '{}', 'c', 1, 'd', 'b', '{}')", ("p", plan))).ShouldBe(PostgresErrorCodes.CheckViolation);
     }
 
@@ -369,15 +421,15 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
             await WithAsync(async p =>
             {
                 var s = p.GetRequiredService<IPlanStore>();
-                await s.MoveItemAsync(new ItemMove(items[0].Id, TicketState.Proposed, TicketState.Approved, "owner:me", "ok", Now, new ApprovalInput(ApprovalDecision.Approve, null, null)), Ct);
-                await s.MoveItemAsync(new ItemMove(items[1].Id, TicketState.Proposed, TicketState.Rejected, "owner:me", "no", Now, new ApprovalInput(ApprovalDecision.Reject, null, null)), Ct);
-                (await s.MovePlanAsync(new PlanMove(published.Id, PlanState.Published, PlanState.InReview, "system:review", "decided", Now), Ct)).ShouldBe(MoveStatus.Created);
+                await s.MoveItemAsync(new ItemMove(items[0].Id, TicketState.Proposed, TicketState.Approved, "owner:me", "ok", new ApprovalInput(ApprovalDecision.Approve, null, null)), Ct);
+                await s.MoveItemAsync(new ItemMove(items[1].Id, TicketState.Proposed, TicketState.Rejected, "owner:me", "no", new ApprovalInput(ApprovalDecision.Reject, null, null)), Ct);
+                (await s.MovePlanAsync(new PlanMove(published.Id, PlanState.Published, PlanState.InReview, "system:review", "decided"), Ct)).ShouldBe(MoveStatus.Created);
                 return 0;
             });
 
             await Task.WhenAll(
-                WithAsync(p => p.GetRequiredService<IPlanStore>().MovePlanAsync(new PlanMove(published.Id, PlanState.InReview, PlanState.Approved, "system:review", "done", Now), Ct).AsTask()),
-                WithAsync(p => p.GetRequiredService<IPlanStore>().MoveItemAsync(new ItemMove(items[0].Id, TicketState.Approved, TicketState.Invalidated, "system:preopen", "gap", Now, null), Ct).AsTask()));
+                WithAsync(p => p.GetRequiredService<IPlanStore>().MovePlanAsync(new PlanMove(published.Id, PlanState.InReview, PlanState.Approved, "system:review", "done"), Ct).AsTask()),
+                WithAsync(p => p.GetRequiredService<IPlanStore>().MoveItemAsync(new ItemMove(items[0].Id, TicketState.Approved, TicketState.Invalidated, "system:preopen", "gap", null), Ct).AsTask()));
 
             (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_events a JOIN trading.plan_events b ON b.plan_id = a.plan_id AND b.to_state = 'invalidated' AND b.id < a.id WHERE a.plan_id = @p AND a.item_id IS NULL AND a.to_state = 'approved'", ("p", published.Id))).ShouldBe(0, $"round {n}");
         }
@@ -390,7 +442,7 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         var (_, primary, _, _) = await StoredAsync();
 
         async Task Move(TicketState to, ApprovalInput? approval) =>
-            await WithAsync(p => p.GetRequiredService<IPlanStore>().MoveItemAsync(new ItemMove(primary, TicketState.Proposed, to, "owner:me", "x", Now, approval), Ct).AsTask());
+            await WithAsync(p => p.GetRequiredService<IPlanStore>().MoveItemAsync(new ItemMove(primary, TicketState.Proposed, to, "owner:me", "x", approval), Ct).AsTask());
 
         await Should.ThrowAsync<ArgumentException>(() => Move(TicketState.Approved, null));
         await Should.ThrowAsync<ArgumentException>(() => Move(TicketState.Lapsed, new ApprovalInput(ApprovalDecision.Approve, null, null)));
@@ -406,7 +458,7 @@ public sealed class PlanRecordApiTests(ApiFactory factory) : DataTestBase(factor
         await WithAsync(async p =>
         {
             var store = p.GetRequiredService<IPlanStore>();
-            await store.RecordRunAsync(new NewPlanRun(Session, "plan-2026-10-13-v1", "published", null, "all gates passed", plan, false, at, at.AddMinutes(3)), Ct);
+            await store.RecordRunAsync(new NewPlanRun(Session, "plan-2099-01-05-v1", "published", null, "all gates passed", plan, false, at, at.AddMinutes(3)), Ct);
             await store.RecordRunAsync(new NewPlanRun(Session, null, "failed_closed", "eod_incomplete", "EOD run did not finish", null, false, at, at.AddMinutes(1)), Ct);
             await store.RecordRunAsync(new NewPlanRun(Session, null, "dry_run", null, "dry run", null, true, at, at.AddMinutes(1)), Ct);
             return 0;

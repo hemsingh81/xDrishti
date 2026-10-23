@@ -12,7 +12,7 @@ using XDrishti.Infrastructure.Persistence;
 namespace XDrishti.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(XDrishtiDbContext))]
-    [Migration("20261023105831_AddPlanRecord")]
+    [Migration("20261023112357_AddPlanRecord")]
     partial class AddPlanRecord
     {
         /// <inheritdoc />
@@ -4793,6 +4793,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("plan_id");
 
+                    b.Property<long?>("PrevEventId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("prev_event_id");
+
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -4830,6 +4834,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("plan_events", "trading", t =>
                         {
                             t.HasCheckConstraint("ck_plan_events_approval", "(item_id IS NULL AND approval_id IS NULL) OR (item_id IS NOT NULL AND ((to_state IN ('approved', 'modified', 'rejected')) = (approval_id IS NOT NULL)))");
+
+                            t.HasCheckConstraint("ck_plan_events_chain", "(item_id IS NULL AND (prev_event_id IS NULL) = (from_state = 'draft')) OR (item_id IS NOT NULL AND (prev_event_id IS NULL) = (from_state = 'proposed'))");
 
                             t.HasCheckConstraint("ck_plan_events_legal", "(item_id IS NOT NULL AND (from_state, to_state) IN (('proposed', 'approved'), ('proposed', 'modified'), ('proposed', 'rejected'), ('proposed', 'lapsed'), ('modified', 'approved'), ('modified', 'rejected'), ('modified', 'lapsed'), ('approved', 'armed'), ('approved', 'invalidated'), ('approved', 'expired'), ('armed', 'triggered'), ('armed', 'expired'), ('triggered', 'closed'))) OR (item_id IS NULL AND (from_state, to_state) IN (('draft', 'published'), ('published', 'inreview'), ('published', 'approved'), ('published', 'rejected'), ('published', 'lapsed'), ('inreview', 'approved'), ('inreview', 'rejected'), ('inreview', 'lapsed'), ('approved', 'armed'), ('approved', 'expired'), ('armed', 'expired')))");
 
@@ -5087,9 +5093,13 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("uq_plans_for_date_version");
 
+                    b.HasIndex("Id", "ReviewCutoff")
+                        .IsUnique()
+                        .HasDatabaseName("uq_plans_id_review_cutoff");
+
                     b.ToTable("plans", "trading", t =>
                         {
-                            t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64");
+                            t.HasCheckConstraint("ck_plans_shape", "version >= 1 AND length(plan_key) > 0 AND length(input_hash) = 64 AND (review_cutoff AT TIME ZONE 'Asia/Kolkata')::date = for_date");
                         });
                 });
 

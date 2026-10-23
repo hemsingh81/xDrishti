@@ -11,7 +11,7 @@ namespace XDrishti.Architecture.Tests;
 /// </summary>
 public sealed class NoOrderPlacementArchitectureTests
 {
-    private static readonly string[] Forbidden = ["placeorder", "submitorder", "modifyorder", "cancelorder"];
+    private static readonly string[] Forbidden = ["placeorder", "submitorder", "modifyorder", "cancelorder", "placetrade", "submittrade", "canceltrade", "orderrequest", "neworder"];
 
     private static readonly string[] Shipped = ["XDrishti.Domain", "XDrishti.Application", "XDrishti.Infrastructure", "XDrishti.Hosting", "XDrishti.Api", "XDrishti.Worker", "XDrishti.Feed"];
 
@@ -86,6 +86,9 @@ public sealed class NoOrderPlacementArchitectureTests
     [InlineData("CreateTradeBatch", false)]
     [InlineData("AddTrade", false)]
     [InlineData("SellTradeCard", false)]
+    [InlineData("PlaceTrade", true)]
+    [InlineData("OrderRequest", true)]
+    [InlineData("NewOrder", true)]
     [InlineData("OrderBook", false)]
     [InlineData("PlanItem", false)]
     [InlineData("ArmTicket", false)]

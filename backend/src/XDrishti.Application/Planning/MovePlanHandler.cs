@@ -7,7 +7,7 @@ using XDrishti.Domain.Planning;
 namespace XDrishti.Application.Planning;
 
 /// <summary>Moves a plan along <see cref="PlanLifecycle"/>, checked against the current states of its tickets (spec P7-03).</summary>
-internal sealed class MovePlanHandler(IPlanStore store, TimeProvider time, ILogger<MovePlanHandler> logger) : ICommandHandler<MovePlanCommand, PlanMoveOutcome>
+internal sealed class MovePlanHandler(IPlanStore store, ILogger<MovePlanHandler> logger) : ICommandHandler<MovePlanCommand, PlanMoveOutcome>
 {
     public async ValueTask<Result<PlanMoveOutcome>> HandleAsync(MovePlanCommand command, CancellationToken cancellationToken)
     {
@@ -31,7 +31,7 @@ internal sealed class MovePlanHandler(IPlanStore store, TimeProvider time, ILogg
             return Refuse(PlanErrors.MoveRefused(refusals));
         }
 
-        var status = await store.MovePlanAsync(new PlanMove(command.PlanId, plan.State, command.To, command.Actor, command.Reason, time.GetUtcNow()), cancellationToken);
+        var status = await store.MovePlanAsync(new PlanMove(command.PlanId, plan.State, command.To, command.Actor, command.Reason), cancellationToken);
         if (status != MoveStatus.Created)
         {
             return Refuse(status switch
