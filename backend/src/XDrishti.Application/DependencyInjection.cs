@@ -51,6 +51,7 @@ using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
+using XDrishti.Domain.Planning;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application;
@@ -500,5 +501,8 @@ public static class DependencyInjection
         services.AddScoped<IPlanBuilder>(sp => sp.GetService<IPlanBuilderSettings>()?.UseSelection == true ? sp.GetRequiredService<SelectionPlanBuilder>() : sp.GetRequiredService<NullPlanBuilder>());
         services.AddScoped<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>, RunNightlyPlanHandler>();
         services.AddScoped<IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>>, ListPlanRunsHandler>();
+        services.AddScoped<ICommandHandler<GradePlansCommand, GradeOutcome>, GradePlansHandler>(); // grading (P7-13, ADR 0090): insert-only grades on stored bars, no order
+        services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();
+        services.AddScoped<IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>, GetDecisionsReportHandler>();
     }
 }

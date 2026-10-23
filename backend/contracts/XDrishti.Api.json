@@ -9260,6 +9260,97 @@
         }
       }
     },
+    "/api/plans/{id}/grade": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "The grade of every ticket of a plan (primary, reserve, rejected), each walked through the stored bars of its session and labelled 'simulated on plan prices', with the day's top-1/3/5/all curves and decision groups. A ticket without a stored grade is pending. Read only. 404 plans.not_found",
+        "operationId": "GetPlanGrade",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanGradeView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/decisions": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "Top-1/3/5/all curves by rank, primary versus reserve versus rejected, and the owner's decisions (approved, modified, rejected, lapsed, undecided) over the graded plans of an optional date range, with sample-size notes. Labelled 'simulated on plan prices'. Read only. 422 plans.invalid",
+        "operationId": "GetDecisionsReport",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GradeReportData"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plan-runs": {
       "get": {
         "tags": [
@@ -13694,6 +13785,50 @@
         },
         "description": "The previews in the order the files were asked for; `rowsRead` and `comparedRows` are the totals of the request (its limits are in the summary of the endpoint)."
       },
+      "CurvePoint": {
+        "required": [
+          "planId",
+          "date",
+          "tickets",
+          "triggered",
+          "dayR",
+          "cumulativeR"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "integer",
+            "description": "The plan.",
+            "format": "int64"
+          },
+          "date": {
+            "type": "string",
+            "description": "The planned session.",
+            "format": "date"
+          },
+          "tickets": {
+            "type": "integer",
+            "description": "Tickets in the top K that day.",
+            "format": "int32"
+          },
+          "triggered": {
+            "type": "integer",
+            "description": "Of them graded.",
+            "format": "int32"
+          },
+          "dayR": {
+            "type": "number",
+            "description": "Sum of R of the day.",
+            "format": "double"
+          },
+          "cumulativeR": {
+            "type": "number",
+            "description": "Running sum up to and including the day.",
+            "format": "double"
+          }
+        },
+        "description": "One plan-day of a top-K curve (P7-13)."
+      },
       "DataAccountView": {
         "required": [
           "id",
@@ -16365,6 +16500,202 @@
           }
         },
         "description": "One gate of a verdict as served (spec P5-03, P5-04); `Actual` is null when it is not finite."
+      },
+      "GradeCurve": {
+        "required": [
+          "name",
+          "points",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "top-1, top-3, top-5 or top-all."
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurvePoint"
+            },
+            "description": "One per plan-day, by date then plan."
+          },
+          "totals": {
+            "description": "The figures over all days.",
+            "$ref": "#/components/schemas/GradeStats"
+          }
+        },
+        "description": "The top-K curve by rank: its points day by day and its totals."
+      },
+      "GradeReportData": {
+        "required": [
+          "basis",
+          "plans",
+          "curves",
+          "groups",
+          "decisions",
+          "comparisons",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "Always string TicketGrade.Basis."
+          },
+          "plans": {
+            "type": "integer",
+            "description": "Plan-days covered.",
+            "format": "int32"
+          },
+          "curves": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeCurve"
+            },
+            "description": "Top-1, top-3, top-5 and top-all by rank over primary and reserve tickets."
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeStats"
+            },
+            "description": "Primary, reserve and rejected."
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GradeStats"
+            },
+            "description": "Approved, modified, rejected, lapsed and undecided (primary and reserve tickets only)."
+          },
+          "comparisons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupComparison"
+            },
+            "description": "Did the reserve, the rejection and the owner's refusals help."
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "General notes, the honest limits."
+          }
+        },
+        "description": "The numbers of doc 10 section 8 over a set of graded tickets (P7-13, ADR 0090)."
+      },
+      "GradeStats": {
+        "required": [
+          "name",
+          "tickets",
+          "triggered",
+          "notTriggered",
+          "notGradable",
+          "totalR",
+          "meanR",
+          "winRate",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "What the set is (`top-3`, `primary`, `approved` ...)."
+          },
+          "tickets": {
+            "type": "integer",
+            "description": "All tickets in the set.",
+            "format": "int32"
+          },
+          "triggered": {
+            "type": "integer",
+            "description": "Graded tickets (with an R).",
+            "format": "int32"
+          },
+          "notTriggered": {
+            "type": "integer",
+            "description": "Tickets with no simulated trade.",
+            "format": "int32"
+          },
+          "notGradable": {
+            "type": "integer",
+            "description": "Tickets that cannot be replayed.",
+            "format": "int32"
+          },
+          "totalR": {
+            "type": "number",
+            "description": "Sum of R.",
+            "format": "double"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean R per triggered ticket; null with none.",
+            "format": "double"
+          },
+          "winRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Share of triggered tickets with R above zero; null with none.",
+            "format": "double"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The honest note on the sample size; null when the sample reaches int GradeReport.IndicativeBelow."
+          }
+        },
+        "description": "The figures of a set of graded tickets (P7-13). R is summed over the graded (triggered) tickets only; the others add nothing and are counted."
+      },
+      "GroupComparison": {
+        "required": [
+          "question",
+          "left",
+          "right",
+          "meanDifference",
+          "verdict",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "The question in words."
+          },
+          "left": {
+            "type": "string",
+            "description": "The first set."
+          },
+          "right": {
+            "type": "string",
+            "description": "The second set."
+          },
+          "meanDifference": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean R of the first minus mean R of the second; null when either has no triggered ticket.",
+            "format": "double"
+          },
+          "verdict": {
+            "type": "string",
+            "description": "first_better, second_better, equal or not_enough_data. Never a claim of significance."
+          },
+          "note": {
+            "type": "string",
+            "description": "The sample-size note."
+          }
+        },
+        "description": "Two sets compared by mean R per triggered ticket (P7-13): what the second would have added or avoided."
       },
       "GroupPart": {
         "required": [
@@ -20598,6 +20929,50 @@
           }
         },
         "description": "The evidence of a ticket, with its limits."
+      },
+      "PlanGradeView": {
+        "required": [
+          "planId",
+          "forDate",
+          "basis",
+          "tickets",
+          "pending",
+          "report"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "integer",
+            "description": "The plan.",
+            "format": "int64"
+          },
+          "forDate": {
+            "type": "string",
+            "description": "The planned session.",
+            "format": "date"
+          },
+          "basis": {
+            "type": "string",
+            "description": "Always `simulated on plan prices`."
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketGradeView"
+            },
+            "description": "Every ticket of the plan."
+          },
+          "pending": {
+            "type": "integer",
+            "description": "Tickets without a stored grade.",
+            "format": "int32"
+          },
+          "report": {
+            "description": "The curves and groups of this plan.",
+            "$ref": "#/components/schemas/GradeReportData"
+          }
+        },
+        "description": "The grades of one plan (P7-13)."
       },
       "PlanItemView": {
         "required": [
@@ -24879,6 +25254,107 @@
             "format": "date-time"
           }
         }
+      },
+      "TicketGradeView": {
+        "required": [
+          "itemId",
+          "rank",
+          "group",
+          "symbol",
+          "side",
+          "state",
+          "decision",
+          "status",
+          "r",
+          "maeR",
+          "mfeR",
+          "exitReason",
+          "costBasis",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "description": "The ticket.",
+            "format": "int64"
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Rank within the plan.",
+            "format": "int32"
+          },
+          "group": {
+            "type": "string",
+            "description": "primary, reserve or rejected."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "The instrument."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "state": {
+            "type": "string",
+            "description": "The newest ticket state."
+          },
+          "decision": {
+            "type": "string",
+            "description": "approved, modified, rejected, lapsed or undecided; empty for a rejected candidate."
+          },
+          "status": {
+            "type": "string",
+            "description": "graded, not_triggered, not_gradable or pending (no grade stored yet)."
+          },
+          "r": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Result in R.",
+            "format": "double"
+          },
+          "maeR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Adverse excursion in R.",
+            "format": "double"
+          },
+          "mfeR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Favourable excursion in R.",
+            "format": "double"
+          },
+          "exitReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why the simulated trade ended."
+          },
+          "costBasis": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What R is net of."
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, in words."
+          }
+        },
+        "description": "One ticket with its grade as the API shows it."
       },
       "TimeframeCheck": {
         "required": [

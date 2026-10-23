@@ -161,3 +161,39 @@ internal sealed class PlanRunRecord
 
     public DateTimeOffset FinishedAt { get; set; }
 }
+
+/// <summary>A row of <c>trading.grades</c>: the grade of one ticket (P7-13). Insert-only, one per ticket.</summary>
+internal sealed class GradeRecord
+{
+    public long Id { get; set; }
+
+    public long PlanId { get; set; }
+
+    public long ItemId { get; set; }
+
+    public DateOnly ForDate { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public double? R { get; set; }
+
+    public double? MaeR { get; set; }
+
+    public double? MfeR { get; set; }
+
+    public string? ExitReason { get; set; }
+
+    public double? EntryPrice { get; set; }
+
+    public double? ExitPrice { get; set; }
+
+    public string CostBasis { get; set; } = string.Empty;
+
+    public string Detail { get; set; } = string.Empty;
+
+    public string Basis { get; set; } = string.Empty;
+
+    public string? RunKey { get; set; }
+
+    public DateTimeOffset GradedAt { get; set; }
+}
