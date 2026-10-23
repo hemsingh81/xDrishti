@@ -39,13 +39,14 @@ internal sealed class RevertChangelogHandler(ILearningChangelog changelog, TimeP
         var e = target.Entry;
         var reasons = new List<string>();
         var restored = CellStateExtensions.Parse(e.FromState);
-        if (e.Kind != "transition" || restored is null)
+        var undone = CellStateExtensions.Parse(e.ToState);
+        if (e.Kind != "transition" || restored is null || undone is null)
         {
             reasons.Add("Only a cell transition can be reverted; a revert is not reverted (record the move again) and a designation is changed by designating again.");
         }
         else
         {
-            reasons.AddRange(CellLifecycle.RevertRefusals(restored.Value));
+            reasons.AddRange(CellLifecycle.RevertRefusals(restored.Value, undone.Value));
             var history = await changelog.HistoryAsync(e.Subject, cancellationToken);
             if (history.Count == 0 || history[^1].Id != target.Id)
             {

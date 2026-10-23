@@ -117,6 +117,40 @@ public sealed class CellLifecycleTests
         Enum.GetValues<CellState>().Where(s => s != CellState.Active).ShouldAllBe(s => CellLifecycle.RevertRefusals(s).Count == 0);
     }
 
+    [Fact]
+    public void A_revert_never_un_retires_a_cell()
+    {
+        CellLifecycle.RevertRefusals(CellState.Research, CellState.Retired).Single().ShouldContain("final");
+        CellLifecycle.RevertRefusals(CellState.Paused, CellState.Retired).Count.ShouldBe(1);
+        CellLifecycle.RevertRefusals(CellState.Research, CellState.Candidate).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_mistaken_pause_cannot_be_reverted_because_it_would_restore_active()
+    {
+        CellLifecycle.RevertRefusals(CellState.Active, CellState.Paused).Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_revert_must_undo_the_row_just_before_it_and_return_to_that_rows_from()
+    {
+        var notPrevious = CellReplay.Of(
+        [
+            new CellMove(1, CellState.Research, CellState.Candidate, null),
+            new CellMove(2, CellState.Candidate, CellState.Paper, null),
+            new CellMove(3, CellState.Paper, CellState.Candidate, 1),
+        ]);
+        var wrongTarget = CellReplay.Of(
+        [
+            new CellMove(1, CellState.Research, CellState.Candidate, null),
+            new CellMove(2, CellState.Candidate, CellState.Paper, null),
+            new CellMove(3, CellState.Paper, CellState.Research, 2),
+        ]);
+
+        notPrevious.Problems.Single().ShouldContain("not the row just before");
+        wrongTarget.Problems.Single().ShouldContain("not the candidate");
+    }
+
     [Theory]
     [InlineData("research", CellState.Research)]
     [InlineData("candidate", CellState.Candidate)]

@@ -10,6 +10,13 @@ namespace XDrishti.Application.Learning;
 internal sealed class RecordCellTransitionHandler(ILearningChangelog changelog, TimeProvider time, ILogger<RecordCellTransitionHandler> logger) : ICommandHandler<RecordCellTransitionCommand, ChangelogOutcome>
 {
     private const int MaxEvidence = 20;
+    private const int MaxReason = 400; // the stored reason also carries the claimed facts, within the column's 500
+
+    /// <summary>The facts are claims by the caller and nobody checks them; the row shows what was claimed.</summary>
+    private static string ClaimedPrefix(TransitionFacts f) =>
+        $"[claimed, unverified: gates={Yn(f.GatesPassed)} owner={Yn(f.OwnerApproved)} band={Yn(f.WithinBand)} recovered={Yn(f.Recovered)} paperDays={f.PaperDays}] ";
+
+    private static string Yn(bool value) => value ? "yes" : "no";
 
     public async ValueTask<Result<ChangelogOutcome>> HandleAsync(RecordCellTransitionCommand command, CancellationToken cancellationToken)
     {
@@ -42,7 +49,7 @@ internal sealed class RecordCellTransitionHandler(ILearningChangelog changelog, 
         }
 
         var paperDays = replay.State == CellState.Paper && command.To == CellState.Active ? command.Facts.PaperDays : (int?)null;
-        var entry = new NewChangelogEntry("transition", "cell", command.Cell, replay.State.Code(), command.To.Code(), command.Reason.Trim(), command.Actor, command.EvidenceIds, command.BeforeRef, command.AfterRef, paperDays, null, time.GetUtcNow());
+        var entry = new NewChangelogEntry("transition", "cell", command.Cell, replay.State.Code(), command.To.Code(), ClaimedPrefix(command.Facts) + command.Reason.Trim(), command.Actor, command.EvidenceIds, command.BeforeRef, command.AfterRef, paperDays, null, time.GetUtcNow());
         var appended = await changelog.AppendAsync(entry, cancellationToken);
         if (appended.Stale)
         {
@@ -67,9 +74,9 @@ internal sealed class RecordCellTransitionHandler(ILearningChangelog changelog, 
             problems.Add(new FieldError("to", "The state is research, candidate, paper, active, paused or retired."));
         }
 
-        if (string.IsNullOrWhiteSpace(command.Reason) || command.Reason.Length > 500)
+        if (string.IsNullOrWhiteSpace(command.Reason) || command.Reason.Length > MaxReason)
         {
-            problems.Add(new FieldError("reason", "The reason is required and at most 500 characters."));
+            problems.Add(new FieldError("reason", $"The reason is required and at most {MaxReason} characters."));
         }
 
         if (string.IsNullOrWhiteSpace(command.Actor) || command.Actor.Length > 100)

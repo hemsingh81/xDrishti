@@ -89,6 +89,20 @@ public static class CellLifecycle
     /// Empty when it may.
     /// </summary>
     /// <param name="restored">The state the revert would restore.</param>
-    public static IReadOnlyList<string> RevertRefusals(CellState restored) =>
-        restored == CellState.Active ? ["A revert cannot make a cell active again; it needs the paper period and the owner (Paper to Active)."] : [];
+    /// <param name="undone">The state the reverted move had led to.</param>
+    public static IReadOnlyList<string> RevertRefusals(CellState restored, CellState undone = CellState.Research)
+    {
+        var reasons = new List<string>();
+        if (restored == CellState.Active)
+        {
+            reasons.Add("A revert cannot make a cell active again; it needs the paper period and the owner (Paper to Active).");
+        }
+
+        if (undone == CellState.Retired)
+        {
+            reasons.Add("Retired is final; a retired cell is not brought back by a revert.");
+        }
+
+        return reasons;
+    }
 }

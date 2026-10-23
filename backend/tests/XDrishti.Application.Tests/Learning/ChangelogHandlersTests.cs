@@ -31,7 +31,8 @@ public sealed class ChangelogHandlersTests
 
         result.IsSuccess.ShouldBeTrue();
         var row = _log.Rows.Single();
-        (row.Entry.Kind, row.Entry.FromState, row.Entry.ToState, row.Entry.Reason, row.Entry.Actor).ShouldBe(("transition", "research", "candidate", "why", "test"));
+        (row.Entry.Kind, row.Entry.FromState, row.Entry.ToState, row.Entry.Actor).ShouldBe(("transition", "research", "candidate", "test"));
+        row.Entry.Reason.ShouldBe("[claimed, unverified: gates=yes owner=yes band=yes recovered=yes paperDays=20] why");
         row.Entry.EvidenceIds.ShouldBe(["run:abc"]);
         row.Entry.At.ShouldBe(_time.GetUtcNow());
     }
@@ -131,6 +132,30 @@ public sealed class ChangelogHandlersTests
 
         toActive.Error.Message.ShouldContain("active");
         designation.Error.Code.ShouldBe(ChangelogErrors.NotRevertibleCode);
+    }
+
+    [Fact]
+    public async Task A_retirement_and_a_pause_cannot_be_reverted()
+    {
+        await Record().HandleAsync(Move(CellState.Retired), Ct);
+        var retired = await Revert().HandleAsync(new RevertChangelogCommand(_log.Rows[^1].Id, "x", "test"), Ct);
+
+        retired.Error.Code.ShouldBe(ChangelogErrors.NotRevertibleCode);
+        retired.Error.Message.ShouldContain("final");
+        _log.Rows.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_mistaken_pause_cannot_be_reverted()
+    {
+        await WalkToPaperAsync();
+        await Record().HandleAsync(Move(CellState.Active), Ct);
+        await Record().HandleAsync(Move(CellState.Paused), Ct);
+
+        var result = await Revert().HandleAsync(new RevertChangelogCommand(_log.Rows[^1].Id, "x", "test"), Ct);
+
+        result.Error.Code.ShouldBe(ChangelogErrors.NotRevertibleCode);
+        result.Error.Message.ShouldContain("active");
     }
 
     [Fact]

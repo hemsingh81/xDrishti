@@ -121,6 +121,25 @@ public sealed class LearningChangelogApiTests(ApiFactory factory) : DataTestBase
     }
 
     [Fact]
+    public async Task Two_appends_at_the_same_time_from_the_same_state_let_exactly_one_win()
+    {
+        var at = DateTimeOffset.UtcNow;
+        var entry = new NewChangelogEntry("transition", "cell", Cell, "research", "candidate", "r", "t", ["e"], null, null, null, null, at);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 2).Select(async _ =>
+        {
+            using var scope = Factory.Services.CreateScope();
+            return await scope.ServiceProvider.GetRequiredService<ILearningChangelog>().AppendAsync(entry, Ct);
+        }));
+
+        results.Count(r => !r.Stale).ShouldBe(1);
+        results.Count(r => r.Stale).ShouldBe(1);
+        var state = await StateAsync();
+        state.GetProperty("rows").GetInt32().ShouldBe(1);
+        state.GetProperty("problems").GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
     public async Task A_champion_designation_writes_its_changelog_row_and_a_replaced_champion_gets_one_too()
     {
         var first = await RegisterAsync('d', 'a');
