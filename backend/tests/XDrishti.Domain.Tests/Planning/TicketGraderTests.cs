@@ -24,16 +24,16 @@ public sealed class TicketGraderTests
             rFilled, 0, 100.5, 105.5, EntryFill.AtLimit, false, 1, 0, costing);
     }
 
-    private static SimulationRun Run(IReadOnlyList<SimTrade> trades, IReadOnlyList<SimTrade>? open = null, bool costed = false, DateOnly? last = null, SkipReason? skip = null, RunFates? fates = null)
+    private static SimulationRun Run(IReadOnlyList<SimTrade> trades, IReadOnlyList<SimTrade>? open = null, bool costed = false, DateOnly? last = null, SkipReason? skip = null, RunFates? fates = null, IReadOnlyList<DiscontinuityNote>? flagged = null, IReadOnlyList<SessionNote>? notes = null)
     {
         var strategy = new StrategyRecord("ORB", new Dictionary<string, double>(), "{}", new string('1', 64), Timeframe.M15, [Side.Buy]);
         var universe = new UniverseRecord(UniverseKind.InstrumentList, null, null, UniverseLabels.InstrumentsAsListed, [new UniverseMember(Guid.Empty, "X")]);
         var header = new RunHeader(strategy, "sim-6", F, F, ReplayOptions.Default, false, "{}", universe, new TradingCalendar([]), costed ? Sheet : null);
-        var record = new InstrumentRun(Guid.Empty, "X", skip, null, F.AddDays(-30), last ?? F, F.AddDays(-30), new DateSpan(F.AddDays(-30), F), 0, 0, 0, 0, null, 0.05m, false, [], SessionCounts.Empty, [], false, [], [], WalkCounters.Empty, fates ?? RunFates.Empty, 0, 0);
+        var record = new InstrumentRun(Guid.Empty, "X", skip, null, F.AddDays(-30), last ?? F, F.AddDays(-30), new DateSpan(F.AddDays(-30), F), 0, 0, 0, 0, null, 0.05m, false, [], SessionCounts.Empty, notes ?? [], false, flagged ?? [], [], WalkCounters.Empty, fates ?? RunFates.Empty, 0, 0);
         return RunAssembler.Assemble(header, [new InstrumentReplay(record, trades, open ?? [])]);
     }
 
-    private static GraderResult G(SimulationRun main, SimulationRun? tail = null, bool daily = false) => TicketGrader.Grade(main, tail, Side.Buy, F, D, daily);
+    private static GraderResult G(SimulationRun main, SimulationRun? tail = null, bool daily = false, bool rests = false) => TicketGrader.Grade(main, tail, Side.Buy, F, D, daily, rests);
 
     [Fact]
     public void A_gross_trade_on_the_planned_session_is_graded_at_the_filled_r_and_labelled()
@@ -82,10 +82,13 @@ public sealed class TicketGraderTests
     }
 
     [Fact]
-    public void No_trade_is_not_triggered_with_the_reason_the_replay_gives()
+    public void No_trade_is_not_triggered_with_one_generic_reason_that_does_not_name_a_whole_history_counter()
     {
-        G(Run([])).Grade!.Detail.ShouldContain("did not hold");
-        G(Run([], fates: RunFates.Empty with { LimitNotReached = 1 })).Grade!.Detail.ShouldContain("limit was not reached");
+        var plain = G(Run([])).Grade!;
+        var withCounters = G(Run([], fates: RunFates.Empty with { LimitNotReached = 3, PositionOpen = 2, NoFillBar = 1, AfterSquareOff = 1, EntryThroughStop = 1 })).Grade!;
+
+        plain.Status.ShouldBe(GradeStatus.NotTriggered);
+        withCounters.Detail.ShouldBe(plain.Detail);
     }
 
     [Fact]
@@ -111,13 +114,6 @@ public sealed class TicketGraderTests
 
         result.IsPending.ShouldBeTrue();
         result.PendingReason!.ShouldContain("tick_size_invalid");
-    }
-
-    [Fact]
-    public void A_flagged_day_or_a_pending_order_is_pending_not_final()
-    {
-        G(Run([], fates: RunFates.Empty with { EntriesSuppressed = 1 })).IsPending.ShouldBeTrue();
-        G(Run([], fates: RunFates.Empty with { OrderPendingAtEnd = 1 })).IsPending.ShouldBeTrue();
     }
 
     private static long CloseOf(DateOnly date) => new DateTimeOffset(date.Year, date.Month, date.Day, 15, 30, 0, TimeSpan.FromMinutes(330)).ToUnixTimeSeconds();
@@ -160,20 +156,17 @@ public sealed class TicketGraderTests
     }
 
     [Fact]
-    public void A_dropped_trade_of_another_day_does_not_make_this_ticket_not_gradable()
+    public void A_trade_dropped_on_a_later_day_does_not_make_this_ticket_not_gradable()
     {
-        // the main run (from D) dropped trades by the cost rule; the tail run (from F) shows the same drops, so they were decided after D
-        var main = Run([], fates: RunFates.Empty with { SkippedCost = 2, PositionOpen = 1 });
-        var tail = Run([], fates: RunFates.Empty with { SkippedCost = 2, PositionOpen = 1 });
+        // the counters cut to the window: the main run (from the decision day) and the tail (from the next day) both show the drop, so it was decided after the decision day
+        var main = Run([], fates: RunFates.Empty with { SkippedCost = 1, SkippedQuantity = 1 });
+        var tail = Run([], fates: RunFates.Empty with { SkippedCost = 1, SkippedQuantity = 1 });
 
-        var grade = G(main, tail, daily: true).Grade!;
-
-        grade.Status.ShouldBe(GradeStatus.NotTriggered);
-        grade.Detail.ShouldNotContain("earlier position");
+        G(main, tail, daily: true).Grade!.Status.ShouldBe(GradeStatus.NotTriggered);
     }
 
     [Fact]
-    public void A_dropped_trade_of_the_decision_day_alone_is_not_gradable()
+    public void A_trade_dropped_on_the_decision_day_alone_is_not_gradable()
     {
         var main = Run([], fates: RunFates.Empty with { SkippedCost = 1 });
         var tail = Run([], fates: RunFates.Empty);
@@ -182,22 +175,42 @@ public sealed class TicketGraderTests
     }
 
     [Fact]
-    public void A_flagged_day_or_a_pending_order_after_the_decision_day_does_not_leave_the_ticket_pending()
+    public void A_position_that_cannot_cross_a_discontinuity_on_the_decision_day_is_pending_and_on_a_later_day_is_not()
     {
-        var main = Run([], fates: RunFates.Empty with { EntriesSuppressed = 1, OrderPendingAtEnd = 1, ExcludedAcrossDiscontinuity = 1 });
-        var tail = Run([], fates: RunFates.Empty with { EntriesSuppressed = 1, OrderPendingAtEnd = 1, ExcludedAcrossDiscontinuity = 1 });
+        var one = RunFates.Empty with { ExcludedAcrossDiscontinuity = 1 };
 
-        G(main, tail, daily: true).IsPending.ShouldBeFalse();
+        G(Run([], fates: one), Run([])).IsPending.ShouldBeTrue();
+        G(Run([], fates: one), Run([], fates: one)).IsPending.ShouldBeFalse();
     }
 
     [Fact]
-    public void A_not_triggered_reason_of_a_later_day_is_not_this_tickets_reason()
+    public void A_flagged_decision_or_fill_day_is_pending_and_a_flagged_day_before_or_after_is_not()
     {
-        var main = Run([], fates: RunFates.Empty with { LimitNotReached = 1 });
-        var tail = Run([], fates: RunFates.Empty with { LimitNotReached = 1 });
+        G(Run([], flagged: [new DiscontinuityNote(F, 0.5)])).IsPending.ShouldBeTrue();
+        G(Run([], flagged: [new DiscontinuityNote(F.AddDays(-9), 0.5)])).IsPending.ShouldBeFalse();
+        G(Run([], flagged: [new DiscontinuityNote(F.AddDays(5), 0.5)])).IsPending.ShouldBeFalse();
+        G(Run([], flagged: [new DiscontinuityNote(F, 0.5)]), daily: true).IsPending.ShouldBeTrue("the fill day F of a daily ticket");
+        G(Run([], flagged: [new DiscontinuityNote(D, 0.5)]), daily: true).IsPending.ShouldBeTrue("the decision day D of a daily ticket");
+    }
 
-        G(main, tail, daily: true).Grade!.Detail.ShouldNotContain("limit");
-        G(main, null, daily: true).Grade!.Detail.ShouldContain("limit");
+    [Fact]
+    public void A_session_left_out_of_the_replay_on_the_decision_or_fill_day_is_pending()
+    {
+        G(Run([], notes: [new SessionNote(F, SessionExclusion.ShortSession, 100, 375)])).IsPending.ShouldBeTrue();
+        G(Run([], notes: [new SessionNote(F.AddDays(-9), SessionExclusion.ShortSession, 100, 375)])).IsPending.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Data_that_ends_on_the_decision_day_of_a_swing_ticket_is_pending_because_an_order_may_be_resting()
+    {
+        G(Run([]), rests: true).IsPending.ShouldBeTrue();
+        G(Run([]), rests: false).IsPending.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_skipped_tail_run_is_pending_never_a_guess()
+    {
+        G(Run([]), Run([], skip: SkipReason.FeaturesNotReady), daily: true).IsPending.ShouldBeTrue();
     }
 
     [Fact]

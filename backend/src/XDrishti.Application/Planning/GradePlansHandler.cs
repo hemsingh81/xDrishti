@@ -122,7 +122,7 @@ internal sealed class GradePlansHandler(
 
         // The engine cuts trades by the day of the DECISION. A ticket on a daily-or-longer timeframe is decided at the close of D (the session it was built on) and fills at the open of F, so its window starts on D; a ticket on an intraday
         // timeframe is decided on F, so its window starts on F. Only that one decision day is the ticket's (the grader checks). An intraday-style ticket is read to F, a swing ticket to the last closed session; nothing after the last closed
-        // session is ever read. The fates of a window cover all its days, so a second run from the day after the decision day (same end) is subtracted to leave the fates of the decision day alone.
+        // session is ever read. Only the counters the replayer cuts to its window (trades dropped by the sizing or cost rule, positions that cannot cross a discontinuity) are attributed to the decision day, by taking away a second run that starts the day after it (same end); flagged days and excluded sessions are read by date from the run record; no-trade reasons are not attributed.
         var daily = Timeframes.TryParse(cell.Timeframe, out var timeframe) && timeframe >= Timeframe.D1;
         var information = Before(calendar, forDate);
         var decisionDay = daily ? information : forDate;
@@ -148,7 +148,7 @@ internal sealed class GradePlansHandler(
             tail = second.Value;
         }
 
-        var result = TicketGrader.Grade(main.Value, tail, item.Side == "BUY" ? Side.Buy : Side.Sell, forDate, information, daily);
+        var result = TicketGrader.Grade(main.Value, tail, item.Side == "BUY" ? Side.Buy : Side.Sell, forDate, information, daily, swing);
         return (result.Grade, result.Grade is null ? null : main.Value.RunKey, result.PendingReason);
     }
 
