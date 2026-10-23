@@ -16,7 +16,7 @@ public sealed class IntradayBatchSeedTests
         { "PDH_PDL_REJECT", "d10af24055e897cfefaec76c1093862e14f1e719e30548044608f79c83377466" },
         { "VWAP_RECLAIM", "bb5d6811ea0813df6f0af3ed00c06f17ab0b96b1e437268e8f9b922929b85c49" },
         { "EMA_PULLBACK", "19d83b33a51effeeb79ecb906917188c396f437e6a75973e7510142f90e608da" },
-        { "GAP_GO", "941586d44748bdbd6d61714155a62e0543f571371a752b13388316806edd3bcb" },
+        { "GAP_GO", "66bbe72e8a1aadf59c71adc16e8aefc1b0ae0dd91e0b12aecb60b168eb94b083" },
         { "GAP_FILL", "b73192c68e8ee5cc09df27e8eba0da0256953b9b776dd10498531e56aad725b3" },
         { "INSIDE_BAR_BO", "197d2028259feff0986282e08b248f77a208ba1ebb5cb2b41d839446ee50757d" },
         { "MEAN_REV_BANDS", "cd8e7b657792a9109c6f3cf52d283bb3cc8d19cc2a2d636983ba80ce0115d0d7" },
@@ -25,16 +25,6 @@ public sealed class IntradayBatchSeedTests
     private static readonly SimulationEngineAdapter Engine = new();
 
     private static string Seed(string id) => StrategySeeder.EmbeddedTexts().Single(t => t.Name == id + ".yaml").Text;
-
-    [Fact]
-    public void The_eleven_built_ins_are_embedded_as_text()
-    {
-        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldBe(
-        [
-            "BASE_BREAKOUT.yaml", "EMA_PULLBACK.yaml", "GAP_FILL.yaml", "GAP_GO.yaml", "INSIDE_BAR_BO.yaml", "MEAN_REV_BANDS.yaml",
-            "ORB.yaml", "PDH_PDL_BREAK.yaml", "PDH_PDL_REJECT.yaml", "VWAP_PULLBACK.yaml", "VWAP_RECLAIM.yaml",
-        ]);
-    }
 
     [Theory]
     [MemberData(nameof(Pinned))]

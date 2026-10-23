@@ -17,7 +17,6 @@ strategy:
   trigger:
     all:
       - "close > or_high(or_min) and close[1] <= or_high(or_min)"
-      - "close > today.open"
   entry:
     type: at_close
   stop:
@@ -33,7 +32,6 @@ strategy:
     trigger:
       all:
         - "close < or_low(or_min) and close[1] >= or_low(or_min)"
-        - "close < today.open"
     entry:
       type: at_close
     stop:

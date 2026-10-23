@@ -69,11 +69,13 @@ public sealed class StoredStrategyTests
     private static Dictionary<string, double> Params(params (string Name, double Value)[] values) => values.ToDictionary(v => v.Name, v => v.Value);
 
     [Fact]
-    public void The_three_first_built_ins_are_still_embedded_as_text()
+    public void The_eleven_built_ins_are_embedded_as_text()
     {
-        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldContain("BASE_BREAKOUT.yaml");
-        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldContain("ORB.yaml");
-        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldContain("VWAP_PULLBACK.yaml");
+        StrategySeeder.EmbeddedTexts().Select(t => t.Name).ShouldBe(
+        [
+            "BASE_BREAKOUT.yaml", "EMA_PULLBACK.yaml", "GAP_FILL.yaml", "GAP_GO.yaml", "INSIDE_BAR_BO.yaml", "MEAN_REV_BANDS.yaml",
+            "ORB.yaml", "PDH_PDL_BREAK.yaml", "PDH_PDL_REJECT.yaml", "VWAP_PULLBACK.yaml", "VWAP_RECLAIM.yaml",
+        ]);
     }
 
     [Theory]

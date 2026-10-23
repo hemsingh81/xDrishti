@@ -22,10 +22,12 @@ Eight more intraday strategies exist as stored, versioned text, run by `simulate
 | `PDH_PDL_REJECT` | wick below `prev_day.low`, close back above it and above the open, previous close not below it (SELL: at the previous high) | the bar's low | 09:30 to 14:30 |
 | `VWAP_RECLAIM` | daily close above daily EMA(20); two closes below `vwap`, then a close above `vwap` and the open | lowest low of 3 bars | 10:00 to 14:30 |
 | `EMA_PULLBACK` | `ema(9) > ema(21)` and hourly close above hourly EMA(21); the bar's low reaches `ema(21)` and it closes above `ema(9)` and its open | the bar's low | 09:45 to 14:30 |
-| `GAP_GO` | `gap_pct >= gap_min` (0.5); close breaks above the opening range (`or_min` 15) and above the day's open | opposite end of the opening range | 09:30 to 11:00 |
+| `GAP_GO` | `gap_pct >= gap_min` (0.5); close breaks above the opening range (`or_min` 15; being above the range high it is already above the day's open, so no separate test of the open) | opposite end of the opening range | 09:30 to 11:00 |
 | `GAP_FILL` | gap down within `gap_min` (0.5) to `gap_max` (3) percent; close back above the day's open after a close at or below it (SELL: gap up, mirror) | lowest low of 3 bars | 10:00 to 12:00 |
 | `INSIDE_BAR_BO` | previous bar `inside_bar`, close above the mother bar's high | lowest low of 3 bars | 10:00 to 14:00 |
 | `MEAN_REV_BANDS` | `adx(14) < adx_max` (25); `crosses_above(close, bb_lower(20, 2))` and close above open (rr 1.5) | lowest low of 3 bars | 10:00 to 14:30 |
+
+**Notes on the table.** `PDH_PDL_BREAK` starts at 10:00 on purpose: its stop is the lowest low of the last 3 bars, which at 09:30 or 09:45 would reach into the previous session, and a gap through the level at the open has no later bar that crosses it from below, so it never fires (`GAP_GO` is the strategy for gaps). `GAP_FILL` is a gap fade that exits on `FIXED_RR` like the others, not a fill-to-previous-close target (only `FIXED_RR` runs). The thresholds chosen by the author (`gap_min`, `gap_max`, `adx_max`, `rr`, the windows and lookbacks) are tunable parameters or text, to be judged through the ledger and the experiment margin, not conclusions.
 
 **Deferred, with the missing piece:** `CPR` (central pivot range). Its levels can be written from `prev_day.*`, but doc 07 and the roadmap row give no definition (narrow-range threshold, which side, which levels as entry) and the row marks it UNVERIFIED; the numbers would be invented, so it waits for an owner definition. The swing batch is P6-17b.
 **Out:** the BUY to SELL mirror (P3-02e), ATR stops and buffers, a target at a band or level (only `FIXED_RR` runs), any API change, any new log event id, any migration.
@@ -45,7 +47,8 @@ Eight more intraday strategies exist as stored, versioned text, run by `simulate
 No secrets, no new log id (the seeder's 4433 to 4435 are reused).
 
 ## Test plan
-`Simulation.Tests`: `IntradayBatchTests` (56 cases) over `IntradayBatchDays`. `Infrastructure.Tests`: `IntradayBatchSeedTests`. `Api.IntegrationTests`: the seed row count in `LabStoreTests`. Edge cases: a wick that closes on the level (no break), a gap outside the band, a close inside the mother bar, a ranging versus trending ADX gate.
+There is no C# oracle for these strategies, by design: ADR 0056 kept the builders of the first three only as the test oracle for their seeds, and these have no builder (a second hand-written copy of the same rules would test the copy against itself). The oracle is the hand-calculated fabricated day, each with its stop, entry and target written next to it, plus the plain-arithmetic EMA check of the `EMA_PULLBACK` day. Every setup gate has a day on which the trigger holds and only that gate is false, and the same day with the gate deleted gives a candidate, so deleting a gate turns a test red.
+`Simulation.Tests`: `IntradayBatchTests` (63 cases) over `IntradayBatchDays`. `Infrastructure.Tests`: `IntradayBatchSeedTests`. `Api.IntegrationTests`: the seed row count in `LabStoreTests`. Edge cases: a wick that closes on the level (no break), a gap outside the band, a close inside the mother bar, a ranging versus trending ADX gate.
 
 ## Open questions
 None blocking. For the owner later: the definition of `CPR`; whether any of the eight should be dropped before the ledger counts them.
