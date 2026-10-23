@@ -79,6 +79,11 @@ internal static class XdCommand
             return await LearnPolicyCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "learn" && args[1] == "counterfactual")
+        {
+            return await LearnCounterfactualCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "learn" && args[1] == "experiment")
         {
             return await LearnExperimentCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
