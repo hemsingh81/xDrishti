@@ -15,6 +15,7 @@ public sealed class PlanBuilderChoiceTests
         services.AddLogging();
         services.AddApplication();
         services.AddScoped<ITicketSource, NoTickets>();
+        services.AddScoped<IPlanContextSource, NoContext>();
         if (flag is { } value)
         {
             services.AddSingleton<IPlanBuilderSettings>(new Settings(value));
@@ -37,6 +38,12 @@ public sealed class PlanBuilderChoiceTests
     {
         public ValueTask<Result<TicketSourceResult>> ReadAsync(DateOnly session, DateOnly forDate, CancellationToken cancellationToken) =>
             ValueTask.FromResult(Result.Success(new TicketSourceResult([], 0, 0, [])));
+    }
+
+    private sealed class NoContext : IPlanContextSource
+    {
+        public ValueTask<Result<PlanContext>> ReadAsync(PlanContextRequest request, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(Result.Success(new PlanContext([], new Dictionary<string, InstrumentFacts>(), [], null, null, null, [])));
     }
 
     private sealed class Settings(bool useSelection) : IPlanBuilderSettings

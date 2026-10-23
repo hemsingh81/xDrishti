@@ -137,6 +137,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, HoldingQuotesService>();
         services.AddSingleton<IScheduledService, PortfolioBrokerHistoryService>();
         services.AddSingleton<IScheduledService, NightlyService>(); // the fail-closed nightly plan (P7-08); starts paused
+        services.AddSingleton<IScheduledService, SuggestionsService>(); // the owner's suggestions after the nightly plan (P7-09); starts paused, rules only
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
@@ -507,6 +508,7 @@ public static class DependencyInjection
         services.AddScoped<SelectionPlanBuilder>(); // P7-04, ADR 0088: registered, not the default
         services.AddScoped<IPlanBuilder>(sp => sp.GetService<IPlanBuilderSettings>()?.UseSelection == true ? sp.GetRequiredService<SelectionPlanBuilder>() : sp.GetRequiredService<NullPlanBuilder>());
         services.AddScoped<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>, RunNightlyPlanHandler>();
+        services.AddScoped<ICommandHandler<GenerateSuggestionsCommand, SuggestionsOutcome>, GenerateSuggestionsHandler>(); // deterministic suggestions into the append-only inbox (P7-09, ADR 0092)
         services.AddScoped<IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>>, ListPlanRunsHandler>();
         services.AddScoped<ICommandHandler<GradePlansCommand, GradeOutcome>, GradePlansHandler>(); // grading (P7-13, ADR 0090): insert-only grades on stored bars, no order
         services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();

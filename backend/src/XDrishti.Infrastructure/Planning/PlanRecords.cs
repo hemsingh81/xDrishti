@@ -227,3 +227,19 @@ internal sealed class GradeRecord
 
     public DateTimeOffset GradedAt { get; set; }
 }
+
+/// <summary>A row of <c>workflow.suggestions</c>: one suggestion for the owner's inbox (P7-09). Insert-only; one per plan, kind and subject.</summary>
+internal sealed class SuggestionRecord
+{
+    public long Id { get; set; }
+
+    public long PlanId { get; set; }
+
+    public string Kind { get; set; } = string.Empty;
+
+    public string Subject { get; set; } = string.Empty;
+
+    public string Text { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAt { get; set; }
+}

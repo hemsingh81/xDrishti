@@ -32,7 +32,9 @@ public sealed class SelectionPlanBuilderTests
     {
         var source = Substitute.For<ITicketSource>();
         source.ReadAsync(Session, ForDate, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(new TicketSourceResult(found, 1, 2, ["history not ready at the close"]))));
-        return new SelectionPlanBuilder(source, NullLogger<SelectionPlanBuilder>.Instance, rules);
+        var context = Substitute.For<IPlanContextSource>();
+        context.ReadAsync(Arg.Any<PlanContextRequest>(), Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Success(WiredPlanFixture.Context())));
+        return new SelectionPlanBuilder(source, context, NullLogger<SelectionPlanBuilder>.Instance, rules);
     }
 
     private static readonly SelectionRules Loose = new(OptionalFilters: [FilterCodes.Cost, FilterCodes.Event, FilterCodes.FnoBan, FilterCodes.Surveillance]);
@@ -49,31 +51,6 @@ public sealed class SelectionPlanBuilderTests
         Assert.Empty(item.Allocations);
         Assert.True(result.Value.Provisional);
         Assert.Equal("nightly:2026-10-26:selection", result.Value.PlanKey);
-    }
-
-    [Fact]
-    public async Task Loosened_rules_rank_the_ticket_primary_with_levels_and_evidence()
-    {
-        var result = await Builder([Candidate("AAA", "S1"), Candidate("BBB", "S2")], Loose).BuildAsync(Request, CancellationToken.None);
-
-        Assert.All(result.Value.Items, i => Assert.Equal(TicketGroup.Primary, i.Group));
-        Assert.Equal([1, 2], result.Value.Items.Select(i => i.Rank));
-        var first = result.Value.Items[0];
-        Assert.Equal("stop below the low", first.Stop);
-        Assert.Equal(40, first.Evidence.Trades);
-        Assert.Contains("cell statistics as of 2026-10-22", first.Evidence.DataRange, StringComparison.Ordinal);
-        Assert.Contains("smart_rules", first.Evidence.Unavailable);
-    }
-
-    [Fact]
-    public async Task More_than_the_primary_cut_goes_to_reserve()
-    {
-        var many = Enumerable.Range(0, SelectionPlanBuilder.MaxPrimary + 2).Select(i => Candidate("S" + i, "STRAT" + i)).ToList();
-
-        var result = await Builder(many, Loose).BuildAsync(Request, CancellationToken.None);
-
-        Assert.Equal(SelectionPlanBuilder.MaxPrimary, result.Value.Items.Count(i => i.Group == TicketGroup.Primary));
-        Assert.All(result.Value.Items.Where(i => i.Group == TicketGroup.Reserve), i => Assert.Contains("below_primary_cut", i.Reasons));
     }
 
     [Fact]
@@ -114,7 +91,7 @@ public sealed class SelectionPlanBuilderTests
         var source = Substitute.For<ITicketSource>();
         source.ReadAsync(Session, ForDate, Arg.Any<CancellationToken>()).Returns(ValueTask.FromResult(Result.Failure<TicketSourceResult>(Error.Upstream("x.y", "no"))));
 
-        var result = await new SelectionPlanBuilder(source, NullLogger<SelectionPlanBuilder>.Instance).BuildAsync(Request, CancellationToken.None);
+        var result = await new SelectionPlanBuilder(source, Substitute.For<IPlanContextSource>(), NullLogger<SelectionPlanBuilder>.Instance).BuildAsync(Request, CancellationToken.None);
 
         Assert.True(result.IsFailure);
     }

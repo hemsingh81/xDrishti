@@ -205,3 +205,19 @@ internal sealed class AutonomySettingRecordConfiguration : IEntityTypeConfigurat
         builder.HasIndex(x => new { x.Id, x.SnapshotHash }).IsUnique().HasDatabaseName("uq_autonomy_settings_id_hash");
     }
 }
+
+/// <summary><c>workflow.suggestions</c> (spec P7-09, ADR 0092): the owner's suggestion inbox. Insert-only for the runtime role; the same plan, kind and subject is stored once.</summary>
+internal sealed class SuggestionRecordConfiguration : IEntityTypeConfiguration<SuggestionRecord>
+{
+    public void Configure(EntityTypeBuilder<SuggestionRecord> builder)
+    {
+        builder.ToTable("suggestions", Schemas.Workflow, t => t.HasCheckConstraint("ck_suggestions_shape", "length(btrim(kind)) > 0 AND length(btrim(subject)) > 0 AND length(btrim(text)) > 0"));
+        builder.HasKey(x => x.Id).HasName("pk_suggestions");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.Kind).HasMaxLength(40).IsRequired();
+        builder.Property(x => x.Subject).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Text).HasMaxLength(500).IsRequired();
+        builder.HasIndex(x => new { x.PlanId, x.Kind, x.Subject }).IsUnique().HasDatabaseName("uq_suggestions_plan_kind_subject"); // idempotent: the second insert is skipped
+        builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_suggestions_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
+    }
+}

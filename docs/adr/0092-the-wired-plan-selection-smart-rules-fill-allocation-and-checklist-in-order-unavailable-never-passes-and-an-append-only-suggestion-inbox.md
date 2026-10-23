@@ -1,0 +1,31 @@
+# 0092 — The wired plan: selection, smart rules, fill, allocation and checklist in order, unavailable never passes, and an append-only suggestion inbox
+
+- **Status:** Proposed (spec [P7-09](../specs/P7-09-wire-the-pipeline-and-the-suggestions-service.md), approved under the owner's standing run instruction and the owner's binding decisions of 2026-10-23; built 2026-10-24). Becomes Accepted when the owner has read it.
+- **Date:** 2026-10-24.
+- **Relation to other ADRs:** [0082](0082-selection-core-filters-with-unavailable-merge-and-a-deterministic-rank.md), [0084](0084-portfolio-fill-greedy-with-every-limit-rechecked-and-unavailable-blocking.md), [0085](0085-smart-rules-in-the-plan-gate-and-throttle-and-same-bet-with-unavailable-never-a-pass.md), [0087](0087-pretrade-checklist-pure-unavailable-never-passes-and-an-owner-only-confirm-despite.md), [0088](0088-ticket-builder-kleene-classification-from-the-close-bars-after-the-close-dropped-selection-builder-off-by-default.md) (the builder and its off-by-default switch), [0089](0089-per-account-allocation-a-pure-split-of-the-ticket-by-each-paper-accounts-own-limits-and-unavailable-allocating-nothing.md), [0086](0086-the-fail-closed-nightly-pipeline-gates-one-row-per-attempt-a-null-builder-and-a-paused-service.md), [0083](0083-the-plan-record-insert-only-state-trails-owner-only-approvals-lapse-by-default-and-no-order-by-name.md), [0091](0091-auto-approval-is-an-option-behind-an-owner-setting-default-off-a-new-approval-kind-the-database-checks.md).
+
+## Context
+P7-01 to P7-08 built the parts. P7-09 joins them. The binding owner decisions: P7 places no order; tickets go to paper accounts only; default autonomy Advisory and any auto approval is a setting defaulting OFF; no reserve promotion; no automatic learning change; no depth recording.
+
+## Decision
+1. **One order, in the builder:** tickets (P7-04) -> selection (filters, merge, rank) -> smart rules (gate, correlation-aware selection, throttle) -> portfolio fill on the smart-rules survivors -> for each primary ticket, allocation to the paper Trading accounts and the checklist for every Trading account. Groups: primary (taken by the fill), reserve (moved by a smart rule, or admissible but not taken, with the reason), rejected (not admissible, held by a filter, or lost in the merge). Every non-primary item has reason codes (`code:fail` or `code:unavailable`).
+2. **A port for everything that is not a ticket:** `IPlanContextSource` returns accounts (with profile and overrides applied), holdings, sector and baskets, correlations and notes. A part with no source is null and every rule reads null as unavailable. A context failure fails the build closed (no plan), like a ticket-source failure. The stored implementation is read only.
+3. **Unavailable never passes, visibly.** The market gate has no data (P3-01d/e unbuilt), so every wired plan is flagged in its basis (`market gate unavailable ...`), and a suggestion says so. A pair with no correlation figure blocks a fill pick. An unknown sector blocks. Checklist inputs without a source are null: their checks are unavailable and are listed on the ticket; the auto-approval checklist source stays the null source, so P7-12's rule declines every ticket even if its setting is turned on.
+4. **The one assumption that is not a gap:** the open book is empty (no journal yet, paper days start in P10); the plan says "none recorded". Positions held outside the system are not counted. Reversible in one line.
+5. **No checklist column (P7-03).** The standings that are not a pass are stored in the evidence's list as `checklist:<code>:<outcome>`; allocation exclusions as `allocation:<code>`. The review recomputes the full checklist from live inputs.
+6. **Sizes:** entry is the close of the session (indicative, said on every primary ticket); the pool is the liquidity share (1 % of average daily turnover over the entry); the risk multiplier of the smart rules scales each account's risk per trade; earlier tickets use up an account's risk headroom and funds; the live account is excluded by the allocator and refused by the checklist.
+7. **No look-ahead:** returns are built from 1D bars read up to the close of the session and the pure `ReturnSeries` drops anything later; a test adds, changes and removes later bars against the real database and the context does not move.
+8. **Honesty in the basis:** the plan's basis starts with "Proposed, provisional: no order exists, nothing here is approved." (pinned), then what the numbers rest on, then the banner flags; the column's 500 characters cut it with an ellipsis, the gate flag first.
+9. **Suggestions:** rules only (`SuggestionRules`), one inbox table `workflow.suggestions` (insert-only grants, unique `(plan_id, kind, subject)`, the second insert skipped), a `suggestions` service that follows `nightly` and starts paused. One suggestion per unavailable input (naming up to 8 tickets), not one per ticket. No endpoint, snooze or expiry yet.
+10. **The switch and the services stay off.** `Planning:Builder:UseSelection` is false by default and a test pins that the null builder's plan is unchanged; the owner switches the builder, `nightly` and `suggestions` on.
+11. Log ids 4740 to 4749 (4740 to 4743 used).
+
+## Consequences
+- Turning the builder on produces a real, flagged proposal; with default selection rules most candidates are still held for unavailable cost, events, ban and surveillance (P7-01), so early plans may have no primary ticket, and the suggestions say why.
+- Each wired plan costs one daily-bar read per ranked instrument.
+- The exit criterion's wall-clock count starts when the owner deploys with the switch on.
+
+## Alternatives considered
+- **Book unavailable.** Honest about positions held outside the system, but the fill would then take nothing, ever, until a journal exists. Rejected as the default; one line to switch.
+- **A checklist column now.** Needs a migration for data the review will recompute anyway. Deferred to P7-10.
+- **One suggestion per held ticket.** Floods the inbox on a default-rules night. Rejected.

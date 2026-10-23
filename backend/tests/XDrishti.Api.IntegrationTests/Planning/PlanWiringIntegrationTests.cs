@@ -1,0 +1,107 @@
+using Microsoft.Extensions.DependencyInjection;
+using XDrishti.Api.IntegrationTests.Data;
+using XDrishti.Api.IntegrationTests.Infrastructure;
+using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Domain.Market.Bars;
+using XDrishti.Domain.Planning;
+using XDrishti.Tests.Shared;
+
+namespace XDrishti.Api.IntegrationTests.Planning;
+
+/// <summary>Spec P7-09 on the real database: the stored context source never reads past the close of the session (truncation), and the suggestion inbox stores a plan, kind and subject once.</summary>
+[Collection(ApiTestSuite.Name)]
+public sealed class PlanWiringIntegrationTests(ApiFactory factory) : DataTestBase(factory)
+{
+    private static readonly DateOnly Session = new(2026, 10, 9);
+
+    private static readonly DateOnly ForDate = new(2026, 10, 12);
+
+    private static IEnumerable<DateOnly> Weekdays(DateOnly from, DateOnly to)
+    {
+        for (var d = from; d <= to; d = d.AddDays(1))
+        {
+            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))
+            {
+                yield return d;
+            }
+        }
+    }
+
+    private static Bar[] Series(IEnumerable<DateOnly> days, Func<int, double> price) => [.. days.Select((d, i) => ReplayDays.Flat(d, price(i))).SelectMany(b => b)];
+
+    private async Task StoreAsync(Guid id, Bar[] bars)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IBarStore>();
+        await using var merge = await store.BeginMergeAsync(id, BarSource.Dhan, Ct);
+        await merge.AddAsync(bars, Ct);
+        await merge.CompleteAsync(null, Ct);
+        var aggregates = scope.ServiceProvider.GetRequiredService<IBarAggregates>();
+        await aggregates.MarkAllDirtyAsync(Ct);
+        foreach (var dirty in await aggregates.ListDirtyAsync(Ct))
+        {
+            await aggregates.BuildAsync(dirty, Ct);
+        }
+    }
+
+    private async Task<PlanContext> ContextAsync(params ContextInstrument[] instruments)
+    {
+        using var scope = Factory.Services.CreateScope();
+        var result = await scope.ServiceProvider.GetRequiredService<IPlanContextSource>().ReadAsync(new PlanContextRequest(Session, ForDate, instruments), Ct);
+        result.IsSuccess.ShouldBeTrue();
+        return result.Value;
+    }
+
+    [Fact]
+    public async Task Bars_after_the_close_of_the_session_change_nothing_in_the_context()
+    {
+        var a = await SeedAsync("WIRA");
+        var b = await SeedAsync("WIRB");
+        var past = Weekdays(new DateOnly(2026, 8, 24), Session).ToList();
+        await StoreAsync(a, Series(past, i => 100 + (i * 7 % 11)));
+        await StoreAsync(b, Series(past, i => 50 + (i * 5 % 13)));
+        var instruments = new[] { new ContextInstrument(a, "WIRA"), new ContextInstrument(b, "WIRB") };
+        var before = await ContextAsync(instruments);
+
+        var later = Weekdays(Session.AddDays(3), Session.AddDays(9)).ToList();
+        await StoreAsync(a, Series(later, i => 500 + i * 40));
+        await StoreAsync(b, Series(later, i => 1 + i));
+        var after = await ContextAsync(instruments);
+
+        before.Correlations.ShouldNotBeNull().Get("WIRA", "WIRB").ShouldNotBeNull();
+        after.Correlations.ShouldNotBeNull().Get("WIRA", "WIRB").ShouldBe(before.Correlations.Get("WIRA", "WIRB"));
+        after.Instruments.Keys.ShouldBe(before.Instruments.Keys);
+        after.Book.ShouldBe(before.Book);
+        after.Gate.ShouldBeNull();
+        after.TakenTrades.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task The_context_says_the_book_is_not_recorded_and_has_no_market_figures()
+    {
+        var context = await ContextAsync();
+
+        context.Book.ShouldNotBeNull().ShouldBeEmpty();
+        context.Notes.ShouldContain(note => note.Contains("none recorded", StringComparison.Ordinal));
+        context.Gate.ShouldBeNull();
+        context.Accounts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_suggestion_is_stored_once_per_plan_kind_and_subject()
+    {
+        using var scope = Factory.Services.CreateScope();
+        var plans = scope.ServiceProvider.GetRequiredService<IPlanStore>();
+        var published = await plans.PublishAsync(new NewPlan("wiring-suggest", ForDate, new DateTimeOffset(2026, 10, 12, 3, 35, 0, TimeSpan.Zero), 1, new string('d', 64), "b", true, "test", DateTimeOffset.UnixEpoch, []), Ct);
+        var store = scope.ServiceProvider.GetRequiredService<ISuggestionStore>();
+        NewSuggestion[] suggestions = [new(SuggestionKinds.NoPrimaryTickets, "plan", "none"), new(SuggestionKinds.TicketsHeldUnavailableInput, "cost", "held")];
+
+        var first = await store.InsertAsync(published.Id, suggestions, DateTimeOffset.UnixEpoch, Ct);
+        var again = await store.InsertAsync(published.Id, suggestions, DateTimeOffset.UnixEpoch, Ct);
+
+        first.ShouldBe(2);
+        again.ShouldBe(0);
+        (await store.ForPlanAsync(published.Id, Ct)).Select(s => s.Suggestion).ShouldBe(suggestions);
+    }
+}
