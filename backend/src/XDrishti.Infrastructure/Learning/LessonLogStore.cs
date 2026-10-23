@@ -15,11 +15,27 @@ internal sealed class LessonLogStore(NpgsqlDataSource dataSource) : ILessonLog
         SELECT DISTINCT ON (COALESCE(lesson_id, id)) {Columns} FROM research.lessons ORDER BY COALESCE(lesson_id, id), id DESC
         """;
 
+    private const string GrowingTag = "growing_tag";
+
     public async ValueTask<LessonAppend> OpenAsync(NewLessonRow row, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(row);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // One opener per finding at a time, so the check and the insert cannot interleave (a growing tag has no unique index: its key is reused after a lesson is final).
+        await using (var advisory = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtext(@k))", connection, transaction))
+        {
+            advisory.Parameters.AddWithValue("k", NpgsqlDbType.Text, $"research.lessons.open:{row.MonitorKind}|{row.Subject}|{row.EvidenceKey}");
+            await advisory.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (await FindExistingAsync(connection, transaction, row.MonitorKind, row.Subject, row.EvidenceKey, cancellationToken) is { } known)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new LessonAppend(known, LessonAppendStatus.Existing);
+        }
+
         var id = await InsertAsync(connection, transaction, row, onConflictDoNothing: true, cancellationToken);
         if (id is { } created)
         {
@@ -28,8 +44,7 @@ internal sealed class LessonLogStore(NpgsqlDataSource dataSource) : ILessonLog
         }
 
         await transaction.RollbackAsync(cancellationToken);
-        var existing = await FindIdByEvidenceAsync(row.MonitorKind, row.Subject, row.EvidenceKey, cancellationToken);
-        return new LessonAppend(existing ?? 0, existing is null ? LessonAppendStatus.Stale : LessonAppendStatus.Existing);
+        return new LessonAppend(0, LessonAppendStatus.Stale);
     }
 
     public async ValueTask<LessonAppend> AppendAsync(NewLessonRow row, CancellationToken cancellationToken)
@@ -60,7 +75,24 @@ internal sealed class LessonLogStore(NpgsqlDataSource dataSource) : ILessonLog
 
     public async ValueTask<long?> FindIdByEvidenceAsync(string monitorKind, string subject, string evidenceKey, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand("SELECT id FROM research.lessons WHERE lesson_id IS NULL AND monitor_kind = @m AND subject = @s AND evidence_key = @e");
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        return await FindExistingAsync(connection, null, monitorKind, subject, evidenceKey, cancellationToken);
+    }
+
+    // A growing tag: the key is the tag kind (rows written before ADR 0078's amendment carry the kind and counts, "Kind:a/b->c/d", and still count); a lesson blocks while its newest row is open or linked.
+    // Every other monitor: the exact key, in any state.
+    private static async Task<long?> FindExistingAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, string monitorKind, string subject, string evidenceKey, CancellationToken cancellationToken)
+    {
+        var growing = monitorKind == GrowingTag;
+        var sql = growing
+            ? """
+              SELECT o.id FROM research.lessons o
+              WHERE o.lesson_id IS NULL AND o.monitor_kind = @m AND o.subject = @s AND (o.evidence_key = @e OR starts_with(o.evidence_key, @e || ':'))
+                AND (SELECT x.state FROM research.lessons x WHERE x.id = o.id OR x.lesson_id = o.id ORDER BY x.id DESC LIMIT 1) IN ('open', 'linked')
+              ORDER BY o.id LIMIT 1
+              """
+            : "SELECT id FROM research.lessons WHERE lesson_id IS NULL AND monitor_kind = @m AND subject = @s AND evidence_key = @e";
+        await using var select = new NpgsqlCommand(sql, connection, transaction);
         select.Parameters.AddWithValue("m", NpgsqlDbType.Varchar, monitorKind);
         select.Parameters.AddWithValue("s", NpgsqlDbType.Varchar, subject);
         select.Parameters.AddWithValue("e", NpgsqlDbType.Varchar, evidenceKey);
@@ -82,17 +114,24 @@ internal sealed class LessonLogStore(NpgsqlDataSource dataSource) : ILessonLog
         return await ReadAllAsync(select, cancellationToken);
     }
 
-    public async ValueTask<IReadOnlyList<LessonRow>> ListAsync(string? state, int limit, CancellationToken cancellationToken)
+    public async ValueTask<IReadOnlyList<LessonListed>> ListAsync(string? state, int limit, CancellationToken cancellationToken)
     {
-        await using var select = dataSource.CreateCommand($"SELECT {Columns} FROM ({Latest}) l WHERE (@state::text IS NULL OR state = @state::text) ORDER BY COALESCE(lesson_id, id) DESC LIMIT @limit");
+        await using var select = dataSource.CreateCommand($"SELECT l.*, (SELECT o.created_at FROM research.lessons o WHERE o.id = COALESCE(l.lesson_id, l.id)) AS opened_at FROM ({Latest}) l WHERE (@state::text IS NULL OR l.state = @state::text) ORDER BY COALESCE(l.lesson_id, l.id) DESC LIMIT @limit");
         select.Parameters.Add(new NpgsqlParameter("state", NpgsqlDbType.Text) { Value = (object?)state ?? DBNull.Value });
         select.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
-        return await ReadAllAsync(select, cancellationToken);
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        var listed = new List<LessonListed>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            listed.Add(new LessonListed(Read(reader), reader.GetFieldValue<DateTimeOffset>(19)));
+        }
+
+        return listed;
     }
 
     private static async Task<long?> InsertAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, NewLessonRow row, bool onConflictDoNothing, CancellationToken cancellationToken)
     {
-        var conflict = onConflictDoNothing ? " ON CONFLICT (monitor_kind, subject, evidence_key) WHERE lesson_id IS NULL DO NOTHING" : string.Empty;
+        var conflict = onConflictDoNothing ? " ON CONFLICT (monitor_kind, subject, evidence_key) WHERE lesson_id IS NULL AND monitor_kind <> 'growing_tag' DO NOTHING" : string.Empty;
         await using var insert = new NpgsqlCommand($"""
             INSERT INTO research.lessons (lesson_id, state, from_state, monitor_kind, subject, evidence_key, problem, hypothesis_ref, experiment_id, result, experiment_outcome, before_mean_r, after_mean_r, before_total_r, after_total_r, reason, actor, created_at)
             VALUES (@lid, @state, @from, @monitor, @subject, @evidence, @problem, @href, @exp, @result, @outcome, @bmean, @amean, @btotal, @atotal, @reason, @actor, @at){conflict}

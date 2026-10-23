@@ -9,6 +9,10 @@ internal static class LessonRows
 {
     public const int MaxProblem = 500;
 
+    public const int MaxSubject = 400;
+
+    public const int MaxEvidenceKey = 200;
+
     /// <summary>The problems of a reason and an actor, empty when both are usable.</summary>
     public static List<FieldError> CheckReasonAndActor(string? reason, string? actor)
     {

@@ -28,6 +28,6 @@ internal sealed class ListLessonsHandler(ILessonLog log) : IQueryHandler<ListLes
         }
 
         var rows = await log.ListAsync(query.State?.ToLowerInvariant(), query.Limit, cancellationToken);
-        return Result.Success<IReadOnlyList<LessonView>>([.. rows.Select(r => LessonView.Of(r, r.Row.CreatedAt, []))]);
+        return Result.Success<IReadOnlyList<LessonView>>([.. rows.Select(r => LessonView.Of(r.Latest, r.OpenedAt, []))]);
     }
 }

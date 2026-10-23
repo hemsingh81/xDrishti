@@ -35,7 +35,7 @@ public sealed class LessonFindingsTests
     }
 
     [Fact]
-    public void A_growing_tag_is_a_finding_whose_key_names_the_counts()
+    public void A_growing_tag_is_a_finding_whose_key_is_the_tag_kind_and_the_counts_are_in_the_problem()
     {
         var growing = new GrowingTag(Cell, LossTagKind.GaveBackProfit, 6, 2, 10);
         var report = new LossTagReport(new LossTagOptions(), 40, 20, [new CellLossTags(Cell, 40, 20, [0, 6, 0, 0, 0, 0, 0], 3, [growing])], [], 1, []);
@@ -44,7 +44,7 @@ public sealed class LessonFindingsTests
 
         finding.Monitor.ShouldBe(LessonMonitorKind.GrowingTag);
         finding.Subject.ShouldBe(Cell);
-        finding.EvidenceKey.ShouldBe("GaveBackProfit:2/10->6/10");
+        finding.EvidenceKey.ShouldBe("GaveBackProfit");
         finding.Problem.ShouldContain("2 of 10 to 6 of 10");
     }
 

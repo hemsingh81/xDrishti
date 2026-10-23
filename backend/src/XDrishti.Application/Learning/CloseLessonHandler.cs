@@ -47,6 +47,7 @@ internal sealed class CloseLessonHandler(ILessonLog log, IHypothesisLog hypothes
             return Refuse(LessonErrors.MoveRefused(refusals));
         }
 
+        // Shortcut (ADR 0078): the fix is not checked against the lesson's subject. The experiment's runs name no cell the log can compare cheaply, so any stored experiment can close any linked lesson; the owner links the fix and reads the numbers.
         var e = stored!.Experiment;
         var result = e.Outcome == ExperimentOutcome.Better ? Improved : NoChange;
         var next = LessonRows.Next(latest, LessonState.Closed, command.Reason, command.Actor, time.GetUtcNow()) with

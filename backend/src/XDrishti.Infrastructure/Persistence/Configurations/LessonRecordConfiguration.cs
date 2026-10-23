@@ -20,6 +20,7 @@ internal sealed class LessonRecordConfiguration : IEntityTypeConfiguration<Lesso
             t.HasCheckConstraint("ck_lessons_shape", "monitor_kind IN ('growing_tag', 'rolling_band', 'cusum', 'calibration')");
             t.HasCheckConstraint("ck_lessons_links", "(state <> 'open' OR (hypothesis_ref IS NULL AND experiment_id IS NULL)) AND (state <> 'linked' OR (hypothesis_ref IS NOT NULL) <> (experiment_id IS NOT NULL)) AND (state <> 'closed' OR experiment_id IS NOT NULL)");
             t.HasCheckConstraint("ck_lessons_result", "(state = 'closed') = (result IS NOT NULL) AND (result IS NULL OR result IN ('improved', 'no_measurable_change')) AND (state = 'closed' OR (experiment_outcome IS NULL AND before_total_r IS NULL AND after_total_r IS NULL AND before_mean_r IS NULL AND after_mean_r IS NULL))");
+            t.HasCheckConstraint("ck_lessons_closed", "state <> 'closed' OR (experiment_outcome IS NOT NULL AND before_total_r IS NOT NULL AND after_total_r IS NOT NULL AND (result = 'improved') = (experiment_outcome = 'Better'))");
         });
         builder.HasKey(x => x.Id).HasName("pk_lessons");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();

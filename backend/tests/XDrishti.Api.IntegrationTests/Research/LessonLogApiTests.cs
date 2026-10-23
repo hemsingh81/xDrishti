@@ -30,7 +30,7 @@ public sealed class LessonLogApiTests(ApiFactory factory) : DataTestBase(factory
         await ExecuteAsync(connection, "DELETE FROM research.experiments");
     }
 
-    private static NewLessonRow Opening(string evidence = "GaveBackProfit:2/10->6/10") =>
+    private static NewLessonRow Opening(string evidence = "GaveBackProfit") =>
         new(null, "open", null, "growing_tag", Cell, evidence, "gave back profit grew", null, null, null, null, null, null, null, null, "found by the replayed monitors", "cli:xd", DateTimeOffset.UnixEpoch);
 
     private async Task<TResult> WithAsync<TResult>(Func<IServiceProvider, Task<TResult>> work)
@@ -81,13 +81,74 @@ public sealed class LessonLogApiTests(ApiFactory factory) : DataTestBase(factory
     public async Task The_same_finding_opened_at_once_writes_one_lesson()
     {
         var results = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening(), Ct).AsTask())));
-        var other = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening("GaveBackProfit:3/10->7/10"), Ct).AsTask());
+        var other = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening("GaveUpTooSoon"), Ct).AsTask());
 
         results.Count(r => r.Status == LessonAppendStatus.Created).ShouldBe(1);
         results.Where(r => r.Status == LessonAppendStatus.Existing).Select(r => r.Id).Distinct().ShouldBe([results.Single(r => r.Status == LessonAppendStatus.Created).Id]);
         other.Status.ShouldBe(LessonAppendStatus.Created);
         using var list = await Client.GetAsync(new Uri("/api/lessons", UriKind.Relative), Ct);
         (await list.Content.ReadFromJsonAsync<JsonElement>(Ct)).GetArrayLength().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_growing_tag_opens_no_second_lesson_while_one_is_open_or_linked_and_a_fresh_one_after_it_is_final()
+    {
+        var log = (await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening(), Ct).AsTask()));
+        var legacy = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening("Late:1/10->4/10") with { Subject = "other" }, Ct).AsTask());
+        var sameKindOldKey = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening("Late") with { Subject = "other" }, Ct).AsTask());
+        var again = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening(), Ct).AsTask());
+        var drift = Opening("100:3") with { MonitorKind = "cusum" };
+        await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(drift, Ct).AsTask());
+        await SendAsync(new DismissLessonCommand(log.Id, "no", "cli:xd"));
+        await SendAsync(new DismissLessonCommand(legacy.Id, "no", "cli:xd"));
+        var fresh = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening(), Ct).AsTask());
+        var driftAgain = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(drift, Ct).AsTask());
+        var freshDry = await WithAsync(p => p.GetRequiredService<ILessonLog>().FindIdByEvidenceAsync("growing_tag", Cell, "GaveBackProfit", Ct).AsTask());
+        var legacyFresh = await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening("Late") with { Subject = "other" }, Ct).AsTask());
+
+        sameKindOldKey.ShouldBe(new LessonAppend(legacy.Id, LessonAppendStatus.Existing));
+        (again.Status, again.Id).ShouldBe((LessonAppendStatus.Existing, log.Id));
+        fresh.Status.ShouldBe(LessonAppendStatus.Created);
+        fresh.Id.ShouldNotBe(log.Id);
+        freshDry.ShouldBe(fresh.Id);
+        driftAgain.Status.ShouldBe(LessonAppendStatus.Existing);
+        legacyFresh.Status.ShouldBe(LessonAppendStatus.Created);
+    }
+
+    [Fact]
+    public async Task The_list_shows_when_a_lesson_was_opened_not_when_it_last_moved()
+    {
+        var lesson = (await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening(), Ct).AsTask())).Id;
+        await SendAsync(new DismissLessonCommand(lesson, "x", "cli:xd"));
+
+        using var list = await Client.GetAsync(new Uri("/api/lessons", UriKind.Relative), Ct);
+        var first = (await list.Content.ReadFromJsonAsync<JsonElement>(Ct))[0];
+
+        first.GetProperty("createdAt").GetDateTimeOffset().ShouldBe(DateTimeOffset.UnixEpoch);
+        first.GetProperty("updatedAt").GetDateTimeOffset().ShouldBeGreaterThan(DateTimeOffset.UnixEpoch);
+    }
+
+    [Fact]
+    public async Task A_closed_row_with_a_result_but_no_numbers_or_a_result_that_disagrees_with_the_outcome_is_refused_by_the_database()
+    {
+        var hypothesis = await HypothesisJudgedAsync();
+        var lesson = (await WithAsync(p => p.GetRequiredService<ILessonLog>().OpenAsync(Opening(), Ct).AsTask())).Id;
+        await using var connection = await OpenAsync();
+        var experiment = await new NpgsqlCommand($"SELECT experiment_id FROM research.hypotheses WHERE id = {hypothesis} OR hypothesis_id = {hypothesis} ORDER BY id DESC LIMIT 1", connection).ExecuteScalarAsync(Ct);
+        const string Head = "INSERT INTO research.lessons (lesson_id, state, from_state, monitor_kind, subject, evidence_key, problem, experiment_id, result, experiment_outcome, before_total_r, after_total_r, reason, actor, created_at)";
+        var tail = "'cusum', 's', 'e', 'p'";
+        var noNumbers = $"{Head} VALUES ({lesson}, 'closed', 'linked', {tail}, {experiment}, 'improved', 'Better', NULL, NULL, 'r', 'a', now())";
+        var noOutcome = $"{Head} VALUES ({lesson}, 'closed', 'linked', {tail}, {experiment}, 'no_measurable_change', NULL, 1, 2, 'r', 'a', now())";
+        var disagrees = $"{Head} VALUES ({lesson}, 'closed', 'linked', {tail}, {experiment}, 'improved', 'Inconclusive', 1, 2, 'r', 'a', now())";
+        var agrees = $"{Head} VALUES ({lesson}, 'closed', 'linked', {tail}, {experiment}, 'no_measurable_change', 'Inconclusive', 1, 2, 'r', 'a', now())";
+
+        foreach (var sql in new[] { noNumbers, noOutcome, disagrees })
+        {
+            var refused = await Should.ThrowAsync<PostgresException>(async () => await new NpgsqlCommand(sql, connection).ExecuteNonQueryAsync(Ct));
+            (refused.SqlState, refused.ConstraintName).ShouldBe((PostgresErrorCodes.CheckViolation, "ck_lessons_closed"));
+        }
+
+        (await new NpgsqlCommand(agrees, connection).ExecuteNonQueryAsync(Ct)).ShouldBe(1);
     }
 
     [Fact]

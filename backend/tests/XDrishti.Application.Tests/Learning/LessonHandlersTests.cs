@@ -30,11 +30,12 @@ public sealed class LessonHandlersTests
 
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 23, 0, 0, 0, TimeSpan.Zero));
 
-    private OpenLessonsHandler Open()
+    private OpenLessonsHandler Open(int recent = 6, string? cell = null)
     {
-        var growing = new GrowingTag(Cell, LossTagKind.GaveBackProfit, 6, 2, 10);
+        var subject = cell ?? Cell;
+        var growing = new GrowingTag(subject, LossTagKind.GaveBackProfit, recent, 2, 10);
         _tags.HandleAsync(Arg.Any<AnalyzeLossTagsQuery>(), Arg.Any<CancellationToken>())
-            .Returns(Result.Success(new LossTagReport(new LossTagOptions(), 40, 20, [new CellLossTags(Cell, 40, 20, [0, 6, 0, 0, 0, 0, 0], 3, [growing])], [], 1, [])));
+            .Returns(Result.Success(new LossTagReport(new LossTagOptions(), 40, 20, [new CellLossTags(subject, 40, 20, [0, 6, 0, 0, 0, 0, 0], 3, [growing])], [], 1, [])));
         _drift.HandleAsync(Arg.Any<ReplayDriftQuery>(), Arg.Any<CancellationToken>())
             .Returns(Result.Success(new DriftReport(new DriftOptions(), 0, [new CellDrift(Cell, 50, 20, null, null, [new DriftEvent(DriftDetectorKind.Cusum, Cell, true, 100, 4, 5, 3, "cusum 5.00 over 3.00")])], null, [], [])));
         return new OpenLessonsHandler(_tags, _drift, _log, _time, NullLogger<OpenLessonsHandler>.Instance);
@@ -79,6 +80,36 @@ public sealed class LessonHandlersTests
         second.Value.Items.ShouldAllBe(i => i.Status == "existing");
         second.Value.Items.Select(i => i.LessonId).ShouldBe(first.Value.Items.Select(i => i.LessonId));
         _log.Rows.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task A_persisting_growing_tag_with_other_counts_opens_no_new_lesson_while_the_lesson_is_not_final_and_a_fresh_one_after()
+    {
+        var id = await OpenOneAsync();
+        var again = await Open(recent: 8).HandleAsync(Scan(), Ct);
+        var dry = await Open(recent: 9).HandleAsync(Scan(dry: true), Ct);
+        await Link().HandleAsync(new LinkLessonCommand(id, "experiment", 5, "tried", "cli:xd"), Ct);
+        _ledger.FindAsync(5, Arg.Any<CancellationToken>()).Returns(Experiment(5, ExperimentOutcome.Inconclusive));
+        var whileLinked = await Open(recent: 9).HandleAsync(Scan(), Ct);
+        await Dismiss().HandleAsync(new DismissLessonCommand(id, "no", "cli:xd"), Ct);
+        var after = await Open(recent: 9).HandleAsync(Scan(), Ct);
+
+        again.Value.Items.First(i => i.Monitor == "growing_tag").ShouldBe(new LessonScanItem("growing_tag", Cell, again.Value.Items[0].Problem, "existing", id));
+        dry.Value.Items[0].Status.ShouldBe("existing");
+        whileLinked.Value.Items[0].Status.ShouldBe("existing");
+        after.Value.Items[0].Status.ShouldBe("opened");
+        after.Value.Items[0].LessonId.ShouldNotBe(id);
+        after.Value.Items[0].Problem.ShouldContain("2 of 10 to 9 of 10");
+    }
+
+    [Fact]
+    public async Task A_finding_whose_subject_does_not_fit_its_column_is_skipped_and_the_scan_goes_on()
+    {
+        var result = await Open(cell: new string('x', 401)).HandleAsync(Scan(), Ct);
+
+        result.Value.Items.Select(i => (i.Monitor, i.Status)).ShouldBe([("growing_tag", "skipped"), ("cusum", "opened")]);
+        result.Value.Items[0].Subject.Length.ShouldBe(400);
+        _log.Rows.Count.ShouldBe(1);
     }
 
     [Fact]
@@ -210,6 +241,8 @@ public sealed class LessonHandlersTests
     public async Task The_views_show_history_next_states_and_the_closing_numbers_and_refuse_bad_filters()
     {
         var id = await OpenOneAsync();
+        var openedAt = _time.GetUtcNow();
+        _time.Advance(TimeSpan.FromHours(2));
         _ledger.FindAsync(5, Arg.Any<CancellationToken>()).Returns(Experiment(5, ExperimentOutcome.Better));
         await Link().HandleAsync(new LinkLessonCommand(id, "experiment", 5, "tried", "cli:xd"), Ct);
         await Close().HandleAsync(new CloseLessonCommand(id, "ok", "cli:xd"), Ct);
@@ -223,6 +256,8 @@ public sealed class LessonHandlersTests
         one.Value.NextStates.ShouldBeEmpty();
         (one.Value.Result, one.Value.BeforeMeanR, one.Value.AfterMeanR).ShouldBe(("improved", 0.10, 0.14));
         list.Value.Single().Id.ShouldBe(id);
+        list.Value.Single().CreatedAt.ShouldBe(openedAt);
+        list.Value.Single().UpdatedAt.ShouldBeGreaterThan(openedAt);
         bad.Error.Code.ShouldBe(LearningErrors.InvalidCode);
         missing.Error.Code.ShouldBe(LessonErrors.NotFoundCode);
     }
@@ -237,10 +272,9 @@ public sealed class LessonHandlersTests
 
         public ValueTask<LessonAppend> OpenAsync(NewLessonRow row, CancellationToken cancellationToken)
         {
-            var known = Rows.FirstOrDefault(r => r.Row.LessonId is null && r.Row.MonitorKind == row.MonitorKind && r.Row.Subject == row.Subject && r.Row.EvidenceKey == row.EvidenceKey);
-            if (known is not null)
+            if (Known(row.MonitorKind, row.Subject, row.EvidenceKey) is { } known)
             {
-                return ValueTask.FromResult(new LessonAppend(known.Id, LessonAppendStatus.Existing));
+                return ValueTask.FromResult(new LessonAppend(known, LessonAppendStatus.Existing));
             }
 
             Rows.Add(new LessonRow(++_next, row));
@@ -259,7 +293,12 @@ public sealed class LessonHandlersTests
         }
 
         public ValueTask<long?> FindIdByEvidenceAsync(string monitorKind, string subject, string evidenceKey, CancellationToken cancellationToken) =>
-            ValueTask.FromResult<long?>(Rows.FirstOrDefault(r => r.Row.LessonId is null && r.Row.MonitorKind == monitorKind && r.Row.Subject == subject && r.Row.EvidenceKey == evidenceKey)?.Id);
+            ValueTask.FromResult(Known(monitorKind, subject, evidenceKey));
+
+        // The rule of the real log: a growing tag blocks while its lesson is open or linked, any other finding in any state.
+        private long? Known(string monitorKind, string subject, string evidenceKey) =>
+            Rows.FirstOrDefault(r => r.Row.LessonId is null && r.Row.MonitorKind == monitorKind && r.Row.Subject == subject && r.Row.EvidenceKey == evidenceKey
+                && (monitorKind != "growing_tag" || Rows.Last(x => x.LessonId == r.Id).Row.State is "open" or "linked"))?.Id;
 
         public ValueTask<LessonRow?> FindAsync(long lessonId, CancellationToken cancellationToken) =>
             ValueTask.FromResult(Rows.Where(r => r.LessonId == lessonId).LastOrDefault());
@@ -267,7 +306,7 @@ public sealed class LessonHandlersTests
         public ValueTask<IReadOnlyList<LessonRow>> HistoryAsync(long lessonId, CancellationToken cancellationToken) =>
             ValueTask.FromResult<IReadOnlyList<LessonRow>>([.. Rows.Where(r => r.LessonId == lessonId)]);
 
-        public ValueTask<IReadOnlyList<LessonRow>> ListAsync(string? state, int limit, CancellationToken cancellationToken) =>
-            ValueTask.FromResult<IReadOnlyList<LessonRow>>([.. Rows.GroupBy(r => r.LessonId).Select(g => g.Last()).Where(r => state is null || r.Row.State == state).Take(limit)]);
+        public ValueTask<IReadOnlyList<LessonListed>> ListAsync(string? state, int limit, CancellationToken cancellationToken) =>
+            ValueTask.FromResult<IReadOnlyList<LessonListed>>([.. Rows.GroupBy(r => r.LessonId).Select(g => new LessonListed(g.Last(), g.First().Row.CreatedAt)).Where(r => state is null || r.Latest.Row.State == state).Take(limit)]);
     }
 }

@@ -5,13 +5,16 @@ namespace XDrishti.Application.Abstractions.Learning;
 /// </summary>
 public interface ILessonLog
 {
-    /// <summary>Writes the opening row unless a lesson with the same monitor, subject and evidence key exists (then <see cref="LessonAppendStatus.Existing"/> and that lesson's id).</summary>
+    /// <summary>
+    /// Writes the opening row unless the finding is already a lesson (then <see cref="LessonAppendStatus.Existing"/> and that lesson's id): for a growing tag, while a lesson of that monitor, subject and tag kind is open or linked (a closed or dismissed one
+    /// does not block a new one); for every other monitor, a lesson with the same monitor, subject and evidence key in any state.
+    /// </summary>
     ValueTask<LessonAppend> OpenAsync(NewLessonRow row, CancellationToken cancellationToken);
 
     /// <summary>Writes a state-change row under a lock per lesson after checking again that the newest row is still in <c>row.FromState</c> (else <see cref="LessonAppendStatus.Stale"/>).</summary>
     ValueTask<LessonAppend> AppendAsync(NewLessonRow row, CancellationToken cancellationToken);
 
-    /// <summary>The id of the lesson recorded for this finding, or null.</summary>
+    /// <summary>The id of the lesson that makes this finding already recorded (the same rule as <see cref="OpenAsync"/>), or null.</summary>
     ValueTask<long?> FindIdByEvidenceAsync(string monitorKind, string subject, string evidenceKey, CancellationToken cancellationToken);
 
     /// <summary>The newest row of a lesson, or null.</summary>
@@ -20,6 +23,6 @@ public interface ILessonLog
     /// <summary>Every row of a lesson, oldest first.</summary>
     ValueTask<IReadOnlyList<LessonRow>> HistoryAsync(long lessonId, CancellationToken cancellationToken);
 
-    /// <summary>The newest row of each lesson, newest lesson first, optionally only those in a state.</summary>
-    ValueTask<IReadOnlyList<LessonRow>> ListAsync(string? state, int limit, CancellationToken cancellationToken);
+    /// <summary>The newest row of each lesson with the time it was opened, newest lesson first, optionally only those in a state.</summary>
+    ValueTask<IReadOnlyList<LessonListed>> ListAsync(string? state, int limit, CancellationToken cancellationToken);
 }

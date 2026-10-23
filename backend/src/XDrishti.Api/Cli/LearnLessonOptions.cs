@@ -83,6 +83,11 @@ internal sealed record LearnLessonOptions(
         var action = args[0];
         if (action == "scan")
         {
+            if (values.ContainsKey("--id") || values.ContainsKey("--reason") || values.ContainsKey("--hypothesis") || values.ContainsKey("--experiment"))
+            {
+                errors.Add("--id, --reason, --hypothesis and --experiment do not go with scan");
+            }
+
             if (runs.Count == 0)
             {
                 errors.Add("give at least one --run");
@@ -102,7 +107,13 @@ internal sealed record LearnLessonOptions(
         }
 
         var id = action == "scan" ? 0 : Whole(values, "--id", errors, required: true);
-        var months = action == "scan" ? (int)Whole(values, "--monitor-months", errors, required: false, fallback: 6) : 6;
+        var monthsLong = action == "scan" ? Whole(values, "--monitor-months", errors, required: false, fallback: 6) : 6;
+        if (monthsLong is < 1 or > 120)
+        {
+            errors.Add("--monitor-months is 1 to 120");
+        }
+
+        var months = (int)Math.Clamp(monthsLong, 1, 120);
         long? model = action == "scan" && values.ContainsKey("--model") ? Whole(values, "--model", errors, required: false) : null;
         string? kind = null;
         long fixId = 0;

@@ -7,7 +7,7 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Application.Learning;
 
 /// <summary>
-/// Opens lessons from the replayed monitors (spec P6-16, ADR 0078): the growing loss tags and the drift alarms still on at the end of the replay. Idempotent: a finding with the same monitor, subject and evidence key is never opened twice. Reads
+/// Opens lessons from the replayed monitors (spec P6-16, ADR 0078): the growing loss tags and the drift alarms still on at the end of the replay. Idempotent: a drift finding with the same monitor, subject and evidence key is never opened twice; a growing tag opens no new lesson while one of the same monitor, subject and tag kind is open or linked. A finding whose subject or key does not fit its column is listed as skipped. Reads
 /// stored runs only; execution gap and decision drag are listed as not built. Nothing is applied.
 /// </summary>
 internal sealed class OpenLessonsHandler(
@@ -68,6 +68,13 @@ internal sealed class OpenLessonsHandler(
     private async ValueTask<LessonScanItem> ScanOneAsync(LessonFinding f, string code, OpenLessonsCommand command, CancellationToken cancellationToken)
     {
         var problem = f.Problem.Length <= LessonRows.MaxProblem ? f.Problem : f.Problem[..LessonRows.MaxProblem];
+        if (f.Subject.Length > LessonRows.MaxSubject || f.EvidenceKey.Length > LessonRows.MaxEvidenceKey)
+        {
+            // Too long for its column: skipped and said so, never an aborted scan or a clipped key that could collide with another finding.
+            var shown = f.Subject.Length <= LessonRows.MaxSubject ? f.Subject : f.Subject[..LessonRows.MaxSubject];
+            return new LessonScanItem(code, shown, problem, "skipped", 0);
+        }
+
         if (command.DryRun)
         {
             return await log.FindIdByEvidenceAsync(code, f.Subject, f.EvidenceKey, cancellationToken) is { } known

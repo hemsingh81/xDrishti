@@ -5,7 +5,7 @@ namespace XDrishti.Domain.Learning;
 /// <summary>Pure conversion of monitor reports into lesson findings (spec P6-16). No clock, no database; the same reports give the same findings in the same order.</summary>
 public static class LessonFindings
 {
-    /// <summary>The problem of each growing tag.</summary>
+    /// <summary>The problem of each growing tag. The evidence key is the tag kind alone: a persisting problem is one finding while its lesson is not final; the counts are in the problem text.</summary>
     public static IReadOnlyList<LessonFinding> FromLossTags(LossTagReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
@@ -13,7 +13,7 @@ public static class LessonFindings
         return [.. report.Cells.SelectMany(cell => cell.Growing.Select(g => new LessonFinding(
             LessonMonitorKind.GrowingTag,
             cell.CellKey,
-            string.Create(c, $"{g.Kind}:{g.EarlierCount}/{g.Window}->{g.RecentCount}/{g.Window}"),
+            g.Kind.ToString(),
             string.Create(c, $"{g.Kind} losses grew from {g.EarlierCount} of {g.Window} to {g.RecentCount} of {g.Window} in the last two windows of losses."))))
             .OrderBy(f => f.Subject, StringComparer.Ordinal).ThenBy(f => f.EvidenceKey, StringComparer.Ordinal)];
     }
