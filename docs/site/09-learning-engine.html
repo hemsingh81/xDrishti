@@ -428,6 +428,9 @@ is audited, and is monitored for 60 trades with <strong>automatic rollback</stro
 one-click <strong>Revert</strong>, and password re-entry to raise the autonomy level. Auto-approved tickets are marked on the
 plan and in the audit log; the Decisions report compares them with your manual decisions so the threshold can
 itself be tuned from evidence.</p>
+<blockquote>
+<p><strong>As built in P7-12 (<a href="../adr/0091-auto-approval-is-an-option-behind-an-owner-setting-default-off-a-new-approval-kind-the-database-checks.html">ADR 0091</a>):</strong> auto-approval is an owner setting (<code>autonomy.auto_approve_tickets</code>, default <strong>OFF</strong> = manual approval; changing it is the owner&#39;s act with password re-entry), not a level that is on by default. The rule uses the lower bound of the shrunk cell win rate (default 0.58), needs every pre-trade check to pass (an unavailable check never does), covers only primary tickets (never a reserve), is capped per day, and is recorded as an <code>auto</code> approval by <code>rule:autonomy</code> with the settings snapshot. No setting lets anything place an order, and no learning change is applied automatically yet.</p>
+</blockquote>
 <h2 id="14-smart-rules-from-learned-signals-to-a-safer-plan">14. Smart rules: from learned signals to a safer plan<a class="hash" href="#14-smart-rules-from-learned-signals-to-a-safer-plan" aria-label="Link to this section">#</a></h2>
 <p>Five learned rules sit between the scanner&#39;s candidates and tomorrow&#39;s plan, plus two feedback features. All run
 in the nightly pipeline without you; their state is shown on Plan review and <strong>Learning → Smart rules</strong>, and
@@ -518,7 +521,7 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-23 16:03</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-23 16:38</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>

@@ -67,6 +67,8 @@ internal sealed class PlanItemRecord
 
     public double? PWin { get; set; }
 
+    public double? PWinLower { get; set; }
+
     public double? ConservativeExpectancyR { get; set; }
 
     public string[] Unavailable { get; set; } = [];
@@ -136,6 +138,34 @@ internal sealed class ApprovalRecord
     public DateTimeOffset Cutoff { get; set; }
 
     public DateTimeOffset DecidedAt { get; set; }
+
+    public long? SettingsId { get; set; }
+
+    public string? SettingsHash { get; set; }
+
+    public string? PolicyVersion { get; set; }
+}
+
+/// <summary>A row of <c>workflow.autonomy_settings</c>: one change of the autonomy settings by the owner. Insert-only; the newest row is the current settings. The hash and the time are stamped by the database.</summary>
+internal sealed class AutonomySettingRecord
+{
+    public long Id { get; set; }
+
+    public bool AutoApproveTickets { get; set; }
+
+    public bool PromoteFromReserve { get; set; }
+
+    public decimal MinPWin { get; set; }
+
+    public int MaxAutoPerDay { get; set; }
+
+    public string SnapshotHash { get; set; } = string.Empty;
+
+    public string Actor { get; set; } = string.Empty;
+
+    public string Reason { get; set; } = string.Empty;
+
+    public DateTimeOffset ChangedAt { get; set; }
 }
 
 /// <summary>A row of <c>trading.plan_runs</c>: one attempt of the pipeline. Insert-only.</summary>

@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals"]);
+        names.ShouldBe(["trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -81,6 +81,9 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "UPDATE workflow.approvals SET decision = 'approve' WHERE false",
             "DELETE FROM workflow.approvals WHERE false",
             "TRUNCATE workflow.approvals",
+            "UPDATE workflow.autonomy_settings SET auto_approve_tickets = true WHERE false",
+            "DELETE FROM workflow.autonomy_settings WHERE false",
+            "TRUNCATE workflow.autonomy_settings",
         })
         {
             (await SqlStateAsync(server.App, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
@@ -130,6 +133,9 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "ALTER TABLE trading.plan_events DISABLE TRIGGER trg_plan_events_check",
             "ALTER TABLE workflow.approvals DISABLE TRIGGER trg_approvals_stamp",
             "DROP TRIGGER trg_approvals_stamp ON workflow.approvals",
+            "CREATE OR REPLACE FUNCTION workflow.stamp_approval() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$",
+            "DROP TRIGGER trg_autonomy_settings_stamp ON workflow.autonomy_settings",
+            "ALTER TABLE workflow.autonomy_settings DISABLE TRIGGER trg_autonomy_settings_stamp",
         })
         {
             (await RunAsync(statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);

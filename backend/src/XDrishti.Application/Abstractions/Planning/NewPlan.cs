@@ -47,7 +47,8 @@ public sealed record NewPlanItem(int Rank, TicketGroup Group, string Symbol, str
 /// <param name="ConservativeExpectancyR">The conservative expectancy in R, if any.</param>
 /// <param name="Unavailable">Inputs that were missing; never a pass.</param>
 /// <param name="AdvisoryNote">A model's figure shown beside, labelled advisory, or empty.</param>
-public sealed record PlanEvidence(string CellKey, int Trades, string DataRange, string PWinBasis, double? PWin, double? ConservativeExpectancyR, IReadOnlyList<string> Unavailable, string? AdvisoryNote);
+/// <param name="PWinLower">The lower bound of the shrunk cell estimate of the win rate (P7-12: the only P(win) the auto-approval rule reads); null when not known.</param>
+public sealed record PlanEvidence(string CellKey, int Trades, string DataRange, string PWinBasis, double? PWin, double? ConservativeExpectancyR, IReadOnlyList<string> Unavailable, string? AdvisoryNote, double? PWinLower = null);
 
 /// <summary>Size for one Trading account. Only paper-mode allocations are accepted until the owner decides otherwise (P7-00 question 2).</summary>
 /// <param name="AccountId">The broker account.</param>

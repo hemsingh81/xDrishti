@@ -35,6 +35,7 @@ internal sealed class PlanItemRecordConfiguration : IEntityTypeConfiguration<Pla
         builder.ToTable("plan_items", Schemas.Trading, t =>
         {
             t.HasCheckConstraint("ck_plan_items_group", "item_group IN ('primary', 'reserve', 'rejected') AND (item_group = 'primary' OR cardinality(reasons) > 0)");
+            t.HasCheckConstraint("ck_plan_items_p_win_lower", "p_win_lower IS NULL OR (p_win_lower >= 0 AND p_win_lower <= 1)");
             t.HasCheckConstraint("ck_plan_items_shape", "item_rank >= 1 AND side IN ('BUY', 'SELL') AND trades >= 0 AND (p_win IS NULL OR (p_win >= 0 AND p_win <= 1))");
         });
         builder.HasKey(x => x.Id).HasName("pk_plan_items");
@@ -115,12 +116,15 @@ internal sealed class PlanEventRecordConfiguration : IEntityTypeConfiguration<Pl
 /// <summary><c>workflow.approvals</c>: the owner's decisions. The only kind is <c>owner</c> (a check refuses any other): there is no automatic approval.</summary>
 internal sealed class ApprovalRecordConfiguration : IEntityTypeConfiguration<ApprovalRecord>
 {
+    // An owner row: an owner actor and no settings columns. An auto row (P7-12, ADR 0091): approve only, the rule as actor (never an owner prefix), the settings snapshot and the policy version, nothing the owner alone gives (modifications, confirmation).
+    internal const string ApprovalShape = "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND length(btrim(reason)) > 0 AND (decision = 'reject' OR decided_at < cutoff) AND ((kind = 'owner' AND actor LIKE 'owner:%' AND settings_id IS NULL AND settings_hash IS NULL AND policy_version IS NULL) OR (kind = 'auto' AND actor = 'rule:autonomy' AND decision = 'approve' AND modifications IS NULL AND confirm_reason IS NULL AND settings_id IS NOT NULL AND settings_hash IS NOT NULL AND policy_version IS NOT NULL AND item_id IS NOT NULL))";
+
     public void Configure(EntityTypeBuilder<ApprovalRecord> builder)
     {
         builder.ToTable("approvals", Schemas.Workflow, t =>
         {
-            t.HasCheckConstraint("ck_approvals_kind", "kind = 'owner'");
-            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND actor LIKE 'owner:%' AND length(btrim(reason)) > 0 AND (decision = 'reject' OR decided_at < cutoff)");
+            t.HasCheckConstraint("ck_approvals_kind", "kind IN ('owner', 'auto')");
+            t.HasCheckConstraint("ck_approvals_shape", ApprovalShape);
         });
         builder.HasKey(x => x.Id).HasName("pk_approvals");
         builder.Property(x => x.Id).UseIdentityAlwaysColumn();
@@ -130,6 +134,8 @@ internal sealed class ApprovalRecordConfiguration : IEntityTypeConfiguration<App
         builder.Property(x => x.Reason).HasMaxLength(500).IsRequired();
         builder.Property(x => x.ConfirmReason).HasMaxLength(500);
         builder.Property(x => x.Modifications).HasMaxLength(1000);
+        builder.Property(x => x.SettingsHash).HasMaxLength(64);
+        builder.Property(x => x.PolicyVersion).HasMaxLength(40);
         builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_approvals_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlanItemRecord>().WithMany().HasForeignKey(x => x.ItemId).HasConstraintName("fk_approvals_plan_items_item_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.PlanId, x.Id }).HasDatabaseName("ix_approvals_plan_id_id");
@@ -154,5 +160,24 @@ internal sealed class PlanRunRecordConfiguration : IEntityTypeConfiguration<Plan
         builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_plan_runs_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.ForDate, x.Id }).HasDatabaseName("ix_plan_runs_for_date_id");
         builder.HasIndex(x => x.ForDate).IsUnique().HasFilter("outcome = 'published'").HasDatabaseName("uq_plan_runs_published_for_date"); // a planned session has at most one published run (P7-08)
+    }
+}
+
+/// <summary><c>workflow.autonomy_settings</c> (spec P7-12, ADR 0091): every change of the autonomy switches, appended by the owner's act and never edited; the newest row is current, no row means everything OFF. The hash and time are stamped by a trigger.</summary>
+internal sealed class AutonomySettingRecordConfiguration : IEntityTypeConfiguration<AutonomySettingRecord>
+{
+    public void Configure(EntityTypeBuilder<AutonomySettingRecord> builder)
+    {
+        builder.ToTable("autonomy_settings", Schemas.Workflow, t =>
+        {
+            t.HasCheckConstraint("ck_autonomy_settings_shape", "min_p_win >= 0.5 AND min_p_win <= 0.99 AND max_auto_per_day >= 1 AND max_auto_per_day <= 20 AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0");
+        });
+        builder.HasKey(x => x.Id).HasName("pk_autonomy_settings");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.MinPWin).HasPrecision(4, 3);
+        builder.Property(x => x.SnapshotHash).HasMaxLength(64).IsRequired();
+        builder.Property(x => x.Actor).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+        builder.HasIndex(x => new { x.Id, x.SnapshotHash }).IsUnique().HasDatabaseName("uq_autonomy_settings_id_hash");
     }
 }

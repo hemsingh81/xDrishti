@@ -2,7 +2,9 @@ using System.Data.Common;
 using System.Globalization;
 using Npgsql;
 using NpgsqlTypes;
+using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Planning;
+using XDrishti.Domain.Autonomy;
 using XDrishti.Domain.Planning;
 
 namespace XDrishti.Infrastructure.Planning;
@@ -11,7 +13,7 @@ namespace XDrishti.Infrastructure.Planning;
 /// The plan record behind <see cref="IPlanStore"/> (spec P7-03, ADR 0083): raw SQL, insert and select only (the runtime role has no more). A state change is a new row in <c>trading.plan_events</c>, written under a transaction advisory lock
 /// per plan or item after checking that the newest state is still the one the caller saw. Nothing here talks to a broker.
 /// </summary>
-internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) : IPlanStore
+internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) : IPlanStore, IAutoApprovalStore
 {
     private const string PlanStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.plan_id = p.id AND e.item_id IS NULL ORDER BY e.id DESC LIMIT 1), 'draft')";
 
@@ -26,7 +28,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
 
     private const string ItemColumns = $"""
         i.id, i.plan_id, i.item_rank, i.item_group, i.symbol, i.side, i.strategy_id, i.strategy_version_hash, i.trigger_text, i.stop_text, i.target_text, i.validity_text, i.reasons,
-        i.cell_key, i.trades, i.data_range, i.p_win_basis, i.p_win, i.conservative_expectancy_r, i.unavailable, i.advisory_note, {ItemStateSql}
+        i.cell_key, i.trades, i.data_range, i.p_win_basis, i.p_win, i.conservative_expectancy_r, i.unavailable, i.advisory_note, {ItemStateSql}, i.p_win_lower
         """;
 
     public ValueTask<PlanPublished> PublishAsync(NewPlan plan, CancellationToken cancellationToken) => PublishCoreAsync(plan, null, cancellationToken);
@@ -278,6 +280,97 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         return MoveStatus.Created;
     }
 
+    public async ValueTask<MoveStatus> AutoApproveAsync(AutoApproveMove move, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(move);
+        await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        long planId;
+        await using (var owner = new NpgsqlCommand("SELECT plan_id FROM trading.plan_items WHERE id = @id", connection, transaction))
+        {
+            owner.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, move.ItemId);
+            if (await owner.ExecuteScalarAsync(cancellationToken) is not long found)
+            {
+                return MoveStatus.NotFound;
+            }
+
+            planId = found;
+        }
+
+        // The same order of locks as an owner decision (plan, then item), so of an automatic approval and a manual decision on one ticket exactly one is written; the other sees a different state (stale).
+        await LockAsync(connection, transaction, "trading.plans:" + planId.ToString(CultureInfo.InvariantCulture), cancellationToken);
+        await LockAsync(connection, transaction, "trading.plan_items:" + move.ItemId.ToString(CultureInfo.InvariantCulture), cancellationToken);
+
+        var now = time.GetUtcNow();
+        DateTimeOffset cutoff;
+        await using (var state = new NpgsqlCommand($"SELECT i.item_group, {ItemStateSql}, (SELECT {PlanStateSql} FROM trading.plans p WHERE p.id = i.plan_id), (SELECT p.review_cutoff FROM trading.plans p WHERE p.id = i.plan_id) FROM trading.plan_items i WHERE i.id = @id", connection, transaction))
+        {
+            state.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, move.ItemId);
+            await using var reader = await state.ExecuteReaderAsync(cancellationToken);
+            await reader.ReadAsync(cancellationToken);
+            if (reader.GetString(0) != TicketGroup.Primary.Code())
+            {
+                return MoveStatus.Refused;
+            }
+
+            if (reader.GetString(1) != TicketState.Proposed.Code())
+            {
+                return MoveStatus.Stale;
+            }
+
+            if (reader.GetString(2) is not ("published" or "inreview"))
+            {
+                return MoveStatus.Refused;
+            }
+
+            cutoff = reader.GetFieldValue<DateTimeOffset>(3);
+            if (now >= cutoff)
+            {
+                return MoveStatus.AfterCutoff;
+            }
+        }
+
+        long approvalId;
+        try
+        {
+            await using var insertApproval = new NpgsqlCommand("""
+                INSERT INTO workflow.approvals (plan_id, item_id, kind, decision, actor, reason, cutoff, decided_at, settings_id, settings_hash, policy_version)
+                VALUES (@plan, @item, 'auto', 'approve', @actor, @reason, @cutoff, clock_timestamp(), @sid, @shash, @policy) RETURNING id
+                """, connection, transaction);
+            var p = insertApproval.Parameters;
+            p.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
+            p.AddWithValue("item", NpgsqlDbType.Bigint, move.ItemId);
+            p.AddWithValue("actor", NpgsqlDbType.Varchar, AutoApprovalWording.Actor);
+            p.AddWithValue("reason", NpgsqlDbType.Varchar, move.Reason.Length <= 500 ? move.Reason : move.Reason[..500]);
+            p.AddWithValue("cutoff", NpgsqlDbType.TimestampTz, cutoff);
+            p.AddWithValue("sid", NpgsqlDbType.Bigint, move.SettingsId);
+            p.AddWithValue("shash", NpgsqlDbType.Varchar, move.SettingsHash);
+            p.AddWithValue("policy", NpgsqlDbType.Varchar, move.PolicyVersion);
+            approvalId = (long)(await insertApproval.ExecuteScalarAsync(cancellationToken))!;
+        }
+        catch (PostgresException failure) when (failure.SqlState == PostgresErrorCodes.CheckViolation)
+        {
+            // The shape check holds the cutoff (the database clock); the trigger holds the switch, the group, the plan state and the cap.
+            return failure.ConstraintName == "ck_approvals_shape" ? MoveStatus.AfterCutoff : MoveStatus.Refused;
+        }
+        catch (PostgresException failure) when (failure.SqlState == PostgresErrorCodes.ForeignKeyViolation)
+        {
+            return MoveStatus.Refused;
+        }
+
+        await InsertEventAsync(connection, transaction, planId, move.ItemId, TicketState.Proposed.Code(), TicketState.Approved.Code(), AutoApprovalWording.Actor, move.Reason.Length <= 500 ? move.Reason : move.Reason[..500], approvalId, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return MoveStatus.Created;
+    }
+
+    public async ValueTask<int> CountAutoApprovalsAsync(DateOnly forDate, CancellationToken cancellationToken)
+    {
+        await using var count = dataSource.CreateCommand("SELECT count(*) FROM workflow.approvals a JOIN trading.plans p ON p.id = a.plan_id WHERE a.kind = 'auto' AND p.for_date = @date");
+        count.Parameters.AddWithValue("date", NpgsqlDbType.Date, forDate);
+        return (int)(long)(await count.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async ValueTask<MoveStatus> MovePlanAsync(PlanMove move, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(move);
@@ -409,8 +502,8 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         long itemId;
         await using (var insert = new NpgsqlCommand("""
             INSERT INTO trading.plan_items (plan_id, item_rank, item_group, symbol, side, strategy_id, strategy_version_hash, trigger_text, stop_text, target_text, validity_text, reasons,
-                cell_key, trades, data_range, p_win_basis, p_win, conservative_expectancy_r, unavailable, advisory_note)
-            VALUES (@plan, @rank, @group, @symbol, @side, @sid, @shash, @trigger, @stop, @target, @validity, @reasons, @cell, @trades, @range, @basis, @pwin, @er, @unavail, @note) RETURNING id
+                cell_key, trades, data_range, p_win_basis, p_win, conservative_expectancy_r, unavailable, advisory_note, p_win_lower)
+            VALUES (@plan, @rank, @group, @symbol, @side, @sid, @shash, @trigger, @stop, @target, @validity, @reasons, @cell, @trades, @range, @basis, @pwin, @er, @unavail, @note, @pwl) RETURNING id
             """, connection, transaction))
         {
             var e = item.Evidence;
@@ -432,6 +525,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             p.AddWithValue("range", NpgsqlDbType.Varchar, e.DataRange);
             p.AddWithValue("basis", NpgsqlDbType.Varchar, e.PWinBasis);
             p.Add(new NpgsqlParameter("pwin", NpgsqlDbType.Double) { Value = e.PWin is { } w ? w : DBNull.Value });
+            p.Add(new NpgsqlParameter("pwl", NpgsqlDbType.Double) { Value = e.PWinLower is { } l ? l : DBNull.Value });
             p.Add(new NpgsqlParameter("er", NpgsqlDbType.Double) { Value = e.ConservativeExpectancyR is { } r ? r : DBNull.Value });
             p.AddWithValue("unavail", NpgsqlDbType.Array | NpgsqlDbType.Text, e.Unavailable.ToArray());
             p.Add(new NpgsqlParameter("note", NpgsqlDbType.Varchar) { Value = (object?)e.AdvisoryNote ?? DBNull.Value });
@@ -456,7 +550,7 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                var evidence = new PlanEvidence(reader.GetString(13), reader.GetInt32(14), reader.GetString(15), reader.GetString(16), Real(reader, 17), Real(reader, 18), reader.GetFieldValue<string[]>(19), Text(reader, 20));
+                var evidence = new PlanEvidence(reader.GetString(13), reader.GetInt32(14), reader.GetString(15), reader.GetString(16), Real(reader, 17), Real(reader, 18), reader.GetFieldValue<string[]>(19), Text(reader, 20), Real(reader, 22));
                 var item = new NewPlanItem(
                     reader.GetInt32(2), TicketGroupText.TryParse(reader.GetString(3)) ?? TicketGroup.Rejected, reader.GetString(4), reader.GetString(5), reader.GetString(6), reader.GetString(7),
                     reader.GetString(8), reader.GetString(9), reader.GetString(10), reader.GetString(11), reader.GetFieldValue<string[]>(12), evidence, []);

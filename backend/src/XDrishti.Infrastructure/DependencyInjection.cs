@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Auth;
+using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Learning;
 using XDrishti.Application.Abstractions.Live;
@@ -130,6 +131,8 @@ public static class DependencyInjection
         services.AddScoped<IHypothesisLog, HypothesisLogStore>(); // the insert-only hypothesis log (spec P6-10)
         services.AddScoped<ILessonLog, LessonLogStore>(); // the insert-only lesson log (spec P6-16)
         services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
+        services.AddScoped<IAutoApprovalStore>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-12: the automatic approval is written by the same store, in the same lock order as an owner's decision
+        services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
         services.AddScoped<ITicketSource, StoredTicketSource>();
         services.AddSingleton<IModelFiles, ModelFiles>(); // the model files under data/models, named by hash (spec P6-07)

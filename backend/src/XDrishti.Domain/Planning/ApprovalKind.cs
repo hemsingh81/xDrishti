@@ -1,8 +1,8 @@
 namespace XDrishti.Domain.Planning;
 
 /// <summary>
-/// Whose decision an approval row records (spec P7-03, ADR 0083). Owner is the only member: there is no system, rule or automatic kind, and the table refuses any other value. Adding one is the owner's decision (P7-00 questions 3 and 4)
-/// and a new migration, not a code path that appears by itself.
+/// Whose decision an OWNER approval row records (spec P7-03, ADR 0083). Owner is the only member of this enum on purpose: the owner's moves (<see cref="Planning.MoveActor.Owner"/>) are the only ones that carry it. The automatic kind of P7-12 (ADR 0091) is not
+/// an owner decision and is written only by its own store method with the actor <c>rule:autonomy</c>, the settings snapshot and the policy version; the database allows it only under the conditions of that ADR. Never add a member here for it.
 /// </summary>
 public enum ApprovalKind
 {

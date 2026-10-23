@@ -210,6 +210,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
             await db.Database.ExecuteSqlRawAsync("""
                 DELETE FROM trading.plan_events;
                 DELETE FROM workflow.approvals;
+                DELETE FROM workflow.autonomy_settings;
                 DELETE FROM trading.plan_item_allocations;
                 DELETE FROM trading.plan_runs;
                 DELETE FROM trading.plan_items;
@@ -339,6 +340,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM platform.app_settings;
                 DELETE FROM trading.plan_events;
                 DELETE FROM workflow.approvals;
+                DELETE FROM workflow.autonomy_settings;
                 DELETE FROM trading.plan_item_allocations;
                 DELETE FROM trading.plan_runs;
                 DELETE FROM trading.plan_items;

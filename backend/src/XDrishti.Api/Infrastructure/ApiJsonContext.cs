@@ -11,6 +11,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Autonomy;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Live.Push;
@@ -74,6 +75,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<HypothesisView>))]
 [JsonSerializable(typeof(LessonView))]
 [JsonSerializable(typeof(IReadOnlyList<LessonView>))]
+[JsonSerializable(typeof(AutonomySettingsView))]
+[JsonSerializable(typeof(ChangeAutonomyRequest))]
 [JsonSerializable(typeof(PlanView))]
 [JsonSerializable(typeof(IReadOnlyList<PlanView>))]
 [JsonSerializable(typeof(PlanRunView))]
