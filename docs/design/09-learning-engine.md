@@ -51,6 +51,8 @@ Only test windows count. Gap ≥ max holding (5 sessions). Tuning only inside tr
 
 Built (P6-05, [ADR 0067](../adr/0067-validation-harness-and-baselines-purged-folds-and-an-honest-eligibility-rule.md)): quarterly folds (first test 9 months in) with train rows purged by label horizon, scored against base-rate, cell-rate and logistic baselines; a model is eligible only if it beats both of the last two by a margin in 2/3 of the folds and pooled, with calibration error within 5 pp; fewer than 6 folds is "inconclusive"; the last 6 months are a hold-out used once.
 
+Built (P6-14, [ADR 0069](../adr/0069-learned-entry-windows-shrunk-bucket-runs-judged-on-purged-folds.md)): learned entry windows per cell are a proposal only: the best run of 30-minute entry buckets (win rate shrunk toward the cell, at least 30 trades, a lift floor, no weak bucket inside), re-learnt on each purged fold's train rows and judged on its test rows; "no stable window" is an ordinary outcome, fewer than 6 folds is at best "inconclusive", and nothing is applied to the scanner or a strategy.
+
 ## 3. Daily feedback loop
 
 1. Grade yesterday's primary, reserve and rejected items against actual data.

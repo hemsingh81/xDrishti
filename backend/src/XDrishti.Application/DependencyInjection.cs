@@ -47,6 +47,7 @@ using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Research;
 using XDrishti.Application.Research.CostSheets;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Learning;
 using XDrishti.Domain.Research;
 
 namespace XDrishti.Application;
@@ -441,6 +442,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ComputeCellStatsCommand, CellStatsOutcome>, ComputeCellStatsHandler>(); // cell statistics, Bayesian and recency (P6-01, ADR 0064)
         services.AddScoped<ICommandHandler<ExtractTradeFeaturesCommand, TradeFeaturesOutcome>, ExtractTradeFeaturesHandler>(); // decision-time features of a stored run (P6-04, ADR 0066)
         services.AddScoped<ICommandHandler<BuildTrainingSetCommand, TrainingSetOutcome>, BuildTrainingSetHandler>(); // the training set: labels joined to features (P6-04)
+        services.AddScoped<IQueryHandler<ProposeEntryWindowsQuery, Result<EntryWindowReport>>, ProposeEntryWindowsHandler>(); // learned entry windows, proposal only (P6-14, ADR 0069)
         services.AddScoped<IQueryHandler<ListCellsQuery, Result<IReadOnlyList<CellStatsView>>>, ListCellsHandler>();
         services.AddScoped<IQueryHandler<GetCellQuery, Result<IReadOnlyList<CellStatsView>>>, GetCellHandler>();
     }
