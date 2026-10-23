@@ -43,6 +43,29 @@ public sealed record RunFates(
     /// <summary>The walker no-trades, all reasons.</summary>
     public long NoTrade => NoFillBar + AfterSquareOff + EntryThroughStop + LimitNotReached + PositionOpen + OrderPendingAtEnd;
 
+    /// <summary>
+    /// The field-by-field difference (P7-13): the fates of a window minus the fates of a window that starts later and ends at the same day, which is the fates of the decisions on the days between. Fates count candidates by the day of their decision
+    /// and do not depend on the window, so for nested windows the difference is exact; a field never goes below zero.
+    /// </summary>
+    public RunFates Minus(RunFates other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return new RunFates(
+            Math.Max(0, EntriesSuppressed - other.EntriesSuppressed),
+            Math.Max(0, TradesBeforeWindow - other.TradesBeforeWindow),
+            Math.Max(0, OpenAtEnd - other.OpenAtEnd),
+            Math.Max(0, Trades - other.Trades),
+            Math.Max(0, NoFillBar - other.NoFillBar),
+            Math.Max(0, AfterSquareOff - other.AfterSquareOff),
+            Math.Max(0, EntryThroughStop - other.EntryThroughStop),
+            Math.Max(0, LimitNotReached - other.LimitNotReached),
+            Math.Max(0, ExcludedAcrossDiscontinuity - other.ExcludedAcrossDiscontinuity),
+            Math.Max(0, PositionOpen - other.PositionOpen),
+            Math.Max(0, SkippedQuantity - other.SkippedQuantity),
+            Math.Max(0, SkippedCost - other.SkippedCost),
+            Math.Max(0, OrderPendingAtEnd - other.OrderPendingAtEnd));
+    }
+
     /// <summary>The field-by-field sum.</summary>
     public RunFates Add(RunFates other)
     {

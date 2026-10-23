@@ -42,7 +42,7 @@ public static class GradeReport
         ];
         if (truncated)
         {
-            notes.Add("TRUNCATED: more graded tickets matched than the report reads; the newest sessions are shown and the older ones are left out. Narrow the date range.");
+            notes.Add("TRUNCATED: more graded tickets matched than the report reads; the newest sessions are shown and the older ones are left out; the oldest day shown may be cut part-way through its plan (a partial curve). Narrow the date range.");
         }
 
         return new GradeReportData(TicketGrade.Basis, plans, curves, groups, decisions, comparisons, notes);

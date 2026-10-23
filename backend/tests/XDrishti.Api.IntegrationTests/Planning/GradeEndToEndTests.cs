@@ -25,8 +25,9 @@ namespace XDrishti.Api.IntegrationTests.Planning;
 /// swing "DAILY_UP" (buy when close &gt; sma(3), stop = lowest low of 3 days, target 2R):
 ///   Mar 2-9 flat 100 | Mar 10 flat 110 (signal at its close) | Mar 11 opens 110, spikes to 135 at 10:00 (target 130) | Mar 12 flat 135
 /// (a) plan for Mar 11 (built on Mar 10): decided at the close of D, filled at the open of F, target hit on F: graded, ~2R
-/// (c) plan for Mar 10 (built on Mar 9): decided on F, filled on Mar 11: graded
-/// (b) intraday ORB: the F1 day of P3-03 on Mar 3 after a flat Mar 2: decided and filled on F, target: graded +2R
+/// (c) plan for Mar 10 (built on Mar 9): the daily decision at the close of Mar 10 is the ticket of Mar 11, not of Mar 10: not triggered
+/// (b) intraday ORB: the F1 day of P3-03 on Mar 3 after a flat Mar 2: decided and filled on F, target: graded +2R (the F-only window of the first version also passes this one)
+/// (e) ORB trades on D (Mar 2), F (Mar 3) is flat: the D trade is not the outcome of the ticket for F: not triggered
 /// (d) no spike on Mar 11 and the spike on Mar 25, after the pinned "today" (Mar 20): the position is open at the end of what may be read, so the ticket is pending and nothing is written
 /// </code>
 /// </summary>
@@ -183,15 +184,31 @@ public sealed class GradeEndToEndTests(ApiFactory factory) : DataTestBase(factor
     }
 
     [Fact]
-    public async Task A_swing_ticket_decided_on_F_and_filled_on_the_next_session_is_graded_within_the_read()
+    public async Task A_daily_decision_at_the_close_of_F_is_not_graded_as_the_outcome_of_the_ticket_for_F()
     {
+        // The signal of Mar 10's close fills on Mar 11 and belongs to the ticket for Mar 11 (case a). The ticket for Mar 10 was built on Mar 9, whose close gave no signal: it did not trigger.
         var (_, symbol) = await InstrumentAsync("DUC", DailySeries(spikeOnF: true, spikeLater: false));
         var hash = await StoreStrategyAsync("DAILY_UP", "swing", DailyUp);
 
         var (outcome, grade) = await GradeAsync(Plan("e2e-c", Mar(10), symbol, hash, "DAILY_UP", SwingCell));
 
-        outcome.Graded.ShouldBe(1, grade?.Grade.Grade.Detail);
-        grade!.Grade.Grade.Detail.ShouldContain("entered 2026-03-11");
+        outcome.NotTriggered.ShouldBe(1, grade?.Grade.Grade.Detail);
+        outcome.Graded.ShouldBe(0);
+        grade!.Grade.Grade.Detail.ShouldContain("close of 2026-03-09");
+    }
+
+    [Fact]
+    public async Task An_intraday_trade_decided_on_D_is_not_the_outcome_of_the_ticket_for_F()
+    {
+        // ORB trades on Mar 2 (D) and the target is hit that day; Mar 3 (F) is flat. The ticket for Mar 3 did not trigger. (The F-only window of the first version gave the same answer here; the case guards the D-to-R window.)
+        var bars = ReplayDays.Join(ReplayDays.F1(Mar(2)), ReplayDays.Flat(Mar(3), 105.00));
+        var (_, symbol) = await InstrumentAsync("DUE", bars);
+        var hash = await StoreStrategyAsync("ORB", "intraday", Orb());
+
+        var (outcome, grade) = await GradeAsync(Plan("e2e-e", Mar(3), symbol, hash, "ORB", "ORB|15m|BUY|intraday|FIXED_RR{rr=2}|*"));
+
+        outcome.NotTriggered.ShouldBe(1, grade?.Grade.Grade.Detail);
+        outcome.Graded.ShouldBe(0);
     }
 
     [Fact]

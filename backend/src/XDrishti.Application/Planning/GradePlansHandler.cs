@@ -8,6 +8,7 @@ using XDrishti.Application.Research;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Market;
+using XDrishti.Domain.Market.Bars;
 using XDrishti.Domain.Market.Calendar;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Research;
@@ -55,11 +56,12 @@ internal sealed class GradePlansHandler(
         var calendar = await calendars.GetAsync(cancellationToken);
         var lastClosed = calendar.LastClosedSession(now);
         int graded = 0, notTriggered = 0, notGradable = 0, pending = 0, already = 0;
+        var stored = await grades.ForPlansAsync([.. due.Select(p => p.Id)], cancellationToken); // one read for every due plan (ticket ids are unique across plans)
         foreach (var plan in due)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var items = await plans.ItemsAsync(plan.Id, cancellationToken);
-            var existing = await grades.ForPlansAsync([plan.Id], cancellationToken);
+            var existing = stored;
             var batch = new List<NewGrade>();
             foreach (var item in items)
             {
@@ -118,22 +120,40 @@ internal sealed class GradePlansHandler(
             return (null, null, "the symbol `" + item.Symbol + "` is in no basket now, so its instrument is unknown");
         }
 
-        // The window starts on D, the session the ticket was built on, because the engine cuts trades by the day of the decision: a daily trigger decided at the close of D fills at the open of F. The grader then keeps only the trades the
-        // ticket could know (decided on F, or at the close of D on a daily-or-longer trigger). An intraday ticket is read to F; a swing ticket to the last closed session. Nothing after the last closed session is ever read.
+        // The engine cuts trades by the day of the DECISION. A ticket on a daily-or-longer timeframe is decided at the close of D (the session it was built on) and fills at the open of F, so its window starts on D; a ticket on an intraday
+        // timeframe is decided on F, so its window starts on F. Only that one decision day is the ticket's (the grader checks). An intraday-style ticket is read to F, a swing ticket to the last closed session; nothing after the last closed
+        // session is ever read. The fates of a window cover all its days, so a second run from the day after the decision day (same end) is subtracted to leave the fates of the decision day alone.
+        var daily = Timeframes.TryParse(cell.Timeframe, out var timeframe) && timeframe >= Timeframe.D1;
         var information = Before(calendar, forDate);
+        var decisionDay = daily ? information : forDate;
         var swing = string.Equals(cell.Style, "swing", StringComparison.OrdinalIgnoreCase);
         var to = swing && lastClosed > forDate ? lastClosed : forDate;
-        var request = new SimulationRequest(stored.StrategyId, null, cell.Timeframe, information, to, [instrumentId], null, costs, StrategyHash: stored.Hash, Exits: exit);
-        var run = await simulation.HandleAsync(new RunSimulationQuery(request), cancellationToken);
-        if (run.IsFailure)
+        var after = decisionDay == information ? forDate : forDate.AddDays(1);
+        var main = await simulation.HandleAsync(new RunSimulationQuery(Request(stored, cell, decisionDay, to, instrumentId, costs, exit)), cancellationToken);
+        if (main.IsFailure)
         {
             // A refusal (a sheet not in force yet, a missing instrument row, a strategy that does not compile now) may be mended later: pending, not a final grade.
-            return (null, null, "the simulator refused the ticket: " + Clip(run.Error.Code + " " + run.Error.Message));
+            return (null, null, "the simulator refused the ticket: " + Clip(main.Error.Code + " " + main.Error.Message));
         }
 
-        var result = TicketGrader.Grade(run.Value, item.Side == "BUY" ? Side.Buy : Side.Sell, forDate, information);
-        return (result.Grade, result.Grade is null ? null : run.Value.RunKey, result.PendingReason);
+        SimulationRun? tail = null;
+        if (after <= to)
+        {
+            var second = await simulation.HandleAsync(new RunSimulationQuery(Request(stored, cell, after, to, instrumentId, costs, exit)), cancellationToken);
+            if (second.IsFailure)
+            {
+                return (null, null, "the simulator refused the ticket: " + Clip(second.Error.Code + " " + second.Error.Message));
+            }
+
+            tail = second.Value;
+        }
+
+        var result = TicketGrader.Grade(main.Value, tail, item.Side == "BUY" ? Side.Buy : Side.Sell, forDate, information, daily);
+        return (result.Grade, result.Grade is null ? null : main.Value.RunKey, result.PendingReason);
     }
+
+    private static SimulationRequest Request(StoredVersion stored, CellId cell, DateOnly from, DateOnly to, Guid instrumentId, CostChoice costs, ExitChoice exit) =>
+        new(stored.StrategyId, null, cell.Timeframe, from, to, [instrumentId], null, costs, StrategyHash: stored.Hash, Exits: exit);
 
     /// <summary>Gross when no sheet is configured; a configured sheet that cannot be found fails the run (no silent gross fallback).</summary>
     private async Task<Result<CostChoice>> CostsAsync(CancellationToken cancellationToken)
@@ -153,7 +173,10 @@ internal sealed class GradePlansHandler(
         return Result.Success(CostChoice.Sheet(sheet.Value.Id, settings.Capital));
     }
 
-    /// <summary>The trading session before <paramref name="forDate"/> (the session the ticket was built on); the day before when the calendar knows none within ten days.</summary>
+    /// <summary>
+    /// The trading session before <paramref name="forDate"/> (the session the ticket was built on). Shortcut: when the calendar knows none within ten days (a long closure, or an empty calendar) the previous calendar day is used; the window
+    /// then starts on a non-session and a daily decision at the close of the true D would be missed (the ticket reads as not triggered).
+    /// </summary>
     private static DateOnly Before(TradingCalendar calendar, DateOnly forDate)
     {
         for (var i = 1; i <= 10; i++)
