@@ -46,6 +46,7 @@ using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
 using XDrishti.Application.Research;
 using XDrishti.Application.Research.CostSheets;
+using XDrishti.Application.Selection;
 using XDrishti.Domain.Common;
 using XDrishti.Domain.Learning;
 using XDrishti.Domain.Research;
@@ -453,6 +454,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<DesignateModelCommand, DesignationOutcome>, DesignateModelHandler>(); // champion / challenger / retired, appended (P6-07)
         services.AddScoped<IQueryHandler<GetLearningOverviewQuery, Result<LearningOverviewView>>, GetLearningOverviewHandler>(); // counts and newest stored verdicts for the Learning screen (P6-18, ADR 0080)
         services.AddScoped<IQueryHandler<EvaluatePhaseCheckQuery, Result<PhaseCheckView>>, EvaluatePhaseCheckHandler>(); // the P6 exit criteria from stored records (P6-18, ADR 0080)
+        services.AddScoped<IQueryHandler<ShowSelectionQuery, Result<SelectionView>>, ShowSelectionHandler>(); // cell-level view of the P7 selection filters and rank, read-only (P7-01, ADR 0082)
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();
         services.AddScoped<IQueryHandler<ScoreWithModelQuery, Result<ModelScoreView>>, ScoreWithModelHandler>(); // for experiments and P7 (advisory)

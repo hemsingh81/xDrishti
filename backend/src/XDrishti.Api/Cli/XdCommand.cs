@@ -109,6 +109,11 @@ internal static class XdCommand
             return await LearnDriftCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "select" && args[1] == "cells")
+        {
+            return await SelectCellsCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "learn" && args[1] == "phase-check")
         {
             return await LearnPhaseCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
