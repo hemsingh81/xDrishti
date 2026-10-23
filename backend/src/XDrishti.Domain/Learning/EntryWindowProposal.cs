@@ -20,6 +20,9 @@ namespace XDrishti.Domain.Learning;
 /// <param name="FoldsEvaluable">Folds that could judge the window learnt on their train rows.</param>
 /// <param name="FoldsHeld">Of them where it beat the outside.</param>
 /// <param name="FoldsRequired">Folds that had to hold (the share of the validation options, rounded up).</param>
+/// <param name="PooledLift">Out-of-sample win rate inside minus outside, pooled over the evaluable folds; null when none.</param>
+/// <param name="FoldsOverlapFinal">Fold windows that overlap the final window.</param>
+/// <param name="FoldsEqualFinal">Fold windows equal to the final window.</param>
 /// <param name="Folds">Every shared fold for this cell.</param>
 /// <param name="Buckets">Every bucket of the session for this cell.</param>
 /// <param name="Reasons">Why the status is what it is, one sentence each.</param>
@@ -41,6 +44,9 @@ public sealed record EntryWindowProposal(
     int FoldsEvaluable,
     int FoldsHeld,
     int FoldsRequired,
+    double? PooledLift,
+    int FoldsOverlapFinal,
+    int FoldsEqualFinal,
     IReadOnlyList<EntryWindowFold> Folds,
     IReadOnlyList<EntryWindowBucket> Buckets,
     IReadOnlyList<string> Reasons);

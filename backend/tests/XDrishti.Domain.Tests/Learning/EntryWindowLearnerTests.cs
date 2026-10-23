@@ -227,6 +227,53 @@ public sealed class EntryWindowLearnerTests
     }
 
     [Fact]
+    public void Random_labels_over_many_cells_almost_never_give_a_proposal()
+    {
+        var rng = new Random(20260101);
+        var rows = Enumerable.Range(0, 40).SelectMany(c => Series((_, _, _) => rng.Next(2), $"C{c:D2}")).ToList();
+
+        var report = Learn(rows, Plain(30), TwoFoldsEnough);
+
+        report.Cells.Count(c => c.Status == EntryWindowStatus.Proposed).ShouldBeLessThanOrEqualTo(2);
+        report.Limits.ShouldContain(l => l.Contains("cells compared, expect about"));
+    }
+
+    [Fact]
+    public void A_fold_needs_a_lift_above_the_floor_out_of_sample()
+    {
+        // inside 80 % vs outside 50 % in train; the test has inside only a hair above outside
+        static int Thin(int i, int b, DateOnly d) => d < new DateOnly(2025, 10, 1) ? (b == 0 ? (i % 5 != 0 ? 1 : 0) : i % 2) : (b == 0 ? (i % 20 < 11 ? 1 : 0) : (i % 20 < 10 ? 1 : 0));
+
+        var p = Learn(Series(Thin), Plain(30, 0.1), TwoFoldsEnough).Cells.Single();
+
+        p.FoldsHeld.ShouldBe(0);
+        p.Status.ShouldBe(EntryWindowStatus.NoStableWindow);
+    }
+
+    [Fact]
+    public void Zero_prior_strength_and_a_single_trade_bucket_stay_finite()
+    {
+        var rows = Bucket("a", B0, 1, 1).Concat(Bucket("b", B1, 20, 10));
+
+        var p = Learn(rows, new EntryWindowOptions(30, 10, 0.03, 0)).Cells.Single();
+
+        p.Buckets.ShouldAllBe(b => double.IsFinite(b.ShrunkRate));
+        p.Buckets[0].N.ShouldBe(1);
+        p.Buckets[0].ShrunkRate.ShouldBe(1.0, 1e-12);
+    }
+
+    [Fact]
+    public void Dropped_out_of_session_trades_are_named_in_the_not_enough_evidence_reason()
+    {
+        var rows = Bucket("a", B0, 3, 3).Append(Row("late", Day, 18 * 60, 1));
+
+        var p = Learn(rows).Cells.Single();
+
+        p.Status.ShouldBe(EntryWindowStatus.NotEnoughEvidence);
+        p.Reasons.ShouldContain(r => r.Contains("1 dropped as decided out of session"));
+    }
+
+    [Fact]
     public void Bad_input_is_a_failure_with_a_code()
     {
         var one = Bucket("a", B0, 20, 10).ToList();

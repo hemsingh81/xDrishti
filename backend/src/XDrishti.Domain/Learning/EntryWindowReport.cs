@@ -37,7 +37,7 @@ public sealed record EntryWindowReport(
             if (p.ShrunkRate is { } rate && p.CellWinRate is { } cell)
             {
                 sb.AppendLine(string.Create(c, $"  window n {p.WindowTrades} ({p.KeptShare:P0} of the cell), shrunk win rate {rate:F3} vs cell {cell:F3}, lift {p.Lift:F3}, mean R inside {Show(p.MeanRInside)} outside {Show(p.MeanROutside)}"));
-                sb.AppendLine(string.Create(c, $"  folds: held {p.FoldsHeld} of {p.FoldsEvaluable} evaluable, {p.FoldsRequired} required"));
+                sb.AppendLine(string.Create(c, $"  folds: held {p.FoldsHeld} of {p.FoldsEvaluable} evaluable, {p.FoldsRequired} required, pooled out-of-sample lift {(p.PooledLift is { } pl ? pl.ToString("F3", c) : "n/a")}, fold windows overlapping it {p.FoldsOverlapFinal}, equal {p.FoldsEqualFinal}"));
             }
 
             foreach (var reason in p.Reasons)
