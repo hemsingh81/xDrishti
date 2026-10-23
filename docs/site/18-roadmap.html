@@ -795,11 +795,11 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P7-03</td>
-<td><strong>Plan record and state machines</strong>: <code>trading.plans</code>, <code>plan_items</code>, <code>plan_runs</code>, <code>workflow.approvals</code> (insert-only), the ticket and plan transition tables, <code>GET /api/plans</code>, and the architecture rule that no type may place, modify or cancel an order. Unblocked.</td>
+<td><strong>Plan record and state machines</strong>: <code>trading.plans</code>, <code>plan_items</code>, <code>plan_runs</code>, <code>workflow.approvals</code> (insert-only), the ticket and plan transition tables, <code>GET /api/plans</code>, and the architecture rule that no type may place, modify or cancel an order. <strong>Built 2026-10-23 (<a href="../adr/0083-the-plan-record-insert-only-state-trails-owner-only-approvals-lapse-by-default-and-no-order-by-name.html">ADR 0083</a>)</strong>: six insert-only tables, ticket (13 moves) and plan (11 moves) tables, lapse at the cutoff, owner-only approvals, paper-only allocations, no-order architecture rule with a planted example, read-only <code>GET /api/plans</code>.</td>
 <td>P7</td>
 <td>3 d</td>
-<td>Draft (plan)</td>
-<td><a href="../specs/P7-00-selection-accounts-and-nightly-plan.html">plan</a></td>
+<td>Done (check on the report)</td>
+<td><a href="../specs/P7-03-plan-record-and-state-machines.html">spec</a></td>
 <td>Transition table; grants as <code>xd_app</code>; the rule fails on a planted <code>PlaceOrder</code></td>
 </tr>
 <tr>
@@ -1268,7 +1268,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 11:59</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-23 12:41</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>

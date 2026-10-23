@@ -269,6 +269,7 @@ stateDiagram-v2
 - Only **Approved → Armed** tickets enter the live active set and alerts.
 - Every decision is recorded. Reports compare **system proposal vs your decision** — e.g. "rejected tickets would
   have made +4.2R this month" — so you can see whether your overrides add value.
+- **As built (P7-03, [ADR 0083](../adr/0083-the-plan-record-insert-only-state-trails-owner-only-approvals-lapse-by-default-and-no-order-by-name.md)):** the state of a ticket or plan is the newest row of an insert-only trail (`trading.plan_events`); approvals (`workflow.approvals`) have one kind, `owner`; at the cutoff every undecided ticket lapses; Modified can also be rejected or lapse, Approved can expire before arming; the only automatic moves are lapse, arm, invalidate, expire, trigger and close, never approve. No member of the code base may be named for placing, modifying or cancelling an order (architecture test).
 
 ### 4.3 AI suggestions inbox
 

@@ -27,6 +27,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Heartbeats;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
@@ -480,5 +481,10 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListLessonsQuery, Result<IReadOnlyList<LessonView>>>, ListLessonsHandler>();
         services.AddScoped<IQueryHandler<GetLessonQuery, Result<LessonView>>, GetLessonHandler>();
         services.AddScoped<IQueryHandler<GetCellStateQuery, Result<CellStateView>>, GetCellStateHandler>();
+        services.AddScoped<IQueryHandler<ListPlansQuery, Result<IReadOnlyList<PlanView>>>, ListPlansHandler>(); // the plan record (P7-03, ADR 0083)
+        services.AddScoped<IQueryHandler<GetPlanQuery, Result<PlanView>>, GetPlanHandler>();
+        services.AddScoped<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>, MoveTicketHandler>(); // owner decisions and service moves along the ticket table; no path to a broker
+        services.AddScoped<ICommandHandler<MovePlanCommand, PlanMoveOutcome>, MovePlanHandler>();
+        services.AddScoped<ICommandHandler<ApplyReviewCutoffCommand, PlanMoveOutcome>, ApplyReviewCutoffHandler>(); // unreviewed tickets lapse; never an approval
     }
 }

@@ -25,6 +25,7 @@ using XDrishti.Application.Market.Quality;
 using XDrishti.Application.Market.Refresh;
 using XDrishti.Application.Market.Search;
 using XDrishti.Application.Market.Tracking;
+using XDrishti.Application.Planning;
 using XDrishti.Application.Platform.Services;
 using XDrishti.Application.Platform.SystemStatus;
 using XDrishti.Application.Portfolio;
@@ -73,6 +74,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<HypothesisView>))]
 [JsonSerializable(typeof(LessonView))]
 [JsonSerializable(typeof(IReadOnlyList<LessonView>))]
+[JsonSerializable(typeof(PlanView))]
+[JsonSerializable(typeof(IReadOnlyList<PlanView>))]
 [JsonSerializable(typeof(ChangelogEntryView))]
 [JsonSerializable(typeof(IReadOnlyList<ChangelogEntryView>))]
 [JsonSerializable(typeof(CellStateView))]

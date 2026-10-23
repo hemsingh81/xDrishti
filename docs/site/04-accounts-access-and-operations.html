@@ -537,6 +537,7 @@ expected R and the AI briefing. You review it in the evening or morning (phone w
 <li>Only <strong>Approved → Armed</strong> tickets enter the live active set and alerts.</li>
 <li>Every decision is recorded. Reports compare <strong>system proposal vs your decision</strong> — e.g. &quot;rejected tickets would
 have made +4.2R this month&quot; — so you can see whether your overrides add value.</li>
+<li><strong>As built (P7-03, <a href="../adr/0083-the-plan-record-insert-only-state-trails-owner-only-approvals-lapse-by-default-and-no-order-by-name.html">ADR 0083</a>):</strong> the state of a ticket or plan is the newest row of an insert-only trail (<code>trading.plan_events</code>); approvals (<code>workflow.approvals</code>) have one kind, <code>owner</code>; at the cutoff every undecided ticket lapses; Modified can also be rejected or lapse, Approved can expire before arming; the only automatic moves are lapse, arm, invalidate, expire, trigger and close, never approve. No member of the code base may be named for placing, modifying or cancelling an order (architecture test).</li>
 </ul>
 <h3 id="43-ai-suggestions-inbox">4.3 AI suggestions inbox<a class="hash" href="#43-ai-suggestions-inbox" aria-label="Link to this section">#</a></h3>
 <p>The assistant and learning engine post suggestions to an <strong>inbox</strong>; each has a reason, evidence and an expiry:</p>
@@ -617,7 +618,7 @@ have made +4.2R this month&quot; — so you can see whether your overrides add v
     <a class="prev" href="03-target-architecture.html"><small>← Previous  [</small>03 · Target architecture</a>
     <a class="next" href="05-data-and-brokers.html"><small>Next  ] →</small>05 · Data &amp; brokers</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-23 11:59</footer>
+  <footer class="foot">Generated from <code>docs/04-accounts-access-and-operations.md</code> · 2026-10-23 12:41</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-broker-accounts-and-their-roles" class="d2">1. Broker accounts and their roles</a>
 <a href="#11-accounts-screen" class="d3">1.1 Accounts screen</a>

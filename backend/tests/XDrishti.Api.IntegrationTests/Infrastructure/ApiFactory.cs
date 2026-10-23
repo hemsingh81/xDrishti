@@ -208,6 +208,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         await this.WithDbAsync(async db =>
         {
             await db.Database.ExecuteSqlRawAsync("""
+                DELETE FROM trading.plan_events;
+                DELETE FROM workflow.approvals;
+                DELETE FROM trading.plan_item_allocations;
+                DELETE FROM trading.plan_runs;
+                DELETE FROM trading.plan_items;
+                DELETE FROM trading.plans;
                 DELETE FROM portfolio.price_alerts;
                 DELETE FROM portfolio.action_states;
                 DELETE FROM portfolio.dividend_suggestions;
@@ -331,6 +337,12 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 DELETE FROM market.quality_runs;
                 DELETE FROM market.bar_gaps;
                 DELETE FROM platform.app_settings;
+                DELETE FROM trading.plan_events;
+                DELETE FROM workflow.approvals;
+                DELETE FROM trading.plan_item_allocations;
+                DELETE FROM trading.plan_runs;
+                DELETE FROM trading.plan_items;
+                DELETE FROM trading.plans;
                 DELETE FROM portfolio.price_alerts;
                 DELETE FROM portfolio.action_states;
                 DELETE FROM market.corporate_actions;
