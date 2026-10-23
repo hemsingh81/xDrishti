@@ -33,12 +33,14 @@ public sealed class TicketGraderTests
         return RunAssembler.Assemble(header, [new InstrumentReplay(record, trades, open ?? [])]);
     }
 
+    private static GraderResult G(SimulationRun main, SimulationRun? tail = null, bool daily = false) => TicketGrader.Grade(main, tail, Side.Buy, F, D, daily);
+
     [Fact]
     public void A_gross_trade_on_the_planned_session_is_graded_at_the_filled_r_and_labelled()
     {
         var run = Run([Trade(F, Side.Buy, 1.8, 0, costed: false)]);
 
-        var result = TicketGrader.Grade(run, Side.Buy, F, D);
+        var result = G(run);
 
         result.IsPending.ShouldBeFalse();
         result.Grade!.Status.ShouldBe(GradeStatus.Graded);
@@ -53,7 +55,7 @@ public sealed class TicketGraderTests
     {
         var run = Run([Trade(F, Side.Buy, 2.0, 1.9, costed: true)], costed: true);
 
-        var grade = TicketGrader.Grade(run, Side.Buy, F, D).Grade!;
+        var grade = G(run).Grade!;
 
         grade.R.ShouldBe(1.9);
         grade.CostBasis.ShouldBe("net of the charge sheet test-a");
@@ -64,7 +66,7 @@ public sealed class TicketGraderTests
     {
         var run = Run([Trade(F.AddDays(-1), Side.Buy, 5, 0, false), Trade(F, Side.Sell, 5, 0, false)]);
 
-        var grade = TicketGrader.Grade(run, Side.Buy, F, D).Grade!;
+        var grade = G(run).Grade!;
 
         grade.Status.ShouldBe(GradeStatus.NotTriggered);
         grade.R.ShouldBeNull();
@@ -76,20 +78,20 @@ public sealed class TicketGraderTests
         var later = Trade(F, Side.Buy, 9, 0, false) with { EntryEpochSeconds = Trade(F, Side.Buy, 0, 0, false).EntryEpochSeconds + 600 };
         var run = Run([later, Trade(F, Side.Buy, 1, 0, false)]);
 
-        TicketGrader.Grade(run, Side.Buy, F, D).Grade!.R.ShouldBe(1);
+        G(run).Grade!.R.ShouldBe(1);
     }
 
     [Fact]
     public void No_trade_is_not_triggered_with_the_reason_the_replay_gives()
     {
-        TicketGrader.Grade(Run([]), Side.Buy, F, D).Grade!.Detail.ShouldContain("did not hold");
-        TicketGrader.Grade(Run([], fates: RunFates.Empty with { LimitNotReached = 1 }), Side.Buy, F, D).Grade!.Detail.ShouldContain("limit was not reached");
+        G(Run([])).Grade!.Detail.ShouldContain("did not hold");
+        G(Run([], fates: RunFates.Empty with { LimitNotReached = 1 })).Grade!.Detail.ShouldContain("limit was not reached");
     }
 
     [Fact]
     public void A_trade_dropped_by_sizing_or_cost_is_not_gradable_not_not_triggered()
     {
-        var grade = TicketGrader.Grade(Run([], fates: RunFates.Empty with { SkippedCost = 1 }), Side.Buy, F, D).Grade!;
+        var grade = G(Run([], fates: RunFates.Empty with { SkippedCost = 1 })).Grade!;
 
         grade.Status.ShouldBe(GradeStatus.NotGradable);
     }
@@ -97,15 +99,15 @@ public sealed class TicketGraderTests
     [Fact]
     public void A_position_still_open_or_bars_that_do_not_reach_the_session_are_pending()
     {
-        TicketGrader.Grade(Run([], [Trade(F, Side.Buy, 0, 0, false)]), Side.Buy, F, D).IsPending.ShouldBeTrue();
-        TicketGrader.Grade(Run([], last: F.AddDays(-1)), Side.Buy, F, D).IsPending.ShouldBeTrue();
-        TicketGrader.Grade(Run([], skip: SkipReason.NoBars), Side.Buy, F, D).IsPending.ShouldBeTrue();
+        G(Run([], [Trade(F, Side.Buy, 0, 0, false)])).IsPending.ShouldBeTrue();
+        G(Run([], last: F.AddDays(-1))).IsPending.ShouldBeTrue();
+        G(Run([], skip: SkipReason.NoBars)).IsPending.ShouldBeTrue();
     }
 
     [Fact]
     public void An_instrument_the_replay_skipped_is_pending_with_the_code_because_it_may_be_mended()
     {
-        var result = TicketGrader.Grade(Run([], skip: SkipReason.TickSizeInvalid), Side.Buy, F, D);
+        var result = G(Run([], skip: SkipReason.TickSizeInvalid));
 
         result.IsPending.ShouldBeTrue();
         result.PendingReason!.ShouldContain("tick_size_invalid");
@@ -114,8 +116,8 @@ public sealed class TicketGraderTests
     [Fact]
     public void A_flagged_day_or_a_pending_order_is_pending_not_final()
     {
-        TicketGrader.Grade(Run([], fates: RunFates.Empty with { EntriesSuppressed = 1 }), Side.Buy, F, D).IsPending.ShouldBeTrue();
-        TicketGrader.Grade(Run([], fates: RunFates.Empty with { OrderPendingAtEnd = 1 }), Side.Buy, F, D).IsPending.ShouldBeTrue();
+        G(Run([], fates: RunFates.Empty with { EntriesSuppressed = 1 })).IsPending.ShouldBeTrue();
+        G(Run([], fates: RunFates.Empty with { OrderPendingAtEnd = 1 })).IsPending.ShouldBeTrue();
     }
 
     private static long CloseOf(DateOnly date) => new DateTimeOffset(date.Year, date.Month, date.Day, 15, 30, 0, TimeSpan.FromMinutes(330)).ToUnixTimeSeconds();
@@ -125,7 +127,7 @@ public sealed class TicketGraderTests
     {
         var trade = Trade(F, Side.Buy, 1.7, 0, false) with { DecisionEpochSeconds = CloseOf(D), TriggerTimeframe = Timeframe.D1 };
 
-        var grade = TicketGrader.Grade(Run([trade]), Side.Buy, F, D).Grade!;
+        var grade = G(Run([trade]), daily: true).Grade!;
 
         grade.Status.ShouldBe(GradeStatus.Graded);
         grade.R.ShouldBe(1.7);
@@ -136,19 +138,66 @@ public sealed class TicketGraderTests
     {
         var trade = Trade(F, Side.Buy, 1.7, 0, false) with { DecisionEpochSeconds = CloseOf(D) - 3600, TriggerTimeframe = Timeframe.M15 };
 
-        TicketGrader.Grade(Run([trade]), Side.Buy, F, D).Grade!.Status.ShouldBe(GradeStatus.NotTriggered);
+        G(Run([trade])).Grade!.Status.ShouldBe(GradeStatus.NotTriggered);
     }
 
     [Fact]
-    public void A_swing_trade_decided_on_F_and_filled_on_the_next_session_is_graded()
+    public void A_daily_decision_at_the_close_of_F_belongs_to_the_ticket_of_the_next_session_not_to_this_one()
     {
         var next = F.AddDays(1);
         var trade = Trade(next, Side.Buy, 0.9, 0, false) with { DecisionEpochSeconds = CloseOf(F), TriggerTimeframe = Timeframe.D1 };
 
-        var grade = TicketGrader.Grade(Run([trade]), Side.Buy, F, D).Grade!;
+        var grade = G(Run([trade]), daily: true).Grade!;
 
-        grade.R.ShouldBe(0.9);
-        grade.Detail.ShouldContain("entered 2026-03-04");
+        grade.Status.ShouldBe(GradeStatus.NotTriggered);
+        grade.Detail.ShouldContain("close of 2026-03-02");
+    }
+
+    [Fact]
+    public void An_intraday_trade_decided_on_F_does_not_count_for_a_daily_ticket()
+    {
+        G(Run([Trade(F, Side.Buy, 1.7, 0, false)]), daily: true).Grade!.Status.ShouldBe(GradeStatus.NotTriggered);
+    }
+
+    [Fact]
+    public void A_dropped_trade_of_another_day_does_not_make_this_ticket_not_gradable()
+    {
+        // the main run (from D) dropped trades by the cost rule; the tail run (from F) shows the same drops, so they were decided after D
+        var main = Run([], fates: RunFates.Empty with { SkippedCost = 2, PositionOpen = 1 });
+        var tail = Run([], fates: RunFates.Empty with { SkippedCost = 2, PositionOpen = 1 });
+
+        var grade = G(main, tail, daily: true).Grade!;
+
+        grade.Status.ShouldBe(GradeStatus.NotTriggered);
+        grade.Detail.ShouldNotContain("earlier position");
+    }
+
+    [Fact]
+    public void A_dropped_trade_of_the_decision_day_alone_is_not_gradable()
+    {
+        var main = Run([], fates: RunFates.Empty with { SkippedCost = 1 });
+        var tail = Run([], fates: RunFates.Empty);
+
+        G(main, tail, daily: true).Grade!.Status.ShouldBe(GradeStatus.NotGradable);
+    }
+
+    [Fact]
+    public void A_flagged_day_or_a_pending_order_after_the_decision_day_does_not_leave_the_ticket_pending()
+    {
+        var main = Run([], fates: RunFates.Empty with { EntriesSuppressed = 1, OrderPendingAtEnd = 1, ExcludedAcrossDiscontinuity = 1 });
+        var tail = Run([], fates: RunFates.Empty with { EntriesSuppressed = 1, OrderPendingAtEnd = 1, ExcludedAcrossDiscontinuity = 1 });
+
+        G(main, tail, daily: true).IsPending.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void A_not_triggered_reason_of_a_later_day_is_not_this_tickets_reason()
+    {
+        var main = Run([], fates: RunFates.Empty with { LimitNotReached = 1 });
+        var tail = Run([], fates: RunFates.Empty with { LimitNotReached = 1 });
+
+        G(main, tail, daily: true).Grade!.Detail.ShouldNotContain("limit");
+        G(main, null, daily: true).Grade!.Detail.ShouldContain("limit");
     }
 
     [Fact]
@@ -156,6 +205,6 @@ public sealed class TicketGraderTests
     {
         var run = Run([Trade(F, Side.Buy, 1.25, 0, false)]);
 
-        TicketGrader.Grade(run, Side.Buy, F, D).ShouldBe(TicketGrader.Grade(run, Side.Buy, F, D));
+        G(run).ShouldBe(G(run));
     }
 }

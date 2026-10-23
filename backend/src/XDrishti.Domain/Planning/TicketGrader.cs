@@ -5,24 +5,31 @@ using XDrishti.Domain.Research;
 namespace XDrishti.Domain.Planning;
 
 /// <summary>
-/// Turns the simulator's record of one instrument over the window [D, read-to] into the grade of a ticket (P7-13, ADR 0090), where F is the planned session and D the session the ticket was built on (the last session before F). Pure.
+/// Turns the simulator's record of one instrument into the grade of a ticket (P7-13, ADR 0090), where F is the planned session and D the session the ticket was built on (the last session before F). Pure.
 /// <list type="bullet">
-/// <item><b>Which trade counts.</b> The engine cuts trades by the day of the DECISION (ADR 0043 D6), so the window starts on D. A trade belongs to the ticket when it was decided on F (an intraday signal, or a daily one that fills on the next
-/// session), or decided at the close of D on a daily-or-longer trigger (known at the close of D, filled at the open of F; ADR 0088 section 2). A trade decided before the close of D (an intraday trigger on D) used information the ticket
-/// did not have and is never graded. The first such trade by entry instant is the outcome.</item>
+/// <item><b>Which decision is the ticket's.</b> The engine cuts trades by the day of the DECISION (ADR 0043 D6). A ticket whose trigger is on a daily-or-longer timeframe is decided at the close of D (known at that close, filled at the open of
+/// F; ADR 0088 section 2) and ONLY that decision counts: a daily decision on F is made at the close of F and belongs to the ticket for the next session. A ticket with an intraday trigger is decided on F and ONLY that decision counts; an
+/// intraday decision on D used information the ticket did not have. The first qualifying trade by entry instant is the outcome.</item>
+/// <item><b>Reasons come only from the ticket's own decision day.</b> The run's fates cover every day of its window, so the fates of the days after the decision day are taken away with the fates of a second run that starts the day after
+/// (<c>tail</c>, same end): a dropped trade, a flagged day or an open position on another day never decides this ticket's status.</item>
 /// <item>R is the net R of the charge sheet when the trade was charged, otherwise the R from the filled prices (the convention of the cells).</item>
-/// <item><b>Pending is not a grade.</b> No bar of F yet, a position still open at the end of the data, a refused or skipped replay, a flagged day or a pending order leave the ticket for a later run. Only a deterministic, final fact is stored as not gradable.</item>
+/// <item><b>Pending is not a grade.</b> No bar of F yet, a position still open at the end of the data, a refused or skipped replay, a flagged day or a pending order of the decision day leave the ticket for a later run. Only a deterministic, final fact is stored as not gradable.</item>
 /// </list>
 /// </summary>
 public static class TicketGrader
 {
-    /// <summary>The grade of a ticket for <paramref name="side"/> planned for <paramref name="forDate"/> and built on <paramref name="informationDate"/>, from a run over one instrument.</summary>
-    public static GraderResult Grade(SimulationRun run, Side side, DateOnly forDate, DateOnly informationDate)
+    /// <summary>
+    /// The grade of a ticket for <paramref name="side"/> planned for <paramref name="forDate"/> and built on <paramref name="informationDate"/>. <paramref name="main"/> is the run from the decision day (D when <paramref name="daily"/>, else F) to the end
+    /// of the read; <paramref name="tail"/> is the run from the day after the decision day to the same end, or null when that day is after the end of the read.
+    /// </summary>
+    public static GraderResult Grade(SimulationRun main, SimulationRun? tail, Side side, DateOnly forDate, DateOnly informationDate, bool daily)
     {
-        ArgumentNullException.ThrowIfNull(run);
+        ArgumentNullException.ThrowIfNull(main);
+        var run = main;
+        var decisionDay = daily ? informationDate : forDate;
         var gross = "gross, no charges";
         var basis = run.Costs is { } costs ? "net of the charge sheet " + costs.SheetId : gross;
-        if (run.Instruments.Count != 1)
+        if (run.Instruments.Count != 1 || (tail is not null && tail.Instruments.Count != 1))
         {
             return Pending("the replay did not cover exactly one instrument");
         }
@@ -38,7 +45,7 @@ public static class TicketGrader
             return Pending("the replay skipped the instrument: " + skip.ToCode() + (inst.SkipDetail is { } d ? " (" + d + ")" : string.Empty));
         }
 
-        bool Mine(SimTrade t) => t.Side == side && t.TradeDate >= forDate && Belongs(t, forDate, informationDate);
+        bool Mine(SimTrade t) => t.Side == side && SessionClock.DateOf(t.DecisionEpochSeconds - 60) == decisionDay;
         var mine = run.Trades.Where(t => Mine(t.Trade)).OrderBy(t => t.Trade.EntryEpochSeconds).ToList();
         if (mine.Count > 0)
         {
@@ -54,10 +61,10 @@ public static class TicketGrader
             return Pending("the position is still open at the end of the stored bars");
         }
 
-        var f = run.Totals.Fates;
+        var f = tail is null ? run.Totals.Fates : run.Totals.Fates.Minus(tail.Totals.Fates);
         if (f.EntriesSuppressed + f.ExcludedAcrossDiscontinuity > 0)
         {
-            return Pending("a flagged day (price discontinuity) lies in the window; the replay cannot follow it");
+            return Pending("the decision day is a flagged day (price discontinuity); the replay cannot follow it");
         }
 
         if (f.OrderPendingAtEnd > 0)
@@ -75,19 +82,12 @@ public static class TicketGrader
             : f.EntryThroughStop > 0 ? "the price opened through the stop"
             : f.AfterSquareOff > 0 ? "the signal came after the square-off time"
             : f.PositionOpen > 0 ? "an earlier position in the replay was still open (one position at a time; not the owner's book)"
-            : "the entry condition did not hold on " + Date(forDate);
+            : daily ? "the entry condition did not hold at the close of " + Date(informationDate) : "the entry condition did not hold on " + Date(forDate);
         return Done(GradeStatus.NotTriggered, basis, why);
     }
 
     /// <summary>A grade for a ticket that cannot be replayed, for a final reason.</summary>
     public static TicketGrade NotGradable(string reason) => new(GradeStatus.NotGradable, null, null, null, null, null, null, "none", reason);
-
-    /// <summary>Whether the trade was decided with the information of the ticket: on F, or at the close of D on a daily-or-longer trigger.</summary>
-    private static bool Belongs(SimTrade t, DateOnly forDate, DateOnly informationDate)
-    {
-        var decided = SessionClock.DateOf(t.DecisionEpochSeconds - 60);
-        return decided == forDate || (decided == informationDate && t.TriggerTimeframe >= Timeframe.D1);
-    }
 
     private static GraderResult Pending(string reason) => new(null, reason);
 

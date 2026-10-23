@@ -75,7 +75,7 @@ public sealed class GradePlansHandlerTests
             FabricatedRun.List((Instrument, "NSE:AAA")), [FabricatedRun.Ran(Instrument, "NSE:AAA", F.AddDays(-30), last ?? F)], trades, from: F, to: F)));
 
     [Fact]
-    public async Task Each_ticket_is_replayed_from_the_session_it_was_built_on_to_its_own_with_its_stored_version_and_exit_and_written_once()
+    public async Task An_intraday_ticket_is_replayed_over_exactly_its_own_session_with_its_stored_version_and_exit_and_written_once()
     {
         _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketGroup.Primary)]);
         Replay([FabricatedRun.Trade(Instrument, "NSE:AAA", Side.Buy, F, rFilled: 1.5)]);
@@ -84,7 +84,7 @@ public sealed class GradePlansHandlerTests
 
         result.Value.ShouldBe(new GradeOutcome(1, 1, 0, 0, 0, 0));
         await _simulation.Received(1).HandleAsync(
-            Arg.Is<RunSimulationQuery>(q => q.Request.From == D && q.Request.To == F && q.Request.StrategyHash == Hash && q.Request.InstrumentIds!.Single() == Instrument
+            Arg.Is<RunSimulationQuery>(q => q.Request.From == F && q.Request.To == F && q.Request.StrategyHash == Hash && q.Request.InstrumentIds!.Single() == Instrument
                 && q.Request.Exits!.Candidates.Single().Id == "FIXED_RR{rr=2}" && q.Request.Costs == CostChoice.Gross && q.Request.EvaluationTimeframe == "15m"), Ct);
         await _grades.Received(1).InsertAsync(Arg.Is<IReadOnlyList<NewGrade>>(g => g.Count == 1 && g[0].ItemId == 11 && g[0].Grade.R == 1.5 && g[0].Grade.Status == GradeStatus.Graded), Ct);
     }
@@ -144,7 +144,7 @@ public sealed class GradePlansHandlerTests
     }
 
     [Fact]
-    public async Task A_swing_ticket_is_read_to_the_last_closed_session_and_an_intraday_one_to_its_own()
+    public async Task A_swing_ticket_with_an_intraday_trigger_is_read_from_F_to_the_last_closed_session_with_a_second_run_from_the_next_day_to_scope_the_fates()
     {
         var swing = "ORB|15m|BUY|swing|FIXED_RR{rr=2}|*";
         _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketGroup.Primary, cell: swing)]);
@@ -152,7 +152,31 @@ public sealed class GradePlansHandlerTests
 
         await Handler().HandleAsync(new GradePlansCommand(F), Ct);
 
+        await _simulation.Received(1).HandleAsync(Arg.Is<RunSimulationQuery>(q => q.Request.From == F && q.Request.To == new DateOnly(2026, 3, 10)), Ct);
+        await _simulation.Received(1).HandleAsync(Arg.Is<RunSimulationQuery>(q => q.Request.From == F.AddDays(1) && q.Request.To == new DateOnly(2026, 3, 10)), Ct);
+    }
+
+    [Fact]
+    public async Task A_daily_trigger_ticket_is_read_from_D_with_a_second_run_from_F()
+    {
+        _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketGroup.Primary, cell: "ORB|1D|BUY|swing|FIXED_RR{rr=2}|*")]);
+        Replay([]);
+
+        await Handler().HandleAsync(new GradePlansCommand(F), Ct);
+
         await _simulation.Received(1).HandleAsync(Arg.Is<RunSimulationQuery>(q => q.Request.From == D && q.Request.To == new DateOnly(2026, 3, 10)), Ct);
+        await _simulation.Received(1).HandleAsync(Arg.Is<RunSimulationQuery>(q => q.Request.From == F && q.Request.To == new DateOnly(2026, 3, 10)), Ct);
+    }
+
+    [Fact]
+    public async Task The_grades_of_all_due_plans_are_read_once()
+    {
+        _plans.ItemsAsync(1, Ct).Returns([Item(11, TicketGroup.Primary)]);
+        Replay([]);
+
+        await Handler().HandleAsync(new GradePlansCommand(F), Ct);
+
+        await _grades.Received(1).ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct);
     }
 
     [Fact]
