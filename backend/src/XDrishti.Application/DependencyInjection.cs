@@ -495,7 +495,9 @@ public static class DependencyInjection
         services.AddScoped<INightlyGate, FreshDataGate>();
         services.AddScoped<INightlyGate, QualityGate>();
         services.AddScoped<INightlyGate, SelectionInputsGate>();
-        services.AddScoped<IPlanBuilder, NullPlanBuilder>();
+        services.AddScoped<NullPlanBuilder>();
+        services.AddScoped<SelectionPlanBuilder>(); // P7-04, ADR 0088: registered, not the default
+        services.AddScoped<IPlanBuilder>(sp => sp.GetService<IPlanBuilderSettings>()?.UseSelection == true ? sp.GetRequiredService<SelectionPlanBuilder>() : sp.GetRequiredService<NullPlanBuilder>());
         services.AddScoped<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>, RunNightlyPlanHandler>();
         services.AddScoped<IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>>, ListPlanRunsHandler>();
     }

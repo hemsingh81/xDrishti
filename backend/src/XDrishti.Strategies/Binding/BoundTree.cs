@@ -38,6 +38,9 @@ internal static class BoundTree
         }
     }
 
+    /// <summary>Whether the node reads the clock: the <c>time</c> keyword or a comparison of it (P7-04: such a part cannot be decided from the close of a day for the day after).</summary>
+    public static bool ReadsClock(IBoundExpression node) => node is BoundTimeKeyword or BoundTimeCompare || Children(node).Any(ReadsClock);
+
     /// <summary>
     /// Whether the node has the same value on every bar: it reads no feature and not <c>time</c>. A part that could not be bound is not constant (nothing is said about it). A parameter is a number known at compile
     /// time, so it counts as a constant like a literal.
