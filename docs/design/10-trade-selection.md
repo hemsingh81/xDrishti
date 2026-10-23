@@ -110,3 +110,6 @@ Rejected candidates are graded nightly. Reports compare primary vs reserve vs re
 curves — showing whether ranking adds value and what `max_new_entries_per_day` should be.
 Your decisions are graded too: approved vs rejected vs lapsed vs modified tickets, compared with what the
 system proposed.
+
+## 9. As built (P7-01, [ADR 0082](../adr/0082-selection-core-filters-with-unavailable-merge-and-a-deterministic-rank.md))
+Sections 2 to 4 exist as pure code (`XDrishti.Domain.Selection`): each filter answers pass, fail or unavailable with a stable code; unavailable is never a pass. Minimum cell state is Candidate until paper days exist and such plans are labelled provisional. The model is advisory and is not used in filters, merge or rank. `xd select cells --date D` shows the stored cells through the filters.
