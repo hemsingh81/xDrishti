@@ -51,4 +51,31 @@ public sealed class PlanAllocateOptionsTests
         PlanAllocateOptions.Parse(["--ticket", Ticket, "--ticket", Ticket, "--account", Account]).Options.ShouldBeNull();
         PlanAllocateOptions.Parse(["--ticket", Ticket]).Options.ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData("AAA:BUY:10O:98:1000:1")]
+    [InlineData("AAA:BUY:100:98:1000:x")]
+    public void A_typo_in_a_ticket_number_is_a_usage_error_and_is_not_reported_as_a_missing_ticket(string ticket)
+    {
+        var (options, errors) = PlanAllocateOptions.Parse(["--ticket", ticket, "--account", Account]);
+
+        options.ShouldBeNull();
+        errors.ShouldNotContain("give a --ticket");
+        errors.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public void A_typo_in_an_account_number_is_a_usage_error_not_an_unknown()
+    {
+        var (options, errors) = PlanAllocateOptions.Parse(["--ticket", Ticket, "--account", Guid.NewGuid() + ":paper:trading:1O00:0.5:20:3:1:500000:no"]);
+
+        options.ShouldBeNull();
+        errors.ShouldContain(e => e.Contains("EQUITY", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_missing_ticket_is_reported()
+    {
+        PlanAllocateOptions.Parse(["--account", Account]).Errors.ShouldContain("give a --ticket");
+    }
 }

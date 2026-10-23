@@ -10,10 +10,11 @@ Doc 10 section 6 sizes a ticket per Trading account from its risk profile. The o
 ## Decision
 1. **Pure Domain allocator** (`XDrishti.Domain.Allocation.PerAccountAllocator`): one decision per supplied account, ordered by account id, deterministic for any input order.
 2. **Gates first, in the type, not the caller:** an account without the Trading role (`account_not_trading`) or not in paper mode (`account_not_paper`) is excluded with a code and can never receive a quantity, whatever else is true. A duplicate account id excludes every copy.
-3. **Capacity** is the least of the risk-per-trade, capital-per-trade, funds and open-risk-headroom limits, rounded down to whole lots; the binding limit is named on the decision.
-4. **The ticket quantity is a pool** shared by capacity (proportional, largest remainder, lowest id); the sum never exceeds it. An account squeezed out says `pool_exhausted` with its capacity.
+3. **Capacity** is the least of the risk-per-trade, capital-per-trade, funds and open-risk-headroom limits, rounded down to whole lots; the binding limit is named on the decision. Limits hold to a tolerance of 1e-9 of a share (so a float sum at the limit still passes); no account is ever above a limit by more than that.
+4. **The ticket quantity is a pool** shared by capacity (proportional, largest unused capacity, then lowest account id); the sum never exceeds it. An account squeezed out says `pool_exhausted` with its capacity.
 5. **Unavailable allocates nothing:** missing, non-finite, zero or negative inputs (account or ticket) give a code naming the fields, never a guess.
 6. **Rows:** `AllocationRows.ToNew` produces only paper rows with a quantity above 0, the shape the plan store and the database check accept. No new store method: allocations are written with the plan item at publish, insert-only, unchanged owner-only and cutoff rules.
+6a. **Caveat carried everywhere.** `AllocationResult.Caveat` ("pool split by each account's own limits only; no cross-account caps, replicate/distribute or liquidity cap; funds not margin-aware for SELL") is printed by the verb and referenced by `AllocationRows`, so P7-09 inherits it.
 7. **Verb** `xd plan allocate` runs the allocator over supplied inputs and prints each decision. It reads and writes nothing.
 
 ## Where this differs from the docs (stated, not hidden)

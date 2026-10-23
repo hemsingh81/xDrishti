@@ -12,7 +12,8 @@
 5. **Split of the pool:** if all capacities fit, each gets its own; otherwise lots are shared in proportion to capacity (rounded down) and leftover lots go to the largest unused capacity, then the lowest account id. Deterministic for any input order.
 6. **Unavailable never allocates.** A missing, non-finite, zero or negative equity, percent, funds or holding fact gives that account nothing (`unavailable_account`, naming the fields); an unusable ticket (side, entry, stop on the wrong side, lot, quantity below one lot) gives every eligible account nothing (`unavailable_ticket`). Gates come first: a non-Trading or non-paper account is excluded with its own code whatever else is missing.
 7. **Held symbols:** an account that already holds the symbol gets nothing (`already_held`); unknown holdings are unavailable.
-8. Equity (fixed capital or the funds the last sync read) is passed in; where it comes from is the pipeline's (P7-09). Compare tolerance 1e-9 share.
+8. **Caveat** line on every output (`AllocationResult.Caveat`): pool split by each account's own limits only; no cross-account caps, replicate/distribute or liquidity cap; funds not margin-aware for SELL. In the verb, a value that is neither `?` nor a number is a usage error.
+9. Equity (fixed capital or the funds the last sync read) is passed in; where it comes from is the pipeline's (P7-09). Compare tolerance 1e-9 share.
 
 ## Goal
 For one ticket and the accounts, say per account the quantity it gets, or the code and numbers of why it gets none, never more than its own limits or the ticket's quantity, and never to a non-paper or non-Trading account.
