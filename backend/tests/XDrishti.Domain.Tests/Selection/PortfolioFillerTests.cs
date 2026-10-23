@@ -231,6 +231,80 @@ public sealed class PortfolioFillerTests
     }
 
     [Fact]
+    public void Positive_correlation_on_opposite_sides_is_a_hedge_and_passes()
+    {
+        var r = Run([Fc("A", 1, side: "BUY"), Fc("B", 2, side: "SELL")], corr: Corr(("A", "B", 0.9)));
+
+        Symbols(r.Primary).ShouldBe(["A", "B"]);
+    }
+
+    [Theory]
+    [InlineData("SELL", "BUY")]
+    [InlineData("BUY", "SELL")]
+    public void Negative_correlation_on_opposite_sides_is_one_concentrated_bet_and_blocks(string first, string second)
+    {
+        var r = Run([Fc("A", 1, side: first), Fc("B", 2, side: second)], corr: Corr(("A", "B", -0.9)));
+
+        Symbols(r.Primary).ShouldBe(["A"]);
+        Math.Round(Reason(r.Reserve.Single(), FillCodes.Correlation).Value!.Value, 6).ShouldBe(0.9);
+    }
+
+    [Fact]
+    public void Negative_correlation_on_the_same_side_passes()
+    {
+        var r = Run([Fc("A", 1), Fc("B", 2)], corr: Corr(("A", "B", -0.9)));
+
+        Symbols(r.Primary).ShouldBe(["A", "B"]);
+    }
+
+    [Fact]
+    public void An_open_position_with_zero_risk_is_known_and_does_not_block()
+    {
+        var r = Run([Fc("A", 1)], book: [Held("H", risk: 0.0)]);
+
+        Symbols(r.Primary).ShouldBe(["A"]);
+    }
+
+    [Fact]
+    public void A_ticket_with_zero_risk_is_unavailable()
+    {
+        var r = Run([Fc("A", 1, risk: 0.0)]);
+
+        Reason(r.Rejected.Single(), FillCodes.PerTradeRisk).Outcome.ShouldBe(FilterOutcome.Unavailable);
+    }
+
+    [Fact]
+    public void An_open_position_with_an_unknown_side_makes_net_exposure_and_correlation_unavailable()
+    {
+        var r = Run([Fc("A", 1)], book: [Held("H", side: "HOLD")]);
+
+        Reason(r.Rejected.Single(), FillCodes.NetExposure).Outcome.ShouldBe(FilterOutcome.Unavailable);
+        Reason(r.Rejected.Single(), FillCodes.Correlation).Outcome.ShouldBe(FilterOutcome.Unavailable);
+    }
+
+    [Fact]
+    public void Sectors_and_symbols_compare_ignoring_case()
+    {
+        var sector = Run([Fc("A", 1, sector: "Banks"), Fc("B", 2, sector: "banks"), Fc("C", 3, sector: "BANKS")]);
+        var symbol = Run([Fc("A", 1), Fc("a", 2, side: "SELL")]);
+
+        Symbols(sector.Primary).ShouldBe(["A", "B"]);
+        Reason(sector.Reserve.Single(), FillCodes.Sector).Value.ShouldBe(3);
+        Symbols(symbol.Primary).ShouldBe(["A"]);
+        Reason(symbol.Reserve.Single(), FillCodes.OnePerSymbol).Outcome.ShouldBe(FilterOutcome.Fail);
+    }
+
+    [Fact]
+    public void A_candidate_blocked_only_by_an_earlier_pick_is_reserve_not_rejected()
+    {
+        var r = Run([Fc("A", 1, sector: "x"), Fc("B", 2, sector: "x"), Fc("C", 3, sector: "x")], new FillConstraints(MaxPlanItems: 10, MaxPerSector: 2));
+
+        r.Rejected.ShouldBeEmpty();
+        r.Reserve.Single().Status.ShouldBe(FillStatus.Reserve);
+        Symbols(r.Reserve).ShouldBe(["C"]);
+    }
+
+    [Fact]
     public void Unknown_correlation_blocks_the_second_pick_but_not_the_first()
     {
         var r = PortfolioFiller.Fill([Fc("A", 1), Fc("B", 2)], [], null, new FillConstraints());
