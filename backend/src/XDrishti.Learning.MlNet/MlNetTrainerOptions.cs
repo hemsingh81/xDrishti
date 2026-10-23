@@ -60,9 +60,9 @@ public sealed record MlNetTrainerOptions(
             problems.Add("min_fit_rows and min_calibration_rows must be at least 2");
         }
 
-        if (!double.IsFinite(ProbabilityFloor) || ProbabilityFloor is < 0 or >= 0.5)
+        if (!double.IsFinite(ProbabilityFloor) || ProbabilityFloor is <= 0 or >= 0.5)
         {
-            problems.Add("probability_floor must be 0 to below 0.5");
+            problems.Add("probability_floor must be above 0 and below 0.5");
         }
 
         return problems;

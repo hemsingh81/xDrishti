@@ -18,9 +18,3 @@ internal sealed class Example
         return ml.Data.LoadFromEnumerable(rows, schema);
     }
 }
-
-/// <summary>The raw margin that the trainer's transformer writes.</summary>
-internal sealed class RawOutput
-{
-    public float Score { get; set; }
-}

@@ -26,6 +26,13 @@
     <Company>xDrishti</Company>
   </PropertyGroup>
 
+  <!-- Microsoft.ML / Microsoft.ML.LightGbm build targets refuse an arm64 PlatformTarget in the consuming project. Set here, not in the adapter project,
+       so that every host that will reference XDrishti.Learning.MlNet (P6-07) and its tests get the supported opt-out (as the P0 spike). Other projects ignore the properties. -->
+  <PropertyGroup>
+    <EnableMLUnsupportedPlatformTargetCheck>false</EnableMLUnsupportedPlatformTargetCheck>
+    <EnableLightGBMUnsupportedPlatformTargetCheck>false</EnableLightGBMUnsupportedPlatformTargetCheck>
+  </PropertyGroup>
+
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>

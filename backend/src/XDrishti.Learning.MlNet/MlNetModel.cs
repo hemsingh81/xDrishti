@@ -12,8 +12,9 @@ using Isotonic = XDrishti.Domain.Learning.IsotonicCalibrator;
 namespace XDrishti.Learning.MlNet;
 
 /// <summary>
-/// A trained model (P6-06, ADR 0068): imputation means, a tree ensemble, a PAV calibration map. <see cref="Score"/> is the calibrated probability of label 1; <see cref="RawScore"/> is the margin of the trees; <see cref="Explain"/> gives the per-feature
-/// contributions to the margin (tree-path contributions, in raw-score units: they add up to the margin, not to the calibrated probability). Thread-safe: one scoring call at a time per model.
+/// A trained model (P6-06, ADR 0068): imputation means, a tree ensemble, a PAV calibration map. <see cref="Score"/> is the calibrated probability of label 1; <see cref="RawScore"/> is the margin of the trees; <see cref="Explain"/> gives path-based
+/// per-feature attributions in raw-score units: they point the same way as the margin and rank the features, but they are not exact (they do not add up to <see cref="RawScore"/>), not SHAP, and the bias term is not included. A missing or
+/// non-finite feature value is imputed to the fit mean and then appears as an ordinary contribution of that mean value. Thread-safe: one scoring call at a time per model.
 /// </summary>
 public sealed class MlNetModel : IExplainableScorer, IFitNote
 {
@@ -23,7 +24,6 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
     private readonly Isotonic _calibration;
     private readonly double _floor;
     private readonly Lock _gate = new();
-    private PredictionEngine<Example, RawOutput>? _engine;
     private FeatureContributionCalculatingTransformer? _contributor;
 
     internal MlNetModel(MLContext ml, ITransformer trees, ArtifactHeader header, Isotonic calibration)
@@ -56,34 +56,86 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
 
     internal ArtifactHeader Header { get; }
 
-    /// <summary>Restores a model from its artifact; the optional hash is checked first.</summary>
+    /// <summary>
+    /// Restores a model from its artifact after checking the bytes against the stored SHA-256. The hash is an integrity check (the bytes are the ones that were stored), not authenticity: whoever can replace the file can replace the hash.
+    /// </summary>
     /// <param name="bytes">The artifact.</param>
-    /// <param name="expectedSha256">The stored hash, or null to skip the check.</param>
-    public static Result<MlNetModel> Load(byte[] bytes, string? expectedSha256 = null)
+    /// <param name="expectedSha256">The stored hash (hex).</param>
+    public static Result<MlNetModel> Load(byte[] bytes, string expectedSha256)
     {
         ArgumentNullException.ThrowIfNull(bytes);
-        if (expectedSha256 is not null && !string.Equals(ArtifactCodec.Hash(bytes), expectedSha256, StringComparison.OrdinalIgnoreCase))
+        ArgumentException.ThrowIfNullOrWhiteSpace(expectedSha256);
+        if (bytes.Length > ArtifactCodec.MaxArtifactBytes)
+        {
+            return TooBig();
+        }
+
+        if (!string.Equals(ArtifactCodec.Hash(bytes), expectedSha256, StringComparison.OrdinalIgnoreCase))
         {
             return Result.Failure<MlNetModel>(Error.Validation("ml.hash_mismatch", "The model bytes do not match their stored SHA-256."));
         }
 
-        if (ArtifactCodec.Unpack(bytes) is not var (header, zip) || header.Version != 1 || header.Width < 1 || header.Means.Length != header.Width)
+        return LoadUnverified(bytes);
+    }
+
+    /// <summary>Restores a model without a hash check: for tests and tools that have no stored hash. Everything else about the bytes is still validated.</summary>
+    /// <param name="bytes">The artifact.</param>
+    public static Result<MlNetModel> LoadUnverified(byte[] bytes)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        if (bytes.Length > ArtifactCodec.MaxArtifactBytes)
         {
-            return Result.Failure<MlNetModel>(Error.Validation("ml.bad_artifact", "The bytes are not a model artifact this code can read."));
+            return TooBig();
         }
 
         try
         {
+            if (ArtifactCodec.Unpack(bytes) is not var (header, zip) || !header.IsUsable() || !ArtifactCodec.ZipIsSane(zip))
+            {
+                return Bad("The bytes are not a model artifact this code can read.");
+            }
+
             var ml = new MLContext(seed: header.Seed);
             using var stream = new MemoryStream(zip);
             var trees = ml.Model.Load(stream, out _);
             var calibration = Isotonic.FromKnots(header.CalibrationScores, header.CalibrationValues);
-            return Result.Success(new MlNetModel(ml, trees, header, calibration));
+            var model = new MlNetModel(ml, trees, header, calibration);
+            return model.Check() is { } problem ? Bad(problem) : Result.Success(model);
         }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IOException or InvalidDataException or FormatException)
+        catch (Exception e) when (e is not (OutOfMemoryException or StackOverflowException or ThreadAbortException or AccessViolationException))
         {
-            return Result.Failure<MlNetModel>(Error.Validation("ml.bad_artifact", "The model could not be loaded: " + e.Message));
+            // ML.NET's loader throws whatever the bytes make it throw (KeyNotFound, Overflow, InvalidCast, NotSupported, FileLoad, TargetInvocation, ...); the bytes are untrusted, so every ordinary failure is a failed load.
+            return Bad("The model could not be loaded: " + e.Message);
         }
+    }
+
+    private static Result<MlNetModel> TooBig() => Bad("The artifact is larger than " + ArtifactCodec.MaxArtifactBytes + " bytes.");
+
+    private static Result<MlNetModel> Bad(string message) => Result.Failure<MlNetModel>(Error.Validation("ml.bad_artifact", message));
+
+    /// <summary>Settles at load what would otherwise fail at the first call: the transformer type, its input width, a first score and the contribution calculator.</summary>
+    private string? Check()
+    {
+        var inputType = (Header.Trainer, _trees) switch
+        {
+            (TreeTrainer.LightGbm, BinaryPredictionTransformer<CalibratedModelParametersBase<LightGbmBinaryModelParameters, PlattCalibrator>> t) => t.FeatureColumnType,
+            (TreeTrainer.FastTree, BinaryPredictionTransformer<CalibratedModelParametersBase<FastTreeBinaryModelParameters, PlattCalibrator>> t) => t.FeatureColumnType,
+            _ => null,
+        };
+        if (inputType is null)
+        {
+            return "The model is not the calibrated binary tree model that the header names.";
+        }
+
+        if (inputType is not VectorDataViewType { Size: var size } || size != Width)
+        {
+            return "The model reads a different number of features than the header says.";
+        }
+
+        // A few probes (zeros, means, far below, far above) so that a corrupt tree fails here and not on the first real row. Bytes whose hash was not checked can still hold a tree that fails only on some other row.
+        float[][] probes = [new float[Width], [.. _means.Select(m => (float)m)], [.. Enumerable.Repeat(-1e6f, Width)], [.. Enumerable.Repeat(1e6f, Width)]];
+        _contributor ??= BuildContributor();
+        return probes.All(p => double.IsFinite(Margin(new Example { Features = p }))) ? null : "The model gives a non-finite score.";
     }
 
     /// <summary>The bytes of the model and their SHA-256. The same trained model gives the same bytes.</summary>
@@ -98,11 +150,15 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
     public double RawScore(ValidationRow row)
     {
         ArgumentNullException.ThrowIfNull(row);
-        var example = ToExample(row);
+        return Margin(ToExample(row));
+    }
+
+    private double Margin(Example example)
+    {
         lock (_gate)
         {
-            _engine ??= _ml.Model.CreatePredictionEngine<Example, RawOutput>(_trees, inputSchemaDefinition: Schema());
-            return _engine.Predict(example).Score;
+            var data = Example.View(_ml, [example], Width);
+            return _trees.Transform(data).GetColumn<float>("Score").First();
         }
     }
 
@@ -170,13 +226,6 @@ public sealed class MlNetModel : IExplainableScorer, IFitNote
         }
 
         return x;
-    }
-
-    private SchemaDefinition Schema()
-    {
-        var schema = SchemaDefinition.Create(typeof(Example));
-        schema[nameof(Example.Features)].ColumnType = new VectorDataViewType(NumberDataViewType.Single, Width);
-        return schema;
     }
 
     private FeatureContributionCalculatingTransformer BuildContributor()

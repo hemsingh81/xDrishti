@@ -10,7 +10,7 @@
 - **One fixed setting, no grid** (P6-00 said "small fixed grids chosen inside train folds"). With about two years of data every extra setting looked at is another way to fit noise; the setting count would be the `trials` of the rule. Deviation from the plan row, on purpose; a grid can be added later with `trials` raised.
 - `split_by: [style, side]` is **not** built here: the caller decides which rows to hand over (strategy, style and side can be features). One model over the rows it is given.
 - Calibration share 25 % of the train rows (the latest by decision time), the probability floor 0.005, 100 trees, 8 leaves, learning rate 0.05, min 20 rows per leaf: my choices, options, stored in the artifact where they matter.
-- Feature contributions come from ML.NET's tree-path contribution calculator (`CalculateFeatureContribution`): exact for the margin of the trees, in raw-score units, before the calibration map. Permutation importance is replaced by the mean absolute contribution (`MlNetModel.Importance`), computed the same way for both trainers.
+- Feature contributions come from ML.NET's tree-path contribution calculator (`CalculateFeatureContribution`): path-based attributions in raw-score units, before the calibration map: not exact, not SHAP, bias term not included, so they do not add up to the margin (a test measures how closely they follow it); a missing value is imputed to the fit mean and shows as an ordinary contribution. Permutation importance is replaced by the mean absolute contribution (`MlNetModel.Importance`), computed the same way for both trainers.
 - No log events (ids 4500 to 4509 stay unused): the adapter is a pure function of its rows; the fall-back is recorded in the model's note and artifact, which the registry and the report print.
 - ADR number 0068.
 
@@ -28,17 +28,17 @@ A candidate model that the P6-05 harness can score against the baselines: trees 
 4. Calibration is monotone in the raw score and inside `[floor, 1 - floor]`.
 5. No leak: the held-back calibration rows are the latest in time; changing their labels changes the calibration but not the trees; changing fit-row labels changes the trees; a fit row whose horizon reaches the first held-back decision is dropped.
 6. Determinism: the same rows in any order give the same artifact bytes and hash; another seed gives another hash.
-7. Round trip: a saved model loads (hash checked), scores, explains and saves to the same hash; a wrong hash, foreign bytes or a cut file are a failure with a code, not an exception.
-8. LightGBM unavailable: the model is FastTree and says so in its note; asked for FastTree there is no note.
+7. Round trip: a saved model loads (`Load` requires the stored hash; `LoadUnverified` is the named exception), scores, explains and saves to the same hash; a wrong hash, foreign bytes, a cut file, null or out-of-range header fields (floor not in (0, 0.5), width not the model's), a header or zip directory with flipped bytes and an artifact over 64 MB are a failure with a code, not an exception. The hash is integrity, not authenticity; ML.NET's deserialiser is not hardened against crafted tree payloads, so only bytes whose hash came from the registry are to be loaded.
+8. LightGBM unavailable (only a load failure: DllNotFound, BadImageFormat, EntryPointNotFound, TypeInitialization): the model is FastTree and its note names the exception and message; any other LightGBM error surfaces. Tested by an injected failing fitter; the LightGBM success path is tested only where the native library loads (skipped with a reason elsewhere). The container images do not carry `libgomp1`, so production uses FastTree until a container build proves otherwise (ADR 0068). Asked for FastTree there is no note.
 9. Rows that cannot be trained on (too few, one class, no features, bad options) are failures with a code from `Train`; `Fit` then returns the base rate with a note.
 10. Architecture: the adapter references only Domain and the three ML.NET packages; no other project references `Microsoft.ML*`; no ML.NET type in a public signature.
 
 ## Contract
 - **API / Data / UI / jobs:** none. No migration, no log events.
-- Artifact: `"XDMODEL1"`, int32 header length, JSON header (trainer, width, imputation means, calibration knots, floor, row counts, seed, note), then the ML.NET model zip re-packed with sorted entries and a fixed timestamp.
+- Artifact: `"XDMODEL1"`, int32 header length, JSON header (trainer, width, imputation means, calibration knots, floor, row counts, seed, note), then the ML.NET model zip re-packed with sorted entries, a fixed timestamp and no compression.
 
 ## Non-functional
-Single thread and fixed seed for reproducible bytes. Scoring one row takes a lock (the ML.NET prediction engine is not thread-safe). Speed was measured by the P0 spike in the container (276,000 rows/s batch with LightGBM) and is not re-measured here.
+Single thread and fixed seed for reproducible bytes. Scoring one row takes a lock and goes through a data-view transform (no prediction engine to dispose). Speed was measured by the P0 spike in the container (276,000 rows/s batch with LightGBM) and is not re-measured here.
 
 ## Test plan
 `IsotonicCalibratorTests` (Domain.Tests); `MlNetScorerFactoryTests`, `MlNetHarnessTests` (Learning.MlNet.Tests); `MlNetArchitectureTests`.

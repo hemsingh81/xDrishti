@@ -49,6 +49,8 @@ public static class WalkForwardValidator
         var pooledLabels = new List<int>();
         var notes = new SortedSet<string>(StringComparer.Ordinal);
         var lastTrain = 0;
+        var noted = 0;
+        var fits = 0;
         var comparisons = candidates.Select(_ => new List<BaselineComparison>()).ToArray();
         for (var i = 0; i < windows.Count; i++)
         {
@@ -67,9 +69,15 @@ public static class WalkForwardValidator
             for (var s = 0; s < scorers.Length; s++)
             {
                 var scorer = scorers[s].Fit(fold.Train);
+                if (s >= baselines.Length)
+                {
+                    fits++;
+                }
+
                 if (scorer is IFitNote { Note: { } note })
                 {
                     notes.Add(note);
+                    noted++;
                 }
 
                 var scores = new double[test.Length];
@@ -110,7 +118,7 @@ public static class WalkForwardValidator
             verdicts.Add(EligibilityRule.Judge(candidates[k].Name, comparisons[k], p, lastTrain, options));
         }
 
-        return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes)));
+        return Result.Success(new ValidationReport(options, ordered.Length, from, to, folds, results, pooled, verdicts, LimitsOf(options, ordered.Length, from, to, results.Count, notes, noted, fits)));
     }
 
     private static (ValidationFold Fold, ValidationRow[] Train) Cut(int index, DateOnly start, DateOnly end, ValidationRow[] before, ValidationRow[] test, ValidationOptions options)
@@ -165,7 +173,7 @@ public static class WalkForwardValidator
         return null;
     }
 
-    private static List<string> LimitsOf(ValidationOptions o, int rows, DateOnly from, DateOnly to, int folds, IEnumerable<string> notes)
+    private static List<string> LimitsOf(ValidationOptions o, int rows, DateOnly from, DateOnly to, int folds, IEnumerable<string> notes, int noted, int fits)
     {
         var c = CultureInfo.InvariantCulture;
         var limits = new List<string>
@@ -187,6 +195,11 @@ public static class WalkForwardValidator
         }
 
         limits.AddRange(notes);
+        if (noted > 0)
+        {
+            limits.Add(string.Create(c, $"{noted} of {fits} model fits carried a note (a fall-back or a scorer that could not train); those folds do not measure the model as designed."));
+        }
+
         return limits;
     }
 

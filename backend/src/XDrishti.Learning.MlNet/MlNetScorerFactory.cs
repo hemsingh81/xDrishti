@@ -13,16 +13,31 @@ namespace XDrishti.Learning.MlNet;
 /// <summary>
 /// The candidate model of the validation harness (P6-06, ADR 0068): <see cref="IScorerFactory"/> over the train rows of a fold. The train rows are ordered by decision time; the earliest part fits the trees, the latest
 /// <see cref="MlNetTrainerOptions.CalibrationShare"/> is held back and only fits the PAV calibration map (fit rows whose label horizon reaches the first held-back decision are dropped, so the map is not fitted on rows the trees were helped by).
-/// Test rows never reach <c>Fit</c>. LightGBM is tried first; when its native library cannot load, FastTree is used and the model's note says so. Deterministic: one thread, fixed seed.
+/// Test rows never reach <c>Fit</c>. LightGBM is tried first; when its native library cannot load (only a load failure is caught; any other error is a bug and surfaces), FastTree is used and the model's note says so. Deterministic: one thread, fixed seed.
 /// When the rows cannot be trained on (too few, one class, no features) <see cref="Fit"/> returns the smoothed base rate with a note, and <see cref="Train"/> returns the failure.
 /// </summary>
-/// <param name="options">The settings; the defaults are the conservative fixed ones.</param>
-public sealed class MlNetScorerFactory(MlNetTrainerOptions? options = null) : IScorerFactory
+public sealed class MlNetScorerFactory : IScorerFactory
 {
     /// <summary>The report name (doc 16 <c>meta_model</c>).</summary>
     public const string ScorerName = "meta_model";
 
-    private readonly MlNetTrainerOptions _options = options ?? new MlNetTrainerOptions();
+    private readonly MlNetTrainerOptions _options;
+    private readonly Func<MLContext, IDataView, ITransformer> _lightGbm;
+
+    /// <summary>Creates the factory.</summary>
+    /// <param name="options">The settings; the defaults are the conservative fixed ones.</param>
+    public MlNetScorerFactory(MlNetTrainerOptions? options = null)
+    {
+        _options = options ?? new MlNetTrainerOptions();
+        _lightGbm = FitLightGbm;
+    }
+
+    /// <summary>For tests: replaces the LightGBM fitter, so that the fall-back can be forced on a machine where the native library loads.</summary>
+    internal MlNetScorerFactory(MlNetTrainerOptions? options, Func<MLContext, IDataView, ITransformer> lightGbm)
+        : this(options)
+    {
+        _lightGbm = lightGbm;
+    }
 
     /// <inheritdoc />
     public string Name => ScorerName;
@@ -114,13 +129,13 @@ public sealed class MlNetScorerFactory(MlNetTrainerOptions? options = null) : IS
         {
             try
             {
-                var lightGbm = FitLightGbm(ml, data);
+                var lightGbm = _lightGbm(ml, data);
                 return (lightGbm, TreeTrainer.LightGbm, null);
             }
-            catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or TypeInitializationException or EntryPointNotFoundException or InvalidOperationException or NotSupportedException or ArgumentException or InvalidProgramException)
+            catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or TypeInitializationException)
             {
                 // The native LightGBM library is not loadable on every machine (for example macOS arm64 ships none): use FastTree and say so, so that the numbers are never read as LightGBM's.
-                note = string.Create(CultureInfo.InvariantCulture, $"LightGBM could not be used on this machine ({e.GetType().Name}); the model was trained with FastTree instead.");
+                note = string.Create(CultureInfo.InvariantCulture, $"LightGBM could not be used on this machine ({e.GetType().Name}: {e.Message}); the model was trained with FastTree instead.");
             }
         }
 

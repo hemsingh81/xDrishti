@@ -108,6 +108,7 @@ public sealed class WalkForwardValidatorTests
         var report = Run(Data(), [new Noted(), new Cheat()]);
 
         report.Limits.Count(l => l == "noted did not converge").ShouldBe(1);
+        report.Limits.ShouldContain(l => l.Contains(" model fits carried a note", StringComparison.Ordinal) && l.StartsWith(report.Results.Count + " of " + (report.Results.Count * 2) + " ", StringComparison.Ordinal));
         var last = report.Results[^1].Fold.TrainCount;
         last.ShouldBeLessThan(Data().Count);
         report.Verdicts.ShouldAllBe(v => !v.Reasons.Any(r => r.StartsWith("trained on", StringComparison.Ordinal)));

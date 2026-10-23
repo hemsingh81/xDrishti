@@ -23,4 +23,15 @@ public sealed record ArtifactHeader(
     int FitRows,
     int CalibrationRows,
     int Seed,
-    string? Note);
+    string? Note)
+{
+    /// <summary>True when every field is present, finite and in range, so that the loader can use it without a surprise. The width against the model itself is checked after the model is unpacked.</summary>
+    internal bool IsUsable() =>
+        Version == 1
+        && Enum.IsDefined(Trainer)
+        && Width is >= 1 and <= 100000
+        && Means is { } means && means.Length == Width && means.All(double.IsFinite)
+        && CalibrationScores is { Length: > 0 } scores && CalibrationValues is { } values && values.Length == scores.Length && scores.All(double.IsFinite) && values.All(double.IsFinite)
+        && double.IsFinite(ProbabilityFloor) && ProbabilityFloor is > 0 and < 0.5
+        && FitRows >= 0 && CalibrationRows >= 0;
+}

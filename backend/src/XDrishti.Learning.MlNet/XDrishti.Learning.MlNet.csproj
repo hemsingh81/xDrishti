@@ -2,11 +2,6 @@
   <!-- The ML.NET trainer adapter (P6-06, ADR 0068): the only project that references Microsoft.ML*. It implements the Domain port IScorerFactory over validation rows,
        fits LightGBM (FastTree when the native library cannot load), calibrates with PAV on a held-back slice of the train rows and explains predictions.
        References Domain only; architecture tests assert it and that no other project references the packages. -->
-  <PropertyGroup>
-    <!-- Microsoft.ML's build targets refuse an arm64 PlatformTarget; the supported opt-out (as the P0 spike). -->
-    <EnableMLUnsupportedPlatformTargetCheck>false</EnableMLUnsupportedPlatformTargetCheck>
-    <EnableLightGBMUnsupportedPlatformTargetCheck>false</EnableLightGBMUnsupportedPlatformTargetCheck>
-  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\XDrishti.Domain\XDrishti.Domain.csproj" />
   </ItemGroup>

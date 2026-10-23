@@ -154,24 +154,149 @@ public sealed class MlNetScorerFactoryTests
         var artifact = Train(SyntheticRows.Make(500, learnable: true)).ToArtifact();
 
         MlNetModel.Load(artifact.Bytes, new string('0', 64)).Error.Code.ShouldBe("ml.hash_mismatch");
-        MlNetModel.Load([1, 2, 3, 4]).Error.Code.ShouldBe("ml.bad_artifact");
-        MlNetModel.Load(artifact.Bytes[..40]).Error.Code.ShouldBe("ml.bad_artifact");
+        MlNetModel.LoadUnverified([1, 2, 3, 4]).Error.Code.ShouldBe("ml.bad_artifact");
+        MlNetModel.LoadUnverified(artifact.Bytes[..40]).Error.Code.ShouldBe("ml.bad_artifact");
+        MlNetModel.LoadUnverified(artifact.Bytes[..(artifact.Bytes.Length / 2)]).Error.Code.ShouldBe("ml.bad_artifact");
+        Should.Throw<ArgumentException>(() => MlNetModel.Load(artifact.Bytes, " "));
     }
 
     [Fact]
-    public void When_lightgbm_cannot_be_used_the_model_says_it_was_trained_with_fasttree()
+    public void Contributions_are_path_attributions_that_follow_the_margin_but_are_not_an_exact_decomposition()
+    {
+        var rows = SyntheticRows.Make(700, learnable: true);
+        var model = Train(rows, new MlNetTrainerOptions(Preferred: TreeTrainer.FastTree));
+        var sample = rows.Take(200).ToArray();
+
+        var sums = sample.Select(r => model.Explain(r, model.Width).Sum(c => c.Value)).ToArray();
+        var raw = sample.Select(model.RawScore).ToArray();
+
+        // Documented in the model's remarks: they are not asserted to equal the margin (no bias term, path-based), only to track it.
+        Correlation(sums, raw).ShouldBeGreaterThan(0.9);
+    }
+
+    [Fact]
+    public void A_missing_value_is_imputed_to_the_mean_and_explains_as_that_mean()
+    {
+        var rows = SyntheticRows.Make(600, learnable: true);
+        var model = Train(rows);
+        var mean = model.Header.Means[0];
+
+        var missing = SyntheticRows.WithFeatures(rows[0], double.NaN, 0, 0);
+        var atMean = SyntheticRows.WithFeatures(rows[0], mean, 0, 0);
+
+        model.Explain(missing, 3).ShouldBe(model.Explain(atMean, 3));
+        model.RawScore(missing).ShouldBe(model.RawScore(atMean), 1e-5);
+    }
+
+    [Fact]
+    public void When_lightgbm_cannot_be_loaded_the_model_is_fasttree_and_the_note_says_why()
+    {
+        var factory = new MlNetScorerFactory(null, (_, _) => throw new DllNotFoundException("lib_lightgbm.so not found"));
+
+        var model = factory.Train(SyntheticRows.Make(500, learnable: true)).Value;
+
+        model.Trainer.ShouldBe(TreeTrainer.FastTree);
+        model.Note.ShouldNotBeNull();
+        model.Note.ShouldContain("FastTree");
+        model.Note.ShouldContain("DllNotFoundException");
+        model.Note.ShouldContain("lib_lightgbm.so not found");
+        MlNetModel.Load(model.ToArtifact().Bytes, model.ToArtifact().Sha256).Value.Note.ShouldBe(model.Note);
+    }
+
+    [Fact]
+    public void A_lightgbm_failure_that_is_not_a_load_failure_is_not_hidden()
+    {
+        var factory = new MlNetScorerFactory(null, (_, _) => throw new InvalidOperationException("bad data"));
+
+        Should.Throw<InvalidOperationException>(() => factory.Train(SyntheticRows.Make(500, learnable: true)));
+    }
+
+    [Fact]
+    public void Lightgbm_is_used_and_round_trips_where_its_native_library_loads()
     {
         var model = Train(SyntheticRows.Make(500, learnable: true));
+        Assert.SkipWhen(model.Trainer == TreeTrainer.FastTree, "The LightGBM native library does not load on this machine (" + model.Note + "); the fall-back is covered by its own test.");
 
-        if (model.Trainer == TreeTrainer.FastTree)
+        model.Note.ShouldBeNull();
+        var artifact = model.ToArtifact();
+        var loaded = MlNetModel.Load(artifact.Bytes, artifact.Sha256).Value;
+        loaded.Trainer.ShouldBe(TreeTrainer.LightGbm);
+        loaded.Explain(SyntheticRows.Make(5, learnable: true)[0], 3).ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public void Tampered_bytes_fail_the_hash_and_a_tampered_header_or_zip_directory_is_a_failure_not_an_exception()
+    {
+        var artifact = Train(SyntheticRows.Make(500, learnable: true)).ToArtifact();
+        var headerEnd = 12 + BitConverter.ToInt32(artifact.Bytes, 8);
+        // The tree payload is not flipped on purpose: ML.NET's deserialiser is not hardened against crafted trees (a cyclic tree can spin), so only the hash protects it; see ADR 0068.
+        var positions = Enumerable.Range(0, headerEnd).Where(i => i % 3 == 0).Concat(Enumerable.Range(artifact.Bytes.Length - 200, 200)).ToArray();
+
+        foreach (var at in positions)
         {
-            model.Note.ShouldNotBeNull();
-            model.Note.ShouldContain("FastTree");
+            var bytes = (byte[])artifact.Bytes.Clone();
+            bytes[at] ^= 0xFF;
+            MlNetModel.Load(bytes, artifact.Sha256).Error.Code.ShouldBe("ml.hash_mismatch");
+            var result = MlNetModel.LoadUnverified(bytes);
+            if (result.IsFailure)
+            {
+                result.Error.Code.ShouldBe("ml.bad_artifact");
+            }
         }
-        else
-        {
-            model.Note.ShouldBeNull();
-        }
+    }
+
+    [Fact]
+    public void A_header_with_missing_or_out_of_range_fields_is_refused_at_load()
+    {
+        var artifact = Train(SyntheticRows.Make(500, learnable: true)).ToArtifact();
+        var (header, zip) = ArtifactCodec.Unpack(artifact.Bytes)!.Value;
+
+        Refuse(header with { Means = null! }, zip);
+        Refuse(header with { CalibrationScores = null! }, zip);
+        Refuse(header with { CalibrationValues = null! }, zip);
+        Refuse(header with { CalibrationValues = [] }, zip);
+        Refuse(header with { ProbabilityFloor = 0 }, zip);
+        Refuse(header with { ProbabilityFloor = 0.5 }, zip);
+        Refuse(header with { ProbabilityFloor = -0.1 }, zip);
+        Refuse(header with { Version = 2 }, zip);
+        Refuse(header with { Trainer = (TreeTrainer)9 }, zip);
+        Refuse(header with { Trainer = header.Trainer == TreeTrainer.FastTree ? TreeTrainer.LightGbm : TreeTrainer.FastTree }, zip);
+        Refuse(header with { Width = 2, Means = [0, 0] }, zip);
+        Refuse(header with { Width = header.Width + 1, Means = [.. header.Means, 0.0] }, zip);
+        Refuse(header with { CalibrationScores = [.. header.CalibrationScores.Reverse()] }, zip);
+        ArtifactCodec.ZipIsSane([1, 2, 3]).ShouldBeFalse();
+
+        MlNetModel.LoadUnverified(ArtifactCodec.Pack(header, zip).Bytes).IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void An_oversize_artifact_is_refused_before_it_is_hashed_or_read()
+    {
+        var big = new byte[ArtifactCodec.MaxArtifactBytes + 1];
+
+        MlNetModel.Load(big, new string('0', 64)).Error.Code.ShouldBe("ml.bad_artifact");
+        MlNetModel.LoadUnverified(big).Error.Code.ShouldBe("ml.bad_artifact");
+    }
+
+    [Fact]
+    public void A_header_longer_than_the_cap_is_refused()
+    {
+        var bytes = new byte[40];
+        "XDMODEL1"u8.CopyTo(bytes);
+        BitConverter.TryWriteBytes(bytes.AsSpan(8, 4), ArtifactCodec.MaxHeaderBytes + 1);
+
+        ArtifactCodec.Unpack(bytes).ShouldBeNull();
+    }
+
+    private static void Refuse(ArtifactHeader header, byte[] zip) =>
+        MlNetModel.LoadUnverified(ArtifactCodec.Pack(header, zip).Bytes).Error.Code.ShouldBe("ml.bad_artifact");
+
+    private static double Correlation(double[] x, double[] y)
+    {
+        var mx = x.Average();
+        var my = y.Average();
+        var cov = x.Zip(y, (a, b) => (a - mx) * (b - my)).Sum();
+        return cov / Math.Sqrt(x.Sum(a => (a - mx) * (a - mx)) * y.Sum(b => (b - my) * (b - my)));
     }
 
     [Fact]
