@@ -103,6 +103,12 @@ internal sealed class CellStatsStore(NpgsqlDataSource dataSource) : ICellStatsSt
         return await ReadAsync(command, cancellationToken);
     }
 
+    public async ValueTask<DateOnly?> NewestAsOfAsync(CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("SELECT max(as_of) FROM research.cell_stats");
+        return await command.ExecuteScalarAsync(cancellationToken) is DateOnly date ? date : null;
+    }
+
     public async ValueTask<IReadOnlyList<StoredCellStats>> ListLatestBeforeAsync(DateOnly before, string? strategy, string? window, CancellationToken cancellationToken)
     {
         await using var command = dataSource.CreateCommand($"""

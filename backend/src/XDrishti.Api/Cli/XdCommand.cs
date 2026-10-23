@@ -119,6 +119,11 @@ internal static class XdCommand
             return await LearnPhaseCheckCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
         }
 
+        if (args.Count >= 2 && args[0] == "plan" && args[1] == "run")
+        {
+            return await PlanRunCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         var parsed = XdOptions.Parse(args);
         if (parsed.Options is not { } options)
         {

@@ -22,6 +22,22 @@ internal sealed class PlansEndpoints : IEndpointModule
             .WithName("GetPlan")
             .WithSummary("One plan with its tickets (primary, reserve, rejected with reasons and evidence), size per account, the states they may move to and the trail of every state change. Armed means watched, never an order. 404 plans.not_found")
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        api.MapGroup("/plan-runs").WithTags("Plans").MapGet("/", ListRunsAsync)
+            .WithName("ListPlanRuns")
+            .WithSummary("The recorded attempts of the nightly pipeline, newest planned session first: published (with the plan) or failed closed (with the gate and the reason). Optional planned-session date, limit 1 to 200 (default 50). Read only. 422 plans.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    private static async Task<Results<Ok<IReadOnlyList<PlanRunView>>, ProblemHttpResult>> ListRunsAsync(
+        DateOnly? date,
+        int? limit,
+        HttpContext http,
+        IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ListPlanRunsQuery(date, limit ?? 50), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<PlanView>>, ProblemHttpResult>> ListAsync(

@@ -9259,6 +9259,58 @@
           }
         }
       }
+    },
+    "/api/plan-runs": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "summary": "The recorded attempts of the nightly pipeline, newest planned session first: published (with the plan) or failed closed (with the gate and the reason). Optional planned-session date, limit 1 to 200 (default 50). Read only. 422 plans.invalid",
+        "operationId": "ListPlanRuns",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlanRunView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -20648,6 +20700,84 @@
           }
         },
         "description": "One candidate of a plan."
+      },
+      "PlanRunView": {
+        "required": [
+          "id",
+          "attempt",
+          "forDate",
+          "planKey",
+          "outcome",
+          "failedGate",
+          "reason",
+          "planId",
+          "manual",
+          "startedAt",
+          "finishedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row id.",
+            "format": "int64"
+          },
+          "attempt": {
+            "type": "integer",
+            "description": "1 for the first attempt of the planned session.",
+            "format": "int32"
+          },
+          "forDate": {
+            "type": "string",
+            "description": "The session planned for.",
+            "format": "date"
+          },
+          "planKey": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The plan key when a plan was published."
+          },
+          "outcome": {
+            "type": "string",
+            "description": "published or failed_closed."
+          },
+          "failedGate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The gate that blocked, or null."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why, in words."
+          },
+          "planId": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The plan published, or null.",
+            "format": "int64"
+          },
+          "manual": {
+            "type": "boolean",
+            "description": "Whether a person started it."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "Start.",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "description": "End.",
+            "format": "date-time"
+          }
+        },
+        "description": "One recorded attempt."
       },
       "PlanView": {
         "required": [

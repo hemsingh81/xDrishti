@@ -2758,6 +2758,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plan-runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The recorded attempts of the nightly pipeline, newest planned session first: published (with the plan) or failed closed (with the gate and the reason). Optional planned-session date, limit 1 to 200 (default 50). Read only. 422 plans.invalid */
+    get: operations['ListPlanRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6712,6 +6729,49 @@ export interface components {
       evidence: components['schemas']['PlanEvidenceView'];
       /** @description Size per account. */
       allocations: components['schemas']['PlanAllocationView'][];
+    };
+    /** @description One recorded attempt. */
+    PlanRunView: {
+      /**
+       * Format: int64
+       * @description The row id.
+       */
+      id: number;
+      /**
+       * Format: int32
+       * @description 1 for the first attempt of the planned session.
+       */
+      attempt: number;
+      /**
+       * Format: date
+       * @description The session planned for.
+       */
+      forDate: string;
+      /** @description The plan key when a plan was published. */
+      planKey: null | string;
+      /** @description published or failed_closed. */
+      outcome: string;
+      /** @description The gate that blocked, or null. */
+      failedGate: null | string;
+      /** @description Why, in words. */
+      reason: string;
+      /**
+       * Format: int64
+       * @description The plan published, or null.
+       */
+      planId: null | number;
+      /** @description Whether a person started it. */
+      manual: boolean;
+      /**
+       * Format: date-time
+       * @description Start.
+       */
+      startedAt: string;
+      /**
+       * Format: date-time
+       * @description End.
+       */
+      finishedAt: string;
     };
     /** @description A plan as the API shows it (P7-03, ADR 0083): header, current state, the sentences it carries as data, and for one plan the tickets and the trail. */
     PlanView: {
@@ -15258,6 +15318,38 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPlanRuns: {
+    parameters: {
+      query?: {
+        date?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanRunView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

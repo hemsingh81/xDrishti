@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
 using XDrishti.Application.Abstractions.Messaging;
+using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Accounts;
@@ -132,6 +133,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, InstrumentMasterService>();
         services.AddSingleton<IScheduledService, HoldingQuotesService>();
         services.AddSingleton<IScheduledService, PortfolioBrokerHistoryService>();
+        services.AddSingleton<IScheduledService, NightlyService>(); // the fail-closed nightly plan (P7-08); starts paused
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
@@ -486,5 +488,15 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>, MoveTicketHandler>(); // owner decisions and service moves along the ticket table; no path to a broker
         services.AddScoped<ICommandHandler<MovePlanCommand, PlanMoveOutcome>, MovePlanHandler>();
         services.AddScoped<ICommandHandler<ApplyReviewCutoffCommand, PlanMoveOutcome>, ApplyReviewCutoffHandler>(); // unreviewed tickets lapse; never an approval
+        // the fail-closed nightly pipeline (P7-08, ADR 0086): the gates in the order they are read, the builder (the skeleton's null builder until P7-04/P7-09) and the run
+        services.AddScoped<INightlyGate, CalendarGate>();
+        services.AddScoped<INightlyGate, EodGate>();
+        services.AddScoped<INightlyGate, PortfolioSyncGate>();
+        services.AddScoped<INightlyGate, FreshDataGate>();
+        services.AddScoped<INightlyGate, QualityGate>();
+        services.AddScoped<INightlyGate, SelectionInputsGate>();
+        services.AddScoped<IPlanBuilder, NullPlanBuilder>();
+        services.AddScoped<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>, RunNightlyPlanHandler>();
+        services.AddScoped<IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>>, ListPlanRunsHandler>();
     }
 }

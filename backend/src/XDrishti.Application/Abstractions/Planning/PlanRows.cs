@@ -73,8 +73,16 @@ public enum MoveStatus
 
 /// <summary>What a publish did.</summary>
 /// <param name="Id">The plan id (the existing one when the key was already stored).</param>
-/// <param name="Created">False when the same key was already stored; nothing was written.</param>
-public sealed record PlanPublished(long Id, bool Created);
+/// <param name="Created">False when the same key was already stored; the plan was not written again.</param>
+/// <param name="RunRecorded">True when a published run row was written in the same transaction (only <see cref="IPlanStore.PublishWithRunAsync"/>).</param>
+public sealed record PlanPublished(long Id, bool Created, bool RunRecorded = false);
+
+/// <summary>The published run row stored in the same transaction as its plan (spec P7-08); the plan id and planned date come from the plan.</summary>
+/// <param name="Manual">Whether a person started it.</param>
+/// <param name="StartedAt">Start.</param>
+/// <param name="FinishedAt">End.</param>
+/// <param name="Reason">Why, in words (at most 500 characters).</param>
+public sealed record PublishRun(bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt, string Reason);
 
 /// <summary>One attempt of the nightly pipeline (spec P7-03; written by P7-08). Insert-only.</summary>
 /// <param name="ForDate">The session planned for.</param>
@@ -87,3 +95,9 @@ public sealed record PlanPublished(long Id, bool Created);
 /// <param name="StartedAt">Start.</param>
 /// <param name="FinishedAt">End.</param>
 public sealed record NewPlanRun(DateOnly ForDate, string? PlanKey, string Outcome, string? FailedGate, string Reason, long? PlanId, bool Manual, DateTimeOffset StartedAt, DateTimeOffset FinishedAt);
+
+/// <summary>One stored attempt of the nightly pipeline (spec P7-08).</summary>
+/// <param name="Id">The row id.</param>
+/// <param name="Attempt">1 for the first row of the planned session, then 2, 3 (counted by id).</param>
+/// <param name="Run">What was stored.</param>
+public sealed record PlanRunRow(long Id, int Attempt, NewPlanRun Run);

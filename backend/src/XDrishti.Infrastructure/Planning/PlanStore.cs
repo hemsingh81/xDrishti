@@ -29,7 +29,15 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         i.cell_key, i.trades, i.data_range, i.p_win_basis, i.p_win, i.conservative_expectancy_r, i.unavailable, i.advisory_note, {ItemStateSql}
         """;
 
-    public async ValueTask<PlanPublished> PublishAsync(NewPlan plan, CancellationToken cancellationToken)
+    public ValueTask<PlanPublished> PublishAsync(NewPlan plan, CancellationToken cancellationToken) => PublishCoreAsync(plan, null, cancellationToken);
+
+    public ValueTask<PlanPublished> PublishWithRunAsync(NewPlan plan, PublishRun run, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        return PublishCoreAsync(plan, run, cancellationToken);
+    }
+
+    private async ValueTask<PlanPublished> PublishCoreAsync(NewPlan plan, PublishRun? run, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(plan);
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
@@ -41,8 +49,21 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             existing.Parameters.AddWithValue("k", NpgsqlDbType.Varchar, plan.PlanKey);
             if (await existing.ExecuteScalarAsync(cancellationToken) is long known)
             {
-                await transaction.RollbackAsync(cancellationToken);
-                return new PlanPublished(known, false);
+                // A plan with this key is stored. With a run to record: if no published run names it, record it now, in this transaction.
+                var recorded = false;
+                if (run is not null)
+                {
+                    await using var has = new NpgsqlCommand("SELECT 1 FROM trading.plan_runs WHERE plan_id = @p AND outcome = 'published'", connection, transaction);
+                    has.Parameters.AddWithValue("p", NpgsqlDbType.Bigint, known);
+                    if (await has.ExecuteScalarAsync(cancellationToken) is null)
+                    {
+                        await InsertPublishedRunAsync(connection, transaction, plan, known, run, "A plan with this key was already stored; its run is recorded now. " + run.Reason, cancellationToken);
+                        recorded = true;
+                    }
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return new PlanPublished(known, false, recorded);
             }
         }
 
@@ -83,8 +104,30 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
             await published.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        if (run is not null)
+        {
+            await InsertPublishedRunAsync(connection, transaction, plan, planId, run, run.Reason, cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
-        return new PlanPublished(planId, true);
+        return new PlanPublished(planId, true, run is not null);
+    }
+
+    private static async Task InsertPublishedRunAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, NewPlan plan, long planId, PublishRun run, string reason, CancellationToken cancellationToken)
+    {
+        await using var insert = new NpgsqlCommand("""
+            INSERT INTO trading.plan_runs (for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, started_at, finished_at)
+            VALUES (@date, @key, 'published', NULL, @reason, @plan, @manual, @start, @end)
+            """, connection, transaction);
+        var p = insert.Parameters;
+        p.AddWithValue("date", NpgsqlDbType.Date, plan.ForDate);
+        p.AddWithValue("key", NpgsqlDbType.Varchar, plan.PlanKey);
+        p.AddWithValue("reason", NpgsqlDbType.Varchar, reason.Length <= 500 ? reason : reason[..499] + "~");
+        p.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
+        p.AddWithValue("manual", NpgsqlDbType.Boolean, run.Manual);
+        p.AddWithValue("start", NpgsqlDbType.TimestampTz, run.StartedAt);
+        p.AddWithValue("end", NpgsqlDbType.TimestampTz, run.FinishedAt);
+        await insert.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async ValueTask<PlanRow?> FindAsync(long planId, CancellationToken cancellationToken)
@@ -297,6 +340,29 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         p.AddWithValue("start", NpgsqlDbType.TimestampTz, run.StartedAt);
         p.AddWithValue("end", NpgsqlDbType.TimestampTz, run.FinishedAt);
         await insert.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    // Shortcut: the attempt number is row_number() over all rows of the date, computed over the whole table before the filter (one row per night, so small); filter inside the subquery if the table ever grows large.
+    public async ValueTask<IReadOnlyList<PlanRunRow>> ListRunsAsync(DateOnly? forDate, int limit, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("""
+            SELECT id, attempt, for_date, plan_key, outcome, failed_gate, reason, plan_id, manual, started_at, finished_at FROM (
+                SELECT r.*, row_number() OVER (PARTITION BY for_date ORDER BY id) AS attempt FROM trading.plan_runs r
+            ) x WHERE (@date::date IS NULL OR for_date = @date) ORDER BY for_date DESC, id DESC LIMIT @limit
+            """);
+        select.Parameters.Add(new NpgsqlParameter("date", NpgsqlDbType.Date) { Value = forDate is { } d ? d : DBNull.Value });
+        select.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
+        var rows = new List<PlanRunRow>();
+        await using var r = await select.ExecuteReaderAsync(cancellationToken);
+        while (await r.ReadAsync(cancellationToken))
+        {
+            rows.Add(new PlanRunRow(
+                r.GetInt64(0),
+                (int)r.GetInt64(1),
+                new NewPlanRun(r.GetFieldValue<DateOnly>(2), Text(r, 3), r.GetString(4), Text(r, 5), r.GetString(6), Whole(r, 7), r.GetBoolean(8), r.GetFieldValue<DateTimeOffset>(9), r.GetFieldValue<DateTimeOffset>(10))));
+        }
+
+        return rows;
     }
 
     // The lock keys are 32-bit hashtext values: two different keys can collide and then wait for each other, which is harmless (only slower); the continuity indexes and checks of the migration do not rely on the lock.

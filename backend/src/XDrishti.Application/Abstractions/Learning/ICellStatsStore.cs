@@ -14,6 +14,9 @@ public interface ICellStatsStore
     /// <summary>Like <see cref="ListLatestAsync"/> but of the newest snapshot whose as-of date is before <paramref name="before"/>: what was known then. Empty when there is none.</summary>
     ValueTask<IReadOnlyList<StoredCellStats>> ListLatestBeforeAsync(DateOnly before, string? strategy, string? window, CancellationToken cancellationToken);
 
+    /// <summary>The newest as-of date of any stored snapshot, or null when there is none (one aggregate read, no rows).</summary>
+    ValueTask<DateOnly?> NewestAsOfAsync(CancellationToken cancellationToken);
+
     /// <summary>The rows (one per window) of one cell in the newest snapshot that holds it; empty when no snapshot holds it.</summary>
     ValueTask<IReadOnlyList<StoredCellStats>> FindLatestAsync(string cellKey, CancellationToken cancellationToken);
 }
