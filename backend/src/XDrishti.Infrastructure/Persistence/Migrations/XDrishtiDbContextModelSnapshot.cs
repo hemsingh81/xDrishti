@@ -4753,6 +4753,104 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.GradeRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("basis");
+
+                    b.Property<string>("CostBasis")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("cost_basis");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("detail");
+
+                    b.Property<double?>("EntryPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("entry_price");
+
+                    b.Property<double?>("ExitPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("exit_price");
+
+                    b.Property<string>("ExitReason")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("exit_reason");
+
+                    b.Property<DateOnly>("ForDate")
+                        .HasColumnType("date")
+                        .HasColumnName("for_date");
+
+                    b.Property<DateTimeOffset>("GradedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("graded_at");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<double?>("MaeR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mae_r");
+
+                    b.Property<double?>("MfeR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("mfe_r");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<double?>("R")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r");
+
+                    b.Property<string>("RunKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("run_key");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grades");
+
+                    b.HasIndex("ItemId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_grades_item_id");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_grades_plan_id");
+
+                    b.HasIndex("ForDate", "PlanId")
+                        .HasDatabaseName("ix_grades_for_date_plan_id");
+
+                    b.ToTable("grades", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_grades_status", "status IN ('graded', 'not_triggered', 'not_gradable') AND basis = 'simulated on plan prices' AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (exit_reason IS NOT NULL)) AND length(detail) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanEventRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -6987,6 +7085,23 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_approvals_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.GradeRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_grades_plan_items_item_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_grades_plans_plan_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanEventRecord", b =>

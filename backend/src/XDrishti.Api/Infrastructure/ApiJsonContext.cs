@@ -39,6 +39,7 @@ using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
+using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
 
 namespace XDrishti.Api.Infrastructure;
@@ -77,6 +78,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(PlanView))]
 [JsonSerializable(typeof(IReadOnlyList<PlanView>))]
 [JsonSerializable(typeof(PlanRunView))]
+[JsonSerializable(typeof(PlanGradeView))]
+[JsonSerializable(typeof(GradeReportData))]
 [JsonSerializable(typeof(IReadOnlyList<PlanRunView>))]
 [JsonSerializable(typeof(ChangelogEntryView))]
 [JsonSerializable(typeof(IReadOnlyList<ChangelogEntryView>))]

@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals"]);
+        names.ShouldBe(["trading.grades", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -78,6 +78,9 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "TRUNCATE trading.plan_events",
             "UPDATE trading.plan_runs SET reason = 'x' WHERE false",
             "DELETE FROM trading.plan_runs WHERE false",
+            "UPDATE trading.grades SET r = 1 WHERE false",
+            "DELETE FROM trading.grades WHERE false",
+            "TRUNCATE trading.grades",
             "UPDATE workflow.approvals SET decision = 'approve' WHERE false",
             "DELETE FROM workflow.approvals WHERE false",
             "TRUNCATE workflow.approvals",

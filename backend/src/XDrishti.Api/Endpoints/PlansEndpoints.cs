@@ -3,6 +3,7 @@ using XDrishti.Api.Auth;
 using XDrishti.Application.Abstractions.Messaging;
 using XDrishti.Application.Planning;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Planning;
 
 namespace XDrishti.Api.Endpoints;
 
@@ -22,6 +23,16 @@ internal sealed class PlansEndpoints : IEndpointModule
             .WithName("GetPlan")
             .WithSummary("One plan with its tickets (primary, reserve, rejected with reasons and evidence), size per account, the states they may move to and the trail of every state change. Armed means watched, never an order. 404 plans.not_found")
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        group.MapGet("/{id:long}/grade", GradeAsync)
+            .WithName("GetPlanGrade")
+            .WithSummary("The grade of every ticket of a plan (primary, reserve, rejected), each walked through the stored bars of its session and labelled 'simulated on plan prices', with the day's top-1/3/5/all curves and decision groups. A ticket without a stored grade is pending. Read only. 404 plans.not_found")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        api.MapGroup("/reports").WithTags("Plans").MapGet("/decisions", DecisionsAsync)
+            .WithName("GetDecisionsReport")
+            .WithSummary("Top-1/3/5/all curves by rank, primary versus reserve versus rejected, and the owner's decisions (approved, modified, rejected, lapsed, undecided) over the graded plans of an optional date range, with sample-size notes. Labelled 'simulated on plan prices'. Read only. 422 plans.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
         api.MapGroup("/plan-runs").WithTags("Plans").MapGet("/", ListRunsAsync)
             .WithName("ListPlanRuns")
@@ -59,6 +70,27 @@ internal sealed class PlansEndpoints : IEndpointModule
         CancellationToken cancellationToken)
     {
         var result = await handler.HandleAsync(new GetPlanQuery(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<PlanGradeView>, ProblemHttpResult>> GradeAsync(
+        long id,
+        HttpContext http,
+        IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetPlanGradeQuery(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<GradeReportData>, ProblemHttpResult>> DecisionsAsync(
+        DateOnly? from,
+        DateOnly? to,
+        HttpContext http,
+        IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetDecisionsReportQuery(from, to), cancellationToken);
         return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 

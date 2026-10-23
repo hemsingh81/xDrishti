@@ -2758,6 +2758,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans/{id}/grade': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The grade of every ticket of a plan (primary, reserve, rejected), each walked through the stored bars of its session and labelled 'simulated on plan prices', with the day's top-1/3/5/all curves and decision groups. A ticket without a stored grade is pending. Read only. 404 plans.not_found */
+    get: operations['GetPlanGrade'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/decisions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Top-1/3/5/all curves by rank, primary versus reserve versus rejected, and the owner's decisions (approved, modified, rejected, lapsed, undecided) over the graded plans of an optional date range, with sample-size notes. Labelled 'simulated on plan prices'. Read only. 422 plans.invalid */
+    get: operations['GetDecisionsReport'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plan-runs': {
     parameters: {
       query?: never;
@@ -4258,6 +4292,39 @@ export interface components {
       /** Format: int64 */
       comparedRows: number;
     };
+    /** @description One plan-day of a top-K curve (P7-13). */
+    CurvePoint: {
+      /**
+       * Format: int64
+       * @description The plan.
+       */
+      planId: number;
+      /**
+       * Format: date
+       * @description The planned session.
+       */
+      date: string;
+      /**
+       * Format: int32
+       * @description Tickets in the top K that day.
+       */
+      tickets: number;
+      /**
+       * Format: int32
+       * @description Of them graded.
+       */
+      triggered: number;
+      /**
+       * Format: double
+       * @description Sum of R of the day.
+       */
+      dayR: number;
+      /**
+       * Format: double
+       * @description Running sum up to and including the day.
+       */
+      cumulativeR: number;
+    };
     /** @description The primary Data account. `status`: connected · expired · notConnected. */
     DataAccountView: {
       /** Format: uuid */
@@ -5227,6 +5294,95 @@ export interface components {
       actual: null | number;
       passed: boolean;
       reason: string;
+    };
+    /** @description The top-K curve by rank: its points day by day and its totals. */
+    GradeCurve: {
+      /** @description top-1, top-3, top-5 or top-all. */
+      name: string;
+      /** @description One per plan-day, by date then plan. */
+      points: components['schemas']['CurvePoint'][];
+      /** @description The figures over all days. */
+      totals: components['schemas']['GradeStats'];
+    };
+    /** @description The numbers of doc 10 section 8 over a set of graded tickets (P7-13, ADR 0090). */
+    GradeReportData: {
+      /** @description Always string TicketGrade.Basis. */
+      basis: string;
+      /**
+       * Format: int32
+       * @description Plan-days covered.
+       */
+      plans: number;
+      /** @description Top-1, top-3, top-5 and top-all by rank over primary and reserve tickets. */
+      curves: components['schemas']['GradeCurve'][];
+      /** @description Primary, reserve and rejected. */
+      groups: components['schemas']['GradeStats'][];
+      /** @description Approved, modified, rejected, lapsed and undecided (primary and reserve tickets only). */
+      decisions: components['schemas']['GradeStats'][];
+      /** @description Did the reserve, the rejection and the owner's refusals help. */
+      comparisons: components['schemas']['GroupComparison'][];
+      /** @description General notes, the honest limits. */
+      notes: string[];
+    };
+    /** @description The figures of a set of graded tickets (P7-13). R is summed over the graded (triggered) tickets only; the others add nothing and are counted. */
+    GradeStats: {
+      /** @description What the set is (`top-3`, `primary`, `approved` ...). */
+      name: string;
+      /**
+       * Format: int32
+       * @description All tickets in the set.
+       */
+      tickets: number;
+      /**
+       * Format: int32
+       * @description Graded tickets (with an R).
+       */
+      triggered: number;
+      /**
+       * Format: int32
+       * @description Tickets with no simulated trade.
+       */
+      notTriggered: number;
+      /**
+       * Format: int32
+       * @description Tickets that cannot be replayed.
+       */
+      notGradable: number;
+      /**
+       * Format: double
+       * @description Sum of R.
+       */
+      totalR: number;
+      /**
+       * Format: double
+       * @description Mean R per triggered ticket; null with none.
+       */
+      meanR: null | number;
+      /**
+       * Format: double
+       * @description Share of triggered tickets with R above zero; null with none.
+       */
+      winRate: null | number;
+      /** @description The honest note on the sample size; null when the sample reaches int GradeReport.IndicativeBelow. */
+      note: null | string;
+    };
+    /** @description Two sets compared by mean R per triggered ticket (P7-13): what the second would have added or avoided. */
+    GroupComparison: {
+      /** @description The question in words. */
+      question: string;
+      /** @description The first set. */
+      left: string;
+      /** @description The second set. */
+      right: string;
+      /**
+       * Format: double
+       * @description Mean R of the first minus mean R of the second; null when either has no triggered ticket.
+       */
+      meanDifference: null | number;
+      /** @description first_better, second_better, equal or not_enough_data. Never a claim of significance. */
+      verdict: string;
+      /** @description The sample-size note. */
+      note: string;
     };
     /** @description The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value. */
     GroupPart: {
@@ -6689,6 +6845,30 @@ export interface components {
       /** @description A model's figure, labelled advisory, or null. */
       advisoryNote: null | string;
     };
+    /** @description The grades of one plan (P7-13). */
+    PlanGradeView: {
+      /**
+       * Format: int64
+       * @description The plan.
+       */
+      planId: number;
+      /**
+       * Format: date
+       * @description The planned session.
+       */
+      forDate: string;
+      /** @description Always `simulated on plan prices`. */
+      basis: string;
+      /** @description Every ticket of the plan. */
+      tickets: components['schemas']['TicketGradeView'][];
+      /**
+       * Format: int32
+       * @description Tickets without a stored grade.
+       */
+      pending: number;
+      /** @description The curves and groups of this plan. */
+      report: components['schemas']['GradeReportData'];
+    };
     /** @description One candidate of a plan. */
     PlanItemView: {
       /**
@@ -8114,6 +8294,52 @@ export interface components {
       isHealthy: boolean;
       /** Format: date-time */
       checkedAt: string;
+    };
+    /** @description One ticket with its grade as the API shows it. */
+    TicketGradeView: {
+      /**
+       * Format: int64
+       * @description The ticket.
+       */
+      itemId: number;
+      /**
+       * Format: int32
+       * @description Rank within the plan.
+       */
+      rank: number;
+      /** @description primary, reserve or rejected. */
+      group: string;
+      /** @description The instrument. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /** @description The newest ticket state. */
+      state: string;
+      /** @description approved, modified, rejected, lapsed or undecided; empty for a rejected candidate. */
+      decision: string;
+      /** @description graded, not_triggered, not_gradable or pending (no grade stored yet). */
+      status: string;
+      /**
+       * Format: double
+       * @description Result in R.
+       */
+      r: null | number;
+      /**
+       * Format: double
+       * @description Adverse excursion in R.
+       */
+      maeR: null | number;
+      /**
+       * Format: double
+       * @description Favourable excursion in R.
+       */
+      mfeR: null | number;
+      /** @description Why the simulated trade ended. */
+      exitReason: null | string;
+      /** @description What R is net of. */
+      costBasis: null | string;
+      /** @description Why, in words. */
+      detail: null | string;
     };
     /** @description The aggregates of one timeframe compared with the recomputed ones: `compared` buckets (stored or recomputed), `differences` among them. */
     TimeframeCheck: {
@@ -15318,6 +15544,69 @@ export interface operations {
       };
       /** @description Not Found */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanGrade: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanGradeView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetDecisionsReport: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GradeReportData'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
         headers: {
           [name: string]: unknown;
         };

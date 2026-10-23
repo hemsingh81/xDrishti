@@ -181,6 +181,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<PlanRunRecord> PlanRuns => Set<PlanRunRecord>();
 
+    internal DbSet<GradeRecord> Grades => Set<GradeRecord>();
+
     /// <summary>The verdicts of full tests (spec P5-04).</summary>
     internal DbSet<LabResultRow> LabResults => Set<LabResultRow>();
 

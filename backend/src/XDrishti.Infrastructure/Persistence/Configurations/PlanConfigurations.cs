@@ -156,3 +156,27 @@ internal sealed class PlanRunRecordConfiguration : IEntityTypeConfiguration<Plan
         builder.HasIndex(x => x.ForDate).IsUnique().HasFilter("outcome = 'published'").HasDatabaseName("uq_plan_runs_published_for_date"); // a planned session has at most one published run (P7-08)
     }
 }
+
+/// <summary><c>trading.grades</c> (spec P7-13, ADR 0090): the grade of one ticket, one per ticket, insert-only for the runtime role.</summary>
+internal sealed class GradeRecordConfiguration : IEntityTypeConfiguration<GradeRecord>
+{
+    public void Configure(EntityTypeBuilder<GradeRecord> builder)
+    {
+        builder.ToTable("grades", Schemas.Trading, t =>
+        {
+            t.HasCheckConstraint("ck_grades_status", "status IN ('graded', 'not_triggered', 'not_gradable') AND basis = 'simulated on plan prices' AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (exit_reason IS NOT NULL)) AND length(detail) > 0");
+        });
+        builder.HasKey(x => x.Id).HasName("pk_grades");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.Status).HasMaxLength(16).IsRequired();
+        builder.Property(x => x.ExitReason).HasMaxLength(32);
+        builder.Property(x => x.CostBasis).HasMaxLength(120).IsRequired();
+        builder.Property(x => x.Detail).HasMaxLength(500).IsRequired();
+        builder.Property(x => x.Basis).HasMaxLength(40).IsRequired();
+        builder.Property(x => x.RunKey).HasMaxLength(64);
+        builder.HasIndex(x => x.ItemId).IsUnique().HasDatabaseName("uq_grades_item_id"); // one grade per ticket; the second insert is skipped
+        builder.HasIndex(x => new { x.ForDate, x.PlanId }).HasDatabaseName("ix_grades_for_date_plan_id");
+        builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_grades_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<PlanItemRecord>().WithMany().HasForeignKey(x => x.ItemId).HasConstraintName("fk_grades_plan_items_item_id").OnDelete(DeleteBehavior.Restrict);
+    }
+}
