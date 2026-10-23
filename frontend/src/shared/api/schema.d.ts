@@ -2809,6 +2809,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/autonomy/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The autonomy settings in force (automatic approval and reserve promotion, both OFF = manual approval by default) with the history of changes. No order is placed in any setting */
+    get: operations['GetAutonomySettings'];
+    /** Change the autonomy settings as the owner; appends an audited row. Needs a session, the CSRF token and the password in the body, checked on EVERY change (an earlier step-up window does not count and is not used up). 401 auth.invalid_credentials, 423 auth.locked, 403 autonomy.owner_only, 400 autonomy.values_invalid or autonomy.reason_invalid, 409 autonomy.stale */
+    put: operations['ChangeAutonomySettings'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3204,6 +3222,67 @@ export interface components {
       timeIst: string;
       /** Format: date-time */
       nextRunAt: null | string;
+    };
+    /** @description One change in the history. */
+    AutonomyChangeView: {
+      /**
+       * Format: int64
+       * @description The row.
+       */
+      id: number;
+      /** @description The hash. */
+      hash: string;
+      /** @description The value after. */
+      autoApproveTickets: boolean;
+      /** @description The value after. */
+      promoteFromReserve: boolean;
+      /**
+       * Format: double
+       * @description The threshold after.
+       */
+      minPWin: number;
+      /**
+       * Format: int32
+       * @description The cap after.
+       */
+      maxAutoPerDay: number;
+      /** @description Who. */
+      actor: string;
+      /** @description Why. */
+      reason: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      changedAt: string;
+    };
+    /** @description The settings in force, with the history newest first. */
+    AutonomySettingsView: {
+      /**
+       * Format: int64
+       * @description The row in force; null while nothing was ever stored (defaults, all OFF).
+       */
+      id: null | number;
+      /** @description Its hash. */
+      hash: null | string;
+      /** @description `autonomy.auto_approve_tickets`. */
+      autoApproveTickets: boolean;
+      /** @description `autonomy.promote_from_reserve`. */
+      promoteFromReserve: boolean;
+      /**
+       * Format: double
+       * @description The threshold.
+       */
+      minPWin: number;
+      /**
+       * Format: int32
+       * @description The daily cap.
+       */
+      maxAutoPerDay: number;
+      /** @description No order is placed in any setting. */
+      notice: string;
+      /** @description The changes, newest first (the latest 50). */
+      history: components['schemas']['AutonomyChangeView'][];
     };
     /** @description A bar that broke a row rule: its start and what is wrong with it. */
     BadBar: {
@@ -3846,6 +3925,27 @@ export interface components {
       oosMeanR: null | number;
       /** Format: double */
       defaultOosMeanR: null | number;
+    };
+    /** @description The body of the autonomy change. The owner is never part of it: the actor comes from the signed-in session. */
+    ChangeAutonomyRequest: {
+      /** @description The new value of `autonomy.auto_approve_tickets`: ON means tickets the rule allows need no manual approval, OFF means manual approval. */
+      autoApproveTickets: boolean;
+      /** @description The new value of `autonomy.promote_from_reserve`. */
+      promoteFromReserve: boolean;
+      /**
+       * Format: double
+       * @description The least lower-bound P(win), 0.5 to 0.99 (design default 0.58).
+       */
+      minPWin: number;
+      /**
+       * Format: int32
+       * @description The most automatic approvals per planned session, 1 to 20.
+       */
+      maxAutoPerDay: number;
+      /** @description Why, 1 to 500 characters. */
+      reason: string;
+      /** @description The owner's password, re-entered for THIS change. It is checked on every request (a step-up window opened earlier does not count and is not used up or extended); wrong ones count toward the sign-in lockout. */
+      password: null | string;
     };
     /** @description Body of `POST /api/auth/change-password`. */
     ChangePasswordRequest: {
@@ -15639,6 +15739,68 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetAutonomySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutonomySettingsView'];
+        };
+      };
+    };
+  };
+  ChangeAutonomySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangeAutonomyRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AutonomySettingsView'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
         headers: {
           [name: string]: unknown;
         };

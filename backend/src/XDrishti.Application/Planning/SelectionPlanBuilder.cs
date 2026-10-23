@@ -94,7 +94,8 @@ internal sealed class SelectionPlanBuilder(ITicketSource source, ILogger<Selecti
             stats?.WinRatePosterior,
             expectancy,
             unavailable,
-            advisory is { } p ? string.Create(CultureInfo.InvariantCulture, $"model P(win) {p:0.###}, advisory only") : null);
+            advisory is { } p ? string.Create(CultureInfo.InvariantCulture, $"model P(win) {p:0.###}, advisory only") : null,
+            stats?.WinRateLower);
         return new NewPlanItem(
             rank, group, draft.Symbol, draft.Side, draft.StrategyId, draft.StrategyVersionHash,
             Clamp(draft.TriggerText, 500), Clamp(draft.StopText, 500), Clamp(draft.TargetText, 500), Clamp(draft.ValidityText, 200), reasons, evidence, []);

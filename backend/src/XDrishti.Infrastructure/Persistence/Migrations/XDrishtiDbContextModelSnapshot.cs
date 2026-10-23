@@ -4730,11 +4730,25 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("plan_id");
 
+                    b.Property<string>("PolicyVersion")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("policy_version");
+
                     b.Property<string>("Reason")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
+
+                    b.Property<string>("SettingsHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("settings_hash");
+
+                    b.Property<long?>("SettingsId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settings_id");
 
                     b.HasKey("Id")
                         .HasName("pk_approvals");
@@ -4747,9 +4761,70 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
 
                     b.ToTable("approvals", "workflow", t =>
                         {
-                            t.HasCheckConstraint("ck_approvals_kind", "kind = 'owner'");
+                            t.HasCheckConstraint("ck_approvals_kind", "kind IN ('owner', 'auto')");
 
-                            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND actor LIKE 'owner:%' AND length(btrim(reason)) > 0 AND (decision = 'reject' OR decided_at < cutoff)");
+                            t.HasCheckConstraint("ck_approvals_shape", "decision IN ('approve', 'modify', 'reject') AND (decision = 'modify') = (modifications IS NOT NULL) AND (confirm_reason IS NULL OR decision = 'approve') AND length(btrim(reason)) > 0 AND (decision = 'reject' OR decided_at < cutoff) AND ((kind = 'owner' AND actor LIKE 'owner:%' AND settings_id IS NULL AND settings_hash IS NULL AND policy_version IS NULL) OR (kind = 'auto' AND actor = 'rule:autonomy' AND decision = 'approve' AND modifications IS NULL AND confirm_reason IS NULL AND settings_id IS NOT NULL AND settings_hash IS NOT NULL AND policy_version IS NOT NULL AND item_id IS NOT NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.AutonomySettingRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<bool>("AutoApproveTickets")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_approve_tickets");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("changed_at");
+
+                    b.Property<int>("MaxAutoPerDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_auto_per_day");
+
+                    b.Property<decimal>("MinPWin")
+                        .HasPrecision(4, 3)
+                        .HasColumnType("numeric(4,3)")
+                        .HasColumnName("min_p_win");
+
+                    b.Property<bool>("PromoteFromReserve")
+                        .HasColumnType("boolean")
+                        .HasColumnName("promote_from_reserve");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("SnapshotHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("snapshot_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_autonomy_settings");
+
+                    b.HasIndex("Id", "SnapshotHash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_autonomy_settings_id_hash");
+
+                    b.ToTable("autonomy_settings", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_autonomy_settings_shape", "min_p_win >= 0.5 AND min_p_win <= 0.99 AND max_auto_per_day >= 1 AND max_auto_per_day <= 20 AND actor LIKE 'owner:%' AND length(btrim(actor)) > 6 AND length(btrim(reason)) > 0");
                         });
                 });
 
@@ -5031,6 +5106,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("p_win_basis");
 
+                    b.Property<double?>("PWinLower")
+                        .HasColumnType("double precision")
+                        .HasColumnName("p_win_lower");
+
                     b.Property<long>("PlanId")
                         .HasColumnType("bigint")
                         .HasColumnName("plan_id");
@@ -5107,6 +5186,8 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("plan_items", "trading", t =>
                         {
                             t.HasCheckConstraint("ck_plan_items_group", "item_group IN ('primary', 'reserve', 'rejected') AND (item_group = 'primary' OR cardinality(reasons) > 0)");
+
+                            t.HasCheckConstraint("ck_plan_items_p_win_lower", "p_win_lower IS NULL OR (p_win_lower >= 0 AND p_win_lower <= 1)");
 
                             t.HasCheckConstraint("ck_plan_items_shape", "item_rank >= 1 AND side IN ('BUY', 'SELL') AND trades >= 0 AND (p_win IS NULL OR (p_win >= 0 AND p_win <= 1))");
                         });

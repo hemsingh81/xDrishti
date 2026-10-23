@@ -247,6 +247,8 @@ one-click **Revert**, and password re-entry to raise the autonomy level. Auto-ap
 plan and in the audit log; the Decisions report compares them with your manual decisions so the threshold can
 itself be tuned from evidence.
 
+> **As built in P7-12 ([ADR 0091](../adr/0091-auto-approval-is-an-option-behind-an-owner-setting-default-off-a-new-approval-kind-the-database-checks.md)):** auto-approval is an owner setting (`autonomy.auto_approve_tickets`, default **OFF** = manual approval; changing it is the owner's act with password re-entry), not a level that is on by default. The rule uses the lower bound of the shrunk cell win rate (default 0.58), needs every pre-trade check to pass (an unavailable check never does), covers only primary tickets (never a reserve), is capped per day, and is recorded as an `auto` approval by `rule:autonomy` with the settings snapshot. No setting lets anything place an order, and no learning change is applied automatically yet.
+
 ## 14. Smart rules: from learned signals to a safer plan
 
 Five learned rules sit between the scanner's candidates and tomorrow's plan, plus two feedback features. All run

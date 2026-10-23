@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using XDrishti.Application.Abstractions.Autonomy;
 using XDrishti.Application.Abstractions.Lab;
 using XDrishti.Application.Abstractions.Live;
 using XDrishti.Application.Abstractions.Market.Calendar;
@@ -12,6 +13,7 @@ using XDrishti.Application.Accounts.Buckets;
 using XDrishti.Application.Accounts.Connections;
 using XDrishti.Application.Accounts.RiskProfiles;
 using XDrishti.Application.Auth;
+using XDrishti.Application.Autonomy;
 using XDrishti.Application.Lab;
 using XDrishti.Application.Learning;
 using XDrishti.Application.Live;
@@ -489,6 +491,11 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>, MoveTicketHandler>(); // owner decisions and service moves along the ticket table; no path to a broker
         services.AddScoped<ICommandHandler<MovePlanCommand, PlanMoveOutcome>, MovePlanHandler>();
         services.AddScoped<ICommandHandler<ApplyReviewCutoffCommand, PlanMoveOutcome>, ApplyReviewCutoffHandler>(); // unreviewed tickets lapse; never an approval
+        // autonomy (P7-12, ADR 0091): the settings are the owner's act; the auto-approval pass does nothing while the switch is OFF (the default); no order exists in any setting
+        services.AddScoped<IQueryHandler<GetAutonomySettingsQuery, AutonomySettingsView>, GetAutonomySettingsHandler>();
+        services.AddScoped<ICommandHandler<ChangeAutonomySettingsCommand, AutonomySettingsView>, ChangeAutonomySettingsHandler>();
+        services.AddScoped<ICommandHandler<AutoApprovePlanCommand, AutoApprovalOutcome>, AutoApprovePlanHandler>();
+        services.AddScoped<IChecklistSource, NullChecklistSource>(); // no checklist inputs wired yet (P7-10): nothing is ever auto-approved on a missing checklist
         // the fail-closed nightly pipeline (P7-08, ADR 0086): the gates in the order they are read, the builder (the skeleton's null builder until P7-04/P7-09) and the run
         services.AddScoped<INightlyGate, CalendarGate>();
         services.AddScoped<INightlyGate, EodGate>();

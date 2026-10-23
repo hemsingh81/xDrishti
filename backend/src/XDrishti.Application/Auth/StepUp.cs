@@ -7,7 +7,11 @@ using XDrishti.Domain.Common;
 namespace XDrishti.Application.Auth;
 
 /// <summary>Re-enter the password to allow sensitive actions for <see cref="AuthSession.ElevationDuration"/>.</summary>
-public sealed record StepUpCommand(Guid SessionId, string? Password, ClientInfo Client) : ICommand;
+/// <param name="SessionId">The session.</param>
+/// <param name="Password">The password re-entered.</param>
+/// <param name="Client">Where from.</param>
+/// <param name="Elevate">False only for a one-off confirmation of the password for a single act (P7-12 autonomy settings): the same lockout counters and audit, but the session's elevation window is neither opened nor extended.</param>
+public sealed record StepUpCommand(Guid SessionId, string? Password, ClientInfo Client, bool Elevate = true) : ICommand;
 
 /// <param name="ElevatedUntil">End of the window in which sensitive actions are allowed.</param>
 public sealed record StepUpResult(DateTimeOffset ElevatedUntil);
@@ -61,7 +65,7 @@ internal sealed class StepUpHandler(
             }
 
             var outcome = correct
-                ? await TryAcceptAsync(found, now, command.Client, cancellationToken)
+                ? await TryAcceptAsync(found, now, command.Client, command.Elevate, cancellationToken)
                 : await TryRejectAsync(found.Owner, now, command.Client, cancellationToken);
             if (outcome is not null)
             {
@@ -74,10 +78,10 @@ internal sealed class StepUpHandler(
     }
 
     /// <summary>Returns null when the save lost against a concurrent change (nothing was saved).</summary>
-    private async ValueTask<Result<StepUpResult>?> TryAcceptAsync(SessionWithOwner found, DateTimeOffset now, ClientInfo client, CancellationToken cancellationToken)
+    private async ValueTask<Result<StepUpResult>?> TryAcceptAsync(SessionWithOwner found, DateTimeOffset now, ClientInfo client, bool elevate, CancellationToken cancellationToken)
     {
         found.Owner.RegisterSuccess();
-        var until = found.Session.Elevate(now);
+        var until = elevate ? found.Session.Elevate(now) : found.Session.ElevatedUntil ?? now;
         audit.Record(AuditEvent.Record(AuditEventType.StepUpSucceeded, now, found.Owner.Email, client.Ip, client.UserAgent));
         if (!await unitOfWork.TrySaveChangesAsync(cancellationToken))
         {
