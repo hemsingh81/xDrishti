@@ -28,6 +28,7 @@ internal static class PlanAllocateCommand
             await console.Out.WriteLineAsync(SimulateOptions.Show($"  {d.AccountId} {d.Quantity,8} {d.Code}: {d.Message}"));
         }
 
+        await console.Out.WriteLineAsync("note: " + AllocationResult.Caveat);
         return XdCommand.Done;
     }
 }

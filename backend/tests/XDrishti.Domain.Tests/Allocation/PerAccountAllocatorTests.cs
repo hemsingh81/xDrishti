@@ -88,7 +88,7 @@ public sealed class PerAccountAllocatorTests
     }
 
     [Fact]
-    public void Leftover_lots_go_to_the_largest_remainder_then_the_lowest_id()
+    public void Leftover_lots_go_to_the_largest_unused_capacity_then_the_lowest_account_id()
     {
         // capacities 10 and 10 shares (funds 1000 at 100), pool 5 lots of 1: 2 and 2 by proportion, one left to the lower id
         var r = PerAccountAllocator.Allocate(Ticket(qty: 5), [Account(2, funds: 1000), Account(1, funds: 1000)]);
@@ -297,5 +297,50 @@ public sealed class PerAccountAllocatorTests
     public void No_accounts_gives_an_empty_result()
     {
         PerAccountAllocator.Allocate(Ticket(), []).Decisions.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void A_mode_value_outside_the_enum_is_excluded_not_allocated()
+    {
+        var r = PerAccountAllocator.Allocate(Ticket(), [Account(1, (TradingMode)99), Account(2)]);
+
+        For(r, 1).Quantity.ShouldBe(0);
+        For(r, 1).Code.ShouldBe(AllocationCodes.NotPaper);
+        r.Allocated.ShouldAllBe(d => d.Mode == TradingMode.Paper);
+    }
+
+    [Theory]
+    [InlineData(int.MaxValue, 1)]
+    [InlineData(int.MaxValue, 3)]
+    [InlineData(int.MaxValue, 75)]
+    [InlineData(int.MaxValue - 1, 2)]
+    public void A_huge_quantity_and_capacity_never_overflows_and_the_sum_stays_within_the_ticket(int qty, int lot)
+    {
+        var accounts = new[] { Account(1, equity: 1e18, risk: 2, capital: 100, total: 100, open: 0, funds: 1e18), Account(2, equity: 1e18, risk: 2, capital: 100, total: 100, open: 0, funds: 1e18) };
+
+        var r = PerAccountAllocator.Allocate(Ticket(qty: qty, lot: lot), accounts);
+
+        r.TotalAllocated.ShouldBeLessThanOrEqualTo(qty);
+        r.TotalAllocated.ShouldBeGreaterThan(0);
+        r.Decisions.ShouldAllBe(d => d.Quantity % lot == 0 && d.Quantity >= 0);
+    }
+
+    [Fact]
+    public void A_tiny_stop_distance_gives_a_clamped_finite_result()
+    {
+        var r = PerAccountAllocator.Allocate(Ticket(entry: 100, stop: 100 - 1e-12, qty: 1000), [Account(1, equity: 1e18, risk: 2, capital: 100, total: 100, open: 0, funds: 1e18)]);
+
+        var d = For(r, 1);
+        d.Quantity.ShouldBe(1000);
+        double.IsFinite(d.RiskPct).ShouldBeTrue();
+        d.Capacity.ShouldNotBeNull();
+        d.Capacity.Value.ShouldBeGreaterThanOrEqualTo(1000);
+    }
+
+    [Fact]
+    public void The_result_carries_the_caveat_text()
+    {
+        AllocationResult.Caveat.ShouldContain("no cross-account caps");
+        AllocationResult.Caveat.ShouldContain("funds not margin-aware for SELL");
     }
 }

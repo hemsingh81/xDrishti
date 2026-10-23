@@ -4,7 +4,7 @@ using XDrishti.Domain.Allocation;
 
 namespace XDrishti.Application.Planning;
 
-/// <summary>Maps an allocation to the rows of <c>trading.plan_item_allocations</c> (spec P7-07). Only paper rows with a quantity above 0 are produced; the database check repeats that.</summary>
+/// <summary>Maps an allocation to the rows of <c>trading.plan_item_allocations</c> (spec P7-07). Only paper rows with a quantity above 0 are produced; the database check repeats that. Caveat: see <see cref="AllocationResult.Caveat"/> (pool split by each account's own limits only; no cross-account caps, replicate/distribute or liquidity cap; funds not margin-aware for SELL); whoever publishes these rows must show it.</summary>
 public static class AllocationRows
 {
     /// <summary>The rows to publish with a plan item.</summary>
