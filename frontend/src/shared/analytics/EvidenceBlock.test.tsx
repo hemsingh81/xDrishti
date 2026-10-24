@@ -14,6 +14,22 @@ describe('EvidenceBlock', () => {
     expect(within(block).queryByText('Provisional')).not.toBeInTheDocument();
   });
 
+  it('takes a landmark name so two blocks on one page can be told apart', () => {
+    renderKit(
+      <>
+        <EvidenceBlock n={1} range={range} basis="gross" label="Evidence for the heatmap" />
+        <EvidenceBlock n={2} range={range} basis="gross" label="Evidence for the table" />
+      </>,
+    );
+    expect(screen.getByRole('region', { name: 'Evidence for the heatmap' })).toHaveTextContent('n 1');
+    expect(screen.getByRole('region', { name: 'Evidence for the table' })).toHaveTextContent('n 2');
+  });
+
+  it('keeps two identical limit strings as two items', () => {
+    renderKit(<EvidenceBlock n={1} range={range} basis="gross" limits={['In-sample', 'In-sample']} />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
   it('says net only when the basis is net', () => {
     renderKit(<EvidenceBlock n={10} range={range} basis="net" />);
     expect(screen.getByText('Net R (after the stored charge sheet)')).toBeInTheDocument();

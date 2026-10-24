@@ -39,6 +39,18 @@ describe('report formatters', () => {
     expect(formatR(-0)).toBe('0.00 R');
   });
 
+  it('never prints a minus sign on zero: counts, ratios and percentages that round to zero are plain zero', () => {
+    expect(formatCount(-0)).toBe('0');
+    expect(formatCount(-0.4)).toBe('0');
+    expect(formatRatio(-0)).toBe('0.00');
+    expect(formatRatio(-0.001)).toBe('0.00');
+    expect(formatRate(-0)).toBe('0.0%');
+    expect(formatRate(-0.0001)).toBe('0.0%');
+    expect(formatRatio(-1.5)).toBe('-1.50');
+    expect(formatRate(-0.25)).toBe('-25.0%');
+    expect(formatCount(-3)).toBe('-3');
+  });
+
   it('writes a ratio with two decimals and a fraction as a percentage with one', () => {
     expect(formatRatio(1.8)).toBe('1.80');
     expect(formatRate(0.542)).toBe('54.2%');

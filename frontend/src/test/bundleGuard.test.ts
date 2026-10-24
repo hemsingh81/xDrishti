@@ -1,4 +1,14 @@
-import { BUDGET_BYTES, firstLoadAssets, gzipBytes, kb, measureFirstLoad, report } from '../../scripts/firstLoad.mjs';
+import {
+  BUDGET_BYTES,
+  firstLoadAssets,
+  gzipBytes,
+  kb,
+  measureAlwaysNeeded,
+  measureFirstLoad,
+  report,
+  reportAlwaysNeeded,
+  warning,
+} from '../../scripts/firstLoad.mjs';
 
 /** Bytes that do not compress (a fixed pseudo-random sequence), so a file of N bytes is about N bytes gzipped. */
 function incompressible(size: number, seed = 1): Uint8Array {
@@ -12,7 +22,7 @@ function incompressible(size: number, seed = 1): Uint8Array {
 }
 
 const html = `<!doctype html><html><head>
-  <link rel="preload" href="/assets/font.woff2" as="font" />
+  <link rel="preload" href="/assets/font-EEE.woff2" as="font" type="font/woff2" crossorigin />
   <script type="module" crossorigin src="/assets/index-AAA.js"></script>
   <link rel="modulepreload" crossorigin href="/assets/vendor-BBB.js">
   <link href="/assets/ui-CCC.js" rel="modulepreload">
@@ -34,9 +44,67 @@ describe('the bundle guard', () => {
     expect(firstLoadAssets(html)).toEqual(['/assets/index-AAA.js', '/assets/vendor-BBB.js', '/assets/ui-CCC.js']);
   });
 
-  it('does not count fonts, stylesheets or lazy chunks', () => {
+  it('guards only the entry and the preload chunks: fonts, stylesheets and lazy chunks are reported beside it, not in it', () => {
     const assets = firstLoadAssets(html);
     expect(assets.some((a) => a.endsWith('.woff2') || a.endsWith('.css'))).toBe(false);
+    const sizes = {
+      '/assets/index-AAA.js': 1000,
+      '/assets/vendor-BBB.js': 1000,
+      '/assets/ui-CCC.js': 1000,
+      '/assets/AppShell-FFF.js': 2000,
+      '/assets/today-GGG.js': 500,
+      '/assets/index-DDD.css': 300,
+      '/assets/font-EEE.woff2': 48_000,
+    };
+    const readAsset = dist(sizes);
+    const guarded = measureFirstLoad(html, readAsset);
+    const needed = measureAlwaysNeeded(
+      html,
+      readAsset,
+      Object.keys(sizes).map((p) => p.replace('/assets/', '')),
+      guarded,
+    );
+    expect(needed.lazy.map((c) => c.href)).toEqual(['/assets/AppShell-FFF.js', '/assets/today-GGG.js']);
+    expect(needed.styles.map((c) => c.href)).toEqual(['/assets/index-DDD.css']);
+    expect(needed.fonts).toEqual([{ href: '/assets/font-EEE.woff2', bytes: 48_000 }]);
+    // The total adds the shell, the landing route and the stylesheet to the guarded number; the font is raw and stays out.
+    const extra = [...needed.lazy, ...needed.styles].reduce((sum, c) => sum + c.gzip, 0);
+    expect(extra).toBeGreaterThan(2_700);
+    expect(needed.total).toBe(guarded.total + extra);
+    expect(needed.total).toBeGreaterThan(guarded.total);
+    // The limit still applies to the guarded number alone.
+    expect(measureFirstLoad(html, readAsset, guarded.total + 1).withinBudget).toBe(true);
+    const lines = reportAlwaysNeeded(needed, guarded).join('\n');
+    expect(lines).toMatch(
+      /Always needed at first paint .*: \d+\.\d KB gzip\. Only the guarded number is held to 200\.0 KB\./,
+    );
+    expect(lines).toContain('/assets/font-EEE.woff2 (font, raw bytes, not in the total)');
+  });
+
+  it('fails when an always-needed chunk cannot be found, or found twice, instead of printing a smaller total', () => {
+    const readAsset = dist({ '/assets/index-AAA.js': 10, '/assets/vendor-BBB.js': 10, '/assets/ui-CCC.js': 10 });
+    const guarded = measureFirstLoad(html, readAsset);
+    expect(() => measureAlwaysNeeded(html, readAsset, ['today-GGG.js'], guarded)).toThrow(
+      /"AppShell-\*\.js".* found 0/,
+    );
+    expect(() =>
+      measureAlwaysNeeded(html, readAsset, ['AppShell-A.js', 'AppShell-B.js', 'today-GGG.js'], guarded),
+    ).toThrow(/"AppShell-\*\.js".* found 2/);
+  });
+
+  it('warns, without failing, when less than 3 KB of headroom is left', () => {
+    const base = { '/assets/index-AAA.js': 125_000, '/assets/vendor-BBB.js': 50_000, '/assets/ui-CCC.js': 20_300 };
+    const roomy = measureFirstLoad(html, dist({ ...base, '/assets/index-AAA.js': 100_000 }));
+    expect(warning(roomy)).toBeNull();
+    const tight = measureFirstLoad(html, dist({ ...base, '/assets/index-AAA.js': 127_500 }));
+    expect(tight.withinBudget).toBe(true);
+    expect(tight.headroom).toBeLessThan(3_000);
+    expect(warning(tight)).toMatch(
+      /^WARNING: only \d\.\d KB left under 200\.0 KB\. The next slice that adds eager code must first free space/,
+    );
+    const over = measureFirstLoad(html, dist({ ...base, '/assets/index-AAA.js': 140_000 }));
+    expect(over.withinBudget).toBe(false);
+    expect(warning(over)).toBeNull();
   });
 
   it('measures the gzip size of each chunk and passes under the budget', () => {
@@ -82,6 +150,11 @@ describe('the bundle guard', () => {
 
   it('fails when index.html has no module entry script', () => {
     expect(() => measureFirstLoad('<html><body></body></html>', dist({}))).toThrow(/no module entry script/);
+  });
+
+  it('fails when the module script has no src (an inline script is not the entry chunk)', () => {
+    const inline = '<script type="module">import("/x.js")</script><link rel="modulepreload" href="/assets/ui-CCC.js">';
+    expect(() => measureFirstLoad(inline, dist({ '/assets/ui-CCC.js': 10 }))).toThrow(/no module entry script/);
   });
 
   it('prints every chunk, the total, the budget and the verdict', () => {

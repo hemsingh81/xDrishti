@@ -24,6 +24,13 @@ src/
 - Accessibility: semantic elements, labelled controls, visible focus, status not by colour alone (jsx-a11y enforced).
 - Performance: route-level `lazy`; reuse `Intl` formatters (`shared/lib/format.ts`); virtualise long lists; memoise
   only measured hot paths; keep the initial bundle ≤ 200 KB gzip.
+  The rule is enforced by `npm run size` (called by `scripts/check.sh` after the build): it holds **entry + modulepreload
+  chunks of `dist/index.html`** to 200 KB gzip (1 KB = 1000 bytes). That is not everything the first paint fetches: the lazy
+  app shell, the landing route chunk (`today`) and the stylesheet are always fetched too, and the guard prints that larger
+  "always needed" total (and the preloaded font in raw bytes) beside the guarded number without limiting it. Eager code
+  additions (nav entries, route definitions, tokens, `shared/lib`, `shared/ui` exports) spend the budget; lazy screens do
+  not. Below 3 KB of headroom the guard prints a WARNING; the first slice to see it must free space first (the preload path,
+  splitting the entry chunk) before adding eager code.
 - Errors: every query shows `LoadingState`/`ErrorState`; routes have an `errorElement`.
 
 ## Tests

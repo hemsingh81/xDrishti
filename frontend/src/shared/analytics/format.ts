@@ -7,8 +7,13 @@ import { formatDate, formatIstDate, formatIstDateTime } from '@/shared/lib/forma
  */
 export const NOT_AVAILABLE = 'n/a';
 
-const count = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
-const ratio = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// signDisplay 'negative': a negative number keeps its minus, but zero and a figure that rounds to zero never print "-0".
+const count = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0, signDisplay: 'negative' });
+const ratio = new Intl.NumberFormat('en-IN', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  signDisplay: 'negative',
+});
 const signedRatio = new Intl.NumberFormat('en-IN', {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
@@ -18,6 +23,7 @@ const rate = new Intl.NumberFormat('en-IN', {
   style: 'percent',
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
+  signDisplay: 'negative',
 });
 
 type Maybe = number | null | undefined;

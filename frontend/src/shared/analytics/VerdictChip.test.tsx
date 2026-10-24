@@ -26,6 +26,18 @@ describe('VerdictChip', () => {
     expect(colour('not_evaluable')).toBe(false);
   });
 
+  it('uses the good colour for MET alone in dark mode too', () => {
+    const colour = (verdict: Verdict) => {
+      const { container, unmount } = renderKit(<VerdictChip verdict={verdict} />, 'dark');
+      const good = usesGoodColour(container, 'dark');
+      unmount();
+      return good;
+    };
+    expect(colour('met')).toBe(true);
+    expect(colour('not_met')).toBe(false);
+    expect(colour('not_evaluable')).toBe(false);
+  });
+
   it('does not read MET inside NOT MET or NOT EVALUABLE', () => {
     renderKit(<VerdictChip verdict="not_evaluable" />);
     expect(screen.queryByText('MET')).not.toBeInTheDocument();

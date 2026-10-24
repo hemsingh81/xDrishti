@@ -29,7 +29,7 @@ interface DataTableProps<Row> {
   rowKey: (row: Row) => string;
   /** Loading, error or empty replace the body with that state in words; a table never shows a header over blank space. */
   status?: TableStatus;
-  /** The evidence under the table (n, range, basis, limits). Pass it for any table of figures. */
+  /** The evidence under the table (n, range, basis, limits). Pass it for any table of figures; hidden while loading or failed. */
   evidence?: Omit<EvidenceProps, 'compact'>;
 }
 
@@ -83,7 +83,7 @@ export function DataTable<Row>({ label, columns, rows, rowKey, status, evidence 
           </TableBody>
         </Table>
       </TableContainer>
-      {evidence && (
+      {evidence && status?.kind !== 'loading' && status?.kind !== 'error' && (
         <Box sx={{ mt: 1 }}>
           <EvidenceBlock {...evidence} />
         </Box>
