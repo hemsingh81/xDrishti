@@ -84,27 +84,7 @@ public static class CellStatsCalculator
     private static CellStatsRow Row(CellInput input, CellWindow window, List<CellTrade> trades, DateOnly asOf, double priorRate, CellStatsOptions options)
     {
         var (wWins, wTotal) = Sum(trades, asOf, options);
-        var s = options.PriorStrength;
-        var alpha = (s * priorRate) + wWins;
-        var beta = (s * (1 - priorRate)) + (wTotal - wWins);
-        double posterior;
-        double lower;
-        double upper;
-        if (alpha <= 0 || beta <= 0)
-        {
-            // strength 0 and no weighted wins or losses: the interval is the degenerate point or the full range
-            posterior = alpha + beta > 0 ? alpha / (alpha + beta) : priorRate;
-            lower = alpha <= 0 ? 0 : posterior;
-            upper = beta <= 0 ? 1 : posterior;
-        }
-        else
-        {
-            posterior = alpha / (alpha + beta);
-            var tail = (1 - options.CredibleLevel) / 2;
-            lower = BetaDistribution.Quantile(tail, alpha, beta);
-            upper = BetaDistribution.Quantile(1 - tail, alpha, beta);
-        }
-
+        var (posterior, lower, upper) = BetaShrinkage.Posterior(wWins, wTotal, priorRate, options.PriorStrength, options.CredibleLevel);
         var wins = trades.Count(t => t.R > 0);
         double winSum = 0;
         double winWeight = 0;
