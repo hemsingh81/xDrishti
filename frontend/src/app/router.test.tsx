@@ -36,7 +36,7 @@ describe('app routes', () => {
   it('shows the roadmap phase for screens that are not built yet', async () => {
     renderRoutes(routes, { initialPath: '/audit' });
 
-    expect(await screen.findByText('P1')).toBeInTheDocument();
+    expect(await screen.findByText('P8')).toBeInTheDocument();
   });
 
   it('opens the Data quality screen (no longer a placeholder) and marks it in the navigation', async () => {

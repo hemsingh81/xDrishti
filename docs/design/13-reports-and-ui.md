@@ -69,6 +69,13 @@ title shows the current screen.
 - **Pivot builder:** any two dimensions (strategy, timeframe, basket, side, style, exit, regime, account,
   instrument, sector, weekday, month, decision) × metric (expectancy, total R, win rate, trades, profit factor).
 
+- **Honest states (P8-01, [ADR 0098](../adr/0098-the-analytics-kit-draws-a-non-value-as-a-word-never-a-digit-and-the-first-load-javascript-is-guarded-at-200-kb.md)):**
+  every figure on a report or Learning screen is drawn through the shared analytics kit
+  (`frontend/src/shared/analytics`): a value, a provisional value (number plus the word and the reason), or a
+  non-value shown as an icon and a word — *Insufficient data* (with n and the minimum), *Not available*, *Not
+  evaluable*, *No records yet*, *Loading*, *Could not load* — never as a digit, a zero, a flat chart or the good
+  colour. Beside a number sits the evidence (n, data range, gross or net basis, provisional, data used, limits).
+
 ## 1d. Responsive design (all monitors)
 
 | Width | Layout |

@@ -939,11 +939,11 @@ monitoring comes early because it is useful on its own while the trading engine 
 </tr>
 <tr>
 <td>P8-01</td>
-<td><strong>Shared analytics kit and guards</strong>: the six-state vocabulary as components (<code>insufficient</code>, <code>unavailable</code>, <code>not_evaluable</code>, <code>empty</code>; never a digit for a non-value), the evidence-block renderer, URL filter state, lazy heatmap / scatter / histogram chart types with table fallbacks, nav labels fixed, and a bundle guard in <code>scripts/check.sh</code> (first-load JavaScript measured 195.3 KB gzip on 2026-10-24, rule 200). Unblocked.</td>
+<td><strong>Shared analytics kit and guards</strong>: the six-state vocabulary as components (<code>insufficient</code>, <code>unavailable</code>, <code>not_evaluable</code>, <code>empty</code>; never a digit for a non-value), the evidence-block renderer, URL filter state, lazy heatmap / scatter / histogram chart types with table fallbacks, nav labels fixed, and a bundle guard in <code>scripts/check.sh</code> (first-load JavaScript measured 195.3 KB gzip on 2026-10-24, rule 200). <strong>Built 2026-10-24 (<a href="../adr/0098-the-analytics-kit-draws-a-non-value-as-a-word-never-a-digit-and-the-first-load-javascript-is-guarded-at-200-kb.html">ADR 0098</a>): the kit (<code>MetricState</code> of eight kinds, <code>NonValue</code>, <code>MetricValue</code> / <code>Cell</code> / <code>Tile</code>, <code>DataTable</code>, <code>EvidenceBlock</code>, <code>VerdictChip</code>, formatters) and the guard (<code>npm run size</code> in <code>scripts/check.sh</code>, 195.2 KB measured); <code>useUrlState</code> and the new chart types wait for P8-02 / P8-10.</strong></td>
 <td>P8</td>
 <td>3 d</td>
-<td>Spec Draft (plan)</td>
-<td><a href="../specs/P8-00-reports-and-ui-plan.html">plan</a></td>
+<td>Spec Approved, built</td>
+<td><a href="../specs/P8-01-analytics-kit-and-bundle-guard.html">spec</a></td>
 <td>A non-value never renders a digit; the guard fails on a planted import</td>
 </tr>
 <tr>
@@ -1467,7 +1467,7 @@ monitoring comes early because it is useful on its own while the trading engine 
     <a class="prev" href="17-deployment-and-operations.html"><small>← Previous  [</small>17 · Deployment &amp; operations</a>
     <a class="next" href="19-risks-and-compliance.html"><small>Next  ] →</small>19 · Risks &amp; compliance</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-24 09:41</footer>
+  <footer class="foot">Generated from <code>docs/18-roadmap.md</code> · 2026-10-24 09:53</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#p3-slices" class="d2">P3 slices</a>
 <a href="#open-owner-decisions" class="d2">Open owner decisions</a>
