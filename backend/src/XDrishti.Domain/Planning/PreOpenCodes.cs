@@ -12,6 +12,9 @@ public static class PreOpenCodes
     /// <summary>No usable pre-open price: invalidated (never armed on a missing input).</summary>
     public const string UnavailableQuote = "unavailable_quote";
 
+    /// <summary>The batch of prices looks stale (almost all equal the previous close: probably no pre-open price yet): invalidated.</summary>
+    public const string StaleQuote = "stale_quote";
+
     /// <summary>No previous close: invalidated.</summary>
     public const string UnavailablePreviousClose = "unavailable_previous_close";
 

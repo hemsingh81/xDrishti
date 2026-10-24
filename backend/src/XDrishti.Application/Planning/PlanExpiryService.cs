@@ -17,7 +17,7 @@ public sealed class PlanExpiryService(IServiceScopeFactory scopes) : IScheduledS
     public static readonly ServiceDefinition Definition = new(
         Id,
         "Plan expiry",
-        "At 15:40, after the close, ends the day for the plan's tickets: armed tickets expire and their instruments leave the live feed. Also closes any earlier plan still open. It never places an order.",
+        "At 15:40, after the close, ends the day for the plan's tickets: armed tickets expire and their instruments leave the live feed. Also closes any earlier plan still open. It never places an order. Price alerts on trigger and stop are not built yet; only the live price is shown.",
         "xd-api",
         [ScheduleType.Daily],
         new ServiceSettings(false, Schedule.Daily(new TimeOnly(15, 40)), 0, 4, true, true, new Dictionary<string, System.Text.Json.JsonElement>()),

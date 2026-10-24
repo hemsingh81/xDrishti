@@ -34,11 +34,20 @@ internal sealed class RunPreOpenCheckHandler(
 
     private static readonly TimeSpan MarketOpen = new(9, 15, 0);
 
+    /// <summary>Before this the pre-open price discovery has not produced a price (an early manual run would read yesterday's last price against yesterday's close).</summary>
+    private static readonly TimeSpan Earliest = new(9, 8, 0);
+
     public async ValueTask<Result<PreOpenOutcome>> HandleAsync(RunPreOpenCheckCommand command, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(command);
         var now = time.GetUtcNow();
         var today = IndiaTime.Today(now);
+        if (IndiaTime.ToIst(now).TimeOfDay < Earliest)
+        {
+            PreOpenLog.Refused(logger, "plans.preopen_early");
+            return Result.Failure<PreOpenOutcome>(Error.Conflict("plans.preopen_early", "It is before 09:08: the pre-open session has not produced a price yet, so nothing is checked or armed."));
+        }
+
         if (IndiaTime.ToIst(now).TimeOfDay >= MarketOpen)
         {
             PreOpenLog.Refused(logger, "plans.preopen_late");
@@ -71,6 +80,11 @@ internal sealed class RunPreOpenCheckHandler(
             PreOpenLog.SourceProblem(logger);
         }
 
+        // Batch guard: a quote that still carries yesterday's close shows almost every price equal to the previous close.
+        var batch = symbols.Select(s => snapshot.Readings.GetValueOrDefault(s)).OfType<PreOpenReading>().ToList();
+        var stale = PreOpenRules.StaleBatch(batch, out var equalCount, out var batchSize);
+        var staleNote = stale ? $"price equals previous close for {equalCount} of {batchSize}: probably no pre-open price yet" : null;
+
         var armedTotal = 0;
         var invalidatedTotal = 0;
         var failures = new List<string>();
@@ -80,11 +94,16 @@ internal sealed class RunPreOpenCheckHandler(
             var invalidatedHere = 0;
             foreach (var item in approved)
             {
+                var reading = snapshot.Readings.GetValueOrDefault(item.Item.Symbol) ?? new PreOpenReading(null, null, null);
                 var decision = armedHere >= PreOpenRules.MaxArmedTickets
                     ? new PreOpenDecision(false, PreOpenCodes.CapExceeded, $"At most {PreOpenRules.MaxArmedTickets} tickets are armed in a session; this one (rank {item.Item.Rank}) was refused, the others are untouched.")
-                    : PreOpenRules.Decide(snapshot.Readings.GetValueOrDefault(item.Item.Symbol) ?? new PreOpenReading(null, null, null));
+                    : stale && reading.Last is > 0 && reading.Last == reading.PreviousClose
+                        ? new PreOpenDecision(false, PreOpenCodes.StaleQuote, staleNote!)
+                        : PreOpenRules.Decide(reading, today);
                 var to = decision.Arm ? TicketState.Armed : TicketState.Invalidated;
-                var reason = decision.Arm ? $"{PlanWording.Armed} Pre-open: {decision.Detail}." : $"Invalidated at the pre-open check ({decision.Code}): {decision.Detail}";
+                var reason = decision.Arm
+                    ? $"{PlanWording.Armed} Pre-open: {decision.Detail}. {PlanWording.PreOpenPriceCaveat} {PlanWording.NotRechecked} {PlanWording.AlertsNotBuilt}"
+                    : $"Invalidated at the pre-open check ({decision.Code}): {decision.Detail}";
                 var moved = await tickets.HandleAsync(new MoveTicketCommand(item.Id, to, Actor, Truncate(reason, 500)), cancellationToken);
                 if (moved.IsFailure)
                 {
@@ -104,8 +123,17 @@ internal sealed class RunPreOpenCheckHandler(
                 invalidatedHere++;
                 invalidatedTotal++;
                 PreOpenLog.Invalidated(logger, item.Id, decision.Code);
-                var text = Truncate(string.Create(CultureInfo.InvariantCulture, $"Ticket {item.Item.Rank} ({item.Item.Symbol}) was dropped at the pre-open check: {decision.Code}, {decision.Detail} It was not armed. No order was placed and none exists."), NewSuggestion.MaxTextLength);
-                await inbox.InsertAsync(plan.Id, [new NewSuggestion(InvalidatedKind, "item-" + item.Id.ToString(CultureInfo.InvariantCulture), text)], now, cancellationToken);
+                var text = Truncate(string.Create(CultureInfo.InvariantCulture, $"Ticket {item.Item.Rank} ({item.Item.Symbol}) was dropped at the pre-open check: {decision.Code}, {decision.Detail} It was not armed. No order was placed and none exists. {PlanWording.AlertsNotBuilt}"), NewSuggestion.MaxTextLength);
+                try
+                {
+                    await inbox.InsertAsync(plan.Id, [new NewSuggestion(InvalidatedKind, "item-" + item.Id.ToString(CultureInfo.InvariantCulture), text)], now, cancellationToken);
+                }
+#pragma warning disable CA1031 // The note to the owner is secondary: the ticket is already invalidated, and one failed write must not stop the other tickets.
+                catch (Exception failure) when (failure is not OperationCanceledException)
+#pragma warning restore CA1031
+                {
+                    PreOpenLog.InboxFailed(logger, item.Id, failure.GetType().Name);
+                }
             }
 
             await MovePlanAsync(plan, armedHere, failures, cancellationToken);
@@ -115,10 +143,24 @@ internal sealed class RunPreOpenCheckHandler(
         if (armedTotal > 0)
         {
             // Tells the feed at once to read the armed tickets (its one-minute recompute stays the safety net; with no listener this is harmless).
-            await notifier.ActiveSetChangedAsync(cancellationToken);
+            try
+            {
+                await notifier.ActiveSetChangedAsync(cancellationToken);
+            }
+#pragma warning disable CA1031 // The signal is only a hurry-up: the tickets are armed already and the feed reads them within a minute.
+            catch (Exception failure) when (failure is not OperationCanceledException)
+#pragma warning restore CA1031
+            {
+                PreOpenLog.NotifyFailed(logger, failure.GetType().Name);
+            }
         }
 
-        var summary = $"{work.Count} plan(s): {armedTotal} armed, {invalidatedTotal} invalidated. Ban list, surveillance and price band were not checked (no data source).";
+        var summary = $"{work.Count} plan(s): {armedTotal} armed, {invalidatedTotal} invalidated. {PlanWording.NotRechecked} {PlanWording.PreOpenPriceCaveat} {PlanWording.AlertsNotBuilt}";
+        if (staleNote is not null)
+        {
+            summary += " " + char.ToUpperInvariant(staleNote[0]) + staleNote[1..] + ".";
+        }
+
         if (snapshot.Problem is not null)
         {
             summary += " The price read failed: " + snapshot.Problem;

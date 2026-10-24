@@ -47,7 +47,7 @@ public sealed class DhanQuoteClientTests : IDisposable
     private static string Answer(params (string Id, string Entry)[] entries) =>
         "{\"data\":{\"NSE_EQ\":{" + string.Join(',', entries.Select(e => $"\"{e.Id}\":{e.Entry}")) + "}},\"status\":\"success\"}";
 
-    private static string Entry(string last, string close = "98.5") => $$"""{"average_price":0,"buy_quantity":0,"depth":{"buy":[],"sell":[]},"last_price":{{last}},"last_quantity":0,"net_change":0,"ohlc":{"close":{{close}},"high":0,"low":0,"open":0},"volume":0}""";
+    private static string Entry(string last, string close = "98.5") => $$"""{"average_price":0,"buy_quantity":0,"depth":{"buy":[],"sell":[]},"last_price":{{last}},"last_quantity":0,"net_change":0,"ohlc":{"close":{{close}},"high":0,"low":0,"open":0} }""";
 
     [Fact]
     public async Task It_posts_the_documented_body_with_the_token_and_client_id_headers_and_reads_price_and_previous_close()
@@ -132,6 +132,38 @@ public sealed class DhanQuoteClientTests : IDisposable
         var result = await QuoteAsync("1");
 
         result.Quotes.ShouldBe([new SecurityQuote("1", 10m, null)]);
+    }
+
+    [Theory]
+    [InlineData("\"last_trade_time\":\"26/10/2026 09:09:30\"", 2026, 10, 26, 3, 39, 30)]
+    [InlineData("\"last_trade_time\":1792985970", 2026, 10, 26, 3, 39, 30)]
+    public async Task The_last_trade_time_and_volume_of_the_same_answer_travel_with_the_quote(string timeField, int year, int month, int day, int hour, int minute, int second)
+    {
+        _broker.Respond = _ => StubBroker.Json(HttpStatusCode.OK, Answer(("1", "{\"last_price\":10,\"volume\":1234," + timeField + ",\"ohlc\":{\"close\":9}}")));
+
+        var quote = (await QuoteAsync("1")).Quotes.Single();
+
+        quote.LastTradeTime.ShouldBe(new DateTimeOffset(year, month, day, hour, minute, second, TimeSpan.Zero));
+        quote.Volume.ShouldBe(1234);
+        quote.PreviousClose.ShouldBe(9m);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(",\"last_trade_time\":null")]
+    [InlineData(",\"last_trade_time\":\"yesterday\"")]
+    [InlineData(",\"last_trade_time\":\"2026-10-26T09:09:30\"")]
+    [InlineData(",\"last_trade_time\":0")]
+    [InlineData(",\"last_trade_time\":true")]
+    public async Task A_missing_or_unreadable_trade_time_is_null_and_the_price_still_counts(string field)
+    {
+        _broker.Respond = _ => StubBroker.Json(HttpStatusCode.OK, Answer(("1", "{\"last_price\":10" + field + "}")));
+
+        var quote = (await QuoteAsync("1")).Quotes.Single();
+
+        quote.LastPrice.ShouldBe(10m);
+        quote.LastTradeTime.ShouldBeNull();
+        quote.Volume.ShouldBeNull();
     }
 
     [Fact]

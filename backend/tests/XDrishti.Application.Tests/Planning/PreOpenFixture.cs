@@ -24,11 +24,11 @@ internal sealed class PreOpenFixture
 
     private readonly List<PlanItemRow> _items = [];
 
-    public PreOpenFixture(PlanState planState = PlanState.Approved, DateOnly? forDate = null)
+    public PreOpenFixture(PlanState planState = PlanState.Approved, DateOnly? forDate = null, DateTimeOffset? at = null)
     {
         PlanState = planState;
         ForDate = forDate ?? Session;
-        Time = new FakeTimeProvider(PreOpenTime);
+        Time = new FakeTimeProvider(at ?? PreOpenTime);
         Store.FindAsync(1, Arg.Any<CancellationToken>()).Returns(_ => Plan());
         Store.ListAsync(Arg.Any<DateOnly?>(), Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(_ => new List<PlanRow> { Plan() });
         Store.ItemsAsync(1, Arg.Any<CancellationToken>()).Returns(_ => (IReadOnlyList<PlanItemRow>)[.. _items.Select(i => i with { State = _states[i.Id] })]);
@@ -72,6 +72,8 @@ internal sealed class PreOpenFixture
 
     public TicketState StateOf(long id) => _states[id];
 
+    public void SetState(long id, TicketState state) => _states[id] = state;
+
     public void Add(long id, string symbol, TicketState state = TicketState.Approved, TicketGroup group = TicketGroup.Primary)
     {
         _items.Add(new PlanItemRow(id, 1, new NewPlanItem(
@@ -80,9 +82,12 @@ internal sealed class PreOpenFixture
         _states[id] = state;
     }
 
-    public void Quotes(params (string Symbol, double? Last, double? Previous, double? Atr)[] readings)
+    /// <summary>Readings whose price is timed at 09:10 India time on the session (inside the pre-open session).</summary>
+    public void Quotes(params (string Symbol, double? Last, double? Previous, double? Atr)[] readings) => QuotesAt(PreOpenTime, readings);
+
+    public void QuotesAt(DateTimeOffset? at, params (string Symbol, double? Last, double? Previous, double? Atr)[] readings)
     {
-        var map = readings.ToDictionary(r => r.Symbol, r => new PreOpenReading(r.Last, r.Previous, r.Atr), StringComparer.Ordinal);
+        var map = readings.ToDictionary(r => r.Symbol, r => new PreOpenReading(r.Last, r.Previous, r.Atr, at), StringComparer.Ordinal);
         Source.ReadAsync(Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<DateOnly>(), Arg.Any<CancellationToken>()).Returns(new PreOpenSnapshot(map, null));
     }
 

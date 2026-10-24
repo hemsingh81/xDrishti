@@ -1,7 +1,10 @@
 namespace XDrishti.Application.Abstractions.Portfolio;
 
-/// <summary>The market quote of one security (ADR 0019): the last traded price and the previous session's close. The price is positive; the previous close is null when the answer gave none that is usable.</summary>
-public sealed record SecurityQuote(string SecurityId, decimal LastPrice, decimal? PreviousClose);
+/// <summary>
+/// The market quote of one security (ADR 0019): the last traded price and the previous session's close. The price is positive; the previous close is null when the answer gave none that is usable.
+/// <paramref name="LastTradeTime"/> and <paramref name="Volume"/> come from the same answer (P7-11, ADR 0096) and are null when the answer had none that is usable; the pre-open check treats a missing time as no price.
+/// </summary>
+public sealed record SecurityQuote(string SecurityId, decimal LastPrice, decimal? PreviousClose, DateTimeOffset? LastTradeTime = null, long? Volume = null);
 
 public enum QuoteFailureKind
 {

@@ -6,4 +6,5 @@ namespace XDrishti.Domain.Planning;
 /// <param name="Last">The last (indicative, before the open) price, rupees; null when no usable quote came.</param>
 /// <param name="PreviousClose">The previous session's close, rupees; null when not given.</param>
 /// <param name="Atr">The average true range of the last closed sessions, rupees; null when there were too few sessions.</param>
-public sealed record PreOpenReading(double? Last, double? PreviousClose, double? Atr);
+/// <param name="QuoteTime">The time of the last trade the price comes from (from the same quote answer); null when the answer had none, which reads as no price.</param>
+public sealed record PreOpenReading(double? Last, double? PreviousClose, double? Atr, DateTimeOffset? QuoteTime = null);

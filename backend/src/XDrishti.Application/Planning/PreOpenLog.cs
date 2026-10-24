@@ -26,6 +26,12 @@ internal static partial class PreOpenLog
     [LoggerMessage(EventId = 4786, Level = LogLevel.Warning, Message = "plans.armed.provider_failed {Failure}: armed tickets left out of the active set this time")]
     public static partial void ProviderFailed(ILogger logger, string failure);
 
+    [LoggerMessage(EventId = 4788, Level = LogLevel.Warning, Message = "plans.preopen.notify_failed {Failure}: the feed will read the armed tickets at its next recompute")]
+    public static partial void NotifyFailed(ILogger logger, string failure);
+
+    [LoggerMessage(EventId = 4789, Level = LogLevel.Warning, Message = "plans.preopen.inbox_failed {ItemId}: {Failure}")]
+    public static partial void InboxFailed(ILogger logger, long itemId, string failure);
+
     [LoggerMessage(EventId = 4787, Level = LogLevel.Warning, Message = "plans.preopen.move_failed {ItemId}: {Code}")]
     public static partial void MoveFailed(ILogger logger, long itemId, string code);
 }

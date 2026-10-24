@@ -1,4 +1,5 @@
 using System.Globalization;
+using XDrishti.Domain.Market;
 
 namespace XDrishti.Domain.Planning;
 
@@ -15,12 +16,50 @@ public static class PreOpenRules
     /// <summary>The most tickets armed in one session; the rest are refused with <see cref="PreOpenCodes.CapExceeded"/>.</summary>
     public const int MaxArmedTickets = 50;
 
-    public static PreOpenDecision Decide(PreOpenReading reading, double gapInvalidateAtr = DefaultGapInvalidateAtr)
+    /// <summary>The first moment (India time) a price counts as a pre-open price: the pre-open session starts at 09:00.</summary>
+    public static readonly TimeSpan PreOpenStart = new(9, 0, 0);
+
+    /// <summary>The first moment a price no longer counts as a pre-open price: the market opens at 09:15.</summary>
+    public static readonly TimeSpan MarketOpen = new(9, 15, 0);
+
+    /// <summary>Share (in tenths) of the batch whose price equals the previous close that makes the whole batch look stale.</summary>
+    private const int StaleShareTenths = 8;
+
+    /// <summary>The fewest readings for the batch guard to apply (with fewer, one unchanged share is ordinary).</summary>
+    private const int StaleMinimum = 3;
+
+    /// <summary>
+    /// Whether most of the batch has a price exactly equal to the previous close (at least 80 % of three or more readings): before the open that is what a quote that carries yesterday's close looks like. Only readings that have both numbers count.
+    /// </summary>
+    public static bool StaleBatch(IReadOnlyCollection<PreOpenReading> readings, out int equal, out int total)
+    {
+        ArgumentNullException.ThrowIfNull(readings);
+        var counted = readings.Where(r => r.Last is > 0 && r.PreviousClose is > 0).ToList();
+        total = counted.Count;
+        equal = counted.Count(r => r.Last == r.PreviousClose);
+        return total >= StaleMinimum && equal * 10 >= total * StaleShareTenths;
+    }
+
+    /// <summary>
+    /// Decides on one reading. The price must carry a trade time that is today (India date) and within the pre-open session (09:00 up to 09:15); a missing, old or later time reads as no price (fail closed).
+    /// </summary>
+    public static PreOpenDecision Decide(PreOpenReading reading, DateOnly today, double gapInvalidateAtr = DefaultGapInvalidateAtr)
     {
         ArgumentNullException.ThrowIfNull(reading);
         if (reading.Last is not > 0 || !double.IsFinite(reading.Last.Value))
         {
             return Invalidate(PreOpenCodes.UnavailableQuote, "No usable pre-open price.");
+        }
+
+        if (reading.QuoteTime is not { } at)
+        {
+            return Invalidate(PreOpenCodes.UnavailableQuote, "The price carries no trade time, so it cannot be told from yesterday's.");
+        }
+
+        var ist = IndiaTime.ToIst(at);
+        if (DateOnly.FromDateTime(ist.DateTime) != today || ist.TimeOfDay < PreOpenStart || ist.TimeOfDay >= MarketOpen)
+        {
+            return Invalidate(PreOpenCodes.UnavailableQuote, string.Create(CultureInfo.InvariantCulture, $"The price is from {ist:yyyy-MM-dd HH:mm:ss} India time, not from today's pre-open session."));
         }
 
         if (reading.PreviousClose is not > 0 || !double.IsFinite(reading.PreviousClose.Value))

@@ -18,7 +18,7 @@ public sealed class PreOpenService(IServiceScopeFactory scopes) : IScheduledServ
     public static readonly ServiceDefinition Definition = new(
         Id,
         "Pre-open check",
-        "At 09:10, after the review cutoff and before the open, checks every ticket you approved against the pre-open price (the gap to the previous close against half the average true range; a missing price or range counts as a fail) and arms the ones that pass: they are watched in the live feed with alerts. No order is placed and none exists; a stop is only an alert. Nothing is approved or taken from the reserve.",
+        "At 09:10, after the review cutoff and before the open, checks every ticket you approved against the pre-open price (the gap to the previous close against half the average true range; a missing price or range counts as a fail) and arms the ones that pass: they are watched in the live feed with alerts. No order is placed and none exists; a stop is only an alert. Price alerts on trigger and stop are not built yet; only the live price is shown. Nothing is approved or taken from the reserve. Do not switch it on before a real 09:10 quote has been recorded (the last price may be the previous close before the open).",
         "xd-api",
         [ScheduleType.Daily],
         new ServiceSettings(false, Schedule.Daily(new TimeOnly(9, 10)), 0, 4, false, true, new Dictionary<string, System.Text.Json.JsonElement>()),
@@ -26,9 +26,9 @@ public sealed class PreOpenService(IServiceScopeFactory scopes) : IScheduledServ
         new ServiceConstraints
         {
             MustFollow = [ReviewCutoffService.Id],
-            StartNotBefore = new TimeOnly(9, 5),
+            StartNotBefore = new TimeOnly(9, 8),
             StartNotAfter = new TimeOnly(9, 14),
-            StartAdvice = "It must start after the review cutoff (09:05) and before the open (09:15); after 09:15 it arms nothing.",
+            StartAdvice = "It must start after the review cutoff (09:05) and the first pre-open price (09:08) and before the open (09:15); before 09:08 or after 09:15 it arms nothing.",
             CatchUpReach = CatchUpReach.SameDay,
         });
 

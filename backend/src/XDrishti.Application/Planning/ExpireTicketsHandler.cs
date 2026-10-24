@@ -47,6 +47,7 @@ internal sealed class ExpireTicketsHandler(
         {
             var items = await store.ItemsAsync(plan.Id, cancellationToken);
             var here = 0;
+            var failedHere = false;
             foreach (var item in items.Where(i => i.Item.Group != TicketGroup.Rejected && i.State is TicketState.Armed or TicketState.Approved))
             {
                 var moved = await tickets.HandleAsync(new MoveTicketCommand(item.Id, TicketState.Expired, Actor, "The validity window ended with the session."), cancellationToken);
@@ -54,6 +55,7 @@ internal sealed class ExpireTicketsHandler(
                 {
                     PreOpenLog.MoveFailed(logger, item.Id, moved.Error.Code);
                     failures.Add($"item {item.Id}: {moved.Error.Code}");
+                    failedHere = true;
                     continue;
                 }
 
@@ -61,6 +63,12 @@ internal sealed class ExpireTicketsHandler(
             }
 
             expired += here;
+            if (failedHere)
+            {
+                // A ticket is still Armed or Approved: the plan stays open (and is not counted as closed), so the next run tries again.
+                continue;
+            }
+
             var move = await plansMover.HandleAsync(new MovePlanCommand(plan.Id, PlanState.Expired, Actor, "The session ended."), cancellationToken);
             if (move.IsFailure)
             {
@@ -76,7 +84,16 @@ internal sealed class ExpireTicketsHandler(
 
         if (expired > 0)
         {
-            await notifier.ActiveSetChangedAsync(cancellationToken);
+            try
+            {
+                await notifier.ActiveSetChangedAsync(cancellationToken);
+            }
+#pragma warning disable CA1031 // The signal is only a hurry-up: the feed reads the tickets again within a minute.
+            catch (Exception failure) when (failure is not OperationCanceledException)
+#pragma warning restore CA1031
+            {
+                PreOpenLog.NotifyFailed(logger, failure.GetType().Name);
+            }
         }
 
         var summary = $"{plansClosed} plan(s) closed, {expired} ticket(s) expired.";

@@ -97,7 +97,7 @@ public sealed class PreOpenArmingDatabaseTests(ApiFactory factory) : DataTestBas
         await ScalarAsync<string>("SELECT to_state FROM trading.plan_events WHERE plan_id = @p AND item_id IS NULL ORDER BY id DESC LIMIT 1", ("p", plan));
 
     private static FakeSource Source(params (string Symbol, double? Last, double? Previous, double? Atr)[] readings) =>
-        new(readings.ToDictionary(r => r.Symbol, r => new PreOpenReading(r.Last, r.Previous, r.Atr), StringComparer.Ordinal));
+        new(readings.ToDictionary(r => r.Symbol, r => new PreOpenReading(r.Last, r.Previous, r.Atr, PreOpen), StringComparer.Ordinal));
 
     private sealed class FakeSource(Dictionary<string, PreOpenReading> readings) : IPreOpenSource
     {
@@ -204,6 +204,38 @@ public sealed class PreOpenArmingDatabaseTests(ApiFactory factory) : DataTestBas
         var failure = await Should.ThrowAsync<PostgresException>(async () => await insert.ExecuteNonQueryAsync(Ct));
 
         failure.SqlState.ShouldBe(PostgresErrorCodes.CheckViolation);
+        (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_events WHERE to_state = 'armed'")).ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData("proposed", PostgresErrorCodes.CheckViolation)]
+    [InlineData("lapsed", PostgresErrorCodes.ForeignKeyViolation)]
+    [InlineData("rejected", PostgresErrorCodes.ForeignKeyViolation)]
+    [InlineData("modified", PostgresErrorCodes.ForeignKeyViolation)]
+    public async Task The_database_refuses_an_armed_row_that_claims_to_come_from_approved_over_a_ticket_that_is_not(string actual, string sqlState)
+    {
+        Factory.Clock.Pin(BeforeCutoff);
+        var plan = new NewPlan("forged-" + actual, Session, Cutoff, 1, new string('c', 64), "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, [Item(1, "NSE:ZZZ")]);
+        var published = await WithAsync(p => p.GetRequiredService<IPlanStore>().PublishAsync(plan, Ct).AsTask());
+        var item = (await WithAsync(p => p.GetRequiredService<IPlanStore>().ItemsAsync(published.Id, Ct).AsTask())).Single().Id;
+        if (actual != "proposed")
+        {
+            var to = actual switch { "lapsed" => TicketState.Lapsed, "rejected" => TicketState.Rejected, _ => TicketState.Modified };
+            var moved = await WithAsync(p => p.GetRequiredService<ICommandHandler<MoveTicketCommand, TicketMoveOutcome>>().HandleAsync(new MoveTicketCommand(item, to, to == TicketState.Lapsed ? "system:test" : OwnerActor, "r", to == TicketState.Modified ? "qty:x=1" : null), Ct).AsTask());
+            moved.IsSuccess.ShouldBeTrue();
+        }
+
+        // The forged row names the real previous event but says the ticket was approved: the previous event's to_state must equal from_state (fk_plan_events_prev).
+        await using var connection = await OpenAsync();
+        await using var insert = new NpgsqlCommand(
+            "INSERT INTO trading.plan_events (plan_id, item_id, from_state, to_state, actor, reason, prev_event_id, created_at) VALUES (@p, @i, 'approved', 'armed', 'system:preopen', 'r', (SELECT max(id) FROM trading.plan_events WHERE item_id = @i), now())",
+            connection);
+        insert.Parameters.AddWithValue("p", published.Id);
+        insert.Parameters.AddWithValue("i", item);
+
+        var failure = await Should.ThrowAsync<PostgresException>(async () => await insert.ExecuteNonQueryAsync(Ct));
+
+        failure.SqlState.ShouldBe(sqlState);
         (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_events WHERE to_state = 'armed'")).ShouldBe(0);
     }
 
