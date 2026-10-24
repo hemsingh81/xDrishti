@@ -132,7 +132,7 @@
     return `
     <section class="hero"><h2>Where we are — ${esc(P.asOf)}</h2><p class="lead">${esc(P.now)}</p></section>
     <div class="tiles">
-      <div class="tile"><div class="k">Phases built</div><div class="v">${built}<small class="dim"> / ${phases.length}</small></div><div class="s">P0–P5 built · P6 built bar regime labels · P7 started</div></div>
+      <div class="tile"><div class="k">Phases built</div><div class="v">${built}<small class="dim"> / ${phases.length}</small></div><div class="s">P0–P5 built · P6 and P7 nearly built</div></div>
       <div class="tile"><div class="k">Tracked slices built</div><div class="v">${sBuilt}<small class="dim"> / ${sBuilt + sOpen.length}</small></div><div class="s">P3–P7 slices listed below</div></div>
       <div class="tile"><div class="k">Open or blocked</div><div class="v">${sOpen.length}</div><div class="s">${sOpen.map((x) => x[0]).join(", ")}</div></div>
     </div>
