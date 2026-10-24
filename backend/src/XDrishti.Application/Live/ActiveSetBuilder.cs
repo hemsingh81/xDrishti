@@ -5,7 +5,7 @@ namespace XDrishti.Application.Live;
 
 /// <summary>
 /// Builds the active set from what the providers propose (ADR 0024 §2, P2-10 criterion 7) - pure, no I/O. Candidates of the same security (segment and id) are merged into one member: the reasons are added, the mode is the richer
-/// one (quote over ticker) and the value is the largest. The members are ordered alerts first, then indices, then holdings by value (largest first; equal values by security id, so that the same input always gives the same set) and
+/// one (quote over ticker) and the value is the largest. The members are ordered alerts first, then indices, then holdings by value (largest first), then armed tickets of today's plan by rank (spec P7-11: they are cut first, so no other member is displaced; equal values by security id, so that the same input always gives the same set) and
 /// cut at the cap; <see cref="ActiveSet.Cut"/> says how many were dropped. A candidate whose security id is not a positive number cannot be subscribed to and is left out.
 /// </summary>
 internal static class ActiveSetBuilder
@@ -57,7 +57,7 @@ internal static class ActiveSetBuilder
     }
 
     private static int Rank(ActiveSetReason reasons) =>
-        reasons.HasFlag(ActiveSetReason.Alert) ? 0 : reasons.HasFlag(ActiveSetReason.Index) ? 1 : 2;
+        reasons.HasFlag(ActiveSetReason.Alert) ? 0 : reasons.HasFlag(ActiveSetReason.Index) ? 1 : reasons.HasFlag(ActiveSetReason.Holding) ? 2 : 3;
 
     private sealed class Merged(Guid instrumentId, string segment, string securityId, FeedMode mode, ActiveSetReason reasons, decimal value)
     {

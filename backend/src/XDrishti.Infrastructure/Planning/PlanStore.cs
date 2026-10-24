@@ -13,7 +13,7 @@ namespace XDrishti.Infrastructure.Planning;
 /// The plan record behind <see cref="IPlanStore"/> (spec P7-03, ADR 0083): raw SQL, insert and select only (the runtime role has no more). A state change is a new row in <c>trading.plan_events</c>, written under a transaction advisory lock
 /// per plan or item after checking that the newest state is still the one the caller saw. Nothing here talks to a broker.
 /// </summary>
-internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) : IPlanStore, IAutoApprovalStore
+internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) : IPlanStore, IAutoApprovalStore, IArmedTicketReader
 {
     private const string PlanStateSql = "COALESCE((SELECT e.to_state FROM trading.plan_events e WHERE e.plan_id = p.id AND e.item_id IS NULL ORDER BY e.id DESC LIMIT 1), 'draft')";
 
@@ -192,6 +192,24 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         while (await reader.ReadAsync(cancellationToken))
         {
             rows.Add(new ApprovalRow(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), Text(reader, 6), Text(reader, 7), reader.GetFieldValue<DateTimeOffset>(8)));
+        }
+
+        return rows;
+    }
+
+    public async ValueTask<IReadOnlyList<ArmedTicket>> ListAsync(DateOnly forDate, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand($"""
+            SELECT i.id, i.plan_id, i.item_rank, i.symbol FROM trading.plan_items i JOIN trading.plans p ON p.id = i.plan_id
+            WHERE p.for_date = @d AND i.item_group <> 'rejected' AND {ItemStateSql} = 'armed'
+            ORDER BY i.item_rank, i.id
+            """);
+        select.Parameters.AddWithValue("d", NpgsqlDbType.Date, forDate);
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        var rows = new List<ArmedTicket>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new ArmedTicket(reader.GetInt64(0), reader.GetInt64(1), reader.GetInt32(2), reader.GetString(3)));
         }
 
         return rows;

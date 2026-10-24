@@ -220,7 +220,7 @@ internal sealed class DhanQuoteClient(IHttpClientFactory httpClients, IDataAccou
         {
             if (wanted.Remove(entry.Name) && Price(entry.Value, "last_price") is { } last)
             {
-                quotes.Add(new SecurityQuote(entry.Name, last, entry.Value.TryGetProperty("ohlc", out var ohlc) ? Price(ohlc, "close") : null));
+                quotes.Add(new SecurityQuote(entry.Name, last, entry.Value.TryGetProperty("ohlc", out var ohlc) ? Price(ohlc, "close") : null, TradeTime(entry.Value), Volume(entry.Value)));
             }
         }
 
@@ -231,6 +231,32 @@ internal sealed class DhanQuoteClient(IHttpClientFactory httpClients, IDataAccou
     private static bool IsFailed(JsonElement root) =>
         root.TryGetProperty("status", out var status) && status.ValueKind == JsonValueKind.String
         && status.GetString() is { } text && (text.Equals("failed", StringComparison.OrdinalIgnoreCase) || text.Equals("failure", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// <c>last_trade_time</c> of the same answer (P7-11): India time, read from <c>dd/MM/yyyy HH:mm:ss</c> or from epoch seconds (no other form is guessed at); null when missing or in none of those forms. The format is not verified against the real
+    /// API: an unreadable time is null, and the pre-open check then treats the price as unavailable (fail closed).
+    /// </summary>
+    internal static DateTimeOffset? TradeTime(JsonElement owner)
+    {
+        if (owner.ValueKind != JsonValueKind.Object || !owner.TryGetProperty("last_trade_time", out var value))
+        {
+            return null;
+        }
+
+        var ist = System.Globalization.CultureInfo.InvariantCulture;
+        if (value.ValueKind == JsonValueKind.String && value.GetString() is { } text)
+        {
+            return DateTime.TryParseExact(text, "dd/MM/yyyy HH:mm:ss", ist, System.Globalization.DateTimeStyles.None, out var local)
+                ? new DateTimeOffset(local, XDrishti.Domain.Market.IndiaTime.Offset)
+                : null;
+        }
+
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var seconds) && seconds > 0 && seconds < 32_503_680_000L ? DateTimeOffset.FromUnixTimeSeconds(seconds) : null;
+    }
+
+    /// <summary>The traded volume of the same answer; null when missing, not a whole number or negative.</summary>
+    private static long? Volume(JsonElement owner) =>
+        owner.ValueKind == JsonValueKind.Object && owner.TryGetProperty("volume", out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number) && number >= 0 ? number : null;
 
     /// <summary>A positive number under the name; null when it is missing, not a number (a text is no number here), zero, negative or absurd.</summary>
     private static decimal? Price(JsonElement owner, string name) =>

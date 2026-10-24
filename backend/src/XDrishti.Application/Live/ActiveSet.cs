@@ -16,6 +16,9 @@ public enum ActiveSetReason
 
     /// <summary>The benchmark or a context index (NIFTY 50, NIFTY BANK, INDIA VIX).</summary>
     Index = 4,
+
+    /// <summary>An armed ticket of today's plan (spec P7-11): watched with alerts; no order exists. Ranks after every other reason, so when the cap cuts, an armed ticket goes first and no existing member is displaced.</summary>
+    ArmedTicket = 8,
 }
 
 /// <summary>What a provider proposes for the active set: the instrument, how to subscribe to it, why, and a value (for holdings: the value held) that orders the candidates of one reason when the set must be cut.</summary>
