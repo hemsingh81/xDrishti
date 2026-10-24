@@ -27,7 +27,7 @@ internal static class PlanDigestCommand
         {
             await using var scope = services.CreateAsyncScope();
             var result = await scope.ServiceProvider.GetRequiredService<ICommandHandler<BuildDigestCommand, DigestView>>()
-                .HandleAsync(new BuildDigestCommand(options.Week, options.DryRun, Actor), cancellationToken);
+                .HandleAsync(new BuildDigestCommand(options.Week, options.Store, Actor), cancellationToken);
             if (result.IsFailure)
             {
                 await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));
@@ -36,7 +36,7 @@ internal static class PlanDigestCommand
 
             var view = result.Value;
             await console.Out.WriteAsync(view.Text);
-            await console.Out.WriteLineAsync(view.Id is null ? "(dry run: nothing stored)" : view.Repeated ? $"(digest {view.Id} was stored already; nothing written)" : $"(stored as digest {view.Id})");
+            await console.Out.WriteLineAsync(view.Id is null ? "(printed only: nothing stored; use --store to keep it)" : view.Repeated ? $"(digest {view.Id} was stored already; nothing written)" : $"(stored as digest {view.Id})");
             return XdCommand.Done;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

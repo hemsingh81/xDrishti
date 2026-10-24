@@ -7,9 +7,10 @@
 ## Assumptions (stated up front)
 1. **Safety: nothing is applied, approved or ordered.** The digest only lists. It reads stored records and writes exactly one thing, the digest. No lesson, hypothesis, experiment, changelog row, cell state, model designation, approval or plan is written, and no broker, order or credential path is touched. Q6 and Q16 hold: the weekly service runs no P6 verb that writes.
 2. **The service is called `weekly`**, not `retrain`: it retrains nothing. P7-00 named a Saturday 10:00 `retrain`/digest service that would also run cell statistics, drift replay and hypothesis triggers and store their results; those P6 verbs write records (snapshots, lessons, hypotheses). The owner's binding decision (no automatic learning change, and the instruction that the service must not call a writing handler) cuts that part: it is left to the owner's own `xd learn ...` runs. The digest reads what they stored.
-3. **Starts paused**, no first-start seed (ADR 0086 pattern); Saturday 10:00 India time, weekly schedule of the framework (ADR 0018); catch-up within 24 hours.
-4. **Digest = one stored text and its sections, per ISO week**, immutable, insert-only. The first digest of a week is kept; a second build for the same week returns it and writes nothing. Content is as of when it was built (Saturday 10:00 by default), so later records of that week are not in it.
-5. **Week** is Monday to Sunday (ISO), India time; the default is the week of today; a future week is refused.
+3. **Starts paused**, no first-start seed (ADR 0086 pattern); Saturday 10:00 India time, weekly schedule of the framework (ADR 0018); catch-up within 24 hours (`CatchUpReach.SameDay` is, for a weekly job, 24 hours: a missed Saturday run is caught up on Sunday, still the current week).
+4. **Digest = one stored text and its sections, per ISO week**, immutable, insert-only. The first digest of a week is kept; a second build for the same week returns it and writes nothing. Content is as of when it was built, so later records of that week are not in it. **The digest reads today's state** (open lessons, hypotheses, models, the phase check), so storing is allowed only for the current week built at or after its Saturday 10:00 India time (the service's time) or for the most recent completed week (built within the following 7 days). Any older week can only be built as a dry run, never stored, and its text says `State as of <build date>, not as of the end of the week`. Every digest carries a `Built at <timestamp> IST` line.
+5. **Week** is Monday to Sunday (ISO), India time (records at Sunday 23:59 IST are in, Monday 00:00 IST is out; the default week is the India week of today, not the UTC one); a future week is refused. The 200-record read limit in the text is the code's constant, and a truncated section says its counts are undercounts.
+5a. **`xd plan digest` prints by default** and stores only with an explicit `--store`, subject to the rule above (a Monday manual run cannot lock in a near-empty digest of the current week). The weekly service stores through the same rule. A phase check that cannot be read fails the build (nothing stored; the service run fails and can be retried).
 6. **Drift proposals and loss-tag trends are the open or linked lessons** raised by the monitors (rolling band, CUSUM, calibration; growing loss tag), because that is where the P6 monitors store their findings (ADR 0078). The digest does not replay the monitors (that would recompute). Entry-window proposals (ADR 0069) are not stored anywhere, so they are not in the digest; this is stated here, not hidden.
 7. **Records are read newest 200 of each kind** (as the learning overview does); a section says when that limit was hit.
 8. **Plan outcomes** come from the stored P7-13 grades of the sessions in the week, through the existing report (curves and groups), labelled `simulated on plan prices`. Summing the stored R over a set is the grade report's own arithmetic; the digest adds none.
@@ -20,7 +21,7 @@
 Once a week the owner can read one summary built from the stored learning and plan records, with ids, listing only what awaits their decision, and saying in every section that nothing was applied.
 
 ## Scope
-**In:** Domain `Learning`: `DigestWeek`, `DigestItem`, `DigestInput`, `DigestSection`, `WeeklyDigest`, `DigestBuilder` (pure); Application: port `IDigestStore`, `BuildDigestHandler`, `GetDigestHandler`, `ListDigestsHandler`, `WeeklyService`; Infrastructure: `DigestStore`, record and configuration, migration `AddWeeklyDigests` (with `Down`, insert-only for `xd_app`); Api: `GET /api/learning/digest`, `GET /api/learning/digests`, `xd plan digest [--week] [--dry-run]`; tests; ADR 0094; docs and roadmap row.
+**In:** Domain `Learning`: `DigestWeek`, `DigestItem`, `DigestInput`, `DigestSection`, `WeeklyDigest`, `DigestBuilder` (pure); Application: port `IDigestStore`, `BuildDigestHandler`, `GetDigestHandler`, `ListDigestsHandler`, `WeeklyService`; Infrastructure: `DigestStore`, record and configuration, migration `AddWeeklyDigests` (with `Down`, insert-only for `xd_app`); Api: `GET /api/learning/digest`, `GET /api/learning/digests`, `xd plan digest [--week] [--store]`; tests; ADR 0094; docs and roadmap row.
 **Out:** any write to lessons, hypotheses, experiments, changelog, cells, models, approvals or plans; running cell statistics, drift replay or hypothesis triggers; notifications; a screen; the counterfactual progress line; the monthly review.
 
 ## Acceptance criteria
@@ -31,11 +32,12 @@ Once a week the owner can read one summary built from the stored learning and pl
 5. The service starts paused, runs Saturday 10:00, and its run only calls the digest handler as `system:weekly`.
 6. Determinism: the same stored records give the same text.
 7. `xd_app` can insert and select digests but not update, delete or truncate (grants test).
-8. A bad or future week is refused (`learning.invalid`, 422); an unknown week is `learning.digest_not_found` (404).
+8. Storing is refused (422 `learning.invalid`) for an older week and before the week's Saturday 10:00 IST; a dry run of any past week works and says its state is the build date's; a phase check failure fails the build; boundaries (Sunday 23:59 IST in, Monday 00:00 IST out; UTC date versus India date) are tested.
+9. A bad or future week is refused (`learning.invalid`, 422); an unknown week is `learning.digest_not_found` (404).
 
 ## Contract
 - **API:** `GET /api/learning/digest?week=2026-W43` (default: the newest stored), `GET /api/learning/digests?limit=` (1 to 52, default 12). Read only.
-- **CLI:** `xd plan digest [--week YYYY-Www] [--dry-run]`.
+- **CLI:** `xd plan digest [--week YYYY-Www] [--store]`.
 - **Data:** `research.digests` (iso_week unique, week_start, week_end, text, sections_json, built_by, created_at; check on the shape and on the pinned phrase). Log ids 4760 to 4769.
 - **Jobs:** service `weekly`, Saturday 10:00, paused by default.
 

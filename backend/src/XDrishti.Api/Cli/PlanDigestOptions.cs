@@ -4,13 +4,15 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Api.Cli;
 
 /// <summary>The parsed command line of <c>xd plan digest</c> (spec P7-15). Nothing here reads a file or the database.</summary>
-internal sealed record PlanDigestOptions(string? Week, bool DryRun)
+internal sealed record PlanDigestOptions(string? Week, bool Store)
 {
     public const string Usage = """
         usage:
-          xd plan digest [--week YYYY-Www] [--dry-run]
-            builds the weekly learning digest from stored records and stores it once per ISO week (default: this week, India time)
-            a week that has a digest shows the stored one and writes nothing; --dry-run builds and prints, stores nothing
+          xd plan digest [--week YYYY-Www] [--store]
+            builds the weekly learning digest from stored records and PRINTS it; nothing is stored unless --store is given (default week: this week, India time)
+            --store keeps it, once per ISO week, only for the current week from its Saturday 10:00 India time or the most recent completed week; an older week can only be printed
+            a week that has a digest shows the stored one with --store and writes nothing
+            the text says when it was built and, for a finished week, that the state is the build date's
             the digest only lists proposals: nothing is applied, approved or ordered
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
@@ -22,12 +24,12 @@ internal sealed record PlanDigestOptions(string? Week, bool DryRun)
         ArgumentNullException.ThrowIfNull(args);
         var errors = new List<string>();
         string? week = null;
-        var dryRun = false;
+        var store = false;
         for (var i = 0; i < args.Count; i++)
         {
-            if (args[i] == "--dry-run")
+            if (args[i] == "--store")
             {
-                dryRun = true;
+                store = true;
             }
             else if (args[i] != "--week")
             {
@@ -52,6 +54,6 @@ internal sealed record PlanDigestOptions(string? Week, bool DryRun)
             }
         }
 
-        return errors.Count > 0 ? (null, errors) : (new PlanDigestOptions(week, dryRun), errors);
+        return errors.Count > 0 ? (null, errors) : (new PlanDigestOptions(week, store), errors);
     }
 }

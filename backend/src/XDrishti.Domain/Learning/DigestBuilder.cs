@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using XDrishti.Domain.Market;
 using XDrishti.Domain.Planning;
 
 namespace XDrishti.Domain.Learning;
@@ -11,10 +12,13 @@ namespace XDrishti.Domain.Learning;
 public static class DigestBuilder
 {
     /// <summary>The sentence the digest opens with, and the phrase the stored row must contain.</summary>
-    public const string NothingApplied = "Nothing was applied: every item below is a proposal; applying any of it is the owner's own act.";
+    public const string NothingApplied = "Nothing was applied: the items below are stored records, findings and proposals; deciding or applying any of it is the owner's own act.";
+
+    /// <summary>The most records of one kind the digest reads; the text says so, and the handler reads exactly this many.</summary>
+    public const int ReadLimit = 200;
 
     /// <summary>The closing line of every section.</summary>
-    public const string SectionNote = "Nothing was applied in this section: these are stored records and proposals for the owner.";
+    public const string SectionNote = "Nothing was applied in this section: these are stored records, findings and proposals for the owner.";
 
     /// <summary>Printed in a section with nothing to list.</summary>
     public const string None = "- none";
@@ -36,7 +40,7 @@ public static class DigestBuilder
         };
         var week = input.Week;
         var text = new StringBuilder();
-        text.Append(CultureInfo.InvariantCulture, $"Weekly learning digest {week.Key} ({week.Start:yyyy-MM-dd} to {week.End:yyyy-MM-dd})\n{NothingApplied}\n");
+        text.Append(CultureInfo.InvariantCulture, $"Weekly learning digest {week.Key} ({week.Start:yyyy-MM-dd} to {week.End:yyyy-MM-dd})\n{NothingApplied}\n{BuiltLine(input)}\n");
         var number = 1;
         foreach (var s in sections)
         {
@@ -48,6 +52,16 @@ public static class DigestBuilder
         }
 
         return new WeeklyDigest(week, sections, text.ToString());
+    }
+
+    /// <summary>When it was built, in India time; for a week that has ended, also that the state is the build date's, not the week's end.</summary>
+    private static string BuiltLine(DigestInput input)
+    {
+        var ist = IndiaTime.ToIst(input.BuiltAt);
+        var line = string.Create(CultureInfo.InvariantCulture, $"Built at {ist:yyyy-MM-dd HH:mm} IST.");
+        return DateOnly.FromDateTime(ist.DateTime) > input.Week.End
+            ? string.Create(CultureInfo.InvariantCulture, $"{line} State as of {ist:yyyy-MM-dd}, not as of the end of the week: open lessons, hypotheses, models and the phase check are read as they are at the build date.")
+            : line;
     }
 
     private static DigestSection Section(string key, string title, IEnumerable<string> lines) => new(key, title, [.. lines, SectionNote]);
@@ -83,7 +97,7 @@ public static class DigestBuilder
     {
         if (input.Truncated.Contains(kind, StringComparer.Ordinal))
         {
-            yield return $"Note: the newest 200 {kind} were read; there may be more.";
+            yield return string.Create(CultureInfo.InvariantCulture, $"Note: the newest {ReadLimit} {kind} were read; there may be more, so the counts in this section are undercounts.");
         }
     }
 
@@ -207,12 +221,6 @@ public static class DigestBuilder
             yield return t;
         }
 
-        if (input.PhaseCriteria is null)
-        {
-            yield return "Phase check unavailable: " + (input.PhaseProblem ?? "not read") + ".";
-            yield break;
-        }
-
         foreach (var cr in input.PhaseCriteria)
         {
             yield return string.Create(CultureInfo.InvariantCulture, $"Phase criterion {cr.Number}: {PhaseCheckReport.Label(cr)} - {cr.Name}");
@@ -225,7 +233,7 @@ public static class DigestBuilder
     private static IEnumerable<string> Limits(DigestInput input)
     {
         yield return string.Create(CultureInfo.InvariantCulture, $"Everything here rests on about 2.1 years of data and {PhaseCheck.UsableFoldsText} usable validation folds; fills are modelled, and plan outcomes are simulated on plan prices, not on fills.");
-        yield return "Lists read the newest 200 records of each kind; a note says where there may be more.";
+        yield return string.Create(CultureInfo.InvariantCulture, $"Lists read the newest {ReadLimit} records of each kind; a note says where there may be more, and then the counts are undercounts.");
         yield return "Statistics are as stored when each record was made; this digest recomputes nothing and is stored once per ISO week.";
         foreach (var limit in input.PhaseLimits)
         {

@@ -28,7 +28,10 @@ internal sealed class BuildDigestHandler(
     ILogger<BuildDigestHandler> logger) : ICommandHandler<BuildDigestCommand, DigestView>
 {
     /// <summary>The records of each kind read.</summary>
-    public const int ReadLimit = 200;
+    public const int ReadLimit = DigestBuilder.ReadLimit;
+
+    /// <summary>The most graded tickets of the week the plan report reads.</summary>
+    public const int GradeReportLimit = 5000;
 
     private static readonly string[] DriftMonitors = ["rolling_band", "cusum", "calibration"];
 
@@ -58,14 +61,25 @@ internal sealed class BuildDigestHandler(
             return Result.Failure<DigestView>(LearningErrors.Invalid(problems));
         }
 
-        if (!command.DryRun && await store.FindByWeekAsync(week.Key, cancellationToken) is { } existing)
+        if (command.Store && week.StoreRefusal(now) is { } refusal)
+        {
+            return Result.Failure<DigestView>(LearningErrors.Invalid([new FieldError("store", refusal)]));
+        }
+
+        if (command.Store && await store.FindByWeekAsync(week.Key, cancellationToken) is { } existing)
         {
             DigestLog.Repeat(logger, week.Key, existing.Id);
             return Result.Success(Of(existing, true));
         }
 
-        var digest = DigestBuilder.Build(await GatherAsync(week, cancellationToken));
-        if (command.DryRun)
+        var gathered = await GatherAsync(week, now, cancellationToken);
+        if (gathered.IsFailure)
+        {
+            return Result.Failure<DigestView>(gathered.Error);
+        }
+
+        var digest = DigestBuilder.Build(gathered.Value);
+        if (!command.Store)
         {
             DigestLog.DryRun(logger, week.Key);
             return Result.Success(new DigestView(null, week.Key, week.Start, week.End, digest.Sections, digest.Text, null, null, false));
@@ -88,7 +102,7 @@ internal sealed class BuildDigestHandler(
     internal static DigestView Of(StoredDigest s, bool repeated) =>
         new(s.Id, s.Digest.Week.Key, s.Digest.Week.Start, s.Digest.Week.End, s.Digest.Sections, s.Digest.Text, s.BuiltBy, s.CreatedAt, repeated);
 
-    private async ValueTask<DigestInput> GatherAsync(DigestWeek week, CancellationToken cancellationToken)
+    private async ValueTask<Result<DigestInput>> GatherAsync(DigestWeek week, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var from = new DateTimeOffset(week.Start.ToDateTime(TimeOnly.MinValue), IndiaTime.Offset);
         var to = from.AddDays(7);
@@ -130,17 +144,20 @@ internal sealed class BuildDigestHandler(
             .Select(m => new DigestItem(m.Id, m.Role.Code(), string.Empty, m.Model.Verdict.ToString(),
                 string.Create(CultureInfo.InvariantCulture, $"beat both baselines in {m.Model.FoldsBeatingBoth} of {m.Model.UsedFolds} folds ({m.Model.FoldsNeeded} needed); pooled calibration error {m.Model.PooledEcePp:F2} pp; hold-out {(m.Model.HoldOutStart is { } h ? "from " + h.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : "none kept")}"))).ToList();
 
-        var page = await grades.ReportItemsAsync(week.Start, week.End, GetDecisionsReportHandlerLimit, cancellationToken);
+        var page = await grades.ReportItemsAsync(week.Start, week.End, GradeReportLimit, cancellationToken);
         var plans = page.Items.Count == 0 ? null : GradeReport.Build(page.Items, page.Truncated);
 
         var phase = await phaseCheck.HandleAsync(new EvaluatePhaseCheckQuery(null), cancellationToken);
         if (phase.IsFailure)
         {
+            // A digest without the phase check would be stored for ever without it: the build fails (and a service run can be retried) instead.
             DigestLog.PhaseUnavailable(logger, week.Key, phase.Error.Code);
+            return Result.Failure<DigestInput>(phase.Error);
         }
 
-        return new DigestInput(
+        return Result.Success(new DigestInput(
             week,
+            now,
             asOf,
             cellChanges,
             drift,
@@ -153,13 +170,10 @@ internal sealed class BuildDigestHandler(
             weekExperiments,
             plans,
             modelItems,
-            phase.IsSuccess ? phase.Value.Report.Criteria : null,
-            phase.IsFailure ? phase.Error.Code : null,
-            phase.IsSuccess ? phase.Value.Report.Limits : [],
-            truncated);
+            phase.Value.Report.Criteria,
+            phase.Value.Report.Limits,
+            truncated));
     }
-
-    private const int GetDecisionsReportHandlerLimit = 5000;
 
     private static void Flag(List<string> truncated, string kind, int count)
     {

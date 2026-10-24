@@ -24,6 +24,7 @@ public sealed class WeeklyServiceTests
         d.Defaults.Enabled.ShouldBeFalse();
         d.Defaults.Schedule.ShouldBe(Schedule.Weekly(DayOfWeek.Saturday, new TimeOnly(10, 0)));
         new WeeklyService(Substitute.For<IServiceScopeFactory>()).FirstStartSettings().ShouldBeNull();
+        d.Constraints.CatchUpReach.ShouldBe(CatchUpReach.SameDay); // a weekly job missed on Saturday is caught up within 24 hours
     }
 
     [Fact]
@@ -44,7 +45,7 @@ public sealed class WeeklyServiceTests
 
         outcome.Status.ShouldBe(ServiceRunStatus.Succeeded);
         outcome.Message.ShouldNotBeNull().ShouldContain("nothing applied");
-        await handler.Received(1).HandleAsync(Arg.Is<BuildDigestCommand>(c => c.Week == null && !c.DryRun && c.Actor == "system:weekly"), Ct);
+        await handler.Received(1).HandleAsync(Arg.Is<BuildDigestCommand>(c => c.Week == null && c.Store && c.Actor == "system:weekly"), Ct);
         provider.ReceivedCalls().Count().ShouldBe(1);
     }
 }

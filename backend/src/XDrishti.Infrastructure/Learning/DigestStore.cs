@@ -30,7 +30,7 @@ internal sealed class DigestStore(NpgsqlDataSource dataSource) : IDigestStore
         p.AddWithValue("text", NpgsqlDbType.Text, d.Text);
         p.AddWithValue("sections", NpgsqlDbType.Text, JsonSerializer.Serialize(d.Sections));
         p.AddWithValue("by", NpgsqlDbType.Varchar, digest.BuiltBy);
-        p.AddWithValue("at", NpgsqlDbType.TimestampTz, digest.CreatedAt);
+        p.AddWithValue("at", NpgsqlDbType.TimestampTz, digest.CreatedAt.ToUniversalTime());
         var written = await insert.ExecuteNonQueryAsync(cancellationToken);
         var stored = await FindByWeekAsync(d.Week.Key, cancellationToken) ?? throw new InvalidOperationException("The digest was not found after it was stored.");
         return (stored, written == 1);

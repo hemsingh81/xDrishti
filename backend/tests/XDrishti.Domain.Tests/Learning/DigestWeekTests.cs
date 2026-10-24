@@ -39,4 +39,34 @@ public sealed class DigestWeekTests
     {
         DigestWeek.TryParse(text).ShouldBeNull();
     }
+
+    private static DateTimeOffset Ist(string iso) => DateTimeOffset.Parse(iso + "+05:30", System.Globalization.CultureInfo.InvariantCulture);
+
+    [Theory]
+    [InlineData("2026-W43", "2026-10-24T10:00:00", false)]
+    [InlineData("2026-W43", "2026-10-24T09:59:59", true)]
+    [InlineData("2026-W43", "2026-10-26T12:00:00", false)]
+    [InlineData("2026-W43", "2026-10-31T10:00:00", false)]
+    [InlineData("2026-W43", "2026-11-02T12:00:00", true)]
+    [InlineData("2026-W42", "2026-10-26T12:00:00", true)]
+    [InlineData("2026-W42", "2026-10-17T09:00:00", true)]
+    [InlineData("2026-W43", "2026-10-21T12:00:00", true)]
+    [InlineData("2026-W44", "2026-10-24T12:00:00", true)]
+    public void Only_the_current_week_from_saturday_10_or_the_last_completed_week_may_be_stored(string week, string now, bool refused)
+    {
+        var refusal = DigestWeek.TryParse(week)!.Value.StoreRefusal(Ist(now));
+
+        (refusal is not null).ShouldBe(refused);
+    }
+
+    [Fact]
+    public void The_week_follows_the_india_date_not_the_utc_date()
+    {
+        var newYear = new DateTimeOffset(2026, 12, 31, 20, 0, 0, TimeSpan.Zero);
+        var sunday = new DateTimeOffset(2026, 10, 25, 20, 0, 0, TimeSpan.Zero);
+
+        DigestWeek.Of(XDrishti.Domain.Market.IndiaTime.Today(newYear)).Key.ShouldBe("2026-W53");
+        DigestWeek.Of(XDrishti.Domain.Market.IndiaTime.Today(sunday)).Key.ShouldBe("2026-W44");
+        DigestWeek.Of(DateOnly.FromDateTime(sunday.UtcDateTime)).Key.ShouldBe("2026-W43");
+    }
 }

@@ -7,6 +7,7 @@ namespace XDrishti.Domain.Learning;
 /// No clock and no store here: the builder only lists and counts.
 /// </summary>
 /// <param name="Week">The week.</param>
+/// <param name="BuiltAt">When the digest is built: printed in India time on the digest, and says whether the state read is that of a finished week.</param>
 /// <param name="CellsAsOf">As-of date of the newest cell-statistics snapshot, or null before the first.</param>
 /// <param name="CellChanges">Cell state changes (changelog rows) of the week.</param>
 /// <param name="DriftProposals">Open or linked lessons raised by the drift and calibration monitors.</param>
@@ -19,12 +20,12 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Experiments">Experiments recorded during the week.</param>
 /// <param name="Plans">The grade report over the plans of the week, or null when there is none to read.</param>
 /// <param name="Models">The champion and the challengers.</param>
-/// <param name="PhaseCriteria">The phase check's criteria, or null when it could not be read.</param>
-/// <param name="PhaseProblem">Why the phase check could not be read; null when it was.</param>
+/// <param name="PhaseCriteria">The phase check's criteria (a build whose phase check cannot be read fails and stores nothing).</param>
 /// <param name="PhaseLimits">The phase check's own limits.</param>
 /// <param name="Truncated">Kinds of record whose read hit the limit, so there may be more.</param>
 public sealed record DigestInput(
     DigestWeek Week,
+    DateTimeOffset BuiltAt,
     DateOnly? CellsAsOf,
     IReadOnlyList<DigestItem> CellChanges,
     IReadOnlyList<DigestItem> DriftProposals,
@@ -37,7 +38,6 @@ public sealed record DigestInput(
     IReadOnlyList<DigestItem> Experiments,
     GradeReportData? Plans,
     IReadOnlyList<DigestItem> Models,
-    IReadOnlyList<PhaseCriterion>? PhaseCriteria,
-    string? PhaseProblem,
+    IReadOnlyList<PhaseCriterion> PhaseCriteria,
     IReadOnlyList<string> PhaseLimits,
     IReadOnlyList<string> Truncated);

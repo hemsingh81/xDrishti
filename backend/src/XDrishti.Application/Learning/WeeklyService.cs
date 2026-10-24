@@ -27,7 +27,7 @@ public sealed class WeeklyService(IServiceScopeFactory scopes) : IScheduledServi
         [],
         new ServiceConstraints
         {
-            CatchUpReach = CatchUpReach.SameDay,
+            CatchUpReach = CatchUpReach.SameDay, // a weekly job missed on Saturday is caught up within 24 hours (Sunday); a later start would store a digest of a past week
         });
 
     ServiceDefinition IScheduledService.Definition => Definition;
@@ -40,7 +40,7 @@ public sealed class WeeklyService(IServiceScopeFactory scopes) : IScheduledServi
         await using var scope = scopes.CreateAsyncScope();
         var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<BuildDigestCommand, DigestView>>();
         var manual = context.Trigger == ServiceRunTrigger.Manual;
-        var result = await handler.HandleAsync(new BuildDigestCommand(null, false, manual ? context.RequestedBy : Requester), cancellationToken);
+        var result = await handler.HandleAsync(new BuildDigestCommand(null, true, manual ? context.RequestedBy : Requester), cancellationToken);
         if (result.IsFailure)
         {
             return ServiceOutcome.Failed(result.Error.Message);

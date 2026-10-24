@@ -1,4 +1,5 @@
 using System.Globalization;
+using XDrishti.Domain.Market;
 
 namespace XDrishti.Domain.Learning;
 
@@ -41,6 +42,22 @@ public readonly record struct DigestWeek
         }
 
         return new DigestWeek(year, week);
+    }
+
+    /// <summary>
+    /// Why a digest of this week may not be STORED at <paramref name="now"/>, or null when it may: only the current week, from its Saturday 10:00 India time (the weekly service's time), or the most recent completed week, may be stored; the digest reads
+    /// today's state, so an older week stored immutably would show today's state as that week's. An older week can only be built as a dry run.
+    /// </summary>
+    public string? StoreRefusal(DateTimeOffset now)
+    {
+        var today = IndiaTime.Today(now);
+        if (this != Of(today) && this != Of(today.AddDays(-7)))
+        {
+            return "Only the current week or the most recent completed week can be stored; an older or future week can only be built as a dry run, because the digest reads today's state.";
+        }
+
+        var saturday = new DateTimeOffset(Start.AddDays(5).ToDateTime(new TimeOnly(10, 0)), IndiaTime.Offset);
+        return now < saturday ? "A week is stored from its Saturday 10:00 India time; before that the digest would be near empty and could not be replaced." : null;
     }
 
     /// <inheritdoc />

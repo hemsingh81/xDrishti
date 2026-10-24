@@ -8,9 +8,9 @@ namespace XDrishti.Application.Learning;
 /// Builds the weekly learning digest from stored records and stores it once per ISO week (P7-15, ADR 0094). It reads; the only thing it writes is the digest. It applies nothing, approves nothing and places no order.
 /// </summary>
 /// <param name="Week">The ISO week (<c>2026-W43</c>); null for the week of today (India time).</param>
-/// <param name="DryRun">Build and show, store nothing.</param>
+/// <param name="Store">Store the digest (only when the week may be stored, see <c>DigestWeek.StoreRefusal</c>); false builds and shows it and stores nothing.</param>
 /// <param name="Actor">Who asked (<c>system:weekly</c>, <c>cli:xd</c>).</param>
-public sealed record BuildDigestCommand(string? Week, bool DryRun, string Actor) : ICommand;
+public sealed record BuildDigestCommand(string? Week, bool Store, string Actor) : ICommand;
 
 /// <summary>The weekly digest as the API and the verb show it.</summary>
 /// <param name="Id">The row id; null for a dry run that stored nothing.</param>
