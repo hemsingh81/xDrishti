@@ -140,6 +140,7 @@ public static class DependencyInjection
         services.AddScoped<IInstrumentSecurities, InstrumentSecurities>(); // shares by canonical symbol with their Dhan NSE equity id (P7-11)
         services.AddScoped<IPreOpenSource, PreOpenSource>(); // the pre-open price, previous close and ATR: the existing read-only quote and stored day bars (P7-11)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
+        services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
         services.AddSingleton<IOpenBookSettings, OpenBookSettings>(); // off by default: the open book is unavailable (P7-09, ADR 0092)
         services.AddScoped<ITicketSource, StoredTicketSource>();

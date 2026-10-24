@@ -39,10 +39,26 @@ internal sealed class PlansEndpoints : IEndpointModule
             .WithSummary("Top-1/3/5/all curves by rank, primary versus reserve versus rejected, and the owner's decisions (approved, modified, rejected, lapsed, undecided) over the graded plans of an optional date range, with sample-size notes. Labelled 'simulated on plan prices'. Read only. 422 plans.invalid")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
 
-        api.MapGroup("/plan-runs").WithTags("Plans").MapGet("/", ListRunsAsync)
+        var runs = api.MapGroup("/plan-runs").WithTags("Plans");
+        runs.MapGet("/", ListRunsAsync)
             .WithName("ListPlanRuns")
             .WithSummary("The recorded attempts of the nightly pipeline, newest planned session first: published (with the plan) or failed closed (with the gate and the reason). Optional planned-session date, limit 1 to 200 (default 50). Read only. 422 plans.invalid")
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        runs.MapGet("/phase-check", PhaseCheckAsync)
+            .WithName("GetPlanPhaseCheck")
+            .WithSummary("The P7 phase check from stored records: the last ten trading sessions (scheduled or manual run, gates, published or failed closed, tickets, manual runs), then each acceptance criterion as MET, NOT MET or NOT EVALUABLE with its numbers, the services and owner switches that are still off, and the honest limits. The exit is never MET on fewer than ten consecutive scheduled sessions. Optional 'through' planned-session date. Read only; writes nothing. 422 plans.invalid")
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    private static async Task<Results<Ok<PlanPhaseCheckView>, ProblemHttpResult>> PhaseCheckAsync(
+        DateOnly? through,
+        HttpContext http,
+        IQueryHandler<EvaluatePlanPhaseCheckQuery, Result<PlanPhaseCheckView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new EvaluatePlanPhaseCheckQuery(through), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<IReadOnlyList<PlanRunView>>, ProblemHttpResult>> ListRunsAsync(

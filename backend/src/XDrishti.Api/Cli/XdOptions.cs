@@ -42,6 +42,7 @@ internal sealed record XdOptions(
           xd learn phase-check [--replay-seconds X]
           xd select cells --date YYYY-MM-DD [--min-state candidate|paper|active]
           xd plan run [--date YYYY-MM-DD] [--dry-run]
+          xd plan phase-check [--through YYYY-MM-DD]
           xd plan digest [--week YYYY-Www] [--store]
           xd learn training-set --run RUNKEY:STYLE:EXIT [--run ...] [--require NAME,NAME,...] [--half-life-days N] [--prior-strength N] [--min-trades N]
           xd lab runs [--strategy ID] [--state queued|running|succeeded|failed|cancelled|interrupted] [--limit 1..200]

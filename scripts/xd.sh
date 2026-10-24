@@ -10,6 +10,7 @@
 #   scripts/xd.sh learn experiment --baseline RUNKEY --candidate RUNKEY --knob NAME --kind slippage --from 8 --to 12   (P6-11, ADR 0072: judge a knob change between two stored runs, recorded)
 #   scripts/xd.sh learn phase-check [--replay-seconds X]   (P6-18, ADR 0080: the P6 exit criteria from stored records, MET / NOT MET / NOT EVALUABLE, limits printed)
 #   scripts/xd.sh plan run [--date YYYY-MM-DD] [--dry-run]   (P7-08, ADR 0086: the fail-closed nightly pipeline now; a failing gate publishes nothing and exits 1; --dry-run writes nothing)
+#   scripts/xd.sh plan phase-check [--through YYYY-MM-DD]   (P7-18, ADR 0097: the P7 exit criteria from stored plan runs, MET / NOT MET / NOT EVALUABLE, limits printed; read only)
 #   scripts/xd.sh lab runs [--strategy ID] [--state succeeded] [--limit 20]
 # Exit codes: 0 done (a full test: PASS), 1 refused (located problems on stderr), 2 wrong command line or configuration, 3 failure or timeout,
 # 4 a full test with verdict MARGINAL or FAIL, 130 cancelled. A test needs the stack running (deploy/xd-up.sh): xd-api carries the run out; this command stores
