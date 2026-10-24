@@ -63,8 +63,12 @@ public sealed record PhaseEvidenceFacts(int Plans, int Tickets, int PlansWithout
 /// <param name="TicketsLapsed">Tickets in the lapsed state.</param>
 /// <param name="UndecidedPastCutoff">Tickets still waiting for the cutoff job well after the cutoff.</param>
 /// <param name="DecisionsAfterCutoff">Approval rows dated at or after their plan's cutoff.</param>
-/// <param name="ApprovedWithoutRow">Tickets in an approved, armed or triggered state with no approve row.</param>
+/// <param name="ApprovedWithoutRow">Tickets that are, or ever were, approved, armed or triggered (by state or by their trail) and have no approve row.</param>
 /// <param name="AutoSwitchEverOn">Whether the auto-approval switch was ever stored as ON.</param>
+/// <param name="AutoBeforeFirstOn">Auto approvals dated before the switch was first stored ON, or all of them when it never was.</param>
+/// <param name="PlansCap">The most plans read (0 when not stated).</param>
+/// <param name="PlansTruncated">Whether more plans exist than were read.</param>
+/// <param name="AutoHistoryTruncated">Whether the autonomy history is longer than the rows read (the first ON row may be older).</param>
 public sealed record PhaseReviewFacts(
     int Plans,
     int PlansLapsed,
@@ -77,7 +81,11 @@ public sealed record PhaseReviewFacts(
     int UndecidedPastCutoff,
     int DecisionsAfterCutoff,
     int ApprovedWithoutRow,
-    bool AutoSwitchEverOn);
+    bool AutoSwitchEverOn,
+    int AutoBeforeFirstOn = 0,
+    int PlansCap = 0,
+    bool PlansTruncated = false,
+    bool AutoHistoryTruncated = false);
 
 /// <summary>The per-account sizes stored on tickets (criterion 8).</summary>
 /// <param name="Allocations">Allocation rows read.</param>

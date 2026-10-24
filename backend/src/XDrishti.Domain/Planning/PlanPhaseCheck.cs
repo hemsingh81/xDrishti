@@ -12,6 +12,15 @@ public static class PlanPhaseCheck
     /// <summary>The number of consecutive sessions the roadmap exit asks for.</summary>
     public const int RequiredSessions = 10;
 
+    /// <summary>The newest run rows read for the history and the fail-closed counts.</summary>
+    public const int RunRowsRead = 200;
+
+    /// <summary>The newest plans whose tickets, approvals, grades and journal are counted.</summary>
+    public const int PlansRead = 60;
+
+    /// <summary>The autonomy settings rows read (the store's own ceiling).</summary>
+    public const int AutonomyRowsRead = 200;
+
     public const string StateCounted = "counted";
 
     public const string StateManual = "manual_run";
@@ -80,8 +89,7 @@ public static class PlanPhaseCheck
             ByTests(12, "Every slice ends with scripts/check.sh green, a gen-api run, a reviewer pass, an ADR and build-docs", "a process step of the build, not a stored record"),
         };
 
-        var exit = criteria[0].Verdict;
-        return new PlanPhaseReport(facts.Through, streak, exit, criteria, sessions, facts.Setup.Services, facts.Setup.Switches, Blockers(facts.Setup), facts.Setup.Counts, Limits());
+        return new PlanPhaseReport(facts.Through, streak, criteria[0].Verdict, PlanPhaseReport.Label(criteria[0]), criteria, sessions, facts.Setup.Services, facts.Setup.Switches, Blockers(facts.Setup), facts.Setup.Counts, Limits());
     }
 
     /// <summary>One line per planned session of the window, oldest first.</summary>
@@ -101,7 +109,7 @@ public static class PlanPhaseCheck
         var deciding = published ?? runs.LastOrDefault();
         var plan = published is not null ? s.Plan : null;
         var zero = plan is not null && plan.Primary == 0;
-        var skeleton = plan is not null && plan.Basis.StartsWith("skeleton", StringComparison.Ordinal);
+        var skeleton = plan is not null && plan.Basis.StartsWith(PlanWording.SkeletonBasisPrefix, StringComparison.Ordinal);
 
         var (state, note) = (runs.Count, manual, failed, published, plan) switch
         {
@@ -147,15 +155,26 @@ public static class PlanPhaseCheck
         var index = run.FailedGate is null ? -1 : GateOrder.ToList().IndexOf(run.FailedGate);
         return index >= 0
             ? $"{index} pass, {run.FailedGate} did not pass"
-            : $"{GateOrder.Count} pass, stage {run.FailedGate ?? "unknown"} failed";
+            : $"{GateOrder.Count} pass, stage {(run.FailedGate is null ? "unknown" : Clean(run.FailedGate, GateResult.MaxGateLength))} failed";
     }
 
-    private static string FailureText(PhaseRun run) => $"{run.FailedGate ?? "unknown"}: {Clean(run.Reason, 160)}";
+    private static string FailureText(PhaseRun run) => $"{(run.FailedGate is null ? "unknown" : Clean(run.FailedGate, GateResult.MaxGateLength))}: {Clean(run.Reason, 160)}";
 
     private static string Clean(string text, int max)
     {
         var flat = new string([.. text.Select(ch => char.IsControl(ch) ? ' ' : ch)]);
-        return flat.Length <= max ? flat : flat[..(max - 1)] + "~";
+        if (flat.Length <= max)
+        {
+            return flat;
+        }
+
+        var cut = max - 1;
+        if (cut > 0 && char.IsHighSurrogate(flat[cut - 1]))
+        {
+            cut--; // never leave half of a surrogate pair
+        }
+
+        return flat[..cut] + "~";
     }
 
     private static int Streak(IReadOnlyList<PlanPhaseSession> sessions)
@@ -179,9 +198,15 @@ public static class PlanPhaseCheck
         var zero = sessions.Count(s => s.ZeroPrimary);
         var facts1 = string.Create(c, $"{sessions.Count(s => s.State == StateCounted)} of {sessions.Count} sessions up to {facts.Through:yyyy-MM-dd} counted, {streak} in a row at the end, manual runs in the window {manualRuns}, failed-closed attempts {sessions.Sum(s => s.FailedRuns)}, plans with zero primary tickets {zero}, skeleton plans {sessions.Count(s => s.Skeleton)}");
 
-        if (sessions.Count < RequiredSessions)
+        if (sessions.Count != RequiredSessions)
         {
-            return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.NotEvaluable, string.Create(c, $"{facts1}; the window has only {sessions.Count} trading sessions, {RequiredSessions} are needed."));
+            return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.NotEvaluable, string.Create(c, $"{facts1}; the window has {sessions.Count} trading sessions, exactly {RequiredSessions} are needed."));
+        }
+
+        var problem = WindowProblem(facts, sessions);
+        if (problem is not null)
+        {
+            return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.NotEvaluable, facts1 + "; the window is malformed (" + problem + "), so no call is made.");
         }
 
         if (breaks.Count > 0)
@@ -195,14 +220,31 @@ public static class PlanPhaseCheck
             return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.NotEvaluable, string.Create(c, $"{facts1}; only {sessions.Count - before} of {RequiredSessions} sessions have any history and all of them are good so far: {before} more trading session(s) of scheduled runs are needed (wall-clock time)."));
         }
 
-        // Defensive: MET only when every one of the ten sessions is counted (checked above) - spelled out so no edit can print MET on less.
-        if (sessions.Any(s => s.State != StateCounted || s.ManualRuns > 0 || s.FailedRuns > 0 || !s.Published))
+        // Defensive: MET only when exactly ten sessions are counted (checked above) - spelled out so no edit can print MET on less.
+        if (sessions.Count != RequiredSessions || sessions.Any(s => s.State != StateCounted || s.ManualRuns > 0 || s.FailedRuns > 0 || !s.Published))
         {
             return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.NotEvaluable, facts1 + "; internal inconsistency.");
         }
 
-        var caveat = zero > 0 ? string.Create(c, $"{zero} of {sessions.Count} plans have zero primary tickets, {sessions.Count(s => s.Skeleton)} of them skeleton") : null;
+        var empty = sessions.Count(s => s is { Primary: 0, Reserve: 0 });
+        var caveat = empty == sessions.Count
+            ? string.Create(c, $"COUNT ONLY: all {sessions.Count} plans are empty, no ticket was ever proposed")
+            : zero > 0 ? string.Create(c, $"{zero} of {sessions.Count} plans have zero primary tickets, {sessions.Count(s => s.Skeleton)} of them skeleton") : null;
         return new PlanPhaseCriterion(1, name, PlanPhaseVerdicts.Met, facts1 + "; unattended means: scheduled or catch-up runs only (the stored manual flag), no failed-closed attempt, in the trading calendar's order (a holiday between two sessions does not break the run).", caveat);
+    }
+
+    /// <summary>Why the window cannot be trusted as ten consecutive trading sessions ending at the requested date; null when it can.</summary>
+    private static string? WindowProblem(PlanPhaseFacts facts, IReadOnlyList<PlanPhaseSession> sessions)
+    {
+        for (var i = 1; i < sessions.Count; i++)
+        {
+            if (sessions[i].Date <= sessions[i - 1].Date)
+            {
+                return "dates are not strictly ascending";
+            }
+        }
+
+        return sessions[^1].Date == facts.Through ? null : "the last date is not the requested one";
     }
 
     private static PlanPhaseCriterion FailClosed(PhaseFailClosedFacts f)
@@ -210,7 +252,7 @@ public static class PlanPhaseCheck
         const string name = "Fail closed: a gate that does not pass publishes no plan, and one run row carries the gate and the reason";
         var c = CultureInfo.InvariantCulture;
         var failed = f.ByGate.Sum(g => g.Count);
-        var gates = f.ByGate.Count == 0 ? "none" : string.Join(", ", f.ByGate.Select(g => $"{g.Gate} {g.Count}"));
+        var gates = f.ByGate.Count == 0 ? "none" : string.Join(", ", f.ByGate.Select(g => $"{Clean(g.Gate, GateResult.MaxGateLength)} {g.Count}"));
         var facts = string.Create(c, $"{failed} failed-closed row(s) in the newest {f.RowsRead} run rows{(f.Truncated ? " (older rows exist)" : string.Empty)}; per gate: {gates}");
         if (f.Inconsistent > 0)
         {
@@ -264,7 +306,7 @@ public static class PlanPhaseCheck
             4,
             name,
             PlanPhaseVerdicts.Met,
-            string.Create(c, $"the allow-list has the {f.Current.Count} pinned entries and none more; all {RefusedProbes.Count} order, position and fund probes are refused."),
+            string.Create(c, $"the allow-list has the {f.Current.Count} pinned entries and no entry beyond those the guard's rule table declares; all {RefusedProbes.Count} order, position and fund probes are refused."),
             "the architecture tripwire (NoOrderPlacementArchitectureTests) is a test, not run here");
     }
 
@@ -292,11 +334,12 @@ public static class PlanPhaseCheck
     {
         const string name = "Human in the loop: unreviewed tickets lapse at the cutoff, only an approved ticket is armed, every decision is a stored row";
         var c = CultureInfo.InvariantCulture;
-        var facts = string.Create(c, $"{f.Plans} plan(s) read: lapsed {f.PlansLapsed}, with a decision {f.PlansWithDecision}; tickets: owner approved {f.OwnerApproved}, modified {f.OwnerModified}, rejected {f.OwnerRejected}, auto approved {f.AutoApproved}, lapsed {f.TicketsLapsed}");
+        var cap = f.PlansCap > 0 ? string.Create(c, $" (the newest {f.PlansCap} at most{(f.PlansTruncated ? "; older plans are not read" : string.Empty)})") : string.Empty;
+        var facts = string.Create(c, $"{f.Plans} plan(s) read{cap}: lapsed {f.PlansLapsed}, with a decision {f.PlansWithDecision}; tickets: owner approved {f.OwnerApproved}, modified {f.OwnerModified}, rejected {f.OwnerRejected}, auto approved {f.AutoApproved}, lapsed {f.TicketsLapsed}");
         var problems = new List<string>();
-        if (f.AutoApproved > 0 && !f.AutoSwitchEverOn)
+        if (f.AutoBeforeFirstOn > 0)
         {
-            problems.Add(string.Create(c, $"{f.AutoApproved} auto approval(s) exist although the switch was never stored as ON"));
+            problems.Add(string.Create(c, $"{f.AutoBeforeFirstOn} auto approval(s) dated before the switch was first stored ON (or the switch was never ON)"));
         }
 
         if (f.DecisionsAfterCutoff > 0)
@@ -306,7 +349,7 @@ public static class PlanPhaseCheck
 
         if (f.ApprovedWithoutRow > 0)
         {
-            problems.Add(string.Create(c, $"{f.ApprovedWithoutRow} approved or armed ticket(s) without an approve row"));
+            problems.Add(string.Create(c, $"{f.ApprovedWithoutRow} ticket(s) that were approved, armed or triggered (now or earlier in their trail) without an approve row"));
         }
 
         if (f.UndecidedPastCutoff > 0)
@@ -314,15 +357,16 @@ public static class PlanPhaseCheck
             problems.Add(string.Create(c, $"{f.UndecidedPastCutoff} ticket(s) still undecided well after the cutoff (the review-cutoff job did not lapse them)"));
         }
 
+        var history = f.AutoHistoryTruncated ? " The autonomy history is longer than the rows read, so an auto approval before the first ON row cannot be told." : string.Empty;
         if (problems.Count > 0)
         {
-            return new PlanPhaseCriterion(7, name, PlanPhaseVerdicts.NotMet, facts + "; " + string.Join("; ", problems) + ".");
+            return new PlanPhaseCriterion(7, name, PlanPhaseVerdicts.NotMet, facts + "; " + string.Join("; ", problems) + "." + history);
         }
 
         var decided = f.OwnerApproved + f.OwnerModified + f.OwnerRejected + f.AutoApproved + f.TicketsLapsed;
         return decided == 0
-            ? new PlanPhaseCriterion(7, name, PlanPhaseVerdicts.NotEvaluable, facts + "; no ticket has been reviewed or lapsed yet.")
-            : new PlanPhaseCriterion(7, name, PlanPhaseVerdicts.Met, facts + "; auto approvals are " + (f.AutoApproved == 0 ? "0" : "recorded as auto, under a switch the owner turned ON") + ".", "refusals of bad edits and the owner-only rule are tests (ReviewHandlersTests), not run here");
+            ? new PlanPhaseCriterion(7, name, PlanPhaseVerdicts.NotEvaluable, facts + "; no ticket has been reviewed or lapsed yet." + history)
+            : new PlanPhaseCriterion(7, name, PlanPhaseVerdicts.Met, facts + "; auto approvals are " + (f.AutoApproved == 0 ? "0" : "recorded as auto, under a switch the owner turned ON") + "." + history, "refusals of bad edits and the owner-only rule are tests (ReviewHandlersTests), not run here");
     }
 
     private static PlanPhaseCriterion Accounts(PhaseAllocationFacts f)
@@ -344,12 +388,7 @@ public static class PlanPhaseCheck
     {
         const string name = "Grading: primary, reserve and rejected tickets of a day are graded once, labelled 'simulated on plan prices'";
         var c = CultureInfo.InvariantCulture;
-        var facts = string.Create(c, $"{f.GradedPlans} plan(s) graded, {f.GradedTickets} of {f.TicketsOfGradedPlans} tickets of those plans have a grade ({f.PartlyGradedPlans} plan(s) graded in part: a ticket that cannot be replayed yet stays pending and is not written)");
-        if (f.GradedTickets > f.TicketsOfGradedPlans)
-        {
-            return new PlanPhaseCriterion(9, name, PlanPhaseVerdicts.NotMet, facts + ": more grades than tickets, so a ticket was graded more than once.");
-        }
-
+        var facts = string.Create(c, $"{f.GradedPlans} plan(s) graded, {f.GradedTickets} of {f.TicketsOfGradedPlans} tickets of those plans have a grade ({f.PartlyGradedPlans} plan(s) graded in part: a ticket that cannot be replayed yet stays pending and is not written; the store keeps the first grade of a ticket, so a second cannot be stored)");
         return f.GradedPlans == 0
             ? new PlanPhaseCriterion(9, name, PlanPhaseVerdicts.NotEvaluable, facts + "; nothing has been graded yet.")
             : new PlanPhaseCriterion(9, name, PlanPhaseVerdicts.Met, facts + ".", "grades are re-simulations on plan prices, not execution; the hand reproduction of the curves is a test (GradeReportTests)");
@@ -402,7 +441,9 @@ public static class PlanPhaseCheck
         "unattended is read from the stored manual flag and the absence of failed attempts; a code change or an owner action on the pipeline is not recorded and cannot be seen here",
         "the Dhan Data-account token lapses about daily; a lapse fails the EOD gate and breaks the run, so ten in a row may take more than ten calendar sessions",
         "stored records only: the criteria that tests prove are NOT EVALUABLE here (no test is run), and a MET with a caveat rests on a test or a configuration this check does not run or see",
-        "switches are read from this process's configuration and the owner's stored settings; the running stack may be configured differently",
+        "a run the services framework starts as a catch-up after a restart counts as scheduled (only a manual start sets the manual flag); hand-run eod or portfolio-sync runs are not read, only the nightly's own rows",
+        "the newest 200 run rows, the newest 60 plans (with their tickets, approvals, grades and journal) and up to 200 autonomy settings rows are read; older records are not",
+        "switches marked as read by this process are read from the configuration of the process that ran the check (the host CLI when run with xd); the running containers may be configured differently",
         "nothing is written, trained or changed by this check, and no setting is turned on by it",
     ];
 }

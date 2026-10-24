@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,7 +46,7 @@ public sealed class PlanPhaseCheckApiTests(ApiFactory factory) : DataTestBase(fa
     {
         var view = await ReadAsync();
 
-        view.GetProperty("report").GetProperty("exitCriterion").GetString().ShouldBe("NOT EVALUABLE");
+        view.GetProperty("report").GetProperty("exitVerdict").GetString().ShouldBe("NOT EVALUABLE");
         view.GetProperty("report").GetProperty("sessions").GetArrayLength().ShouldBe(10);
         view.GetProperty("report").GetProperty("criteria").GetArrayLength().ShouldBe(12);
         view.GetProperty("report").GetProperty("limits").GetArrayLength().ShouldBeGreaterThan(5);
@@ -62,7 +63,9 @@ public sealed class PlanPhaseCheckApiTests(ApiFactory factory) : DataTestBase(fa
 
         var view = await ReadAsync();
 
-        view.GetProperty("report").GetProperty("exitCriterion").GetString().ShouldBe("MET");
+        view.GetProperty("report").GetProperty("exitVerdict").GetString().ShouldBe("MET");
+        view.GetProperty("report").GetProperty("exitCriterion").GetString().ShouldBe("MET (COUNT ONLY: all 10 plans are empty, no ticket was ever proposed)"); // the stored plans are the empty skeletons
+        view.GetProperty("text").GetString()!.ShouldContain("exit criterion (1): MET (COUNT ONLY");
         view.GetProperty("report").GetProperty("streak").GetInt32().ShouldBe(10);
         view.GetProperty("report").GetProperty("through").GetString().ShouldBe("2026-10-12");
         (await ScalarAsync<long>("SELECT count(*) FROM trading.plan_runs")).ShouldBe(before);
@@ -75,7 +78,7 @@ public sealed class PlanPhaseCheckApiTests(ApiFactory factory) : DataTestBase(fa
 
         var view = await ReadAsync();
 
-        view.GetProperty("report").GetProperty("exitCriterion").GetString().ShouldBe("NOT MET");
+        view.GetProperty("report").GetProperty("exitVerdict").GetString().ShouldBe("NOT MET");
         view.GetProperty("report").GetProperty("sessions").EnumerateArray().Count(s => s.GetProperty("state").GetString() == "manual_run").ShouldBe(1);
     }
 
@@ -89,8 +92,18 @@ public sealed class PlanPhaseCheckApiTests(ApiFactory factory) : DataTestBase(fa
 
         var view = await ReadAsync();
 
-        view.GetProperty("report").GetProperty("exitCriterion").GetString().ShouldBe("NOT EVALUABLE");
+        view.GetProperty("report").GetProperty("exitVerdict").GetString().ShouldBe("NOT EVALUABLE");
         view.GetProperty("report").GetProperty("streak").GetInt32().ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task The_phase_check_needs_a_signed_in_owner()
+    {
+        using var anonymous = Factory.CreateClient();
+
+        using var response = await anonymous.GetAsync(new Uri("/api/plan-runs/phase-check", UriKind.Relative), Ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     [Fact]

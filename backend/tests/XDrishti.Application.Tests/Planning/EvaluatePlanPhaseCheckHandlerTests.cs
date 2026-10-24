@@ -1,5 +1,5 @@
 #pragma warning disable CA2012 // NSubstitute setup and verification calls on ValueTask members are not awaited
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
 using XDrishti.Application.Abstractions.Autonomy;
@@ -34,6 +34,8 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
     private readonly Dictionary<long, List<PlanItemRow>> _items = [];
 
     private readonly Dictionary<long, List<ApprovalRow>> _approvals = [];
+
+    private readonly Dictionary<long, List<PlanEventRow>> _events = [];
 
     private readonly Dictionary<long, StoredGrade> _grades = [];
 
@@ -74,6 +76,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         _store.ListAsync(null, null, Arg.Any<int>(), Ct).Returns(_ => ValueTask.FromResult<IReadOnlyList<PlanRow>>([.. _planRows.Values.OrderByDescending(p => p.Id)]));
         _store.ItemsAsync(Arg.Any<long>(), Ct).Returns(call => ValueTask.FromResult<IReadOnlyList<PlanItemRow>>([.. _items.GetValueOrDefault(call.Arg<long>()) ?? []]));
         _store.ApprovalsAsync(Arg.Any<long>(), Ct).Returns(call => ValueTask.FromResult<IReadOnlyList<ApprovalRow>>([.. _approvals.GetValueOrDefault(call.Arg<long>()) ?? []]));
+        _store.HistoryAsync(Arg.Any<long>(), Ct).Returns(call => ValueTask.FromResult<IReadOnlyList<PlanEventRow>>([.. _events.GetValueOrDefault(call.Arg<long>()) ?? []]));
         _gradeStore.ForPlansAsync(Arg.Any<IReadOnlyList<long>>(), Ct).Returns(_ => ValueTask.FromResult<IReadOnlyDictionary<long, StoredGrade>>(_grades));
         _journal.EntriesAsync(Arg.Any<long>(), Ct).Returns(call => ValueTask.FromResult<IReadOnlyList<StoredEntry>>([.. _entries.GetValueOrDefault(call.Arg<long>()) ?? []]));
         _digests.ListAsync(Arg.Any<int>(), Ct).Returns(ValueTask.FromResult<IReadOnlyList<StoredDigest>>([]));
@@ -84,8 +87,23 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         _allowList.Allows(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
     }
 
+    private readonly CapturingLogger _log = new();
+
+    private sealed class CapturingLogger : ILogger<EvaluatePlanPhaseCheckHandler>
+    {
+        public List<string> Lines { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Lines.Add($"{eventId.Id} {formatter(state, exception)}");
+    }
+
     private EvaluatePlanPhaseCheckHandler Handler() =>
-        new(_calendar, _store, _gradeStore, _journal, _digests, _autonomy, _services, _allowList, _builder, _openBook, _time, NullLogger<EvaluatePlanPhaseCheckHandler>.Instance);
+        new(_calendar, _store, _gradeStore, _journal, _digests, _autonomy, _services, _allowList, _builder, _openBook, _time, _log);
 
     private async Task<PlanPhaseReport> Run(DateOnly? through = null)
     {
@@ -109,11 +127,11 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         return dates;
     }
 
-    private long Publish(DateOnly forDate, bool manual = false, int primary = 2, string basis = "cell statistics only", NewPlan? plan = null)
+    private long Publish(DateOnly forDate, bool manual = false, int primary = 2, string basis = "cell statistics only", NewPlan? plan = null, int reserve = 1)
     {
         var id = _nextPlan++;
         var at = new DateTimeOffset(forDate.AddDays(-1).ToDateTime(new TimeOnly(18, 30)), TimeSpan.FromMinutes(330)).ToUniversalTime();
-        _planRows[id] = new PlanRow(id, plan ?? NewPlanFor(forDate, basis), PlanState.Published, primary, 1, 3);
+        _planRows[id] = new PlanRow(id, plan ?? NewPlanFor(forDate, basis), PlanState.Published, primary, reserve, 3);
         _runs.Add(new PlanRunRow(_runs.Count + 1, _runs.Count(r => r.Run.ForDate == forDate) + 1, new NewPlanRun(forDate, "k" + id, "published", null, "Published", id, manual, at, at.AddMinutes(1))));
         return id;
     }
@@ -148,12 +166,29 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
 
         var report = await Run();
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.Met);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
         report.Streak.ShouldBe(10);
         report.Through.ShouldBe(Monday);
         report.Sessions.Select(s => s.Date).ShouldBe(window.AsEnumerable().Reverse());
         report.Sessions.Select(s => s.Date).ShouldNotContain(holiday);
         await _store.DidNotReceive().ListRunsAsync(holiday, Arg.Any<int>(), Ct);
+    }
+
+    [Fact]
+    public async Task Ten_empty_plans_say_count_only_in_the_exit_the_text_and_the_log()
+    {
+        foreach (var date in Sessions(Monday))
+        {
+            Publish(date, primary: 0, basis: "skeleton: no tickets are built yet", reserve: 0);
+        }
+
+        var result = await Handler().HandleAsync(new EvaluatePlanPhaseCheckQuery(null), Ct);
+
+        const string label = "MET (COUNT ONLY: all 10 plans are empty, no ticket was ever proposed)";
+        result.Value.Report.ExitVerdict.ShouldBe("MET");
+        result.Value.Report.ExitCriterion.ShouldBe(label);
+        result.Value.Text.ShouldContain("exit criterion (1): " + label);
+        _log.Lines.ShouldContain(l => l.StartsWith("4790 ", StringComparison.Ordinal) && l.Contains(label, StringComparison.Ordinal) && l.Contains("zero-primary plans 10", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -165,7 +200,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
 
         var report = await Run();
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions[^1].State.ShouldBe("manual_run");
         report.Streak.ShouldBe(0);
     }
@@ -179,7 +214,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
 
         var report = await Run();
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions.Single(s => s.State == "failed_closed").Gates.ShouldBe("4 pass, data-quality did not pass");
         report.Criteria.Single(c => c.Number == 2).Verdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable); // one gate seen, five not yet
         report.Criteria.Single(c => c.Number == 2).Detail.ShouldContain("data-quality 1");
@@ -193,7 +228,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
 
         var report = await Run();
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions.Single(s => s.State == "no_run").Date.ShouldBe(window[5]);
     }
 
@@ -204,7 +239,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
 
         var report = await Run();
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
         report.Streak.ShouldBe(4);
         report.Sessions.Count(s => s.State == "before_history").ShouldBe(6);
     }
@@ -215,7 +250,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         var result = await Handler().HandleAsync(new EvaluatePlanPhaseCheckQuery(null), Ct);
 
         result.IsSuccess.ShouldBeTrue();
-        result.Value.Report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
+        result.Value.Report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
         result.Value.Report.Sessions.ShouldAllBe(s => s.State == "before_history");
         result.Value.Text.ShouldContain("limit: about 2.1 years of data");
         result.Value.Text.ShouldContain("count plans read: 0");
@@ -230,7 +265,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         var report = await Run();
 
         report.Through.ShouldBe(Friday);
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.Met);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
     }
 
     [Fact]
@@ -242,7 +277,31 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
 
         report.Through.ShouldBe(Monday);
         report.Sessions[^1].State.ShouldBe("no_run");
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
+    }
+
+    [Fact]
+    public async Task A_few_minutes_after_the_nightly_time_the_session_is_still_not_read_as_a_gap()
+    {
+        _time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 23, 13, 5, 0, TimeSpan.Zero)); // 18:35 India time, nightly 18:30
+        PublishAll(Sessions(Friday));
+
+        var report = await Run();
+
+        report.Through.ShouldBe(Friday);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
+    }
+
+    [Fact]
+    public async Task Once_the_grace_is_over_the_missing_run_is_a_gap()
+    {
+        _time = new FakeTimeProvider(new DateTimeOffset(2026, 10, 23, 13, 15, 0, TimeSpan.Zero)); // 18:45 India time
+        PublishAll(Sessions(Friday));
+
+        var report = await Run();
+
+        report.Through.ShouldBe(Monday);
+        report.Sessions[^1].State.ShouldBe("no_run");
     }
 
     [Fact]
@@ -264,7 +323,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         var report = await Run(new DateOnly(2026, 10, 24));
 
         report.Through.ShouldBe(Friday);
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.Met);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
     }
 
     [Fact]
@@ -275,6 +334,8 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         result.IsFailure.ShouldBeTrue();
         result.Error.Code.ShouldBe(PlanErrors.InvalidCode);
     }
+
+    private static IEnumerable<string> CalendarCalls(ITradingCalendar calendar) => calendar.ReceivedCalls().Select(c => c.GetMethodInfo().Name).Distinct();
 
     [Fact]
     public async Task The_check_only_reads_and_writes_nothing()
@@ -287,6 +348,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         await Run();
 
         string[] reads = ["ListRunsAsync", "ListAsync", "FindAsync", "ItemsAsync", "ApprovalsAsync", "ForPlansAsync", "EntriesAsync", "CurrentAsync", "HistoryAsync", "GetAsync", "Entries", "Allows", "get_UseSelection", "get_AssumedEmpty"];
+        CalendarCalls(_calendar).ShouldBeSubsetOf(["GetAsync"]);
         foreach (var fake in new object[] { _store, _gradeStore, _journal, _digests, _autonomy, _services, _allowList, _builder, _openBook })
         {
             fake.ReceivedCalls().Select(c => c.GetMethodInfo().Name).Distinct().ShouldBeSubsetOf(reads);
@@ -322,6 +384,8 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         report.Switches.Single(s => s.Name == "Planning:Builder:UseSelection").On.ShouldBeTrue();
         report.Switches.Single(s => s.Name == "Planning:OpenBook:AssumedEmpty").On.ShouldBeFalse();
         report.Switches.Single(s => s.Name == AutonomySettings.AutoApproveKey).On.ShouldBeTrue();
+        report.Switches.Single(s => s.Name == "Planning:Builder:UseSelection").Effect.ShouldContain("read by this process");
+        report.Switches.Single(s => s.Name == "Planning:OpenBook:AssumedEmpty").Effect.ShouldContain("the containers may differ");
         report.Blockers.ShouldContain(b => b.StartsWith("service nightly is paused", StringComparison.Ordinal));
         report.Blockers.ShouldContain(b => b.StartsWith("switch Planning:OpenBook:AssumedEmpty is OFF", StringComparison.Ordinal));
         report.Blockers.ShouldNotContain(b => b.Contains("UseSelection", StringComparison.Ordinal));
@@ -340,8 +404,35 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
         var on = await Run();
 
         off.Criteria.Single(c => c.Number == 7).Verdict.ShouldBe(PlanPhaseVerdicts.NotMet);
-        off.Criteria.Single(c => c.Number == 7).Detail.ShouldContain("switch was never stored as ON");
+        off.Criteria.Single(c => c.Number == 7).Detail.ShouldContain("dated before the switch was first stored ON");
         on.Criteria.Single(c => c.Number == 7).Verdict.ShouldBe(PlanPhaseVerdicts.Met);
+    }
+
+    [Fact]
+    public async Task An_auto_approval_dated_before_the_first_on_row_is_not_met_even_if_the_switch_was_on_later()
+    {
+        var id = Publish(Monday);
+        _items[id] = [Item(1, id, TicketState.Approved)];
+        _approvals[id] = [new ApprovalRow(1, 1, "auto", "approve", "rule:autonomy", "auto-approved", null, null, new DateTimeOffset(2026, 10, 26, 3, 0, 0, TimeSpan.Zero))];
+        _autonomy.HistoryAsync(Arg.Any<int>(), Ct).Returns(ValueTask.FromResult<IReadOnlyList<AutonomyChangeRow>>([new AutonomyChangeRow(2, new string('a', 64), true, false, 0.58, 3, "owner:x", "on", new DateTimeOffset(2026, 10, 26, 3, 30, 0, TimeSpan.Zero)), new AutonomyChangeRow(1, new string('b', 64), false, false, 0.58, 3, "owner:x", "off", Evening.AddDays(-9))]));
+
+        var report = await Run();
+
+        report.Criteria.Single(c => c.Number == 7).Verdict.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.Criteria.Single(c => c.Number == 7).Detail.ShouldContain("1 auto approval(s) dated before the switch was first stored ON");
+    }
+
+    [Fact]
+    public async Task A_ticket_that_was_approved_and_later_expired_without_an_approve_row_is_not_met()
+    {
+        var id = Publish(Monday);
+        _items[id] = [Item(1, id, TicketState.Expired)];
+        _events[id] = [new PlanEventRow(1, 1, "proposed", "approved", "rule:x", "r", null, Evening), new PlanEventRow(2, 1, "approved", "expired", "system", "r", null, Evening)];
+
+        var report = await Run();
+
+        report.Criteria.Single(c => c.Number == 7).Verdict.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.Criteria.Single(c => c.Number == 7).Detail.ShouldContain("without an approve row");
     }
 
     [Fact]
@@ -372,7 +463,7 @@ public sealed class EvaluatePlanPhaseCheckHandlerTests
 
         var criterion = report.Criteria.Single(c => c.Number == 7);
         criterion.Verdict.ShouldBe(PlanPhaseVerdicts.NotMet);
-        criterion.Detail.ShouldContain("1 approved or armed ticket(s) without an approve row");
+        criterion.Detail.ShouldContain("1 ticket(s) that were approved, armed or triggered (now or earlier in their trail) without an approve row");
         criterion.Detail.ShouldContain("1 ticket(s) still undecided well after the cutoff");
         report.Counts.Single(c => c.Name == "armed tickets").Value.ShouldBe(1);
     }

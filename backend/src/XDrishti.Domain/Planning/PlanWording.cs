@@ -3,6 +3,9 @@ namespace XDrishti.Domain.Planning;
 /// <summary>The fixed sentences every plan carries as data (spec P7-03, ADR 0083). A test pins them.</summary>
 public static class PlanWording
 {
+    /// <summary>The words every skeleton (empty, no builder) plan's basis starts with; the null builder writes it and the phase check reads it.</summary>
+    public const string SkeletonBasisPrefix = "skeleton";
+
     /// <summary>Stored on every plan: armed is not an order.</summary>
     public const string NoOrder = "No order is placed by this system. Armed means the instrument is watched and alerts are raised; a stop is a level and an alert, not a protection. Any order is entered by hand in the broker's own app.";
 

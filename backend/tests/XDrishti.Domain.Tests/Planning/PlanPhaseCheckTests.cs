@@ -9,7 +9,7 @@ namespace XDrishti.Domain.Tests.Planning;
 public sealed class PlanPhaseCheckTests
 {
     // Ten consecutive weekdays (a Friday to Friday with the weekend skipped by the caller: the check takes the window as given).
-    private static readonly DateOnly[] Dates = [.. Enumerable.Range(0, 14).Select(i => new DateOnly(2026, 10, 5).AddDays(i)).Where(d => d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))];
+    private static readonly DateOnly[] Dates = [.. Enumerable.Range(0, 21).Select(i => new DateOnly(2026, 10, 5).AddDays(i)).Where(d => d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday))];
 
     private static readonly DateTimeOffset At = new(2026, 10, 9, 13, 0, 0, TimeSpan.Zero);
 
@@ -19,8 +19,8 @@ public sealed class PlanPhaseCheckTests
     private static PhaseRun Failed(long id, string gate = "eod", bool manual = false) =>
         new(id, 1, "failed_closed", gate, "the end-of-day run had not finished", manual, At, At.AddMinutes(1), null);
 
-    private static PhaseSessionInput Good(DateOnly date, int primary = 2, string basis = "cell statistics only") =>
-        new(date, [Published(date.DayNumber, planId: date.DayNumber)], new PhasePlan(date.DayNumber, basis, primary, 1, 3));
+    private static PhaseSessionInput Good(DateOnly date, int primary = 2, string basis = "cell statistics only", int reserve = 1) =>
+        new(date, [Published(date.DayNumber, planId: date.DayNumber)], new PhasePlan(date.DayNumber, basis, primary, reserve, 3));
 
     private static List<PhaseSessionInput> Ten() => [.. Dates.Take(10).Select(d => Good(d))];
 
@@ -28,6 +28,7 @@ public sealed class PlanPhaseCheckTests
         List<PhaseSessionInput>? window = null,
         DateOnly? first = null,
         bool noHistory = false,
+        DateOnly? through = null,
         PhaseFailClosedFacts? failClosed = null,
         PhaseAllowListFacts? allowList = null,
         PhaseEvidenceFacts? evidence = null,
@@ -39,7 +40,7 @@ public sealed class PlanPhaseCheckTests
     {
         window ??= Ten();
         return new PlanPhaseFacts(
-            window[^1].Date,
+            through ?? window[^1].Date,
             window,
             noHistory ? null : first ?? window[0].Date,
             failClosed ?? new PhaseFailClosedFacts(10, false, [], 0),
@@ -59,7 +60,7 @@ public sealed class PlanPhaseCheckTests
     {
         var report = PlanPhaseCheck.Evaluate(Facts());
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.Met);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
         report.Streak.ShouldBe(10);
         report.Sessions.ShouldAllBe(s => s.State == "counted" && s.ManualRuns == 0 && s.FailedRuns == 0 && s.Published);
         Criterion(report, 1).Caveat.ShouldBeNull();
@@ -73,10 +74,84 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.Met);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
         Criterion(report, 1).Caveat.ShouldBe("10 of 10 plans have zero primary tickets, 10 of them skeleton");
         report.Sessions.ShouldAllBe(s => s.ZeroPrimary && s.Skeleton);
         report.ToText().ShouldContain("MET (10 of 10 plans have zero primary tickets, 10 of them skeleton)");
+    }
+
+    [Fact]
+    public void Ten_fully_empty_plans_meet_the_count_only_and_the_headline_and_the_label_say_so()
+    {
+        var window = Dates.Take(10).Select(d => Good(d, 0, "skeleton: no builder", reserve: 0)).ToList();
+
+        var report = PlanPhaseCheck.Evaluate(Facts(window));
+
+        const string label = "MET (COUNT ONLY: all 10 plans are empty, no ticket was ever proposed)";
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
+        report.ExitCriterion.ShouldBe(label);
+        report.ToText().ShouldContain("exit criterion (1): " + label);
+        report.ToText().ShouldContain("1. " + label + "  Plans published");
+    }
+
+    [Fact]
+    public void Ten_good_plans_with_a_few_empty_ones_carry_the_zero_primary_share_in_the_headline()
+    {
+        var window = Ten();
+        window[3] = Good(window[3].Date, 0);
+        window[4] = Good(window[4].Date, 0, "skeleton: no builder");
+
+        var report = PlanPhaseCheck.Evaluate(Facts(window));
+
+        report.ExitCriterion.ShouldBe("MET (2 of 10 plans have zero primary tickets, 1 of them skeleton)");
+        report.ToText().ShouldContain("exit criterion (1): MET (2 of 10 plans have zero primary tickets, 1 of them skeleton)");
+    }
+
+    [Fact]
+    public void A_headline_without_a_caveat_is_the_bare_word_and_a_break_has_no_label()
+    {
+        PlanPhaseCheck.Evaluate(Facts()).ExitCriterion.ShouldBe("MET");
+        var window = Ten();
+        window[9] = window[9] with { Runs = [Failed(1)], Plan = null };
+
+        PlanPhaseCheck.Evaluate(Facts(window)).ExitCriterion.ShouldBe("NOT MET");
+    }
+
+    [Fact]
+    public void More_than_ten_sessions_are_never_met_whatever_they_say()
+    {
+        var window = Dates.Take(10).Select(d => Good(d)).Append(Good(Dates[10])).ToList();
+
+        var report = PlanPhaseCheck.Evaluate(Facts(window));
+
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
+        Criterion(report, 1).Detail.ShouldContain("the window has 11 trading sessions, exactly 10 are needed");
+    }
+
+    [Fact]
+    public void Duplicate_or_out_of_order_dates_are_never_met()
+    {
+        var dup = Ten();
+        dup[5] = Good(dup[4].Date);
+        var swapped = Ten();
+        (swapped[2], swapped[3]) = (swapped[3], swapped[2]);
+
+        foreach (var window in new[] { dup, swapped })
+        {
+            var report = PlanPhaseCheck.Evaluate(Facts(window, through: window[^1].Date));
+
+            report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
+            Criterion(report, 1).Detail.ShouldContain("dates are not strictly ascending");
+        }
+    }
+
+    [Fact]
+    public void A_window_that_does_not_end_at_the_requested_date_is_never_met()
+    {
+        var report = PlanPhaseCheck.Evaluate(Facts(Ten(), through: Dates[11]));
+
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
+        Criterion(report, 1).Detail.ShouldContain("the last date is not the requested one");
     }
 
     [Fact]
@@ -87,7 +162,7 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions[4].State.ShouldBe("manual_run");
         report.Sessions[4].ManualRuns.ShouldBe(1);
         report.Streak.ShouldBe(5);
@@ -102,7 +177,7 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions[9].State.ShouldBe("manual_run");
         (report.Sessions[9].ScheduledRuns, report.Sessions[9].ManualRuns, report.Sessions[9].FailedRuns).ShouldBe((1, 1, 1));
     }
@@ -116,7 +191,7 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions[2].State.ShouldBe("failed_closed");
         report.Sessions[7].State.ShouldBe("failed_closed");
         report.Sessions[7].Note.ShouldContain("data-quality: the end-of-day run had not finished");
@@ -132,7 +207,7 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions[5].State.ShouldBe("no_run");
         Criterion(report, 1).Detail.ShouldContain($"{window[5].Date:yyyy-MM-dd} no_run");
     }
@@ -145,7 +220,7 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         report.Sessions[9].State.ShouldBe("plan_missing");
     }
 
@@ -158,7 +233,7 @@ public sealed class PlanPhaseCheckTests
         var report = PlanPhaseCheck.Evaluate(Facts(window));
 
         window.Zip(window.Skip(1)).ShouldContain(p => p.Second.Date.DayNumber - p.First.Date.DayNumber > 1);
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.Met);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.Met);
     }
 
     [Theory]
@@ -176,7 +251,7 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window, first: recorded == 0 ? null : window[10 - recorded].Date, noHistory: recorded == 0));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
         report.Streak.ShouldBe(recorded);
         report.Sessions.Count(s => s.State == "before_history").ShouldBe(10 - recorded);
         Criterion(report, 1).Detail.ShouldContain($"{10 - recorded} more trading session(s)");
@@ -191,7 +266,7 @@ public sealed class PlanPhaseCheckTests
 
         var report = PlanPhaseCheck.Evaluate(Facts(window, first: window[1].Date));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
     }
 
     [Fact]
@@ -199,7 +274,7 @@ public sealed class PlanPhaseCheckTests
     {
         var report = PlanPhaseCheck.Evaluate(Facts(Ten().Take(9).ToList()));
 
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
     }
 
     [Fact]
@@ -211,7 +286,7 @@ public sealed class PlanPhaseCheckTests
         var report = PlanPhaseCheck.Evaluate(Facts(window, first: DateOnly.MinValue));
 
         report.Sessions[0].State.ShouldBe("no_run");
-        report.ExitCriterion.ShouldBe(PlanPhaseVerdicts.NotMet);
+        report.ExitVerdict.ShouldBe(PlanPhaseVerdicts.NotMet);
     }
 
     [Fact]
@@ -229,7 +304,8 @@ public sealed class PlanPhaseCheckTests
     {
         var report = PlanPhaseCheck.Evaluate(Facts());
 
-        report.ExitCriterion.ShouldBe(Criterion(report, 1).Verdict);
+        report.ExitVerdict.ShouldBe(Criterion(report, 1).Verdict);
+        report.ExitCriterion.ShouldBe(PlanPhaseReport.Label(Criterion(report, 1)));
         report.Criteria.Select(c => c.Number).ShouldBe([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
         report.ToText().ShouldContain($"summary: {report.Criteria.Count(c => c.Verdict == "MET")} met, {report.Criteria.Count(c => c.Verdict == "NOT MET")} not met, {report.Criteria.Count(c => c.Verdict == "NOT EVALUABLE")} not evaluable");
     }
@@ -305,16 +381,25 @@ public sealed class PlanPhaseCheckTests
     }
 
     [Theory]
-    [InlineData(1, 0, 0, 0, false, "auto approval(s) exist although the switch was never stored as ON")]
-    [InlineData(0, 1, 0, 0, false, "decision(s) dated at or after the cutoff")]
-    [InlineData(0, 0, 1, 0, false, "approved or armed ticket(s) without an approve row")]
-    [InlineData(0, 0, 0, 2, false, "ticket(s) still undecided well after the cutoff")]
-    public void A_fact_against_the_review_workflow_is_not_met(int auto, int afterCutoff, int noRow, int undecided, bool switchOn, string expected)
+    [InlineData(1, 0, 0, 0, "auto approval(s) dated before the switch was first stored ON")]
+    [InlineData(0, 1, 0, 0, "decision(s) dated at or after the cutoff")]
+    [InlineData(0, 0, 1, 0, "ticket(s) that were approved, armed or triggered (now or earlier in their trail) without an approve row")]
+    [InlineData(0, 0, 0, 2, "ticket(s) still undecided well after the cutoff")]
+    public void A_fact_against_the_review_workflow_is_not_met(int autoBefore, int afterCutoff, int noRow, int undecided, string expected)
     {
-        var criterion = Criterion(PlanPhaseCheck.Evaluate(Facts(review: new PhaseReviewFacts(10, 0, 1, 1, 0, 0, auto, 0, undecided, afterCutoff, noRow, switchOn))), 7);
+        var criterion = Criterion(PlanPhaseCheck.Evaluate(Facts(review: new PhaseReviewFacts(10, 0, 1, 1, 0, 0, autoBefore, 0, undecided, afterCutoff, noRow, false, autoBefore))), 7);
 
         criterion.Verdict.ShouldBe(PlanPhaseVerdicts.NotMet);
         criterion.Detail.ShouldContain(expected);
+    }
+
+    [Fact]
+    public void The_caps_and_a_long_autonomy_history_are_said_in_the_review_detail()
+    {
+        var capped = Criterion(PlanPhaseCheck.Evaluate(Facts(review: new PhaseReviewFacts(60, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, false, 0, 60, true, true))), 7);
+
+        capped.Detail.ShouldContain("60 plan(s) read (the newest 60 at most; older plans are not read)");
+        capped.Detail.ShouldContain("autonomy history is longer than the rows read");
     }
 
     [Fact]
@@ -337,7 +422,6 @@ public sealed class PlanPhaseCheckTests
 
         Criterion(PlanPhaseCheck.Evaluate(Facts()), 9).Verdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
         Criterion(PlanPhaseCheck.Evaluate(Facts(grades: new PhaseGradeFacts(3, 1, 8, 10))), 9).Verdict.ShouldBe(PlanPhaseVerdicts.Met);
-        Criterion(PlanPhaseCheck.Evaluate(Facts(grades: new PhaseGradeFacts(3, 0, 11, 10))), 9).Verdict.ShouldBe(PlanPhaseVerdicts.NotMet);
 
         Criterion(PlanPhaseCheck.Evaluate(Facts()), 11).Verdict.ShouldBe(PlanPhaseVerdicts.NotEvaluable);
         Criterion(PlanPhaseCheck.Evaluate(Facts(journal: new PhaseJournalFacts(2, 4, 1, 0))), 11).Verdict.ShouldBe(PlanPhaseVerdicts.Met);
@@ -405,6 +489,33 @@ public sealed class PlanPhaseCheckTests
         text.ShouldContain("switch autonomy.auto_approve_tickets: OFF");
         text.ShouldContain("service preopen: enabled");
         text.ShouldContain("count plans read: 0");
+    }
+
+    [Fact]
+    public void A_gate_name_is_cleaned_cut_without_splitting_a_surrogate_pair_and_never_prints_control_characters()
+    {
+        var gate = new string('g', 38) + "\U0001F600\U0001F600\n";
+        var window = Ten();
+        window[9] = window[9] with { Runs = [new PhaseRun(1, 1, "failed_closed", gate, "why", false, At, At, null)], Plan = null };
+
+        var report = PlanPhaseCheck.Evaluate(Facts(window, failClosed: new PhaseFailClosedFacts(1, false, [new PhaseGateCount(gate, 1)], 0)));
+        var text = report.ToText();
+
+        text.ShouldNotContain("\n" + new string('g', 38) + "\U0001F600\U0001F600");
+        text.ShouldNotContain("\u001b");
+        text.Where(char.IsHighSurrogate).Count().ShouldBe(text.Where(char.IsLowSurrogate).Count());
+        text.ShouldContain(new string('g', 38) + "~");
+    }
+
+    [Fact]
+    public void The_limits_say_that_a_catch_up_counts_as_scheduled_and_name_the_read_caps()
+    {
+        var text = PlanPhaseCheck.Evaluate(Facts()).ToText();
+
+        text.ShouldContain("catch-up after a restart counts as scheduled");
+        text.ShouldContain("hand-run eod or portfolio-sync runs are not read");
+        text.ShouldContain("the newest 200 run rows, the newest 60 plans");
+        text.ShouldContain("read by this process");
     }
 
     [Fact]

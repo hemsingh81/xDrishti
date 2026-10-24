@@ -59,7 +59,8 @@ public sealed record PlanPhaseSession(
 /// <summary>The P7 phase check: the acceptance criteria, the ten sessions, the setup and the limits that are always printed.</summary>
 /// <param name="Through">The last planned session of the window.</param>
 /// <param name="Streak">Consecutive counted sessions ending at <see cref="Through"/>.</param>
-/// <param name="ExitCriterion">The call on the roadmap exit (criterion 1): MET only after ten consecutive scheduled published sessions.</param>
+/// <param name="ExitVerdict">The bare call on the roadmap exit (criterion 1): MET, NOT MET or NOT EVALUABLE; MET only after ten consecutive scheduled published sessions.</param>
+/// <param name="ExitCriterion">The same call as printed, with its caveat in the label (for example "MET (COUNT ONLY: all 10 plans are empty, no ticket was ever proposed)").</param>
 /// <param name="Criteria">The criteria in order.</param>
 /// <param name="Sessions">The sessions of the window, oldest first.</param>
 /// <param name="Services">The services and their state.</param>
@@ -70,6 +71,7 @@ public sealed record PlanPhaseSession(
 public sealed record PlanPhaseReport(
     DateOnly Through,
     int Streak,
+    string ExitVerdict,
     string ExitCriterion,
     IReadOnlyList<PlanPhaseCriterion> Criteria,
     IReadOnlyList<PlanPhaseSession> Sessions,

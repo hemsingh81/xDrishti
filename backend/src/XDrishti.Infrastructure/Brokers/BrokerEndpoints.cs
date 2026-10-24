@@ -58,16 +58,31 @@ internal static class BrokerEndpoints
         (HttpMethod.Post, DhanMarketQuote, null),
     ];
 
+    /// <summary>One allowed request shape: method, host, how it reads in the phase check (ADR 0097) and what the rest of the URL must look like.</summary>
+    private sealed record Rule(HttpMethod Method, string Host, string Description, Func<Uri, bool> Matches);
+
     /// <summary>
-    /// The allow-list as text for the phase check (ADR 0097), sorted: <c>METHOD host/path</c>, the query KEYS (never a value) after a <c>?</c>, and the two path/query shapes of the trade history and the ledger. Read only. A new path in
-    /// <see cref="IsAllowed"/> that is not declared here would not be listed, which is why the phase check also asks <see cref="IsAllowed"/> about order, position and fund requests; <c>BrokerEndpointsTests</c> is the real guard.
+    /// THE table of allowed HTTPS requests: <see cref="IsAllowed"/> asks it and <see cref="Describe"/> prints it, so what the phase check lists is what the guard allows. The exact-path rows come from <see cref="Allowed"/>; the trade history and the ledger
+    /// are the two shapes with a path or query to check.
+    /// </summary>
+    private static readonly Rule[] Rules =
+    [
+        .. Allowed.Select(a => new Rule(
+            a.Method,
+            a.Endpoint.Host,
+            $"{a.Method.Method} {a.Endpoint.Host}{a.Endpoint.AbsolutePath}{(a.QueryParameter is null ? string.Empty : "?" + a.QueryParameter)}",
+            uri => string.Equals(uri.AbsolutePath, a.Endpoint.AbsolutePath, StringComparison.Ordinal) && QueryIsAllowed(uri, a.QueryParameter))),
+        new Rule(HttpMethod.Get, DhanHoldings.Host, $"GET {DhanHoldings.Host}{DhanTradeHistoryBase.AbsolutePath}/{{from}}/{{to}}/{{page}}", IsTradeHistory),
+        new Rule(HttpMethod.Get, DhanHoldings.Host, $"GET {DhanLedgerBase.Host}{DhanLedgerBase.AbsolutePath}?{LedgerFromKey}&{LedgerToKey}", IsLedger),
+    ];
+
+    /// <summary>
+    /// The allow-list as text for the phase check (ADR 0097), sorted: one line per row of the rule table (<c>METHOD host/path</c>, query KEYS only, never a value) and the feed socket. Read only; it is derived from the same table
+    /// <see cref="IsAllowed"/> uses, and the socket from <see cref="DhanFeed"/> and <see cref="FeedQueryKeys"/> that <see cref="IsAllowedWebSocket"/> uses.
     /// </summary>
     public static IReadOnlyList<string> Describe() =>
     [
-        .. Allowed
-            .Select(a => $"{a.Method.Method} {a.Endpoint.Host}{a.Endpoint.AbsolutePath}{(a.QueryParameter is null ? string.Empty : "?" + a.QueryParameter)}")
-            .Append($"GET {DhanHoldings.Host}{DhanTradeHistoryBase.AbsolutePath}/{{from}}/{{to}}/{{page}}")
-            .Append($"GET {DhanLedgerBase.Host}{DhanLedgerBase.AbsolutePath}?{LedgerFromKey}&{LedgerToKey}")
+        .. Rules.Select(r => r.Description)
             .Append($"WSS {DhanFeed.Host}?{string.Join('&', FeedQueryKeys.Order(StringComparer.Ordinal))}")
             .Order(StringComparer.Ordinal),
     ];
@@ -81,18 +96,7 @@ internal static class BrokerEndpoints
             return false;
         }
 
-        foreach (var (allowedMethod, endpoint, parameter) in Allowed)
-        {
-            if (method == allowedMethod
-                && string.Equals(uri.Host, endpoint.Host, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(uri.AbsolutePath, endpoint.AbsolutePath, StringComparison.Ordinal)
-                && QueryIsAllowed(uri, parameter))
-            {
-                return true;
-            }
-        }
-
-        return method == HttpMethod.Get && string.Equals(uri.Host, DhanHoldings.Host, StringComparison.OrdinalIgnoreCase) && (IsTradeHistory(uri) || IsLedger(uri));
+        return Rules.Any(r => method == r.Method && string.Equals(uri.Host, r.Host, StringComparison.OrdinalIgnoreCase) && r.Matches(uri));
     }
 
     /// <summary>The URL of one page of the trade history: <c>https://api.dhan.co/v2/trades/2026-09-01/2026-09-30/0</c>. Dates are written the same way whatever the culture; the result is never logged.</summary>
