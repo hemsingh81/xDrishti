@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.grades", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings"]);
+        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -81,6 +81,15 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "UPDATE trading.grades SET r = 1 WHERE false",
             "DELETE FROM trading.grades WHERE false",
             "TRUNCATE trading.grades",
+            "UPDATE trading.journal_entries SET for_date = current_date WHERE false",
+            "DELETE FROM trading.journal_entries WHERE false",
+            "TRUNCATE trading.journal_entries",
+            "UPDATE trading.journal_fills SET role = 'exit' WHERE false",
+            "DELETE FROM trading.journal_fills WHERE false",
+            "TRUNCATE trading.journal_fills",
+            "UPDATE trading.fill_grades SET r = 1 WHERE false",
+            "DELETE FROM trading.fill_grades WHERE false",
+            "TRUNCATE trading.fill_grades",
             "UPDATE workflow.approvals SET decision = 'approve' WHERE false",
             "DELETE FROM workflow.approvals WHERE false",
             "TRUNCATE workflow.approvals",

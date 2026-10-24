@@ -69,7 +69,7 @@ public static class TicketGrader
             var costed = t.Costs == CostBasis.Charged && t.Costing is not null;
             var r = costed ? t.Costing!.RNet : t.RFilled;
             var detail = string.Create(CultureInfo.InvariantCulture, $"entered {Date(t.TradeDate)}, left {Date(SessionClock.DateOf(t.ExitEpochSeconds))} ({t.ExitReason})");
-            return new GraderResult(new TicketGrade(GradeStatus.Graded, r, t.MaeR, t.MfeR, t.ExitReason.ToString(), t.EntryPrice, t.ExitPrice, costed ? basis : gross, detail), null);
+            return new GraderResult(new TicketGrade(GradeStatus.Graded, r, t.MaeR, t.MfeR, t.ExitReason.ToString(), t.EntryPrice, t.ExitPrice, costed ? basis : gross, detail, t.StopPrice), null);
         }
 
         if (main.OpenAtEnd.Any(t => Mine(t.Trade)))

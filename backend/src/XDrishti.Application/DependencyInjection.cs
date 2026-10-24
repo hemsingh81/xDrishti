@@ -511,5 +511,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<GradePlansCommand, GradeOutcome>, GradePlansHandler>(); // grading (P7-13, ADR 0090): insert-only grades on stored bars, no order
         services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();
         services.AddScoped<IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>, GetDecisionsReportHandler>();
+        services.AddScoped<ICommandHandler<JournalPlansCommand, JournalOutcome>, JournalPlansHandler>(); // auto-journal (P7-14, ADR 0093): reads stored fills, insert-only links, no order
+        services.AddScoped<IQueryHandler<GetPlanJournalQuery, Result<PlanJournalView>>, GetPlanJournalHandler>();
     }
 }

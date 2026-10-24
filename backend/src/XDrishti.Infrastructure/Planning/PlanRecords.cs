@@ -226,4 +226,82 @@ internal sealed class GradeRecord
     public string? RunKey { get; set; }
 
     public DateTimeOffset GradedAt { get; set; }
+
+    public double? StopPrice { get; set; }
+}
+
+/// <summary>A row of <c>trading.journal_entries</c>: one approved ticket on one account that the owner's fills were matched to (P7-14). Insert-only.</summary>
+internal sealed class JournalEntryRecord
+{
+    public long Id { get; set; }
+
+    public long PlanId { get; set; }
+
+    public long ItemId { get; set; }
+
+    public Guid AccountId { get; set; }
+
+    public DateOnly ForDate { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public string? UncertainReason { get; set; }
+}
+
+/// <summary>A row of <c>trading.journal_fills</c>: one stored trade and what the journal made of it (P7-14). Insert-only; a trade has one row.</summary>
+internal sealed class JournalFillRecord
+{
+    public long Id { get; set; }
+
+    public Guid TransactionId { get; set; }
+
+    public long? EntryId { get; set; }
+
+    public string Role { get; set; } = string.Empty;
+
+    public long Qty { get; set; }
+
+    public string Reason { get; set; } = string.Empty;
+
+    public DateOnly ForDate { get; set; }
+
+    public DateTimeOffset JournaledAt { get; set; }
+}
+
+/// <summary>A row of <c>trading.fill_grades</c>: the realised-fills grade of one journal entry (P7-14). Insert-only, one per entry.</summary>
+internal sealed class FillGradeRecord
+{
+    public long Id { get; set; }
+
+    public long EntryId { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+
+    public long Qty { get; set; }
+
+    public double EntryPrice { get; set; }
+
+    public double ExitPrice { get; set; }
+
+    public double? PlanEntryPrice { get; set; }
+
+    public double? PlanStopPrice { get; set; }
+
+    public double? PlanR { get; set; }
+
+    public double? SlippagePrice { get; set; }
+
+    public double? SlippageR { get; set; }
+
+    public decimal GrossPnl { get; set; }
+
+    public decimal Charges { get; set; }
+
+    public double? R { get; set; }
+
+    public string Basis { get; set; } = string.Empty;
+
+    public string Detail { get; set; } = string.Empty;
+
+    public DateTimeOffset GradedAt { get; set; }
 }

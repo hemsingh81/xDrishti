@@ -4828,6 +4828,100 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.FillGradeRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("basis");
+
+                    b.Property<decimal>("Charges")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("charges");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("detail");
+
+                    b.Property<long>("EntryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entry_id");
+
+                    b.Property<double>("EntryPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("entry_price");
+
+                    b.Property<double>("ExitPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("exit_price");
+
+                    b.Property<DateTimeOffset>("GradedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("graded_at");
+
+                    b.Property<decimal>("GrossPnl")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("gross_pnl");
+
+                    b.Property<double?>("PlanEntryPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("plan_entry_price");
+
+                    b.Property<double?>("PlanR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("plan_r");
+
+                    b.Property<double?>("PlanStopPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("plan_stop_price");
+
+                    b.Property<long>("Qty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qty");
+
+                    b.Property<double?>("R")
+                        .HasColumnType("double precision")
+                        .HasColumnName("r");
+
+                    b.Property<double?>("SlippagePrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("slippage_price");
+
+                    b.Property<double?>("SlippageR")
+                        .HasColumnType("double precision")
+                        .HasColumnName("slippage_r");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fill_grades");
+
+                    b.HasIndex("EntryId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_fill_grades_entry_id");
+
+                    b.ToTable("fill_grades", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_fill_grades_shape", "status IN ('graded', 'no_plan_levels', 'uncertain') AND basis = 'realised fills, not simulated' AND qty > 0 AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (slippage_r IS NOT NULL)) AND length(detail) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.GradeRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -4907,6 +5001,10 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(16)")
                         .HasColumnName("status");
 
+                    b.Property<double?>("StopPrice")
+                        .HasColumnType("double precision")
+                        .HasColumnName("stop_price");
+
                     b.HasKey("Id")
                         .HasName("pk_grades");
 
@@ -4923,6 +5021,116 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     b.ToTable("grades", "trading", t =>
                         {
                             t.HasCheckConstraint("ck_grades_status", "status IN ('graded', 'not_triggered', 'not_gradable') AND basis = 'simulated on plan prices' AND ((status = 'graded') = (r IS NOT NULL)) AND ((status = 'graded') = (exit_reason IS NOT NULL)) AND length(detail) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.JournalEntryRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("ForDate")
+                        .HasColumnType("date")
+                        .HasColumnName("for_date");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("UncertainReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("uncertain_reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_journal_entries");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("ix_journal_entries_account_id");
+
+                    b.HasIndex("PlanId")
+                        .HasDatabaseName("ix_journal_entries_plan_id");
+
+                    b.HasIndex("ItemId", "AccountId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_journal_entries_item_account");
+
+                    b.ToTable("journal_entries", "trading");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.JournalFillRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("EntryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entry_id");
+
+                    b.Property<DateOnly>("ForDate")
+                        .HasColumnType("date")
+                        .HasColumnName("for_date");
+
+                    b.Property<DateTimeOffset>("JournaledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("journaled_at");
+
+                    b.Property<long>("Qty")
+                        .HasColumnType("bigint")
+                        .HasColumnName("qty");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transaction_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_journal_fills");
+
+                    b.HasIndex("EntryId")
+                        .HasDatabaseName("ix_journal_fills_entry_id");
+
+                    b.HasIndex("ForDate")
+                        .HasDatabaseName("ix_journal_fills_for_date");
+
+                    b.HasIndex("TransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_journal_fills_transaction_id");
+
+                    b.ToTable("journal_fills", "trading", t =>
+                        {
+                            t.HasCheckConstraint("ck_journal_fills_shape", "role IN ('entry', 'exit', 'discretionary') AND (role = 'discretionary') = (entry_id IS NULL) AND qty > 0 AND length(reason) > 0");
                         });
                 });
 
@@ -7168,6 +7376,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_approvals_plans_plan_id");
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.FillGradeRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.JournalEntryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fill_grades_journal_entries_entry_id");
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.GradeRecord", b =>
                 {
                     b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
@@ -7183,6 +7401,46 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_grades_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.JournalEntryRecord", b =>
+                {
+                    b.HasOne("XDrishti.Domain.Accounts.BrokerAccount", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_journal_entries_broker_accounts_account_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanItemRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_journal_entries_plan_items_item_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_journal_entries_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.JournalFillRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.JournalEntryRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_journal_fills_journal_entries_entry_id");
+
+                    b.HasOne("XDrishti.Domain.Portfolio.Transaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_journal_fills_transactions_transaction_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Planning.PlanEventRecord", b =>

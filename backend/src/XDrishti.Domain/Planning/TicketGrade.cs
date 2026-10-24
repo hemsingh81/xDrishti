@@ -12,7 +12,8 @@ namespace XDrishti.Domain.Planning;
 /// <param name="ExitPrice">The exact simulated exit. Only when graded.</param>
 /// <param name="CostBasis">What R is net of: <c>net of the charge sheet X</c> or <c>gross, no charges</c>.</param>
 /// <param name="Detail">Why: the reason a ticket is not gradable, what did not happen for a ticket not triggered, or the entry and exit session for a graded one.</param>
-public sealed record TicketGrade(GradeStatus Status, double? R, double? MaeR, double? MfeR, string? ExitReason, double? EntryPrice, double? ExitPrice, string CostBasis, string Detail)
+/// <param name="StopPrice">The simulated trade's initial stop, so the fill grade measures the same 1R (P7-14). Only when graded; grades stored before P7-14 have none.</param>
+public sealed record TicketGrade(GradeStatus Status, double? R, double? MaeR, double? MfeR, string? ExitReason, double? EntryPrice, double? ExitPrice, string CostBasis, string Detail, double? StopPrice = null)
 {
     /// <summary>The label every grade carries: the grade is a re-simulation on plan prices, not an execution.</summary>
     public const string Basis = "simulated on plan prices";

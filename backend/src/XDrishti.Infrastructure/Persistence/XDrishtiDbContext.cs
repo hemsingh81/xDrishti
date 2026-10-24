@@ -182,6 +182,9 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<PlanRunRecord> PlanRuns => Set<PlanRunRecord>();
 
     internal DbSet<GradeRecord> Grades => Set<GradeRecord>();
+    internal DbSet<JournalEntryRecord> JournalEntries => Set<JournalEntryRecord>();
+    internal DbSet<JournalFillRecord> JournalFills => Set<JournalFillRecord>();
+    internal DbSet<FillGradeRecord> FillGrades => Set<FillGradeRecord>();
     internal DbSet<AutonomySettingRecord> AutonomySettings => Set<AutonomySettingRecord>();
 
     /// <summary>The verdicts of full tests (spec P5-04).</summary>

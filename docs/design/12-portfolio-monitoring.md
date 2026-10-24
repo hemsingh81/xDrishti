@@ -436,6 +436,7 @@ move on a holding · data or token issue for an account.
 - Positions created from plan tickets keep `plan_item_id` → strategy, cell, R-multiple and grading.
 - Trades not matching any plan are tagged **discretionary**; their results are reported separately (and in the
   discipline report).
+- **Built in P7-14 ([ADR 0093](../adr/0093-auto-journal-reads-the-stored-fills-matches-them-to-approved-tickets-by-account-instrument-side-and-day-and-stores-a-fill-grade-beside-the-plan-grade.md)):** `portfolio.transactions` has no `plan_item_id`; the link lives in the journal's own insert-only tables (`trading.journal_entries`, `journal_fills`, `fill_grades`), so the portfolio is only read. `xd plan journal` and `GET /api/plans/{id}/journal`.
 - Long-term holdings are not managed by the system's exits unless you assign a strategy/exit to them.
 
 ## 9. Data model (`portfolio` schema)
