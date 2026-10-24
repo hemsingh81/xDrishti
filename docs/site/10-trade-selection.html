@@ -243,13 +243,15 @@ system proposed.</p>
 <p>Section 6b exists as pure code (<code>XDrishti.Domain.Checklist</code>): 13 checks per ticket and paper-mode Trading account plus an account gate (live accounts are refused). Each answers pass, fail or unavailable with a stable code and numbers; unavailable never passes. Approving despite needs an <code>owner:</code> actor and a reason, and shows as &quot;confirmed despite&quot;, never as a pass. Results dates, the F&amp;O ban list and correlation have no source yet, so they are unavailable. No table or verb; P7-10 stores the reason with the approval.</p>
 <h2 id="12-as-built-p7-13-adr-0090">12. As built (P7-13, <a href="../adr/0090-grading-replays-each-ticket-through-the-simulator-on-its-own-session-and-stores-one-insert-only-grade.html">ADR 0090</a>)<a class="hash" href="#12-as-built-p7-13-adr-0090" aria-label="Link to this section">#</a></h2>
 <p>Section 8 exists: <code>xd plan grade</code> walks every ticket of a past plan (primary, reserve, rejected) through the stored bars of its session with the simulator&#39;s rules and stores one insert-only grade, labelled <code>simulated on plan prices</code>. <code>GET /api/plans/{id}/grade</code> and <code>GET /api/reports/decisions</code> give the top-1/3/5/all curves, primary versus reserve versus rejected and the owner&#39;s decisions (approved, modified, rejected, lapsed, undecided; no auto-approval exists), with a note below 30 triggered tickets. A ticket whose exit label is not one candidate spelling is stored as not gradable with the reason; a ticket whose bars are not there yet waits.</p>
+<h2 id="13-as-built-p7-11-adr-0096">13. As built (P7-11, <a href="../adr/0096-the-pre-open-check-arms-only-approved-tickets-as-a-service-move-a-missing-input-invalidates-and-armed-tickets-join-the-feed-set-last.html">ADR 0096</a>)<a class="hash" href="#13-as-built-p7-11-adr-0096" aria-label="Link to this section">#</a></h2>
+<p>The pre-open check of section 7 is the paused <code>preopen</code> service (09:10, never after 09:15): each Approved ticket is armed or invalidated from <code>|last - previous close| &gt; 0.5 x ATR(14)</code>; a missing price, previous close or range invalidates, so nothing is armed on a missing input. <strong>There is no promotion from the reserve</strong>: the owner decided it is off, the code has no path and a test fails if one appears. Ban list, surveillance and the price band are not re-checked (no source). Arming says &quot;Armed: watched with alerts. No order is placed and none exists. A stop is only an alert.&quot; The <code>plan-expiry</code> service (15:40) expires what is left.</p>
 
   </article>
   <nav class="pager" aria-label="Previous and next document">
     <a class="prev" href="09-learning-engine.html"><small>← Previous  [</small>09 · Learning engine</a>
     <a class="next" href="11-strategy-lab.html"><small>Next  ] →</small>11 · Strategy Lab</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-24 06:18</footer>
+  <footer class="foot">Generated from <code>docs/10-trade-selection.md</code> · 2026-10-24 07:42</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-pipeline" class="d2">1. Pipeline</a>
 <a href="#smart-rules-learned-doc-09-14" class="d3">Smart rules (learned, doc 09 §14)</a>
@@ -266,7 +268,8 @@ system proposed.</p>
 <a href="#11-as-built-p7-06-adr-0085" class="d2">11. As built (P7-06, ADR 0085)</a>
 <a href="#10-as-built-p7-02-adr-0084" class="d2">10. As built (P7-02, ADR 0084)</a>
 <a href="#10-as-built-p7-05-adr-0087" class="d2">10. As built (P7-05, ADR 0087)</a>
-<a href="#12-as-built-p7-13-adr-0090" class="d2">12. As built (P7-13, ADR 0090)</a></aside>
+<a href="#12-as-built-p7-13-adr-0090" class="d2">12. As built (P7-13, ADR 0090)</a>
+<a href="#13-as-built-p7-11-adr-0096" class="d2">13. As built (P7-11, ADR 0096)</a></aside>
 </div>
 <div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
 <script src="assets/search-index.js"></script>

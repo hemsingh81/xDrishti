@@ -254,7 +254,7 @@ export const iconChip = {
 /** Navigation route path -> hue; unknown routes use `slate`. */
 export const navHue: Record<string, IconHueName> = {
   '/': 'today',
-  '/review': 'review',
+  '/plans': 'review',
   '/suggestions': 'suggestions',
   '/portfolio': 'portfolio',
   '/instruments': 'instruments',

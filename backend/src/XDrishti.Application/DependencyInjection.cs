@@ -100,6 +100,7 @@ public static class DependencyInjection
         services.AddScoped<IActiveSetProvider, HoldingsProvider>();
         services.AddScoped<IActiveSetProvider, AlertsProvider>();
         services.AddScoped<IActiveSetProvider, IndicesProvider>();
+        services.AddScoped<IActiveSetProvider, ArmedTicketsProvider>(); // armed tickets of today's plan: watched with alerts, no order (P7-11)
         services.AddSingleton<MissingIndexReport>();
         services.AddSingleton<ActiveSetLoader>();
         services.AddSingleton<FeedPacketStats>();
@@ -139,6 +140,8 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, NightlyService>(); // the fail-closed nightly plan (P7-08); starts paused
         services.AddSingleton<IScheduledService, SuggestionsService>(); // the owner's suggestions after the nightly plan (P7-09); starts paused, rules only
         services.AddSingleton<IScheduledService, ReviewCutoffService>(); // lapses unreviewed tickets at the plan's cutoff; the optional auto pass runs only when the owner's setting is ON; starts paused (P7-10)
+        services.AddSingleton<IScheduledService, PreOpenService>(); // arms the approved tickets at 09:10 (P7-11); starts paused, no order, no promotion
+        services.AddSingleton<IScheduledService, PlanExpiryService>(); // expires the day's armed tickets after the close (P7-11); starts paused
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
@@ -510,6 +513,8 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListSuggestionsQuery, Result<IReadOnlyList<SuggestionView>>>, ListSuggestionsHandler>();
         services.AddScoped<ICommandHandler<MarkSuggestionSeenCommand>, MarkSuggestionSeenHandler>();
         services.AddScoped<ICommandHandler<RunReviewCycleCommand, ReviewCycleOutcome>, RunReviewCycleHandler>();
+        services.AddScoped<ICommandHandler<RunPreOpenCheckCommand, PreOpenOutcome>, RunPreOpenCheckHandler>(); // arms or invalidates the approved tickets before the open (P7-11); approves nothing
+        services.AddScoped<ICommandHandler<ExpireTicketsCommand, ExpiryOutcome>, ExpireTicketsHandler>(); // ends the day for armed tickets (P7-11)
         services.AddScoped<IChecklistSource, StoredChecklistSource>(); // the checklist the plan stored (P7-10, ADR 0095): a missing or unreadable record is no checklist, never a pass
         // the fail-closed nightly pipeline (P7-08, ADR 0086): the gates in the order they are read, the builder (the skeleton's null builder until P7-04/P7-09) and the run
         services.AddScoped<INightlyGate, CalendarGate>();
