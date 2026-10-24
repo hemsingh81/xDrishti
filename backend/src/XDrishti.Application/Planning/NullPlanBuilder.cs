@@ -11,9 +11,9 @@ namespace XDrishti.Application.Planning;
 /// </summary>
 internal sealed class NullPlanBuilder : IPlanBuilder
 {
-    public const string BuilderId = "skeleton";
+    public const string BuilderId = PlanWording.SkeletonBasisPrefix;
 
-    public const string Basis = "skeleton: no tickets are built yet (the real builder is P7-04/P7-09)";
+    public const string Basis = PlanWording.SkeletonBasisPrefix + ": no tickets are built yet (the real builder is P7-04/P7-09)";
 
     public const string CreatedBy = "system:nightly-skeleton";
 

@@ -7506,7 +7506,9 @@ export interface components {
        * @description Consecutive counted sessions ending at DateOnly PlanPhaseReport.Through.
        */
       streak: number;
-      /** @description The call on the roadmap exit (criterion 1): MET only after ten consecutive scheduled published sessions. */
+      /** @description The bare call on the roadmap exit (criterion 1): MET, NOT MET or NOT EVALUABLE; MET only after ten consecutive scheduled published sessions. */
+      exitVerdict: string;
+      /** @description The same call as printed, with its caveat in the label (for example "MET (COUNT ONLY: all 10 plans are empty, no ticket was ever proposed)"). */
       exitCriterion: string;
       /** @description The criteria in order. */
       criteria: components['schemas']['PlanPhaseCriterion'][];

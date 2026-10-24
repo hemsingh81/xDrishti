@@ -35,15 +35,18 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
     ILogger<EvaluatePlanPhaseCheckHandler> logger) : IQueryHandler<EvaluatePlanPhaseCheckQuery, Result<PlanPhaseCheckView>>
 {
     /// <summary>The run rows read for the history and the fail-closed counts (the store's limit is 200).</summary>
-    internal const int RunRowsRead = 200;
+    internal const int RunRowsRead = PlanPhaseCheck.RunRowsRead;
 
     /// <summary>The newest plans whose tickets, approvals, grades and journal are counted.</summary>
-    internal const int PlansRead = 60;
+    internal const int PlansRead = PlanPhaseCheck.PlansRead;
+
+    /// <summary>A few minutes after the nightly's time before the newest session reads as a gap: the row is written when the run ends.</summary>
+    internal static readonly TimeSpan NightlyGrace = TimeSpan.FromMinutes(10);
 
     /// <summary>How long after the cutoff a ticket may still wait for the cutoff job before it is counted as left undecided.</summary>
     internal static readonly TimeSpan CutoffGrace = TimeSpan.FromHours(2);
 
-    private const int HistoryRead = 50;
+    private const int DigestRead = 52;
 
     private static readonly TimeOnly DefaultNightlyTime = new(18, 30);
 
@@ -79,12 +82,13 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
 
         var window = await ReadWindowAsync(calendar, through, cancellationToken);
         var allRuns = await plans.ListRunsAsync(null, RunRowsRead, cancellationToken);
-        var stored = (await plans.ListAsync(null, null, PlansRead, cancellationToken)).Where(p => p.Plan.ForDate <= through).ToList();
+        var listed = await plans.ListAsync(null, null, PlansRead, cancellationToken);
+        var stored = listed.Where(p => p.Plan.ForDate <= through).ToList();
         var autonomyNow = await autonomy.CurrentAsync(cancellationToken);
-        var autonomyHistory = await autonomy.HistoryAsync(HistoryRead, cancellationToken);
-        var digestCount = (await digests.ListAsync(HistoryRead, cancellationToken)).Count;
+        var autonomyHistory = await autonomy.HistoryAsync(PlanPhaseCheck.AutonomyRowsRead, cancellationToken);
+        var digestCount = (await digests.ListAsync(DigestRead, cancellationToken)).Count;
 
-        var read = await ReadStoredPlansAsync(stored, autonomyNow, autonomyHistory, digestCount, now, cancellationToken);
+        var read = await ReadStoredPlansAsync(stored, listed.Count >= PlansRead, autonomyNow, autonomyHistory, digestCount, now, cancellationToken);
 
         var facts = new PlanPhaseFacts(
             through,
@@ -100,10 +104,11 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
             await SetupAsync(autonomyNow, read.Counts, cancellationToken));
 
         var report = PlanPhaseCheck.Evaluate(facts);
+        var zeroPrimary = report.Sessions.Count(x => x.ZeroPrimary);
         var met = report.Criteria.Count(c => c.Verdict == PlanPhaseVerdicts.Met);
         var notMet = report.Criteria.Count(c => c.Verdict == PlanPhaseVerdicts.NotMet);
         var notEvaluable = report.Criteria.Count(c => c.Verdict == PlanPhaseVerdicts.NotEvaluable);
-        PlanPhaseCheckLog.Evaluated(logger, through, report.ExitCriterion, report.Streak, met, notMet, notEvaluable);
+        PlanPhaseCheckLog.Evaluated(logger, through, report.ExitCriterion, report.Streak, zeroPrimary, met, notMet, notEvaluable);
         return Result.Success(new PlanPhaseCheckView(report, report.ToText()));
     }
 
@@ -133,7 +138,7 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
 
         var time = (await services.GetAsync(NightlyService.Id, cancellationToken))?.TimeIst ?? DefaultNightlyTime;
         var ist = IndiaTime.ToIst(now);
-        return !(DateOnly.FromDateTime(ist.DateTime) == lastClosed && TimeOnly.FromDateTime(ist.DateTime) < time);
+        return !(DateOnly.FromDateTime(ist.DateTime) == lastClosed && ist.TimeOfDay < time.ToTimeSpan() + NightlyGrace);
     }
 
     private async ValueTask<List<PhaseSessionInput>> ReadWindowAsync(TradingCalendar calendar, DateOnly through, CancellationToken cancellationToken)
@@ -189,6 +194,7 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
 
     private async ValueTask<StoredRead> ReadStoredPlansAsync(
         List<PlanRow> stored,
+        bool plansTruncated,
         AutonomySettings autonomyNow,
         IReadOnlyList<AutonomyChangeRow> autonomyHistory,
         int digestCount,
@@ -202,12 +208,16 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
         int gradedPlans = 0, partly = 0, gradedTickets = 0, ticketsOfGraded = 0;
         int entries = 0, fills = 0, fillGrades = 0, duplicates = 0;
         var seenFills = new HashSet<Guid>();
+        int autoBeforeOn = 0;
+        var historyTruncated = autonomyHistory.Count >= PlanPhaseCheck.AutonomyRowsRead;
+        DateTimeOffset? firstOn = autonomyHistory.Where(h => h.AutoApproveTickets).Select(h => (DateTimeOffset?)h.ChangedAt).Min();
 
         foreach (var plan in stored)
         {
             var items = await plans.ItemsAsync(plan.Id, cancellationToken);
             var approvals = await plans.ApprovalsAsync(plan.Id, cancellationToken);
             var journalled = await journal.EntriesAsync(plan.Id, cancellationToken);
+            var trail = await plans.HistoryAsync(plan.Id, cancellationToken);
 
             noNotice += plan.Plan.Notice == PlanWording.NoOrder ? 0 : 1;
             noLimits += string.IsNullOrWhiteSpace(plan.Plan.Limits) ? 1 : 0;
@@ -219,7 +229,12 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
             noEvidence += real.Count(i => string.IsNullOrWhiteSpace(i.Item.Evidence.DataRange) || string.IsNullOrWhiteSpace(i.Item.Evidence.PWinBasis));
             lapsedTickets += real.Count(i => i.State == TicketState.Lapsed);
             armed += real.Count(i => i.State == TicketState.Armed);
-            approvedNoRow += real.Count(i => (i.State is TicketState.Approved or TicketState.Armed or TicketState.Triggered) && !approvals.Any(a => a.ItemId == i.Id && a.Decision == "approve"));
+            // a ticket that is, or ever was, approved, armed or triggered needs an approve row, even when it later expired or closed
+            string[] approvedCodes = [TicketState.Approved.Code(), TicketState.Armed.Code(), TicketState.Triggered.Code()];
+            var needsApproval = real.Where(i => i.State is TicketState.Approved or TicketState.Armed or TicketState.Triggered).Select(i => i.Id)
+                .Concat(trail.Where(e => e.ItemId is not null && approvedCodes.Contains(e.To, StringComparer.Ordinal)).Select(e => e.ItemId!.Value))
+                .ToHashSet();
+            approvedNoRow += needsApproval.Count(id => !approvals.Any(a => a.ItemId == id && a.Decision == "approve"));
             if (plan.State is PlanState.Published or PlanState.InReview && now >= plan.Plan.ReviewCutoff + CutoffGrace)
             {
                 undecided += ReviewCutoff.Decide([.. items.Select(i => (i.Item.Group, i.State))]).LapseIndexes.Count;
@@ -229,6 +244,7 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
             ownerModified += approvals.Count(a => a.Kind == "owner" && a.Decision == "modify");
             ownerRejected += approvals.Count(a => a.Kind == "owner" && a.Decision == "reject");
             autoApproved += approvals.Count(a => a.Kind == "auto");
+            autoBeforeOn += historyTruncated ? 0 : approvals.Count(a => a.Kind == "auto" && (firstOn is null || a.DecidedAt < firstOn));
             afterCutoff += approvals.Count(a => a.DecidedAt >= plan.Plan.ReviewCutoff);
 
             var allocs = real.SelectMany(i => i.Item.Allocations).ToList();
@@ -263,7 +279,7 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
         };
         return new StoredRead(
             new PhaseEvidenceFacts(stored.Count, tickets, noNotice, noLimits, noEvidence),
-            new PhaseReviewFacts(stored.Count, lapsedPlans, withDecision, ownerApproved, ownerModified, ownerRejected, autoApproved, lapsedTickets, undecided, afterCutoff, approvedNoRow, autonomyNow.AutoApproveTickets || autonomyHistory.Any(h => h.AutoApproveTickets)),
+            new PhaseReviewFacts(stored.Count, lapsedPlans, withDecision, ownerApproved, ownerModified, ownerRejected, autoApproved, lapsedTickets, undecided, afterCutoff, approvedNoRow, autonomyNow.AutoApproveTickets || autonomyHistory.Any(h => h.AutoApproveTickets), autoBeforeOn, PlansRead, plansTruncated, historyTruncated),
             new PhaseAllocationFacts(allocations, notPaper),
             new PhaseGradeFacts(gradedPlans, partly, gradedTickets, ticketsOfGraded),
             new PhaseJournalFacts(entries, fills, fillGrades, duplicates),
@@ -292,8 +308,8 @@ internal sealed class EvaluatePlanPhaseCheckHandler(
 
         var switches = new List<PhaseSwitch>
         {
-            new("Planning:Builder:UseSelection", builderSettings.UseSelection, "the selection builder; OFF means the nightly publishes only the empty skeleton plan, with zero primary tickets", true),
-            new("Planning:OpenBook:AssumedEmpty", openBook.AssumedEmpty, "the open book taken as empty; OFF means it is unavailable and the portfolio fill takes nothing", true),
+            new("Planning:Builder:UseSelection", builderSettings.UseSelection, "read by this process (the host CLI when run with xd; the containers may differ): the selection builder; OFF means the nightly publishes only the empty skeleton plan, with zero primary tickets", true),
+            new("Planning:OpenBook:AssumedEmpty", openBook.AssumedEmpty, "read by this process (the host CLI when run with xd; the containers may differ): the open book taken as empty; OFF means it is unavailable and the portfolio fill takes nothing", true),
             new(AutonomySettings.AutoApproveKey, autonomyNow.AutoApproveTickets, "auto-approval before the cutoff; OFF (the default) means the owner approves by hand and unreviewed tickets lapse; not part of the exit", false),
             new(AutonomySettings.PromoteFromReserveKey, autonomyNow.PromoteFromReserve, "promotion from the reserve at the pre-open check; OFF (the default) means nothing is armed without the owner's approval; not part of the exit", false),
         };
