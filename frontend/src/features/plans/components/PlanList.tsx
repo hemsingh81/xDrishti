@@ -2,6 +2,7 @@ import { Card, CardActionArea, CardContent, Stack, Typography } from '@mui/mater
 import { Link as RouterLink } from 'react-router';
 import { formatWeekdayDate } from '@/shared/lib/format';
 import type { Plan } from '../api/planQueries';
+import { PlanBasisLine } from './PlanBasisLine';
 import { PlanFlags } from './PlanFlags';
 
 interface Props {
@@ -28,6 +29,7 @@ export function PlanList({ plans, selectedId }: Props) {
                     {formatWeekdayDate(p.forDate)} · v{p.version}
                   </Typography>
                   <PlanFlags plan={p} />
+                  <PlanBasisLine basis={p.basis} />
                   <Typography variant="caption" color="text.secondary">
                     {p.primary} primary · {p.reserve} reserve · {p.rejected} rejected
                   </Typography>

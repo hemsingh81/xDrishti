@@ -29,6 +29,7 @@ import { actionCenterHandlers } from './actionCenterFixtures';
 import { answerGroupHoldings, groupHandlers } from './groupFixtures';
 import { historyHandlers } from './historyFixtures';
 import { buildTimeline, sampleServicesWithQuotes } from './servicesFixtures';
+import { planHandlers } from './planFixtures';
 import { tradeHandlers } from './tradeFixtures';
 
 /** A made-up Dhan consent page URL (the documented form, with a fake consentAppId). */
@@ -41,8 +42,8 @@ export const dhanRedirectUrl = 'http://localhost:8080/api/brokers/dhan/callback'
 export const handlers = [
   http.get('/api/auth/session', () => HttpResponse.json(buildSession())),
   http.get('/api/system/status', () => HttpResponse.json(buildSystemStatus())),
-  // Plans (P7-17): none by default; tests of the plan screen bring their own.
-  http.get('/api/plans', () => HttpResponse.json([])),
+  // Plans (P7-17): only the list, empty; a plan's own endpoints are never defaulted (see planFixtures).
+  ...planHandlers,
   // Accounts (read side). Writes are mocked per test, because each test cares about a different outcome.
   http.get('/api/accounts', () => HttpResponse.json([summaryOf(buildAccountDetail()), summaryOf(buildSwingAccount())])),
   http.get('/api/accounts/:id', ({ params }) => {

@@ -15,99 +15,10 @@ import {
 } from '@/test/planFixtures';
 import { renderWithProviders } from '@/test/render';
 import { problemResponse, server } from '@/test/server';
+import { capture, mount, wording } from '@/test/planScreen';
 import { PlansPage } from './components/PlansPage';
 
 pinClock(beforeCutoff);
-
-const wording = 'Approved for watching: no order is placed and none exists.';
-const detailPlan = () => buildPlan({ items: planItems() });
-
-interface Options {
-  review?: ReturnType<typeof buildReview>;
-  autoApprove?: boolean;
-}
-
-/** Mounts the screen over a published plan; returns the bodies the tests posted. */
-function mount(opts: Options = {}) {
-  const posted: Record<string, unknown> = {};
-  server.use(
-    http.get('/api/plans', () => HttpResponse.json([buildPlan()])),
-    http.get('/api/plans/7', () => HttpResponse.json(detailPlan())),
-    http.get('/api/plans/7/review', () => HttpResponse.json(opts.review ?? buildReview())),
-    http.get('/api/plans/7/suggestions', () =>
-      HttpResponse.json([
-        {
-          id: 5,
-          kind: 'open_book_unavailable',
-          subject: 'plan',
-          text: 'Open book is unavailable.',
-          createdAt: '2026-10-25T16:00:00Z',
-          seen: false,
-        },
-      ]),
-    ),
-    http.get('/api/plans/7/grade', () =>
-      HttpResponse.json({
-        planId: 7,
-        forDate: '2026-10-26',
-        basis: 'simulated on plan prices',
-        tickets: [],
-        pending: 3,
-        report: {},
-      }),
-    ),
-    http.get('/api/plans/7/journal', () =>
-      HttpResponse.json({
-        planId: 7,
-        forDate: '2026-10-26',
-        fillBasis: 'realised fills, not simulated',
-        planBasis: 'simulated on plan prices',
-        entries: [],
-        discretionary: [],
-        ticketsWithoutFills: 0,
-      }),
-    ),
-    http.get('/api/learning/digests', () =>
-      HttpResponse.json([
-        {
-          id: 1,
-          isoWeek: '2026-W43',
-          weekStart: '2026-10-19',
-          weekEnd: '2026-10-25',
-          sections: [{ key: 'cells', title: 'Cells', lines: ['Cell orb is drifting.'] }],
-          text: '',
-          builtBy: 'rule:weekly',
-          createdAt: null,
-          repeated: false,
-        },
-      ]),
-    ),
-    http.get('/api/autonomy/settings', () =>
-      HttpResponse.json({
-        id: null,
-        hash: null,
-        autoApproveTickets: opts.autoApprove ?? false,
-        promoteFromReserve: false,
-        minPWin: 0.6,
-        maxAutoPerDay: 3,
-        notice: 'No order is placed in any setting.',
-        history: [],
-      }),
-    ),
-  );
-  return posted;
-}
-
-function capture(path: string, body: object, status = 200) {
-  const seen: { body?: unknown } = {};
-  server.use(
-    http.post(path, async ({ request }) => {
-      seen.body = await request.json().catch(() => undefined);
-      return status === 200 ? HttpResponse.json(body) : problemResponse(body, status);
-    }),
-  );
-  return seen;
-}
 
 describe('Plan review screen', () => {
   it('says there is no plan yet', async () => {
@@ -145,6 +56,10 @@ describe('Plan review screen', () => {
     expect(screen.getByText(/40m 00s left/)).toBeInTheDocument();
     expect(screen.getAllByText(/Undecided tickets lapse at the cutoff/).length).toBeGreaterThan(0);
     expect(screen.getByText(/Automatic approval: OFF/)).toBeInTheDocument();
+    expect(screen.queryByText(/Approval is manual/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Armed is not an order\. Armed or approved means watching only, not protected/),
+    ).toBeInTheDocument();
     expect(screen.getAllByText(/data_quality/, { selector: 'strong' }).length).toBeGreaterThan(0);
   });
 
@@ -271,7 +186,7 @@ describe('Plan review screen', () => {
     renderWithProviders(<PlansPage />);
     await userEvent.click(await screen.findByRole('button', { name: 'Approve all' }));
     const dialog = await screen.findByRole('dialog', { name: 'Approve all' });
-    expect(within(dialog).getByText(/exactly 2 primary ticket\(s\)/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/2 primary ticket\(s\) have every check passed: AAA, DDD/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Reserve tickets are not included/)).toBeInTheDocument();
     expect(within(dialog).getByText(wording)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Approve 2 ticket(s)' }));
@@ -338,7 +253,7 @@ describe('Plan review screen', () => {
       }),
     );
     renderWithProviders(<PlansPage />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Mark suggestion 5 as seen' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Mark seen/ }));
     await waitFor(() => {
       expect(seen.called).toBe(true);
     });

@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query';
-import { api, ensureOk, unwrap, type Schemas } from '@/shared/api';
+import { api, ensureOk, queryRoots, unwrap, type Schemas } from '@/shared/api';
 
 export type Plan = Schemas['PlanView'];
 export type PlanItem = Schemas['PlanItemView'];
@@ -30,7 +30,6 @@ export const planKeys = {
   journal: (id: number) => ['plans', 'journal', id] as const,
   digests: ['plans', 'digests'] as const,
   autonomy: ['plans', 'autonomy'] as const,
-  accounts: ['plans', 'accounts'] as const,
 };
 
 export const plansQuery = queryOptions({
@@ -83,12 +82,11 @@ export const autonomyQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET('/api/autonomy/settings', { signal })),
 });
 
+/** The accounts list under the shared accounts root (one fetch with the Accounts screen); only the names are used here. */
 export const accountNamesQuery = queryOptions({
-  queryKey: planKeys.accounts,
-  queryFn: async ({ signal }) => {
-    const accounts = unwrap(await api.GET('/api/accounts', { signal }));
-    return Object.fromEntries(accounts.map((a) => [a.id, a.name]));
-  },
+  queryKey: [...queryRoots.accounts, 'list'] as const,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/accounts', { signal })),
+  select: (accounts): Record<string, string> => Object.fromEntries(accounts.map((a) => [a.id, a.name])),
 });
 
 export const approveTicket = async (planId: number, itemId: number, confirmations: Confirmation[]) =>

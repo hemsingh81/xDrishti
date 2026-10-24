@@ -2,8 +2,8 @@ import { Button, Stack, Typography } from '@mui/material';
 import { useId, useState } from 'react';
 import type { Decisions } from '../hooks/useDecisions';
 import type { ReviewTicket } from '../api/planQueries';
-import { approveBlock, confirmableCodes, decidable } from '../lib/checks';
-import { noOrderWording } from '../lib/planText';
+import { approveBlock, confirmableCodes, decidable, refusedCodes } from '../lib/checks';
+import { decisionError, noOrderWording } from '../lib/planText';
 import { ConfirmDespiteDialog } from './ConfirmDespiteDialog';
 import { ModifyDialog } from './ModifyDialog';
 import { RejectDialog } from './RejectDialog';
@@ -29,13 +29,21 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
     decidable(ticket.state) &&
     ticket.checklistRecorded &&
     ticket.accounts.some((a) => confirmableCodes(a).length > 0) &&
-    !ticket.accounts.some((a) => a.checks.some((c) => c.standing.toLowerCase() === 'refused'));
+    refusedCodes(ticket).length === 0;
+  // A dialog closes on success only: after an error it stays open with the typed reason and says what happened.
   const done = () => {
     setDialog(null);
   };
   const close = () => {
     if (!decisions.busy) setDialog(null);
   };
+  const open = (which: 'despite' | 'modify' | 'reject') => {
+    decisions.approve.reset();
+    decisions.modify.reset();
+    decisions.reject.reset();
+    setDialog(which);
+  };
+  const errorOf = (m: { error: unknown }) => (m.error ? decisionError(m.error) : null);
 
   return (
     <Stack spacing={1}>
@@ -48,7 +56,7 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
           onClick={() => {
             decisions.approve.mutate(
               { itemId: ticket.itemId, symbol: ticket.symbol, confirmations: [] },
-              { onSettled: done },
+              { onSuccess: done },
             );
           }}
         >
@@ -59,7 +67,7 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
             variant="outlined"
             size="small"
             onClick={() => {
-              setDialog('despite');
+              open('despite');
             }}
           >
             Confirm despite…
@@ -69,7 +77,7 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
           size="small"
           disabled={!reviewOpen || ticket.state.toLowerCase() !== 'proposed' || decisions.busy}
           onClick={() => {
-            setDialog('modify');
+            open('modify');
           }}
         >
           Modify
@@ -79,7 +87,7 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
           color="error"
           disabled={!planOpen || !decidable(ticket.state) || decisions.busy}
           onClick={() => {
-            setDialog('reject');
+            open('reject');
           }}
         >
           Reject
@@ -99,11 +107,12 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
           accounts={ticket.accounts}
           names={names}
           busy={decisions.busy}
+          error={errorOf(decisions.approve)}
           onClose={close}
           onConfirm={(confirmations) => {
             decisions.approve.mutate(
               { itemId: ticket.itemId, symbol: ticket.symbol, confirmations },
-              { onSettled: done },
+              { onSuccess: done },
             );
           }}
         />
@@ -114,11 +123,12 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
           accounts={ticket.accounts}
           names={names}
           busy={decisions.busy}
+          error={errorOf(decisions.modify)}
           onClose={close}
           onSubmit={(reason, quantities) => {
             decisions.modify.mutate(
               { itemId: ticket.itemId, symbol: ticket.symbol, reason, quantities },
-              { onSettled: done },
+              { onSuccess: done },
             );
           }}
         />
@@ -127,9 +137,10 @@ export function TicketActions({ ticket, reviewOpen, planOpen, names, decisions }
         <RejectDialog
           symbol={ticket.symbol}
           busy={decisions.busy}
+          error={errorOf(decisions.reject)}
           onClose={close}
           onSubmit={(reason) => {
-            decisions.reject.mutate({ itemId: ticket.itemId, symbol: ticket.symbol, reason }, { onSettled: done });
+            decisions.reject.mutate({ itemId: ticket.itemId, symbol: ticket.symbol, reason }, { onSuccess: done });
           }}
         />
       )}

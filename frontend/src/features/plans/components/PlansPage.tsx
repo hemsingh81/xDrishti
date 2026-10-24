@@ -1,7 +1,7 @@
 import ChecklistIcon from '@mui/icons-material/ChecklistOutlined';
 import { Alert, Box, Stack, Typography } from '@mui/material';
 import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { plansQuery } from '../api/planQueries';
 import { DigestList } from './DigestList';
@@ -15,9 +15,12 @@ import { Suggestions } from './Suggestions';
 export function PlansPage() {
   const plans = useQuery(plansQuery);
   const [params] = useSearchParams();
-  const asked = Number(params.get('plan'));
+  const askedText = params.get('plan');
+  const asked = Number(askedText);
   const list = plans.data ?? [];
-  const selected = list.find((p) => p.id === asked) ?? list[0];
+  // A plan id that is not in the list is said so; it never falls back to another plan silently.
+  const unknown = askedText !== null && !list.some((p) => p.id === asked);
+  const selected = unknown ? undefined : (list.find((p) => p.id === asked) ?? list[0]);
 
   return (
     <>
@@ -35,6 +38,11 @@ export function PlansPage() {
       {plans.isError && <ErrorState error={plans.error} />}
       {plans.data && list.length === 0 && (
         <Typography>No plan yet. The nightly plan appears here once it is published.</Typography>
+      )}
+      {plans.data && unknown && list.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Plan not found: {askedText} is not among the latest plans. <Link to="/plans">Show the newest plan</Link>
+        </Alert>
       )}
       {selected && (
         <Box sx={{ display: 'grid', gap: 2, gridTemplateColumns: { xs: '1fr', md: '300px 1fr' }, alignItems: 'start' }}>

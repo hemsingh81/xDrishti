@@ -15,7 +15,9 @@ export function TicketChecklist({ accounts, names }: { accounts: ReviewAccount[]
     <Stack spacing={1}>
       {accounts.map((a) => {
         const name = names[a.accountId] ?? a.accountId;
-        const notPassed = a.checks.filter((c) => c.standing.toLowerCase() !== 'passed');
+        const notPassed = a.checks.filter(
+          (c) => c.standing.toLowerCase() !== 'passed' || c.outcome.toLowerCase() !== 'pass',
+        );
         return (
           <Box key={a.accountId}>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>

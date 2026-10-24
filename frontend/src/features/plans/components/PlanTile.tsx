@@ -6,6 +6,7 @@ import { formatIstDayAndTime, formatWeekdayDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { plansQuery } from '../api/planQueries';
 import { lapseWording, stateLabel } from '../lib/planText';
+import { PlanBasisLine } from './PlanBasisLine';
 import { PlanFlags } from './PlanFlags';
 
 /** Today tile: the newest plan's state, counts and review cutoff. */
@@ -29,6 +30,7 @@ export function PlanTile() {
                 reserve, {plan.rejected} rejected.
               </Typography>
               <PlanFlags plan={plan} />
+              <PlanBasisLine basis={plan.basis} />
               <Typography variant="body2" color="text.secondary">
                 Review cutoff {formatIstDayAndTime(plan.reviewCutoff)} IST. {lapseWording} No order is placed.
               </Typography>
