@@ -31,7 +31,7 @@ internal static class InsightBuilder
         if (population.AnyExitKnown)
         {
             List<ReportDimension> exitDimensions = population.StyleVaries ? [ReportDimension.Exit, ReportDimension.Style] : [ReportDimension.Exit];
-            insights.Add(Extreme(InsightKind.BestExit, "Best exit", "No exit stands out", Compare(population, exitDimensions, "exit", min), best: true));
+            insights.Add(Extreme(InsightKind.BestExit, population.StyleVaries ? "Best exit and style" : "Best exit", population.StyleVaries ? "No exit and style stands out" : "No exit stands out", Compare(population, exitDimensions, population.StyleVaries ? "exit and style" : "exit", min), best: true));
         }
         else
         {
@@ -62,7 +62,7 @@ internal static class InsightBuilder
         }
 
         var cell = best ? compared.Best! : compared.Worst!;
-        return Said(kind, $"{title}: {Describe(cell)}.", cell);
+        return Said(kind, $"{title}: {Describe(cell, compared.ThinBelow)}.", cell);
     }
 
     private static Insight Gap(InsightKind kind, string title, Compared? compared, string suffix)
@@ -83,7 +83,7 @@ internal static class InsightBuilder
         }
 
         var gap = compared.Best!.ExpectancyR.Number!.Value - compared.Worst!.ExpectancyR.Number!.Value;
-        return Said(kind, $"{title}: {Describe(compared.Best)} against {Describe(compared.Worst)}, a gap of {ReportText.Plain(gap)} R.{suffix}", compared.Best, compared.Worst);
+        return Said(kind, $"{title}: {Describe(compared.Best, compared.ThinBelow)} against {Describe(compared.Worst, compared.ThinBelow)}, a gap of {ReportText.Plain(gap)} R.{suffix}", compared.Best, compared.Worst);
     }
 
     private static Insight Reason(InsightKind kind, MetricState state, string text) => new(kind, state, text, new ValueList<string>([]));
@@ -91,8 +91,8 @@ internal static class InsightBuilder
     private static Insight Said(InsightKind kind, string text, params ReportGroup?[] cells) =>
         new(kind, MetricState.Value, text, new ValueList<string>(cells.Where(c => c is not null).Select(c => c!.Key.Text).Distinct(StringComparer.Ordinal)));
 
-    private static string Describe(ReportGroup g) =>
-        $"{g.Key.Label} {ReportText.R(g.ExpectancyR.Number!.Value)} per trade over {ReportText.Count(g.N)} trades (win rate {ReportText.Percent(g.WinRate.Number!.Value)})";
+    private static string Describe(ReportGroup g, int thinBelow) =>
+        $"{g.Key.Label} {ReportText.R(g.ExpectancyR.Number!.Value)} per trade over {ReportText.Count(g.N)} trades (win rate {ReportText.Percent(g.WinRate.Number!.Value)}{(g.N < thinBelow ? ", in-sample, thin sample" : string.Empty)})";
 
     private static Compared Compare(ReportPopulation population, IReadOnlyList<ReportDimension> dimensions, string noun, int min)
     {
@@ -127,8 +127,8 @@ internal static class InsightBuilder
 
         var best = qualified.OrderByDescending(g => g.ExpectancyR.Number!.Value).ThenByDescending(g => g.N).ThenBy(g => g.Key.Text, StringComparer.Ordinal).First();
         var worst = qualified.OrderBy(g => g.ExpectancyR.Number!.Value).ThenByDescending(g => g.N).ThenBy(g => g.Key.Text, StringComparer.Ordinal).First();
-        return new Compared(MetricState.Value, null, best, worst, qualified.Count, best.ExpectancyR.Number!.Value == worst.ExpectancyR.Number!.Value);
+        return new Compared(MetricState.Value, null, best, worst, qualified.Count, best.ExpectancyR.Number!.Value == worst.ExpectancyR.Number!.Value, population.Options.Stats.MinTrades);
     }
 
-    private sealed record Compared(MetricState State, string? Reason, ReportGroup? Best, ReportGroup? Worst, int Count, bool Tied);
+    private sealed record Compared(MetricState State, string? Reason, ReportGroup? Best, ReportGroup? Worst, int Count, bool Tied, int ThinBelow = 0);
 }

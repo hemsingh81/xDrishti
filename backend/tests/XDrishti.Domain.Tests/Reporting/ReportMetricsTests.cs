@@ -91,7 +91,7 @@ public sealed class ReportMetricsTests
         trades.AddRange(orb.Select((r, i) => new ReportTrade("r1", $"ORB{i:D2}", "ORB", "15m", "BUY", InstrumentOf("AAA"), "AAA", new([]), asOf, asOf, r, null, 1)));
         trades.AddRange(vwap.Select((r, i) => new ReportTrade("r2", $"VWAP{i:D2}", "VWAP", "15m", "BUY", InstrumentOf("AAA"), "AAA", new([]), asOf, asOf, r, null, 1)));
         var stats = new CellStatsOptions(PriorStrength: 20, MinTrades: 3, CredibleLevel: 0.9);
-        var population = Population([Run("r1"), Run("r2")], trades, new ReportOptions { Stats = stats });
+        var population = Population([Run("r1"), Run("r2")], trades, new ReportOptions { Stats = stats, MinWins = 1, MinNonWins = 1 });
         CellId Cell(string strategy) => new(strategy, "15m", "BUY", "intraday", "FIXED_RR");
         var rows = CellStatsCalculator.Compute(
             [
@@ -192,7 +192,6 @@ public sealed class ReportMetricsTests
     {
         Metric.Of(double.NaN).State.ShouldBe(MetricState.NotEvaluable);
         Metric.Of(double.PositiveInfinity).Number.ShouldBeNull();
-        Metric.OfProvisional(double.NaN, "x").State.ShouldBe(MetricState.NotEvaluable);
         Metric.Of(0).State.ShouldBe(MetricState.Value);
         Metric.Of(0).Number.ShouldBe(0);
     }

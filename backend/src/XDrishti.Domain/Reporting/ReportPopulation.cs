@@ -15,6 +15,7 @@ namespace XDrishti.Domain.Reporting;
 public sealed class ReportPopulation
 {
     private readonly IReadOnlyList<ReportRow> _rows;
+    private readonly Dictionary<(string?, string?), Pool> _pools;
 
     private ReportPopulation(IReadOnlyList<ReportRow> rows, ReportOptions options, bool styleVaries, bool exitVaries, ReportEvidence evidence, bool anyExitRecorded, bool anyBasketRecorded)
     {
@@ -25,6 +26,7 @@ public sealed class ReportPopulation
         Evidence = evidence;
         AnyExitKnown = anyExitRecorded;
         AnyBasketKnown = anyBasketRecorded;
+        _pools = PoolsOf(rows, exitVaries, styleVaries);
     }
 
     /// <summary>The options the population was built with.</summary>
@@ -93,7 +95,7 @@ public sealed class ReportPopulation
 
         if (options.Basis == ReportBasis.Net)
         {
-            if (!options.NetBasisConfirmed)
+            if (options.NetBasisConfirmation is null)
             {
                 return Fail(ReportErrors.NetNotConfirmed());
             }
@@ -161,7 +163,8 @@ public sealed class ReportPopulation
         var population = GroupMath.EvidenceOf(rows, options.Basis);
         population = population with { RunKeys = new ValueList<string>(sortedRuns.Select(r => r.RunKey)), Provisional = sortedRuns.Any(r => r.Provisional) };
         var unavailable = UnavailableInputs(sortedRuns, rows);
-        var evidence = new ReportEvidence(population, new ValueList<string>(ReportLimits.For(options.Basis, population.Provisional)), new ValueList<string>(unavailable), dropped);
+        var confirmation = options.Basis == ReportBasis.Net ? options.NetBasisConfirmation : null;
+        var evidence = new ReportEvidence(population, new ValueList<string>(ReportLimits.For(options.Basis, population.Provisional, confirmation)), new ValueList<string>(unavailable), dropped, confirmation);
         return Result.Success(new ReportPopulation(rows, options, styleVaries, exitVaries, evidence, sortedRuns.Any(r => r.Exit is not null), rows.Any(r => r.Trade.BasketIds.Count > 0)));
     }
 
@@ -256,7 +259,7 @@ public sealed class ReportPopulation
             return Result.Failure<WhatWorks>(grouped.Error);
         }
 
-        return Result.Success(WhatWorksBuilder.Build(grouped.Value, Options.Stats.MinTrades, left));
+        return Result.Success(WhatWorksBuilder.Build(grouped.Value, Options, left));
     }
 
     /// <summary>The auto-insights of doc 15 section 6, always the same eight in the same order; each states a figure only when every group it compares has the minimum number of trades.</summary>
@@ -294,54 +297,56 @@ public sealed class ReportPopulation
             return Fail<ReportGrouping>(ReportErrors.DoubleCount(required));
         }
 
-        var buckets = new Dictionary<string, (GroupKey Key, List<ReportRow> Rows)>(StringComparer.Ordinal);
+        // one pass, no LINQ and no string per trade: every dimension but the basket has one value per trade; a trade in several baskets is added once under each
+        var bucketer = new Bucketer(dimensions);
+        var months = new Dictionary<int, string>();
+        var basketIndex = -1;
+        for (var i = 0; i < dimensions.Count; i++)
+        {
+            if (dimensions[i] == ReportDimension.Basket)
+            {
+                basketIndex = i;
+            }
+        }
+
         var nonAdditive = false;
         foreach (var row in _rows)
         {
-            var lists = dimensions.Select(d => ValuesOf(row, d)).ToList();
-            var combinations = 1;
-            foreach (var list in lists)
+            for (var i = 0; i < dimensions.Count; i++)
             {
-                combinations *= list.Count;
-            }
-
-            nonAdditive |= combinations > 1;
-            foreach (var combination in Product(lists))
-            {
-                var text = string.Join('\u0001', combination.Select(v => v ?? "\u0002"));
-                if (!buckets.TryGetValue(text, out var bucket))
+                if (i != basketIndex)
                 {
-                    var key = new GroupKey(new ValueList<GroupPart>(combination.Select((v, i) => new GroupPart(dimensions[i], v))));
-                    bucket = (key, []);
-                    buckets[text] = bucket;
+                    bucketer.Values[i] = SingleValue(row, dimensions[i], months);
                 }
-
-                bucket.Rows.Add(row);
             }
-        }
 
-        var pools = new Dictionary<(string?, string?), Pool>();
-        foreach (var row in _rows)
-        {
-            var pool = PoolFor(pools, row);
-            pool.Add(row);
-        }
-
-        var strength = Options.Stats.PriorStrength;
-        var groups = new List<ReportGroup>(buckets.Count);
-        foreach (var (key, rows) in buckets.Values.OrderBy(b => b.Key, Comparer<GroupKey>.Create(GroupMath.CompareKeys)))
-        {
-            var pool = pools[PoolKey(rows[0])];
-            var systemRate = pool.N > 0 ? (double)pool.Wins / pool.N : 0.5;
-            var strategy = key.ValueOf(ReportDimension.Strategy);
-            double prior = systemRate;
-            if (strategy is not null && pool.Strategies.TryGetValue(strategy, out var s))
+            if (basketIndex < 0)
             {
-                var denominator = s.N + strength;
-                prior = denominator > 0 ? (s.Wins + (strength * systemRate)) / denominator : systemRate;
+                bucketer.Add(row);
+                continue;
             }
 
-            groups.Add(GroupMath.Build(key, rows, prior, Options, minTrades));
+            var baskets = row.Trade.BasketIds;
+            if (baskets.Count <= 1)
+            {
+                bucketer.Values[basketIndex] = baskets.Count == 0 ? null : baskets[0];
+                bucketer.Add(row);
+                continue;
+            }
+
+            var distinct = baskets.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+            nonAdditive |= distinct.Count > 1;
+            foreach (var basket in distinct)
+            {
+                bucketer.Values[basketIndex] = basket;
+                bucketer.Add(row);
+            }
+        }
+
+        var groups = new List<ReportGroup>(bucketer.Count);
+        foreach (var bucket in bucketer.Buckets.OrderBy(b => b.Key, Comparer<GroupKey>.Create(GroupMath.CompareKeys)))
+        {
+            groups.Add(GroupMath.Build(bucket.Key, bucket.Rows, PriorsFor(bucket.Key, bucket.Rows[0]), Options, minTrades));
         }
 
         return Result.Success(new ReportGrouping(new ValueList<ReportDimension>(dimensions), new ValueList<ReportGroup>(groups), nonAdditive, Evidence));
@@ -473,61 +478,189 @@ public sealed class ReportPopulation
         return list;
     }
 
-    private static List<string?> ValuesOf(ReportRow row, ReportDimension dimension) => dimension switch
+    /// <summary>The value of a single-valued dimension for a trade (the basket is handled by the caller).</summary>
+    private static string? SingleValue(ReportRow row, ReportDimension dimension, Dictionary<int, string> months) => dimension switch
     {
-        ReportDimension.Basket => row.Trade.BasketIds.Count == 0 ? [null] : [.. row.Trade.BasketIds.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)],
-        ReportDimension.Instrument => [row.Trade.Symbol],
-        ReportDimension.Strategy => [row.Trade.Strategy],
-        ReportDimension.Timeframe => [row.Trade.Timeframe],
-        ReportDimension.Side => [row.Trade.Side],
-        ReportDimension.Style => [row.Style],
-        ReportDimension.Exit => [row.Exit],
-        ReportDimension.Month => [GroupMath.MonthOf(row.Trade.EntryDate)],
-        ReportDimension.Weekday => [GroupMath.WeekdayOf(row.Trade.EntryDate)],
+        ReportDimension.Instrument => row.Trade.Symbol,
+        ReportDimension.Strategy => row.Trade.Strategy,
+        ReportDimension.Timeframe => row.Trade.Timeframe,
+        ReportDimension.Side => row.Trade.Side,
+        ReportDimension.Style => row.Style,
+        ReportDimension.Exit => row.Exit,
+        ReportDimension.Month => Month(row.Trade.EntryDate, months),
+        ReportDimension.Weekday => GroupMath.WeekdayOf(row.Trade.EntryDate),
         _ => throw new ArgumentOutOfRangeException(nameof(dimension)),
     };
 
-    private static IEnumerable<string?[]> Product(List<List<string?>> lists)
+    private static string Month(DateOnly date, Dictionary<int, string> months)
     {
-        IEnumerable<string?[]> result = [[]];
-        foreach (var list in lists)
+        var index = (date.Year * 12) + date.Month;
+        if (!months.TryGetValue(index, out var text))
         {
-            var current = result.ToList();
-            result = current.SelectMany(prefix => list.Select(v => (string?[])[.. prefix, v]));
+            text = GroupMath.MonthOf(date);
+            months[index] = text;
         }
 
-        return result;
+        return text;
     }
 
-    private (string?, string?) PoolKey(ReportRow row) => (ExitVaries ? row.Exit : string.Empty, StyleVaries ? row.Style : string.Empty);
-
-    private Pool PoolFor(Dictionary<(string?, string?), Pool> pools, ReportRow row)
+    private static Dictionary<(string?, string?), Pool> PoolsOf(IReadOnlyList<ReportRow> rows, bool exitVaries, bool styleVaries)
     {
-        var key = PoolKey(row);
-        if (!pools.TryGetValue(key, out var pool))
+        var pools = new Dictionary<(string?, string?), Pool>();
+        foreach (var row in rows)
         {
-            pool = new Pool();
-            pools[key] = pool;
+            var key = (exitVaries ? row.Exit : string.Empty, styleVaries ? row.Style : string.Empty);
+            if (!pools.TryGetValue(key, out var pool))
+            {
+                pool = new Pool();
+                pools[key] = pool;
+            }
+
+            pool.Add(row);
         }
 
-        return pool;
+        return pools;
     }
 
-    private sealed class Pool
+    /// <summary>What a group is shrunk toward. The system level is the pool (all trades with the same differing labels); when the strategy is a coordinate of the group, the strategy level is the system level shrunk toward the pool, as in the cell statistics.</summary>
+    private GroupPriors PriorsFor(GroupKey key, ReportRow first)
+    {
+        var pool = _pools[(ExitVaries ? first.Exit : string.Empty, StyleVaries ? first.Style : string.Empty)];
+        var strength = Options.Stats.PriorStrength;
+        var system = pool.All;
+        var rate = system.N > 0 ? (double)system.Wins / system.N : 0.5;
+        double? win = system.WinCount > 0 ? system.WinSum / system.WinCount : null;
+        double? nonWin = system.NonWinCount > 0 ? system.NonWinSum / system.NonWinCount : null;
+        var strategy = key.ValueOf(ReportDimension.Strategy);
+        if (strategy is not null && pool.Strategies.TryGetValue(strategy, out var t))
+        {
+            var denominator = t.N + strength;
+            rate = denominator > 0 ? (t.Wins + (strength * rate)) / denominator : rate;
+            win = Shrink(t.WinSum, t.WinCount, win, strength);
+            nonWin = Shrink(t.NonWinSum, t.NonWinCount, nonWin, strength);
+        }
+
+        return new GroupPriors(rate, win, nonWin);
+    }
+
+    private static double? Shrink(double sum, int count, double? parentMean, double strength)
+    {
+        if (parentMean is null)
+        {
+            return null;
+        }
+
+        var denominator = count + strength;
+        return denominator > 0 ? (sum + (strength * parentMean.Value)) / denominator : parentMean;
+    }
+
+    private sealed class Tally
     {
         public int N { get; private set; }
 
         public int Wins { get; private set; }
 
-        public Dictionary<string, (int N, int Wins)> Strategies { get; } = new(StringComparer.Ordinal);
+        public int WinCount { get; private set; }
+
+        public double WinSum { get; private set; }
+
+        public int NonWinCount { get; private set; }
+
+        public double NonWinSum { get; private set; }
+
+        public void Add(double r)
+        {
+            N++;
+            if (r > 0)
+            {
+                Wins++;
+                WinCount++;
+                WinSum += r;
+            }
+            else
+            {
+                NonWinCount++;
+                NonWinSum += r;
+            }
+        }
+    }
+
+    private sealed class Pool
+    {
+        public Tally All { get; } = new();
+
+        public Dictionary<string, Tally> Strategies { get; } = new(StringComparer.Ordinal);
 
         public void Add(ReportRow row)
         {
-            var win = row.R > 0 ? 1 : 0;
-            N++;
-            Wins += win;
-            Strategies.TryGetValue(row.Trade.Strategy, out var s);
-            Strategies[row.Trade.Strategy] = (s.N + 1, s.Wins + win);
+            All.Add(row.R);
+            if (!Strategies.TryGetValue(row.Trade.Strategy, out var tally))
+            {
+                tally = new Tally();
+                Strategies[row.Trade.Strategy] = tally;
+            }
+
+            tally.Add(row.R);
+        }
+    }
+
+    private sealed class Bucket(GroupKey key)
+    {
+        public GroupKey Key { get; } = key;
+
+        public List<ReportRow> Rows { get; } = [];
+    }
+
+    /// <summary>Finds or makes the bucket of a combination of values without building a string per trade: the key is written into a reused buffer and looked up as a span.</summary>
+    private sealed class Bucketer(IReadOnlyList<ReportDimension> dimensions)
+    {
+        private readonly Dictionary<string, Bucket> _buckets = new(StringComparer.Ordinal);
+        private char[] _buffer = new char[128];
+
+        public string?[] Values { get; } = new string?[dimensions.Count];
+
+        public IEnumerable<Bucket> Buckets => _buckets.Values;
+
+        public int Count => _buckets.Count;
+
+        public void Add(ReportRow row)
+        {
+            var length = 0;
+            foreach (var value in Values)
+            {
+                length += (value?.Length ?? 1) + 1;
+            }
+
+            if (_buffer.Length < length)
+            {
+                _buffer = new char[length * 2];
+            }
+
+            var position = 0;
+            foreach (var value in Values)
+            {
+                if (value is null)
+                {
+                    _buffer[position++] = '\u0002';
+                }
+                else
+                {
+                    value.CopyTo(0, _buffer, position, value.Length);
+                    position += value.Length;
+                }
+
+                _buffer[position++] = '\u0001';
+            }
+
+            var lookup = _buckets.GetAlternateLookup<ReadOnlySpan<char>>();
+            var span = _buffer.AsSpan(0, position);
+            if (!lookup.TryGetValue(span, out var bucket))
+            {
+                bucket = new Bucket(new GroupKey(new ValueList<GroupPart>(Values.Select((v, i) => new GroupPart(dimensions[i], v)))));
+                lookup[span] = bucket;
+            }
+
+            bucket.Rows.Add(row);
         }
     }
 }

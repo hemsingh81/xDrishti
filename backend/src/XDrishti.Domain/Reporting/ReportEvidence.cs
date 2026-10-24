@@ -7,4 +7,5 @@ namespace XDrishti.Domain.Reporting;
 /// <param name="Limits">The honest limits, as text.</param>
 /// <param name="UnavailableInputs">Inputs a figure would need that do not exist, each with the reason.</param>
 /// <param name="DuplicateTradesDropped">Identical records of one trade in one run, kept once.</param>
-public sealed record ReportEvidence(EvidenceBlock Population, ValueList<string> Limits, ValueList<string> UnavailableInputs, int DuplicateTradesDropped);
+/// <param name="NetBasisConfirmation">What the owner confirmed, for a net report; null for a gross one.</param>
+public sealed record ReportEvidence(EvidenceBlock Population, ValueList<string> Limits, ValueList<string> UnavailableInputs, int DuplicateTradesDropped, ChargeSheetConfirmation? NetBasisConfirmation = null);

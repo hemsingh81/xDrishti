@@ -7,7 +7,7 @@ namespace XDrishti.Domain.Reporting;
 /// <summary>The figures of one group, from its trades in exit order (ADR 0099). The shrinkage is <see cref="BetaShrinkage"/>, the same code the cell statistics use; every trade has weight 1.</summary>
 internal static class GroupMath
 {
-    public static ReportGroup Build(GroupKey key, IReadOnlyList<ReportRow> rows, double? priorRate, ReportOptions options, int minTrades)
+    public static ReportGroup Build(GroupKey key, IReadOnlyList<ReportRow> rows, GroupPriors priors, ReportOptions options, int minTrades)
     {
         var n = rows.Count;
         var wins = rows.Count(r => r.R > 0);
@@ -27,7 +27,6 @@ internal static class GroupMath
             return Wrap(key, n, wins, _ => Metric.Insufficient(reason), null, evidence);
         }
 
-        var prior = priorRate ?? 0.5;
         double sumWin = 0;
         double sumNonWin = 0;
         double sumLoss = 0;
@@ -73,10 +72,36 @@ internal static class GroupMath
 
         var avgWin = wins > 0 ? Metric.Of(sumWin / wins) : Metric.NotEvaluable("no winning trade");
         var avgLoss = losses > 0 ? Metric.Of(sumLoss / losses) : Metric.NotEvaluable("no losing trade");
-        var (posterior, lower, _) = BetaShrinkage.Posterior(wins, n, prior, options.Stats.PriorStrength, options.Stats.CredibleLevel);
-        Metric FromRate(double rate) => wins == 0 ? Metric.NotEvaluable("no winning trade")
-            : nonWins == 0 ? Metric.NotEvaluable("no losing trade")
-            : Metric.Of((rate * (sumWin / wins)) + ((1 - rate) * (sumNonWin / nonWins)));
+        var strength = options.Stats.PriorStrength;
+        var (posterior, lower, _) = BetaShrinkage.Posterior(wins, n, priors.WinRate, strength, options.Stats.CredibleLevel);
+
+        // the mean win and the mean non-win are shrunk toward the parent group's with the strength of the win-rate prior: (sum + s x parent mean) / (count + s)
+        var shrunkWin = wins > 0 && priors.AvgWin is { } pw ? (sumWin + (strength * pw)) / (wins + strength) : (double?)null;
+        var shrunkNonWin = nonWins > 0 && priors.AvgNonWin is { } pn ? (sumNonWin + (strength * pn)) / (nonWins + strength) : (double?)null;
+        Metric FromRate(double rate, bool ranking)
+        {
+            if (wins == 0 || shrunkWin is null)
+            {
+                return Metric.NotEvaluable("no winning trade");
+            }
+
+            if (nonWins == 0 || shrunkNonWin is null)
+            {
+                return Metric.NotEvaluable("no losing trade");
+            }
+
+            if (ranking && wins < options.MinWins)
+            {
+                return Metric.NotEvaluable($"only {wins} {(wins == 1 ? "win" : "wins")}, at least {options.MinWins} needed for a bound on the payoff");
+            }
+
+            if (ranking && nonWins < options.MinNonWins)
+            {
+                return Metric.NotEvaluable($"only {nonWins} non-winning {(nonWins == 1 ? "trade" : "trades")}, at least {options.MinNonWins} needed for a bound on the payoff");
+            }
+
+            return Metric.Of((rate * shrunkWin.Value) + ((1 - rate) * shrunkNonWin.Value));
+        }
 
         var values = new Dictionary<ReportMetric, Metric>
         {
@@ -91,8 +116,8 @@ internal static class GroupMath
             [ReportMetric.AvgHoldingSessions] = Metric.Of((double)sessions / n),
             [ReportMetric.ShrunkWinRate] = Metric.Of(posterior),
             [ReportMetric.WinRateLower] = Metric.Of(lower),
-            [ReportMetric.ShrunkExpectancyR] = FromRate(posterior),
-            [ReportMetric.ExpectancyLowerR] = FromRate(lower),
+            [ReportMetric.ShrunkExpectancyR] = FromRate(posterior, ranking: false),
+            [ReportMetric.ExpectancyLowerR] = FromRate(lower, ranking: true),
         };
 
         if (evidence.Provisional)
@@ -105,7 +130,7 @@ internal static class GroupMath
             }
         }
 
-        return Wrap(key, n, wins, m => values[m], prior, evidence);
+        return Wrap(key, n, wins, m => values[m], priors, evidence);
     }
 
     public static EvidenceBlock EvidenceOf(IReadOnlyList<ReportRow> rows, ReportBasis basis) => new(
@@ -116,7 +141,7 @@ internal static class GroupMath
         rows.Any(r => r.Provisional),
         new ValueList<string>(rows.Select(r => r.Trade.RunKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)));
 
-    private static ReportGroup Wrap(GroupKey key, int n, int wins, Func<ReportMetric, Metric> metric, double? prior, EvidenceBlock evidence) => new(
+    private static ReportGroup Wrap(GroupKey key, int n, int wins, Func<ReportMetric, Metric> metric, GroupPriors? priors, EvidenceBlock evidence) => new(
         key,
         n,
         wins,
@@ -133,7 +158,9 @@ internal static class GroupMath
         metric(ReportMetric.WinRateLower),
         metric(ReportMetric.ShrunkExpectancyR),
         metric(ReportMetric.ExpectancyLowerR),
-        prior,
+        priors?.WinRate,
+        priors?.AvgWin,
+        priors?.AvgNonWin,
         evidence);
 
     /// <summary>Compares two values of one dimension: a value that was not recorded last, weekdays in calendar order, everything else by ordinal text.</summary>

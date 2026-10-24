@@ -18,9 +18,11 @@ namespace XDrishti.Domain.Reporting;
 /// <param name="AvgHoldingSessions">Mean sessions held.</param>
 /// <param name="ShrunkWinRate">The win rate shrunk toward the parent group (P6-01 Beta posterior mean).</param>
 /// <param name="WinRateLower">Lower end of the credible interval of the shrunk win rate.</param>
-/// <param name="ShrunkExpectancyR">Expectancy from the shrunk win rate and the mean win and loss.</param>
-/// <param name="ExpectancyLowerR">Expectancy from the lower credible win rate and the mean win and loss; the ranking figure.</param>
+/// <param name="ShrunkExpectancyR">Expectancy from the shrunk win rate and the shrunk mean win and mean non-win.</param>
+/// <param name="ExpectancyLowerR">Expectancy from the lower credible win rate and the shrunk mean win and non-win; the ranking figure. Not formed below the minimum number of wins and non-wins.</param>
 /// <param name="PriorRate">The parent group's win rate the group was shrunk toward; null where no estimate was made.</param>
+/// <param name="PriorAvgWinR">The parent group's mean win the group's mean win was shrunk toward; null where none was made.</param>
+/// <param name="PriorAvgNonWinR">The parent group's mean non-win (R of 0 or less) the group's was shrunk toward; null where none was made.</param>
 /// <param name="Evidence">The evidence block of the group.</param>
 public sealed record ReportGroup(
     GroupKey Key,
@@ -40,6 +42,8 @@ public sealed record ReportGroup(
     Metric ShrunkExpectancyR,
     Metric ExpectancyLowerR,
     double? PriorRate,
+    double? PriorAvgWinR,
+    double? PriorAvgNonWinR,
     EvidenceBlock Evidence)
 {
     /// <summary>One figure by name. <see cref="ReportMetric.Trades"/> is a count: a fact for any group that has a trade, empty for none.</summary>

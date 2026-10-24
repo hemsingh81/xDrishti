@@ -32,10 +32,10 @@ public sealed class InsightTests
 
         var best = Of(insights, InsightKind.BestStrategy);
         best.State.ShouldBe(MetricState.Value);
-        best.Text.ShouldBe("Best strategy: A +0.20 R per trade over 20 trades (win rate 60 %).");
+        best.Text.ShouldBe("Best strategy: A +0.20 R per trade over 20 trades (win rate 60 %, in-sample, thin sample).");
         best.Cells.ShouldBe(["Strategy=A"]);
         var weakest = Of(insights, InsightKind.WeakestStrategy);
-        weakest.Text.ShouldBe("Weakest strategy: B -0.20 R per trade over 20 trades (win rate 40 %).");
+        weakest.Text.ShouldBe("Weakest strategy: B -0.20 R per trade over 20 trades (win rate 40 %, in-sample, thin sample).");
         weakest.Cells.ShouldBe(["Strategy=B"]);
     }
 
@@ -91,7 +91,7 @@ public sealed class InsightTests
         var gap = Of(Population([Run("r1")], trades, Defaults).Insights(), InsightKind.BasketGap);
 
         gap.State.ShouldBe(MetricState.Value);
-        gap.Text.ShouldBe("Basket gap: North +0.20 R per trade over 20 trades (win rate 60 %) against South -0.20 R per trade over 20 trades (win rate 40 %), a gap of 0.40 R. Baskets overlap, so these figures are not additive.");
+        gap.Text.ShouldBe("Basket gap: North +0.20 R per trade over 20 trades (win rate 60 %, in-sample, thin sample) against South -0.20 R per trade over 20 trades (win rate 40 %, in-sample, thin sample), a gap of 0.40 R. Baskets overlap, so these figures are not additive.");
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class InsightTests
 
         var side = Of(Population([Run("r1")], trades, Defaults).Insights(), InsightKind.SideBias);
 
-        side.Text.ShouldBe("Side bias: BUY +0.20 R per trade over 20 trades (win rate 60 %) against SELL -0.20 R per trade over 20 trades (win rate 40 %), a gap of 0.40 R.");
+        side.Text.ShouldBe("Side bias: BUY +0.20 R per trade over 20 trades (win rate 60 %, in-sample, thin sample) against SELL -0.20 R per trade over 20 trades (win rate 40 %, in-sample, thin sample), a gap of 0.40 R.");
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed class InsightTests
         var none = Population([Run("r1", exit: null)], Series("r1", "A", WinsAndLosses(12, 8)), Defaults);
         var one = Population([Run("r1")], Series("r1", "A", WinsAndLosses(12, 8)), Defaults);
 
-        Of(two.Insights(), InsightKind.BestExit).Text.ShouldBe("Best exit: FIXED_RR +0.20 R per trade over 20 trades (win rate 60 %).");
+        Of(two.Insights(), InsightKind.BestExit).Text.ShouldBe("Best exit: FIXED_RR +0.20 R per trade over 20 trades (win rate 60 %, in-sample, thin sample).");
         Of(none.Insights(), InsightKind.BestExit).State.ShouldBe(MetricState.Unavailable);
         Of(one.Insights(), InsightKind.BestExit).State.ShouldBe(MetricState.NotEvaluable);
     }
@@ -165,6 +165,26 @@ public sealed class InsightTests
         var best = Of(Population([Run("r1")], trades, new ReportOptions { InsightMinTrades = 5 }).Insights(), InsightKind.BestStrategy);
 
         best.State.ShouldBe(MetricState.Value);
-        best.Text.ShouldBe("Best strategy: A +0.20 R per trade over 5 trades (win rate 60 %).");
+        best.Text.ShouldBe("Best strategy: A +0.20 R per trade over 5 trades (win rate 60 %, in-sample, thin sample).");
+    }
+
+    [Fact]
+    public void A_cell_with_the_cell_minimum_of_trades_carries_no_thin_sample_note()
+    {
+        List<ReportTrade> trades = [.. Series("r1", "A", WinsAndLosses(24, 16)), .. Series("r1", "B", WinsAndLosses(16, 24))];
+
+        var best = Of(Population([Run("r1")], trades, Defaults).Insights(), InsightKind.BestStrategy);
+
+        best.Text.ShouldBe("Best strategy: A +0.20 R per trade over 40 trades (win rate 60 %).");
+    }
+
+    [Fact]
+    public void When_only_the_style_varies_the_exit_insight_names_the_style_too()
+    {
+        List<ReportTrade> trades = [.. Series("r1", "A", WinsAndLosses(12, 8)), .. Series("r2", "A", WinsAndLosses(8, 12))];
+
+        var insights = Population([Run("r1", style: "intraday"), Run("r2", style: "swing")], trades, Defaults).Insights();
+
+        Of(insights, InsightKind.BestExit).Text.ShouldStartWith("Best exit and style: FIXED_RR / intraday +0.20 R");
     }
 }

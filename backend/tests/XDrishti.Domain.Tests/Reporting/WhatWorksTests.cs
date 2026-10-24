@@ -4,12 +4,13 @@ using static XDrishti.Domain.Tests.Reporting.ReportFixtures;
 
 namespace XDrishti.Domain.Tests.Reporting;
 
-/// <summary>"What works": ranked by the credible lower bound of expectancy, thin cells listed after, and "nothing has enough evidence yet" as an answer (P8-05, ADR 0099).</summary>
+/// <summary>"What works": ranked by the credible lower bound of expectancy, thin cells listed after, a sample that grows with the cells compared, and "nothing has enough evidence yet" as an answer (P8-05, ADR 0099).</summary>
 public sealed class WhatWorksTests
 {
     private static readonly ReportDimension[] ByStrategy = [ReportDimension.Strategy];
 
-    private static ReportOptions Options() => new() { Stats = new CellStatsOptions(PriorStrength: 20, MinTrades: 5) };
+    /// <summary>Minimums small enough for a hand table: the sample, one win and one non-win.</summary>
+    private static ReportOptions Options(int minTrades = 5) => new() { Stats = new CellStatsOptions(PriorStrength: 20, MinTrades: minTrades), MinWins = 1, MinNonWins = 1 };
 
     private static List<ReportTrade> Cells(params (string Strategy, int Wins, int Losses)[] cells)
     {
@@ -25,6 +26,7 @@ public sealed class WhatWorksTests
     [Fact]
     public void Cells_with_enough_sample_are_ranked_by_the_lower_bound_and_the_rest_follow_with_the_reason()
     {
+        // three cells compare (S1, S2, S4 have 10 trades; S3 has 4): the factor is 1 + 0.25 x log2(3), so 5 trades become 7
         var population = Population([Run("r1")], Cells(("S1", 8, 2), ("S2", 5, 5), ("S3", 3, 1), ("S4", 0, 10)), Options());
 
         var answer = population.FindWhatWorks(ByStrategy).Value;
@@ -37,10 +39,12 @@ public sealed class WhatWorksTests
         answer.NotRanked[0].Reason.ShouldBe("no lower bound can be formed: no winning trade");
         answer.NotRanked[1].Reason.ShouldBe("insufficient sample: 4 trades, at least 5 needed");
         answer.CellsLookedAt.ShouldBe(4);
+        answer.CellsComparable.ShouldBe(3);
+        answer.RequiredTrades.ShouldBe(7);
         answer.LargestN.ShouldBe(10);
         answer.MinTrades.ShouldBe(5);
-        answer.Headline.ShouldStartWith("2 of 4 cells have 5 or more trades and are ranked by the credible lower bound of expectancy;");
-        answer.SelectionNote.ShouldContain("the best of 4 will look good by chance");
+        answer.Headline.ShouldStartWith("2 of 4 cells have 7 or more trades and are ranked by the credible lower bound of expectancy;");
+        answer.SelectionNote.ShouldContain("the best of 3 will look good by chance");
         answer.Evidence.Population.N.ShouldBe(34);
     }
 
@@ -48,7 +52,7 @@ public sealed class WhatWorksTests
     public void The_lower_bound_ranks_a_big_modest_cell_above_a_thin_lucky_one_although_the_raw_mean_says_the_opposite()
     {
         // 4 wins and 1 loss (mean +0.60 R) against 60 wins and 40 losses (mean +0.20 R)
-        var population = Population([Run("r1")], Cells(("THIN", 4, 1), ("BIG", 60, 40), ("OTHER", 0, 6)), Options());
+        var population = Population([Run("r1")], Cells(("THIN", 4, 1), ("BIG", 60, 40), ("OTHER", 0, 6)), Options(3));
 
         var answer = population.FindWhatWorks(ByStrategy).Value;
 
@@ -58,6 +62,89 @@ public sealed class WhatWorksTests
         thin.ExpectancyR.Number!.Value.ShouldBeGreaterThan(big.ExpectancyR.Number!.Value);
         big.ExpectancyLowerR.Number!.Value.ShouldBeGreaterThan(thin.ExpectancyLowerR.Number!.Value);
         answer.NotRanked.Select(u => u.Group.Key.Text).ShouldBe(["Strategy=OTHER"]);
+    }
+
+    [Fact]
+    public void A_thin_cell_with_a_payoff_outlier_is_not_ranked_because_two_wins_are_not_a_payoff_estimate()
+    {
+        // 2 wins (one of 9 R) and 38 losses against 300 trades at 55 % of +1 / -1: the 9 R win must not lift the thin cell
+        List<ReportTrade> trades = [.. Series("r1", "THIN", [9, 1, .. Repeat(-1, 38)]), .. Series("r1", "BROAD", WinsAndLosses(165, 135))];
+        var population = Population([Run("r1")], trades, new ReportOptions());
+
+        var answer = population.FindWhatWorks(ByStrategy).Value;
+
+        answer.Ranked.Select(r => r.Group.Key.Text).ShouldBe(["Strategy=BROAD"]);
+        var thin = answer.NotRanked.Single();
+        thin.Group.Key.Text.ShouldBe("Strategy=THIN");
+        thin.Reason.ShouldBe("no lower bound can be formed: only 2 wins, at least 5 needed for a bound on the payoff");
+        thin.Group.ExpectancyLowerR.Number.ShouldBeNull();
+    }
+
+    [Fact]
+    public void The_mean_win_and_mean_non_win_are_shrunk_toward_the_parent_so_one_outlier_moves_the_bound_little()
+    {
+        // 5 wins (one of 9 R) and 35 losses: the raw mean win is 2.6 R; the parent (with 300 trades of +1 / -1) pulls it toward 1
+        List<ReportTrade> trades = [.. Series("r1", "OUTLIER", [9, 1, 1, 1, 1, .. Repeat(-1, 35)]), .. Series("r1", "BROAD", WinsAndLosses(165, 135))];
+        var population = Population([Run("r1")], trades, new ReportOptions());
+
+        var answer = population.FindWhatWorks(ByStrategy).Value;
+
+        var outlier = answer.Ranked.Single(r => r.Group.Key.Text == "Strategy=OUTLIER");
+        var group = outlier.Group;
+        group.AvgWinR.Number!.Value.ShouldBe(2.6, 1e-12);
+        group.PriorAvgWinR!.Value.ShouldBeLessThan(1.5);
+        var lower = group.WinRateLower.Number!.Value;
+        var withRawPayoffs = (lower * group.AvgWinR.Number!.Value) + ((1 - lower) * group.AvgLossR.Number!.Value);
+        group.ExpectancyLowerR.Number!.Value.ShouldBeLessThan(withRawPayoffs);
+        answer.Ranked[0].Group.Key.Text.ShouldBe("Strategy=BROAD");
+    }
+
+    [Fact]
+    public void Comparing_many_cells_raises_the_sample_every_cell_needs_so_forty_trades_stop_being_enough()
+    {
+        // eight cells of 40 trades each: the factor is 1 + 0.25 x log2(8) = 1.75, so the 30 trades become 53
+        List<ReportTrade> trades = [];
+        for (var i = 0; i < 8; i++)
+        {
+            trades.AddRange(Series("r1", "S" + i, WinsAndLosses(24, 16)));
+        }
+
+        var many = Population([Run("r1")], trades, new ReportOptions()).FindWhatWorks(ByStrategy).Value;
+        var one = Population([Run("r1")], Series("r1", "S0", WinsAndLosses(24, 16)), new ReportOptions()).FindWhatWorks(ByStrategy).Value;
+
+        many.Kind.ShouldBe(WhatWorksKind.NothingQualifies);
+        many.CellsComparable.ShouldBe(8);
+        many.RequiredTrades.ShouldBe(53);
+        many.NotRanked.ShouldAllBe(u => u.Reason == "40 trades, 53 needed when 8 cells are compared (30 x 1.75)");
+        many.Headline.ShouldBe("Nothing has enough evidence yet: looked at 8 cells, the largest has 40 trades and 53 are needed. (30 per cell, raised to 53 because 8 cells are compared.)");
+        one.Kind.ShouldBe(WhatWorksKind.Ranked);
+        one.RequiredTrades.ShouldBe(30);
+    }
+
+    [Fact]
+    public void Ranked_cells_come_with_the_number_of_positives_chance_alone_gives_and_thin_cells_are_not_in_the_count_of_cells_compared()
+    {
+        // eight cells of 70 trades (46 wins) and four of 10: only the eight compete
+        List<ReportTrade> trades = [];
+        for (var i = 0; i < 8; i++)
+        {
+            trades.AddRange(Series("r1", "BIG" + i, WinsAndLosses(46, 24)));
+        }
+
+        for (var i = 0; i < 4; i++)
+        {
+            trades.AddRange(Series("r1", "TINY" + i, WinsAndLosses(7, 3)));
+        }
+
+        var answer = Population([Run("r1")], trades, new ReportOptions()).FindWhatWorks(ByStrategy).Value;
+
+        answer.CellsLookedAt.ShouldBe(12);
+        answer.CellsComparable.ShouldBe(8);
+        answer.Ranked.Count.ShouldBe(8);
+        answer.ExpectedChancePositives.ShouldBe(0.4, 1e-12);
+        answer.PositiveLowerBound.ShouldBeGreaterThan(0);
+        answer.Headline.ShouldEndWith($"{answer.PositiveLowerBound} of them have a lower bound above zero, about 0.4 expected by chance alone.");
+        answer.SelectionNote.ShouldContain("the best of 8 will look good by chance");
     }
 
     [Fact]
@@ -72,6 +159,7 @@ public sealed class WhatWorksTests
         answer.NotRanked.Count.ShouldBe(3);
         answer.NotRanked.ShouldAllBe(u => u.Reason.StartsWith("insufficient sample", StringComparison.Ordinal));
         answer.CellsLookedAt.ShouldBe(3);
+        answer.CellsComparable.ShouldBe(0);
         answer.LargestN.ShouldBe(4);
         answer.Headline.ShouldBe("Nothing has enough evidence yet: looked at 3 cells, the largest has 4 trades and 5 are needed.");
         answer.NotRanked.ShouldAllBe(u => u.Group.ExpectancyLowerR.Number == null && u.Group.ExpectancyR.Number == null);
@@ -95,7 +183,7 @@ public sealed class WhatWorksTests
         var answer = population.FindWhatWorks(ByStrategy).Value;
 
         answer.Kind.ShouldBe(WhatWorksKind.NothingQualifies);
-        answer.Headline.ShouldContain("2 with 5 or more trades have no lower bound");
+        answer.Headline.ShouldContain("2 with 7 or more trades have no lower bound");
     }
 
     [Fact]

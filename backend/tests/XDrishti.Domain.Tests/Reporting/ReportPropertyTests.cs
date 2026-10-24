@@ -188,4 +188,117 @@ public sealed class ReportPropertyTests
         after.TradeCount.ShouldBe(before.TradeCount + 1);
         Group(after, ReportDimension.Side).Groups.Sum(g => g.N).ShouldBe(Group(before, ReportDimension.Side).Groups.Sum(g => g.N) + 1);
     }
+
+    /// <summary>The same signals under a second exit (some runs without an exit label before), a provisional run, and every fifth record twice.</summary>
+    private static (List<ReportRun> Runs, List<ReportTrade> Trades) GenerateVarying(int seed)
+    {
+        var (runs, trades) = Generate(seed, count: 90);
+        var random = new Random(seed + 1000);
+        var alternative = runs.Select(r => r with { RunKey = "alt-" + r.RunKey, Exit = "TRAIL", Provisional = r.RunKey.EndsWith("GAP", StringComparison.Ordinal) }).ToList();
+        var alternativeTrades = trades.Select(t => t with { RunKey = "alt-" + t.RunKey, RGross = Math.Round((random.NextDouble() * 5) - 2, 2) }).ToList();
+        var all = trades.Concat(alternativeTrades).ToList();
+        all.AddRange(all.Where((_, i) => i % 5 == 0).ToList());
+        return ([.. runs, .. alternative], all);
+    }
+
+    private static readonly ReportDimension[][] VaryingSubsets =
+    [
+        [ReportDimension.Exit], [ReportDimension.Exit, ReportDimension.Strategy], [ReportDimension.Exit, ReportDimension.Side, ReportDimension.Basket], [ReportDimension.Exit, ReportDimension.Month],
+    ];
+
+    [Fact]
+    public void With_exits_that_vary_duplicates_and_a_provisional_run_the_order_of_the_input_still_changes_nothing_and_each_signal_is_counted_once_per_exit()
+    {
+        for (var seed = 1; seed <= 8; seed++)
+        {
+            var (runs, trades) = GenerateVarying(seed);
+            var reference = Build(runs, trades);
+            var random = new Random(seed * 17);
+            var shuffled = Build([.. runs.OrderBy(_ => random.Next())], [.. trades.OrderBy(_ => random.Next())]);
+
+            reference.ExitVaries.ShouldBeTrue();
+            reference.Evidence.DuplicateTradesDropped.ShouldBeGreaterThan(0);
+            reference.Evidence.Population.Provisional.ShouldBeTrue();
+            reference.GroupBy([ReportDimension.Strategy]).Error.Code.ShouldBe("reports.double_count");
+            foreach (var dimensions in VaryingSubsets)
+            {
+                var grouping = Group(reference, dimensions);
+                shuffled.GroupBy(dimensions).Value.ShouldBe(grouping);
+                var distinct = trades.Distinct().Count();
+                grouping.Groups.Sum(g => g.N).ShouldBe(dimensions.Contains(ReportDimension.Basket) ? trades.Distinct().Sum(t => Math.Max(1, t.BasketIds.Distinct().Count())) : distinct);
+            }
+
+            shuffled.FindWhatWorks().Value.ShouldBe(reference.FindWhatWorks().Value);
+            shuffled.Insights().ShouldBe(reference.Insights());
+            shuffled.Evidence.ShouldBe(reference.Evidence);
+        }
+    }
+
+    [Fact]
+    public void Shrunk_figures_of_another_group_move_only_through_its_parent_figures_and_not_at_all_without_prior_strength()
+    {
+        var (runs, trades) = Generate(21, count: 200);
+        ReportTrade added = Trade("run-ORB", "ORB-extra", 2.5, "ORB", "15m", "BUY", "AAA", day: 70);
+
+        foreach (var strength in new[] { 0.0, 20.0 })
+        {
+            var options = new ReportOptions { Stats = new CellStatsOptions(PriorStrength: strength, MinTrades: 5) };
+            var before = Group(Population(runs, trades, options), ReportDimension.Strategy, ReportDimension.Side);
+            var after = Group(Population(runs, [.. trades, added], options), ReportDimension.Strategy, ReportDimension.Side);
+
+            foreach (var group in before.Groups.Where(g => g.Key.Text != "Strategy=ORB|Side=BUY"))
+            {
+                var other = Only(after, group.Key.Text);
+                var sameParent = other.PriorRate == group.PriorRate && other.PriorAvgWinR == group.PriorAvgWinR && other.PriorAvgNonWinR == group.PriorAvgNonWinR;
+                if (strength == 0 || sameParent)
+                {
+                    other.ShrunkWinRate.ShouldBe(group.ShrunkWinRate);
+                    other.WinRateLower.ShouldBe(group.WinRateLower);
+                    other.ShrunkExpectancyR.ShouldBe(group.ShrunkExpectancyR);
+                    other.ExpectancyLowerR.ShouldBe(group.ExpectancyLowerR);
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void A_trade_added_under_one_exit_changes_no_figure_of_the_other_exit_because_each_exit_has_its_own_pool()
+    {
+        var (runs, trades) = GenerateVarying(4);
+        var options = new ReportOptions { Stats = new CellStatsOptions(PriorStrength: 20, MinTrades: 5) };
+        ReportTrade added = Trade("alt-run-ORB", "ORB-extra-alt", 2.5, "ORB", "15m", "BUY", "AAA", day: 70);
+
+        var before = Group(Population(runs, trades, options), ReportDimension.Exit, ReportDimension.Strategy);
+        var after = Group(Population(runs, [.. trades, added], options), ReportDimension.Exit, ReportDimension.Strategy);
+
+        foreach (var group in before.Groups.Where(g => g.Key.ValueOf(ReportDimension.Exit) != "TRAIL"))
+        {
+            Only(after, group.Key.Text).ShouldBe(group);
+        }
+    }
+
+    [Fact]
+    public void Half_a_million_trades_are_grouped_in_one_pass_timing_is_written_for_information_only()
+    {
+        const int Count = 500_000;
+        var random = new Random(5);
+        string[] strategies = ["ORB", "VWAP", "GAP", "RSI", "EMA"];
+        var runs = strategies.Select(s => Run("run-" + s)).ToList();
+        var trades = new List<ReportTrade>(Count);
+        for (var i = 0; i < Count; i++)
+        {
+            var strategy = strategies[i % strategies.Length];
+            trades.Add(Trade("run-" + strategy, $"{strategy}-{i}", Math.Round((random.NextDouble() * 4) - 1.5, 2), strategy, i % 3 == 0 ? "5m" : "15m", i % 2 == 0 ? "BUY" : "SELL", Symbols[i % Symbols.Length], day: i % 300));
+        }
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var population = Build(runs, trades, minTrades: 30);
+        var created = clock.ElapsedMilliseconds;
+        var grouping = Group(population, ReportDimension.Strategy, ReportDimension.Timeframe, ReportDimension.Side, ReportDimension.Month);
+        var grouped = clock.ElapsedMilliseconds - created;
+        var answer = population.FindWhatWorks().Value;
+
+        TestContext.Current.SendDiagnosticMessage($"500,000 trades: create {created} ms, group by strategy/timeframe/side/month {grouped} ms ({grouping.Groups.Count} groups), what works {clock.ElapsedMilliseconds - created - grouped} ms ({answer.CellsLookedAt} cells)");
+        grouping.Groups.Sum(g => g.N).ShouldBe(Count);
+    }
 }

@@ -26,10 +26,6 @@ public sealed record Metric
     public static Metric Of(double number) =>
         double.IsFinite(number) ? new Metric(MetricState.Value, number, null) : NotEvaluable("the result is not a finite number");
 
-    /// <summary>A number that rests on a provisional input.</summary>
-    public static Metric OfProvisional(double number, string reason) =>
-        double.IsFinite(number) ? new Metric(MetricState.Provisional, number, reason) : NotEvaluable("the result is not a finite number");
-
     /// <summary>Trades exist but too few.</summary>
     public static Metric Insufficient(string reason) => new(MetricState.Insufficient, null, reason);
 

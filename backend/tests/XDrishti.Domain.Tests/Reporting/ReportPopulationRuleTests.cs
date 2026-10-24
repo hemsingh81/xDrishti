@@ -100,7 +100,8 @@ public sealed class ReportPopulationRuleTests
         var trades = new[] { Trade("r1", "A", 1, net: 0.9) };
 
         Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net }).Error.Code.ShouldBe("reports.net_not_confirmed");
-        Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmed = false }).IsFailure.ShouldBeTrue();
+        Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = null }).IsFailure.ShouldBeTrue();
+        Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = new ChargeSheetConfirmation(" ", new DateOnly(2026, 10, 1)) }).Error.Code.ShouldBe("reports.invalid");
     }
 
     [Fact]
@@ -108,14 +109,15 @@ public sealed class ReportPopulationRuleTests
     {
         var runs = new[] { Run("r1", costed: true) };
         var trades = new[] { Trade("r1", "A", 1, net: 0.75), Trade("r1", "B", -1, net: -1.25, day: 1) };
-        var options = new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmed = true, Stats = Small(1).Stats };
+        var options = new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = Confirmed, Stats = Small(1).Stats, MinWins = 1, MinNonWins = 1 };
 
         var population = Create(runs, trades, options).Value;
 
         var group = Only(Group(population), "all");
         group.TotalR.Number!.Value.ShouldBe(-0.5, 1e-12);
         group.Evidence.Basis.ShouldBe(ReportBasis.Net);
-        population.Evidence.Limits.ShouldContain(l => l.Contains("net of the stored charge sheet", StringComparison.Ordinal));
+        population.Evidence.Limits.ShouldContain(l => l.Contains("net of the stored charge sheet: charge sheet 'sheet-1' confirmed by the owner on 2026-10-01", StringComparison.Ordinal));
+        population.Evidence.NetBasisConfirmation.ShouldBe(Confirmed);
     }
 
     [Fact]
@@ -128,12 +130,13 @@ public sealed class ReportPopulationRuleTests
         group.TotalR.Number!.Value.ShouldBe(1, 1e-12);
         group.Evidence.Basis.ShouldBe(ReportBasis.Gross);
         population.Evidence.Limits.ShouldContain(l => l.Contains("R is gross", StringComparison.Ordinal));
+        population.Evidence.NetBasisConfirmation.ShouldBeNull();
     }
 
     [Fact]
     public void A_confirmed_net_report_over_gross_runs_has_no_net_r()
     {
-        var result = Create([Run("r1")], [Trade("r1", "A", 1)], new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmed = true });
+        var result = Create([Run("r1")], [Trade("r1", "A", 1)], new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = Confirmed });
 
         result.Error.Code.ShouldBe("reports.net_unavailable");
     }
