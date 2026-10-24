@@ -20,6 +20,9 @@ public static class LearningErrors
     /// <summary>No cell with this key is stored.</summary>
     public const string CellNotFoundCode = "learning.cell_not_found";
 
+    /// <summary>No weekly digest is stored for the week asked.</summary>
+    public const string DigestNotFoundCode = "learning.digest_not_found";
+
     /// <summary>The problems found before anything was read.</summary>
     public static Error Invalid(IReadOnlyList<FieldError> fields)
     {

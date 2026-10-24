@@ -129,6 +129,11 @@ internal static class XdCommand
             return await PlanAllocateCommand.RunAsync([.. args.Skip(2)], console);
         }
 
+        if (args.Count >= 2 && args[0] == "plan" && args[1] == "digest")
+        {
+            return await PlanDigestCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);
+        }
+
         if (args.Count >= 2 && args[0] == "plan" && args[1] == "grade")
         {
             return await PlanGradeCommand.RunAsync([.. args.Skip(2)], services, console, cancellationToken);

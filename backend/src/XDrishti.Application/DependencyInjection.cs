@@ -137,6 +137,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, HoldingQuotesService>();
         services.AddSingleton<IScheduledService, PortfolioBrokerHistoryService>();
         services.AddSingleton<IScheduledService, NightlyService>(); // the fail-closed nightly plan (P7-08); starts paused
+        services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
         services.AddSingleton<ServiceRunner>();
@@ -460,6 +461,9 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<DesignateModelCommand, DesignationOutcome>, DesignateModelHandler>(); // champion / challenger / retired, appended (P6-07)
         services.AddScoped<IQueryHandler<GetLearningOverviewQuery, Result<LearningOverviewView>>, GetLearningOverviewHandler>(); // counts and newest stored verdicts for the Learning screen (P6-18, ADR 0080)
         services.AddScoped<IQueryHandler<EvaluatePhaseCheckQuery, Result<PhaseCheckView>>, EvaluatePhaseCheckHandler>(); // the P6 exit criteria from stored records (P6-18, ADR 0080)
+        services.AddScoped<ICommandHandler<BuildDigestCommand, DigestView>, BuildDigestHandler>(); // the weekly digest from stored records; its only write is the digest (P7-15, ADR 0094)
+        services.AddScoped<IQueryHandler<GetDigestQuery, Result<DigestView>>, GetDigestHandler>();
+        services.AddScoped<IQueryHandler<ListDigestsQuery, Result<IReadOnlyList<DigestView>>>, ListDigestsHandler>();
         services.AddScoped<IQueryHandler<ShowSelectionQuery, Result<SelectionView>>, ShowSelectionHandler>(); // cell-level view of the P7 selection filters and rank, read-only (P7-01, ADR 0082)
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();
         services.AddScoped<IQueryHandler<GetModelQuery, Result<ModelDetailView>>, GetModelHandler>();

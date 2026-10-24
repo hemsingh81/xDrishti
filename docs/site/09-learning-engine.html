@@ -515,13 +515,15 @@ switching one off needs your password.</p>
 <p>Honesty rules for these features: each rule&#39;s evidence (trade counts, R by bucket) is shown next to it; a rule
 that would remove half or more of the candidates it saw in one plan (as built in P7-06, per plan; the same test over the last 100 trades needs graded reserve outcomes, P7-13), or whose &quot;skipped&quot; trades are not worse than the &quot;taken&quot; ones over
 the last 100 trades, is flagged for review instead of being trusted blindly.</p>
+<h2 id="15-as-built-the-weekly-digest-p7-15-adr-0094">15. As built: the weekly digest (P7-15, <a href="../adr/0094-the-weekly-digest-lists-stored-proposals-in-one-insert-only-record-per-iso-week-and-the-weekly-service-applies-nothing.html">ADR 0094</a>)<a class="hash" href="#15-as-built-the-weekly-digest-p7-15-adr-0094" aria-label="Link to this section">#</a></h2>
+<p>The weekly learning digest (section 10, row 10) exists as a list of stored proposals, built by <code>xd plan digest --store</code> (it prints without <code>--store</code>; storing only for the current week from Saturday 10:00 IST or the last completed week) or by the <code>weekly</code> service (Saturday 10:00, paused until the owner starts it) and stored once per ISO week in <code>research.digests</code>. It reads the cell, changelog, lesson, hypothesis, experiment, model and grade records and the phase check; it applies, approves and orders nothing, and says so in every section. The service does not run cell statistics, drift replay or hypothesis triggers (they write records); the progress line against the frozen-model counterfactual, the in-app notification and &quot;focus for next week&quot; are not built. <code>GET /api/learning/digest</code>, <code>GET /api/learning/digests</code>.</p>
 
   </article>
   <nav class="pager" aria-label="Previous and next document">
     <a class="prev" href="08-exits-and-risk.html"><small>← Previous  [</small>08 · Exits &amp; risk</a>
     <a class="next" href="10-trade-selection.html"><small>Next  ] →</small>10 · Trade selection</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-23 19:35</footer>
+  <footer class="foot">Generated from <code>docs/09-learning-engine.md</code> · 2026-10-24 05:02</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-four-layers" class="d2">1. Four layers</a>
 <a href="#2-validation-purged-walk-forward" class="d2">2. Validation: purged walk-forward</a>
@@ -536,7 +538,8 @@ the last 100 trades, is flagged for review instead of being trusted blindly.</p>
 <a href="#11-making-learning-visible-learning-screen" class="d2">11. Making learning visible (Learning screen)</a>
 <a href="#12-tweak-re-run-experiments" class="d2">12. Tweak &amp;amp; re-run (experiments)</a>
 <a href="#13-autonomy-less-intervention-same-control" class="d2">13. Autonomy: less intervention, same control</a>
-<a href="#14-smart-rules-from-learned-signals-to-a-safer-plan" class="d2">14. Smart rules: from learned signals to a safer plan</a></aside>
+<a href="#14-smart-rules-from-learned-signals-to-a-safer-plan" class="d2">14. Smart rules: from learned signals to a safer plan</a>
+<a href="#15-as-built-the-weekly-digest-p7-15-adr-0094" class="d2">15. As built: the weekly digest (P7-15, ADR 0094)</a></aside>
 </div>
 <div id="modal" class="modal" hidden><div class="modal-bar"><button class="btn" data-zoom="-1">−</button><button class="btn" data-zoom="0">Fit</button><button class="btn" data-zoom="1">+</button><button class="btn" id="modal-close">Close ✕</button></div><div class="modal-body"></div></div>
 <script src="assets/search-index.js"></script>
