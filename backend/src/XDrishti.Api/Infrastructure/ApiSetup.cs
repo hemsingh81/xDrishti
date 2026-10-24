@@ -29,6 +29,9 @@ internal static class ApiSetup
     /// <summary>Failed and successful logins together: more than this per minute from one address are refused with 429.</summary>
     public const int LoginAttemptsPerMinute = 10;
 
+    /// <summary>The most owner decisions on a plan (approve, modify, reject, approve-all, mark seen) per minute and client (P7-10): far above a person, far below a script.</summary>
+    public const int PlanDecisionsPerMinute = 120;
+
     private static readonly string[] TrustedProxyNetworks = ["127.0.0.0/8", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"];
 
     public static IServiceCollection AddApi(this IServiceCollection services)
@@ -91,6 +94,7 @@ internal static class ApiSetup
         services.AddSingleton<IEndpointModule, LessonsEndpoints>();
         services.AddSingleton<IEndpointModule, PlansEndpoints>();
         services.AddSingleton<IEndpointModule, AutonomyEndpoints>();
+        services.AddSingleton<IEndpointModule, PlanReviewEndpoints>(); // the owner's approve / modify / reject / approve-all of a plan (P7-10); session + CSRF, manual approval, no order
 
         // Instrument master (ADR 0010): the worker that carries out registered refreshes.
         services.AddHostedService<RefreshJobWorker>();
@@ -221,6 +225,9 @@ internal static class ApiSetup
             o.AddPolicy(SessionAuthentication.LoginRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = LoginAttemptsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            o.AddPolicy(SessionAuthentication.PlanDecisionRateLimitPolicy, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = PlanDecisionsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             o.OnRejected = async (context, _) =>
             {
                 int? retryAfter = null;

@@ -30,6 +30,9 @@ public interface IPlanStore
     /// <summary>Every state row of a plan and its items, oldest first.</summary>
     ValueTask<IReadOnlyList<PlanEventRow>> HistoryAsync(long planId, CancellationToken cancellationToken);
 
+    /// <summary>Every approval row of a plan's tickets (owner and auto), oldest first. Read only.</summary>
+    ValueTask<IReadOnlyList<ApprovalRow>> ApprovalsAsync(long planId, CancellationToken cancellationToken);
+
     /// <summary>Writes an item state row (and the owner's approval row, in the same transaction) if the newest state is still <c>From</c>; of two concurrent moves from the same state one wins.</summary>
     ValueTask<MoveStatus> MoveItemAsync(ItemMove move, CancellationToken cancellationToken);
 

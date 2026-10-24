@@ -276,3 +276,17 @@ internal sealed class SuggestionRecordConfiguration : IEntityTypeConfiguration<S
         builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_suggestions_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary><c>workflow.suggestion_seen</c> (spec P7-10, ADR 0095): the owner marked a suggestion as read. Insert-only for the runtime role; one mark per suggestion. The suggestion itself is never changed.</summary>
+internal sealed class SuggestionSeenRecordConfiguration : IEntityTypeConfiguration<SuggestionSeenRecord>
+{
+    public void Configure(EntityTypeBuilder<SuggestionSeenRecord> builder)
+    {
+        builder.ToTable("suggestion_seen", Schemas.Workflow, t => t.HasCheckConstraint("ck_suggestion_seen_actor", "actor LIKE 'owner:%'"));
+        builder.HasKey(x => x.Id).HasName("pk_suggestion_seen");
+        builder.Property(x => x.Id).UseIdentityAlwaysColumn();
+        builder.Property(x => x.Actor).HasMaxLength(100).IsRequired();
+        builder.HasIndex(x => x.SuggestionId).IsUnique().HasDatabaseName("uq_suggestion_seen_suggestion_id");
+        builder.HasOne<SuggestionRecord>().WithMany().HasForeignKey(x => x.SuggestionId).HasConstraintName("fk_suggestion_seen_suggestions_suggestion_id").OnDelete(DeleteBehavior.Restrict);
+    }
+}

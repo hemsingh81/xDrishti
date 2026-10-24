@@ -138,6 +138,7 @@ public static class DependencyInjection
         services.AddSingleton<IScheduledService, PortfolioBrokerHistoryService>();
         services.AddSingleton<IScheduledService, NightlyService>(); // the fail-closed nightly plan (P7-08); starts paused
         services.AddSingleton<IScheduledService, SuggestionsService>(); // the owner's suggestions after the nightly plan (P7-09); starts paused, rules only
+        services.AddSingleton<IScheduledService, ReviewCutoffService>(); // lapses unreviewed tickets at the plan's cutoff; the optional auto pass runs only when the owner's setting is ON; starts paused (P7-10)
         services.AddSingleton<IScheduledService, WeeklyService>(); // the weekly learning digest (P7-15); starts paused, builds and stores one digest, applies nothing
         services.AddSingleton<IScheduledService, LiveFeedService>(); // shown and edited here, run by xd-feed (IExternallyRunService): no scheduler starts it
         services.AddSingleton<ServiceRegistry>();
@@ -500,7 +501,16 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetAutonomySettingsQuery, AutonomySettingsView>, GetAutonomySettingsHandler>();
         services.AddScoped<ICommandHandler<ChangeAutonomySettingsCommand, AutonomySettingsView>, ChangeAutonomySettingsHandler>();
         services.AddScoped<ICommandHandler<AutoApprovePlanCommand, AutoApprovalOutcome>, AutoApprovePlanHandler>();
-        services.AddScoped<IChecklistSource, NullChecklistSource>(); // no checklist inputs wired yet (P7-10): nothing is ever auto-approved on a missing checklist
+        // the owner's review (P7-10, ADR 0095): approve, modify, reject, approve-all, the review view, the suggestions inbox and the cutoff job; manual approval, no order
+        services.AddScoped<ICommandHandler<ApproveTicketCommand, ReviewDecisionOutcome>, ApproveTicketHandler>();
+        services.AddScoped<ICommandHandler<ModifyTicketCommand, ReviewDecisionOutcome>, ModifyTicketHandler>();
+        services.AddScoped<ICommandHandler<RejectTicketCommand, ReviewDecisionOutcome>, RejectTicketHandler>();
+        services.AddScoped<ICommandHandler<ApproveAllCommand, ApproveAllOutcome>, ApproveAllHandler>();
+        services.AddScoped<IQueryHandler<GetPlanReviewQuery, Result<PlanReviewView>>, GetPlanReviewHandler>();
+        services.AddScoped<IQueryHandler<ListSuggestionsQuery, Result<IReadOnlyList<SuggestionView>>>, ListSuggestionsHandler>();
+        services.AddScoped<ICommandHandler<MarkSuggestionSeenCommand>, MarkSuggestionSeenHandler>();
+        services.AddScoped<ICommandHandler<RunReviewCycleCommand, ReviewCycleOutcome>, RunReviewCycleHandler>();
+        services.AddScoped<IChecklistSource, StoredChecklistSource>(); // the checklist the plan stored (P7-10, ADR 0095): a missing or unreadable record is no checklist, never a pass
         // the fail-closed nightly pipeline (P7-08, ADR 0086): the gates in the order they are read, the builder (the skeleton's null builder until P7-04/P7-09) and the run
         services.AddScoped<INightlyGate, CalendarGate>();
         services.AddScoped<INightlyGate, EodGate>();

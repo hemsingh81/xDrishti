@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings", "workflow.suggestions"]);
+        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings", "workflow.suggestion_seen", "workflow.suggestions"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -99,6 +99,9 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "UPDATE workflow.suggestions SET text = 'x' WHERE false",
             "DELETE FROM workflow.suggestions WHERE false",
             "TRUNCATE workflow.suggestions",
+            "UPDATE workflow.suggestion_seen SET actor = 'owner:x' WHERE false",
+            "DELETE FROM workflow.suggestion_seen WHERE false",
+            "TRUNCATE workflow.suggestion_seen",
         })
         {
             (await SqlStateAsync(server.App, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);

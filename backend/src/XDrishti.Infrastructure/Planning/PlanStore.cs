@@ -183,6 +183,20 @@ internal sealed class PlanStore(NpgsqlDataSource dataSource, TimeProvider time) 
         return rows;
     }
 
+    public async ValueTask<IReadOnlyList<ApprovalRow>> ApprovalsAsync(long planId, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("SELECT id, item_id, kind, decision, actor, reason, confirm_reason, modifications, decided_at FROM workflow.approvals WHERE plan_id = @id AND item_id IS NOT NULL ORDER BY id");
+        select.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, planId);
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        var rows = new List<ApprovalRow>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new ApprovalRow(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5), Text(reader, 6), Text(reader, 7), reader.GetFieldValue<DateTimeOffset>(8)));
+        }
+
+        return rows;
+    }
+
     public async ValueTask<MoveStatus> MoveItemAsync(ItemMove move, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(move);

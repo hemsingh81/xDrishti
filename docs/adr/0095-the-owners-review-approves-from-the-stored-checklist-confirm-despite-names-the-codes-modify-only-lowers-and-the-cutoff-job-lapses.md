@@ -1,0 +1,31 @@
+# 0095 — The owner's review approves from the stored checklist; confirm-despite names the codes; modify only lowers; the cutoff job lapses
+
+- **Status:** Proposed (spec [P7-10](../specs/P7-10-plan-review-and-approval-workflow.md), approved under the owner's standing run instruction and the owner's binding decisions of 2026-10-23; built 2026-10-24). Becomes Accepted when the owner has read it.
+- **Date:** 2026-10-24.
+- **Relation to other ADRs:** [0083](0083-the-plan-record-insert-only-state-trails-owner-only-approvals-lapse-by-default-and-no-order-by-name.md) (owner-only approvals, cutoff, lock order and its three safety reviews are kept whole), [0087](0087-pretrade-checklist-pure-unavailable-never-passes-and-an-owner-only-confirm-despite.md) (the checklist and the bound confirmation), [0091](0091-auto-approval-is-an-option-behind-an-owner-setting-default-off-a-new-approval-kind-the-database-checks.md) (the optional auto path), [0092](0092-the-wired-plan-selection-smart-rules-fill-allocation-and-checklist-in-order-unavailable-never-passes-and-an-append-only-suggestion-inbox.md) (stored standings, inbox).
+
+## Context
+P7-03 built the plan record with owner-only approvals, P7-05 the checklist, P7-12 the optional auto approval, P7-09 the wired plan. P7-10 adds the first write endpoints of the plan record. The owner's binding decisions: P7 places no order; paper accounts only; manual approval by default and any auto approval a setting defaulting OFF; no reserve promotion; no automatic learning change.
+
+## Decision
+1. **Endpoints use the autonomy PUT's identity rule** but no password: session + CSRF token (middleware), actor = `owner:` + the verified session's e-mail, built in the endpoint; no body field can name an actor, a kind or a settings snapshot. The handlers refuse any actor that is not an owner actor. No endpoint reaches the auto store or writes a system move.
+2. **Approval goes through the checklist.** `StoredChecklistSource` rebuilds the 14 checks per allocated account from the stored `checklist:<code>:<outcome>` standings (`StoredChecklist`, pure). A ticket without the wiring marker, without an allocation, or with an unreadable standing has no checklist and cannot be approved, with or without a confirmation. A non-paper allocation is refused with the account gate, which no confirmation covers. The auto policy uses the same source, still declines unavailable inputs and any ticket the evidence marks (the marker itself is listed as an unavailable input, so nothing is auto-approved today).
+3. **Confirm-despite** is per account: `{accountId, codes[], reason}`, bound by the server to the ticket's own symbol (`OwnerConfirmation`), covering only the named confirmable codes on that account. Stored in `confirm_reason` as `[account] overrode <codes>: <reason>`, entries joined by ` | `, refused when over 500 characters.
+4. **Modify lowers a size, nothing else.** Quantities per allocated paper account, at least 1, strictly below the allocation (`TicketModification`); stored canonically in the modify approval's `modifications`. Approving a Modified ticket reads the newest modify row back, validates it against the allocations again and runs the checklist as for any ticket. Stop, target, trigger and the rest are text and cannot be re-validated, so they cannot be edited.
+5. **Every state change is the existing owner path:** the handlers call `MoveTicketCommand` (one transaction, approval row + state row, plan then item lock, one winner, the database re-checks the cutoff). A second approve is refused by the table or is stale, never a second row. After the first approval or rejection the plan moves Published to InReview through the lifecycle table.
+6. **Approve-all** approves a primary, still-proposed ticket only if every check of every account is a pass and no confirmation is needed (a warned check is not a pass here); each ticket is its own transaction; the rest are listed with reasons. It never takes reserve, modified or decided tickets.
+7. **The review job (`review-cutoff` service)** runs `RunReviewCycleCommand` every minute 09:03 to 09:10 on trading days, starting paused. For the day's open plans: before the cutoff nothing lapses; in the last 2 minutes, only if the autonomy setting reads ON, `AutoApprovePlanCommand` runs (strictly before the cutoff; the database refuses it at or after); at and after the cutoff `ApplyReviewCutoffCommand` lapses everything undecided with the service actor `system:review-cutoff`. With the setting OFF the auto handler is never called. A closed plan or no plan is a success that does nothing.
+8. **Suggestions:** list with a seen flag; "seen" is an insert-only row in `workflow.suggestion_seen` (grants per table, one per suggestion, actor `owner:%`). Accept and snooze are not built.
+9. **A separate rate limit** (120 per minute per client) for the decision routes; the sign-in limit is not shared.
+10. Log ids 4770 to 4776; migration `AddSuggestionSeen`.
+
+## Consequences
+- With the checks as wired today (data quality has no source) every real ticket needs a named confirm-despite, and approve-all and the auto pass approve nothing; the owner can still approve each ticket with a recorded reason or let it lapse.
+- Standings are plan-wide, so an account may see a failure that belonged to another account: stricter, never looser.
+- The review job's idempotence relies on the plan state: a lapsed plan is skipped.
+
+## Alternatives considered
+- **A checklist column or recomputation from live inputs at review time.** Needs a migration and live sources that do not exist; the stored standings are what the plan was built on. Deferred.
+- **Editing stop/target.** Not re-validatable text; rejected for now.
+- **A password per approval.** Heavier than the risk (a paper ticket, lapses by default); not asked.
+- **Auto pass in a separate service.** Two jobs to keep in step; one job with a time window keeps "strictly before the cutoff" in one place.

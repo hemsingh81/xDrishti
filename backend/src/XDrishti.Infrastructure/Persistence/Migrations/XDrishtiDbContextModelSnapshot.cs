@@ -5662,6 +5662,42 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.SuggestionSeenRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTimeOffset>("SeenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("seen_at");
+
+                    b.Property<long>("SuggestionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("suggestion_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_suggestion_seen");
+
+                    b.HasIndex("SuggestionId")
+                        .IsUnique()
+                        .HasDatabaseName("uq_suggestion_seen_suggestion_id");
+
+                    b.ToTable("suggestion_seen", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_suggestion_seen_actor", "actor LIKE 'owner:%'");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
                 {
                     b.Property<long>("SelectionId")
@@ -7613,6 +7649,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_suggestions_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.SuggestionSeenRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.SuggestionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("SuggestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_suggestion_seen_suggestions_suggestion_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>

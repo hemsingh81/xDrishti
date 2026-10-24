@@ -9608,6 +9608,470 @@
           }
         }
       }
+    },
+    "/api/plans/{id}/review": {
+      "get": {
+        "tags": [
+          "Plan review"
+        ],
+        "summary": "The review of a plan: each primary and reserve ticket with its stored checklist per account (standing of every check, what needs the owner's confirmation, whether approve-all would take it), the cutoff and whether decisions are still open. Approved means watched; no order is placed and none exists. 404 plans.not_found",
+        "operationId": "GetPlanReview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanReviewView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/items/{itemId}/approve": {
+      "post": {
+        "tags": [
+          "Plan review"
+        ],
+        "summary": "Approve one ticket as the owner (session and CSRF token; the owner is the session, never the body). Every account's stored checklist must allow it; a check that is not a pass needs a confirmation naming its code, the account and a reason of 1 to 200 characters; the account gate can never be overridden. 'Approved for watching: no order is placed and none exists.' 409 plans.checklist_blocked, plans.closed (cutoff passed), plans.move_refused or plans.stale (already decided), 400 checklist.* (confirmation), 404",
+        "operationId": "ApprovePlanItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ApproveTicketRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecisionOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/items/{itemId}/modify": {
+      "post": {
+        "tags": [
+          "Plan review"
+        ],
+        "summary": "Lower the size of a ticket for accounts it is already sized for (only reductions; nothing else can be edited). The ticket becomes Modified, not approved: approving it re-validates the change and the checklist. Refused after the cutoff. 400 plans.modification_invalid, 409 plans.closed, plans.move_refused, plans.checklist_blocked, 404",
+        "operationId": "ModifyPlanItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ModifyTicketRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecisionOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/items/{itemId}/reject": {
+      "post": {
+        "tags": [
+          "Plan review"
+        ],
+        "summary": "Reject one ticket as the owner. Allowed after the cutoff time until the cutoff job has closed the plan. 409 plans.move_refused or plans.stale, 404",
+        "operationId": "RejectPlanItem",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "itemId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RejectTicketRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewDecisionOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/approve-all": {
+      "post": {
+        "tags": [
+          "Plan review"
+        ],
+        "summary": "Approve every primary, still-proposed ticket whose stored checklist is complete with every check passed on every account; tickets with a failed, warned or unavailable check, reserve and modified tickets are skipped and listed with the reason, never approved despite a check. 409 plans.closed, 404",
+        "operationId": "ApproveAllPlanItems",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApproveAllOutcome"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/suggestions": {
+      "get": {
+        "tags": [
+          "Plan review"
+        ],
+        "summary": "The suggestions inbox of a plan with the owner's seen marks. Advice only; it changes nothing. 404 plans.not_found",
+        "operationId": "ListPlanSuggestions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SuggestionView"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/plans/{id}/suggestions/{suggestionId}/seen": {
+      "post": {
+        "tags": [
+          "Plan review"
+        ],
+        "summary": "Mark a suggestion as seen (an insert-only row; repeating it changes nothing). 404 plans.suggestion_not_found",
+        "operationId": "MarkPlanSuggestionSeen",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "suggestionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -10762,6 +11226,69 @@
             "format": "int64"
           }
         }
+      },
+      "ApproveAllOutcome": {
+        "required": [
+          "planId",
+          "approved",
+          "skipped",
+          "notice"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "integer",
+            "description": "The plan.",
+            "format": "int64"
+          },
+          "approved": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "The tickets approved."
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SkippedTicket"
+            },
+            "description": "The primary tickets left for the owner, with the reason."
+          },
+          "notice": {
+            "type": "string",
+            "description": "The approval wording."
+          }
+        },
+        "description": "What approve-all did."
+      },
+      "ApproveTicketRequest": {
+        "required": [
+          "reason",
+          "confirmations"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters; a default sentence when omitted."
+          },
+          "confirmations": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CheckConfirmationRequest"
+            },
+            "description": "The checks approved despite, per account."
+          }
+        },
+        "description": "The body of an approval. Everything is optional; a ticket whose checks all passed needs no body. The actor comes from the signed-in session, never from here."
       },
       "AttentionAction": {
         "required": [
@@ -12888,6 +13415,39 @@
           }
         },
         "description": "A changelog row as the API shows it (P6-08): what changed, by whom, why, before and after, and the evidence. A revert has long? ChangelogEntryView.RevertsId."
+      },
+      "CheckConfirmationRequest": {
+        "required": [
+          "accountId",
+          "codes",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account the confirmation is for.",
+            "format": "uuid"
+          },
+          "codes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The check codes approved despite (never the account gate)."
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 200 characters."
+          }
+        },
+        "description": "The owner's \"approve despite\" for one account: the check codes named and why. The ticket's own symbol is bound by the server; the owner is never part of any body."
       },
       "CloneStrategyRequest": {
         "type": "object",
@@ -21186,6 +21746,33 @@
         },
         "description": "A registered model as the API shows it (P6-07, ADR 0070): what made it, what the harness said about it and its current role. No model bytes."
       },
+      "ModifyTicketRequest": {
+        "required": [
+          "reason",
+          "quantities"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          },
+          "quantities": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/QuantityChangeRequest"
+            },
+            "description": "The new quantities."
+          }
+        },
+        "description": "The body of a modification: sizes can only be reduced; nothing else can be edited."
+      },
       "MonteCarloView": {
         "required": [
           "trades",
@@ -21833,6 +22420,55 @@
           }
         },
         "description": "The journal of one plan."
+      },
+      "PlanReviewView": {
+        "required": [
+          "planId",
+          "forDate",
+          "state",
+          "reviewCutoff",
+          "open",
+          "notice",
+          "tickets"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "integer",
+            "description": "The plan.",
+            "format": "int64"
+          },
+          "forDate": {
+            "type": "string",
+            "description": "The session.",
+            "format": "date"
+          },
+          "state": {
+            "type": "string",
+            "description": "The plan state."
+          },
+          "reviewCutoff": {
+            "type": "string",
+            "description": "Approvals and modifications are refused from this time; undecided tickets lapse.",
+            "format": "date-time"
+          },
+          "open": {
+            "type": "boolean",
+            "description": "Whether decisions can still be taken now (plan open and before the cutoff)."
+          },
+          "notice": {
+            "type": "string",
+            "description": "What an approval means: watched, no order."
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewTicketView"
+            },
+            "description": "Primary and reserve tickets."
+          }
+        },
+        "description": "A plan under review (spec P7-10)."
       },
       "PlanRunView": {
         "required": [
@@ -23558,6 +24194,26 @@
         },
         "description": "The window of the checks: how many closed sessions, from which date to which (the ones a run started now would look at)."
       },
+      "QuantityChangeRequest": {
+        "required": [
+          "accountId",
+          "quantity"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account the ticket is already sized for.",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "The new quantity (at least 1, below the allocated one).",
+            "format": "int32"
+          }
+        },
+        "description": "A lower size for one account of the ticket."
+      },
       "RefreshRunView": {
         "required": [
           "id",
@@ -23736,6 +24392,22 @@
           }
         },
         "description": "Where the master list stands: the refresh in progress (if any), the last finished one, the automatic schedule and how many instruments are active."
+      },
+      "RejectTicketRequest": {
+        "required": [
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why, 1 to 500 characters."
+          }
+        },
+        "description": "The body of a rejection."
       },
       "RemoveMembersInput": {
         "required": [
@@ -24098,6 +24770,197 @@
           }
         },
         "description": "The profit/loss figures that every holding row, lot row and summary carries."
+      },
+      "ReviewAccountView": {
+        "required": [
+          "accountId",
+          "mode",
+          "quantity",
+          "effectiveQuantity",
+          "canApprove",
+          "checks"
+        ],
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "description": "The account.",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "description": "The allocation's mode (paper)."
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "The size the plan allocated.",
+            "format": "int32"
+          },
+          "effectiveQuantity": {
+            "type": "integer",
+            "description": "The size after the owner's modification, or the allocated one.",
+            "format": "int32"
+          },
+          "canApprove": {
+            "type": "boolean",
+            "description": "Whether this account's checklist allows approval without a confirmation."
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewCheckView"
+            },
+            "description": "All checks in the fixed order, or empty when the plan stored no readable checklist."
+          }
+        },
+        "description": "A ticket's checklist for one account."
+      },
+      "ReviewCheckView": {
+        "required": [
+          "code",
+          "outcome",
+          "standing",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The check code."
+          },
+          "outcome": {
+            "type": "string",
+            "description": "pass, fail or unavailable, as recorded when the plan was built."
+          },
+          "standing": {
+            "type": "string",
+            "description": "passed, warned, needsconfirmation, confirmeddespite or refused: where it stands for approval."
+          },
+          "detail": {
+            "type": "string",
+            "description": "One line."
+          }
+        },
+        "description": "One check on the review screen."
+      },
+      "ReviewDecisionOutcome": {
+        "required": [
+          "itemId",
+          "state",
+          "notice",
+          "overriddenCodes"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "description": "The ticket.",
+            "format": "int64"
+          },
+          "state": {
+            "type": "string",
+            "description": "The state after."
+          },
+          "notice": {
+            "type": "string",
+            "description": "For an approval, string PlanWording.ApprovedForWatching; otherwise empty."
+          },
+          "overriddenCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The checks approved despite, in check order (empty when none)."
+          }
+        },
+        "description": "What an owner decision did."
+      },
+      "ReviewTicketView": {
+        "required": [
+          "itemId",
+          "rank",
+          "group",
+          "state",
+          "symbol",
+          "side",
+          "checklistRecorded",
+          "canApprove",
+          "needsConfirmation",
+          "approveAllEligible",
+          "modification",
+          "confirmedDespite",
+          "accounts"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "description": "The ticket.",
+            "format": "int64"
+          },
+          "rank": {
+            "type": "integer",
+            "description": "Order in the plan.",
+            "format": "int32"
+          },
+          "group": {
+            "type": "string",
+            "description": "primary or reserve."
+          },
+          "state": {
+            "type": "string",
+            "description": "Its state."
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Instrument."
+          },
+          "side": {
+            "type": "string",
+            "description": "BUY or SELL."
+          },
+          "checklistRecorded": {
+            "type": "boolean",
+            "description": "False when the plan stored no readable checklist: the ticket cannot be approved."
+          },
+          "canApprove": {
+            "type": "boolean",
+            "description": "Whether the owner may approve it as it stands (checks all passed or warned)."
+          },
+          "needsConfirmation": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The check codes per account that need the owner's confirmation to approve; empty when none."
+          },
+          "approveAllEligible": {
+            "type": "boolean",
+            "description": "Whether approve-all would approve it: primary, proposed, every check passed."
+          },
+          "modification": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The owner's size change, as stored, or null."
+          },
+          "confirmedDespite": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the approval overrode (stored text), or null."
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewAccountView"
+            },
+            "description": "The checklist per account."
+          }
+        },
+        "description": "One ticket on the review screen."
       },
       "RiskProfileInput": {
         "required": [
@@ -25221,6 +26084,30 @@
         },
         "description": "The sign-flip baseline: lenient (mean R against 0 given the trade sizes), not a re-run with random entries."
       },
+      "SkippedTicket": {
+        "required": [
+          "itemId",
+          "symbol",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "integer",
+            "description": "The ticket.",
+            "format": "int64"
+          },
+          "symbol": {
+            "type": "string",
+            "description": "Its instrument."
+          },
+          "reason": {
+            "type": "string",
+            "description": "In words, including the check codes that did not pass."
+          }
+        },
+        "description": "A ticket approve-all left alone, and why."
+      },
       "SpikeCheck": {
         "required": [
           "status",
@@ -25757,6 +26644,46 @@
           }
         },
         "description": "The decision about a suggested dividend: `State` is `accepted` (with the `DividendId` created) or `dismissed`."
+      },
+      "SuggestionView": {
+        "required": [
+          "id",
+          "kind",
+          "subject",
+          "text",
+          "createdAt",
+          "seen"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The suggestion.",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Its kind."
+          },
+          "subject": {
+            "type": "string",
+            "description": "What it is about."
+          },
+          "text": {
+            "type": "string",
+            "description": "In words."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When.",
+            "format": "date-time"
+          },
+          "seen": {
+            "type": "boolean",
+            "description": "Whether the owner marked it seen."
+          }
+        },
+        "description": "A suggestion in the inbox."
       },
       "SweepPointView": {
         "required": [
@@ -27650,6 +28577,9 @@
     },
     {
       "name": "Autonomy"
+    },
+    {
+      "name": "Plan review"
     }
   ],
   "x-xdrishti-hubs": {

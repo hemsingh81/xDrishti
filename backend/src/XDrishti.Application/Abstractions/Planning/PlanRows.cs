@@ -29,6 +29,18 @@ public sealed record PlanItemRow(long Id, long PlanId, NewPlanItem Item, TicketS
 /// <param name="At">When.</param>
 public sealed record PlanEventRow(long Id, long? ItemId, string From, string To, string Actor, string Reason, long? ApprovalId, DateTimeOffset At);
 
+/// <summary>One stored approval row (<c>workflow.approvals</c>), insert-only.</summary>
+/// <param name="Id">The row id.</param>
+/// <param name="ItemId">The ticket.</param>
+/// <param name="Kind">owner or auto.</param>
+/// <param name="Decision">approve, modify or reject.</param>
+/// <param name="Actor">Who.</param>
+/// <param name="Reason">Why.</param>
+/// <param name="ConfirmReason">The confirm-despite text of an approval, or null.</param>
+/// <param name="Modifications">What a modify edited, or null.</param>
+/// <param name="DecidedAt">When (database clock).</param>
+public sealed record ApprovalRow(long Id, long ItemId, string Kind, string Decision, string Actor, string Reason, string? ConfirmReason, string? Modifications, DateTimeOffset DecidedAt);
+
 /// <summary>The owner's decision stored beside a ticket move.</summary>
 /// <param name="Decision">Approve, modify or reject.</param>
 /// <param name="Modifications">What was edited; required for modify.</param>

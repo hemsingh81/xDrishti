@@ -321,3 +321,15 @@ internal sealed class SuggestionRecord
 
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+/// <summary>One owner's "seen" mark on a suggestion (spec P7-10, ADR 0095): insert-only, one per suggestion.</summary>
+internal sealed class SuggestionSeenRecord
+{
+    public long Id { get; set; }
+
+    public long SuggestionId { get; set; }
+
+    public string Actor { get; set; } = string.Empty;
+
+    public DateTimeOffset SeenAt { get; set; }
+}
