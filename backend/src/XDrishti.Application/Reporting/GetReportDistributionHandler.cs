@@ -3,7 +3,7 @@ using XDrishti.Domain.Common;
 
 namespace XDrishti.Application.Reporting;
 
-/// <summary>The R distributions of the lens (P8-06).</summary>
+/// <summary>The R distributions of the lens (P8-06); more groups than the cap are refused at the first one past it.</summary>
 internal sealed class GetReportDistributionHandler(ReportLoader loader) : IQueryHandler<GetReportDistributionQuery, Result<DistributionView>>
 {
     /// <summary>The width of a bin in R.</summary>
@@ -18,14 +18,8 @@ internal sealed class GetReportDistributionHandler(ReportLoader loader) : IQuery
             return Result.Failure<DistributionView>(loaded.Error);
         }
 
-        var distribution = loaded.Value.Population.Distribution(query.Query.Lens, BinWidthR);
-        if (distribution.IsFailure)
-        {
-            return Result.Failure<DistributionView>(distribution.Error);
-        }
-
-        return ResponseCaps.Exceeded(distribution.Value.Groups.Count, ResponseCaps.DistributionGroups, "groups") is { } tooMany
-            ? Result.Failure<DistributionView>(tooMany)
-            : Result.Success(ReportViews.Distribution(distribution.Value, loaded.Value));
+        using var report = loaded.Value;
+        var distribution = report.Population.Distribution(query.Query.Lens, BinWidthR, ResponseCaps.DistributionGroups);
+        return distribution.IsFailure ? Result.Failure<DistributionView>(distribution.Error) : Result.Success(ReportViews.Distribution(distribution.Value, report));
     }
 }

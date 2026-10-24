@@ -4,7 +4,7 @@ using XDrishti.Domain.Reporting;
 
 namespace XDrishti.Application.Reporting;
 
-/// <summary>The pivot of two dimensions by one figure (P8-06): every cell is a value, <c>insufficient</c> (masked, with its count) or <c>empty</c>.</summary>
+/// <summary>The pivot of two dimensions by one figure (P8-06): every cell is a value, <c>insufficient</c> (masked, with its count) or <c>empty</c>; a grid over the cap is refused before its cells are laid out.</summary>
 internal sealed class GetReportPivotHandler(ReportLoader loader) : IQueryHandler<GetReportPivotQuery, Result<PivotView>>
 {
     public async ValueTask<Result<PivotView>> HandleAsync(GetReportPivotQuery query, CancellationToken cancellationToken)
@@ -21,14 +21,8 @@ internal sealed class GetReportPivotHandler(ReportLoader loader) : IQueryHandler
             return Result.Failure<PivotView>(loaded.Error);
         }
 
-        var pivot = loaded.Value.Population.Pivot(query.Query.Lens[0], query.Query.Lens[1], query.Query.Metric);
-        if (pivot.IsFailure)
-        {
-            return Result.Failure<PivotView>(pivot.Error);
-        }
-
-        return ResponseCaps.Exceeded(pivot.Value.Cells.Count, ResponseCaps.PivotCells, "cells") is { } tooMany
-            ? Result.Failure<PivotView>(tooMany)
-            : Result.Success(ReportViews.Pivot(pivot.Value, loaded.Value));
+        using var report = loaded.Value;
+        var pivot = report.Population.Pivot(query.Query.Lens[0], query.Query.Lens[1], query.Query.Metric, ResponseCaps.PivotCells);
+        return pivot.IsFailure ? Result.Failure<PivotView>(pivot.Error) : Result.Success(ReportViews.Pivot(pivot.Value, report));
     }
 }

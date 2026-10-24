@@ -21,6 +21,7 @@ namespace XDrishti.Application.Abstractions.Reporting;
 /// <param name="ClosedTrades">Trades closed within the run window: the ones a report counts.</param>
 /// <param name="OpenAtEnd">Trades still open at the end of the data: never counted by a report.</param>
 /// <param name="CreatedAt">When the run was stored.</param>
+/// <param name="CostsRatesSha256">The hash of the rates of the charge sheet the run was costed with (the sheet is overwritten in place, so the id alone does not say which rates); null for a gross run.</param>
 public sealed record ReportRunInfo(
     string RunKey,
     string StrategyId,
@@ -36,7 +37,8 @@ public sealed record ReportRunInfo(
     string? ExitSource,
     int ClosedTrades,
     int OpenAtEnd,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    string? CostsRatesSha256 = null)
 {
     /// <summary>The run's trades carry net R (a charge sheet was applied).</summary>
     public bool Costed => CostsSheetId is not null;

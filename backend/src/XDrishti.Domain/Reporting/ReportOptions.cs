@@ -47,6 +47,11 @@ public sealed record ReportOptions
             problems.Add("the charge sheet confirmation needs a sheet id");
         }
 
+        if (NetBasisConfirmation is { } bound && !(bound.RatesSha256 is { Length: 64 } && bound.RatesSha256.All(c => c is (>= '0' and <= '9') or (>= 'a' and <= 'f'))))
+        {
+            problems.Add("the charge sheet confirmation needs the rates hash (64 lower-case hex characters)");
+        }
+
         return problems.AsReadOnly();
     }
 }

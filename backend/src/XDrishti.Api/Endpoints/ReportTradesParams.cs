@@ -3,14 +3,10 @@ using XDrishti.Application.Reporting;
 
 namespace XDrishti.Api.Endpoints;
 
-/// <summary>
-/// The query string of the report endpoints with its wire names (lower case), bound by <c>[AsParameters]</c>; it is only the raw text of <see cref="ReportQueryInput"/>, which the Application checks against its whitelists. There is deliberately no parameter that
-/// could say the charge sheet was confirmed: whether a report may be net is decided from the owner's stored confirmation only.
-/// </summary>
-internal sealed record ReportQueryParams(
+/// <summary>The query string of the trade list: the page size and cursor, with the run set, the basis and the filters. No confirmation of the charge sheet can be passed. Matching of strategy, symbol, exit and basket is exact and case-sensitive.</summary>
+internal sealed record ReportTradesParams(
     [FromQuery(Name = "runs")] string? Runs = null,
     [FromQuery(Name = "basis")] string? Basis = null,
-    [FromQuery(Name = "lens")] string? Lens = null,
     [FromQuery(Name = "strategy")] string? Strategy = null,
     [FromQuery(Name = "timeframe")] string? Timeframe = null,
     [FromQuery(Name = "side")] string? Side = null,
@@ -20,10 +16,9 @@ internal sealed record ReportQueryParams(
     [FromQuery(Name = "symbol")] string? Symbol = null,
     [FromQuery(Name = "from")] string? From = null,
     [FromQuery(Name = "to")] string? To = null,
-    [FromQuery(Name = "metric")] string? Metric = null,
     [FromQuery(Name = "limit")] string? Limit = null,
     [FromQuery(Name = "cursor")] string? Cursor = null)
 {
     /// <summary>The raw input for the Application.</summary>
-    public ReportQueryInput ToInput() => new(Runs, Basis, Lens, Strategy, Timeframe, Side, Style, Exit, Basket, Symbol, From, To, Metric, Limit, Cursor);
+    public ReportQueryInput ToInput() => new(Runs, Basis, null, Strategy, Timeframe, Side, Style, Exit, Basket, Symbol, From, To, null, Limit, Cursor);
 }

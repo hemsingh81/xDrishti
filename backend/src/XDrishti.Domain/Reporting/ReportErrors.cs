@@ -31,10 +31,25 @@ public static class ReportErrors
     public static Error NetUnavailable() => Error.Validation("reports.net_unavailable", "The runs carry no net R, so no net report can be made.");
 
     /// <summary>A net report was asked for over a run that was not costed with the sheet the owner confirmed.</summary>
-    public static Error NetSheetMismatch(string runKey, string? runSheet, string confirmedSheet) =>
+    public static Error NetSheetMismatch(string runKey, string? runSheet, string? runRates, string confirmedSheet) =>
         Error.Validation("reports.net_unavailable", runSheet is null
             ? $"Run '{runKey}' carries no net R, so no net report can be made over it."
-            : $"Run '{runKey}' was costed with charge sheet '{runSheet}', but the owner confirmed sheet '{confirmedSheet}'; a net report needs runs costed with the confirmed sheet.");
+            : runSheet != confirmedSheet
+                ? $"Run '{runKey}' was costed with charge sheet '{runSheet}', but the owner confirmed sheet '{confirmedSheet}'; a net report needs runs costed with the confirmed sheet."
+                : $"Run '{runKey}' was costed with other rates of charge sheet '{runSheet}' (rates {Short(runRates)}) than the ones the owner confirmed; a net report needs runs costed with the confirmed rates.");
+
+    /// <summary>A net report was asked for, but no run is in the report, so there is nothing that could be net.</summary>
+    public static Error NetNoRuns() => Error.Validation("reports.net_unavailable", "No run is in the report, so no net report can be made.");
+
+    /// <summary>The runs of the report hold more closed trades than one request may read.</summary>
+    public static Error TooLarge(long trades, int ceiling) =>
+        Error.Validation("reports.too_large", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"The runs of this report hold {trades} closed trades; at most {ceiling} are read in one request. Name fewer runs or a single run."));
+
+    /// <summary>A lens names more groups (cells, curves) than one answer may hold; <paramref name="count"/> is null when the pass stopped at the first one past the cap.</summary>
+    public static Error TooManyGroups(long? count, int cap, string noun) =>
+        Error.Validation("reports.invalid", string.Create(System.Globalization.CultureInfo.InvariantCulture, $"The lens has {(count is { } n ? n.ToString(System.Globalization.CultureInfo.InvariantCulture) : "more than " + cap.ToString(System.Globalization.CultureInfo.InvariantCulture))} {noun}; at most {cap} are returned at once. Filter the report or use a coarser lens."));
+
+    private static string Short(string? hash) => hash is null ? "none" : hash.Length > 12 ? hash[..12] : hash;
 
     /// <summary>A dimension for which no data exists.</summary>
     public static Error DimensionUnavailable(ReportDimension dimension) =>

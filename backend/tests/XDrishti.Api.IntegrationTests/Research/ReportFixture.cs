@@ -37,6 +37,9 @@ internal static class ReportFixture
     /// <summary>The same strategy and universe as <see cref="RunA"/>, a window that overlaps it (it ends a day earlier), stored earlier: a second run of the same population.</summary>
     public static SimulationRun RunADuplicate { get; } = Build("RPTA", [(Rpt1, "NSE:RPT1", [Basket1], 6, 4, 1.0), (Rpt2, "NSE:RPT2", [Basket1, Basket2], 3, 3, 1.0)], new DateOnly(2026, 4, 29));
 
+    /// <summary>The very signals of <see cref="RunA"/> under another exit label (rr=3) and a window that ends two days earlier: what an exit comparison stores, so a report over both must split by exit.</summary>
+    public static SimulationRun RunAOtherExit { get; } = Build("RPTA", [(Rpt1, "NSE:RPT1", [Basket1], 20, 12, 1.0), (Rpt2, "NSE:RPT2", [Basket1, Basket2], 12, 18, 1.0)], new DateOnly(2026, 4, 28));
+
     private static SimulationRun Build(string strategy, (Guid Id, string Symbol, Guid[] Baskets, int Wins, int Losses, double Win)[] instruments, DateOnly to)
     {
         var ran = new List<InstrumentRun>();
@@ -75,7 +78,7 @@ internal static class ReportFixture
 
         using var scope = factory.Services.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<IRunStore>();
-        foreach (var (run, at) in new[] { (RunADuplicate, At.AddDays(-1)), (RunA, At), (RunB, At) })
+        foreach (var (run, at) in new[] { (RunAOtherExit, At.AddDays(-2)), (RunADuplicate, At.AddDays(-1)), (RunA, At), (RunB, At) })
         {
             (await store.StoreAsync(StoreKit.ToStore(run, at), cancellationToken)).IsSuccess.ShouldBeTrue();
         }
@@ -84,7 +87,7 @@ internal static class ReportFixture
         await admin.OpenAsync(cancellationToken);
 
         // two comparisons give the labels: A and B are rr=2 and rr=3; the duplicate of A is rr=2 as well, so it carries the very labels of A (the same population twice) and B is rr=3 in both
-        foreach (var (name, first) in new[] { ("report-fixture-comparison", RunA), ("report-fixture-comparison-duplicate", RunADuplicate) })
+        foreach (var (name, first, candidate) in new[] { ("report-fixture-comparison", RunA, "FIXED_RR{rr=2}"), ("report-fixture-comparison-duplicate", RunADuplicate, "FIXED_RR{rr=2}"), ("report-fixture-comparison-other-exit", RunAOtherExit, "FIXED_RR{rr=3}") })
         {
             await using var insert = new NpgsqlCommand(
                 """
@@ -96,7 +99,7 @@ internal static class ReportFixture
             insert.Parameters.AddWithValue("key", NpgsqlDbType.Char, StoreKit.Sha256(name));
             insert.Parameters.AddWithValue("entries", NpgsqlDbType.Char, StoreKit.Sha256(name + "-entries"));
             insert.Parameters.AddWithValue("runs", NpgsqlDbType.Array | NpgsqlDbType.Char, (string[])[first.RunKey, RunB.RunKey]);
-            insert.Parameters.AddWithValue("candidates", NpgsqlDbType.Array | NpgsqlDbType.Varchar, (string[])["FIXED_RR{rr=2}", "FIXED_RR{rr=3}"]);
+            insert.Parameters.AddWithValue("candidates", NpgsqlDbType.Array | NpgsqlDbType.Varchar, new[] { candidate, "FIXED_RR{rr=3}" });
             insert.Parameters.AddWithValue("gated", NpgsqlDbType.Array | NpgsqlDbType.Bigint, (long[])[0, 0]);
             insert.Parameters.AddWithValue("sha", NpgsqlDbType.Char, StoreKit.Sha256(name + "-record"));
             await insert.ExecuteNonQueryAsync(cancellationToken);

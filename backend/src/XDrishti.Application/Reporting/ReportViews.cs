@@ -57,7 +57,7 @@ internal static class ReportViews
         var limits = new List<string>(evidence.Limits) { UniverseLimit, SourcesLimit };
         if (openLeftOut > 0)
         {
-            limits.Add(string.Create(CultureInfo.InvariantCulture, $"{openLeftOut} {(openLeftOut == 1 ? "trade" : "trades")} still open at the end of the data in these runs {(openLeftOut == 1 ? "is" : "are")} left out."));
+            limits.Add(string.Create(CultureInfo.InvariantCulture, $"{openLeftOut} {(openLeftOut == 1 ? "trade" : "trades")} still open at the end of the data in these runs {(openLeftOut == 1 ? "is" : "are")} left out (counted over the whole runs, before any date, symbol or basket filter of this report)."));
         }
 
         return new ReportEvidenceView(

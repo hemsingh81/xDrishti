@@ -410,6 +410,7 @@ public static class DependencyInjection
     /// <summary>The report read endpoints over the stored runs (P8-06, ADR 0100): read only, the numbers come from the pure engine in the Domain.</summary>
     private static void AddReporting(this IServiceCollection services)
     {
+        services.AddSingleton<ReportGate>(); // one report at a time holds a population in memory
         services.AddScoped<ReportLoader>();
         services.AddScoped<IQueryHandler<ListReportRunsQuery, Result<RunsView>>, ListReportRunsHandler>();
         services.AddScoped<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>, GetReportSummaryHandler>();

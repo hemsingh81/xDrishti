@@ -15,7 +15,7 @@ namespace XDrishti.Application.Reporting;
 /// <param name="ExitSource">Where the exit comes from; null when not recorded.</param>
 /// <param name="ClosedTrades">Closed trades the run holds.</param>
 /// <param name="OpenAtEnd">Trades still open at the end of the data, never counted.</param>
-/// <param name="NetPossible">A net report over this run is possible: it was costed with the very charge sheet the owner confirmed.</param>
+/// <param name="NetPossible">A net report over this run is possible: it was costed with the very charge sheet, with the very rates, the owner confirmed.</param>
 /// <param name="InDefaultSet">The default run set takes this run.</param>
 /// <param name="DefaultSetNote">Why the default set leaves the run out; null when it takes it.</param>
 /// <param name="CreatedAt">When the run was stored.</param>

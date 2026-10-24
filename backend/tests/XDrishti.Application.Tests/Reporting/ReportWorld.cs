@@ -23,13 +23,22 @@ internal sealed class ReportWorld : IReportTradeSource, IChargeSheetConfirmation
     /// <summary>How many times each port was asked, so a test can show a refusal was decided without reading trades.</summary>
     public int TradeStreams { get; private set; }
 
-    public ReportLoader Loader => new(this, this, new FakeTimeProvider(T0), NullLogger<ReportLoader>.Instance);
+    /// <summary>The one gate of the world: loaders made by <see cref="Loader"/> share it, as the scoped loaders of the host share the singleton.</summary>
+    public ReportGate Gate { get; } = new();
+
+    public ReportLoader Loader => new(this, this, Gate, new FakeTimeProvider(T0), NullLogger<ReportLoader>.Instance);
+
+    /// <summary>A stand-in for the hash of the rates of a sheet: stable per name, 64 lower-case hex characters.</summary>
+    public static string Rates(string sheet) => Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(sheet)));
+
+    /// <summary>The owner's confirmation of a sheet with its rates.</summary>
+    public static ChargeSheetConfirmation Confirm(string sheet, string? rates = null) => new(sheet, rates ?? Rates(sheet), new DateOnly(2026, 10, 1));
 
     public static string Key(char c) => new(c, 64);
 
-    public ReportRunInfo AddRun(char key, string strategy = "ORB", string universe = "basket:b1", string? sheet = null, string? style = "intraday", string? exit = "FIXED_RR{rr=2}", int createdDays = 0, int startOffset = 0, int endOffset = 300)
+    public ReportRunInfo AddRun(char key, string strategy = "ORB", string universe = "basket:b1", string? sheet = null, string? style = "intraday", string? exit = "FIXED_RR{rr=2}", int createdDays = 0, int startOffset = 0, int endOffset = 300, string? rates = null)
     {
-        var run = new ReportRunInfo(Key(key), strategy, "basket", "members as of today", universe, Day0.AddDays(startOffset), Day0.AddDays(endOffset), sheet, style, style is null ? null : "stored strategy", exit, exit is null ? null : "stored comparison abc", 0, 2, T0.AddDays(createdDays));
+        var run = new ReportRunInfo(Key(key), strategy, "basket", "members as of today", universe, Day0.AddDays(startOffset), Day0.AddDays(endOffset), sheet, style, style is null ? null : "stored strategy", exit, exit is null ? null : "stored comparison abc", 0, 2, T0.AddDays(createdDays), sheet is null ? null : rates ?? Rates(sheet));
         Runs.Add(run);
         return run;
     }

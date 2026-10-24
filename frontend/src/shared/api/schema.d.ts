@@ -2884,7 +2884,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet). Read only. */
+    /** The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet). Takes no parameter. Read only. */
     get: operations['ListReportRuns'];
     put?: never;
     post?: never;
@@ -2901,7 +2901,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportSummary'];
     put?: never;
     post?: never;
@@ -2918,7 +2918,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportGroups'];
     put?: never;
     post?: never;
@@ -2935,7 +2935,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** A pivot of the two dimensions of the lens (rows first) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** A pivot of the two dimensions of the lens (rows first; exactly two) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportPivot'];
     put?: never;
     post?: never;
@@ -2952,7 +2952,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The equity curve (running R) and drawdown of each group of the lens, one point per exit date. A group below the minimum sample has no curve, only the reason. At most 40 curves; a lens with more is refused. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** The equity curve (running R at the end of each exit date) and the deepest drawdown of each date for each group of the lens. A group below the minimum sample has no curve, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportEquity'];
     put?: never;
     post?: never;
@@ -2969,7 +2969,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportDistribution'];
     put?: never;
     post?: never;
@@ -2986,7 +2986,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. The insights compare fixed groupings, so there is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportInsights'];
     put?: never;
     post?: never;
@@ -3003,7 +3003,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. lens is a comma separated list of up to three dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday (regime and account are refused with the reason). Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['GetReportWhatWorks'];
     put?: never;
     post?: never;
@@ -3020,7 +3020,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page): the very set the figures were computed from, open-at-end trades excluded. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    /** A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page, which belongs to that report and is refused for another): the very set the figures were computed from, open-at-end trades excluded. Every page recomputes the population. There is no lens. Read only. Takes runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net) and the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. Strategy, symbol, exit and basket match exactly and case-sensitively. An answer larger than its cap (2,000 groups, 10,000 pivot cells, 200 distributions, 40 curves, 2,000 what-works cells) is refused at the first group past it, never cut; runs holding more than 500,000 closed trades are refused before any trade is read (422 reports.too_large). One report at a time is built; a request waits its turn. 422 reports.invalid, reports.too_large, reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count; 404 reports.not_found; 409 reports.run_overlap or reports.mixed_basis. */
     get: operations['ListReportTrades'];
     put?: never;
     post?: never;
@@ -8784,7 +8784,7 @@ export interface components {
       duplicateTradesDropped: number;
       /**
        * Format: int32
-       * @description Trades still open at the end of the data in the runs used, which no report counts.
+       * @description Trades still open at the end of the data in the runs used, which no report counts; counted over the whole runs from their stored headers, before any date, symbol or basket filter of the report.
        */
       openAtEndLeftOut: number;
       /** @description What the owner confirmed, for a net report; null for a gross one. */
@@ -9104,7 +9104,7 @@ export interface components {
        * @description Trades still open at the end of the data, never counted.
        */
       openAtEnd: number;
-      /** @description A net report over this run is possible: it was costed with the very charge sheet the owner confirmed. */
+      /** @description A net report over this run is possible: it was costed with the very charge sheet, with the very rates, the owner confirmed. */
       netPossible: boolean;
       /** @description The default run set takes this run. */
       inDefaultSet: boolean;
@@ -17347,7 +17347,6 @@ export interface operations {
       query?: {
         runs?: string;
         basis?: string;
-        lens?: string;
         strategy?: string;
         timeframe?: string;
         side?: string;
@@ -17357,9 +17356,6 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
-        cursor?: string;
       };
       header?: never;
       path?: never;
@@ -17420,9 +17416,6 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
-        cursor?: string;
       };
       header?: never;
       path?: never;
@@ -17474,6 +17467,7 @@ export interface operations {
         runs?: string;
         basis?: string;
         lens?: string;
+        metric?: string;
         strategy?: string;
         timeframe?: string;
         side?: string;
@@ -17483,9 +17477,6 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
-        cursor?: string;
       };
       header?: never;
       path?: never;
@@ -17546,9 +17537,6 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
-        cursor?: string;
       };
       header?: never;
       path?: never;
@@ -17609,9 +17597,6 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
-        cursor?: string;
       };
       header?: never;
       path?: never;
@@ -17662,7 +17647,6 @@ export interface operations {
       query?: {
         runs?: string;
         basis?: string;
-        lens?: string;
         strategy?: string;
         timeframe?: string;
         side?: string;
@@ -17672,9 +17656,6 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
-        cursor?: string;
       };
       header?: never;
       path?: never;
@@ -17735,9 +17716,6 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
-        cursor?: string;
       };
       header?: never;
       path?: never;
@@ -17788,7 +17766,6 @@ export interface operations {
       query?: {
         runs?: string;
         basis?: string;
-        lens?: string;
         strategy?: string;
         timeframe?: string;
         side?: string;
@@ -17798,8 +17775,7 @@ export interface operations {
         symbol?: string;
         from?: string;
         to?: string;
-        metric?: string;
-        limit?: number;
+        limit?: string;
         cursor?: string;
       };
       header?: never;

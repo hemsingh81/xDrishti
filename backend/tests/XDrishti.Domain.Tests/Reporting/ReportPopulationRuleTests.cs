@@ -101,7 +101,9 @@ public sealed class ReportPopulationRuleTests
 
         Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net }).Error.Code.ShouldBe("reports.net_not_confirmed");
         Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = null }).IsFailure.ShouldBeTrue();
-        Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = new ChargeSheetConfirmation(" ", new DateOnly(2026, 10, 1)) }).Error.Code.ShouldBe("reports.invalid");
+        Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = new ChargeSheetConfirmation(" ", new string('a', 64), new DateOnly(2026, 10, 1)) }).Error.Code.ShouldBe("reports.invalid");
+        Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = new ChargeSheetConfirmation("sheet-1", "not-a-hash", new DateOnly(2026, 10, 1)) }).Error.Code.ShouldBe("reports.invalid");
+        Create(runs, trades, new ReportOptions { Basis = ReportBasis.Net, NetBasisConfirmation = new ChargeSheetConfirmation("sheet-1", string.Empty, new DateOnly(2026, 10, 1)) }).Error.Code.ShouldBe("reports.invalid");
     }
 
     [Fact]
@@ -116,7 +118,7 @@ public sealed class ReportPopulationRuleTests
         var group = Only(Group(population), "all");
         group.TotalR.Number!.Value.ShouldBe(-0.5, 1e-12);
         group.Evidence.Basis.ShouldBe(ReportBasis.Net);
-        population.Evidence.Limits.ShouldContain(l => l.Contains("net of the stored charge sheet: charge sheet 'sheet-1' confirmed by the owner on 2026-10-01", StringComparison.Ordinal));
+        population.Evidence.Limits.ShouldContain(l => l.Contains("net of the stored charge sheet: charge sheet 'sheet-1' with rates aaaaaaaaaaaa confirmed by the owner on 2026-10-01", StringComparison.Ordinal));
         population.Evidence.NetBasisConfirmation.ShouldBe(Confirmed);
     }
 

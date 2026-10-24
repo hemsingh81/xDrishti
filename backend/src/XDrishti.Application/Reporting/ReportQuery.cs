@@ -83,11 +83,24 @@ public sealed partial record ReportQuery(
     }
 
     /// <summary>The offset a trade-list cursor stands for (0 for the first page).</summary>
-    public int Offset => Page.Cursor is null ? 0 : int.Parse(Page.Cursor[1..], CultureInfo.InvariantCulture);
+    public int Offset => Page.Cursor is null ? 0 : int.Parse(Page.Cursor.AsSpan(1, Page.Cursor.IndexOf('.', StringComparison.Ordinal) - 1), NumberStyles.None, CultureInfo.InvariantCulture);
 
-    /// <summary>The cursor of the page that starts at <paramref name="offset"/>.</summary>
+    /// <summary>The hash of the report a trade-list cursor was made for (null for the first page).</summary>
+    public string? CursorHash => Page.Cursor is null ? null : Page.Cursor[(Page.Cursor.IndexOf('.', StringComparison.Ordinal) + 1)..];
+
+    /// <summary>The cursor of the page that starts at <paramref name="offset"/> of the report with this <paramref name="hash"/>.</summary>
     /// <param name="offset">How many trades the earlier pages held.</param>
-    public static string CursorFor(int offset) => "o" + offset.ToString(CultureInfo.InvariantCulture);
+    /// <param name="hash">See <see cref="ReportHash"/>.</param>
+    public static string CursorFor(int offset, string hash) => "o" + offset.ToString(CultureInfo.InvariantCulture) + "." + hash;
+
+    /// <summary>Eight hex characters standing for the report a cursor belongs to: the runs it was made over and how many trades it holds. A cursor from another report is refused instead of paging through a list that has changed under it.</summary>
+    /// <param name="runKeys">The keys of the runs used.</param>
+    /// <param name="trades">The trades the report counts.</param>
+    public static string ReportHash(IEnumerable<string> runKeys, int trades)
+    {
+        var text = string.Join('|', runKeys.Order(StringComparer.Ordinal)) + "#" + trades.ToString(CultureInfo.InvariantCulture);
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(text)))[..8];
+    }
 
     private static ReportBasis ParseBasis(string? text, List<string> problems)
     {
@@ -193,6 +206,6 @@ public sealed partial record ReportQuery(
     [GeneratedRegex(@"^[A-Za-z0-9:._&\-]{1,40}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
     private static partial Regex Symbol();
 
-    [GeneratedRegex("^o[0-9]{1,9}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
+    [GeneratedRegex(@"^o[0-9]{1,9}\.[0-9a-f]{8}$", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 200)]
     private static partial Regex Cursor();
 }

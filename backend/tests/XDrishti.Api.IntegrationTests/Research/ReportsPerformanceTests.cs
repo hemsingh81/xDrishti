@@ -40,6 +40,13 @@ public sealed class ReportsPerformanceTests(ApiFactory factory)
         summary.All.TotalR.Number!.Value.ShouldBe(run.Trades.Sum(t => t.Trade.RFilled), 1e-6);
         summary.Evidence.DefaultRunSet.ShouldBeTrue();
         groups.Groups.Sum(g => g.N).ShouldBe(run.Trades.Count);
+
+        // a lens with more groups than the cap is refused at the first group past it: the error cannot know the total, which shows the pass stopped
+        var refused = await scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportGroupsQuery, Result<GroupsView>>>().HandleAsync(
+            new GetReportGroupsQuery(ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Instrument, XDrishti.Domain.Reporting.ReportDimension.Month, XDrishti.Domain.Reporting.ReportDimension.Weekday] }), Ct);
+        refused.IsFailure.ShouldBeTrue();
+        refused.Error.Code.ShouldBe("reports.invalid");
+        refused.Error.Message.ShouldContain("more than 2000 groups");
     }
 
     [Fact(Explicit = true)]
@@ -47,16 +54,11 @@ public sealed class ReportsPerformanceTests(ApiFactory factory)
     {
         var samples = int.Parse(Environment.GetEnvironmentVariable("XD_REPORT_SAMPLES") ?? "20", CultureInfo.InvariantCulture);
         await using var scratch = await ScratchDatabase.CreateAsync(factory, "xd_report_p95", Ct);
-        var built = Stopwatch.StartNew();
-        var run = StoredRunFixtures.Synthetic(500_000, costed: false);
-        var toStore = StoreKit.ToStore(run);
-        built.Stop();
-        var write = Stopwatch.StartNew();
-        (await StoreKit.WithStoreAsync(scratch.Host.Services, s => s.StoreAsync(toStore, Ct).AsTask())).IsSuccess.ShouldBeTrue();
-        write.Stop();
-        await StoreKit.ExecuteAsync(scratch.ConnectionString, "VACUUM (ANALYZE) research.sim_trades", Ct);
-        Say($"report-p95: {run.Trades.Count} trades built in {built.ElapsedMilliseconds} ms, stored in {write.ElapsedMilliseconds} ms; {samples} samples per report");
+        var stored = await StoreSyntheticAsync(scratch, 500_000);
+        Say($"report-p95: {stored} trades stored; {samples} samples per report");
 
+        // the fixture is gone (a helper made it and returned a count), so what is measured is the report and nothing it does not hold
+        await MemoryAsync(scratch.Host.Services);
         await StagesAsync(scratch.Host.Services);
         var lens = ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Strategy, XDrishti.Domain.Reporting.ReportDimension.Side] };
         var pivot = ReportQuery.Default with { Lens = [XDrishti.Domain.Reporting.ReportDimension.Instrument, XDrishti.Domain.Reporting.ReportDimension.Month] };
@@ -95,8 +97,68 @@ public sealed class ReportsPerformanceTests(ApiFactory factory)
             var p95 = times[Math.Min(times.Count - 1, (int)Math.Ceiling(times.Count * 0.95) - 1)];
             Say(string.Create(CultureInfo.InvariantCulture, $"report-p95: {name,-26} median {times[times.Count / 2],8:F0} ms   p95 {p95,8:F0} ms   max {times[^1],8:F0} ms   answer {bytes / 1024.0,9:F1} KiB"));
         }
+    }
 
-        Say($"report-p95: managed memory after the run {GC.GetTotalMemory(forceFullCollection: false) / 1048576.0:F0} MiB; peak working set {Process.GetCurrentProcess().PeakWorkingSet64 / 1048576.0:F0} MiB");
+    private static async Task<int> StoreSyntheticAsync(ScratchDatabase scratch, int trades)
+    {
+        var run = StoredRunFixtures.Synthetic(trades, costed: false);
+        var toStore = StoreKit.ToStore(run);
+        (await StoreKit.WithStoreAsync(scratch.Host.Services, s => s.StoreAsync(toStore, Ct).AsTask())).IsSuccess.ShouldBeTrue();
+        await StoreKit.ExecuteAsync(scratch.ConnectionString, "VACUUM (ANALYZE) research.sim_trades", Ct);
+        return run.Trades.Count;
+    }
+
+    /// <summary>
+    /// The real memory of the reports, not the heap at the end of a test: the heap is collected before, then ONE request (and, second, six requests fired at once, which the gate serialises) runs while a timer samples the working set and the managed heap every 10 ms.
+    /// Printed as the peak above the idle process (working set and committed managed heap) and the bytes allocated during the request. Run with <c>DOTNET_GCHeapHardLimit</c> set to what the container allows the GC (75 % of 1 GB) to prove it fits, not only to read it.
+    /// </summary>
+    private static async Task MemoryAsync(IServiceProvider services)
+    {
+        for (var round = 0; round < 3; round++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            var baseHeap = GC.GetTotalMemory(forceFullCollection: true);
+            var baseSet = Process.GetCurrentProcess().WorkingSet64;
+            var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+            long peakSet = baseSet;
+            long peakHeap = baseHeap;
+            using var stop = new CancellationTokenSource();
+            var sampler = Task.Run(
+                async () =>
+                {
+                    using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(10));
+                    while (await timer.WaitForNextTickAsync(stop.Token).ConfigureAwait(false))
+                    {
+                        peakSet = Math.Max(peakSet, Process.GetCurrentProcess().WorkingSet64);
+                        peakHeap = Math.Max(peakHeap, GC.GetGCMemoryInfo().TotalCommittedBytes);
+                    }
+                },
+                CancellationToken.None);
+            var started = Stopwatch.StartNew();
+            if (round < 2)
+            {
+                using var scope = services.CreateScope();
+                await Json(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>>().HandleAsync(new GetReportSummaryQuery(ReportQuery.Default), Ct));
+            }
+            else
+            {
+                await Task.WhenAll(Enumerable.Range(0, 6).Select(async i =>
+                {
+                    using var scope = services.CreateScope();
+                    return i % 2 == 0
+                        ? await Json(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>>().HandleAsync(new GetReportSummaryQuery(ReportQuery.Default), Ct))
+                        : await Json(scope.ServiceProvider.GetRequiredService<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>>().HandleAsync(new GetReportInsightsQuery(ReportQuery.Default), Ct));
+                }));
+            }
+
+            started.Stop();
+            await stop.CancelAsync();
+            await sampler.ContinueWith(_ => { }, TaskScheduler.Default);
+            var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+            Say(string.Create(CultureInfo.InvariantCulture, $"report-memory: {(round == 0 ? "ONE request (warm-up, fixture residue still in the heap)" : round == 1 ? "ONE request" : "SIX requests at once")} in {started.ElapsedMilliseconds} ms: peak working set +{(peakSet - baseSet) / 1048576.0:F0} MiB, peak committed managed heap +{(peakHeap - baseHeap) / 1048576.0:F0} MiB, allocated {allocated / 1048576.0:F0} MiB (idle process {baseSet / 1048576.0:F0} MiB working set, {baseHeap / 1048576.0:F0} MiB heap)"));
+        }
     }
 
     /// <summary>Where one report spends its time: the list of runs, the stream of trades, the population rule, one grouping.</summary>

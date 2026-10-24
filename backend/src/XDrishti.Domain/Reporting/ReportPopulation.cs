@@ -184,13 +184,15 @@ public sealed class ReportPopulation
 
     /// <summary>Groups the trades by the dimensions, in order. A trade is in exactly one group, except under the basket dimension where it is in one per basket (then <see cref="ReportGrouping.NonAdditive"/> says so). Refused when a dimension has no data or when the grouping would add one signal once per label.</summary>
     /// <param name="dimensions">The dimensions; empty is the whole population as one group.</param>
-    public Result<ReportGrouping> GroupBy(IReadOnlyList<ReportDimension> dimensions) => GroupAtMinimum(dimensions, Options.Stats.MinTrades);
+    /// <param name="maxGroups">The most groups the caller will take; the pass over the trades stops at the first group past it and refuses, before any figure is built.</param>
+    public Result<ReportGrouping> GroupBy(IReadOnlyList<ReportDimension> dimensions, int maxGroups = int.MaxValue) => GroupAtMinimum(dimensions, Options.Stats.MinTrades, maxGroups);
 
     /// <summary>A pivot of two different dimensions by one figure. Cells with no trade are empty and cells below the minimum are masked, never zero.</summary>
     /// <param name="rows">The row dimension.</param>
     /// <param name="columns">The column dimension.</param>
     /// <param name="metric">The figure.</param>
-    public Result<ReportPivot> Pivot(ReportDimension rows, ReportDimension columns, ReportMetric metric)
+    /// <param name="maxCells">The most cells (rows times columns) the caller will take; refused before any figure or cell is built when the pass over the trades finds more non-empty cells than that, or the grid itself would be larger.</param>
+    public Result<ReportPivot> Pivot(ReportDimension rows, ReportDimension columns, ReportMetric metric, int maxCells = int.MaxValue)
     {
         if (rows == columns)
         {
@@ -202,7 +204,7 @@ public sealed class ReportPopulation
             return Result.Failure<ReportPivot>(ReportErrors.Invalid("Unknown figure."));
         }
 
-        var grouped = GroupBy([rows, columns]);
+        var grouped = GroupBy([rows, columns], maxCells);
         if (grouped.IsFailure)
         {
             return Result.Failure<ReportPivot>(grouped.Error);
@@ -211,6 +213,11 @@ public sealed class ReportPopulation
         var grouping = grouped.Value;
         var rowValues = grouping.Groups.Select(g => g.Key.Parts[0].Value).Distinct().OrderBy(v => v, Comparer<string?>.Create((a, b) => GroupMath.CompareValues(rows, a, b))).ToList();
         var columnValues = grouping.Groups.Select(g => g.Key.Parts[1].Value).Distinct().OrderBy(v => v, Comparer<string?>.Create((a, b) => GroupMath.CompareValues(columns, a, b))).ToList();
+        if ((long)rowValues.Count * columnValues.Count > maxCells)
+        {
+            return Result.Failure<ReportPivot>(ReportErrors.TooManyGroups((long)rowValues.Count * columnValues.Count, maxCells, "cells"));
+        }
+
         var index = grouping.Groups.ToDictionary(g => (g.Key.Parts[0].Value, g.Key.Parts[1].Value));
         var cells = new List<PivotCell>(rowValues.Count * columnValues.Count);
         foreach (var r in rowValues)
@@ -231,7 +238,8 @@ public sealed class ReportPopulation
     /// the others follow with the reason. When none qualifies the answer says so with the counts. A dimension no run or trade recorded (the exit, the basket) is left out of the default cell and named in the answer.
     /// </summary>
     /// <param name="dimensions">The dimensions of a cell, or null for the default.</param>
-    public Result<WhatWorks> FindWhatWorks(IReadOnlyList<ReportDimension>? dimensions = null)
+    /// <param name="maxCells">The most cells the caller will take; refused at the first cell past it, before any figure is built.</param>
+    public Result<WhatWorks> FindWhatWorks(IReadOnlyList<ReportDimension>? dimensions = null, int maxCells = int.MaxValue)
     {
         var left = new List<string>();
         List<ReportDimension> dims;
@@ -267,7 +275,7 @@ public sealed class ReportPopulation
             dims = [.. dimensions];
         }
 
-        var grouped = GroupBy(dims);
+        var grouped = GroupBy(dims, maxCells);
         if (grouped.IsFailure)
         {
             return Result.Failure<WhatWorks>(grouped.Error);
@@ -284,9 +292,10 @@ public sealed class ReportPopulation
     /// has no points: its total is <see cref="MetricState.Insufficient"/> or <see cref="MetricState.Unavailable"/>, never a flat line.
     /// </summary>
     /// <param name="dimensions">The dimensions; empty is the whole population as one series.</param>
-    public Result<ReportEquity> Equity(IReadOnlyList<ReportDimension> dimensions)
+    /// <param name="maxGroups">The most curves the caller will take; refused at the first group past it, before any point is built.</param>
+    public Result<ReportEquity> Equity(IReadOnlyList<ReportDimension> dimensions, int maxGroups = int.MaxValue)
     {
-        var bucketed = Bucketise(dimensions);
+        var bucketed = Bucketise(dimensions, maxGroups);
         if (bucketed.IsFailure)
         {
             return Result.Failure<ReportEquity>(bucketed.Error);
@@ -312,7 +321,8 @@ public sealed class ReportPopulation
                 var drawdown = peak - running;
                 if (points.Count > 0 && points[^1].Date == row.Trade.ExitDate)
                 {
-                    points[^1] = new EquityPoint(row.Trade.ExitDate, running, drawdown, points[^1].Trades + 1);
+                    // the point of a date carries the running R at the end of the date and the deepest fall reached during it, so the deepest point of the curve is the maximum drawdown of the group whatever the order within a date
+                    points[^1] = new EquityPoint(row.Trade.ExitDate, running, Math.Max(points[^1].DrawdownR, drawdown), points[^1].Trades + 1);
                 }
                 else
                 {
@@ -333,14 +343,15 @@ public sealed class ReportPopulation
     /// </summary>
     /// <param name="dimensions">The dimensions; empty is the whole population as one group.</param>
     /// <param name="binWidthR">The width of a bin in R, 0.1 to 5.</param>
-    public Result<ReportDistribution> Distribution(IReadOnlyList<ReportDimension> dimensions, double binWidthR)
+    /// <param name="maxGroups">The most distributions the caller will take; refused at the first group past it, before any bin is built.</param>
+    public Result<ReportDistribution> Distribution(IReadOnlyList<ReportDimension> dimensions, double binWidthR, int maxGroups = int.MaxValue)
     {
         if (!double.IsFinite(binWidthR) || binWidthR is < 0.1 or > 5)
         {
             return Fail<ReportDistribution>(ReportErrors.Invalid("The bin width is 0.1 to 5 R."));
         }
 
-        var bucketed = Bucketise(dimensions);
+        var bucketed = Bucketise(dimensions, maxGroups);
         if (bucketed.IsFailure)
         {
             return Result.Failure<ReportDistribution>(bucketed.Error);
@@ -432,9 +443,9 @@ public sealed class ReportPopulation
     private static string ProvisionalReason(List<ReportRow> rows) =>
         "rests on a provisional run: " + string.Join(", ", rows.Where(r => r.Provisional).Select(r => r.Trade.RunKey).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
 
-    internal Result<ReportGrouping> GroupAtMinimum(IReadOnlyList<ReportDimension> dimensions, int minTrades)
+    internal Result<ReportGrouping> GroupAtMinimum(IReadOnlyList<ReportDimension> dimensions, int minTrades, int maxGroups = int.MaxValue)
     {
-        var bucketed = Bucketise(dimensions);
+        var bucketed = Bucketise(dimensions, maxGroups);
         if (bucketed.IsFailure)
         {
             return Result.Failure<ReportGrouping>(bucketed.Error);
@@ -450,7 +461,7 @@ public sealed class ReportPopulation
     }
 
     /// <summary>One pass over the trades into buckets, one per combination of the dimensions' values (the basket dimension puts a trade into one bucket per basket), in the fixed order of the keys.</summary>
-    private Result<Bucketed> Bucketise(IReadOnlyList<ReportDimension> dimensions)
+    private Result<Bucketed> Bucketise(IReadOnlyList<ReportDimension> dimensions, int maxBuckets = int.MaxValue)
     {
         ArgumentNullException.ThrowIfNull(dimensions);
         if (dimensions.Distinct().Count() != dimensions.Count || dimensions.Any(d => !Enum.IsDefined(d)))
@@ -497,6 +508,12 @@ public sealed class ReportPopulation
         var nonAdditive = false;
         foreach (var row in _rows)
         {
+            // the work is bounded, not only the answer: the pass stops at the first group past the cap, before a figure, a point or a bin is built
+            if (bucketer.Count > maxBuckets)
+            {
+                return Fail<Bucketed>(ReportErrors.TooManyGroups(null, maxBuckets, "groups"));
+            }
+
             for (var i = 0; i < dimensions.Count; i++)
             {
                 if (i != basketIndex)
@@ -526,6 +543,11 @@ public sealed class ReportPopulation
                 bucketer.Values[basketIndex] = basket;
                 bucketer.Add(row);
             }
+        }
+
+        if (bucketer.Count > maxBuckets)
+        {
+            return Fail<Bucketed>(ReportErrors.TooManyGroups(null, maxBuckets, "groups"));
         }
 
         var ordered = bucketer.Buckets.OrderBy(b => b.Key, Comparer<GroupKey>.Create(GroupMath.CompareKeys)).ToList();

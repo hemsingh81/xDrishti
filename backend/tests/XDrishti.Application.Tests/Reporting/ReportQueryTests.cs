@@ -49,7 +49,7 @@ public sealed class ReportQueryTests
             To: "2026-03-31",
             Metric: "max_drawdown_r",
             Limit: "250",
-            Cursor: "o500"));
+            Cursor: "o500.0123abcd"));
 
         query.Runs.ShouldBe([run]);
         query.Basis.ShouldBe(ReportBasis.Net);
@@ -86,6 +86,8 @@ public sealed class ReportQueryTests
     [InlineData("To", "2026-13-40", "to")]
     [InlineData("Metric", "sharpe", "metric")]
     [InlineData("Cursor", "999999999999", "cursor")]
+    [InlineData("Cursor", "o15", "cursor")]
+    [InlineData("Cursor", "o15.XYZ", "cursor")]
     public void A_name_the_whitelist_does_not_know_is_reports_invalid_and_says_which(string field, string value, string mention)
     {
         var input = new ReportQueryInput();
@@ -164,9 +166,14 @@ public sealed class ReportQueryTests
     [Fact]
     public void The_cursor_of_a_page_round_trips()
     {
-        var cursor = ReportQuery.CursorFor(1500);
+        var cursor = ReportQuery.CursorFor(1500, "0123abcd");
 
-        Ok(new ReportQueryInput(Cursor: cursor)).Offset.ShouldBe(1500);
+        var query = Ok(new ReportQueryInput(Cursor: cursor));
+
+        query.Offset.ShouldBe(1500);
+        query.CursorHash.ShouldBe("0123abcd");
+        ReportQuery.ReportHash(["b", "a"], 5).ShouldBe(ReportQuery.ReportHash(["a", "b"], 5));
+        ReportQuery.ReportHash(["a"], 5).ShouldNotBe(ReportQuery.ReportHash(["a"], 6));
     }
 
     [Fact]

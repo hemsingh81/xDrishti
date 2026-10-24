@@ -25,7 +25,7 @@ public sealed class ReportSeriesTests
         [
             (Day0, 1.0, 0.0, 1),
             (Day0.AddDays(1), -1.0, 2.0, 1),
-            (Day0.AddDays(2), 1.0, 0.0, 2),
+            (Day0.AddDays(2), 1.0, 0.5, 2),
             (Day0.AddDays(3), 0.0, 1.0, 1),
         ]);
         series.Points.Sum(p => p.Trades).ShouldBe(series.N);
@@ -42,6 +42,55 @@ public sealed class ReportSeriesTests
 
         series.Points[^1].CumulativeR.ShouldBe(all.TotalR.Number!.Value, 1e-12);
         series.Points.Max(p => p.DrawdownR).ShouldBe(all.MaxDrawdownR.Number!.Value, 1e-12);
+    }
+
+    [Fact]
+    public void A_loss_followed_by_a_win_on_one_date_keeps_the_deepest_fall_of_that_date_so_the_curve_and_the_summary_agree()
+    {
+        var population = Population([Run("r1")], [Trade("r1", "k0", 1, day: 0), Trade("r1", "k1a", -2, day: 1), Trade("r1", "k1b", 1, day: 1), Trade("r1", "k2", 0.5, day: 2)]);
+
+        var series = population.Equity([]).Value.Series.Single();
+
+        series.Points.Select(p => (p.CumulativeR, p.DrawdownR)).ShouldBe([(1.0, 0.0), (0.0, 2.0), (0.5, 0.5)]);
+        series.Points.Max(p => p.DrawdownR).ShouldBe(Group(population).Groups.Single().MaxDrawdownR.Number!.Value, 1e-12);
+    }
+
+    [Fact]
+    public void A_cap_on_the_groups_stops_the_pass_at_the_first_group_past_it_before_any_figure_is_built()
+    {
+        var trades = Enumerable.Range(0, 500).Select(i => Trade("r1", $"k{i:D4}", 1, symbol: "S" + i, day: i % 200)).ToList();
+        var population = Population([Run("r1")], trades);
+
+        var uncapped = population.GroupBy([ReportDimension.Instrument]);
+        var group = population.GroupBy([ReportDimension.Instrument], 10);
+        var equity = population.Equity([ReportDimension.Instrument], 10);
+        var distribution = population.Distribution([ReportDimension.Instrument], 0.5, 10);
+        var pivot = population.Pivot(ReportDimension.Instrument, ReportDimension.Month, ReportMetric.TotalR, 10);
+        var works = population.FindWhatWorks([ReportDimension.Instrument], 10);
+
+        uncapped.Value.Groups.Count.ShouldBe(500);
+        foreach (var refused in new[] { group.Error, equity.Error, distribution.Error, pivot.Error, works.Error })
+        {
+            refused.Code.ShouldBe("reports.invalid");
+            refused.Message.ShouldContain("more than 10", Shouldly.Case.Sensitive);
+        }
+
+        population.GroupBy([ReportDimension.Instrument], 500).IsSuccess.ShouldBeTrue("a cap equal to the count is not exceeded");
+    }
+
+    [Fact]
+    public void A_pivot_whose_grid_is_larger_than_the_cap_is_refused_before_the_cells_are_laid_out()
+    {
+        // ten symbols each trading in a month of its own: 10 filled cells in a grid of 10 x 10
+        var trades = Enumerable.Range(0, 10).Select(i => Trade("r1", $"k{i:D3}", 1, symbol: "S" + i, day: i * 31)).ToList();
+        var population = Population([Run("r1")], trades);
+
+        var pivot = population.Pivot(ReportDimension.Instrument, ReportDimension.Month, ReportMetric.Trades, 50);
+
+        pivot.IsFailure.ShouldBeTrue();
+        pivot.Error.Message.ShouldContain("100 cells");
+        pivot.Error.Message.ShouldContain("at most 50");
+        population.Pivot(ReportDimension.Instrument, ReportDimension.Month, ReportMetric.Trades, 100).IsSuccess.ShouldBeTrue();
     }
 
     [Fact]
@@ -212,6 +261,7 @@ public sealed class ReportSeriesTests
             series.Points.Sum(p => p.Trades).ShouldBe(series.N);
             series.Points.Select(p => p.Date).ShouldBe(series.Points.Select(p => p.Date).Order().Distinct());
             series.Points[^1].CumulativeR.ShouldBe(Only(groups, series.Key.Text).TotalR.Number!.Value, 1e-9);
+            series.Points.Max(p => p.DrawdownR).ShouldBe(Only(groups, series.Key.Text).MaxDrawdownR.Number!.Value, 1e-9);
         }
 
         distribution.Groups.ShouldAllBe(g => g.Bins.Sum(b => b.Count) == g.N);

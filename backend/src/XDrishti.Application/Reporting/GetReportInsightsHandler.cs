@@ -10,6 +10,12 @@ internal sealed class GetReportInsightsHandler(ReportLoader loader) : IQueryHand
     {
         ArgumentNullException.ThrowIfNull(query);
         var loaded = await loader.LoadAsync(query.Query, "insights", cancellationToken);
-        return loaded.IsFailure ? Result.Failure<InsightsView>(loaded.Error) : Result.Success(ReportViews.Insights(loaded.Value.Population.Insights(), loaded.Value));
+        if (loaded.IsFailure)
+        {
+            return Result.Failure<InsightsView>(loaded.Error);
+        }
+
+        using var report = loaded.Value;
+        return Result.Success(ReportViews.Insights(report.Population.Insights(), report));
     }
 }

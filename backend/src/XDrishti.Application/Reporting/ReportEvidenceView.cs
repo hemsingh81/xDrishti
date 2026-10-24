@@ -15,7 +15,7 @@ namespace XDrishti.Application.Reporting;
 /// <param name="Limits">The limits that always apply, as text.</param>
 /// <param name="UnavailableInputs">Inputs a figure would need that do not exist, each with the reason.</param>
 /// <param name="DuplicateTradesDropped">Identical repeated records of one trade in one run, counted once.</param>
-/// <param name="OpenAtEndLeftOut">Trades still open at the end of the data in the runs used, which no report counts.</param>
+/// <param name="OpenAtEndLeftOut">Trades still open at the end of the data in the runs used, which no report counts; counted over the whole runs from their stored headers, before any date, symbol or basket filter of the report.</param>
 /// <param name="NetBasisConfirmation">What the owner confirmed, for a net report; null for a gross one.</param>
 public sealed record ReportEvidenceView(
     string Basis,

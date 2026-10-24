@@ -15,7 +15,7 @@ internal sealed class GetReportSummaryHandler(ReportLoader loader) : IQueryHandl
             return Result.Failure<SummaryView>(loaded.Error);
         }
 
-        var report = loaded.Value;
+        using var report = loaded.Value;
         var grouping = report.Population.GroupBy([]);
         if (grouping.IsFailure)
         {

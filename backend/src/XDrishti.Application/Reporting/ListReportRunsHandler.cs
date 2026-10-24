@@ -32,7 +32,7 @@ internal sealed class ListReportRunsHandler(IReportTradeSource source, IChargeSh
                 r.ExitSource,
                 r.ClosedTrades,
                 r.OpenAtEnd,
-                confirmation is not null && r.Costed && string.Equals(r.CostsSheetId, confirmation.SheetId, StringComparison.Ordinal),
+                confirmation is not null && r.Costed && string.Equals(r.CostsSheetId, confirmation.SheetId, StringComparison.Ordinal) && string.Equals(r.CostsRatesSha256, confirmation.RatesSha256, StringComparison.Ordinal),
                 inDefault.Contains(r.RunKey),
                 notes.GetValueOrDefault(r.RunKey),
                 r.CreatedAt))

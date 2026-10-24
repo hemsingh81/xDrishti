@@ -86,6 +86,9 @@ public sealed partial class ReportEndpointsArchitectureTests
             registration.ShouldContain(name + ">()");
         }
 
+        registration.ShouldContain("AddSingleton<ReportGate>", Case.Sensitive, "one gate for the whole process: the loader is scoped, the memory is not");
+        Application.GetType("XDrishti.Application.Reporting.ReportGate")!.IsSealed.ShouldBeTrue();
+
         var source = Infrastructure.GetType("XDrishti.Infrastructure.Research.ReportTradeSource");
         source.ShouldNotBeNull();
         source.IsPublic.ShouldBeFalse();

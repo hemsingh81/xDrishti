@@ -1,7 +1,6 @@
 using System.Reflection;
 using XDrishti.Application.Reporting;
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Reporting;
 
 namespace XDrishti.Application.Tests.Reporting;
 
@@ -204,9 +203,9 @@ public sealed class ReportHandlersTests
         var works = await Refused(new GetReportWhatWorksHandler(world.Loader).HandleAsync(new GetReportWhatWorksQuery(instruments), Ct));
 
         groups.Code.ShouldBe("reports.invalid");
-        groups.Message.ShouldContain("2001 groups");
+        groups.Message.ShouldContain("more than 2000 groups");
         groups.Message.ShouldContain("at most 2000");
-        pivot.Message.ShouldContain("cells");
+        pivot.Message.ShouldContain("at most 10000");
         distribution.Message.ShouldContain("at most 200");
         works.Message.ShouldContain("at most 2000");
     }
@@ -270,9 +269,9 @@ public sealed class ReportHandlersTests
 
         first.Total.ShouldBe(40);
         first.Items.Count.ShouldBe(15);
-        first.NextCursor.ShouldBe("o15");
+        first.NextCursor.ShouldStartWith("o15.");
         second.Items.Count.ShouldBe(15);
-        second.NextCursor.ShouldBe("o30");
+        second.NextCursor.ShouldStartWith("o30.");
         third.Items.Count.ShouldBe(10);
         third.NextCursor.ShouldBeNull();
         first.Items.Concat(second.Items).Concat(third.Items).Select(t => t.TradeKey).Distinct().Count().ShouldBe(40);
@@ -422,12 +421,12 @@ public sealed class ReportHandlersTests
         var world = new ReportWorld();
         world.AddRun('n', "ORB", "basket:" + B1, sheet: "sheet-1");
         world.AddTrades('n', Mix(20, 1, 20, -1), cost: 0.1);
-        world.Confirmation = new ChargeSheetConfirmation("sheet-1", new DateOnly(2026, 10, 1));
+        world.Confirmation = ReportWorld.Confirm("sheet-1");
 
         var view = await Ok(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Basis: "net"))), Ct));
 
         view.Evidence.Basis.ShouldBe("net");
-        view.Evidence.NetBasisConfirmation.ShouldBe("charge sheet 'sheet-1' confirmed by the owner on 2026-10-01");
+        view.Evidence.NetBasisConfirmation.ShouldBe(ReportWorld.Confirm("sheet-1").Text);
         view.All.ExpectancyR.Number!.Value.ShouldBe(-0.1, 1e-12);
         view.All.TotalR.Number!.Value.ShouldBe(-4, 1e-9);
         view.Evidence.Limits.ShouldContain(l => l.Contains("net of the stored charge sheet", StringComparison.Ordinal));
@@ -439,7 +438,7 @@ public sealed class ReportHandlersTests
         var world = new ReportWorld();
         world.AddRun('n', "ORB", "basket:" + B1, sheet: "sheet-2");
         world.AddTrades('n', Mix(20, 1, 20, -1), cost: 0.1);
-        world.Confirmation = new ChargeSheetConfirmation("sheet-1", new DateOnly(2026, 10, 1));
+        world.Confirmation = ReportWorld.Confirm("sheet-1");
 
         var error = await Refused(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Basis: "net"))), Ct));
 
@@ -454,7 +453,7 @@ public sealed class ReportHandlersTests
         var world = new ReportWorld();
         world.AddRun('g', "ORB", "basket:" + B1);
         world.AddTrades('g', Mix(20, 1, 20, -1));
-        world.Confirmation = new ChargeSheetConfirmation("sheet-1", new DateOnly(2026, 10, 1));
+        world.Confirmation = ReportWorld.Confirm("sheet-1");
 
         var error = await Refused(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Basis: "net"))), Ct));
 
@@ -488,7 +487,7 @@ public sealed class ReportHandlersTests
         world.AddRun('a', "ORB", sheet: "sheet-1");
         world.AddRun('b', "VWAP", sheet: "sheet-2", createdDays: 1);
         world.AddRun('c', "EMA", createdDays: 2);
-        world.Confirmation = new ChargeSheetConfirmation("sheet-1", new DateOnly(2026, 10, 1));
+        world.Confirmation = ReportWorld.Confirm("sheet-1");
 
         var view = await Ok(new ListReportRunsHandler(world, world).HandleAsync(new ListReportRunsQuery(), Ct));
 
@@ -539,6 +538,148 @@ public sealed class ReportHandlersTests
         var two = await Ok(new GetReportGroupsHandler(backward.Loader).HandleAsync(new GetReportGroupsQuery(Q(new ReportQueryInput(Lens: "basket,strategy"))), Ct));
 
         two.ShouldBe(one, new GroupsViewComparer());
+    }
+
+    [Fact]
+    public async Task Runs_holding_more_closed_trades_than_the_ceiling_are_refused_before_one_trade_is_read()
+    {
+        var world = ThreeBaskets();
+        world.Runs[0] = world.Runs[0] with { ClosedTrades = ReportLoader.MaxClosedTrades / 2 + 1 };
+        world.Runs[1] = world.Runs[1] with { ClosedTrades = ReportLoader.MaxClosedTrades / 2 + 1 };
+
+        var many = await Refused(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('a') + "," + ReportWorld.Key('b')))), Ct));
+        var one = await Ok(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('a')))), Ct));
+
+        many.Code.ShouldBe("reports.too_large");
+        many.Message.ShouldContain((ReportLoader.MaxClosedTrades + 2).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        many.Message.ShouldContain(ReportLoader.MaxClosedTrades.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        one.All.N.ShouldBe(40);
+        world.TradeStreams.ShouldBe(1, "only the second request read trades");
+    }
+
+    [Fact]
+    public async Task One_report_at_a_time_holds_a_population_and_a_waiting_request_honours_its_cancellation()
+    {
+        var world = ThreeBaskets();
+        var handler = new GetReportSummaryHandler(world.Loader);
+        var held = await world.Gate.EnterAsync(Ct);
+
+        var waiting = handler.HandleAsync(new GetReportSummaryQuery(Q()), Ct).AsTask();
+        for (var i = 0; i < 100; i++)
+        {
+            await Task.Yield();
+        }
+
+        using var cancel = new CancellationTokenSource();
+        var cancelled = handler.HandleAsync(new GetReportSummaryQuery(Q()), cancel.Token).AsTask();
+        await cancel.CancelAsync();
+
+        waiting.IsCompleted.ShouldBeFalse("the gate is held");
+        world.TradeStreams.ShouldBe(0, "no trade is read while the gate is held");
+        await Should.ThrowAsync<OperationCanceledException>(() => cancelled);
+        held.Dispose();
+        var result = await waiting;
+        result.IsSuccess.ShouldBeTrue();
+        (await handler.HandleAsync(new GetReportSummaryQuery(Q()), Ct)).IsSuccess.ShouldBeTrue("the lease was released with the answer");
+    }
+
+    [Fact]
+    public async Task A_refusal_after_the_gate_releases_it()
+    {
+        var world = ThreeBaskets();
+        world.AddRun('d', "ORB", "basket:" + B1, createdDays: 5, startOffset: 100, endOffset: 400);
+        world.AddTrades('d', Mix(5, 1, 5, -1), "ORB", baskets: [B1], symbol: "DDD", firstDay: 200);
+        var handler = new GetReportSummaryHandler(world.Loader);
+
+        var overlap = await Refused(handler.HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('a') + "," + ReportWorld.Key('d')))), Ct));
+        var after = await handler.HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('a')))), Ct);
+
+        overlap.Code.ShouldBe("reports.run_overlap");
+        after.IsSuccess.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_trade_cursor_from_another_report_is_refused()
+    {
+        var world = ThreeBaskets();
+        var handler = new PageReportTradesHandler(world.Loader);
+        var first = await Ok(handler.HandleAsync(new PageReportTradesQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('a'), Limit: "10"))), Ct));
+
+        var other = await Refused(handler.HandleAsync(new PageReportTradesQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('b'), Limit: "10", Cursor: first.NextCursor))), Ct));
+        var forged = await Refused(handler.HandleAsync(new PageReportTradesQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('a'), Cursor: "o5.00000000"))), Ct));
+        var same = await Ok(handler.HandleAsync(new PageReportTradesQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('a'), Limit: "10", Cursor: first.NextCursor))), Ct));
+
+        other.Code.ShouldBe("reports.invalid");
+        other.Message.ShouldContain("another report");
+        forged.Code.ShouldBe("reports.invalid");
+        same.Items.Count.ShouldBe(10);
+    }
+
+    [Fact]
+    public async Task A_net_report_over_an_empty_run_set_is_not_an_empty_confirmed_report()
+    {
+        var world = new ReportWorld();
+        world.AddRun('n', "ORB", "basket:" + B1, sheet: "sheet-1");
+        world.AddTrades('n', Mix(20, 1, 20, -1), cost: 0.1);
+        world.Confirmation = ReportWorld.Confirm("sheet-1");
+
+        var error = await Refused(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Basis: "net", Style: "swing"))), Ct));
+        var none = await Refused(new GetReportSummaryHandler(new ReportWorld { Confirmation = ReportWorld.Confirm("sheet-1") }.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Basis: "net"))), Ct));
+
+        error.Code.ShouldBe("reports.net_unavailable");
+        none.Code.ShouldBe("reports.net_unavailable");
+        none.Message.ShouldContain("No run");
+    }
+
+    [Fact]
+    public async Task A_sheet_saved_again_with_other_rates_is_no_longer_what_was_confirmed()
+    {
+        var world = new ReportWorld();
+        world.AddRun('e', "ORB", "basket:" + B1, sheet: "sheet-1");
+        world.AddTrades('e', Mix(20, 1, 20, -1), cost: 0.1);
+        world.AddRun('f', "VWAP", "basket:" + B2, sheet: "sheet-1", rates: ReportWorld.Rates("sheet-1-rates-changed"), createdDays: 1);
+        world.AddTrades('f', Mix(20, 1, 20, -1), "VWAP", cost: 0.1, symbol: "MMM");
+        world.Confirmation = ReportWorld.Confirm("sheet-1");
+
+        var old = await Ok(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('e'), Basis: "net"))), Ct));
+        var changed = await Refused(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Runs: ReportWorld.Key('e') + "," + ReportWorld.Key('f'), Basis: "net"))), Ct));
+        var runs = await Ok(new ListReportRunsHandler(world, world).HandleAsync(new ListReportRunsQuery(), Ct));
+
+        old.Evidence.Basis.ShouldBe("net");
+        changed.Code.ShouldBe("reports.net_unavailable");
+        changed.Message.ShouldContain("other rates");
+        runs.Runs.Where(r => r.NetPossible).Select(r => r.RunKey).ShouldBe([ReportWorld.Key('e')]);
+    }
+
+    [Fact]
+    public async Task A_confirmation_of_other_rates_covers_no_run()
+    {
+        var world = new ReportWorld();
+        world.AddRun('n', "ORB", "basket:" + B1, sheet: "sheet-1");
+        world.AddTrades('n', Mix(20, 1, 20, -1), cost: 0.1);
+        world.Confirmation = ReportWorld.Confirm("sheet-1", ReportWorld.Rates("rates-the-run-was-not-costed-with"));
+
+        var error = await Refused(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Basis: "net"))), Ct));
+
+        error.Code.ShouldBe("reports.net_unavailable");
+    }
+
+    [Fact]
+    public async Task The_same_signals_under_two_exit_labels_need_the_exit_in_the_lens_or_the_report_is_refused_as_a_double_count()
+    {
+        var world = new ReportWorld();
+        world.AddRun('a', "ORB", "basket:" + B1, exit: "FIXED_RR{rr=2}");
+        world.AddRun('b', "ORB", "basket:" + B1, exit: "FIXED_RR{rr=3}", createdDays: 1);
+        world.AddTrades('a', Mix(20, 1, 20, -1), sameKeys: true);
+        world.AddTrades('b', Mix(25, 1, 15, -1), sameKeys: true);
+        var both = ReportWorld.Key('a') + "," + ReportWorld.Key('b');
+
+        var plain = await Refused(new GetReportSummaryHandler(world.Loader).HandleAsync(new GetReportSummaryQuery(Q(new ReportQueryInput(Runs: both))), Ct));
+        var split = await Ok(new GetReportGroupsHandler(world.Loader).HandleAsync(new GetReportGroupsQuery(Q(new ReportQueryInput(Runs: both, Lens: "exit"))), Ct));
+
+        plain.Code.ShouldBe("reports.double_count");
+        split.Groups.Select(g => g.N).ShouldBe([40, 40]);
+        split.Groups.Select(g => g.TotalR.Number!.Value).ShouldBe([0.0, 10.0]);
     }
 
     private static IEnumerable<MetricView> MetricsOf(GroupView group) =>
