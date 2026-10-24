@@ -21,6 +21,9 @@ public static class PlanWording
     /// <summary>Said with every owner approval (spec P7-10, ADR 0095): approval is a state in our own database, not an order; none is placed and none exists. A test pins it.</summary>
     public const string ApprovedForWatching = "Approved for watching: no order is placed and none exists.";
 
+    /// <summary>Said with every arming and in every alert text (spec P7-11, ADR 0096): armed is watched, not an order. A test pins it.</summary>
+    public const string Armed = "Armed: watched with alerts. No order is placed and none exists. A stop is only an alert.";
+
     /// <summary>Stored on every plan: how far the numbers go.</summary>
     public const string HonestLimits = "Numbers are replayed history of about 2.1 years with modelled fills and no hold-out; a probability here is a shrunk estimate, not a forecast. Inputs that were missing are listed on the ticket as unavailable and never count as a pass.";
 }

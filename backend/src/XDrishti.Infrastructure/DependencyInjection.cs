@@ -136,6 +136,9 @@ public static class DependencyInjection
         services.AddScoped<IJournalStore, JournalStore>(); // insert-only journal of the stored fills (P7-14, ADR 0093)
         services.AddSingleton<IGradeSettings, GradeSettings>();
         services.AddScoped<IAutoApprovalStore>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-12: the automatic approval is written by the same store, in the same lock order as an owner's decision
+        services.AddScoped<IArmedTicketReader>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-11: the armed tickets of a session, read only (the feed's active-set provider and the expiry job)
+        services.AddScoped<IInstrumentSecurities, InstrumentSecurities>(); // shares by canonical symbol with their Dhan NSE equity id (P7-11)
+        services.AddScoped<IPreOpenSource, PreOpenSource>(); // the pre-open price, previous close and ATR: the existing read-only quote and stored day bars (P7-11)
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
         services.AddSingleton<IOpenBookSettings, OpenBookSettings>(); // off by default: the open book is unavailable (P7-09, ADR 0092)
