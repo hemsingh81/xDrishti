@@ -2860,6 +2860,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plan-runs/phase-check': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The P7 phase check from stored records: the last ten trading sessions (scheduled or manual run, gates, published or failed closed, tickets, manual runs), then each acceptance criterion as MET, NOT MET or NOT EVALUABLE with its numbers, the services and owner switches that are still off, and the honest limits. The exit is never MET on fewer than ten consecutive scheduled sessions. Optional 'through' planned-session date. Read only; writes nothing. 422 plans.invalid */
+    get: operations['GetPlanPhaseCheck'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/autonomy/settings': {
     parameters: {
       query?: never;
@@ -7257,6 +7274,38 @@ export interface components {
       description: null | string;
       unit: null | string;
     };
+    /** @description A labelled count. */
+    PhaseCount: {
+      /** @description What is counted. */
+      name: string;
+      /**
+       * Format: int32
+       * @description The count.
+       */
+      value: number;
+    };
+    /** @description A service of the framework and whether it runs. */
+    PhaseService: {
+      /** @description The service id. */
+      id: string;
+      /** @description What it is for in one phrase. */
+      role: string;
+      /** @description True when criterion 1 cannot be met without it. */
+      required: boolean;
+      /** @description `enabled`, `paused` or `not registered`. */
+      state: string;
+    };
+    /** @description One of the owner's switches. */
+    PhaseSwitch: {
+      /** @description The setting. */
+      name: string;
+      /** @description Whether it is ON. */
+      on: boolean;
+      /** @description What it does, in a phrase, and whether the exit needs it. */
+      effect: string;
+      /** @description True when the pipeline cannot publish real tickets without it. */
+      needed: boolean;
+    };
     /** @description Size for one account. */
     PlanAllocationView: {
       /**
@@ -7421,6 +7470,118 @@ export interface components {
        * @description Approved tickets that no fill was matched to.
        */
       ticketsWithoutFills: number;
+    };
+    /** @description The phase check as the verb prints it and the endpoint returns it. */
+    PlanPhaseCheckView: {
+      /** @description The criteria, the sessions, the setup and the limits. */
+      report: components['schemas']['PlanPhaseReport'];
+      /** @description The printable report, limits included. */
+      text: string;
+    };
+    /** @description One acceptance criterion of P7-00 with the call and the numbers behind it. */
+    PlanPhaseCriterion: {
+      /**
+       * Format: int32
+       * @description 1 to 12, as numbered in the P7-00 spec.
+       */
+      number: number;
+      /** @description The criterion in the spec's words. */
+      name: string;
+      /** @description MET, NOT MET or NOT EVALUABLE. */
+      verdict: string;
+      /** @description The numbers and the reason. */
+      detail: string;
+      /** @description What a MET rests on without being verified here, printed beside the label; null when none. */
+      caveat?: null | string;
+    };
+    /** @description The P7 phase check: the acceptance criteria, the ten sessions, the setup and the limits that are always printed. */
+    PlanPhaseReport: {
+      /**
+       * Format: date
+       * @description The last planned session of the window.
+       */
+      through: string;
+      /**
+       * Format: int32
+       * @description Consecutive counted sessions ending at DateOnly PlanPhaseReport.Through.
+       */
+      streak: number;
+      /** @description The call on the roadmap exit (criterion 1): MET only after ten consecutive scheduled published sessions. */
+      exitCriterion: string;
+      /** @description The criteria in order. */
+      criteria: components['schemas']['PlanPhaseCriterion'][];
+      /** @description The sessions of the window, oldest first. */
+      sessions: components['schemas']['PlanPhaseSession'][];
+      /** @description The services and their state. */
+      services: components['schemas']['PhaseService'][];
+      /** @description The owner's switches. */
+      switches: components['schemas']['PhaseSwitch'][];
+      /** @description Which switches and services are still off, and why the run cannot yet happen; empty when none. */
+      blockers: string[];
+      /** @description Counts of stored records. */
+      counts: components['schemas']['PhaseCount'][];
+      /** @description The honest limits; never empty. */
+      limits: string[];
+    };
+    /** @description One planned session of the window. */
+    PlanPhaseSession: {
+      /**
+       * Format: date
+       * @description The planned session.
+       */
+      date: string;
+      /** @description `counted`, `manual_run`, `failed_closed`, `no_run`, `plan_missing` or `before_history`. */
+      state: string;
+      /**
+       * Format: int32
+       * @description Attempts started by the schedule or its catch-up.
+       */
+      scheduledRuns: number;
+      /**
+       * Format: int32
+       * @description Attempts a person started.
+       */
+      manualRuns: number;
+      /**
+       * Format: int32
+       * @description Attempts that failed closed.
+       */
+      failedRuns: number;
+      /** @description Whether a published row exists. */
+      published: boolean;
+      /**
+       * Format: int64
+       * @description The plan, or null.
+       */
+      planId: null | number;
+      /**
+       * Format: int32
+       * @description Primary tickets, or null without a plan.
+       */
+      primary: null | number;
+      /**
+       * Format: int32
+       * @description Reserve tickets, or null.
+       */
+      reserve: null | number;
+      /**
+       * Format: int32
+       * @description Rejected candidates, or null.
+       */
+      rejected: null | number;
+      /** @description True when the plan has no primary ticket. */
+      zeroPrimary: boolean;
+      /** @description True when the plan is the empty skeleton. */
+      skeleton: boolean;
+      /** @description The gate results in words. */
+      gates: string;
+      /**
+       * Format: date-time
+       * @description When the deciding attempt finished, or null.
+       */
+      finishedAt: null | string;
+      /** @description Why the session does or does not count. */
+      note: string;
     };
     /** @description A plan under review (spec P7-10). */
     PlanReviewView: {
@@ -16412,6 +16573,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PlanRunView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanPhaseCheck: {
+    parameters: {
+      query?: {
+        through?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanPhaseCheckView'];
         };
       };
       /** @description Unprocessable Entity */

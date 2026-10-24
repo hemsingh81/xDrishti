@@ -58,6 +58,20 @@ internal static class BrokerEndpoints
         (HttpMethod.Post, DhanMarketQuote, null),
     ];
 
+    /// <summary>
+    /// The allow-list as text for the phase check (ADR 0097), sorted: <c>METHOD host/path</c>, the query KEYS (never a value) after a <c>?</c>, and the two path/query shapes of the trade history and the ledger. Read only. A new path in
+    /// <see cref="IsAllowed"/> that is not declared here would not be listed, which is why the phase check also asks <see cref="IsAllowed"/> about order, position and fund requests; <c>BrokerEndpointsTests</c> is the real guard.
+    /// </summary>
+    public static IReadOnlyList<string> Describe() =>
+    [
+        .. Allowed
+            .Select(a => $"{a.Method.Method} {a.Endpoint.Host}{a.Endpoint.AbsolutePath}{(a.QueryParameter is null ? string.Empty : "?" + a.QueryParameter)}")
+            .Append($"GET {DhanHoldings.Host}{DhanTradeHistoryBase.AbsolutePath}/{{from}}/{{to}}/{{page}}")
+            .Append($"GET {DhanLedgerBase.Host}{DhanLedgerBase.AbsolutePath}?{LedgerFromKey}&{LedgerToKey}")
+            .Append($"WSS {DhanFeed.Host}?{string.Join('&', FeedQueryKeys.Order(StringComparer.Ordinal))}")
+            .Order(StringComparer.Ordinal),
+    ];
+
     /// <summary>True only for an allowed method and exact HTTPS endpoint (host, default port, path) with nothing but its own query parameter.</summary>
     public static bool IsAllowed(HttpMethod? method, Uri? uri)
     {

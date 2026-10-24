@@ -529,6 +529,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RunNightlyPlanCommand, NightlyRunView>, RunNightlyPlanHandler>();
         services.AddScoped<ICommandHandler<GenerateSuggestionsCommand, SuggestionsOutcome>, GenerateSuggestionsHandler>(); // deterministic suggestions into the append-only inbox (P7-09, ADR 0092)
         services.AddScoped<IQueryHandler<ListPlanRunsQuery, Result<IReadOnlyList<PlanRunView>>>, ListPlanRunsHandler>();
+        services.AddScoped<IQueryHandler<EvaluatePlanPhaseCheckQuery, Result<PlanPhaseCheckView>>, EvaluatePlanPhaseCheckHandler>(); // the P7 exit criteria from stored records, read only (P7-18, ADR 0097)
         services.AddScoped<ICommandHandler<GradePlansCommand, GradeOutcome>, GradePlansHandler>(); // grading (P7-13, ADR 0090): insert-only grades on stored bars, no order
         services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();
         services.AddScoped<IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>, GetDecisionsReportHandler>();
