@@ -45,12 +45,27 @@ public sealed class PlanWiringIntegrationTests(ApiFactory factory) : DataTestBas
         }
     }
 
-    private async Task<PlanContext> ContextAsync(params ContextInstrument[] instruments)
+    private async Task<PlanContext> ContextAsync(params ContextInstrument[] instruments) => await ContextAsync(null, instruments);
+
+    // With a setting given, the real StoredPlanContextSource is built over the real stores with that open-book setting (the factory's own config is the default, off).
+    private async Task<PlanContext> ContextAsync(bool? assumedEmpty, params ContextInstrument[] instruments)
     {
         using var scope = Factory.Services.CreateScope();
-        var result = await scope.ServiceProvider.GetRequiredService<IPlanContextSource>().ReadAsync(new PlanContextRequest(Session, ForDate, instruments), Ct);
+        IPlanContextSource source = scope.ServiceProvider.GetRequiredService<IPlanContextSource>();
+        if (assumedEmpty is { } value)
+        {
+            var type = typeof(XDrishti.Infrastructure.DependencyInjection).Assembly.GetType("XDrishti.Infrastructure.Planning.StoredPlanContextSource", throwOnError: true)!;
+            source = (IPlanContextSource)ActivatorUtilities.CreateInstance(scope.ServiceProvider, type, new FixedOpenBook(value));
+        }
+
+        var result = await source.ReadAsync(new PlanContextRequest(Session, ForDate, instruments), Ct);
         result.IsSuccess.ShouldBeTrue();
         return result.Value;
+    }
+
+    private sealed class FixedOpenBook(bool assumedEmpty) : IOpenBookSettings
+    {
+        public bool AssumedEmpty => assumedEmpty;
     }
 
     [Fact]
@@ -69,6 +84,12 @@ public sealed class PlanWiringIntegrationTests(ApiFactory factory) : DataTestBas
         await StoreAsync(b, Series(later, i => 1 + i));
         var after = await ContextAsync(instruments);
 
+        // the same days changed (not only added): still nothing moves
+        await StoreAsync(a, Series(later, i => 9000 - i * 3));
+        await StoreAsync(b, Series(later, i => 7 + i * 11));
+        var changed = await ContextAsync(instruments);
+
+        changed.Correlations.ShouldNotBeNull().Get("WIRA", "WIRB").ShouldBe(before.Correlations!.Get("WIRA", "WIRB"));
         before.Correlations.ShouldNotBeNull().Get("WIRA", "WIRB").ShouldNotBeNull();
         after.Correlations.ShouldNotBeNull().Get("WIRA", "WIRB").ShouldBe(before.Correlations.Get("WIRA", "WIRB"));
         after.Instruments.Keys.ShouldBe(before.Instruments.Keys);
@@ -86,6 +107,17 @@ public sealed class PlanWiringIntegrationTests(ApiFactory factory) : DataTestBas
         context.Notes.ShouldContain(note => note.StartsWith("Open book unavailable", StringComparison.Ordinal));
         context.Gate.ShouldBeNull();
         context.Accounts.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task With_the_owner_setting_the_real_context_source_returns_the_empty_book_and_says_so()
+    {
+        var context = await ContextAsync(true);
+
+        context.Book.ShouldNotBeNull().ShouldBeEmpty();
+        context.Notes.ShouldContain(PlanContextNotes.NoBookNote);
+        context.Notes.ShouldContain(PlanContextNotes.NoAccountNote);
+        context.Gate.ShouldBeNull();
     }
 
     [Fact]

@@ -96,7 +96,7 @@ internal sealed class SelectionPlanBuilder(
         for (var i = 0; i < fill.Primary.Count; i++)
         {
             var winner = fill.Primary[i].Candidate.Ranked.Merged.Winner;
-            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, fill.Primary[i].Candidate.Ranked.Caveats, [], fill.Primary[i].Candidate.Ranked.AdvisoryPWin, Applied(flagCodes, filled: true, sized: true), [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is null ? (string[])[] : [PlanWording.OpenBookAssumedEmpty])], wired[i].Allocations));
+            items.Add(Item(items.Count + 1, TicketGroup.Primary, drafts[Key(winner.Candidate)], winner.Candidate, winner.ConservativeExpectancyR, fill.Primary[i].Candidate.Ranked.Caveats, [], fill.Primary[i].Candidate.Ranked.AdvisoryPWin, Applied(flagCodes, filled: true, sized: true), [.. wired[i].Standings, PlanWiring.IndicativeEntry, .. (ctx.Book is { Count: 0 } ? [PlanWording.OpenBookAssumedEmpty] : (string[])[])], wired[i].Allocations));
         }
 
         var reserve = smart.Reserve.Select(r => new ReserveEntry(r.Ranked, [r.Code], false))
@@ -196,7 +196,7 @@ internal sealed class SelectionPlanBuilder(
     }
 
     // The proposal sentence first, then what the numbers rest on, then the banner: the gate flag first (the engine adds it first), the rest as they come, the honest-limit notes last. Cut at the column's length, never silently longer.
-    private static string BasisText(SmartPlan smart, PlanContext ctx)
+    internal static string BasisText(SmartPlan smart, PlanContext ctx)
     {
         var parts = new List<string> { PlanWording.Proposed, Basis };
         parts.AddRange(ctx.Notes); // the open-book sentence first: it says why the fill took nothing, or on what it rests

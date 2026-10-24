@@ -123,6 +123,32 @@ public sealed class WiredPlanEndToEndTests
     }
 
     [Fact]
+    public async Task The_open_book_flag_and_the_gate_flag_both_survive_the_basis_clip_with_no_paper_account()
+    {
+        var plan = await BuildAsync(context: WiredPlanFixture.Context(accounts: [], bookAssumedEmpty: false));
+
+        plan.Basis.Length.ShouldBeLessThanOrEqualTo(SelectionPlanBuilder.MaxBasisLength);
+        plan.Basis.ShouldContain(PlanWording.OpenBookUnavailableMarker);
+        plan.Basis.ShouldContain(PlanWording.GateUnavailableMarker);
+        plan.Basis.ShouldContain(PlanContextNotes.NoAccountNote);
+    }
+
+    [Fact]
+    public void When_the_basis_is_clipped_the_risk_multiplier_sentence_goes_before_the_gate_flag()
+    {
+        var gate = new PlanFlag(SmartRuleCodes.GateUnavailable, PlanWording.GateUnavailableMarker + " partly (breadth not known); a limit that is known tripped");
+        var smart = new SmartPlan([], [], default!, default!, RuleStatus.Applied, 0, 0.75, [gate], false);
+        var filler = new string('x', 500 - PlanWording.Proposed.Length - SelectionPlanBuilder.Basis.Length - gate.Text.Length - 40);
+        var ctx = WiredPlanFixture.Context() with { Notes = [filler] };
+
+        var basis = SelectionPlanBuilder.BasisText(smart, ctx);
+
+        basis.Length.ShouldBe(SelectionPlanBuilder.MaxBasisLength);
+        basis.ShouldContain(gate.Text);
+        basis.ShouldNotContain("(market gate / equity throttle)");
+    }
+
+    [Fact]
     public async Task A_gate_that_has_data_does_not_flag_the_plan()
     {
         var plan = await BuildAsync(context: WiredPlanFixture.Context(new MarketGateInput(new DateOnly(2026, 10, 23), 14, 0.5, false)));

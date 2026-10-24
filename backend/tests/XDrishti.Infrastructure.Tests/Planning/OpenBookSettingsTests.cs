@@ -22,6 +22,11 @@ public sealed class OpenBookSettingsTests
     [InlineData(null, false)]
     [InlineData("", false)]
     [InlineData("yes", false)]
+    [InlineData("True", false)]
+    [InlineData("TRUE", false)]
+    [InlineData(" true", false)]
+    [InlineData("true ", false)]
+    [InlineData("1", false)]
     public void The_open_book_is_unavailable_unless_the_owner_sets_it_true(string? value, bool expected) =>
         Read(value).ShouldBe(expected);
 }

@@ -82,7 +82,19 @@ internal static class WiredPlanFixture
             : null,
         gate,
         null,
-        [bookAssumedEmpty ? PlanWording.OpenBookAssumedEmpty : PlanWording.OpenBookUnavailableMarker + ": no primary tickets (no position record exists)."]);
+        Notes(bookAssumedEmpty, accounts));
+
+    /// <summary>The notes the stored context source adds (its own constants).</summary>
+    public static IReadOnlyList<string> Notes(bool bookAssumedEmpty, IReadOnlyList<ContextAccount>? accounts)
+    {
+        var notes = new List<string> { bookAssumedEmpty ? PlanContextNotes.NoBookNote : PlanContextNotes.BookUnavailableNote };
+        if (accounts is not null && !accounts.Any(a => a.Mode == TradingMode.Paper))
+        {
+            notes.Add(PlanContextNotes.NoAccountNote);
+        }
+
+        return notes;
+    }
 
     public static SelectionPlanBuilder Builder(IReadOnlyList<TicketCandidate> found, PlanContext context, out IPlanContextSource contextSource, SelectionRules? rules = null)
     {

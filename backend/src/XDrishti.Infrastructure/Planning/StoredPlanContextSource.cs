@@ -4,7 +4,6 @@ using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
-using XDrishti.Domain.Planning;
 using XDrishti.Domain.Selection.SmartRules;
 
 namespace XDrishti.Infrastructure.Planning;
@@ -27,12 +26,6 @@ internal sealed class StoredPlanContextSource(
     /// <summary>Calendar days of daily bars read before the close of the session (about 60 sessions plus slack).</summary>
     public const int ReturnLookbackDays = 120;
 
-    public const string NoBookNote = PlanWording.OpenBookAssumedEmpty;
-
-    public const string BookUnavailableNote = PlanWording.OpenBookUnavailableMarker + ": no primary tickets (no position record exists; the owner may set Planning:OpenBook:AssumedEmpty).";
-
-    public const string NoAccountNote = "No Trading account to size for.";
-
     public async ValueTask<Result<PlanContext>> ReadAsync(PlanContextRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -40,6 +33,7 @@ internal sealed class StoredPlanContextSource(
         var trading = active.Where(a => a.Trading.Enabled).OrderBy(a => a.Id).ToList();
         var profileById = (await profiles.ListAsync(cancellationToken)).ToDictionary(p => p.Id);
 
+        // shortcut: accounts, risk profiles and holdings are read as of now, not as of the close of the session; upgrade when a plan is built for an older session or a re-run must reproduce a past night (needs dated account and holding history).
         var rows = await holdings.ListAsync(new HoldingFilter(null, null, null, null), cancellationToken);
         var open = rows.Where(h => h.ClosedAt is null && h.Qty > 0).ToList();
         var contextAccounts = trading.Select(a => ToAccount(a, open, profileById, openBook.AssumedEmpty)).ToList();
@@ -61,10 +55,10 @@ internal sealed class StoredPlanContextSource(
         }
 
         var correlations = await CorrelationsAsync(request, cancellationToken);
-        var notes = new List<string> { openBook.AssumedEmpty ? NoBookNote : BookUnavailableNote };
+        var notes = new List<string> { openBook.AssumedEmpty ? PlanContextNotes.NoBookNote : PlanContextNotes.BookUnavailableNote };
         if (!contextAccounts.Any(a => a.Mode == TradingMode.Paper))
         {
-            notes.Add(NoAccountNote);
+            notes.Add(PlanContextNotes.NoAccountNote);
         }
 
         return Result.Success(new PlanContext(openBook.AssumedEmpty ? [] : null, facts, contextAccounts, correlations, null, null, notes));
@@ -96,6 +90,8 @@ internal sealed class StoredPlanContextSource(
 
     private static double? D(decimal? value) => value is { } v ? (double)v : null;
 
+    // shortcut: closes are unadjusted for splits and bonus issues (a split shows as a fake return) and there is no outlier guard; upgrade when an adjusted close series is wired in (or returns beyond +-25 % are dropped).
+    // shortcut: one serial daily-bar read per ranked instrument, with no cap on how many; upgrade when the ranked list grows past about 100 instruments (one batched query, or a cap with an "unavailable" note).
     private async Task<CorrelationTable?> CorrelationsAsync(PlanContextRequest request, CancellationToken cancellationToken)
     {
         var withIds = request.Instruments.Where(i => i.Id is not null).ToList();
