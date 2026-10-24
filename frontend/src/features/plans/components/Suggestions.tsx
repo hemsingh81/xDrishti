@@ -47,7 +47,7 @@ export function Suggestions({ planId }: { planId: number }) {
                 <Button
                   size="small"
                   disabled={seen.isPending}
-                  aria-label={`Mark suggestion ${s.id} as seen`}
+                  aria-label={`Mark seen: ${s.subject} (${s.kind})`}
                   onClick={() => {
                     seen.mutate(s.id);
                   }}

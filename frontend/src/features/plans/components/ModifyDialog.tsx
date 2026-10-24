@@ -1,4 +1,4 @@
-import { Button, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Button, Stack, TextField, Typography } from '@mui/material';
 import { useRef, useState } from 'react';
 import { AppDialog, AppDialogBody, AppDialogFooter, AppDialogHeader } from '@/shared/ui/dialog';
 import type { ReviewAccount } from '../api/planQueries';
@@ -9,12 +9,14 @@ interface Props {
   accounts: ReviewAccount[];
   names: Record<string, string>;
   busy: boolean;
+  /** What went wrong with the last try; the dialog stays open and keeps what was typed. */
+  error: string | null;
   onSubmit: (reason: string, quantities: { accountId: string; quantity: number }[]) => void;
   onClose: () => void;
 }
 
 /** Size-down only: a smaller quantity for accounts the ticket is already sized for. Nothing else can be edited. */
-export function ModifyDialog({ symbol, accounts, names, busy, onSubmit, onClose }: Props) {
+export function ModifyDialog({ symbol, accounts, names, busy, error, onSubmit, onClose }: Props) {
   const [values, setValues] = useState<Record<string, string>>(
     Object.fromEntries(accounts.map((a) => [a.accountId, String(a.effectiveQuantity)])),
   );
@@ -40,6 +42,7 @@ export function ModifyDialog({ symbol, accounts, names, busy, onSubmit, onClose 
       initialFocusRef={firstRef}
       onSubmit={(e) => {
         e.preventDefault();
+        if (busy) return;
         if (ok)
           onSubmit(
             reason.trim(),
@@ -50,6 +53,7 @@ export function ModifyDialog({ symbol, accounts, names, busy, onSubmit, onClose 
       <AppDialogHeader>{`Lower the size: ${symbol}`}</AppDialogHeader>
       <AppDialogBody>
         <Stack spacing={1.5}>
+          {error && <Alert severity="error">{error}</Alert>}
           <Typography>
             You can only lower the quantity (at least 1, below the current size). Stop, target and trigger cannot be
             edited; to trade differently, reject the ticket. The ticket becomes Modified, not approved.

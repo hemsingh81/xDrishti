@@ -26,13 +26,16 @@ export interface BasisFlags {
   openBookUnavailable: boolean;
 }
 
-/** The basis flags the plan carries in its basis text (P7-09): read from the text, which is always shown in full too. */
+/** The exact markers the backend writes into the basis (PlanWording.GateUnavailableMarker, OpenBookUnavailableMarker). */
+export const gateUnavailableMarker = 'market gate unavailable';
+export const openBookUnavailableMarker = 'Open book unavailable';
+
+/** The basis flags: the backend's exact marker strings, matched as it matches them (ordinal, case-sensitive Contains). */
 export function basisFlags(plan: { basis: string; provisional: boolean }): BasisFlags {
-  const text = plan.basis.toLowerCase();
   return {
     provisional: plan.provisional,
-    gateUnavailable: text.includes('market gate') && text.includes('unavailable'),
-    openBookUnavailable: text.includes('open book unavailable'),
+    gateUnavailable: plan.basis.includes(gateUnavailableMarker),
+    openBookUnavailable: plan.basis.includes(openBookUnavailableMarker),
   };
 }
 

@@ -28,4 +28,23 @@ describe('Countdown', () => {
     });
     expect(screen.getByText('Cutoff passed')).toBeInTheDocument();
   });
+
+  it('calls onElapsed once when the cutoff is crossed, not when it is already past', () => {
+    fakeTimers();
+    const onElapsed = vi.fn();
+    const { unmount } = render(<Countdown cutoff="2026-10-26T03:00:02Z" onElapsed={onElapsed} />);
+    expect(onElapsed).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(onElapsed).toHaveBeenCalledTimes(1);
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(onElapsed).toHaveBeenCalledTimes(1);
+    unmount();
+    const late = vi.fn();
+    render(<Countdown cutoff="2026-10-26T02:00:00Z" onElapsed={late} />);
+    expect(late).not.toHaveBeenCalled();
+  });
 });

@@ -18,7 +18,13 @@ export interface Notice {
  */
 export function useDecisions(planId: number, report: (notice: Notice) => void) {
   const queryClient = useQueryClient();
-  const settle = () => queryClient.invalidateQueries({ queryKey: planKeys.all });
+  // Only what a decision changes: the plan, its review and the list (state and counts). Grade, journal and digests stay.
+  const settle = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: planKeys.one(planId) }),
+      queryClient.invalidateQueries({ queryKey: planKeys.review(planId) }),
+      queryClient.invalidateQueries({ queryKey: planKeys.list }),
+    ]);
   const fail = (e: unknown) => {
     report({ tone: 'error', text: decisionError(e) });
   };

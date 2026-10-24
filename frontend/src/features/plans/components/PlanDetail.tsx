@@ -1,12 +1,12 @@
 import { Alert, Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 import { formatIstDayAndTime, formatWeekdayDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
-import { accountNamesQuery, autonomyQuery, planQuery, reviewQuery, type PlanItem } from '../api/planQueries';
+import { accountNamesQuery, autonomyQuery, planKeys, planQuery, reviewQuery, type PlanItem } from '../api/planQueries';
 import { useDecisions, type Notice } from '../hooks/useDecisions';
-import { lapseWording, noOrderWording } from '../lib/planText';
+import { decisionError, lapseWording, noOrderWording } from '../lib/planText';
 import { Countdown } from './Countdown';
 import { PlanFlags } from './PlanFlags';
 import { TicketCard } from './TicketCard';
@@ -26,6 +26,13 @@ export function PlanDetail({ planId }: { planId: number }) {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const decisions = useDecisions(planId, setNotice);
+  const queryClient = useQueryClient();
+  // At the cutoff the screen reads the server again: it decides what is still open, never this clock.
+  const refreshAtCutoff = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: planKeys.one(planId) });
+    void queryClient.invalidateQueries({ queryKey: planKeys.review(planId) });
+    void queryClient.invalidateQueries({ queryKey: planKeys.list });
+  }, [queryClient, planId]);
 
   if (plan.isPending || review.isPending) return <LoadingState label="Loading plan…" />;
   if (plan.isError) return <ErrorState error={plan.error} />;
@@ -36,6 +43,7 @@ export function PlanDetail({ planId }: { planId: number }) {
   const nameMap = names.data ?? {};
   const planOpen = ['published', 'inreview'].includes(p.state.toLowerCase());
   const eligible = rv.tickets.filter((t) => t.approveAllEligible).length;
+  const eligibleSymbols = rv.tickets.filter((t) => t.approveAllEligible).map((t) => t.symbol);
   const itemsOf = (key: string): PlanItem[] => p.items.filter((i) => i.group === key);
 
   return (
@@ -47,6 +55,7 @@ export function PlanDetail({ planId }: { planId: number }) {
               Plan for {formatWeekdayDate(p.forDate)} (version {p.version})
             </Typography>
             <PlanFlags plan={p} />
+            <Typography variant="body2">{p.notice} Armed or approved means watching only, not protected.</Typography>
             <Typography variant="body2">
               <strong>Basis:</strong> {p.basis}
             </Typography>
@@ -54,11 +63,12 @@ export function PlanDetail({ planId }: { planId: number }) {
               {p.limits}
             </Typography>
             <Typography variant="body2">
-              Review cutoff {formatIstDayAndTime(rv.reviewCutoff)} IST: <Countdown cutoff={rv.reviewCutoff} />.{' '}
-              {lapseWording} Decisions are {rv.open ? 'open' : 'closed'}.
+              Review cutoff {formatIstDayAndTime(rv.reviewCutoff)} IST:{' '}
+              <Countdown cutoff={rv.reviewCutoff} onElapsed={refreshAtCutoff} />. {lapseWording} Decisions are{' '}
+              {rv.open ? 'open' : 'closed'}.
             </Typography>
             <Typography variant="body2">
-              Approval is manual. Automatic approval:{' '}
+              Automatic approval:{' '}
               {autonomy.data
                 ? autonomy.data.autoApproveTickets
                   ? 'ON (set elsewhere by the owner; not changeable here)'
@@ -66,7 +76,7 @@ export function PlanDetail({ planId }: { planId: number }) {
                 : autonomy.isError
                   ? 'not available'
                   : 'loading'}
-              . Reserve tickets are never promoted automatically.
+              .
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {noOrderWording} Paper accounts only.
@@ -107,6 +117,7 @@ export function PlanDetail({ planId }: { planId: number }) {
           variant="contained"
           disabled={!rv.open || eligible === 0 || decisions.busy}
           onClick={() => {
+            decisions.all.reset();
             setConfirmAll(true);
           }}
         >
@@ -157,15 +168,17 @@ export function PlanDetail({ planId }: { planId: number }) {
         }}
         onConfirm={() => {
           decisions.all.mutate(undefined, {
-            onSettled: () => {
+            onSuccess: () => {
               setConfirmAll(false);
             },
           });
         }}
       >
+        {decisions.all.error ? <Alert severity="error">{decisionError(decisions.all.error)}</Alert> : null}
         <p>
-          This approves exactly {eligible} primary ticket(s) whose checks all passed. Reserve tickets are not included,
-          and no ticket is approved despite a check.
+          On this screen {eligible} primary ticket(s) have every check passed: {eligibleSymbols.join(', ') || 'none'}.
+          At confirm time the server decides which are approved, so the count may differ. Reserve tickets are not
+          included, and no ticket is approved despite a check.
         </p>
         <p>{noOrderWording}</p>
       </ConfirmDialog>

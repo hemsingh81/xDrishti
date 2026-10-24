@@ -1,4 +1,8 @@
+import { http, HttpResponse } from 'msw';
 import type { Schemas } from '@/shared/api';
+
+/** Default handlers: the plan list only, empty. Everything else of a plan is mocked by the test that needs it. */
+export const planHandlers = [http.get('/api/plans', () => HttpResponse.json([]))];
 
 /** Builders for the plan screen tests (P7-17). The ids are made up. */
 export const accountA = '00000000-0000-4000-8000-0000000000a1';
