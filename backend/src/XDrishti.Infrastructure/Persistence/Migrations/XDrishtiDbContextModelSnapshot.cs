@@ -5614,6 +5614,54 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.SuggestionRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("PlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("plan_id");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("subject");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_suggestions");
+
+                    b.HasIndex("PlanId", "Kind", "Subject")
+                        .IsUnique()
+                        .HasDatabaseName("uq_suggestions_plan_kind_subject");
+
+                    b.ToTable("suggestions", "workflow", t =>
+                        {
+                            t.HasCheckConstraint("ck_suggestions_shape", "length(btrim(kind)) > 0 AND length(btrim(subject)) > 0 AND length(btrim(text)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>
                 {
                     b.Property<long>("SelectionId")
@@ -7555,6 +7603,16 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_plan_runs_plans_plan_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Planning.SuggestionRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Planning.PlanRecord", null)
+                        .WithMany()
+                        .HasForeignKey("PlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_suggestions_plans_plan_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Research.ExitSelectionFoldRow", b =>

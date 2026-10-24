@@ -28,6 +28,9 @@ public sealed class CorrelationTable
         }
     }
 
+    /// <summary>The pair correlations, for the portfolio fill (P7-09), so both rules read one set of figures.</summary>
+    public CorrelationMatrix Matrix => _matrix;
+
     /// <summary>The correlation of two symbols, or null when unknown.</summary>
     public double? Get(string a, string b) => _matrix.Get(a, b);
 

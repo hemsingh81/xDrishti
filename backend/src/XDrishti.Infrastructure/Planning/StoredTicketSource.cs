@@ -94,7 +94,7 @@ internal sealed class StoredTicketSource(
                 switch (draft.Verdict)
                 {
                     case TicketVerdict.Conditional:
-                        found.Add(new TicketCandidate(draft, stored.Row.Cell, stored.Row, state));
+                        found.Add(new TicketCandidate(draft, stored.Row.Cell, stored.Row, state, id));
                         break;
                     case TicketVerdict.Rejected:
                         rejected++;

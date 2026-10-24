@@ -43,7 +43,7 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             }
         }
 
-        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings"]);
+        names.ShouldBe(["trading.fill_grades", "trading.grades", "trading.journal_entries", "trading.journal_fills", "trading.plan_events", "trading.plan_item_allocations", "trading.plan_items", "trading.plan_runs", "trading.plans", "workflow.approvals", "workflow.autonomy_settings", "workflow.suggestions"]);
         foreach (var name in names)
         {
             foreach (var (privilege, expected) in new[] { ("SELECT", true), ("INSERT", true), ("UPDATE", false), ("DELETE", false), ("TRUNCATE", false) })
@@ -96,10 +96,19 @@ public sealed class PlanGrantsTests(ResearchGrantsTests.DedicatedServer server) 
             "UPDATE workflow.autonomy_settings SET auto_approve_tickets = true WHERE false",
             "DELETE FROM workflow.autonomy_settings WHERE false",
             "TRUNCATE workflow.autonomy_settings",
+            "UPDATE workflow.suggestions SET text = 'x' WHERE false",
+            "DELETE FROM workflow.suggestions WHERE false",
+            "TRUNCATE workflow.suggestions",
         })
         {
             (await SqlStateAsync(server.App, statement)).ShouldBe(PostgresErrorCodes.InsufficientPrivilege, statement);
         }
+
+        // A suggestion is stored once per plan, kind and subject (P7-09): the second insert is skipped, not an error and not a second row.
+        const string suggestion = "INSERT INTO workflow.suggestions (plan_id, kind, subject, text, created_at) SELECT id, 'no_primary_tickets', 'plan', 't', now() FROM trading.plans WHERE plan_key = 'grants-probe' ON CONFLICT (plan_id, kind, subject) DO NOTHING";
+        (await SqlStateAsync(server.App, suggestion)).ShouldBeNull();
+        (await SqlStateAsync(server.App, suggestion)).ShouldBeNull();
+        (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM workflow.suggestions", Ct)).ShouldBe(1);
 
         (await StoreKit.CountAsync(server.App, "SELECT count(*) FROM trading.plans WHERE plan_key = 'grants-probe'", Ct)).ShouldBe(1);
     }

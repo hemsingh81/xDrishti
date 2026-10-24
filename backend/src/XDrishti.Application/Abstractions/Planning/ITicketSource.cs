@@ -9,7 +9,8 @@ namespace XDrishti.Application.Abstractions.Planning;
 /// <param name="Cell">The cell.</param>
 /// <param name="Stats">The cell statistics as of a date before the plan date; null when none.</param>
 /// <param name="State">The cell state before the plan date; null when not known.</param>
-public sealed record TicketCandidate(TicketDraft Draft, CellId Cell, CellStatsRow? Stats, CellState? State);
+/// <param name="InstrumentId">The instrument master id, when the source knows it (P7-09: the context lookups of sector, baskets and holdings use it).</param>
+public sealed record TicketCandidate(TicketDraft Draft, CellId Cell, CellStatsRow? Stats, CellState? State, Guid? InstrumentId = null);
 
 /// <summary>What the source found.</summary>
 /// <param name="Candidates">The conditional tickets.</param>

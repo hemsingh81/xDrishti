@@ -138,7 +138,10 @@ public static class DependencyInjection
         services.AddScoped<IAutoApprovalStore>(sp => (PlanStore)sp.GetRequiredService<IPlanStore>()); // P7-12: the automatic approval is written by the same store, in the same lock order as an owner's decision
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
+        services.AddSingleton<IOpenBookSettings, OpenBookSettings>(); // off by default: the open book is unavailable (P7-09, ADR 0092)
         services.AddScoped<ITicketSource, StoredTicketSource>();
+        services.AddScoped<IPlanContextSource, StoredPlanContextSource>(); // accounts, holdings, sectors and correlations as of the close (P7-09, ADR 0092); read only
+        services.AddScoped<ISuggestionStore, SuggestionStore>(); // the append-only suggestion inbox (P7-09, ADR 0092)
         services.AddSingleton<IModelFiles, ModelFiles>(); // the model files under data/models, named by hash (spec P6-07)
         services.AddSingleton<IModelTrainer, MlNetModelTrainer>(); // the ML.NET adapter behind its port (ADR 0070): stateless
         services.AddSingleton<IModelScorerLoader, MlNetScorerLoader>();
