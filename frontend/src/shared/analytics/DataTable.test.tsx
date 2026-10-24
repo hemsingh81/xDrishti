@@ -131,6 +131,7 @@ describe('DataTable', () => {
     const grid = screen.getByRole('table');
     expect(grid).toHaveAttribute('aria-busy', 'true');
     expect(within(grid).getByText('Loading')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Evidence' })).not.toBeInTheDocument();
     expect(within(grid).queryByText('Breakout 15m long')).not.toBeInTheDocument();
   });
 
@@ -140,6 +141,7 @@ describe('DataTable', () => {
     expect(grid).toHaveAttribute('aria-busy', 'false');
     expect(within(grid).getByText('Could not load')).toBeInTheDocument();
     expect(within(grid).getByText('The server did not answer')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Evidence' })).not.toBeInTheDocument();
     expect(within(grid).queryByText('Breakout 15m long')).not.toBeInTheDocument();
   });
 });

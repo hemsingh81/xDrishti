@@ -9,8 +9,8 @@ export interface MetricValueProps {
   /** How a number is written. Called only for `value` and `provisional`; the default writes a signed 2-decimal figure. */
   format?: (value: number) => string;
   /**
-   * `gain-loss` colours a positive figure `success` and a negative one `error`, only for a real `value`; the sign is in the
-   * text either way. A non-value is never coloured by it.
+   * `gain-loss` colours a positive figure `success` and a negative one `error`, only for a real `value` whose printed
+   * figure is not zero; the sign is in the text either way. A non-value is never coloured by it.
    */
   tone?: 'neutral' | 'gain-loss';
 }
@@ -21,8 +21,11 @@ export function MetricValue({ state, format = formatSigned, tone = 'neutral' }: 
   if (!carriesNumber(resolved)) {
     return <NonValue state={resolved} />;
   }
+  const text = format(resolved.value);
+  // Gain or loss is read from the printed figure: 0.001 that prints "0.00" is zero, so it is not green.
+  const printsZero = !/[1-9]/.test(text);
   const color =
-    resolved.kind === 'value' && tone === 'gain-loss' && resolved.value !== 0
+    resolved.kind === 'value' && tone === 'gain-loss' && !printsZero
       ? resolved.value > 0
         ? 'success.main'
         : 'error.main'
@@ -30,7 +33,7 @@ export function MetricValue({ state, format = formatSigned, tone = 'neutral' }: 
   return (
     <Box component="span" data-state={resolved.kind} sx={{ display: 'inline-flex', flexDirection: 'column' }}>
       <Typography component="span" variant="inherit" sx={{ color, fontWeight: 600, ...numeric }}>
-        {format(resolved.value)}
+        {text}
       </Typography>
       {resolved.kind === 'provisional' && <NonValue state={resolved} />}
     </Box>

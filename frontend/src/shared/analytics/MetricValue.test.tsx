@@ -18,6 +18,16 @@ describe('MetricValue: a value', () => {
     expect(screen.getByText('54.2%')).toBeInTheDocument();
   });
 
+  it('does not colour a figure that prints as zero, whatever its true sign', () => {
+    const { container, rerender } = renderKit(<MetricValue state={{ kind: 'value', value: 0.001 }} tone="gain-loss" />);
+    expect(container).toHaveTextContent('0.00');
+    expect(usesGoodColour(container)).toBe(false);
+    rerender(<MetricValue state={{ kind: 'value', value: -0.001 }} tone="gain-loss" />);
+    expect(container).toHaveTextContent('0.00');
+    expect(container).not.toHaveTextContent('-');
+    expect(usesGoodColour(container)).toBe(false);
+  });
+
   it('prints a real zero as a number', () => {
     renderKit(<MetricValue state={{ kind: 'value', value: 0 }} format={formatR} />);
     expect(screen.getByText('0.00 R')).toBeInTheDocument();
@@ -30,6 +40,12 @@ describe('MetricValue: a value', () => {
     rerender(<MetricValue state={{ kind: 'value', value: -0.4 }} tone="gain-loss" />);
     expect(screen.getByText('-0.40')).toBeInTheDocument();
     expect(usesGoodColour(container)).toBe(false);
+  });
+
+  it('also finds the good colour in dark mode, so the dark-mode absence checks below can fail', () => {
+    const { container } = renderKit(<MetricValue state={{ kind: 'value', value: 0.3 }} tone="gain-loss" />, 'dark');
+    expect(usesGoodColour(container, 'dark')).toBe(true);
+    expect(usesGoodColour(container, 'light')).toBe(false);
   });
 });
 
@@ -114,6 +130,13 @@ describe('MetricCell', () => {
     expect(within(cell).getByText('+1.50')).toBeInTheDocument();
     expect(within(cell).getByText('n 42')).toBeInTheDocument();
     expect(cell).toHaveClass('MuiTableCell-alignRight');
+  });
+
+  it('shows no n beside a figure that is not a number, which is drawn as unavailable', () => {
+    renderKit(inTable(<MetricCell state={{ kind: 'value', value: Number.NaN }} n={42} />));
+    const cell = screen.getByRole('cell');
+    expect(within(cell).getByText('Not available')).toBeInTheDocument();
+    expect(cell).not.toHaveTextContent('42');
   });
 
   it('shows no n beside a non-value, which says its own', () => {

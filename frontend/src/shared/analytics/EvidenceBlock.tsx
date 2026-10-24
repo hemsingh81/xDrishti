@@ -17,6 +17,8 @@ export interface EvidenceProps {
   population?: readonly string[];
   /** The limits text the server sends with the report (in-sample, modelled fills, survivorship ...). */
   limits?: readonly string[];
+  /** The landmark name when a page holds more than one block ("Evidence" by default). */
+  label?: string;
   /** One line, for beside a tile or a table cell, instead of the labelled block. */
   compact?: boolean;
 }
@@ -40,6 +42,7 @@ export function EvidenceBlock({
   population,
   limits,
   compact = false,
+  label = 'Evidence',
 }: EvidenceProps) {
   const nText = n === null ? 'n not reported' : `n ${formatCount(n)}`;
   const rangeText = range ? formatRange(range) : 'range not stated';
@@ -52,7 +55,7 @@ export function EvidenceBlock({
     );
   }
   return (
-    <Box component="section" aria-label="Evidence" sx={{ color: 'text.secondary', fontSize: 'caption.fontSize' }}>
+    <Box component="section" aria-label={label} sx={{ color: 'text.secondary', fontSize: 'caption.fontSize' }}>
       <Box
         component="dl"
         sx={{
@@ -97,8 +100,8 @@ export function EvidenceBlock({
       )}
       {limits && limits.length > 0 && (
         <Box component="ul" aria-label="Limits" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
-          {limits.map((limit) => (
-            <li key={limit}>{limit}</li>
+          {limits.map((limit, index) => (
+            <li key={index}>{limit}</li>
           ))}
         </Box>
       )}
