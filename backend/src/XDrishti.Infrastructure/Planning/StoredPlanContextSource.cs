@@ -4,6 +4,7 @@ using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Planning;
 using XDrishti.Domain.Selection.SmartRules;
 
 namespace XDrishti.Infrastructure.Planning;
@@ -12,20 +13,23 @@ namespace XDrishti.Infrastructure.Planning;
 /// The facts of a plan from stored data (spec P7-09, ADR 0092): the Trading-role accounts with their risk profile and overrides, the synced holdings, the sector and baskets of each instrument, and the correlation of daily returns up to the close
 /// of the session. Read only; nothing here talks to a broker or writes anything.
 /// <b>What has no data source is null</b> (unavailable downstream, never a pass): the market figures (VIX, breadth, events; P3-01d/e), real taken trades, the funds of a broker-funds account.
-/// <b>The open book is the empty list, by stated assumption</b>: the system keeps no position record for a Trading account (no journal yet, P7-14; P7 places no order, paper days start in P10), so the open risk, the open trades and the loss today
-/// are zero, and the plan says so. Positions held outside this system (the broker's own app) are NOT known and not counted.
+/// <b>The open book is unavailable by default</b> (the system keeps no position record for a Trading account: no journal yet, P7-14): book, open risk and the loss today are null, so the fill takes nothing and the plan says so. Only when the owner sets
+/// <c>Planning:OpenBook:AssumedEmpty</c> are they the empty book and zero, and the plan says that instead. Positions held outside this system (the broker's own app) are NOT known and not counted.
 /// </summary>
 internal sealed class StoredPlanContextSource(
     IAccountStore accounts,
     IRiskProfileStore profiles,
     IHoldingQueries holdings,
     IHoldingClassifications classifications,
-    IBarQueries bars) : IPlanContextSource
+    IBarQueries bars,
+    IOpenBookSettings openBook) : IPlanContextSource
 {
     /// <summary>Calendar days of daily bars read before the close of the session (about 60 sessions plus slack).</summary>
     public const int ReturnLookbackDays = 120;
 
-    public const string NoBookNote = "Open book: none recorded (no journal yet); positions held outside this system are not counted.";
+    public const string NoBookNote = PlanWording.OpenBookAssumedEmpty;
+
+    public const string BookUnavailableNote = PlanWording.OpenBookUnavailableMarker + ": no primary tickets (no position record exists; the owner may set Planning:OpenBook:AssumedEmpty).";
 
     public const string NoAccountNote = "No Trading account to size for.";
 
@@ -38,7 +42,7 @@ internal sealed class StoredPlanContextSource(
 
         var rows = await holdings.ListAsync(new HoldingFilter(null, null, null, null), cancellationToken);
         var open = rows.Where(h => h.ClosedAt is null && h.Qty > 0).ToList();
-        var contextAccounts = trading.Select(a => ToAccount(a, open, profileById)).ToList();
+        var contextAccounts = trading.Select(a => ToAccount(a, open, profileById, openBook.AssumedEmpty)).ToList();
 
         var ids = request.Instruments.Where(i => i.Id is not null).Select(i => i.Id!.Value).Distinct().ToList();
         var sectors = ids.Count == 0 ? new Dictionary<Guid, string>() : (await classifications.SectorsAsync(ids, cancellationToken)).ToDictionary(p => p.Key, p => p.Value);
@@ -57,16 +61,16 @@ internal sealed class StoredPlanContextSource(
         }
 
         var correlations = await CorrelationsAsync(request, cancellationToken);
-        var notes = new List<string> { NoBookNote };
+        var notes = new List<string> { openBook.AssumedEmpty ? NoBookNote : BookUnavailableNote };
         if (!contextAccounts.Any(a => a.Mode == TradingMode.Paper))
         {
             notes.Add(NoAccountNote);
         }
 
-        return Result.Success(new PlanContext([], facts, contextAccounts, correlations, null, null, notes));
+        return Result.Success(new PlanContext(openBook.AssumedEmpty ? [] : null, facts, contextAccounts, correlations, null, null, notes));
     }
 
-    private static ContextAccount ToAccount(BrokerAccount account, List<HoldingData> open, Dictionary<Guid, RiskProfile> profiles)
+    internal static ContextAccount ToAccount(BrokerAccount account, List<HoldingData> open, Dictionary<Guid, RiskProfile> profiles, bool bookAssumedEmpty)
     {
         var t = account.Trading;
         var profile = t.RiskProfileId is { } pid && profiles.TryGetValue(pid, out var p) ? p : null;
@@ -82,11 +86,11 @@ internal sealed class StoredPlanContextSource(
             D(overrides.RiskPerTradePct ?? profile?.RiskPerTradePct),
             D(profile?.MaxCapitalPerTradePct),
             D(profile?.MaxTotalRiskPct),
-            0,
+            bookAssumedEmpty ? 0 : null,
             equity,
             profile?.MaxPerSector,
             D(overrides.DailyLossPct ?? profile?.DailyLossPct),
-            0,
+            bookAssumedEmpty ? 0 : null,
             held);
     }
 

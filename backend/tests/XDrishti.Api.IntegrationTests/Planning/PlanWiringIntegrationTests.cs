@@ -78,12 +78,12 @@ public sealed class PlanWiringIntegrationTests(ApiFactory factory) : DataTestBas
     }
 
     [Fact]
-    public async Task The_context_says_the_book_is_not_recorded_and_has_no_market_figures()
+    public async Task By_default_the_context_says_the_open_book_is_unavailable_and_has_no_market_figures()
     {
         var context = await ContextAsync();
 
-        context.Book.ShouldNotBeNull().ShouldBeEmpty();
-        context.Notes.ShouldContain(note => note.Contains("none recorded", StringComparison.Ordinal));
+        context.Book.ShouldBeNull();
+        context.Notes.ShouldContain(note => note.StartsWith("Open book unavailable", StringComparison.Ordinal));
         context.Gate.ShouldBeNull();
         context.Accounts.ShouldBeEmpty();
     }

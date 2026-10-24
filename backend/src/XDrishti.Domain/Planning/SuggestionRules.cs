@@ -27,6 +27,11 @@ public static class SuggestionRules
             result.Add(new NewSuggestion(SuggestionKinds.MarketGateUnavailable, "plan", "The market gate had no data (VIX, breadth, event calendar): this plan was not treated as a normal day. Judge the market yourself before approving anything."));
         }
 
+        if (plan.Basis.Contains(PlanWording.OpenBookUnavailableMarker, StringComparison.Ordinal))
+        {
+            result.Add(new NewSuggestion(SuggestionKinds.OpenBookUnavailable, "plan", "Open book unavailable: no primary tickets. The system keeps no position record, so the portfolio limits cannot be checked. To let the plan use an empty book, the owner sets Planning:OpenBook:AssumedEmpty to true in the configuration."));
+        }
+
         if (!plan.Items.Any(i => i.Group == TicketGroup.Primary))
         {
             result.Add(new NewSuggestion(SuggestionKinds.NoPrimaryTickets, "plan", "No primary ticket today. See the reserve and rejected lists for the reasons; nothing needs approving."));

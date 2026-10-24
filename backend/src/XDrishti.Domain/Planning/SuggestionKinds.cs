@@ -6,6 +6,9 @@ public static class SuggestionKinds
     /// <summary>The market gate had no data: the plan was not treated as a normal day. Subject: <c>plan</c>.</summary>
     public const string MarketGateUnavailable = "market_gate_unavailable";
 
+    /// <summary>The open book is not known (the owner has not set it to assumed empty), so the fill took nothing. Subject: <c>plan</c>.</summary>
+    public const string OpenBookUnavailable = "open_book_unavailable";
+
     /// <summary>The plan has no primary ticket. Subject: <c>plan</c>.</summary>
     public const string NoPrimaryTickets = "no_primary_tickets";
 

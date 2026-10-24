@@ -100,6 +100,29 @@ public sealed class WiredPlanEndToEndTests
     }
 
     [Fact]
+    public async Task With_the_owner_setting_every_primary_ticket_and_the_basis_say_the_book_is_assumed_empty()
+    {
+        var plan = await BuildAsync();
+
+        plan.Basis.ShouldContain(PlanWording.OpenBookAssumedEmpty);
+        plan.Items.Where(i => i.Group == TicketGroup.Primary).ShouldAllBe(i => i.Evidence.Unavailable.Contains(PlanWording.OpenBookAssumedEmpty));
+    }
+
+    [Fact]
+    public async Task By_default_the_open_book_is_unavailable_so_the_fill_takes_nothing_and_the_plan_is_flagged()
+    {
+        var plan = await BuildAsync(context: WiredPlanFixture.Context(bookAssumedEmpty: false));
+
+        plan.Items.ShouldNotContain(i => i.Group == TicketGroup.Primary);
+        plan.Basis.ShouldContain(PlanWording.OpenBookUnavailableMarker);
+        plan.Basis.ShouldNotContain(PlanWording.OpenBookAssumedEmpty);
+        plan.Items.Single(i => i.Symbol == "AAA").Reasons.ShouldContain(FillCodes.Book + ":unavailable");
+        plan.Items.Single(i => i.Symbol == "DDD").Group.ShouldBe(TicketGroup.Reserve); // moved by a smart rule before the fill
+        SuggestionRules.Evaluate(new SuggestionInput(WiredPlanFixture.ForDate, plan.Basis, [.. plan.Items.Select(i => new SuggestionItem(i.Group, i.Symbol, i.Reasons))], new DateOnly(2026, 10, 22)))
+            .Select(s => s.Kind).ShouldContain(SuggestionKinds.OpenBookUnavailable);
+    }
+
+    [Fact]
     public async Task A_gate_that_has_data_does_not_flag_the_plan()
     {
         var plan = await BuildAsync(context: WiredPlanFixture.Context(new MarketGateInput(new DateOnly(2026, 10, 23), 14, 0.5, false)));

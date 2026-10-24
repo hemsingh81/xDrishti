@@ -22,6 +22,14 @@ public sealed class SuggestionRulesTests
     }
 
     [Fact]
+    public void A_plan_whose_open_book_was_unavailable_gets_one_open_book_suggestion()
+    {
+        var result = SuggestionRules.Evaluate(Plan("x " + PlanWording.OpenBookUnavailableMarker + ": no primary tickets.", Fresh, Item(TicketGroup.Primary, "AAA")));
+
+        result.Select(s => (s.Kind, s.Subject)).ShouldBe([(SuggestionKinds.OpenBookUnavailable, "plan")]);
+    }
+
+    [Fact]
     public void A_plan_without_a_primary_ticket_says_so()
     {
         var result = SuggestionRules.Evaluate(Plan("b", Fresh, Item(TicketGroup.Reserve, "AAA", "sector:fail")));

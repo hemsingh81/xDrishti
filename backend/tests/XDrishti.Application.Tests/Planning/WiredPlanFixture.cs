@@ -65,8 +65,8 @@ internal static class WiredPlanFixture
 
     public static ContextAccount LiveAccount() => new(Live, TradingMode.ManualLive, 1_000_000, 0.5, 20, 3, 0, 1_000_000, 2, 1.5, 0, new HashSet<string>());
 
-    public static PlanContext Context(MarketGateInput? gate = null, IReadOnlyList<ContextAccount>? accounts = null, bool withCorrelations = true) => new(
-        [],
+    public static PlanContext Context(MarketGateInput? gate = null, IReadOnlyList<ContextAccount>? accounts = null, bool withCorrelations = true, bool bookAssumedEmpty = true) => new(
+        bookAssumedEmpty ? [] : null,
         new Dictionary<string, InstrumentFacts>
         {
             ["AAA"] = new("Banks", ["Nifty"], false),
@@ -82,10 +82,7 @@ internal static class WiredPlanFixture
             : null,
         gate,
         null,
-        [StoredNote]);
-
-    /// <summary>The note a real context source adds (kept short in the fixture).</summary>
-    public const string StoredNote = "Open book: none recorded (no journal yet).";
+        [bookAssumedEmpty ? PlanWording.OpenBookAssumedEmpty : PlanWording.OpenBookUnavailableMarker + ": no primary tickets (no position record exists)."]);
 
     public static SelectionPlanBuilder Builder(IReadOnlyList<TicketCandidate> found, PlanContext context, out IPlanContextSource contextSource, SelectionRules? rules = null)
     {
