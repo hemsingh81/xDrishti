@@ -75,6 +75,11 @@ title shows the current screen.
   non-value shown as an icon and a word — *Insufficient data* (with n and the minimum), *Not available*, *Not
   evaluable*, *No records yet*, *Loading*, *Could not load* — never as a digit, a zero, a flat chart or the good
   colour. Beside a number sits the evidence (n, data range, gross or net basis, provisional, data used, limits).
+- **Learning screen (P8-02, [spec](../specs/P8-02-learning-screen.md)):** read only, a lazy route with the tab, window and
+  open cell in the address. Setups is a table of strategy rows by timeframe columns with one button per stored cell
+  (never an average of cells): *Enough* cells print the expectancy with its sign, *Not enough* cells are hatched, labelled
+  and print no figure, so a cell below the minimum trades never reads as a winner. The credible bound shown is the
+  win-rate bound the cell stores; no interval on expectancy exists yet.
 
 ## 1d. Responsive design (all monitors)
 

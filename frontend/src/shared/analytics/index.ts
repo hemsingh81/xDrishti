@@ -19,4 +19,5 @@ export { MetricCell, type MetricCellProps } from './MetricCell';
 export { MetricTile } from './MetricTile';
 export { MetricValue, type MetricValueProps } from './MetricValue';
 export { NonValue } from './NonValue';
+export { useUrlState } from './useUrlState';
 export { VerdictChip, type Verdict } from './VerdictChip';

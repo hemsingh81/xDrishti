@@ -57,7 +57,7 @@ export const navigation: NavSection[] = [
   {
     title: 'Research',
     items: [
-      { path: '/learning', label: 'Learning', icon: PsychologyIcon, phase: 'P8' },
+      { path: '/learning', label: 'Learning', icon: PsychologyIcon },
       { path: '/reports', label: 'Reports', icon: BarChartIcon, phase: 'P8' },
       { path: '/lab', label: 'Strategy Lab', icon: ScienceIcon },
     ],

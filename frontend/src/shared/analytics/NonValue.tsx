@@ -52,6 +52,8 @@ export function NonValue({ state, wordOnly = false }: NonValueProps) {
     <Box
       component="span"
       data-state={state.kind}
+      // A hook for a container that sizes its words (a tile's figure is large; its "No records yet" is not).
+      className="xd-non-value"
       sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'inherit', color: look.color }}
     >
       <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
