@@ -88,10 +88,10 @@ public sealed class AutonomyHandlersTests
     }
 
     [Fact]
-    public async Task With_no_checklist_source_nothing_is_ever_approved()
+    public async Task With_no_stored_checklist_nothing_is_ever_approved()
     {
         Arrange(On, Item(5));
-        var none = new AutoApprovePlanHandler(_settings, _plans, _auto, new NullChecklistSource(), _time, NullLogger<AutoApprovePlanHandler>.Instance);
+        var none = new AutoApprovePlanHandler(_settings, _plans, _auto, new StoredChecklistSource(), _time, NullLogger<AutoApprovePlanHandler>.Instance);
 
         var result = await none.HandleAsync(new AutoApprovePlanCommand(1), Ct);
 

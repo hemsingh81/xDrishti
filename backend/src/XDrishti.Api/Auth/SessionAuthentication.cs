@@ -14,6 +14,8 @@ internal static class SessionAuthentication
 
     public const string LoginRateLimitPolicy = "login";
 
+    public const string PlanDecisionRateLimitPolicy = "plan-decisions";
+
     public const string CsrfInvalidCode = "auth.csrf_invalid";
 
     public const string RateLimitedCode = "auth.rate_limited";

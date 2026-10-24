@@ -2878,6 +2878,125 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/plans/{id}/review': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The review of a plan: each primary and reserve ticket with its stored checklist per account (standing of every check, what needs the owner's confirmation, whether approve-all would take it), the cutoff and whether decisions are still open. Approved means watched; no order is placed and none exists. 404 plans.not_found */
+    get: operations['GetPlanReview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/{id}/items/{itemId}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve one ticket as the owner (session and CSRF token; the owner is the session, never the body). Every account's stored checklist must allow it; a check that is not a pass needs a confirmation naming its code, the account and a reason of 1 to 200 characters; the account gate can never be overridden. 'Approved for watching: no order is placed and none exists.' 409 plans.checklist_blocked, plans.closed (cutoff passed), plans.move_refused or plans.stale (already decided), 400 checklist.* (confirmation), 404 */
+    post: operations['ApprovePlanItem'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/{id}/items/{itemId}/modify': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Lower the size of a ticket for accounts it is already sized for (only reductions; nothing else can be edited). The ticket becomes Modified, not approved: approving it re-validates the change and the checklist. Refused after the cutoff. 400 plans.modification_invalid, 409 plans.closed, plans.move_refused, plans.checklist_blocked, 404 */
+    post: operations['ModifyPlanItem'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/{id}/items/{itemId}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reject one ticket as the owner. Allowed after the cutoff time until the cutoff job has closed the plan. 409 plans.move_refused or plans.stale, 404 */
+    post: operations['RejectPlanItem'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/{id}/approve-all': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve every primary, still-proposed ticket whose stored checklist is complete with every check passed on every account; tickets with a failed, warned or unavailable check, reserve, modified and already decided tickets are skipped and listed with the reason, never approved despite a check. 409 plans.closed, 404 */
+    post: operations['ApproveAllPlanItems'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/{id}/suggestions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The suggestions inbox of a plan with the owner's seen marks. Advice only; it changes nothing. 404 plans.not_found */
+    get: operations['ListPlanSuggestions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/plans/{id}/suggestions/{suggestionId}/seen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Mark a suggestion as seen (an insert-only row; repeating it changes nothing). 404 plans.suggestion_not_found */
+    post: operations['MarkPlanSuggestionSeen'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3249,6 +3368,27 @@ export interface components {
       startedAt: string;
       /** Format: int64 */
       uptimeSeconds: number;
+    };
+    /** @description What approve-all did. */
+    ApproveAllOutcome: {
+      /**
+       * Format: int64
+       * @description The plan.
+       */
+      planId: number;
+      /** @description The tickets approved. */
+      approved: number[];
+      /** @description The primary tickets left for the owner, with the reason. */
+      skipped: components['schemas']['SkippedTicket'][];
+      /** @description The approval wording. */
+      notice: string;
+    };
+    /** @description The body of an approval. Everything is optional; a ticket whose checks all passed needs no body. The actor comes from the signed-in session, never from here. */
+    ApproveTicketRequest: {
+      /** @description Why, 1 to 500 characters; a default sentence when omitted. */
+      reason: null | string;
+      /** @description The checks approved despite, per account. */
+      confirmations: null | components['schemas']['CheckConfirmationRequest'][];
     };
     /**
      * @description What the owner can do about an item (ADR 0027), at most two per item. `Kind``route`: `Target` is an in-app path with its query (`/accounts?account=…&amp;tab=connection`) to navigate to. `Kind``command`: `Target` is an existing
@@ -4045,6 +4185,18 @@ export interface components {
        * @description When.
        */
       at: string;
+    };
+    /** @description The owner's "approve despite" for one account: the check codes named and why. The ticket's own symbol is bound by the server; the owner is never part of any body. */
+    CheckConfirmationRequest: {
+      /**
+       * Format: uuid
+       * @description The account the confirmation is for.
+       */
+      accountId: string;
+      /** @description The check codes approved despite (never the account gate). */
+      codes: null | string[];
+      /** @description Why, 1 to 200 characters. */
+      reason: null | string;
     };
     /** @description Body of the clone endpoint: the id of the new strategy; omitted keeps the id (a built-in gets `&lt;ID&gt;_COPY`). */
     CloneStrategyRequest: {
@@ -6991,6 +7143,13 @@ export interface components {
       /** @description The record allows the role champion: an Eligible verdict, a hold-out kept, enough folds and the trials of the registry. */
       mayBeChampion: boolean;
     };
+    /** @description The body of a modification: sizes can only be reduced; nothing else can be edited. */
+    ModifyTicketRequest: {
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
+      /** @description The new quantities. */
+      quantities: null | components['schemas']['QuantityChangeRequest'][];
+    };
     /** @description The bootstrap of the out-of-sample trades; the seed is text (a 64-bit number). */
     MonteCarloView: {
       /** Format: int32 */
@@ -7262,6 +7421,32 @@ export interface components {
        * @description Approved tickets that no fill was matched to.
        */
       ticketsWithoutFills: number;
+    };
+    /** @description A plan under review (spec P7-10). */
+    PlanReviewView: {
+      /**
+       * Format: int64
+       * @description The plan.
+       */
+      planId: number;
+      /**
+       * Format: date
+       * @description The session.
+       */
+      forDate: string;
+      /** @description The plan state. */
+      state: string;
+      /**
+       * Format: date-time
+       * @description Approvals and modifications are refused from this time; undecided tickets lapse.
+       */
+      reviewCutoff: string;
+      /** @description Whether decisions can still be taken now (plan open and before the cutoff). */
+      open: boolean;
+      /** @description What an approval means: watched, no order. */
+      notice: string;
+      /** @description Primary and reserve tickets. */
+      tickets: components['schemas']['ReviewTicketView'][];
     };
     /** @description One recorded attempt. */
     PlanRunView: {
@@ -7881,6 +8066,19 @@ export interface components {
       /** Format: date */
       to: null | string;
     };
+    /** @description A lower size for one account of the ticket. */
+    QuantityChangeRequest: {
+      /**
+       * Format: uuid
+       * @description The account the ticket is already sized for.
+       */
+      accountId: string;
+      /**
+       * Format: int32
+       * @description The new quantity (at least 1, below the allocated one).
+       */
+      quantity: number;
+    };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
       /** Format: uuid */
@@ -7935,6 +8133,11 @@ export interface components {
       autoRefresh: components['schemas']['AutoRefreshView'];
       /** Format: int32 */
       totalActive: number;
+    };
+    /** @description The body of a rejection. */
+    RejectTicketRequest: {
+      /** @description Why, 1 to 500 characters. */
+      reason: null | string;
     };
     /** @description Instruments to remove from a basket (1 to 500; repeats count once). */
     RemoveMembersInput: {
@@ -8046,6 +8249,92 @@ export interface components {
       /** Format: double */
       realisedPnl: number;
       realisedEstimated: boolean;
+    };
+    /** @description A ticket's checklist for one account. */
+    ReviewAccountView: {
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /** @description The allocation's mode (paper). */
+      mode: string;
+      /**
+       * Format: int32
+       * @description The size the plan allocated.
+       */
+      quantity: number;
+      /**
+       * Format: int32
+       * @description The size after the owner's modification, or the allocated one.
+       */
+      effectiveQuantity: number;
+      /** @description Whether this account's checklist allows approval without a confirmation. */
+      canApprove: boolean;
+      /** @description All checks in the fixed order, or empty when the plan stored no readable checklist. */
+      checks: components['schemas']['ReviewCheckView'][];
+    };
+    /** @description One check on the review screen. */
+    ReviewCheckView: {
+      /** @description The check code. */
+      code: string;
+      /** @description pass, fail or unavailable, as recorded when the plan was built. */
+      outcome: string;
+      /** @description passed, warned, needsconfirmation, confirmeddespite or refused: where it stands for approval. */
+      standing: string;
+      /** @description One line. */
+      detail: string;
+    };
+    /** @description What an owner decision did. */
+    ReviewDecisionOutcome: {
+      /**
+       * Format: int64
+       * @description The ticket.
+       */
+      itemId: number;
+      /** @description The state after. */
+      state: string;
+      /** @description For an approval, string PlanWording.ApprovedForWatching; otherwise empty. */
+      notice: string;
+      /** @description The checks approved despite, in check order (empty when none). */
+      overriddenCodes: string[];
+      /** @description Confirmations (or parts of them) that covered nothing, each with the reason, so the owner sees that nothing was overridden by them. */
+      ignored?: null | string[];
+    };
+    /** @description One ticket on the review screen. */
+    ReviewTicketView: {
+      /**
+       * Format: int64
+       * @description The ticket.
+       */
+      itemId: number;
+      /**
+       * Format: int32
+       * @description Order in the plan.
+       */
+      rank: number;
+      /** @description primary or reserve. */
+      group: string;
+      /** @description Its state. */
+      state: string;
+      /** @description Instrument. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /** @description False when the plan stored no readable checklist: the ticket cannot be approved. */
+      checklistRecorded: boolean;
+      /** @description Whether the owner may approve it as it stands (checks all passed or warned). */
+      canApprove: boolean;
+      /** @description The check codes per account that need the owner's confirmation to approve; empty when none. */
+      needsConfirmation: string[];
+      /** @description Whether approve-all would approve it: primary, proposed, every check passed. */
+      approveAllEligible: boolean;
+      /** @description The owner's size change, as stored, or null. */
+      modification: null | string;
+      /** @description What the approval overrode (stored text), or null. */
+      confirmedDespite: null | string;
+      /** @description The checklist per account. */
+      accounts: components['schemas']['ReviewAccountView'][];
     };
     /** @description The values of a risk profile to create or to replace an existing one with. Every value is required. */
     RiskProfileInput: {
@@ -8390,6 +8679,18 @@ export interface components {
       pValue: number;
       label: string;
     };
+    /** @description A ticket approve-all left alone, and why. */
+    SkippedTicket: {
+      /**
+       * Format: int64
+       * @description The ticket.
+       */
+      itemId: number;
+      /** @description Its instrument. */
+      symbol: string;
+      /** @description In words, including the check codes that did not pass. */
+      reason: string;
+    };
     /**
      * @description Spikes: a 1-minute move greater than `spikeMultiple` times the median move and greater than 1 %. One the next bar takes back (at least half) is a spike (a warning); one that is not
      *     taken back is a `largeMove`, a real jump, only reported. `thresholdPercent` is the move a bar needed to count.
@@ -8557,6 +8858,27 @@ export interface components {
       state: string;
       /** Format: uuid */
       dividendId: null | string;
+    };
+    /** @description A suggestion in the inbox. */
+    SuggestionView: {
+      /**
+       * Format: int64
+       * @description The suggestion.
+       */
+      id: number;
+      /** @description Its kind. */
+      kind: string;
+      /** @description What it is about. */
+      subject: string;
+      /** @description In words. */
+      text: string;
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      createdAt: string;
+      /** @description Whether the owner marked it seen. */
+      seen: boolean;
     };
     /** @description One run of the sweep (the base has an empty `Param`): the figures of a plain run of one exit, or the reason the engine refused it. In-sample. */
     SweepPointView: {
@@ -16156,6 +16478,318 @@ export interface operations {
       };
       /** @description Conflict */
       409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPlanReview: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanReviewView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ApprovePlanItem: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        itemId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['ApproveTicketRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReviewDecisionOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ModifyPlanItem: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        itemId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['ModifyTicketRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReviewDecisionOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  RejectPlanItem: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        itemId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': null | components['schemas']['RejectTicketRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReviewDecisionOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ApproveAllPlanItems: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApproveAllOutcome'];
+        };
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPlanSuggestions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SuggestionView'][];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  MarkPlanSuggestionSeen: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: number;
+        suggestionId: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Bad Request */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['HttpValidationProblemDetails'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

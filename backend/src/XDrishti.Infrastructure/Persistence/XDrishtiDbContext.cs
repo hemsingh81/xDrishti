@@ -191,6 +191,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<SuggestionRecord> Suggestions => Set<SuggestionRecord>();
 
+    internal DbSet<SuggestionSeenRecord> SuggestionSeen => Set<SuggestionSeenRecord>();
+
     /// <summary>The verdicts of full tests (spec P5-04).</summary>
     internal DbSet<LabResultRow> LabResults => Set<LabResultRow>();
 

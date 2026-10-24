@@ -18,6 +18,9 @@ public static class PlanWording
     /// <summary>The words the market-gate banner flag starts with when the gate has no data (the smart rules write it, the suggestions rule reads it; a test pins both).</summary>
     public const string GateUnavailableMarker = "market gate unavailable";
 
+    /// <summary>Said with every owner approval (spec P7-10, ADR 0095): approval is a state in our own database, not an order; none is placed and none exists. A test pins it.</summary>
+    public const string ApprovedForWatching = "Approved for watching: no order is placed and none exists.";
+
     /// <summary>Stored on every plan: how far the numbers go.</summary>
     public const string HonestLimits = "Numbers are replayed history of about 2.1 years with modelled fills and no hold-out; a probability here is a shrunk estimate, not a forecast. Inputs that were missing are listed on the ticket as unavailable and never count as a pass.";
 }

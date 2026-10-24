@@ -55,5 +55,37 @@ internal sealed class SuggestionStore(NpgsqlDataSource dataSource) : ISuggestion
         return rows;
     }
 
+    public async ValueTask<IReadOnlyList<long>> SeenIdsAsync(long planId, CancellationToken cancellationToken)
+    {
+        await using var select = dataSource.CreateCommand("SELECT s.suggestion_id FROM workflow.suggestion_seen s JOIN workflow.suggestions g ON g.id = s.suggestion_id WHERE g.plan_id = @plan ORDER BY s.suggestion_id");
+        select.Parameters.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
+        var ids = new List<long>();
+        await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            ids.Add(reader.GetInt64(0));
+        }
+
+        return ids;
+    }
+
+    public async ValueTask<bool> MarkSeenAsync(long planId, long suggestionId, string actor, DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        // One statement: the mark is written only for a suggestion of this plan (a second mark is a no-op by the unique index), and the answer says whether the suggestion belongs to the plan.
+        await using var command = dataSource.CreateCommand("""
+            WITH mark AS (
+                INSERT INTO workflow.suggestion_seen (suggestion_id, actor, seen_at)
+                SELECT g.id, @actor, @at FROM workflow.suggestions g WHERE g.id = @id AND g.plan_id = @plan
+                ON CONFLICT (suggestion_id) DO NOTHING
+                RETURNING 1)
+            SELECT EXISTS (SELECT 1 FROM workflow.suggestions WHERE id = @id AND plan_id = @plan)
+            """);
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Bigint, suggestionId);
+        command.Parameters.AddWithValue("plan", NpgsqlDbType.Bigint, planId);
+        command.Parameters.AddWithValue("actor", NpgsqlDbType.Varchar, actor);
+        command.Parameters.AddWithValue("at", NpgsqlDbType.TimestampTz, at);
+        return await command.ExecuteScalarAsync(cancellationToken) is true;
+    }
+
     private static string Clip(string text, int max) => text.Length <= max ? text : string.Concat(text.AsSpan(0, max - 1), "…");
 }

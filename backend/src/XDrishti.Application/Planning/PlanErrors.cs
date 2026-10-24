@@ -27,6 +27,24 @@ public static class PlanErrors
     public static Error GradingSheetMissing(string sheetId) =>
         Error.Conflict(GradingSheetMissingCode, $"Planning:Grading:CostSheetId names the charge sheet `{sheetId}`, which is not stored; no ticket was graded. Store the sheet or unset the setting to grade gross.");
 
+    /// <summary>Only the owner decides.</summary>
+    public const string OwnerOnlyCode = "plans.owner_only";
+
+    /// <summary>The checklist does not allow the approval.</summary>
+    public const string ChecklistBlockedCode = "plans.checklist_blocked";
+
+    /// <summary>The plan is not open for decisions now.</summary>
+    public const string ClosedCode = "plans.closed";
+
+    /// <summary>The caller is not the owner.</summary>
+    public static Error OwnerOnly() => Error.Forbidden(OwnerOnlyCode, "Only the signed-in owner decides on a ticket.");
+
+    /// <summary>The checklist blocks the approval; the message names the checks.</summary>
+    public static Error ChecklistBlocked(string what) => Error.Conflict(ChecklistBlockedCode, what);
+
+    /// <summary>The plan is closed for decisions (cutoff passed or the plan is no longer in review).</summary>
+    public static Error Closed(string what) => Error.Conflict(ClosedCode, what);
+
     /// <summary>The problems found before anything was read.</summary>
     public static Error Invalid(IReadOnlyList<FieldError> fields)
     {

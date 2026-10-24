@@ -19,4 +19,10 @@ public interface ISuggestionStore
 
     /// <summary>The suggestions of a plan in id order.</summary>
     ValueTask<IReadOnlyList<StoredSuggestion>> ForPlanAsync(long planId, CancellationToken cancellationToken);
+
+    /// <summary>The ids of the suggestions of a plan the owner has marked as seen.</summary>
+    ValueTask<IReadOnlyList<long>> SeenIdsAsync(long planId, CancellationToken cancellationToken);
+
+    /// <summary>Appends the owner's "seen" mark (spec P7-10): one per suggestion, a second is skipped. False when the suggestion is not one of the plan's. The suggestion itself is not changed.</summary>
+    ValueTask<bool> MarkSeenAsync(long planId, long suggestionId, string actor, DateTimeOffset at, CancellationToken cancellationToken);
 }
