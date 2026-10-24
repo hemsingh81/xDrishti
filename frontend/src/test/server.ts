@@ -41,6 +41,8 @@ export const dhanRedirectUrl = 'http://localhost:8080/api/brokers/dhan/callback'
 export const handlers = [
   http.get('/api/auth/session', () => HttpResponse.json(buildSession())),
   http.get('/api/system/status', () => HttpResponse.json(buildSystemStatus())),
+  // Plans (P7-17): none by default; tests of the plan screen bring their own.
+  http.get('/api/plans', () => HttpResponse.json([])),
   // Accounts (read side). Writes are mocked per test, because each test cares about a different outcome.
   http.get('/api/accounts', () => HttpResponse.json([summaryOf(buildAccountDetail()), summaryOf(buildSwingAccount())])),
   http.get('/api/accounts/:id', ({ params }) => {

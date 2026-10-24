@@ -40,7 +40,7 @@ export const navigation: NavSection[] = [
   {
     title: 'Decisions',
     items: [
-      { path: '/review', label: 'Plan review', icon: ChecklistIcon, phase: 'P7' },
+      { path: '/plans', label: 'Plan review', icon: ChecklistIcon },
       { path: '/suggestions', label: 'Suggestions', icon: AutoAwesomeIcon, phase: 'P9' },
     ],
   },

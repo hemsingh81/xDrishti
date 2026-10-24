@@ -33,7 +33,7 @@ describe('Search or jump to', () => {
     expect(within(dialog).getByRole('combobox', { name: 'Search or jump to' })).toBeInTheDocument();
     expect(within(dialog).getByRole('group', { name: 'Pages' })).toBeInTheDocument();
     expect(within(dialog).getByRole('group', { name: 'Actions' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('option', { name: /^Plan review.*coming in P7/ })).toBeInTheDocument();
+    expect(within(dialog).getByRole('option', { name: /^Plan review/ })).not.toHaveTextContent(/coming in/);
     expect(within(dialog).getByRole('option', { name: /Toggle dark mode/ })).toBeInTheDocument();
     // Portfolio is a real screen now: no "coming in" hint.
     expect(within(dialog).getByRole('option', { name: /^Portfolio/ })).not.toHaveTextContent(/coming in/);

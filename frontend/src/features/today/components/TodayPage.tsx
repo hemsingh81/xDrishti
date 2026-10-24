@@ -1,7 +1,8 @@
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import WbSunnyIcon from '@mui/icons-material/WbSunnyOutlined';
-import { Button, Card, CardContent, Stack, Typography } from '@mui/material';
+import { Box, Button, Card, CardContent, Stack, Typography } from '@mui/material';
 import { Link as RouterLink } from 'react-router';
+import { PlanTile } from '@/features/plans';
 import { useSystemStatus } from '@/features/system-status';
 import { PageHeader, StatusChip } from '@/shared/ui';
 
@@ -37,6 +38,9 @@ export function TodayPage() {
           </Stack>
         </CardContent>
       </Card>
+      <Box sx={{ mt: 2 }}>
+        <PlanTile />
+      </Box>
     </>
   );
 }
