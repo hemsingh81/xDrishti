@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # All quality gates — must pass before every commit (Definition of Done, docs/engineering).
 #   backend: format check, build (warnings = errors), unit + architecture + integration tests, proxy config
-#   frontend: type check, lint, format check, tests, production build
+#   frontend: type check, lint, format check, tests, production build, bundle guard
 set -euo pipefail
 source "$(dirname "$0")/_env.sh"
 
@@ -25,6 +25,8 @@ say "Frontend: typecheck, lint, format, tests"
 npm run check
 say "Frontend: build"
 npm run build >/dev/null
+say "Frontend: bundle guard (first-load JavaScript <= 200 KB gzip)"
+npm run size --silent
 
 # Record this green run so the Stop hook knows the current changes were verified.
 "$ROOT/scripts/_fingerprint.sh" >"$(git -C "$ROOT" rev-parse --absolute-git-dir)/xd-check-pass"

@@ -57,7 +57,7 @@ export const navigation: NavSection[] = [
   {
     title: 'Research',
     items: [
-      { path: '/learning', label: 'Learning', icon: PsychologyIcon, phase: 'P6' },
+      { path: '/learning', label: 'Learning', icon: PsychologyIcon, phase: 'P8' },
       { path: '/reports', label: 'Reports', icon: BarChartIcon, phase: 'P8' },
       { path: '/lab', label: 'Strategy Lab', icon: ScienceIcon },
     ],
@@ -68,7 +68,7 @@ export const navigation: NavSection[] = [
       { path: '/accounts', label: 'Accounts', icon: PeopleIcon, badge: 'accounts-attention' },
       { path: '/services', label: 'Services', icon: DnsIcon },
       { path: '/settings', label: 'Settings', icon: TuneIcon },
-      { path: '/audit', label: 'Audit log', icon: HistoryIcon, phase: 'P1' },
+      { path: '/audit', label: 'Audit log', icon: HistoryIcon, phase: 'P8' },
       { path: '/system', label: 'System status', icon: MonitorHeartIcon },
     ],
   },

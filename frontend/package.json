@@ -17,6 +17,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:clock": "node scripts/test-clock.mjs",
+    "size": "node scripts/size.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "gen:api": "openapi-typescript ../backend/contracts/XDrishti.Api.json -o src/shared/api/schema.d.ts && node scripts/gen-hub-contract.mjs && node scripts/gen-attention-commands.mjs && prettier --write src/shared/api/schema.d.ts src/shared/realtime/hubContract.generated.ts src/shared/api/attentionCommands.generated.ts",

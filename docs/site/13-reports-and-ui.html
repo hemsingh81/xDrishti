@@ -202,17 +202,29 @@ a page (g t Today, g r Plan review, g p Portfolio, g l Learning …); <strong>?<
 title shows the current screen.</p>
 <h2 id="1c-reports-experience">1c. Reports experience<a class="hash" href="#1c-reports-experience" aria-label="Link to this section">#</a></h2>
 <ul>
-<li><strong>Landing = Overview:</strong> KPI tiles (trades, win rate, expectancy, total R &amp; ₹, profit factor, max drawdown),
+<li><p><strong>Landing = Overview:</strong> KPI tiles (trades, win rate, expectancy, total R &amp; ₹, profit factor, max drawdown),
 <strong>auto-insights</strong> in plain sentences (<a href="15-smart-insights-and-automation.html">doc 15</a> §6), equity &amp; drawdown,
-monthly results, strategy × timeframe heatmap, expectancy by basket, R distribution, win rate by weekday.</li>
-<li><strong>Left-hand catalogue:</strong> Overview · Basket comparison · Strategies · Exit policies · Side &amp; regime · Calendar &amp;
-time · MAE/MFE · Calibration · Instruments · Accounts · Decisions · Pivot builder · Trade list.</li>
-<li><strong>Global filters:</strong> date range with presets, <strong>multi-select baskets</strong>, side, style, account.</li>
-<li><strong>Basket comparison:</strong> choose 2+ baskets → side-by-side KPIs (trades, win rate, expectancy, total R, profit
+monthly results, strategy × timeframe heatmap, expectancy by basket, R distribution, win rate by weekday.</p>
+</li>
+<li><p><strong>Left-hand catalogue:</strong> Overview · Basket comparison · Strategies · Exit policies · Side &amp; regime · Calendar &amp;
+time · MAE/MFE · Calibration · Instruments · Accounts · Decisions · Pivot builder · Trade list.</p>
+</li>
+<li><p><strong>Global filters:</strong> date range with presets, <strong>multi-select baskets</strong>, side, style, account.</p>
+</li>
+<li><p><strong>Basket comparison:</strong> choose 2+ baskets → side-by-side KPIs (trades, win rate, expectancy, total R, profit
 factor, max drawdown, net ₹, best strategy, buy-and-hold return), overlaid cumulative-R curves, expectancy by
-strategy per basket, basket × side and basket × style heatmaps.</li>
-<li><strong>Pivot builder:</strong> any two dimensions (strategy, timeframe, basket, side, style, exit, regime, account,
-instrument, sector, weekday, month, decision) × metric (expectancy, total R, win rate, trades, profit factor).</li>
+strategy per basket, basket × side and basket × style heatmaps.</p>
+</li>
+<li><p><strong>Pivot builder:</strong> any two dimensions (strategy, timeframe, basket, side, style, exit, regime, account,
+instrument, sector, weekday, month, decision) × metric (expectancy, total R, win rate, trades, profit factor).</p>
+</li>
+<li><p><strong>Honest states (P8-01, <a href="../adr/0098-the-analytics-kit-draws-a-non-value-as-a-word-never-a-digit-and-the-first-load-javascript-is-guarded-at-200-kb.html">ADR 0098</a>):</strong>
+every figure on a report or Learning screen is drawn through the shared analytics kit
+(<code>frontend/src/shared/analytics</code>): a value, a provisional value (number plus the word and the reason), or a
+non-value shown as an icon and a word — <em>Insufficient data</em> (with n and the minimum), <em>Not available</em>, <em>Not
+evaluable</em>, <em>No records yet</em>, <em>Loading</em>, <em>Could not load</em> — never as a digit, a zero, a flat chart or the good
+colour. Beside a number sits the evidence (n, data range, gross or net basis, provisional, data used, limits).</p>
+</li>
 </ul>
 <h2 id="1d-responsive-design-all-monitors">1d. Responsive design (all monitors)<a class="hash" href="#1d-responsive-design-all-monitors" aria-label="Link to this section">#</a></h2>
 <table>
@@ -869,7 +881,7 @@ nightly; responses are chart-ready series.</li>
     <a class="prev" href="12-portfolio-monitoring.html"><small>← Previous  [</small>12 · Portfolio monitoring</a>
     <a class="next" href="14-ai-assistant.html"><small>Next  ] →</small>14 · AI assistant</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-24 08:01</footer>
+  <footer class="foot">Generated from <code>docs/13-reports-and-ui.md</code> · 2026-10-24 09:53</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-screens" class="d2">1. Screens</a>
 <a href="#1b-clickable-prototype" class="d2">1b. Clickable prototype</a>

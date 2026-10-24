@@ -1,0 +1,28 @@
+# 0098 — The analytics kit draws a non-value as a word, never a digit, and the first-load JavaScript is guarded at 200 KB
+
+- **Status:** Proposed (spec [P8-01](../specs/P8-01-analytics-kit-and-bundle-guard.md), approved under the owner's standing run instruction of 2026-10-22; built 2026-10-24). Becomes Accepted when the owner has read it.
+- **Date:** 2026-10-24.
+- **Relation to other ADRs:** [0080](0080-the-phase-check-exit-criteria-from-stored-records-and-never-met-on-thin-data.md) and [0097](0097-the-p7-phase-check-ten-consecutive-scheduled-sessions-from-stored-plan-runs-and-never-met-on-fewer.md) (MET / NOT MET / NOT EVALUABLE, never MET on thin data), [0020](0020-portfolio-value-history-benchmark-and-charts.md) and [0021](0021-portfolio-grouping-and-allocation-charts.md) (the lazy chart chunks and their table fallbacks).
+
+## Context
+P8 puts dozens of figures on screen that rest on about 2.1 years of replayed history, often on thin groups, often with an input that does not exist (regime, events, fills, a champion model). The failure to prevent is a layout that makes "no data" look like a result: a zero, a 0 % bar, an empty chart that reads as flat, a green tick on a missing check. P8-00 D3 names six states and says the UI must have one component per state. Separately, `frontend/CLAUDE.md` asks for an initial bundle of at most 200 KB gzip, but nothing enforced it: P8-00 measured the first load (entry plus `modulepreload` chunks) at 195.3 KB, 4.7 KB under the rule.
+
+## Decision
+1. **One type, eight kinds.** `MetricState` is `value`, `provisional`, `insufficient`, `unavailable`, `not_evaluable`, `empty`, `loading`, `error` (the owner's "six honest states" and P8-00 D3 in one vocabulary). Only `value` and `provisional` have a number field; the others cannot be given one. A non-finite number is drawn as `unavailable`. This is the type screens map their server responses onto; the report engine's own state names (P8-05, P8-06) map one to one.
+2. **Every non-value is an icon and a word**, with the reason as text: "Insufficient data" (with the n and the minimum), "Not available", "Not evaluable", "No records yet", "Loading", "Could not load". The icon is decoration; the word is the status. A non-value is never drawn in the `good` colour; `provisional` uses the warning colour; `VerdictChip` makes only MET green, and NOT EVALUABLE is neutral (a missing input never passes, as in the standing rule for automatic approvals).
+3. **Evidence is required, not optional.** `EvidenceBlock` has required `n`, `range` and `basis` (each can say "not reported" / "not stated" / "unknown"); a report that leaves them out does not type-check. The limits and the data used are server strings rendered as text.
+4. **Numbers are formatted in one place**: null-safe (missing prints "n/a"), one locale, India time, signs as text, a figure that rounds to zero has no sign.
+5. **The kit is a shared folder imported by path**, not part of `shared/ui`'s barrel, so the entry chunk does not carry it.
+6. **A bundle guard in `scripts/check.sh`.** After the build, `npm run size` measures the entry script plus every `modulepreload` chunk of `dist/index.html`, gzip level 6, 1 KB = 1000 bytes, and fails above 200,000 bytes, on a missing chunk, or with no entry script. It prints every chunk, the total and the five largest lazy chunks (information only). Per-route budgets are not set yet: they are set with the first route that needs one.
+
+## Consequences
+- A regression in the first load is caught by `scripts/check.sh` the day it happens, with the number. Measured on this branch: 195.2 KB, 4.8 KB to spare; a planted 10,000-character import took it to 203.6 KB and the guard exited 1.
+- The headroom is small. Any P8 code that is imported eagerly spends it; screens must stay lazy routes and the kit must not be added to the `shared/ui` barrel. If the number is ever over, the fix is to lazy-load the biggest eager import, not to raise the budget.
+- The guard measures what `index.html` loads, not what the browser fetches later (fonts, lazy routes, the Monaco editor at 695 KB gzip in the Lab).
+- The tests prove that no state of any kit component prints a digit for a non-value or uses the `good` colour, in both colour modes; they cannot prove a screen uses the kit for every figure. Each P8 screen slice carries a test that feeds the states through the screen (P8-00 criterion 3).
+
+## Alternatives considered
+- **Six kinds as the owner listed them.** Rejected: P8-00 D3's `insufficient` and `empty` are different facts from "not evaluable" (n below the minimum versus a rule that needs more than exists versus no records), and merging them would lose the n and the minimum the owner wants to see.
+- **A number with a "n/a" style flag instead of a type that cannot carry one.** Rejected: a flag can be forgotten; a missing field cannot be rendered.
+- **A size limit in Vite config (`chunkSizeWarningLimit`).** Rejected: it warns per chunk and is 600 KB; the rule is about the sum that loads first.
+- **Measure the raw or brotli size.** Rejected: the rule and all earlier measurements are gzip.
