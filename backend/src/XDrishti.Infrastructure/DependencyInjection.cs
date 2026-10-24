@@ -18,6 +18,7 @@ using XDrishti.Application.Abstractions.Market.Quality;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Platform;
 using XDrishti.Application.Abstractions.Portfolio;
+using XDrishti.Application.Abstractions.Reporting;
 using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Infrastructure.Accounts;
@@ -35,6 +36,7 @@ using XDrishti.Infrastructure.Persistence;
 using XDrishti.Infrastructure.Planning;
 using XDrishti.Infrastructure.Platform;
 using XDrishti.Infrastructure.Portfolio;
+using XDrishti.Infrastructure.Reporting;
 using XDrishti.Infrastructure.Research;
 
 namespace XDrishti.Infrastructure;
@@ -118,6 +120,8 @@ public static class DependencyInjection
         services.AddPortfolio(configuration);
         services.AddScoped<ICostSheetStore, CostSheetStore>(); // the owner's charge sheets over platform.app_settings (spec P3-03f)
         services.AddScoped<IRunStore, RunStore>(); // the result store of the simulation runs (spec P3-10)
+        services.AddScoped<IReportTradeSource, ReportTradeSource>(); // the read side of the reports over the stored runs, a streamed projection (P8-06, ADR 0100)
+        services.AddScoped<IChargeSheetConfirmationSource, ChargeSheetConfirmationStore>(); // the owner's stored confirmation of the charge sheet; the only source of one (P8-06)
         services.AddScoped<IExitSelectionStore, ExitSelectionStore>(); // the exit choices (spec P4-06)
         services.AddScoped<IStrategyStore, StrategyStore>(); // the stored strategies of the lab schema (spec P3-02d)
         services.AddScoped<ILabResultStore, LabResultStore>(); // the results of full tests (spec P5-04)

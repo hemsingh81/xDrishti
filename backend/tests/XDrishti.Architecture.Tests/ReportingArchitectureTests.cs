@@ -80,7 +80,8 @@ public sealed class ReportingArchitectureTests
     /// <summary>Types of the shipped assemblies that carry a request, a query or a command and hold a charge sheet confirmation or a flag named for one.</summary>
     private static List<string> ConfirmationCarriers(Assembly assembly) =>
         [.. assembly.GetTypes()
-            .Where(t => t.Name.EndsWith("Request", StringComparison.Ordinal) || t.Name.EndsWith("Query", StringComparison.Ordinal) || t.Name.EndsWith("Command", StringComparison.Ordinal) || t.Name.EndsWith("Body", StringComparison.Ordinal) || t.Name.EndsWith("Dto", StringComparison.Ordinal))
+            .Where(t => t.Name.EndsWith("Request", StringComparison.Ordinal) || t.Name.EndsWith("Query", StringComparison.Ordinal) || t.Name.EndsWith("Command", StringComparison.Ordinal) || t.Name.EndsWith("Body", StringComparison.Ordinal) || t.Name.EndsWith("Dto", StringComparison.Ordinal)
+                || t.Name.EndsWith("Input", StringComparison.Ordinal) || t.Name.EndsWith("Filters", StringComparison.Ordinal) || t.Name.EndsWith("Params", StringComparison.Ordinal))
             .Where(t => t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Any(p => p.PropertyType.Name == "ChargeSheetConfirmation" || (p.PropertyType == typeof(bool) && NamedForNetConfirmation(p.Name)))
                 || t.GetConstructors().SelectMany(c => c.GetParameters()).Any(p => p.ParameterType.Name == "ChargeSheetConfirmation" || (p.ParameterType == typeof(bool) && NamedForNetConfirmation(p.Name!))))
             .Select(t => t.FullName!)];
@@ -94,6 +95,7 @@ public sealed class ReportingArchitectureTests
         ConfirmationCarriers(typeof(Program).Assembly).ShouldBeEmpty();
         ConfirmationCarriers(typeof(ConfirmationSentinelRequest).Assembly).ShouldContain(typeof(ConfirmationSentinelRequest).FullName);
         ConfirmationCarriers(typeof(FlagSentinelRequest).Assembly).ShouldContain(typeof(FlagSentinelRequest).FullName);
+        ConfirmationCarriers(typeof(InputSentinelInput).Assembly).ShouldContain(typeof(InputSentinelInput).FullName);
     }
 
     [Fact]
@@ -117,3 +119,6 @@ internal sealed record ConfirmationSentinelRequest(XDrishti.Domain.Reporting.Cha
 
 /// <summary>A request that carries a confirmation flag, to prove the rule sees one (nothing else uses it).</summary>
 internal sealed record FlagSentinelRequest(bool NetConfirmed);
+
+/// <summary>A query-string input that carries a confirmation flag, to prove the rule sees the input types of the report endpoints (nothing else uses it).</summary>
+internal sealed record InputSentinelInput(bool ChargeSheetConfirmed);

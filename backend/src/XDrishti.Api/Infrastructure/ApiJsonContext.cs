@@ -40,6 +40,7 @@ using XDrishti.Application.Portfolio.Groups;
 using XDrishti.Application.Portfolio.Income;
 using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
+using XDrishti.Application.Reporting;
 using XDrishti.Domain.Planning;
 using XDrishti.Domain.Portfolio;
 
@@ -91,6 +92,15 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(IReadOnlyList<PlanView>))]
 [JsonSerializable(typeof(PlanRunView))]
 [JsonSerializable(typeof(PlanPhaseCheckView))]
+[JsonSerializable(typeof(RunsView))]
+[JsonSerializable(typeof(SummaryView))]
+[JsonSerializable(typeof(GroupsView))]
+[JsonSerializable(typeof(PivotView))]
+[JsonSerializable(typeof(EquityView))]
+[JsonSerializable(typeof(DistributionView))]
+[JsonSerializable(typeof(InsightsView))]
+[JsonSerializable(typeof(WhatWorksView))]
+[JsonSerializable(typeof(TradesView))]
 [JsonSerializable(typeof(PlanGradeView))]
 [JsonSerializable(typeof(PlanJournalView))]
 [JsonSerializable(typeof(GradeReportData))]

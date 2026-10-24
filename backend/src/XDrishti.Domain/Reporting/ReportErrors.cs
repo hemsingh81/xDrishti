@@ -30,6 +30,12 @@ public static class ReportErrors
     /// <summary>A net report was asked for, but the runs carry no net R.</summary>
     public static Error NetUnavailable() => Error.Validation("reports.net_unavailable", "The runs carry no net R, so no net report can be made.");
 
+    /// <summary>A net report was asked for over a run that was not costed with the sheet the owner confirmed.</summary>
+    public static Error NetSheetMismatch(string runKey, string? runSheet, string confirmedSheet) =>
+        Error.Validation("reports.net_unavailable", runSheet is null
+            ? $"Run '{runKey}' carries no net R, so no net report can be made over it."
+            : $"Run '{runKey}' was costed with charge sheet '{runSheet}', but the owner confirmed sheet '{confirmedSheet}'; a net report needs runs costed with the confirmed sheet.");
+
     /// <summary>A dimension for which no data exists.</summary>
     public static Error DimensionUnavailable(ReportDimension dimension) =>
         Error.Validation("reports.dimension_unavailable", dimension switch

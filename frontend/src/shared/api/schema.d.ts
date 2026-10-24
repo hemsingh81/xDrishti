@@ -2877,6 +2877,159 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/reports/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored simulation runs a report may use, newest first: strategy, universe, window, costed or gross, the style and exit labels and where they come from, closed and open-at-end trades, whether the default run set takes the run (and why not), and whether net figures are possible at all (unavailable with the reason until the owner has confirmed the stored charge sheet). Read only. */
+    get: operations['ListReportRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/summary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The headline figures of the whole report population: trades, win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown, longest loss streak, holding sessions, the shrunk win rate with its credible lower bound. Each figure is a state (value, provisional, insufficient, unavailable, not_evaluable, empty) and carries a number only for a value; the evidence block says what stands behind it. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['GetReportSummary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/groups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The report grouped by the lens, in a fixed order (a value that was not recorded last). A trade in several baskets appears under each, so basket totals are not additive (nonAdditive says so). Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['GetReportGroups'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/pivot': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A pivot of the two dimensions of the lens (rows first) by one figure (metric, snake case, default expectancy_r): every cell of the grid, empty where no trade fell and masked (insufficient, with its count) below the minimum sample, never a zero. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['GetReportPivot'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/equity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The equity curve (running R) and drawdown of each group of the lens, one point per exit date. A group below the minimum sample has no curve, only the reason. At most 40 curves; a lens with more is refused. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['GetReportEquity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/distribution': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The distribution of R of each group of the lens in bins of half an R from -4 R to 6 R with an open bin at each end. A group below the minimum sample has no bins, only the reason. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['GetReportDistribution'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/insights': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The eight auto-insights (best and weakest strategy, basket gap, side bias, best exit, weekday, regime, calibration) as fixed sentences. A figure is stated only when every group compared has at least 15 trades; otherwise the insight says why it states nothing. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['GetReportInsights'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/what-works': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What works, in which basket, on which timeframe, with which exit: the cells (the dimensions of the lens, or basket, strategy, timeframe, side and exit by default) ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and the answer 'nothing has enough evidence yet' when no cell qualifies (a 200, not an error). Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['GetReportWhatWorks'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reports/trades': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A page of the closed trades the report counts, in the order of the exits (limit 1 to 1,000, default 100; cursor from the previous page): the very set the figures were computed from, open-at-end trades excluded. Read only. Takes the one report query: runs (64-hex keys, comma separated; default the newest run of each strategy and universe), basis (gross or net), lens (comma separated dimensions: basket, instrument, strategy, timeframe, side, style, exit, month, weekday; regime and account are refused with the reason), the filters strategy, timeframe, side, style, exit (semicolon separated), basket, symbol, from, to. 422 reports.invalid, 404 reports.not_found, 409 reports.run_overlap or reports.mixed_basis, 422 reports.net_not_confirmed, reports.net_unavailable, reports.dimension_unavailable or reports.double_count. */
+    get: operations['ListReportTrades'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/autonomy/settings': {
     parameters: {
       query?: never;
@@ -4988,6 +5141,58 @@ export interface components {
       /** @description The week already had a digest: that one is shown and nothing was written. */
       repeated: boolean;
     };
+    /** @description One bin of an R distribution: trades with R from LowerR (included) to UpperR (excluded); a null edge is open. */
+    DistributionBinView: {
+      /**
+       * Format: double
+       * @description The lower edge; null for the open bin below the range.
+       */
+      lowerR: null | number;
+      /**
+       * Format: double
+       * @description The upper edge; null for the open bin above the range.
+       */
+      upperR: null | number;
+      /**
+       * Format: int32
+       * @description Trades in the bin.
+       */
+      count: number;
+    };
+    /** @description The R distribution of one group. The bins exist only when MetricView DistributionGroupView.MeanR is a value or provisional; otherwise it holds the reason there are none. */
+    DistributionGroupView: {
+      /** @description The coordinates as text. */
+      key: string;
+      /** @description The coordinates. */
+      parts: components['schemas']['GroupPartView'][];
+      /**
+       * Format: int32
+       * @description Trades in the group.
+       */
+      n: number;
+      /** @description The mean R, or the reason there is no distribution. */
+      meanR: components['schemas']['MetricView'];
+      /** @description The bins in order, the open bin below first and the open bin above last. */
+      bins: components['schemas']['DistributionBinView'][];
+      /** @description The evidence of the group. */
+      evidence: components['schemas']['GroupEvidenceView'];
+    };
+    /** @description The R distributions of a report for a lens, one per group, with the evidence of the report. */
+    DistributionView: {
+      /**
+       * Format: double
+       * @description The width of a bin in R.
+       */
+      binWidthR: number;
+      /** @description The dimensions grouped by. */
+      dimensions: string[];
+      /** @description A trade is in more than one group. */
+      nonAdditive: boolean;
+      /** @description The distributions. */
+      groups: components['schemas']['DistributionGroupView'][];
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
+    };
     /** @description A row that cannot be imported: the line of the file it starts on and why. */
     DividendBadRow: {
       /** Format: int32 */
@@ -5378,6 +5583,58 @@ export interface components {
       status: string;
       trigger: string;
       message: null | string;
+    };
+    /** @description One point of an equity curve: the running R after the exits of a date and its fall from the running peak. */
+    EquityPointView: {
+      /**
+       * Format: date
+       * @description The India date of the exits.
+       */
+      date: string;
+      /**
+       * Format: double
+       * @description The running R.
+       */
+      cumulativeR: number;
+      /**
+       * Format: double
+       * @description The running peak minus the running R.
+       */
+      drawdownR: number;
+      /**
+       * Format: int32
+       * @description Trades that exited on the date.
+       */
+      trades: number;
+    };
+    /** @description The equity curve of one group. The points exist only when MetricView EquitySeriesView.TotalR is a value or provisional; a group below the minimum sample has no curve, so no flat line can be drawn for it. */
+    EquitySeriesView: {
+      /** @description The coordinates as text. */
+      key: string;
+      /** @description The coordinates. */
+      parts: components['schemas']['GroupPartView'][];
+      /**
+       * Format: int32
+       * @description Trades in the group.
+       */
+      n: number;
+      /** @description The final running R, or the reason there is no curve. */
+      totalR: components['schemas']['MetricView'];
+      /** @description One point per exit date. */
+      points: components['schemas']['EquityPointView'][];
+      /** @description The evidence of the group. */
+      evidence: components['schemas']['GroupEvidenceView'];
+    };
+    /** @description The equity curves of a report for a lens, one per group, with the evidence of the report. At most int EquityView.MaxSeries groups are drawn; a lens with more is refused rather than cut silently. */
+    EquityView: {
+      /** @description The dimensions grouped by. */
+      dimensions: string[];
+      /** @description A trade is in more than one curve. */
+      nonAdditive: boolean;
+      /** @description The curves. */
+      series: components['schemas']['EquitySeriesView'][];
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
     };
     /** @description The out-of-sample numbers a verdict was judged on. A number that is not finite (an infinite profit factor) is null; the reason of its gate says it in words. */
     EvidenceView: {
@@ -5808,12 +6065,97 @@ export interface components {
       /** @description The sample-size note. */
       note: string;
     };
+    /** @description What stands behind the figures of one group: its trades, the dates they span, whether any contributing run is provisional and which runs they came from. */
+    GroupEvidenceView: {
+      /**
+       * Format: int32
+       * @description Trades in the group.
+       */
+      n: number;
+      /**
+       * Format: date
+       * @description Earliest entry date; null without a trade.
+       */
+      firstDate: null | string;
+      /**
+       * Format: date
+       * @description Latest exit date; null without a trade.
+       */
+      lastDate: null | string;
+      /** @description A contributing run is marked provisional. */
+      provisional: boolean;
+      /** @description The runs behind the trades, sorted. */
+      runKeys: string[];
+    };
     /** @description The value of the holdings of a group that fall in one part of the second dimension (an account for sectors, a sector for accounts); the parts sum to the group's value. */
     GroupPart: {
       key: string;
       name: string;
       /** Format: double */
       value: number;
+    };
+    /** @description One coordinate of a group: the dimension (lower case) and its value; a null value is "not recorded". */
+    GroupPartView: {
+      /** @description The dimension name. */
+      dimension: string;
+      /** @description The value; null when the run or trade did not record it. */
+      value: null | string;
+    };
+    /** @description One group of a report on the wire: who it is, its trade count and every figure as a MetricView (a number only for value or provisional), with the evidence of the group. */
+    GroupView: {
+      /** @description The coordinates as text, `strategy=ORB|side=BUY`; `all` for the whole population. */
+      key: string;
+      /** @description The coordinates. */
+      parts: components['schemas']['GroupPartView'][];
+      /**
+       * Format: int32
+       * @description Trades in the group.
+       */
+      n: number;
+      /**
+       * Format: int32
+       * @description Trades with R above 0.
+       */
+      wins: number;
+      /** @description Wins over trades. */
+      winRate: components['schemas']['MetricView'];
+      /** @description Mean R of the winners. */
+      avgWinR: components['schemas']['MetricView'];
+      /** @description Mean R of the losers. */
+      avgLossR: components['schemas']['MetricView'];
+      /** @description Mean R per trade. */
+      expectancyR: components['schemas']['MetricView'];
+      /** @description Winning R over absolute losing R. */
+      profitFactor: components['schemas']['MetricView'];
+      /** @description Sum of R. */
+      totalR: components['schemas']['MetricView'];
+      /** @description Largest peak-to-trough fall of the running R. */
+      maxDrawdownR: components['schemas']['MetricView'];
+      /** @description Most losing trades in a row. */
+      longestLossStreak: components['schemas']['MetricView'];
+      /** @description Mean sessions held. */
+      avgHoldingSessions: components['schemas']['MetricView'];
+      /** @description The win rate shrunk toward its parent group. */
+      shrunkWinRate: components['schemas']['MetricView'];
+      /** @description Lower end of the credible interval of the shrunk win rate. */
+      winRateLower: components['schemas']['MetricView'];
+      /** @description Expectancy from the shrunk win rate and payoffs. */
+      shrunkExpectancyR: components['schemas']['MetricView'];
+      /** @description Expectancy from the lower credible win rate and the shrunk payoffs: the ranking figure. */
+      expectancyLowerR: components['schemas']['MetricView'];
+      /** @description The evidence of the group. */
+      evidence: components['schemas']['GroupEvidenceView'];
+    };
+    /** @description The groups of a report for a lens, in a fixed order (a value that was not recorded last), with the evidence of the report. bool GroupsView.NonAdditive is true when the basket dimension put a trade into more than one group, so the groups must not be summed. */
+    GroupsView: {
+      /** @description The dimensions grouped by, in order. */
+      dimensions: string[];
+      /** @description A trade appears in more than one group. */
+      nonAdditive: boolean;
+      /** @description The groups. */
+      groups: components['schemas']['GroupView'][];
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
     };
     /**
      * @description The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has
@@ -6363,6 +6705,24 @@ export interface components {
       tradeChargesFrom: null | string;
       /** Format: date */
       ledgerChargesFrom: null | string;
+    };
+    /** @description One auto-insight (doc 15 section 6): a fixed-template sentence. string InsightView.State is `value` when the sentence states something; otherwise the text says why it states nothing and carries no figure. */
+    InsightView: {
+      /** @description The rule: best_strategy, weakest_strategy, basket_gap, side_bias, best_exit, weekday, regime or calibration. */
+      kind: string;
+      /** @description value, insufficient, unavailable or not_evaluable. */
+      state: string;
+      /** @description The sentence. */
+      text: string;
+      /** @description The keys of the cells the figures were read from. */
+      cells: string[];
+    };
+    /** @description The eight auto-insights, always in the same order, with the evidence of the report. */
+    InsightsView: {
+      /** @description The insights. */
+      insights: components['schemas']['InsightView'][];
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
     };
     /**
      * @description The latest bars of an instrument and timeframe, newest first. `adjustment` is set only when the read asked for adjusted prices (`adjusted=true`): the bars then have the open, high, low and close multiplied by
@@ -7042,6 +7402,18 @@ export interface components {
     MembersOrderInput: {
       instrumentIds: null | string[];
     };
+    /** @description One reported figure on the wire (P8-00 D3): a state and, only for `value` and `provisional`, a number. For every other state (`insufficient`, `unavailable`, `not_evaluable`, `empty`) the number is absent and the reason says why; a screen draws a word, never a digit. */
+    MetricView: {
+      /** @description One of value, provisional, insufficient, unavailable, not_evaluable, empty. */
+      state: string;
+      /**
+       * Format: double
+       * @description The number; null unless the state is value or provisional.
+       */
+      number: null | number;
+      /** @description Why the figure is not a plain value; null for a value. */
+      reason: null | string;
+    };
     /** @description A missing minute: the India date and the minute (`HH:mm`). */
     MissingMinute: {
       /** Format: date */
@@ -7198,6 +7570,15 @@ export interface components {
       /** Format: int32 */
       new: number;
     };
+    /** @description Whether a net report can be made at all (P8-00 question 19): `value` when the owner's stored confirmation of the charge sheet exists, otherwise `unavailable` with the reason. The confirmation is read from storage; a request cannot supply it. */
+    NetBasisView: {
+      /** @description value or unavailable. */
+      state: string;
+      /** @description Why net figures are unavailable; null when they are not. */
+      reason: null | string;
+      /** @description What the owner confirmed, as text; null when nothing is confirmed. */
+      confirmed: null | string;
+    };
     /** @description The comparison of the derived daily bar with the broker's official daily candle: not available until official daily candles are fetched. */
     OfficialDailyCheck: {
       status: string;
@@ -7305,6 +7686,39 @@ export interface components {
       effect: string;
       /** @description True when the pipeline cannot publish real tickets without it. */
       needed: boolean;
+    };
+    /** @description One cell of a pivot: the trade count and one figure. A cell with no trade is `empty`, a cell below the minimum is `insufficient` (masked, with its count), never a zero. */
+    PivotCellView: {
+      /** @description The row value; null when not recorded. */
+      row: null | string;
+      /** @description The column value; null when not recorded. */
+      column: null | string;
+      /**
+       * Format: int32
+       * @description Trades in the cell.
+       */
+      n: number;
+      /** @description The figure. */
+      value: components['schemas']['MetricView'];
+    };
+    /** @description A pivot of two dimensions by one figure: the row and column values and every cell of the grid, row by row, empty cells included so no gap reads as a zero. */
+    PivotView: {
+      /** @description The dimension of the rows. */
+      rowDimension: string;
+      /** @description The dimension of the columns. */
+      columnDimension: string;
+      /** @description The figure shown (snake case). */
+      metric: string;
+      /** @description The row values, sorted; null is "not recorded" (last). */
+      rows: string[];
+      /** @description The column values, sorted. */
+      columns: string[];
+      /** @description The cells, row by row. */
+      cells: components['schemas']['PivotCellView'][];
+      /** @description A trade appears in more than one cell. */
+      nonAdditive: boolean;
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
     };
     /** @description Size for one account. */
     PlanAllocationView: {
@@ -8242,6 +8656,18 @@ export interface components {
        */
       quantity: number;
     };
+    /** @description A cell with enough sample in its place in the ranking by the credible lower bound of expectancy. */
+    RankedCellView: {
+      /**
+       * Format: int32
+       * @description 1 for the best.
+       */
+      rank: number;
+      /** @description The cell. */
+      group: components['schemas']['GroupView'];
+      /** @description The lower bound of expectancy is above 0: the only reading of "works" the engine allows. */
+      lowerBoundPositive: boolean;
+    };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
       /** Format: uuid */
@@ -8316,6 +8742,53 @@ export interface components {
       notMembers: number;
       /** Format: int32 */
       memberCount: number;
+    };
+    /**
+     * @description The evidence block every report carries (P8-00 D1): the basis, the population, the date range, what is not available and why, the runs behind the numbers (the "Data used" panel) and the honest limits as fields. A screen renders these; none of this wording
+     *     is page prose.
+     */
+    ReportEvidenceView: {
+      /** @description gross or net R. */
+      basis: string;
+      /**
+       * Format: int32
+       * @description Trades in the population.
+       */
+      n: number;
+      /**
+       * Format: date
+       * @description Earliest entry date; null without a trade.
+       */
+      firstDate: null | string;
+      /**
+       * Format: date
+       * @description Latest exit date; null without a trade.
+       */
+      lastDate: null | string;
+      /** @description A contributing run is marked provisional. */
+      provisional: boolean;
+      /** @description The runs behind the numbers, sorted. */
+      runKeys: string[];
+      /** @description The same runs with their facts (the Data used panel). */
+      runs: components['schemas']['RunUsedView'][];
+      /** @description The run set was not named by the caller: the newest run of each strategy and universe. */
+      defaultRunSet: boolean;
+      /** @description The limits that always apply, as text. */
+      limits: string[];
+      /** @description Inputs a figure would need that do not exist, each with the reason. */
+      unavailableInputs: string[];
+      /**
+       * Format: int32
+       * @description Identical repeated records of one trade in one run, counted once.
+       */
+      duplicateTradesDropped: number;
+      /**
+       * Format: int32
+       * @description Trades still open at the end of the data in the runs used, which no report counts.
+       */
+      openAtEndLeftOut: number;
+      /** @description What the owner confirmed, for a net report; null for a gross one. */
+      netBasisConfirmation: null | string;
     };
     /** @description The headline figures of the out-of-sample evidence; a figure that is not finite is null. */
     ReportKpisView: {
@@ -8588,6 +9061,106 @@ export interface components {
       data: components['schemas']['DataRoleView'];
       trading: components['schemas']['TradingRoleView'];
       portfolio: components['schemas']['PortfolioRoleView'];
+    };
+    /** @description A stored run a report may use, with whether the default run set takes it and, if not, why. */
+    RunListItemView: {
+      /** @description The stored run key. */
+      runKey: string;
+      /** @description The strategy. */
+      strategyId: string;
+      /** @description How the universe was chosen (instrumentlist or basket). */
+      universeKind: string;
+      /** @description What the universe is, as stored. */
+      universeLabel: string;
+      /**
+       * Format: date
+       * @description First India date of the run window.
+       */
+      windowStart: string;
+      /**
+       * Format: date
+       * @description Last India date of the run window.
+       */
+      windowEnd: string;
+      /** @description The run carries net R. */
+      costed: boolean;
+      /** @description The charge sheet id; null for a gross run. */
+      costsSheetId: null | string;
+      /** @description The style of the stored strategy; null when not recorded. */
+      style: null | string;
+      /** @description Where the style comes from; null when not recorded. */
+      styleSource: null | string;
+      /** @description The exit candidate of the stored comparison the run belongs to; null when not recorded. */
+      exit: null | string;
+      /** @description Where the exit comes from; null when not recorded. */
+      exitSource: null | string;
+      /**
+       * Format: int32
+       * @description Closed trades the run holds.
+       */
+      closedTrades: number;
+      /**
+       * Format: int32
+       * @description Trades still open at the end of the data, never counted.
+       */
+      openAtEnd: number;
+      /** @description A net report over this run is possible: it was costed with the very charge sheet the owner confirmed. */
+      netPossible: boolean;
+      /** @description The default run set takes this run. */
+      inDefaultSet: boolean;
+      /** @description Why the default set leaves the run out; null when it takes it. */
+      defaultSetNote: null | string;
+      /**
+       * Format: date-time
+       * @description When the run was stored.
+       */
+      createdAt: string;
+    };
+    /** @description One run in the "Data used" panel of a report (P8-00 D2): the run key, what it replayed, its window, whether it was costed and the labels a report took from it. */
+    RunUsedView: {
+      /** @description The stored run key. */
+      runKey: string;
+      /** @description The strategy. */
+      strategyId: string;
+      /** @description How the universe was chosen and what it is. */
+      universe: string;
+      /**
+       * Format: date
+       * @description First India date of the run window.
+       */
+      windowStart: string;
+      /**
+       * Format: date
+       * @description Last India date of the run window.
+       */
+      windowEnd: string;
+      /** @description The run carries net R. */
+      costed: boolean;
+      /** @description The charge sheet id; null for a gross run. */
+      costsSheetId: null | string;
+      /** @description The style label; null when not recorded. */
+      style: null | string;
+      /** @description The exit label; null when not recorded. */
+      exit: null | string;
+      /**
+       * Format: int32
+       * @description Closed trades the run holds (before the filters of the query).
+       */
+      closedTrades: number;
+      /**
+       * Format: int32
+       * @description Trades still open at the end of the data, left out of every report.
+       */
+      openAtEnd: number;
+    };
+    /** @description The stored runs a report may use, newest first, and whether net figures are possible (P8-06). With no stored run the list is empty, which is an ordinary answer. */
+    RunsView: {
+      /** @description The runs. */
+      runs: components['schemas']['RunListItemView'][];
+      /** @description Whether a net report can be made. */
+      net: components['schemas']['NetBasisView'];
+      /** @description How the default run set is chosen, as text. */
+      defaultSetRule: string;
     };
     /** @description Bar sanity: low ≤ open and close ≤ high, prices positive and finite, volume not negative. `examples` holds the first few bad bars. */
     SanityCheck: {
@@ -9043,6 +9616,13 @@ export interface components {
       /** @description Whether the owner marked it seen. */
       seen: boolean;
     };
+    /** @description The headline figures of the whole population (the KPIs of doc 13 section 2) with the evidence of the report. A population below the minimum sample has no figure, only the count and the reason. */
+    SummaryView: {
+      /** @description The whole population as one group. */
+      all: components['schemas']['GroupView'];
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
+    };
     /** @description One run of the sweep (the base has an empty `Param`): the figures of a plain run of one exit, or the reason the engine refused it. In-sample. */
     SweepPointView: {
       param: string;
@@ -9353,6 +9933,49 @@ export interface components {
       lotsReplaced: number;
       report: components['schemas']['TradePreviewReport'];
     };
+    /** @description One closed trade of a report: what it was, when, and its R on the basis of the report (gross or net). */
+    TradeLineView: {
+      /** @description The run it came from. */
+      runKey: string;
+      /** @description The stored signal key. */
+      tradeKey: string;
+      /** @description The strategy id. */
+      strategy: string;
+      /** @description The timeframe code. */
+      timeframe: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /** @description The symbol. */
+      symbol: string;
+      /** @description The baskets the instrument was in when the run was made; empty when not recorded. */
+      basketIds: string[];
+      /**
+       * Format: date
+       * @description India date of the entry.
+       */
+      entryDate: string;
+      /**
+       * Format: date
+       * @description India date of the exit.
+       */
+      exitDate: string;
+      /**
+       * Format: double
+       * @description R on the basis of the report.
+       */
+      r: number;
+      /**
+       * Format: int32
+       * @description Sessions held, both ends included.
+       */
+      sessionsHeld: number;
+      /** @description The run's style label; null when not recorded. */
+      style: null | string;
+      /** @description The run's exit label; null when not recorded. */
+      exit: null | string;
+      /** @description The run is marked provisional. */
+      provisional: boolean;
+    };
     /** @description A holding (or security) that an undo could not rebuild: its `Symbol`, the `HoldingId` when it is a single holding, and the `Reason` — `ambiguous` or the mismatch (`negative_opening`, `sell_exceeds_open`, `fractional_after_adjustment`). */
     TradeNotRebuilt: {
       symbol: string;
@@ -9525,6 +10148,20 @@ export interface components {
       voidedAt: null | string;
       voidedBy: null | string;
     };
+    /** @description A page of the closed trades a report counts, in the order of the exits, with the evidence of the report. Never more than one page: the largest page is 1,000 trades. */
+    TradesView: {
+      /** @description The trades of the page. */
+      items: components['schemas']['TradeLineView'][];
+      /**
+       * Format: int32
+       * @description All trades the report counts.
+       */
+      total: number;
+      /** @description The cursor of the next page; null at the end. */
+      nextCursor: null | string;
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
+    };
     /** @description The complete trading configuration (a replacement, not a patch); whether the role is on is changed with the roles. Mode is "paper" (default) or "manual_live"; CapitalSource is "fixed" (default) or "broker_funds"; Styles holds "intraday" and/or "swing"; allowed instruments: intraday EQ_MIS and FUT, swing buy EQ_CNC and FUT, swing sell FUT. */
     TradingInput: {
       mode: null | string;
@@ -9595,6 +10232,13 @@ export interface components {
       term: string;
       reason: string;
     };
+    /** @description A cell that was looked at and is not in the ranking, listed after the ranked ones with the reason, never hidden. */
+    UnrankedCellView: {
+      /** @description The cell (its figures are non-values; only its count is a number). */
+      group: components['schemas']['GroupView'];
+      /** @description Why it is not ranked. */
+      reason: string;
+    };
     /** @description What an untrack call did: `untracked` were tracked, `notTracked` were not (nothing to do). `totalTracked` is the number tracked now. */
     UntrackResult: {
       /** Format: int32 */
@@ -9653,6 +10297,65 @@ export interface components {
       note: null | string;
       /** Format: date-time */
       createdAt: string;
+    };
+    /**
+     * @description "What works, in which basket, on which timeframe, with which exit": the cells with enough sample ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and when no cell qualifies the answer
+     *     `nothing_qualifies` with the counts. An answer, not an error.
+     */
+    WhatWorksView: {
+      /** @description ranked or nothing_qualifies. */
+      kind: string;
+      /** @description The dimensions a cell is made of. */
+      dimensions: string[];
+      /** @description Cells with enough sample whose lower bound could be formed, best first. */
+      ranked: components['schemas']['RankedCellView'][];
+      /** @description Every other cell, most trades first. */
+      notRanked: components['schemas']['UnrankedCellView'][];
+      /**
+       * Format: int32
+       * @description All cells.
+       */
+      cellsLookedAt: number;
+      /**
+       * Format: int32
+       * @description Cells that compete: every coordinate recorded and the base minimum of trades.
+       */
+      cellsComparable: number;
+      /**
+       * Format: int32
+       * @description The base minimum sample.
+       */
+      minTrades: number;
+      /**
+       * Format: int32
+       * @description The sample a cell needs to be ranked, raised with the number of cells compared.
+       */
+      requiredTrades: number;
+      /**
+       * Format: int32
+       * @description The most trades in any cell.
+       */
+      largestN: number;
+      /**
+       * Format: int32
+       * @description Ranked cells with a positive lower bound.
+       */
+      positiveLowerBound: number;
+      /**
+       * Format: double
+       * @description About how many positive lower bounds chance alone gives among the ranked cells.
+       */
+      expectedChancePositives: number;
+      /** @description The answer in one sentence. */
+      headline: string;
+      /** @description The selection-effect sentence that always accompanies a ranking. */
+      selectionNote: string;
+      /** @description Dimensions left out of the cells because nothing recorded them, with the reason. */
+      unavailableDimensions: string[];
+      /** @description A trade is in more than one cell. */
+      nonAdditive: boolean;
+      /** @description The evidence of the report. */
+      evidence: components['schemas']['ReportEvidenceView'];
     };
     /** @description The out-of-sample trades of one calendar year. */
     YearView: {
@@ -16606,6 +17309,530 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PlanPhaseCheckView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListReportRuns: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RunsView'];
+        };
+      };
+    };
+  };
+  GetReportSummary: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SummaryView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportGroups: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupsView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportPivot: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PivotView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportEquity: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EquityView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportDistribution: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DistributionView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportInsights: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['InsightsView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetReportWhatWorks: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WhatWorksView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListReportTrades: {
+    parameters: {
+      query?: {
+        runs?: string;
+        basis?: string;
+        lens?: string;
+        strategy?: string;
+        timeframe?: string;
+        side?: string;
+        style?: string;
+        exit?: string;
+        basket?: string;
+        symbol?: string;
+        from?: string;
+        to?: string;
+        metric?: string;
+        limit?: number;
+        cursor?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TradesView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
       /** @description Unprocessable Entity */

@@ -48,6 +48,7 @@ using XDrishti.Application.Portfolio.Quotes;
 using XDrishti.Application.Portfolio.Refresh;
 using XDrishti.Application.Portfolio.Reports;
 using XDrishti.Application.Portfolio.Trades;
+using XDrishti.Application.Reporting;
 using XDrishti.Application.Research;
 using XDrishti.Application.Research.CostSheets;
 using XDrishti.Application.Selection;
@@ -86,6 +87,7 @@ public static class DependencyInjection
         services.AddMarket();
         services.AddPortfolio();
         services.AddResearch();
+        services.AddReporting();
         services.AddLab();
 
         return services;
@@ -403,6 +405,21 @@ public static class DependencyInjection
 
         // The refresh loop is a singleton: the API's hosted service runs it for the lifetime of the process.
         services.AddSingleton<PortfolioRefreshRunner>();
+    }
+
+    /// <summary>The report read endpoints over the stored runs (P8-06, ADR 0100): read only, the numbers come from the pure engine in the Domain.</summary>
+    private static void AddReporting(this IServiceCollection services)
+    {
+        services.AddScoped<ReportLoader>();
+        services.AddScoped<IQueryHandler<ListReportRunsQuery, Result<RunsView>>, ListReportRunsHandler>();
+        services.AddScoped<IQueryHandler<GetReportSummaryQuery, Result<SummaryView>>, GetReportSummaryHandler>();
+        services.AddScoped<IQueryHandler<GetReportGroupsQuery, Result<GroupsView>>, GetReportGroupsHandler>();
+        services.AddScoped<IQueryHandler<GetReportPivotQuery, Result<PivotView>>, GetReportPivotHandler>();
+        services.AddScoped<IQueryHandler<GetReportEquityQuery, Result<EquityView>>, GetReportEquityHandler>();
+        services.AddScoped<IQueryHandler<GetReportDistributionQuery, Result<DistributionView>>, GetReportDistributionHandler>();
+        services.AddScoped<IQueryHandler<GetReportInsightsQuery, Result<InsightsView>>, GetReportInsightsHandler>();
+        services.AddScoped<IQueryHandler<GetReportWhatWorksQuery, Result<WhatWorksView>>, GetReportWhatWorksHandler>();
+        services.AddScoped<IQueryHandler<PageReportTradesQuery, Result<TradesView>>, PageReportTradesHandler>();
     }
 
     /// <summary>The Lab API (P5-01, ADR 0057): validate, store and read strategy texts.</summary>
