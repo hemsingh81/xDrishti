@@ -1,0 +1,60 @@
+# P8-05 — Report engine core (pure)
+
+- **Status:** Approved (under the owner's standing run instruction of 2026-10-22; every open question of P8-00 that this slice touches, Q10, Q11, Q12, Q13 and Q19, taken as recommended; none of the SAFETY questions Q1 to Q8 is touched). Built 2026-10-24.
+- **Phase / roadmap row:** P8 — Reports & UI, slice P8-05 of [P8-00](P8-00-reports-and-ui-plan.md), 4 d
+- **Design refs:** docs/design/13-reports-and-ui.md §1c, §2 (standard KPIs, R3, R4, R20, R27, R28) · docs/design/15-smart-insights-and-automation.md §6 (auto-insights, minimum 15 trades) · docs/design/09-learning-engine.md layer 1 · docs/design/11 (research and the result store) · ADR 0045 (result store), 0053/0054 (exit comparison and choice), 0064 (cell statistics), 0067 (validation honesty) · ADR 0099
+
+## Assumptions (taken as recommended; none is a safety item)
+1. **Read only and pure.** This slice adds a Domain namespace and tests. No endpoint, no table, no migration, no CLI verb, no export, no write of any kind; nothing here can start a job or touch an order. If the slice needed an HTTP write, an export or any non-read behaviour it would stop; it does not.
+2. **Q10: "nothing has enough evidence yet" is an answer**, not an error. The engine returns it as a typed answer with the counts.
+3. **Q11: the population rule is enforced in the engine.** A report is computed over an explicit set of stored runs. Refused: two runs of one strategy, universe, overlapping window and the same style and exit; one signal (stored trade key and timeframe) in two runs under the same labels; runs with and without charges in one set. Identical repeated records of one trade in one run are kept once and counted in the evidence. The same signal under different exit or style labels (an exit comparison) is allowed, but then every grouping must split by the label that differs, otherwise it is refused (`reports.double_count`), so no signal is added once per label.
+4. **Q12: no composite score.** Nothing in the namespace is a health, quality or discipline score; an architecture test fails on such a name. The parts that exist are shown, each with its n and state.
+5. **Q13: basket membership is the one stored with the trade (as of the run).** A trade in several baskets appears under each; the grouping says `NonAdditive`.
+6. **Q19: no report is labelled net until the owner confirms the charge sheet.** `ReportOptions.Basis` defaults to gross; a net request without `NetBasisConfirmed` is refused (`reports.net_not_confirmed`). Gross over costed runs uses the filled-price R.
+7. **Exit and style are labels of the run**, not trade columns (ADR 0045, 0064): a run that carries none gives the not-recorded value, a group by that dimension is `Unavailable` with the run named, and "what works" leaves a dimension out of its default cell when no run or trade records it, and says so.
+8. **"Six states"** are `Value`, `Provisional`, `Insufficient`, `Unavailable`, `NotEvaluable`, `Empty` (P8-00 D3 lists five and the plan calls the set six; the sixth is the explicit provisional flag the slice brief asks for). Only the first two carry a number. A "not applicable" case (profit factor with no loss) is `NotEvaluable`, a missing input is `Unavailable`.
+9. **The ranking figure.** The cell statistics of P6-01 give credible bounds for the win rate only. The ranking uses the expectancy built from the lower credible win rate and the cell's mean win and mean non-win: `p_lower x avgWin + (1 - p_lower) x avgNonWin`. It reflects the uncertainty of the win rate only, not of the size of wins and losses; this is stated in the limits of every report and in ADR 0099. A cell with no win or no non-win has no such figure (`NotEvaluable`) and is listed, not ranked.
+10. **Trades weigh 1.** A report describes the whole stored history; the P6 recency weights are not used. The shrinkage code is the P6-01 code (extracted, not copied), so a cell with weights of 1 gives the same numbers as the calculator, which a test pins.
+11. **Not in this slice** (listed in P8-00 row P8-05, built when a screen needs them): equity and drawdown series, R distribution histogram bins, calendar heat-grid layout beyond the month and weekday dimensions, net ₹, Sharpe and Sortino, exposure. They need the trade quantity, charges in rupees or a calendar, which the trade record of a report does not carry yet. They are `unavailable`, not zero, in any later report until built.
+
+## Goal
+One pure engine that, from stored simulated trades and the runs they came from, gives the numbers of "what works, in which basket, on which timeframe, with which exit": groups on any subset of dimensions, a two-dimension pivot, a ranking by the credible lower bound with an honest "nothing has enough evidence yet", rule-based insight sentences, and an evidence block on everything, with the population rule and the six states built in so a flattering or double-counted number cannot be produced.
+
+## Scope
+**In:** `Domain/Reporting` (population rule, KPIs per group, shrunk estimates and bounds through the P6-01 maths, evidence, group-by, pivot, ranking, insights, typed refusals with the `reports.*` codes), the extraction of the Beta shrinkage out of `CellStatsCalculator` into an internal `BetaShrinkage` used by both, the architecture allow-list entry and the purity and no-score architecture tests, unit and property tests, the ADR, the roadmap row.
+**Out (not in this slice):** the reader port and endpoints over `research.sim_runs` / `sim_trades` (P8-06), basket buy-and-hold (P8-07), screens, exports, the series and bins listed in assumption 11, regime and account dimensions (named so a request gets a typed refusal with the reason), any change to a stored record.
+
+## Acceptance criteria
+1. Each KPI of a group (win rate, average win and loss R, expectancy, profit factor, total R, maximum drawdown in R, longest loss streak, average holding sessions) equals a hand table, in the order of the exits and not of the input. *`ReportMetricsTests`.*
+2. The shrunk win rate, its prior, its credible lower bound, the expectancy, profit factor, drawdown and averages equal `CellStatsCalculator` on the same trades (weights 1); with prior strength 0 the shrunk expectancy equals the plain one. *`ReportMetricsTests`.*
+3. Below the minimum sample (30 by default) no figure of a group is a number: each is `Insufficient` with the count and the reason; at the minimum they are values. *`ReportMetricsTests`.*
+4. A group by a label no run recorded is `Unavailable` naming the run; a profit factor with no loss is `NotEvaluable`; a pivot cell with no trade is `Empty`; a run marked provisional makes figures `Provisional` and the evidence says so; a non-finite result is `NotEvaluable`. A property over seeded random populations: a metric has a number if and only if its state is `Value` or `Provisional`, and every number is finite. *`ReportMetricsTests`, `ReportPropertyTests`.*
+5. Group-by works on every dimension (basket, instrument, strategy, timeframe, side, style, exit, month, weekday) alone and in any combination, in a fixed order (weekdays in calendar order, not-recorded last); the empty list is the whole population; a trade in several baskets is under each and the grouping is `NonAdditive`; regime and account are refused with the reason. *`ReportGroupingTests`.*
+6. A pivot of two different dimensions lays out every row and column with empty and masked cells, never a zero for a gap. *`ReportGroupingTests`, `ReportPropertyTests`.*
+7. The population rule: overlapping runs are refused; non-overlapping windows and different strategies are allowed; identical repeats are deduplicated and counted; a repeat with different values is refused; a signal in two runs under the same labels is refused; gross and net runs are never mixed; a net report is refused unless confirmed and needs net R; an unknown run is refused; the same signal under two exits needs the grouping to split by exit and each exit is shrunk toward its own pool. The refusal does not depend on the input order. *`ReportPopulationRuleTests`.*
+8. A trade is counted once: for every grouping not by basket the group counts sum to the number of trades, by basket to the sum of max(1, baskets); duplicating every input record changes no group; the order of runs and trades changes no group, pivot, ranking, insight or evidence; adding a trade to one group leaves the unshrunk figures of every other group unchanged (the shrunk ones move only through their parent pool). *`ReportPropertyTests`.*
+9. "What works": cells with at least the minimum trades and a lower bound are ranked by the lower bound (ties: more trades, then the key), the rest are listed after with the reason, the answer states how many cells were looked at, the largest n and a selection-effect sentence; when none qualifies it says "Nothing has enough evidence yet" with the counts; a big modest cell outranks a thin lucky one; the default cell is basket x strategy x timeframe x side x exit (plus style when it varies) and names a dimension nobody recorded as left out. *`WhatWorksTests`.*
+10. Insights: eight, always in the same order; a sentence with figures only when every group it compares has the minimum (15) and there are two or more; otherwise a reason state ("no group has 15 trades yet", "only A has 15 trades", "only one strategy is in the runs"), with no figure; ties read "no difference"; regime is unavailable and calibration not evaluable; when the runs hold the same signals under different labels only the exit insight is evaluable. The numbers in a sentence are figures of the cells it names. *`InsightTests`.*
+11. Architecture: `Domain.Reporting` is in the allow-list of Domain namespaces; its types do no I/O, read no clock, draw no random number, depend on no framework, are sealed values or static functions, and none is named for a health, quality or discipline score; the no-order rule and the layer rules stay as they were. *`ReportingArchitectureTests`, `DomainResearchSurfaceTests`, `LayerDependencyTests`.*
+
+## Contract
+- **API:** none. The refusal codes the later endpoints will return are fixed here: `reports.invalid` (422), `reports.not_found` (404), `reports.run_overlap` (409), `reports.mixed_basis` (409), `reports.net_not_confirmed` (422), `reports.net_unavailable` (422), `reports.dimension_unavailable` (422), `reports.double_count` (422).
+- **Data:** none; no migration.
+- **UI:** none.
+- **Events/jobs:** none.
+- **Domain surface (public):** `ReportPopulation.Create(runs, trades, options)` -> `GroupBy`, `Pivot`, `FindWhatWorks`, `Insights`, `Evidence`; inputs `ReportRun`, `ReportTrade`, `ReportOptions`; outputs `ReportGrouping`, `ReportGroup`, `Metric` + `MetricState`, `EvidenceBlock`, `ReportEvidence`, `ReportPivot`, `PivotCell`, `WhatWorks`, `RankedCell`, `UnrankedCell`, `Insight`; `ReportErrors`.
+
+## Non-functional
+Pure and allocation-light enough for the 500,000-trade synthetic run P8-06 will measure (one pass to group, sorted once); no log events (nothing logs in a pure core); determinism by construction (all orderings are total). Invariant culture in every sentence.
+
+## Test plan
+Unit and property tests in `XDrishti.Domain.Tests/Reporting` as listed; architecture tests in `XDrishti.Architecture.Tests`; the existing `CellStatsCalculatorTests` guard the extraction. No integration test (no I/O). Property tests use a seeded `Random`, no extra library.
+
+## Open questions
+None for this slice. Recorded for later slices: whether the lower-bound figure should also carry the uncertainty of the sizes of wins and losses (a bootstrap needs a random source, so it would be seeded); where the exit and style labels come from for a stored run (P8-06 spike, P8-00 risk 2).
+
+## Done when
+- [x] All acceptance criteria have evidence
+- [x] `scripts/check.sh` green; reviewer pass left to the caller
+- [x] No contract change, no migration
+- [x] ADR 0099, roadmap row P8-05, `scripts/build-docs.sh`
