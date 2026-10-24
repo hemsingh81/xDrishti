@@ -44,8 +44,14 @@ internal sealed class ApproveAllHandler(
         var items = await store.ItemsAsync(command.PlanId, cancellationToken);
         var approved = new List<long>();
         var skipped = new List<SkippedTicket>();
-        foreach (var item in items.Where(i => i.Item.Group == TicketGroup.Primary).OrderBy(i => i.Item.Rank))
+        foreach (var item in items.Where(i => i.Item.Group != TicketGroup.Rejected).OrderBy(i => i.Item.Rank))
         {
+            if (item.Item.Group != TicketGroup.Primary)
+            {
+                skipped.Add(new SkippedTicket(item.Id, item.Item.Symbol, "reserve ticket; approve-all never takes the reserve, approve it by hand"));
+                continue;
+            }
+
             if (item.State != TicketState.Proposed)
             {
                 skipped.Add(new SkippedTicket(item.Id, item.Item.Symbol, $"already {item.State.Code()}; approve-all takes only tickets nobody has decided on"));

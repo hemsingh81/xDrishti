@@ -120,6 +120,32 @@ internal static class TicketReview
             : Result.Success(joined);
     }
 
+    /// <summary>The confirmations (or codes of them) that covered nothing: for an account the ticket is not sized for, or for checks that needed no override. Said back to the owner.</summary>
+    public static IReadOnlyList<string> Ignored(PlanItemRow item, IReadOnlyList<ChecklistReview?> reviews, IReadOnlyList<CheckConfirmation>? confirmations)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(reviews);
+        var ignored = new List<string>();
+        foreach (var c in confirmations ?? [])
+        {
+            var index = item.Item.Allocations.ToList().FindIndex(a => a.AccountId == c.AccountId);
+            if (index < 0)
+            {
+                ignored.Add($"account {Id(c.AccountId)}: the ticket is not sized for this account; the confirmation covered nothing");
+                continue;
+            }
+
+            var used = reviews[index]?.ConfirmedDespiteCodes ?? [];
+            var unused = c.Codes.Where(code => !used.Contains(code, StringComparer.Ordinal)).ToList();
+            if (unused.Count > 0)
+            {
+                ignored.Add($"account {Id(c.AccountId)}: {string.Join(", ", unused)} needed no override; ignored");
+            }
+        }
+
+        return ignored;
+    }
+
     /// <summary>The codes approved despite, over all accounts, in check order and distinct.</summary>
     public static IReadOnlyList<string> Overridden(IReadOnlyList<ChecklistReview?> reviews)
     {

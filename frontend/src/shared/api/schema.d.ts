@@ -2955,7 +2955,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Approve every primary, still-proposed ticket whose stored checklist is complete with every check passed on every account; tickets with a failed, warned or unavailable check, reserve and modified tickets are skipped and listed with the reason, never approved despite a check. 409 plans.closed, 404 */
+    /** Approve every primary, still-proposed ticket whose stored checklist is complete with every check passed on every account; tickets with a failed, warned or unavailable check, reserve, modified and already decided tickets are skipped and listed with the reason, never approved despite a check. 409 plans.closed, 404 */
     post: operations['ApproveAllPlanItems'];
     delete?: never;
     options?: never;
@@ -8298,6 +8298,8 @@ export interface components {
       notice: string;
       /** @description The checks approved despite, in check order (empty when none). */
       overriddenCodes: string[];
+      /** @description Confirmations (or parts of them) that covered nothing, each with the reason, so the owner sees that nothing was overridden by them. */
+      ignored?: null | string[];
     };
     /** @description One ticket on the review screen. */
     ReviewTicketView: {

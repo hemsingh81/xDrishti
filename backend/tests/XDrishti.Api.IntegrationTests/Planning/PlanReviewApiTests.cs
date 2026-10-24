@@ -302,7 +302,7 @@ public sealed class PlanReviewApiTests(ApiFactory factory) : DataTestBase(factor
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(Ct);
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         body.GetProperty("approved").EnumerateArray().Select(e => e.GetInt64()).ShouldBe([items[0]]);
-        body.GetProperty("skipped").EnumerateArray().Select(e => e.GetProperty("itemId").GetInt64()).ShouldBe([items[1], items[2], items[4]]);
+        body.GetProperty("skipped").EnumerateArray().Select(e => e.GetProperty("itemId").GetInt64()).ShouldBe([items[1], items[2], items[3], items[4]]);
         body.GetProperty("notice").GetString().ShouldBe("Approved for watching: no order is placed and none exists.");
         (await StateAsync(items[0])).ShouldBe("approved");
         (await StateAsync(items[1])).ShouldBe("proposed");

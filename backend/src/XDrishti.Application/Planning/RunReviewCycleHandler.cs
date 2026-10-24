@@ -35,16 +35,20 @@ internal sealed class RunReviewCycleHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
         var now = time.GetUtcNow();
-        var plans = await store.ListAsync(IndiaTime.Today(now), null, 20, cancellationToken);
-        var open = plans.Where(p => p.State is PlanState.Published or PlanState.InReview).ToList();
+        var today = IndiaTime.Today(now);
+
+        // Today's open plans, and any open plan of an earlier session whose cutoff has passed (the job was paused or the machine slept through 09:03 to 09:10): those are lapsed too, never approved.
+        var plans = await store.ListAsync(null, null, 50, cancellationToken);
+        var open = plans.Where(p => p.State is PlanState.Published or PlanState.InReview && (p.Plan.ForDate == today || now >= p.Plan.ReviewCutoff)).ToList();
         if (open.Count == 0)
         {
-            return Result.Success(new ReviewCycleOutcome(0, 0, 0, plans.Count == 0 ? "No plan for today's session." : "No plan of today's session is open for review."));
+            return Result.Success(new ReviewCycleOutcome(0, 0, 0, "No plan is open for review."));
         }
 
         var autoApproved = 0;
         var lapsed = 0;
         var waiting = 0;
+        var failures = new List<string>();
         foreach (var plan in open)
         {
             if (now < plan.Plan.ReviewCutoff)
@@ -65,14 +69,21 @@ internal sealed class RunReviewCycleHandler(
             var lapse = await cutoff.HandleAsync(new ApplyReviewCutoffCommand(plan.Id, Actor), cancellationToken);
             if (lapse.IsFailure)
             {
+                // One plan that cannot be closed does not stop the others; the failure is reported at the end.
                 ReviewLog.Refused(logger, lapse.Error.Code);
-                return Result.Failure<ReviewCycleOutcome>(lapse.Error);
+                failures.Add($"plan {plan.Id}: {lapse.Error.Code}");
+                continue;
             }
 
             lapsed += lapse.Value.Lapsed;
         }
 
         ReviewLog.Cycle(logger, open.Count, autoApproved, lapsed);
+        if (failures.Count > 0)
+        {
+            return Result.Failure<ReviewCycleOutcome>(Error.Conflict("plans.cutoff_failed", $"{failures.Count} plan(s) could not be closed ({string.Join("; ", failures)}); {lapsed} ticket(s) lapsed on the others."));
+        }
+
         var summary = waiting > 0 && lapsed == 0 && autoApproved == 0
             ? $"{waiting} plan(s) wait for the review cutoff; nothing to do yet."
             : $"{open.Count} plan(s): {autoApproved} ticket(s) approved by the rule, {lapsed} lapsed.";

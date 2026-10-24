@@ -88,7 +88,7 @@ internal sealed class ApproveTicketHandler(
         await ReviewProgress.EnterReviewAsync(store, command.PlanId, command.Actor, cancellationToken);
         var overridden = TicketReview.Overridden(reviews.Value);
         ReviewLog.Approved(logger, command.ItemId, overridden.Count);
-        return Result.Success(new ReviewDecisionOutcome(command.ItemId, TicketState.Approved.Code(), PlanWording.ApprovedForWatching, overridden));
+        return Result.Success(new ReviewDecisionOutcome(command.ItemId, TicketState.Approved.Code(), PlanWording.ApprovedForWatching, overridden, TicketReview.Ignored(item, reviews.Value, command.Confirmations)));
     }
 
     private Result<ReviewDecisionOutcome> Refuse(Error error)

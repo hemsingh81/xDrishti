@@ -232,7 +232,7 @@ public sealed class ReviewHandlersTests
         var result = await all.HandleAsync(new ApproveAllCommand(1, Owner), Ct);
 
         result.Value.Approved.ShouldBe([1]);
-        result.Value.Skipped.Select(s => s.ItemId).ShouldBe([2, 3, 5, 6]);
+        result.Value.Skipped.Select(s => s.ItemId).ShouldBe([2, 3, 4, 5, 6]);
         result.Value.Skipped.Single(s => s.ItemId == 2).Reason.ShouldContain("data_quality");
         await _mover.Received(1).HandleAsync(Arg.Any<MoveTicketCommand>(), Ct);
         await _mover.Received(1).HandleAsync(Arg.Is<MoveTicketCommand>(m => m.ItemId == 1 && m.ConfirmReason == null), Ct);
@@ -258,7 +258,7 @@ public sealed class ReviewHandlersTests
         auto.HandleAsync(Arg.Any<AutoApprovePlanCommand>(), Ct).Returns(Result.Success(new AutoApprovalOutcome(1, true, 1, [])));
         var cutoff = Substitute.For<ICommandHandler<ApplyReviewCutoffCommand, PlanMoveOutcome>>();
         cutoff.HandleAsync(Arg.Any<ApplyReviewCutoffCommand>(), Ct).Returns(Result.Success(new PlanMoveOutcome(1, "lapsed", 3)));
-        _plans.ListAsync(new DateOnly(2026, 10, 26), null, Arg.Any<int>(), Ct).Returns([Plan()]);
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([Plan()]);
         return (new RunReviewCycleHandler(_plans, settings, auto, cutoff, _time, NullLogger<RunReviewCycleHandler>.Instance), auto, cutoff, settings);
     }
 
@@ -313,14 +313,63 @@ public sealed class ReviewHandlersTests
     }
 
     [Fact]
+    public async Task An_open_plan_of_an_earlier_session_past_its_cutoff_is_lapsed_and_never_approved()
+    {
+        var (handler, auto, cutoff, _) = Cycle(autoOn: true);
+        var old = Plan() with { Id = 7, Plan = Plan().Plan with { ForDate = new DateOnly(2026, 10, 22), ReviewCutoff = Cutoff.AddDays(-4) } };
+        var future = Plan() with { Id = 8, Plan = Plan().Plan with { ForDate = new DateOnly(2026, 10, 27), ReviewCutoff = Cutoff.AddDays(1) } };
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([future, old]);
+        _time.SetUtcNow(Cutoff.AddHours(3));
+
+        var result = await handler.HandleAsync(new RunReviewCycleCommand(), Ct);
+
+        result.IsSuccess.ShouldBeTrue();
+        await cutoff.Received(1).HandleAsync(Arg.Is<ApplyReviewCutoffCommand>(c => c.PlanId == 7 && c.Actor == "system:review-cutoff"), Ct);
+        await cutoff.DidNotReceive().HandleAsync(Arg.Is<ApplyReviewCutoffCommand>(c => c.PlanId == 8), Ct);
+        await auto.DidNotReceiveWithAnyArgs().HandleAsync(default!, Ct);
+    }
+
+    [Fact]
+    public async Task One_plan_that_cannot_be_closed_does_not_stop_the_others_and_the_failure_is_reported()
+    {
+        var (handler, _, cutoff, _) = Cycle(autoOn: false);
+        var first = Plan() with { Id = 7, Plan = Plan().Plan with { ForDate = new DateOnly(2026, 10, 22), ReviewCutoff = Cutoff.AddDays(-4) } };
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([first, Plan()]);
+        cutoff.HandleAsync(Arg.Is<ApplyReviewCutoffCommand>(c => c.PlanId == 7), Ct).Returns(Result.Failure<PlanMoveOutcome>(PlanErrors.Stale()));
+        _time.SetUtcNow(Cutoff.AddMinutes(1));
+
+        var result = await handler.HandleAsync(new RunReviewCycleCommand(), Ct);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Message.ShouldContain("plan 7");
+        result.Error.Message.ShouldContain("3 ticket(s) lapsed");
+        await cutoff.Received(1).HandleAsync(Arg.Is<ApplyReviewCutoffCommand>(c => c.PlanId == 1), Ct);
+    }
+
+    [Fact]
+    public async Task Confirmations_that_covered_nothing_are_returned_as_ignored_with_the_reason()
+    {
+        Arrange(PlanState.Published, Item(5, ["checklist:data_quality:unavailable"]));
+
+        var result = await Approver().HandleAsync(new ApproveTicketCommand(1, 5, Owner, null, [
+            new CheckConfirmation(AccountA, [ChecklistCodes.DataQuality, ChecklistCodes.FnoBan], "checked"),
+            new CheckConfirmation(AccountB, [ChecklistCodes.DataQuality], "elsewhere")]), Ct);
+
+        result.Value.OverriddenCodes.ShouldBe([ChecklistCodes.DataQuality]);
+        result.Value.Ignored!.Count.ShouldBe(2);
+        result.Value.Ignored.ShouldContain(i => i.Contains("fno_ban", StringComparison.Ordinal) && i.Contains("needed no override", StringComparison.Ordinal));
+        result.Value.Ignored.ShouldContain(i => i.Contains(AccountB.ToString(), StringComparison.Ordinal) && i.Contains("not sized", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_closed_plan_or_no_plan_is_a_success_that_does_nothing()
     {
         var (handler, auto, cutoff, _) = Cycle(autoOn: true);
         _time.SetUtcNow(Cutoff.AddMinutes(5));
-        _plans.ListAsync(new DateOnly(2026, 10, 26), null, Arg.Any<int>(), Ct).Returns([Plan(PlanState.Lapsed)]);
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([Plan(PlanState.Lapsed)]);
 
         var closed = await handler.HandleAsync(new RunReviewCycleCommand(), Ct);
-        _plans.ListAsync(new DateOnly(2026, 10, 26), null, Arg.Any<int>(), Ct).Returns([]);
+        _plans.ListAsync(null, null, Arg.Any<int>(), Ct).Returns([]);
         var none = await handler.HandleAsync(new RunReviewCycleCommand(), Ct);
 
         closed.IsSuccess.ShouldBeTrue();

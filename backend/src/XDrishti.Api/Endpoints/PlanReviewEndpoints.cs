@@ -45,7 +45,7 @@ internal sealed class PlanReviewEndpoints : IEndpointModule
         group.MapPost("/{id:long}/approve-all", ApproveAllAsync)
             .RequireRateLimiting(SessionAuthentication.PlanDecisionRateLimitPolicy)
             .WithName("ApproveAllPlanItems")
-            .WithSummary("Approve every primary, still-proposed ticket whose stored checklist is complete with every check passed on every account; tickets with a failed, warned or unavailable check, reserve and modified tickets are skipped and listed with the reason, never approved despite a check. 409 plans.closed, 404")
+            .WithSummary("Approve every primary, still-proposed ticket whose stored checklist is complete with every check passed on every account; tickets with a failed, warned or unavailable check, reserve, modified and already decided tickets are skipped and listed with the reason, never approved despite a check. 409 plans.closed, 404")
             .ProducesRejections(conflict: true);
 
         group.MapGet("/{id:long}/suggestions", SuggestionsAsync)

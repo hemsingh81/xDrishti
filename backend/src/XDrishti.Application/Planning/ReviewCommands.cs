@@ -48,7 +48,8 @@ public sealed record ApproveAllCommand(long PlanId, string Actor) : ICommand;
 /// <param name="State">The state after.</param>
 /// <param name="Notice">For an approval, <see cref="PlanWording.ApprovedForWatching"/>; otherwise empty.</param>
 /// <param name="OverriddenCodes">The checks approved despite, in check order (empty when none).</param>
-public sealed record ReviewDecisionOutcome(long ItemId, string State, string Notice, IReadOnlyList<string> OverriddenCodes);
+/// <param name="Ignored">Confirmations (or parts of them) that covered nothing, each with the reason, so the owner sees that nothing was overridden by them.</param>
+public sealed record ReviewDecisionOutcome(long ItemId, string State, string Notice, IReadOnlyList<string> OverriddenCodes, IReadOnlyList<string>? Ignored = null);
 
 /// <summary>A ticket approve-all left alone, and why.</summary>
 /// <param name="ItemId">The ticket.</param>
