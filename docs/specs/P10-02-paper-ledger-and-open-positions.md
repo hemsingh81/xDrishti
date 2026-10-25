@@ -69,3 +69,13 @@ None blocking. Owner acts, each with its default: set `Planning:OpenBook:UsePape
 - Confirmation: the real port is `IChargeSheetConfirmationSource` (built in P8-06, ADR 0100); paper code may not read it; net is never printed until a separate owner-act slice (named P10-07 or P8-06b in the report) writes the row and widens the allow-list.
 - Criterion 8 now reads the stale-book rule from `capture_runs` (`outcome`, `pending`, one row per session); no "pending note" exists.
 - Step-up check: this slice has no write endpoint and no UI write (the screen is read only; `UsePaperLedger` is an owner setting edit, default OFF). Any later UI write needs fresh password step-up and the capability gate.
+
+## Build notes 2026-10-26 (ADR 0118; decisions where the spec was open)
+- Capital is the account's own fixed capital (what the plan sizes on), not `paper.epoch_accounts.capital` (the grading notional). BrokerFunds: no capital, equity and percentages `unavailable`.
+- JSON `realised.net` is "result after the stored charges"; its `basis` is `gross, no charges`, the ISS-25 sentence, or a `mixed: n of m` sentence. The UI never prints "net". `chargeSheet.confirmedOn` is always null here.
+- `TakenTrades` follows criterion 7 literally (primary, closed, current epoch); `measure_status = straddle` is not filtered out (P10-05 owns that rule).
+- An open position whose account has no capital is left out of `PlanContext.Book` (its percent is undefined); the account's limits are null so the plan treats them as unknown.
+- Reserve-group trades are in the ledger (they were captured) but not in `TakenTrades`.
+- No epoch yet makes the book unavailable (the first capture starts the epoch and writes a coverage row, so the next plan reads it).
+- `PlanContext.BookFromLedger` (new optional flag) keeps an empty paper book from being flagged as the owner's "assumed empty".
+- Not added to the P7 phase-check switch list (P10-06 prints the setup state).

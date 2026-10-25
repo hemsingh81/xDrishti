@@ -50,3 +50,24 @@ public sealed record GetPaperEpochQuery : IQuery<Result<PaperEpochView>>;
 /// <param name="Reason">Why.</param>
 /// <param name="Basis">The label.</param>
 public sealed record PaperEpochView(long? Id, DateOnly? StartedOn, string? Kind, string? Reason, string Basis);
+
+/// <summary>The paper accounts with their derived ledgers (spec P10-02).</summary>
+/// <param name="EpochId">One epoch, or null for the newest.</param>
+public sealed record GetPaperAccountsQuery(long? EpochId) : IQuery<Result<PaperAccountList>>;
+
+/// <summary>The open positions and closed trades of one paper account (spec P10-02).</summary>
+/// <param name="AccountId">The account.</param>
+/// <param name="EpochId">One epoch, or null for the newest.</param>
+public sealed record GetPaperPositionsQuery(Guid AccountId, long? EpochId) : IQuery<Result<PaperPositionList>>;
+
+/// <summary>The realised-equity line of one paper account (spec P10-02); dates are sessions.</summary>
+/// <param name="AccountId">The account.</param>
+/// <param name="From">First session, or the epoch's start.</param>
+/// <param name="To">Last session, or the last closed one.</param>
+/// <param name="EpochId">One epoch, or null for the newest.</param>
+public sealed record GetPaperEquityQuery(Guid AccountId, DateOnly? From, DateOnly? To, long? EpochId) : IQuery<Result<PaperEquityView>>;
+
+/// <summary>Reconciles one paper account's derived ledger with the stored rows (spec P10-02).</summary>
+/// <param name="AccountId">The account.</param>
+/// <param name="EpochId">One epoch, or null for the newest.</param>
+public sealed record ReconcilePaperQuery(Guid AccountId, long? EpochId) : IQuery<Result<PaperReconcileView>>;

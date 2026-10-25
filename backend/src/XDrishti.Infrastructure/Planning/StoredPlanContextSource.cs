@@ -1,9 +1,11 @@
 using XDrishti.Application.Abstractions.Accounts;
 using XDrishti.Application.Abstractions.Market.Bars;
+using XDrishti.Application.Abstractions.Paper;
 using XDrishti.Application.Abstractions.Planning;
 using XDrishti.Application.Abstractions.Portfolio;
 using XDrishti.Domain.Accounts;
 using XDrishti.Domain.Common;
+using XDrishti.Domain.Paper;
 using XDrishti.Domain.Selection.SmartRules;
 
 namespace XDrishti.Infrastructure.Planning;
@@ -21,7 +23,8 @@ internal sealed class StoredPlanContextSource(
     IHoldingQueries holdings,
     IHoldingClassifications classifications,
     IBarQueries bars,
-    IOpenBookSettings openBook) : IPlanContextSource
+    IOpenBookSettings openBook,
+    IPaperBookReader paperBook) : IPlanContextSource
 {
     /// <summary>Calendar days of daily bars read before the close of the session (about 60 sessions plus slack).</summary>
     public const int ReturnLookbackDays = 120;
@@ -37,6 +40,15 @@ internal sealed class StoredPlanContextSource(
         var rows = await holdings.ListAsync(new HoldingFilter(null, null, null, null), cancellationToken);
         var open = rows.Where(h => h.ClosedAt is null && h.Qty > 0).ToList();
         var contextAccounts = trading.Select(a => ToAccount(a, open, profileById, openBook.AssumedEmpty)).ToList();
+
+        // Only when the owner turned UsePaperLedger on (default off: nothing below runs and the context is byte-identical to P7-09). The book is the paper ledger, or unavailable when capture is behind.
+        var paper = openBook.UsePaperLedger
+            ? await paperBook.ReadAsync(request.Session, [.. trading.Where(a => a.Trading.Mode == TradingMode.Paper).Select(PaperInput)], cancellationToken)
+            : null;
+        if (paper is PaperBook ledger)
+        {
+            contextAccounts = [.. contextAccounts.Select(a => WithLedger(a, ledger))];
+        }
 
         var ids = request.Instruments.Where(i => i.Id is not null).Select(i => i.Id!.Value).Distinct().ToList();
         var sectors = ids.Count == 0 ? new Dictionary<Guid, string>() : (await classifications.SectorsAsync(ids, cancellationToken)).ToDictionary(p => p.Key, p => p.Value);
@@ -55,14 +67,25 @@ internal sealed class StoredPlanContextSource(
         }
 
         var correlations = await CorrelationsAsync(request, cancellationToken);
-        var notes = new List<string> { openBook.AssumedEmpty ? PlanContextNotes.NoBookNote : PlanContextNotes.BookUnavailableNote };
+        var notes = new List<string> { paper switch { PaperBook b => string.Join(' ', b.Notes), PaperBookUnavailable u => u.Reason, _ => openBook.AssumedEmpty ? PlanContextNotes.NoBookNote : PlanContextNotes.BookUnavailableNote } };
         if (!contextAccounts.Any(a => a.Mode == TradingMode.Paper))
         {
             notes.Add(PlanContextNotes.NoAccountNote);
         }
 
-        return Result.Success(new PlanContext(openBook.AssumedEmpty ? [] : null, facts, contextAccounts, correlations, null, null, notes));
+        return paper is PaperBook book
+            ? Result.Success(new PlanContext(book.Positions, facts, contextAccounts, correlations, null, book.Taken, notes, BookFromLedger: true))
+            : Result.Success(new PlanContext(openBook.AssumedEmpty ? [] : null, facts, contextAccounts, correlations, null, null, notes));
     }
+
+    private static PaperAccountInput PaperInput(BrokerAccount a) =>
+        new(a.Id, a.Name, a.Trading.CapitalSource == CapitalSource.Fixed ? a.Trading.CapitalAmount : null, string.Empty);
+
+    /// <summary>A paper account with the ledger's equity, open risk, funds, held symbols and loss carried; an account the ledger has no capital for keeps null numbers (the plan treats its limits as unknown).</summary>
+    private static ContextAccount WithLedger(ContextAccount account, PaperBook book) =>
+        book.Accounts.FirstOrDefault(b => b.AccountId == account.AccountId) is { } b && account.Mode == TradingMode.Paper
+            ? account with { Equity = b.Equity, OpenRiskPct = b.OpenRiskPct, FundsAvailable = b.FundsAvailable, DailyLossPct = b.DailyLossPct, HeldSymbols = b.HeldSymbols }
+            : account;
 
     internal static ContextAccount ToAccount(BrokerAccount account, List<HoldingData> open, Dictionary<Guid, RiskProfile> profiles, bool bookAssumedEmpty)
     {

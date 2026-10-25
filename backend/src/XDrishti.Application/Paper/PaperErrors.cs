@@ -14,6 +14,9 @@ public static class PaperErrors
     /// <summary>The configured charge sheet is not stored.</summary>
     public const string SheetMissingCode = "paper.sheet_missing";
 
+    /// <summary>The account or epoch is not known as a paper one.</summary>
+    public static Error NotFound(string what) => Error.NotFound(NotFoundCode, $"No {what} is recorded.");
+
     /// <summary>The request cannot be used; the message says why.</summary>
     public static Error Invalid(string field, string message) => new(InvalidCode, "The request cannot be used: " + field + ": " + message, ErrorKind.Validation, Fields: [new FieldError(field, message)]);
 

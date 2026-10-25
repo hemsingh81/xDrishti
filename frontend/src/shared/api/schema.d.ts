@@ -3149,6 +3149,74 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/paper/accounts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The paper accounts (Trading role, mode paper) with their ledger derived from the stored paper trades: realised gross, charges and result (labelled gross, or after the stored sheet and not confirmed, never net as a result of record), equity = capital + realised result, funds (no leverage), open risk percent, unrealised (unavailable, never 0, when a mark is), last-session result and closed-trade drawdown. Optional epoch (default the newest). Read only; simulated, no order exists. 404 paper.not_found, 422 paper.invalid */
+    get: operations['ListPaperAccounts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/accounts/{id}/positions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The open paper positions of one account with their marks (the close of the last closed session, or unavailable with the reason and no unrealised figure) and its closed trades, newest exit first. Read only. 404 paper.not_found */
+    get: operations['ListPaperPositions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/accounts/{id}/equity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The realised-equity line of one paper account: one point per trading session from the epoch's start (capital plus the realised result of the exits up to that session). Optional from and to (sessions), at most 400 sessions. Read only. 404 paper.not_found, 422 paper.invalid */
+    get: operations['GetPaperEquity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/paper/accounts/{id}/reconcile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Compares the derived ledger of one paper account with sums read straight from the stored rows (exits sum, entries without exit, exit before entry, entries of an account that is not paper now): status ok or each difference. Read only. 404 paper.not_found */
+    get: operations['ReconcilePaperAccount'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/plans/{id}/alerts': {
     parameters: {
       query?: never;
@@ -9213,6 +9281,127 @@ export interface components {
       newest: null | components['schemas']['OverviewHeadline'];
       champion: null | components['schemas']['OverviewHeadline'];
     };
+    /** @description The paper accounts with the label every paper response carries. */
+    PaperAccountList: {
+      /** @description The label. */
+      basis: string;
+      /** @description The accounts. */
+      items: components['schemas']['PaperAccountView'][];
+    };
+    /** @description One paper account's ledger, every figure derived from its stored trades and labelled as paper (spec P10-02). */
+    PaperAccountView: {
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /** @description Its name. */
+      name: string;
+      /**
+       * Format: int64
+       * @description The epoch; null before the first capture.
+       */
+      epochId: null | number;
+      /**
+       * Format: double
+       * @description The capital; null when the account has none (BrokerFunds).
+       */
+      capital: null | number;
+      /** @description Where it comes from. */
+      capitalSource: string;
+      /** @description The realised result. */
+      realised: components['schemas']['PaperRealisedView'];
+      /** @description Capital plus the realised result. */
+      equity: components['schemas']['MetricView'];
+      /** @description Equity less the open notional, at least 0. */
+      fundsAvailable: components['schemas']['MetricView'];
+      /** @description Open risk, percent of equity. */
+      openRiskPct: components['schemas']['MetricView'];
+      /**
+       * Format: int32
+       * @description Open positions.
+       */
+      openCount: number;
+      /** @description Rupees at the marks; unavailable when any mark is, empty without a position. */
+      unrealised: components['schemas']['MetricView'];
+      /**
+       * Format: double
+       * @description Realised rupees of the last closed session (0 when no trade closed).
+       */
+      lastSessionResult: number;
+      /** @description That result, signed percent of the equity at the start of the session. */
+      lastSessionPct: components['schemas']['MetricView'];
+      /** @description Closed-trade drawdown of the realised result. */
+      maxDrawdownClosed: components['schemas']['PaperDrawdownView'];
+      /** @description The sheet used. */
+      chargeSheet: components['schemas']['PaperChargeSheetView'];
+      /** @description What it rests on. */
+      evidence: components['schemas']['PaperEvidenceView'];
+      /** @description The honest limits. */
+      limits: string[];
+    };
+    /** @description The sheet that charged the account's closed trades. The confirmation is unreadable here, so DateOnly? PaperChargeSheetView.ConfirmedOn is always null. */
+    PaperChargeSheetView: {
+      /** @description The sheet id; null when no closed trade was charged. */
+      id: null | string;
+      /**
+       * Format: date
+       * @description Always null in this view (spec P10-02, criterion 5).
+       */
+      confirmedOn: null | string;
+    };
+    /** @description One closed paper trade in the ledger. */
+    PaperClosedTradeView: {
+      /** @description The symbol. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /**
+       * Format: int32
+       * @description Quantity.
+       */
+      qty: number;
+      /**
+       * Format: date-time
+       * @description The fill minute.
+       */
+      entryAt: string;
+      /**
+       * Format: date-time
+       * @description The exit minute.
+       */
+      exitAt: string;
+      /**
+       * Format: double
+       * @description Rupees before charges.
+       */
+      gross: number;
+      /**
+       * Format: double
+       * @description Rupees of charges; null when none.
+       */
+      charges: null | number;
+      /**
+       * Format: double
+       * @description Rupees after the stored charges (gross where none).
+       */
+      result: number;
+      /**
+       * Format: double
+       * @description The trade's R.
+       */
+      r: number;
+    };
+    /** @description The largest fall of the running realised result from its peak. */
+    PaperDrawdownView: {
+      /**
+       * Format: double
+       * @description Rupees.
+       */
+      amount: number;
+      /** @description Percent of the capital plus the peak. */
+      pct: components['schemas']['MetricView'];
+    };
     /** @description The paper entries with the label and the limits every paper response carries. */
     PaperEntryList: {
       /** @description The label. */
@@ -9302,6 +9491,63 @@ export interface components {
       /** @description What the exit's rupees and R are net of; the gross label while the trade is open. */
       costBasis: string;
     };
+    /** @description One point of the realised-equity line. */
+    PaperEquityPoint: {
+      /**
+       * Format: date
+       * @description The session.
+       */
+      date: string;
+      /**
+       * Format: double
+       * @description The realised result up to and including the session.
+       */
+      realised: number;
+      /** @description Capital plus that result. */
+      equity: components['schemas']['MetricView'];
+    };
+    /** @description The realised-equity line of a paper account, one point per trading session from the epoch's start. */
+    PaperEquityView: {
+      /** @description The label. */
+      basis: string;
+      /** @description The honest limits. */
+      limits: string[];
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /**
+       * Format: int64
+       * @description The epoch; null before the first capture.
+       */
+      epochId: null | number;
+      /** @description The points, oldest first. */
+      points: components['schemas']['PaperEquityPoint'][];
+    };
+    /** @description What the figures rest on. */
+    PaperEvidenceView: {
+      /**
+       * Format: int32
+       * @description Closed trades.
+       */
+      closedTrades: number;
+      /**
+       * Format: int32
+       * @description Open positions.
+       */
+      openTrades: number;
+      /**
+       * Format: date
+       * @description The epoch's first session; null before the first capture.
+       */
+      epochStartedOn: null | string;
+      /**
+       * Format: date
+       * @description The session the marks and the last-session result are as of.
+       */
+      lastClosedSession: string;
+    };
     /** @description The exit of a paper trade as the API shows it (spec P10-01). */
     PaperExitView: {
       /**
@@ -9358,6 +9604,126 @@ export interface components {
        * @description Maximum favourable excursion in R.
        */
       mfeR: number;
+    };
+    /** @description The mark of an open position: a value with its close and date, or unavailable with the reason and no price. */
+    PaperMarkView: {
+      /** @description value or unavailable. */
+      state: string;
+      /**
+       * Format: double
+       * @description The close; null unless value.
+       */
+      price: null | number;
+      /**
+       * Format: date
+       * @description The date of the bar read; null when none.
+       */
+      asOf: null | string;
+      /** @description Why unavailable; null for a value. */
+      reason: null | string;
+    };
+    /** @description The open positions and the closed trades of a paper account. */
+    PaperPositionList: {
+      /** @description The label. */
+      basis: string;
+      /** @description The honest limits. */
+      limits: string[];
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /**
+       * Format: date
+       * @description The session the marks are as of.
+       */
+      asOfSession: string;
+      /** @description Open positions. */
+      open: components['schemas']['PaperPositionView'][];
+      /** @description Closed trades, newest exit first. */
+      closed: components['schemas']['PaperClosedTradeView'][];
+    };
+    /** @description An open paper position. */
+    PaperPositionView: {
+      /** @description The symbol. */
+      symbol: string;
+      /** @description BUY or SELL. */
+      side: string;
+      /**
+       * Format: int32
+       * @description Quantity.
+       */
+      qty: number;
+      /**
+       * Format: date-time
+       * @description The fill minute.
+       */
+      entryAt: string;
+      /**
+       * Format: double
+       * @description The filled entry.
+       */
+      entryPrice: number;
+      /**
+       * Format: double
+       * @description The initial stop.
+       */
+      stopPrice: number;
+      /** @description The mark. */
+      mark: components['schemas']['PaperMarkView'];
+      /** @description Rupees at the mark; unavailable with the mark. */
+      unrealised: components['schemas']['MetricView'];
+      /**
+       * Format: double
+       * @description Rupees at risk to the initial stop.
+       */
+      riskAmount: number;
+      /** @description Risk as a percent of equity. */
+      riskPctOfEquity: components['schemas']['MetricView'];
+      /**
+       * Format: int32
+       * @description Sessions held, entry and last closed session included.
+       */
+      heldSessions: number;
+    };
+    /** @description The realised result of a paper account. decimal PaperRealisedView.Net is gross less the stored sheet's charges where a closed trade was charged; string PaperRealisedView.Basis says what it is after and that the sheet is not confirmed here (ISS-25). */
+    PaperRealisedView: {
+      /**
+       * Format: double
+       * @description Rupees before charges.
+       */
+      gross: number;
+      /**
+       * Format: double
+       * @description Rupees of charges; null when no closed trade was charged.
+       */
+      charges: null | number;
+      /**
+       * Format: double
+       * @description The result after the stored charges (gross where no sheet charged).
+       */
+      net: number;
+      /** @description gross, no charges / after the stored sheet / mixed, in words. */
+      basis: string;
+    };
+    /** @description Whether the derived ledger agrees with the stored rows. */
+    PaperReconcileView: {
+      /** @description The label. */
+      basis: string;
+      /**
+       * Format: uuid
+       * @description The account.
+       */
+      accountId: string;
+      /**
+       * Format: int64
+       * @description The epoch; null before the first capture.
+       */
+      epochId: null | number;
+      /** @description ok, or differences. */
+      status: string;
+      /** @description Each difference, in words (empty when ok). */
+      differences: string[];
     };
     /** @description The sweep of one parameter and its judgement (`stable`, `fragile`, `no_base_edge`, `inconclusive`). */
     ParameterSensitivityView: {
@@ -20131,6 +20497,147 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPaperAccounts: {
+    parameters: {
+      query?: {
+        epoch?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperAccountList'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListPaperPositions: {
+    parameters: {
+      query?: {
+        epoch?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperPositionList'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetPaperEquity: {
+    parameters: {
+      query?: {
+        from?: string;
+        to?: string;
+        epoch?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperEquityView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ReconcilePaperAccount: {
+    parameters: {
+      query?: {
+        epoch?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PaperReconcileView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

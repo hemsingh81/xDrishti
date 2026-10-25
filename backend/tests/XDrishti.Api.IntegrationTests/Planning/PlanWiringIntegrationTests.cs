@@ -66,6 +66,8 @@ public sealed class PlanWiringIntegrationTests(ApiFactory factory) : DataTestBas
     private sealed class FixedOpenBook(bool assumedEmpty) : IOpenBookSettings
     {
         public bool AssumedEmpty => assumedEmpty;
+
+        public bool UsePaperLedger => false;
     }
 
     [Fact]

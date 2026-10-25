@@ -7,4 +7,6 @@ namespace XDrishti.Infrastructure.Planning;
 internal sealed class OpenBookSettings(IConfiguration configuration) : IOpenBookSettings
 {
     public bool AssumedEmpty => string.Equals(configuration["Planning:OpenBook:AssumedEmpty"], "true", StringComparison.Ordinal);
+
+    public bool UsePaperLedger => string.Equals(configuration["Planning:OpenBook:UsePaperLedger"], "true", StringComparison.Ordinal);
 }

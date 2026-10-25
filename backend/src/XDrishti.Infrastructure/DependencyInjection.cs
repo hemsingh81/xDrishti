@@ -150,6 +150,7 @@ public static class DependencyInjection
         services.AddScoped<IDigestStore, DigestStore>(); // the insert-only weekly digests (spec P7-15, ADR 0094)
         services.AddScoped<IPlanStore, PlanStore>(); // the insert-only plan record (spec P7-03, ADR 0083); no order of any kind
         services.AddScoped<IGradeStore, GradeStore>(); // insert-only grades of tickets (P7-13, ADR 0090)
+        services.AddScoped<IPaperLedgerData, PaperLedgerData>(); // read-only paper ledger reads (P10-02, ADR 0118)
         services.AddScoped<IPaperStore, PaperStore>(); // insert-only paper record (P10-01, ADR 0116)
         services.AddOptions<TicketAlertOptions>().Bind(configuration.GetSection(TicketAlertOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // price-crossing alerts and post-trade prompts, default OFF (P7-20, ADR 0115)
         services.AddSingleton<ITicketAlertSettings>(sp => new TicketAlertSettings(sp.GetRequiredService<IOptions<TicketAlertOptions>>().Value));
@@ -164,6 +165,7 @@ public static class DependencyInjection
         services.AddScoped<IAutonomySettingsStore, AutonomySettingsStore>(); // the owner's switches, insert-only (P7-12, ADR 0091)
         services.AddSingleton<IBrokerAllowList, BrokerAllowList>(); // the broker allow-list read only, for the P7 phase check (P7-18, ADR 0097)
         services.AddSingleton<IPlanBuilderSettings, PlanBuilderSettings>(); // off by default: the empty skeleton stays the nightly builder (P7-04, ADR 0088)
+        services.AddOptions<OpenBookCheck>().Configure<IOpenBookSettings>((o, s) => (o.AssumedEmpty, o.UsePaperLedger) = (s.AssumedEmpty, s.UsePaperLedger)).Validate(OpenBookCheck.IsValid, OpenBookCheck.Message).ValidateOnStart(); // the two open-book switches are exclusive (P10-02)
         services.AddSingleton<IOpenBookSettings, OpenBookSettings>(); // off by default: the open book is unavailable (P7-09, ADR 0092)
         services.AddScoped<ITicketSource, StoredTicketSource>();
         services.AddScoped<IPlanContextSource, StoredPlanContextSource>(); // accounts, holdings, sectors and correlations as of the close (P7-09, ADR 0092); read only
