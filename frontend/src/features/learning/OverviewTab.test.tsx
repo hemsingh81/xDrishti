@@ -176,7 +176,6 @@ describe('Learning overview', () => {
     mountLearning();
     renderLearning();
 
-    expect(await screen.findByText(/Not built yet: Smart rules \(P8-13\)/)).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Overview',
       'Setups',
@@ -189,6 +188,8 @@ describe('Learning overview', () => {
       'Autonomy',
       'Phase checks',
       'Journey',
+      'Smart rules',
+      'Loss tags',
     ]);
   });
 

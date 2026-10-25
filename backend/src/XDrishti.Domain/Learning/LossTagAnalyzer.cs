@@ -12,7 +12,7 @@ public static class LossTagAnalyzer
     public const string InvalidCode = "loss_tags.invalid";
 
     /// <summary>A rough share of comparisons that flag by chance alone (a rough planning figure, not a test); the report prints comparisons times this.</summary>
-    private const double ChanceFlagRate = 0.05;
+    public const double ChanceFlagRate = 0.05;
 
     /// <summary>Tags the losses of <paramref name="inputs"/>; fails on bad options, no trades, a repeated trade key or a non-finite R.</summary>
     public static Result<LossTagReport> Analyze(IReadOnlyList<LossTagInput> inputs, LossTagOptions options)
@@ -55,6 +55,7 @@ public static class LossTagAnalyzer
                 .OrderBy(l => l.ExitEpochSeconds).ThenBy(l => l.Key, StringComparer.Ordinal)
                 .ToList();
             var counts = kinds.Select(k => losses.Count(l => l.Tags.Any(t => t.Kind == k))).ToList();
+            var lostR = kinds.Select(k => losses.Where(l => l.Tags.Any(t => t.Kind == k)).Sum(l => l.R)).ToList();
             var growing = new List<GrowingTag>();
             var w = options.GrowingWindow;
             if (losses.Count >= 2 * w)
@@ -73,7 +74,7 @@ public static class LossTagAnalyzer
                 }
             }
 
-            cells.Add(new CellLossTags(group.Key, group.Count(), losses.Count, counts, losses.Count(l => l.Tags.Count == 0), growing));
+            cells.Add(new CellLossTags(group.Key, group.Count(), losses.Count, counts, losses.Count(l => l.Tags.Count == 0), growing, lostR));
             allLosses.AddRange(losses);
         }
 

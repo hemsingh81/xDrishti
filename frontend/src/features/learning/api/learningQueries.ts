@@ -23,6 +23,10 @@ export type GradeStats = Schemas['GradeStats'];
 export type AutonomySettings = Schemas['AutonomySettingsView'];
 export type PlanPhaseCheck = Schemas['PlanPhaseCheckView'];
 export type LearningPhaseCheck = Schemas['LearningPhaseCheckView'];
+export type SmartRules = Schemas['SmartRulesView'];
+export type SmartRule = Schemas['SmartRuleView'];
+export type LossTags = Schemas['LossTagsView'];
+export type CellLossTags = Schemas['CellLossTagsView'];
 
 /** The planned-session range of Plan vs actual and Decisions; either end may be absent (all plans). */
 export interface DateRange {
@@ -69,6 +73,8 @@ export const learningKeys = {
   autonomy: ['learning', 'autonomy'] as const,
   planCheck: ['learning', 'plan-phase-check'] as const,
   learningCheck: ['learning', 'learning-phase-check'] as const,
+  smartRules: ['learning', 'smart-rules'] as const,
+  lossTags: (runs: readonly string[]) => ['learning', 'loss-tags', ...runs] as const,
 };
 
 // All of these are reads. This feature calls no write (see readOnly.test.ts).
@@ -240,4 +246,18 @@ export const counterfactualQuery = (id: number) =>
     staleTime: recordStaleTime,
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/learning/counterfactual', { params: { query: { id } }, signal })),
+  });
+
+/** What the stored plans say about each smart rule (P8-13), over the newest sessions the server reads by default. */
+export const smartRulesQuery = queryOptions({
+  queryKey: learningKeys.smartRules,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/learning/smart-rules', { signal })),
+});
+
+/** Loss tags on the default run set, or on the runs named as `KEY:STYLE:EXIT`. */
+export const lossTagsQuery = (runs: readonly string[]) =>
+  queryOptions({
+    queryKey: learningKeys.lossTags(runs),
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/learning/loss-tags', { params: { query: { run: [...runs] } }, signal })),
   });

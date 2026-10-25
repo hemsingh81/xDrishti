@@ -98,6 +98,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(RunsView))]
 [JsonSerializable(typeof(ReportBenchmarksView))]
 [JsonSerializable(typeof(PlanVsActualView))]
+[JsonSerializable(typeof(SmartRulesView))]
+[JsonSerializable(typeof(LossTagsView))]
 [JsonSerializable(typeof(LearningPhaseCheckView))]
 [JsonSerializable(typeof(SummaryView))]
 [JsonSerializable(typeof(GroupsView))]

@@ -4,7 +4,7 @@ import { DataTable, formatAsOf, formatCount, formatR, MetricTile, type MetricSta
 import { formatDate } from '@/shared/lib/format';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { overviewQuery, planVsActualQuery, type LearningOverview, type OverviewSection } from '../api/learningQueries';
-import { plannedText, type TabProps } from '../lib/tabs';
+import { plannedTabs, plannedText, type TabProps } from '../lib/tabs';
 import { countState } from '../lib/overview';
 import { executionGapState } from '../lib/executionGap';
 import { NoSnapshot } from './NoSnapshot';
@@ -119,8 +119,8 @@ export function OverviewTab({ open }: TabProps) {
         />
       </Panel>
       <Typography variant="body2" color="text.secondary">
-        Each tile is a count of stored records; there is no combined health score. Lessons, experiments, hypotheses and
-        models get their own tabs in later slices. {plannedText()}.
+        Each tile is a count of stored records; there is no combined health score.
+        {plannedTabs.length > 0 ? ` ${plannedText()}.` : ''}
       </Typography>
       <Box>
         <Button
