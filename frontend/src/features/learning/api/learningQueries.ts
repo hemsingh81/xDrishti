@@ -6,6 +6,12 @@ export type OverviewSection = Schemas['OverviewSection'];
 export type CellStats = Schemas['CellStatsView'];
 export type ChangelogEntry = Schemas['ChangelogEntryView'];
 export type CellState = Schemas['CellStateView'];
+export type Lesson = Schemas['LessonView'];
+export type Experiment = Schemas['ExperimentView'];
+export type Hypothesis = Schemas['HypothesisView'];
+export type Model = Schemas['ModelView'];
+export type ModelDetail = Schemas['ModelDetailView'];
+export type Digest = Schemas['DigestView'];
 
 /** The windows the server computes for every cell (`CellWindow` codes). */
 export const cellWindows = ['all', '250d', '60d'] as const;
@@ -28,6 +34,16 @@ export const learningKeys = {
   changelog: (scope: ChangelogScope) =>
     ['learning', 'changelog', scope.subjectKind ?? null, scope.subject ?? null] as const,
   cellState: (cell: string) => ['learning', 'cell-state', cell] as const,
+  lessons: (state: string) => ['learning', 'lessons', state] as const,
+  lesson: (id: number) => ['learning', 'lesson', id] as const,
+  experiments: ['learning', 'experiments'] as const,
+  experiment: (id: number) => ['learning', 'experiment', id] as const,
+  hypotheses: (state: string) => ['learning', 'hypotheses', state] as const,
+  hypothesis: (id: number) => ['learning', 'hypothesis', id] as const,
+  models: (role: string) => ['learning', 'models', role] as const,
+  model: (id: number) => ['learning', 'model', id] as const,
+  digests: ['learning', 'digests'] as const,
+  digest: (week: string) => ['learning', 'digest', week] as const,
 };
 
 // All five are reads. This feature calls no write (see readOnly.test.ts).
@@ -63,4 +79,90 @@ export const cellStateQuery = (cell: string) =>
     queryKey: learningKeys.cellState(cell),
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/changelog/cell-state', { params: { query: { cell } }, signal })),
+  });
+
+// P8-03: the record lists and their details. Lists ask for the newest 50; a detail is read only when its drawer opens.
+const recordStaleTime = 60_000;
+export const recordLimit = 50;
+export const digestLimit = 12;
+const all = (filter: string) => (filter === 'all' ? {} : { state: filter });
+
+export const lessonsQuery = (state: string) =>
+  queryOptions({
+    queryKey: learningKeys.lessons(state),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/lessons', { params: { query: { ...all(state), limit: recordLimit } }, signal })),
+  });
+
+export const lessonQuery = (id: number) =>
+  queryOptions({
+    queryKey: learningKeys.lesson(id),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/lessons/{id}', { params: { path: { id } }, signal })),
+  });
+
+export const experimentsQuery = queryOptions({
+  queryKey: learningKeys.experiments,
+  staleTime: recordStaleTime,
+  queryFn: async ({ signal }) =>
+    unwrap(await api.GET('/api/experiments', { params: { query: { limit: recordLimit } }, signal })),
+});
+
+export const experimentQuery = (id: number) =>
+  queryOptions({
+    queryKey: learningKeys.experiment(id),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/experiments/{id}', { params: { path: { id } }, signal })),
+  });
+
+export const hypothesesQuery = (state: string) =>
+  queryOptions({
+    queryKey: learningKeys.hypotheses(state),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/hypotheses', { params: { query: { ...all(state), limit: recordLimit } }, signal })),
+  });
+
+export const hypothesisQuery = (id: number) =>
+  queryOptions({
+    queryKey: learningKeys.hypothesis(id),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/hypotheses/{id}', { params: { path: { id } }, signal })),
+  });
+
+export const modelsQuery = (role: string) =>
+  queryOptions({
+    queryKey: learningKeys.models(role),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/models', {
+          params: { query: { ...(role === 'all' ? {} : { role }), limit: recordLimit } },
+          signal,
+        }),
+      ),
+  });
+
+export const modelQuery = (id: number) =>
+  queryOptions({
+    queryKey: learningKeys.model(id),
+    staleTime: recordStaleTime,
+    queryFn: async ({ signal }) => unwrap(await api.GET('/api/models/{id}', { params: { path: { id } }, signal })),
+  });
+
+export const digestsQuery = queryOptions({
+  queryKey: learningKeys.digests,
+  staleTime: recordStaleTime,
+  queryFn: async ({ signal }) =>
+    unwrap(await api.GET('/api/learning/digests', { params: { query: { limit: digestLimit } }, signal })),
+});
+
+export const digestQuery = (week: string) =>
+  queryOptions({
+    queryKey: learningKeys.digest(week),
+    staleTime: recordStaleTime,
+    retry: false,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/learning/digest', { params: { query: { week } }, signal })),
   });
