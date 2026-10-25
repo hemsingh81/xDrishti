@@ -10,7 +10,7 @@ namespace XDrishti.Application.Planning;
 /// The plan notices of the bell (P8-15, ADR 0101), derived on read like the data and service notices (ADR 0018 §7, ADR 0030): the newest version of each of the last three sessions' plans with the state of their tickets, the newest recorded attempt of the nightly pipeline
 /// and the stored fills of approved tickets, handed to the pure <see cref="PlanNoticeRules"/>. It calls read members of the plan and journal ports only; nothing is stored, no ticket moves and no order exists anywhere.
 /// </summary>
-internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore journal, TimeProvider clock) : IQueryHandler<GetPlanNoticesQuery, PlanNotices>
+internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore journal, ITicketNoticeSource ticketNotices, TimeProvider clock) : IQueryHandler<GetPlanNoticesQuery, PlanNotices>
 {
     /// <summary>The notices cover the last this many India days: today and the days before it, so three means today, yesterday and the day before. A plan or a failed run of an earlier session is not mentioned any more.</summary>
     public const int RecentDays = 3;
@@ -45,6 +45,7 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
         }
 
         var unmatched = await UnmatchedAsync(withItems, today, cancellationToken);
+        var counts = (await ticketNotices.CountsAsync([.. withItems.Select(p => p.Row.Id)], now, cancellationToken)).ToDictionary(c => c.PlanId);
         var facts = withItems.Select(p => new PlanNoticePlan(
             p.Row.Id,
             p.Row.Plan.ForDate,
@@ -55,7 +56,9 @@ internal sealed class GetPlanNoticesHandler(IPlanStore plans, IJournalStore jour
             p.Items.Count(i => i.State == TicketState.Armed),
             p.Items.Count(i => i.State == TicketState.Invalidated),
             unmatched.GetValueOrDefault(p.Row.Id).Would,
-            unmatched.GetValueOrDefault(p.Row.Id).Ambiguous)).ToList();
+            unmatched.GetValueOrDefault(p.Row.Id).Ambiguous,
+            counts.TryGetValue(p.Row.Id, out var c) ? c.Crossings : 0,
+            counts.TryGetValue(p.Row.Id, out c) ? c.Prompts : 0)).ToList();
         return new PlanNotices(PlanNoticeRules.Derive(now, facts, latestRun));
     }
 

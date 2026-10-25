@@ -231,4 +231,19 @@ describe('derivePlanNotifications', () => {
     expect(list.map((n) => n.id)).toEqual(['plan:review:15', 'plan:armed:7']);
     expect(list.every((n) => n.at === null)).toBe(true);
   });
+
+  it('carries the ticket crossing and post-trade prompt kinds as route-only items without actions', () => {
+    const list = derivePlanNotifications([
+      buildPlanNotice({
+        id: 'plan:crossed:7:1',
+        kind: 'ticket_level_crossed',
+        severity: 'warning',
+        route: '/plans?plan=7',
+      }),
+      buildPlanNotice({ id: 'plan:prompt:7:1', kind: 'post_trade_prompt', severity: 'info', route: '/plans?plan=7' }),
+    ]);
+
+    expect(list.map((n) => n.kind)).toEqual(['ticket_level_crossed', 'post_trade_prompt']);
+    expect(list.every((n) => n.actions.length === 0 && n.href === '/plans?plan=7')).toBe(true);
+  });
 });

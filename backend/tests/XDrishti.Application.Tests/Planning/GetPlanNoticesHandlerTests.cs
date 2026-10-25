@@ -17,6 +17,7 @@ public sealed class GetPlanNoticesHandlerTests
 
     private readonly IPlanStore _plans = Substitute.For<IPlanStore>();
     private readonly IJournalStore _journal = Substitute.For<IJournalStore>();
+    private readonly ITicketNoticeSource _tickets = Substitute.For<ITicketNoticeSource>();
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -28,13 +29,14 @@ public sealed class GetPlanNoticesHandlerTests
         _journal.FillsAsync(Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Ct).Returns([]);
         _journal.EntriesAsync(Arg.Any<long>(), Ct).Returns([]);
         _plans.HistoryAsync(Arg.Any<long>(), Ct).Returns([]);
+        _tickets.CountsAsync(Arg.Any<IReadOnlyList<long>>(), Arg.Any<DateTimeOffset>(), Ct).Returns([]);
     }
 
     // Approved on the evening before the session, before any fill of the session day.
     private static PlanEventRow Approval(long item, DateTimeOffset? at = null) =>
         new(item, item, "proposed", "approved", "owner:me", "ok", 1, at ?? new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
 
-    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _time);
+    private GetPlanNoticesHandler Handler() => new(_plans, _journal, _tickets, _time);
 
     private static PlanRow Row(long id, DateOnly? date = null, int version = 1, PlanState state = PlanState.Published) =>
         new(id, new NewPlan("k" + id, date ?? Session, Cutoff, version, Hash, "cell statistics only", true, "test", DateTimeOffset.UnixEpoch, []), state, 1, 0, 0);
@@ -214,5 +216,17 @@ public sealed class GetPlanNoticesHandlerTests
         var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
 
         result.Items.Select(i => (i.Kind, i.Severity)).ToList().ShouldBe(kind is null ? [] : [(kind, severity!)]);
+    }
+
+    [Fact]
+    public async Task Ticket_alert_counts_of_the_source_become_items_of_their_plan()
+    {
+        Store(Row(1), Item(1, 1, TicketState.Armed));
+        _tickets.CountsAsync(Arg.Is<IReadOnlyList<long>>(ids => ids.SequenceEqual(new long[] { 1 })), Arg.Any<DateTimeOffset>(), Ct).Returns([new TicketNoticeCount(1, 1, 2)]);
+
+        var result = await Handler().HandleAsync(new GetPlanNoticesQuery(), Ct);
+
+        result.Items.Select(i => i.Kind).ShouldContain("ticket_level_crossed");
+        result.Items.Select(i => i.Kind).ShouldContain("post_trade_prompt");
     }
 }

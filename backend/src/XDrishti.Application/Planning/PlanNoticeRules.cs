@@ -14,8 +14,10 @@ namespace XDrishti.Application.Planning;
 /// <param name="Armed">Tickets armed (watched, no order).</param>
 /// <param name="Invalidated">Tickets the pre-open check voided.</param>
 /// <param name="UnmatchedFills">Approved tickets with a stored fill that the journal would link as the ticket's entry (the pure matcher, after the approval) and no stored journal entry yet.</param>
+/// <param name="Crossings">Armed tickets that crossed their indicative level and are neither snoozed nor dismissed (P7-20; 0 while alerts are off).</param>
+/// <param name="Prompts">Open or ambiguous post-trade prompts (P7-20; 0 while alerts are off).</param>
 /// <param name="AmbiguousFills">Fills of the day that fit more than one approved ticket: the journal refuses to guess, so it will never link them.</param>
-internal sealed record PlanNoticePlan(long Id, DateOnly ForDate, DateTimeOffset ReviewCutoff, PlanState State, int Undecided, int Lapsed, int Armed, int Invalidated, int UnmatchedFills, int AmbiguousFills = 0);
+internal sealed record PlanNoticePlan(long Id, DateOnly ForDate, DateTimeOffset ReviewCutoff, PlanState State, int Undecided, int Lapsed, int Armed, int Invalidated, int UnmatchedFills, int AmbiguousFills = 0, int Crossings = 0, int Prompts = 0);
 
 /// <summary>The latest recorded attempt of the newest planned session.</summary>
 /// <param name="ForDate">The planned session.</param>
@@ -87,6 +89,16 @@ internal static class PlanNoticeRules
             {
                 items.Add((new PlanNotice($"plan:fills-ambiguous:{id}:{plan.AmbiguousFills.ToString(CultureInfo.InvariantCulture)}", "plan_fills_unmatched", "info", $"{(plan.AmbiguousFills == 1 ? "1 fill" : plan.AmbiguousFills.ToString(CultureInfo.InvariantCulture) + " fills")} of {Day(plan.ForDate)} fit more than one approved ticket. The journal will not guess, so it will not link {(plan.AmbiguousFills == 1 ? "it" : "them")}.", route, plan.Id, null), plan.ForDate));
             }
+
+            if (plan.Crossings > 0)
+            {
+                items.Add((new PlanNotice($"plan:crossed:{id}:{plan.Crossings.ToString(CultureInfo.InvariantCulture)}", "ticket_level_crossed", "warning", $"{Tickets(plan.Crossings, "watched ticket")} of the plan for {Day(plan.ForDate)} crossed {(plan.Crossings == 1 ? "its" : "their")} indicative level. Alert only: no order is placed and none exists; open the plan.", route, plan.Id, null), plan.ForDate));
+            }
+
+            if (plan.Prompts > 0)
+            {
+                items.Add((new PlanNotice($"plan:prompt:{id}:{plan.Prompts.ToString(CultureInfo.InvariantCulture)}", "post_trade_prompt", "info", $"{Tickets(plan.Prompts, "armed ticket")} of the plan for {Day(plan.ForDate)} {(plan.Prompts == 1 ? "has" : "have")} no trade on record yet: was it taken? Open the plan.", route, plan.Id, null), plan.ForDate));
+            }
         }
 
         return [.. items
@@ -102,7 +114,7 @@ internal static class PlanNoticeRules
 
     private static string Time(DateTimeOffset at) => IndiaTime.ToIst(at).ToString("HH:mm", CultureInfo.InvariantCulture);
 
-    private static string Tickets(int n) => n == 1 ? "1 ticket" : n.ToString(CultureInfo.InvariantCulture) + " tickets";
+    private static string Tickets(int n, string noun = "ticket") => n == 1 ? "1 " + noun : n.ToString(CultureInfo.InvariantCulture) + " " + noun + "s";
 
     private static string Minutes(int n) => n == 1 ? "1 minute" : n.ToString(CultureInfo.InvariantCulture) + " minutes";
 

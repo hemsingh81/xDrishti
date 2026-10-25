@@ -12,6 +12,8 @@ type PlanKind = Extract<
   | 'plan_tickets_armed'
   | 'plan_tickets_invalidated'
   | 'plan_fills_unmatched'
+  | 'ticket_level_crossed'
+  | 'post_trade_prompt'
 >;
 
 const kinds: ReadonlySet<string> = new Set<PlanKind>([
@@ -21,6 +23,8 @@ const kinds: ReadonlySet<string> = new Set<PlanKind>([
   'plan_tickets_armed',
   'plan_tickets_invalidated',
   'plan_fills_unmatched',
+  'ticket_level_crossed',
+  'post_trade_prompt',
 ]);
 
 /** The only places a plan notice may lead: the Plans screen, optionally on one plan. Anything else (another path, a scheme, `//host`, a backslash) is dropped. */

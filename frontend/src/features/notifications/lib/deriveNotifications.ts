@@ -24,7 +24,9 @@ export type NotificationKind =
   | 'plan_tickets_lapsed'
   | 'plan_tickets_armed'
   | 'plan_tickets_invalidated'
-  | 'plan_fills_unmatched';
+  | 'plan_fills_unmatched'
+  | 'ticket_level_crossed'
+  | 'post_trade_prompt';
 export type NotificationSeverity = 'error' | 'warn' | 'info';
 
 /**
