@@ -8674,6 +8674,112 @@
         }
       }
     },
+    "/api/learning/counterfactual": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "A stored frozen-model counterfactual (id=), or the newest: outcome, period, knobs, windows (both sides, paired gain, take-R uplift), the judged and pooled blocks, reasons, limits and basis. Read only. 404 learning.counterfactual_not_found",
+        "operationId": "GetLearningCounterfactual",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CounterfactualReportView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/learning/counterfactuals": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The stored counterfactuals, newest first (limit 1 to 50, default 12). Read only. 422 learning.invalid",
+        "operationId": "ListLearningCounterfactuals",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CounterfactualHeaderView"
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/learning/journey": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "The Journey: header of the newest stored counterfactual, plan-price grades by ISO week (simulated on plan prices), the live line (always not_evaluable until real trades exist) and the evidence block. Read only",
+        "operationId": "GetLearningJourney",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JourneyView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cells": {
       "get": {
         "tags": [
@@ -14541,6 +14647,29 @@
         },
         "description": "One point of the calibration table of a model: a raw score and the probability it maps to."
       },
+      "CellSource": {
+        "required": [
+          "runKey",
+          "style",
+          "exit"
+        ],
+        "type": "object",
+        "properties": {
+          "runKey": {
+            "type": "string",
+            "description": "The 64-hex key of a stored run."
+          },
+          "style": {
+            "type": "string",
+            "description": "`intraday` or `swing`."
+          },
+          "exit": {
+            "type": "string",
+            "description": "The label of the exit policy the run used."
+          }
+        },
+        "description": "A stored run whose closed trades make cells, with the labels the run does not carry itself: the style and the exit policy (the verb names them, as for an exit choice)."
+      },
       "CellStateView": {
         "required": [
           "cell",
@@ -15553,6 +15682,501 @@
           }
         },
         "description": "What undoing a cost batch did: its entries are voided (nothing is deleted). Undoing a batch again is a no-op (`AlreadyUndone`, `Voided` 0)."
+      },
+      "CounterfactualHeaderView": {
+        "required": [
+          "id",
+          "outcome",
+          "asOf",
+          "basis",
+          "createdAt",
+          "builtBy",
+          "windows",
+          "judgedWindows",
+          "sameRunsStored"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "The row id.",
+            "format": "int64"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "The conclusion."
+          },
+          "asOf": {
+            "type": "string",
+            "description": "The last day of the data used.",
+            "format": "date"
+          },
+          "basis": {
+            "type": "string",
+            "description": "gross, costed_unconfirmed or net_confirmed."
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "When it was stored.",
+            "format": "date-time"
+          },
+          "builtBy": {
+            "type": "string",
+            "description": "Who built it."
+          },
+          "windows": {
+            "type": "integer",
+            "description": "Windows scored.",
+            "format": "int32"
+          },
+          "judgedWindows": {
+            "type": "integer",
+            "description": "Windows judged.",
+            "format": "int32"
+          },
+          "sameRunsStored": {
+            "type": "integer",
+            "description": "How many stored counterfactuals use the same runs.",
+            "format": "int32"
+          }
+        },
+        "description": "A stored counterfactual in a list (P8-12): the header only."
+      },
+      "CounterfactualKnobsView": {
+        "required": [
+          "frozenMonths",
+          "retrainMonths",
+          "minWindowRows",
+          "minJudgedWindows",
+          "minGainLogLoss",
+          "significanceZ",
+          "trials",
+          "policyTolerance",
+          "holdOutMonths"
+        ],
+        "type": "object",
+        "properties": {
+          "frozenMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "retrainMonths": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minWindowRows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minJudgedWindows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minGainLogLoss": {
+            "type": "number",
+            "format": "double"
+          },
+          "significanceZ": {
+            "type": "number",
+            "format": "double"
+          },
+          "trials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "policyTolerance": {
+            "type": "number",
+            "format": "double"
+          },
+          "holdOutMonths": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The knobs the result was made with."
+      },
+      "CounterfactualPooledView": {
+        "required": [
+          "rows",
+          "frozen",
+          "retrained",
+          "gain",
+          "gainStandardError",
+          "takeRUplift"
+        ],
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "integer",
+            "description": "Rows scored by both sides.",
+            "format": "int32"
+          },
+          "frozen": {
+            "description": "The frozen side.",
+            "$ref": "#/components/schemas/CounterfactualSideView"
+          },
+          "retrained": {
+            "description": "The retrained side.",
+            "$ref": "#/components/schemas/CounterfactualSideView"
+          },
+          "gain": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean paired log loss gain of retraining (positive: retraining was better).",
+            "format": "double"
+          },
+          "gainStandardError": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Standard error of the gain clustered by trade day; null with fewer than two days.",
+            "format": "double"
+          },
+          "takeRUplift": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Rows times the take-R difference, in R.",
+            "format": "double"
+          }
+        },
+        "description": "Both sides pooled over some windows."
+      },
+      "CounterfactualReportView": {
+        "required": [
+          "schemaVersion",
+          "id",
+          "outcome",
+          "reasons",
+          "cut",
+          "to",
+          "frozenAgeMonths",
+          "frozenTrainRows",
+          "knobs",
+          "windows",
+          "judgedWindows",
+          "judged",
+          "all",
+          "limits",
+          "basis",
+          "sources",
+          "text",
+          "builtBy",
+          "createdAt",
+          "sameRunsStored"
+        ],
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "description": "1.",
+            "format": "int32"
+          },
+          "id": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row id; null inside the stored JSON (the row id is added on read).",
+            "format": "int64"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "Inconclusive, NoDifference, RetrainingHelps or FrozenBetter."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why, one sentence each."
+          },
+          "cut": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The day the frozen model stopped learning; null when no period could be made.",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "description": "The last day of the data used.",
+            "format": "date"
+          },
+          "frozenAgeMonths": {
+            "type": "integer",
+            "description": "Months of stopped learning.",
+            "format": "int32"
+          },
+          "frozenTrainRows": {
+            "type": "integer",
+            "description": "Rows the frozen model was fitted on.",
+            "format": "int32"
+          },
+          "knobs": {
+            "description": "The knobs.",
+            "$ref": "#/components/schemas/CounterfactualKnobsView"
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CounterfactualWindowView"
+            },
+            "description": "The windows in order."
+          },
+          "judgedWindows": {
+            "type": "integer",
+            "description": "Windows that were judged.",
+            "format": "int32"
+          },
+          "judged": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Both sides pooled over the judged windows.",
+                "$ref": "#/components/schemas/CounterfactualPooledView"
+              }
+            ]
+          },
+          "all": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Both sides pooled over every scored window.",
+                "$ref": "#/components/schemas/CounterfactualPooledView"
+              }
+            ]
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sentences that must be shown with the result."
+          },
+          "basis": {
+            "type": "string",
+            "description": "gross, costed_unconfirmed or net_confirmed."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellSource"
+            },
+            "description": "The runs behind the report."
+          },
+          "text": {
+            "type": "string",
+            "description": "The printed text."
+          },
+          "builtBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who built it; null inside the stored JSON."
+          },
+          "createdAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it was stored; null inside the stored JSON.",
+            "format": "date-time"
+          },
+          "sameRunsStored": {
+            "type": "integer",
+            "description": "How many stored counterfactuals use the same runs (every re-run is another trial); 0 inside the stored JSON.",
+            "format": "int32"
+          }
+        },
+        "description": "The stored counterfactual as the API shows it (P8-12, `schemaVersion` 1): the view of the domain report, so NaN cannot enter the JSON. Every statistic is a server field; the screen computes none."
+      },
+      "CounterfactualSideView": {
+        "required": [
+          "logLoss",
+          "brier",
+          "auc",
+          "takeR",
+          "kept",
+          "skipped",
+          "skippedMeanR"
+        ],
+        "type": "object",
+        "properties": {
+          "logLoss": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Out-of-sample log loss.",
+            "format": "double"
+          },
+          "brier": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Brier score.",
+            "format": "double"
+          },
+          "auc": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Area under the ROC curve; null when one class is missing.",
+            "format": "double"
+          },
+          "takeR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "R per candidate of taking what the side scores at or above its own train base rate.",
+            "format": "double"
+          },
+          "kept": {
+            "type": "integer",
+            "description": "Trades taken.",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "description": "Trades skipped.",
+            "format": "int32"
+          },
+          "skippedMeanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean R of the skipped trades; null when none.",
+            "format": "double"
+          }
+        },
+        "description": "One side of the counterfactual on a set of rows, as stored and shown (P8-12). A metric that cannot be computed is null, never NaN."
+      },
+      "CounterfactualWindowView": {
+        "required": [
+          "index",
+          "start",
+          "end",
+          "rows",
+          "days",
+          "instruments",
+          "frozenTrainRows",
+          "retrainedTrainRows",
+          "informative",
+          "frozen",
+          "retrained",
+          "gain",
+          "gainStandardError",
+          "takeRUplift",
+          "cumulativeTakeRUplift",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "1-based.",
+            "format": "int32"
+          },
+          "start": {
+            "type": "string",
+            "description": "First day.",
+            "format": "date"
+          },
+          "end": {
+            "type": "string",
+            "description": "Last day.",
+            "format": "date"
+          },
+          "rows": {
+            "type": "integer",
+            "description": "Rows scored.",
+            "format": "int32"
+          },
+          "days": {
+            "type": "integer",
+            "description": "Distinct trade days.",
+            "format": "int32"
+          },
+          "instruments": {
+            "type": "integer",
+            "description": "Distinct instruments.",
+            "format": "int32"
+          },
+          "frozenTrainRows": {
+            "type": "integer",
+            "description": "Rows the frozen model was fitted on.",
+            "format": "int32"
+          },
+          "retrainedTrainRows": {
+            "type": "integer",
+            "description": "Rows the retrained model was fitted on.",
+            "format": "int32"
+          },
+          "informative": {
+            "type": "boolean",
+            "description": "False: the same model on both sides, not judged."
+          },
+          "frozen": {
+            "description": "The frozen side.",
+            "$ref": "#/components/schemas/CounterfactualSideView"
+          },
+          "retrained": {
+            "description": "The retrained side.",
+            "$ref": "#/components/schemas/CounterfactualSideView"
+          },
+          "gain": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Paired log loss gain; null when not informative.",
+            "format": "double"
+          },
+          "gainStandardError": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Its standard error clustered by day.",
+            "format": "double"
+          },
+          "takeRUplift": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Take-R uplift of the window in R; null when not informative (a zero-width bar, never a bar of 0).",
+            "format": "double"
+          },
+          "cumulativeTakeRUplift": {
+            "type": "number",
+            "description": "The running total of the uplifts up to this window, in R.",
+            "format": "double"
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "A sentence for a window that is not judged, or null."
+          }
+        },
+        "description": "One retrain window."
       },
       "CreateAccountInput": {
         "required": [
@@ -22256,6 +22880,206 @@
           }
         },
         "description": "A fill as the API shows it."
+      },
+      "JourneyEvidenceView": {
+        "required": [
+          "basis",
+          "population",
+          "from",
+          "to",
+          "n",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "gross, costed_unconfirmed or net_confirmed; null with no counterfactual."
+          },
+          "population": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The run keys behind the counterfactual."
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The cut day.",
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The last day of the data.",
+            "format": "date"
+          },
+          "n": {
+            "type": "integer",
+            "description": "Trades scored.",
+            "format": "int32"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The report's limits."
+          }
+        },
+        "description": "What the numbers on the Journey rest on."
+      },
+      "JourneyLiveView": {
+        "required": [
+          "state",
+          "reason",
+          "n"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "Always not_evaluable."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Always 0.",
+            "format": "int32"
+          }
+        },
+        "description": "The live line, which is never evaluable until real trades exist."
+      },
+      "JourneyPlanPriceView": {
+        "required": [
+          "state",
+          "weeks",
+          "totalGraded",
+          "basis",
+          "note"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "ok, or empty when no ticket is graded."
+          },
+          "weeks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JourneyWeekView"
+            },
+            "description": "Oldest first."
+          },
+          "totalGraded": {
+            "type": "integer",
+            "description": "Graded tickets over all weeks.",
+            "format": "int32"
+          },
+          "basis": {
+            "type": "string",
+            "description": "Always \"simulated on plan prices\"."
+          },
+          "note": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Truncation or other caveat, or null."
+          }
+        },
+        "description": "The plan-price line: grades by week."
+      },
+      "JourneyView": {
+        "required": [
+          "counterfactual",
+          "planPrice",
+          "live",
+          "evidence"
+        ],
+        "type": "object",
+        "properties": {
+          "counterfactual": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The newest stored counterfactual's header, or null.",
+                "$ref": "#/components/schemas/CounterfactualHeaderView"
+              }
+            ]
+          },
+          "planPrice": {
+            "description": "Plan-price grades by week.",
+            "$ref": "#/components/schemas/JourneyPlanPriceView"
+          },
+          "live": {
+            "description": "The live line.",
+            "$ref": "#/components/schemas/JourneyLiveView"
+          },
+          "evidence": {
+            "description": "Basis, population, range, n and limits.",
+            "$ref": "#/components/schemas/JourneyEvidenceView"
+          }
+        },
+        "description": "The Journey (spec P8-12)."
+      },
+      "JourneyWeekView": {
+        "required": [
+          "isoWeek",
+          "start",
+          "graded",
+          "meanR",
+          "totalR",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "isoWeek": {
+            "type": "string",
+            "description": "The week."
+          },
+          "start": {
+            "type": "string",
+            "description": "The Monday.",
+            "format": "date"
+          },
+          "graded": {
+            "type": "integer",
+            "description": "Graded tickets.",
+            "format": "int32"
+          },
+          "meanR": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Mean R; null when the week is insufficient.",
+            "format": "double"
+          },
+          "totalR": {
+            "type": "number",
+            "description": "Sum of R.",
+            "format": "double"
+          },
+          "state": {
+            "type": "string",
+            "description": "ok or insufficient."
+          }
+        },
+        "description": "One ISO week of graded plan tickets."
       },
       "JsonElement": { },
       "LabCounts": {

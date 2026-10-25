@@ -212,6 +212,8 @@ Built (P8-02, P8-03): the Learning screen has the tabs Overview and Setups (P8-0
 The frozen-model line is what makes progress honest: improvement is measured against "what would have happened
 if the system had stopped learning", on the same days and instruments.
 
+Built (P8-12, [ADR 0110](../adr/0110-the-frozen-model-counterfactual-is-stored-by-the-verb-in-a-generic-insert-only-report-table-and-the-journey-only-reads-it.md)): the counterfactual is compared **per retrain window** (quarterly by default), not weekly: the evaluator retrains every `RetrainMonths` and scores whole windows, so the period (at most about a year) holds a handful of windows. `xd learn counterfactual --store` keeps the result in the insert-only `research.learning_reports`; the Journey tab reads it with the lessons and model versions of the same period and the plan-price grades by week, and its live line is `not_evaluable` until paper and live trades exist.
+
 ## 12. Tweak & re-run (experiments)
 
 You can change any learning knob and replay the last 12 months walk-forward before anything goes live.

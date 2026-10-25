@@ -23,6 +23,9 @@ public static class LearningErrors
     /// <summary>No weekly digest is stored for the week asked.</summary>
     public const string DigestNotFoundCode = "learning.digest_not_found";
 
+    /// <summary>No stored counterfactual matches (spec P8-12).</summary>
+    public const string CounterfactualNotFoundCode = "learning.counterfactual_not_found";
+
     /// <summary>The problems found before anything was read.</summary>
     public static Error Invalid(IReadOnlyList<FieldError> fields)
     {

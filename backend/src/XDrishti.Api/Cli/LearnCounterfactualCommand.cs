@@ -26,8 +26,23 @@ internal static class LearnCounterfactualCommand
         try
         {
             await using var scope = services.CreateAsyncScope();
+            var query = new EvaluateCounterfactualQuery(options.Sources, new CellStatsOptions(), null, new ValidationOptions(), options.Counterfactual, options.HoldOutMonths);
+            if (options.Store)
+            {
+                var stored = await scope.ServiceProvider.GetRequiredService<ICommandHandler<StoreCounterfactualCommand, StoredCounterfactual>>().HandleAsync(new StoreCounterfactualCommand(query, "cli:xd"), cancellationToken);
+                if (stored.IsFailure)
+                {
+                    await console.Error.WriteLineAsync(SimulateOptions.Show(stored.Error.Code + ": " + stored.Error.Message));
+                    return XdCommand.Refused;
+                }
+
+                await console.Out.WriteAsync(stored.Value.Text);
+                await console.Out.WriteLineAsync(stored.Value.Created ? $"stored as #{stored.Value.Id}" : $"already stored as #{stored.Value.Id} (same inputs)");
+                return XdCommand.Done;
+            }
+
             var result = await scope.ServiceProvider.GetRequiredService<IQueryHandler<EvaluateCounterfactualQuery, Result<CounterfactualReport>>>()
-                .HandleAsync(new EvaluateCounterfactualQuery(options.Sources, new CellStatsOptions(), null, new ValidationOptions(), options.Counterfactual, options.HoldOutMonths), cancellationToken);
+                .HandleAsync(query, cancellationToken);
             if (result.IsFailure)
             {
                 await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));

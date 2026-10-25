@@ -171,6 +171,8 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
 
     internal DbSet<DigestRecord> Digests => Set<DigestRecord>();
 
+    internal DbSet<LearningReportRecord> LearningReports => Set<LearningReportRecord>();
+
     internal DbSet<PlanRecord> Plans => Set<PlanRecord>();
 
     internal DbSet<PlanItemRecord> PlanItems => Set<PlanItemRecord>();

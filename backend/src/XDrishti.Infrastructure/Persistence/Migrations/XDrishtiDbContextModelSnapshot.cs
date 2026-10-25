@@ -3724,6 +3724,90 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Learning.LearningReportRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("AsOf")
+                        .HasColumnType("date")
+                        .HasColumnName("as_of");
+
+                    b.Property<string>("Basis")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)")
+                        .HasColumnName("basis");
+
+                    b.Property<string>("BuiltBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("built_by");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("InputHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_hash");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("OptionsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("options_json");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("ReportJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("report_json");
+
+                    b.Property<string>("SourcesJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("sources_json");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_learning_reports");
+
+                    b.HasIndex("Kind", "InputHash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_learning_reports_kind_hash");
+
+                    b.HasIndex("Kind", "CreatedAt", "Id")
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName("ix_learning_reports_kind_created");
+
+                    b.ToTable("learning_reports", "research", t =>
+                        {
+                            t.HasCheckConstraint("ck_learning_reports_shape", "kind ~ '^[a-z][a-z_]{1,38}$' AND input_hash ~ '^[0-9a-f]{64}$' AND length(outcome) > 0 AND basis IN ('gross','costed_unconfirmed','net_confirmed') AND position('limit:' IN text) > 0 AND length(built_by) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Learning.LessonRecord", b =>
                 {
                     b.Property<long>("Id")

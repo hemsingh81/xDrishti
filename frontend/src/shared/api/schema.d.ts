@@ -2554,6 +2554,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/learning/counterfactual': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A stored frozen-model counterfactual (id=), or the newest: outcome, period, knobs, windows (both sides, paired gain, take-R uplift), the judged and pooled blocks, reasons, limits and basis. Read only. 404 learning.counterfactual_not_found */
+    get: operations['GetLearningCounterfactual'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/counterfactuals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The stored counterfactuals, newest first (limit 1 to 50, default 12). Read only. 422 learning.invalid */
+    get: operations['ListLearningCounterfactuals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/journey': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** The Journey: header of the newest stored counterfactual, plan-price grades by ISO week (simulated on plan prices), the live line (always not_evaluable until real trades exist) and the evidence block. Read only */
+    get: operations['GetLearningJourney'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/cells': {
     parameters: {
       query?: never;
@@ -4333,6 +4384,15 @@ export interface components {
        */
       probability: number;
     };
+    /** @description A stored run whose closed trades make cells, with the labels the run does not carry itself: the style and the exit policy (the verb names them, as for an exit choice). */
+    CellSource: {
+      /** @description The 64-hex key of a stored run. */
+      runKey: string;
+      /** @description `intraday` or `swing`. */
+      style: string;
+      /** @description The label of the exit policy the run used. */
+      exit: string;
+    };
     /** @description Where a cell is, replayed from its changelog rows (P6-08). */
     CellStateView: {
       /** @description The cell key. */
@@ -4685,6 +4745,270 @@ export interface components {
       alreadyUndone: boolean;
       /** Format: int32 */
       voided: number;
+    };
+    /** @description A stored counterfactual in a list (P8-12): the header only. */
+    CounterfactualHeaderView: {
+      /**
+       * Format: int64
+       * @description The row id.
+       */
+      id: number;
+      /** @description The conclusion. */
+      outcome: string;
+      /**
+       * Format: date
+       * @description The last day of the data used.
+       */
+      asOf: string;
+      /** @description gross, costed_unconfirmed or net_confirmed. */
+      basis: string;
+      /**
+       * Format: date-time
+       * @description When it was stored.
+       */
+      createdAt: string;
+      /** @description Who built it. */
+      builtBy: string;
+      /**
+       * Format: int32
+       * @description Windows scored.
+       */
+      windows: number;
+      /**
+       * Format: int32
+       * @description Windows judged.
+       */
+      judgedWindows: number;
+      /**
+       * Format: int32
+       * @description How many stored counterfactuals use the same runs.
+       */
+      sameRunsStored: number;
+    };
+    /** @description The knobs the result was made with. */
+    CounterfactualKnobsView: {
+      /** Format: int32 */
+      frozenMonths: number;
+      /** Format: int32 */
+      retrainMonths: number;
+      /** Format: int32 */
+      minWindowRows: number;
+      /** Format: int32 */
+      minJudgedWindows: number;
+      /** Format: double */
+      minGainLogLoss: number;
+      /** Format: double */
+      significanceZ: number;
+      /** Format: int32 */
+      trials: number;
+      /** Format: double */
+      policyTolerance: number;
+      /** Format: int32 */
+      holdOutMonths: number;
+    };
+    /** @description Both sides pooled over some windows. */
+    CounterfactualPooledView: {
+      /**
+       * Format: int32
+       * @description Rows scored by both sides.
+       */
+      rows: number;
+      /** @description The frozen side. */
+      frozen: components['schemas']['CounterfactualSideView'];
+      /** @description The retrained side. */
+      retrained: components['schemas']['CounterfactualSideView'];
+      /**
+       * Format: double
+       * @description Mean paired log loss gain of retraining (positive: retraining was better).
+       */
+      gain: null | number;
+      /**
+       * Format: double
+       * @description Standard error of the gain clustered by trade day; null with fewer than two days.
+       */
+      gainStandardError: null | number;
+      /**
+       * Format: double
+       * @description Rows times the take-R difference, in R.
+       */
+      takeRUplift: null | number;
+    };
+    /** @description The stored counterfactual as the API shows it (P8-12, `schemaVersion` 1): the view of the domain report, so NaN cannot enter the JSON. Every statistic is a server field; the screen computes none. */
+    CounterfactualReportView: {
+      /**
+       * Format: int32
+       * @description 1.
+       */
+      schemaVersion: number;
+      /**
+       * Format: int64
+       * @description The row id; null inside the stored JSON (the row id is added on read).
+       */
+      id: null | number;
+      /** @description Inconclusive, NoDifference, RetrainingHelps or FrozenBetter. */
+      outcome: string;
+      /** @description Why, one sentence each. */
+      reasons: string[];
+      /**
+       * Format: date
+       * @description The day the frozen model stopped learning; null when no period could be made.
+       */
+      cut: null | string;
+      /**
+       * Format: date
+       * @description The last day of the data used.
+       */
+      to: string;
+      /**
+       * Format: int32
+       * @description Months of stopped learning.
+       */
+      frozenAgeMonths: number;
+      /**
+       * Format: int32
+       * @description Rows the frozen model was fitted on.
+       */
+      frozenTrainRows: number;
+      /** @description The knobs. */
+      knobs: components['schemas']['CounterfactualKnobsView'];
+      /** @description The windows in order. */
+      windows: components['schemas']['CounterfactualWindowView'][];
+      /**
+       * Format: int32
+       * @description Windows that were judged.
+       */
+      judgedWindows: number;
+      judged: null | components['schemas']['CounterfactualPooledView'];
+      all: null | components['schemas']['CounterfactualPooledView'];
+      /** @description Sentences that must be shown with the result. */
+      limits: string[];
+      /** @description gross, costed_unconfirmed or net_confirmed. */
+      basis: string;
+      /** @description The runs behind the report. */
+      sources: components['schemas']['CellSource'][];
+      /** @description The printed text. */
+      text: string;
+      /** @description Who built it; null inside the stored JSON. */
+      builtBy: null | string;
+      /**
+       * Format: date-time
+       * @description When it was stored; null inside the stored JSON.
+       */
+      createdAt: null | string;
+      /**
+       * Format: int32
+       * @description How many stored counterfactuals use the same runs (every re-run is another trial); 0 inside the stored JSON.
+       */
+      sameRunsStored: number;
+    };
+    /** @description One side of the counterfactual on a set of rows, as stored and shown (P8-12). A metric that cannot be computed is null, never NaN. */
+    CounterfactualSideView: {
+      /**
+       * Format: double
+       * @description Out-of-sample log loss.
+       */
+      logLoss: null | number;
+      /**
+       * Format: double
+       * @description Brier score.
+       */
+      brier: null | number;
+      /**
+       * Format: double
+       * @description Area under the ROC curve; null when one class is missing.
+       */
+      auc: null | number;
+      /**
+       * Format: double
+       * @description R per candidate of taking what the side scores at or above its own train base rate.
+       */
+      takeR: null | number;
+      /**
+       * Format: int32
+       * @description Trades taken.
+       */
+      kept: number;
+      /**
+       * Format: int32
+       * @description Trades skipped.
+       */
+      skipped: number;
+      /**
+       * Format: double
+       * @description Mean R of the skipped trades; null when none.
+       */
+      skippedMeanR: null | number;
+    };
+    /** @description One retrain window. */
+    CounterfactualWindowView: {
+      /**
+       * Format: int32
+       * @description 1-based.
+       */
+      index: number;
+      /**
+       * Format: date
+       * @description First day.
+       */
+      start: string;
+      /**
+       * Format: date
+       * @description Last day.
+       */
+      end: string;
+      /**
+       * Format: int32
+       * @description Rows scored.
+       */
+      rows: number;
+      /**
+       * Format: int32
+       * @description Distinct trade days.
+       */
+      days: number;
+      /**
+       * Format: int32
+       * @description Distinct instruments.
+       */
+      instruments: number;
+      /**
+       * Format: int32
+       * @description Rows the frozen model was fitted on.
+       */
+      frozenTrainRows: number;
+      /**
+       * Format: int32
+       * @description Rows the retrained model was fitted on.
+       */
+      retrainedTrainRows: number;
+      /** @description False: the same model on both sides, not judged. */
+      informative: boolean;
+      /** @description The frozen side. */
+      frozen: components['schemas']['CounterfactualSideView'];
+      /** @description The retrained side. */
+      retrained: components['schemas']['CounterfactualSideView'];
+      /**
+       * Format: double
+       * @description Paired log loss gain; null when not informative.
+       */
+      gain: null | number;
+      /**
+       * Format: double
+       * @description Its standard error clustered by day.
+       */
+      gainStandardError: null | number;
+      /**
+       * Format: double
+       * @description Take-R uplift of the window in R; null when not informative (a zero-width bar, never a bar of 0).
+       */
+      takeRUplift: null | number;
+      /**
+       * Format: double
+       * @description The running total of the uplifts up to this window, in R.
+       */
+      cumulativeTakeRUplift: number;
+      /** @description A sentence for a window that is not judged, or null. */
+      note: null | string;
     };
     /**
      * @description A new Dhan account. ClientId and Secrets (API key and secret) are required. ApiKeyIssuedOn is the day the API key was generated
@@ -7096,6 +7420,95 @@ export interface components {
        * @description Fill price.
        */
       price: number;
+    };
+    /** @description What the numbers on the Journey rest on. */
+    JourneyEvidenceView: {
+      /** @description gross, costed_unconfirmed or net_confirmed; null with no counterfactual. */
+      basis: null | string;
+      /** @description The run keys behind the counterfactual. */
+      population: string[];
+      /**
+       * Format: date
+       * @description The cut day.
+       */
+      from: null | string;
+      /**
+       * Format: date
+       * @description The last day of the data.
+       */
+      to: null | string;
+      /**
+       * Format: int32
+       * @description Trades scored.
+       */
+      n: number;
+      /** @description The report's limits. */
+      limits: string[];
+    };
+    /** @description The live line, which is never evaluable until real trades exist. */
+    JourneyLiveView: {
+      /** @description Always not_evaluable. */
+      state: string;
+      /** @description Why. */
+      reason: string;
+      /**
+       * Format: int32
+       * @description Always 0.
+       */
+      n: number;
+    };
+    /** @description The plan-price line: grades by week. */
+    JourneyPlanPriceView: {
+      /** @description ok, or empty when no ticket is graded. */
+      state: string;
+      /** @description Oldest first. */
+      weeks: components['schemas']['JourneyWeekView'][];
+      /**
+       * Format: int32
+       * @description Graded tickets over all weeks.
+       */
+      totalGraded: number;
+      /** @description Always "simulated on plan prices". */
+      basis: string;
+      /** @description Truncation or other caveat, or null. */
+      note: null | string;
+    };
+    /** @description The Journey (spec P8-12). */
+    JourneyView: {
+      counterfactual: null | components['schemas']['CounterfactualHeaderView'];
+      /** @description Plan-price grades by week. */
+      planPrice: components['schemas']['JourneyPlanPriceView'];
+      /** @description The live line. */
+      live: components['schemas']['JourneyLiveView'];
+      /** @description Basis, population, range, n and limits. */
+      evidence: components['schemas']['JourneyEvidenceView'];
+    };
+    /** @description One ISO week of graded plan tickets. */
+    JourneyWeekView: {
+      /** @description The week. */
+      isoWeek: string;
+      /**
+       * Format: date
+       * @description The Monday.
+       */
+      start: string;
+      /**
+       * Format: int32
+       * @description Graded tickets.
+       */
+      graded: number;
+      /**
+       * Format: double
+       * @description Mean R; null when the week is insufficient.
+       */
+      meanR: null | number;
+      /**
+       * Format: double
+       * @description Sum of R.
+       */
+      totalR: number;
+      /** @description ok or insufficient. */
+      state: string;
     };
     JsonElement: unknown;
     /** @description The counts of a finished run: the instruments asked for and replayed, the ones skipped, and the trades (closed and open at the end of the data). */
@@ -17176,6 +17589,88 @@ export interface operations {
         };
         content: {
           'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLearningCounterfactual: {
+    parameters: {
+      query?: {
+        id?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CounterfactualReportView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ListLearningCounterfactuals: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CounterfactualHeaderView'][];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLearningJourney: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JourneyView'];
         };
       };
     };

@@ -20,6 +20,18 @@ public sealed class LearnCounterfactualOptionsTests
     }
 
     [Fact]
+    public void Storing_is_off_unless_store_is_given_and_store_takes_no_value()
+    {
+        var (without, _) = LearnCounterfactualOptions.Parse(["--run", $"{Key}:intraday:X"]);
+        var (with, errors) = LearnCounterfactualOptions.Parse(["--run", $"{Key}:intraday:X", "--store", "--trials", "2"]);
+
+        without!.Store.ShouldBeFalse();
+        errors.ShouldBeEmpty();
+        with!.Store.ShouldBeTrue();
+        with.Counterfactual.Trials.ShouldBe(2);
+    }
+
+    [Fact]
     public void The_knobs_can_be_set()
     {
         var (options, _) = LearnCounterfactualOptions.Parse(["--run", $"{Key}:swing:X", "--frozen-months", "6", "--retrain-months", "2", "--min-gain", "0.01", "--trials", "4", "--hold-out-months", "0"]);
