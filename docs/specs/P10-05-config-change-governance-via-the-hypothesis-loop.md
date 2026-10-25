@@ -77,3 +77,6 @@ None. Owner acts, with defaults: choose to apply a queued hypothesis (default: h
 ## Review fixes 2026-10-25
 - New criterion 11a: learning-refresh services are listed (pinned), shown as blockers when enabled during an epoch, and tested; pre-flight step added in P10-00.
 - Step-up check: all HTTP endpoints are GET; the owner acts (`epoch restart`, `explain`) are CLI verbs with no UI write. If a UI form is ever added for them it needs a fresh password step-up and the capability gate (the P8-19 pattern).
+
+## Built 2026-10-26
+- Built from this Draft under the owner's standing instruction; ADR 0119. Resolved ambiguities are listed in the ADR consequences (smart-rule and selection code defaults are fingerprinted; autonomy threshold direction by strictness; a note naming a hypothesis takes it out of the queue; the Governance tab is the stand-alone route `/paper/governance` until P10-02's paper screen hosts it). Log ids 5240 to 5245.

@@ -4823,6 +4823,181 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                     NpgsqlEntityTypeBuilderExtensions.IsUnlogged(b, true);
                 });
 
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ConfigChangeRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("After")
+                        .HasColumnType("text")
+                        .HasColumnName("after");
+
+                    b.Property<string>("Before")
+                        .HasColumnType("text")
+                        .HasColumnName("before");
+
+                    b.Property<string>("Class")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("class");
+
+                    b.Property<string>("Effect")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("effect");
+
+                    b.Property<long>("EpochId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_id");
+
+                    b.Property<string>("ExplainedBy")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("explained_by");
+
+                    b.Property<long>("FromSnapshotId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_snapshot_id");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("key");
+
+                    b.Property<long>("ToSnapshotId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_snapshot_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_config_changes");
+
+                    b.HasIndex("EpochId")
+                        .HasDatabaseName("ix_config_changes_epoch_id");
+
+                    b.HasIndex("FromSnapshotId")
+                        .HasDatabaseName("ix_config_changes_from_snapshot_id");
+
+                    b.HasIndex("ToSnapshotId")
+                        .HasDatabaseName("ix_config_changes_to_snapshot_id");
+
+                    b.ToTable("config_changes", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_config_changes_shape", "class IN ('frozen', 'risk_down', 'free') AND effect IN ('new_epoch', 'noted')");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ConfigSnapshotRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Components")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("components");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasColumnType("char(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<bool>("Partial")
+                        .HasColumnType("boolean")
+                        .HasColumnName("partial");
+
+                    b.Property<string>("Process")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("process");
+
+                    b.Property<DateOnly>("SessionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("session_date");
+
+                    b.Property<DateTimeOffset>("TakenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("taken_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_config_snapshots");
+
+                    b.HasIndex("TakenAt")
+                        .HasDatabaseName("ix_config_snapshots_taken_at");
+
+                    b.HasIndex("SessionDate", "Hash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_config_snapshots_session_hash");
+
+                    b.ToTable("config_snapshots", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_config_snapshots_shape", "length(hash) = 64 AND length(btrim(process)) > 0");
+                        });
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.EpochNoteRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("actor");
+
+                    b.Property<long?>("ChangeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("change_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<long>("EpochId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("epoch_id");
+
+                    b.Property<long?>("HypothesisId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("hypothesis_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_epoch_notes");
+
+                    b.HasIndex("ChangeId")
+                        .HasDatabaseName("ix_epoch_notes_change_id");
+
+                    b.HasIndex("EpochId")
+                        .HasDatabaseName("ix_epoch_notes_epoch_id");
+
+                    b.ToTable("epoch_notes", "paper", t =>
+                        {
+                            t.HasCheckConstraint("ck_epoch_notes_shape", "length(btrim(text)) > 0 AND length(btrim(actor)) > 0");
+                        });
+                });
+
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperCaptureRunRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -8336,6 +8511,46 @@ namespace XDrishti.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_live_quotes_instruments_instrument_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.ConfigChangeRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEpochRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_config_changes_epochs_epoch_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Paper.ConfigSnapshotRecord", null)
+                        .WithMany()
+                        .HasForeignKey("FromSnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_config_changes_config_snapshots_from_snapshot_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Paper.ConfigSnapshotRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ToSnapshotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_config_changes_config_snapshots_to_snapshot_id");
+                });
+
+            modelBuilder.Entity("XDrishti.Infrastructure.Paper.EpochNoteRecord", b =>
+                {
+                    b.HasOne("XDrishti.Infrastructure.Paper.ConfigChangeRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ChangeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_epoch_notes_config_changes_change_id");
+
+                    b.HasOne("XDrishti.Infrastructure.Paper.PaperEpochRecord", null)
+                        .WithMany()
+                        .HasForeignKey("EpochId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_epoch_notes_epochs_epoch_id");
                 });
 
             modelBuilder.Entity("XDrishti.Infrastructure.Paper.PaperEntryRecord", b =>

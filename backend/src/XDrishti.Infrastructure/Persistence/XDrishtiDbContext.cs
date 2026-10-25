@@ -193,6 +193,9 @@ public sealed class XDrishtiDbContext(DbContextOptions<XDrishtiDbContext> option
     internal DbSet<PaperExitRecord> PaperExits => Set<PaperExitRecord>();
     internal DbSet<PaperSkipRecord> PaperSkips => Set<PaperSkipRecord>();
     internal DbSet<PaperCaptureRunRecord> PaperCaptureRuns => Set<PaperCaptureRunRecord>();
+    internal DbSet<ConfigSnapshotRecord> ConfigSnapshots => Set<ConfigSnapshotRecord>();
+    internal DbSet<ConfigChangeRecord> ConfigChanges => Set<ConfigChangeRecord>();
+    internal DbSet<EpochNoteRecord> EpochNotes => Set<EpochNoteRecord>();
     internal DbSet<JournalEntryRecord> JournalEntries => Set<JournalEntryRecord>();
     internal DbSet<JournalFillRecord> JournalFills => Set<JournalFillRecord>();
     internal DbSet<FillGradeRecord> FillGrades => Set<FillGradeRecord>();

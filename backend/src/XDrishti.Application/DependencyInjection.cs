@@ -600,7 +600,15 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetPlanGradeQuery, Result<PlanGradeView>>, GetPlanGradeHandler>();
         services.AddScoped<IQueryHandler<GetDecisionsReportQuery, Result<GradeReportData>>, GetDecisionsReportHandler>();
         services.AddScoped<TicketReplayer>(); // the one replay path of grading and paper capture (P10-01, ADR 0116)
-        services.AddScoped<IEpochGate, SingleEpochGate>(); // one default epoch until P10-05 replaces it
+        services.AddScoped<IEpochGate, FingerprintEpochGate>(); // the configuration fingerprint decides the epoch (P10-05, ADR 0119): detects, labels and records; applies and blocks nothing
+        services.AddScoped<IConfigSnapshotSource, ConfigSnapshotSource>();
+        services.AddScoped<IQueryHandler<GetEpochsQuery, Result<EpochList>>, GetEpochsHandler>();
+        services.AddScoped<IQueryHandler<GetEpochQuery, Result<EpochDetail>>, GetEpochHandler>();
+        services.AddScoped<IQueryHandler<GetConfigChangesQuery, Result<ConfigChangeList>>, GetConfigChangesHandler>();
+        services.AddScoped<IQueryHandler<GetConfigQuery, Result<ConfigView>>, GetConfigHandler>();
+        services.AddScoped<IQueryHandler<GetQueueQuery, Result<QueueView>>, GetQueueHandler>();
+        services.AddScoped<ICommandHandler<StartEpochCommand, EpochView>, StartEpochHandler>(); // owner act, CLI only (P10-05)
+        services.AddScoped<ICommandHandler<ExplainChangeCommand, ExplainOutcome>, ExplainChangeHandler>(); // owner note, CLI only (P10-05)
         services.AddScoped<ICommandHandler<CapturePaperFillsCommand, PaperCaptureOutcome>, CapturePaperFillsHandler>(); // paper fills of armed tickets: insert-only, replayed on stored bars, no order (P10-01)
         services.AddScoped<IQueryHandler<ListPaperEntriesQuery, Result<PaperEntryList>>, ListPaperEntriesHandler>();
         services.AddScoped<IQueryHandler<ListCaptureRunsQuery, Result<CaptureRunList>>, ListCaptureRunsHandler>();
