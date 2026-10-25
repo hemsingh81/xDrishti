@@ -824,7 +824,7 @@ returns every indicator to its first state. <strong>The per-session rule (<a hre
 </tr>
 <tr>
 <td><code>ops</code></td>
-<td><code>commands</code>, <code>service_schedules</code>, <code>service_runs</code>, <code>validation_runs</code>, <code>validation_results</code>, <code>data_quality_issues</code>, <code>audit_log</code>, <code>notifications</code></td>
+<td><code>commands</code>, <code>service_schedules</code>, <code>service_runs</code>, <code>validation_runs</code>, <code>validation_results</code>, <code>data_quality_issues</code>, <code>notifications</code> (no <code>audit_log</code>: the audit is six insert-only stores read by the Audit log screen, <a href="../adr/0117-the-audit-log-screen-is-a-read-model-over-the-six-insert-only-stores-merged-by-keyset-in-memory-with-pattern-redaction.html">ADR 0117</a>)</td>
 </tr>
 <tr>
 <td><code>insights</code></td>
@@ -1022,7 +1022,7 @@ records the configuring actor for audit.</li>
     <a class="prev" href="02-requirements.html"><small>← Previous  [</small>02 · Requirements</a>
     <a class="next" href="04-accounts-access-and-operations.html"><small>Next  ] →</small>04 · Accounts, access &amp; operations</a>
   </nav>
-  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-25 20:17</footer>
+  <footer class="foot">Generated from <code>docs/03-target-architecture.md</code> · 2026-10-25 21:35</footer>
 </main>
 <aside class="toc" aria-label="On this page"><div class="toc-title">On this page</div><a href="#1-architecture-at-a-glance" class="d2">1. Architecture at a glance</a>
 <a href="#2-technology-decisions" class="d2">2. Technology decisions</a>

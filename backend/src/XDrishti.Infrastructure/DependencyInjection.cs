@@ -23,6 +23,7 @@ using XDrishti.Application.Abstractions.Research;
 using XDrishti.Application.Market.Bars.Dhan;
 using XDrishti.Application.Reporting;
 using XDrishti.Infrastructure.Accounts;
+using XDrishti.Infrastructure.Audit;
 using XDrishti.Infrastructure.Auth;
 using XDrishti.Infrastructure.Brokers;
 using XDrishti.Infrastructure.Lab;
@@ -135,6 +136,7 @@ public static class DependencyInjection
         services.AddOptions<PlanVsActualSettings>().Bind(configuration.GetSection(PlanVsActualSettings.SectionName)).ValidateDataAnnotations().ValidateOnStart(); // plan versus actual (spec P8-04)
         services.AddScoped(sp => sp.GetRequiredService<IOptions<PlanVsActualSettings>>().Value);
         services.AddOptions<ModelStoreOptions>().Bind(configuration.GetSection(ModelStoreOptions.SectionName)).ValidateDataAnnotations().ValidateOnStart();
+        services.AddAuditSources(); // the six insert-only stores behind the audit screen, read-only (spec P8-22)
         services.AddScoped<ILearningChangelog, LearningChangelog>(); // the insert-only learning changelog (spec P6-08)
         services.AddScoped<IModelRegistry, ModelRegistry>(); // the registered models and their designations (spec P6-07)
         services.AddScoped<IExperimentLedger, ExperimentLedger>(); // the experiment ledger: insert-only, its 30-day count is the trials (spec P6-11)

@@ -35,5 +35,6 @@ internal sealed class LearningChangelogRecordConfiguration : IEntityTypeConfigur
         builder.HasOne<LearningChangelogRecord>().WithMany().HasForeignKey(x => x.RevertsId).HasConstraintName("fk_learning_changelog_learning_changelog_reverts_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => x.RevertsId).IsUnique().HasFilter("reverts_id IS NOT NULL").HasDatabaseName("uq_learning_changelog_reverts_id");
         builder.HasIndex(x => new { x.Subject, x.Id }).HasDatabaseName("ix_learning_changelog_subject_id");
+        builder.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_learning_changelog_created_at"); // the audit screen (spec P8-22)
     }
 }

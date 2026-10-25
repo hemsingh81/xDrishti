@@ -124,6 +124,7 @@ internal sealed class PlanEventRecordConfiguration : IEntityTypeConfiguration<Pl
         builder.HasOne<ApprovalRecord>().WithMany().HasForeignKey(x => x.ApprovalId).HasConstraintName("fk_plan_events_approvals_approval_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.PlanId, x.Id }).HasDatabaseName("ix_plan_events_plan_id_id");
         builder.HasIndex(x => new { x.ItemId, x.Id }).HasDatabaseName("ix_plan_events_item_id_id");
+        builder.HasIndex(x => x.CreatedAt).HasDatabaseName("ix_plan_events_created_at"); // the audit screen (spec P8-22)
 
         // Continuity: a state is left at most once, so the trail of an item or plan is one chain even without the lock.
         builder.HasIndex(x => new { x.ItemId, x.FromState }).IsUnique().HasFilter("item_id IS NOT NULL").HasDatabaseName("uq_plan_events_item_from");
@@ -157,6 +158,7 @@ internal sealed class ApprovalRecordConfiguration : IEntityTypeConfiguration<App
         builder.HasOne<PlanRecord>().WithMany().HasForeignKey(x => x.PlanId).HasConstraintName("fk_approvals_plans_plan_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<PlanItemRecord>().WithMany().HasForeignKey(x => x.ItemId).HasConstraintName("fk_approvals_plan_items_item_id").OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(x => new { x.PlanId, x.Id }).HasDatabaseName("ix_approvals_plan_id_id");
+        builder.HasIndex(x => x.DecidedAt).HasDatabaseName("ix_approvals_decided_at"); // the audit screen (spec P8-22)
     }
 }
 

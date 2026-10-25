@@ -95,3 +95,6 @@ None. (The owner's Approved is the owner's act; until then the placeholder stays
 ## Review fixes 2026-10-25
 - `q` no longer matches raw stored text in SQL (that was an oracle that could reveal redacted secrets): it matches the redacted summary, kind and displayed actor in the application, with a scan cap and a test per secret shape (criterion 3, test plan).
 - Facts: `AccountEventType` has 73 values (not 66); `useUrlState` exists (P8-02 built); P8-06 and P8-15 are built and not touched; the highest log id is 4801; the next ADR (0102 today) stays "next free at build time".
+
+## Build notes 2026-10-26 (ADR 0117)
+Built as specified, with these resolutions: the detail response is `{ entry, fields }` (nested, not flat); a source with no rows for the filters is `empty` (`no_rows`, or `not_requested` when a filter excludes it); the cursor check catches a garbled cursor only (a filter-set fingerprint is not carried); an unknown kind name is category `other`; the owner's address for `actorKind` is the signed-in session's (the reader never touches `auth.owner_accounts`); the account filter lists the accounts seen in the loaded rows; "24 hours" is yesterday and today in India dates; the last-24-hours notice counts the rows loaded; autonomy rows carry the four switches in the summary text. Volumes of criterion 11 are an integration test (list p95 about 33 ms).
