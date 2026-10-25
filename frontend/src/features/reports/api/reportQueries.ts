@@ -11,6 +11,7 @@ export type EquityView = Schemas['EquityView'];
 export type DistributionView = Schemas['DistributionView'];
 export type InsightsView = Schemas['InsightsView'];
 export type WhatWorksView = Schemas['WhatWorksView'];
+export type BenchmarksView = Schemas['ReportBenchmarksView'];
 export type EvidenceView = Schemas['ReportEvidenceView'];
 
 /** Stored runs are insert-only, so a report stays valid for minutes (P8-08). */
@@ -43,21 +44,20 @@ export const groupsQuery = (query: ReportQuery, lens: string) =>
     retry: false,
   });
 
-export const pivotQuery = (query: ReportQuery, lens: string) =>
+export const pivotQuery = (query: ReportQuery, lens: string, metric = 'expectancy_r') =>
   queryOptions({
-    queryKey: ['reports', 'pivot', lens, queryString(query)] as const,
+    queryKey: ['reports', 'pivot', lens, metric, queryString(query)] as const,
     queryFn: async ({ signal }) =>
-      unwrap(
-        await api.GET('/api/reports/pivot', { params: { query: { ...query, lens, metric: 'expectancy_r' } }, signal }),
-      ),
+      unwrap(await api.GET('/api/reports/pivot', { params: { query: { ...query, lens, metric } }, signal })),
     staleTime,
     retry: false,
   });
 
-export const equityQuery = (query: ReportQuery) =>
+export const equityQuery = (query: ReportQuery, lens?: string) =>
   queryOptions({
-    queryKey: ['reports', 'equity', queryString(query)] as const,
-    queryFn: async ({ signal }) => unwrap(await api.GET('/api/reports/equity', { params: { query }, signal })),
+    queryKey: ['reports', 'equity', lens ?? '', queryString(query)] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET('/api/reports/equity', { params: { query: lens ? { ...query, lens } : query }, signal })),
     staleTime,
     retry: false,
   });
@@ -78,10 +78,28 @@ export const insightsQuery = (query: ReportQuery) =>
     retry: false,
   });
 
-export const whatWorksQuery = (query: ReportQuery) =>
+export const whatWorksQuery = (query: ReportQuery, lens?: string) =>
   queryOptions({
-    queryKey: ['reports', 'what-works', queryString(query)] as const,
-    queryFn: async ({ signal }) => unwrap(await api.GET('/api/reports/what-works', { params: { query }, signal })),
+    queryKey: ['reports', 'what-works', lens ?? '', queryString(query)] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/reports/what-works', { params: { query: lens ? { ...query, lens } : query }, signal }),
+      ),
+    staleTime,
+    retry: false,
+  });
+
+/** Buy and hold per basket and the index over the same window (P8-07). The comparison treats any failure as `unavailable`. */
+export const benchmarksQuery = (query: ReportQuery) =>
+  queryOptions({
+    queryKey: ['reports', 'benchmarks', query.basket ?? '', query.from ?? '', query.to ?? ''] as const,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET('/api/reports/benchmarks', {
+          params: { query: { basket: query.basket, from: query.from, to: query.to } },
+          signal,
+        }),
+      ),
     staleTime,
     retry: false,
   });

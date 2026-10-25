@@ -8,6 +8,7 @@ import { ErrorState, LoadingState, PageHeader } from '@/shared/ui';
 import { runsQuery, whatWorksQuery } from '../api/reportQueries';
 import { useReportFilter } from '../hooks/useReportFilter';
 import { queryString, toQuery, type ReportView } from '../lib/reportFilter';
+import { BasketComparison } from './BasketComparison';
 import { Catalogue } from './Catalogue';
 import { DataUsedPanel } from './DataUsedPanel';
 import { DistributionPanel } from './DistributionPanel';
@@ -17,6 +18,7 @@ import { GroupBars } from './GroupBars';
 import { InsightsList } from './InsightsList';
 import { KpiTiles } from './KpiTiles';
 import { Panel } from './Panel';
+import { PivotBuilder } from './PivotBuilder';
 import { StrategyTimeframePanel } from './StrategyTimeframePanel';
 import { WhatWorksCard } from './WhatWorksCard';
 import { WhatWorksView } from './WhatWorksView';
@@ -129,6 +131,10 @@ export function ReportsPage() {
         <Box sx={{ display: 'grid', gap: 2, minWidth: 0, alignContent: 'start' }}>
           {view === 'what-works' ? (
             <WhatWorksView query={query} />
+          ) : view === 'baskets' ? (
+            <BasketComparison {...panel} />
+          ) : view === 'pivot' ? (
+            <PivotBuilder {...panel} />
           ) : (
             <>
               <WhatWorksCard
