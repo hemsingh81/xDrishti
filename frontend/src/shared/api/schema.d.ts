@@ -2520,6 +2520,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/learning/smart-rules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** What the stored plans say about each smart rule over the newest 1 to 60 planned sessions (plans, default 30): plans on which the rule was unavailable, candidates it moved to reserve by reason, and plans flagged for review. 'Ran on' is never derived (a plan row stores no code for a rule that ran), and every outcome is not_evaluable with its reason and the command that will fill it. 422 learning.invalid. Read only. */
+    get: operations['GetSmartRulesEvidence'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/loss-tags': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Why trades lost, on the report population: per cell the loss count, untagged count, count, share and R lost per tag, growing tags, the worst losses, the number of comparisons with the expected chance flags, and what is not built. Repeat run=KEY:STYLE:EXIT (1 to 50) to name runs; without it the default run set of the reports is used for the runs that record a style and exit. Computed on read. 422 learning.invalid or reports.too_large; 404 learning.run_not_found; 409 learning.cell_duplicate or learning.mixed_basis. Read only. */
+    get: operations['GetLossTags'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/learning/digest': {
     parameters: {
       query?: never;
@@ -4333,6 +4367,34 @@ export interface components {
        */
       probability: number;
     };
+    /** @description One cell. */
+    CellLossTagsView: {
+      /** @description The cell. */
+      cellKey: string;
+      /**
+       * Format: int32
+       * @description Closed trades.
+       */
+      trades: number;
+      /**
+       * Format: int32
+       * @description Losses.
+       */
+      losses: number;
+      /**
+       * Format: int32
+       * @description Losses with no tag.
+       */
+      untagged: number;
+      /** @description Every tag kind with its count (zeros included). */
+      tags: components['schemas']['TagCountView'][];
+      /** @description `evaluated` or `not_evaluable` (too few losses for two windows). */
+      growingState: string;
+      /** @description Why not evaluable; null otherwise. */
+      growingReason: null | string;
+      /** @description Growing tags. */
+      growing: components['schemas']['GrowingTagView'][];
+    };
     /** @description Where a cell is, replayed from its changelog rows (P6-08). */
     CellStateView: {
       /** @description The cell key. */
@@ -6045,6 +6107,21 @@ export interface components {
       cause: null | string;
       message: null | string;
     };
+    /** @description A plan flagged for review. */
+    FlaggedPlanView: {
+      /**
+       * Format: int64
+       * @description The plan.
+       */
+      planId: number;
+      /**
+       * Format: date
+       * @description The planned session.
+       */
+      forDate: string;
+      /** @description The flag code. */
+      code: string;
+    };
     /** @description Freshness against the trading calendar: the last bar and the last closed session; `daysBehind` counts trading days. */
     FreshnessCheck: {
       status: string;
@@ -6308,6 +6385,26 @@ export interface components {
       groups: components['schemas']['GroupView'][];
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
+    };
+    /** @description A tag whose share rose between two windows of losses. */
+    GrowingTagView: {
+      /** @description The kind. */
+      kind: string;
+      /**
+       * Format: int32
+       * @description Losses with the tag in the latest window.
+       */
+      recent: number;
+      /**
+       * Format: int32
+       * @description Losses with the tag in the window before.
+       */
+      earlier: number;
+      /**
+       * Format: int32
+       * @description Losses per window.
+       */
+      window: number;
     };
     /**
      * @description The benchmark of a history. `State` is `ok` (the benchmark lines are filled) or `unavailable` with the `Reason` in words. `Symbol` is the canonical symbol and `Name` the display name of the index (null when the master list has
@@ -7536,6 +7633,66 @@ export interface components {
       daysLeft: number;
       /** Format: double */
       gainPct: null | number;
+    };
+    /** @description A tag on one loss. */
+    LossTagDetailView: {
+      /** @description The kind. */
+      kind: string;
+      /** @description The numbers behind it, as text. */
+      detail: string;
+    };
+    /** @description The evidence block of the loss tags. */
+    LossTagsEvidenceView: {
+      /** @description gross, net or mixed (per run). */
+      basis: string;
+      /**
+       * Format: int32
+       * @description Closed trades read.
+       */
+      n: number;
+      /** @description The runs used. */
+      runs: components['schemas']['RunUsedView'][];
+      /** @description The caller named no run. */
+      defaultRunSet: boolean;
+      /** @description Runs left out of the default set, each with the reason. */
+      skipped: string[];
+      /** @description Inputs a figure would need that do not exist. */
+      unavailableInputs: string[];
+    };
+    /** @description The loss tags of the report population, as the screen shows them (P8-13). Computed on read from the closed trades of stored runs; nothing is stored or applied. */
+    LossTagsView: {
+      /** @description `empty` when no run can be used, else `ok`. */
+      state: string;
+      /**
+       * Format: int32
+       * @description Closed trades read.
+       */
+      tradesRead: number;
+      /**
+       * Format: int32
+       * @description Of them, losses (R below 0).
+       */
+      losses: number;
+      /** @description One entry per cell. */
+      cells: components['schemas']['CellLossTagsView'][];
+      /** @description The worst losses, at most 25. */
+      worst: components['schemas']['WorstLossView'][];
+      /**
+       * Format: int32
+       * @description Cell and tag pairs the growing-tag detector compared.
+       */
+      comparisons: number;
+      /**
+       * Format: double
+       * @description Flags expected by chance alone at an assumed 5 per cent per comparison.
+       */
+      expectedChanceFlags: number;
+      /** @description What the data cannot support yet, verbatim from the analyzer. */
+      notBuilt: string[];
+      /** @description The runs behind the numbers. */
+      evidence: components['schemas']['LossTagsEvidenceView'];
+      /** @description Sentences that must be printed with the result. */
+      limits: string[];
     };
     /** @description Sets the acquisition date of a lot (between 1990-01-01 and today, India). */
     LotDateInput: {
@@ -9102,6 +9259,16 @@ export interface components {
        */
       share: number;
     };
+    /** @description A reserve reason and its count. */
+    ReasonCountView: {
+      /** @description The stable code. */
+      code: string;
+      /**
+       * Format: int32
+       * @description Items.
+       */
+      count: number;
+    };
     /** @description One refresh run. `trigger`: manual · daily · forced; `status`: running · succeeded · unchanged · failed; `phase` (while running): downloading · parsing · enriching · saving. */
     RefreshRunView: {
       /** Format: uuid */
@@ -9530,6 +9697,20 @@ export interface components {
       trading: components['schemas']['TradingRoleView'];
       portfolio: components['schemas']['PortfolioRoleView'];
     };
+    /** @description The outcome metric of a rule. */
+    RuleOutcomeView: {
+      /** @description `not_evaluable` until the input exists. */
+      state: string;
+      /**
+       * Format: double
+       * @description Always null while not evaluable.
+       */
+      value: null | number;
+      /** @description Why it cannot be evaluated. */
+      reason: string;
+      /** @description The verb or slice that would produce it. */
+      command: string;
+    };
     /** @description A stored run a report may use, with whether the default run set takes it and, if not, why. */
     RunListItemView: {
       /** @description The stored run key. */
@@ -9895,6 +10076,69 @@ export interface components {
       /** @description In words, including the check codes that did not pass. */
       reason: string;
     };
+    /** @description One rule. A count that the plan rows cannot give is null with the reason in NotRecorded, never zero. */
+    SmartRuleView: {
+      /** @description gate, throttle, meta, windows or correlation. */
+      id: string;
+      /** @description The rule's name. */
+      name: string;
+      /** @description `empty` (no plan), `observed` (counts from plans) or `not_recorded` (the plan rows carry no code for this rule). */
+      state: string;
+      /**
+       * Format: int32
+       * @description Plans on which the rule ran: always null, a plan row does not prove a run (ADR 0108).
+       */
+      ranOn: null | number;
+      /**
+       * Format: int32
+       * @description Plans on which the rule was unavailable; null when not recorded.
+       */
+      unavailableOn: null | number;
+      /**
+       * Format: int32
+       * @description Plans on which some correlation pairs were not checked; null for the other rules.
+       */
+      partialOn: null | number;
+      /**
+       * Format: int32
+       * @description Candidates moved to reserve; null when not recorded.
+       */
+      moved: null | number;
+      /** @description Reserve reasons with counts. */
+      reasons: components['schemas']['ReasonCountView'][];
+      /** @description Why a count is null; null when every count is known. */
+      notRecorded: null | string;
+      /** @description The effect of the rule: never a number today. */
+      outcome: components['schemas']['RuleOutcomeView'];
+    };
+    /** @description The smart-rule evidence of P8-13: counts read from stored plan rows, and for every rule an outcome that is a named non-value until its input exists. */
+    SmartRulesView: {
+      /** @description `empty` when no plan is stored, else `observed`. */
+      state: string;
+      /**
+       * Format: int32
+       * @description Planned sessions counted.
+       */
+      plansRead: number;
+      /**
+       * Format: date
+       * @description Earliest planned session; null without a plan.
+       */
+      from: null | string;
+      /**
+       * Format: date
+       * @description Latest planned session; null without a plan.
+       */
+      to: null | string;
+      /** @description Where the counts come from. */
+      source: string;
+      /** @description The five rules. */
+      rules: components['schemas']['SmartRuleView'][];
+      /** @description Plans flagged for review (a rule removed half or more of its candidates). */
+      flaggedPlans: components['schemas']['FlaggedPlanView'][];
+      /** @description What the counts do not say. */
+      limits: string[];
+    };
     /**
      * @description Spikes: a 1-minute move greater than `spikeMultiple` times the median move and greater than 1 %. One the next bar takes back (at least half) is a spike (a warning); one that is not
      *     taken back is a `largeMove`, a real jump, only reported. `thresholdPercent` is the move a bar needed to count.
@@ -10180,6 +10424,26 @@ export interface components {
       isHealthy: boolean;
       /** Format: date-time */
       checkedAt: string;
+    };
+    /** @description A tag kind in a cell. */
+    TagCountView: {
+      /** @description The kind, snake case. */
+      kind: string;
+      /**
+       * Format: int32
+       * @description Losses with the tag.
+       */
+      count: number;
+      /**
+       * Format: double
+       * @description Of the cell's losses; null when the cell has no loss. Tags overlap, shares do not add to 1.
+       */
+      share: null | number;
+      /**
+       * Format: double
+       * @description Sum of the (negative) R of the losses carrying the tag.
+       */
+      lostR: number;
     };
     /** @description One ticket with its grade as the API shows it. */
     TicketGradeView: {
@@ -10824,6 +11088,20 @@ export interface components {
       nonAdditive: boolean;
       /** @description The evidence of the report. */
       evidence: components['schemas']['ReportEvidenceView'];
+    };
+    /** @description One of the worst losses. */
+    WorstLossView: {
+      /** @description The trade key. */
+      key: string;
+      /** @description The cell. */
+      cellKey: string;
+      /**
+       * Format: double
+       * @description The R of the loss.
+       */
+      r: number;
+      /** @description Its tags with the numbers behind each. */
+      tags: components['schemas']['LossTagDetailView'][];
     };
     /** @description The out-of-sample trades of one calendar year. */
     YearView: {
@@ -17105,6 +17383,86 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LearningPhaseCheckView'];
+        };
+      };
+    };
+  };
+  GetSmartRulesEvidence: {
+    parameters: {
+      query?: {
+        plans?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SmartRulesView'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetLossTags: {
+    parameters: {
+      query?: {
+        run?: string[];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LossTagsView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
         };
       };
     };

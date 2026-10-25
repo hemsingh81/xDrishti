@@ -80,6 +80,18 @@ const entries = [
     slice: 'P8-04',
     load: () => import('../components/ChecksTab').then((m) => ({ default: m.ChecksTab })),
   },
+  {
+    id: 'smart-rules',
+    label: 'Smart rules',
+    slice: 'P8-13',
+    load: () => import('../components/SmartRulesTab').then((m) => ({ default: m.SmartRulesTab })),
+  },
+  {
+    id: 'loss-tags',
+    label: 'Loss tags',
+    slice: 'P8-13',
+    load: () => import('../components/LossTagsTab').then((m) => ({ default: m.LossTagsTab })),
+  },
 ] as const satisfies readonly TabEntry[];
 
 /** The ids of the registry, checked by the compiler wherever a tab is named. */
@@ -98,10 +110,7 @@ export const tabs: readonly LearningTab[] = entries.map(({ load, ...tab }): Lear
 }));
 
 /** Tabs that are planned and not built: named on the Overview, never rendered as tabs. Remove an entry when its tab is added. */
-export const plannedTabs: readonly { label: string; slice: string }[] = [
-  { label: 'Journey', slice: 'P8-12' },
-  { label: 'Smart rules', slice: 'P8-13' },
-];
+export const plannedTabs: readonly { label: string; slice: string }[] = [{ label: 'Journey', slice: 'P8-12' }];
 
 export const plannedText = (): string =>
   `Not built yet: ${plannedTabs.map((tab) => `${tab.label} (${tab.slice})`).join(', ')}`;

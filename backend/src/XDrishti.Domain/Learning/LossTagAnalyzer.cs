@@ -55,6 +55,7 @@ public static class LossTagAnalyzer
                 .OrderBy(l => l.ExitEpochSeconds).ThenBy(l => l.Key, StringComparer.Ordinal)
                 .ToList();
             var counts = kinds.Select(k => losses.Count(l => l.Tags.Any(t => t.Kind == k))).ToList();
+            var lostR = kinds.Select(k => losses.Where(l => l.Tags.Any(t => t.Kind == k)).Sum(l => l.R)).ToList();
             var growing = new List<GrowingTag>();
             var w = options.GrowingWindow;
             if (losses.Count >= 2 * w)
@@ -73,7 +74,7 @@ public static class LossTagAnalyzer
                 }
             }
 
-            cells.Add(new CellLossTags(group.Key, group.Count(), losses.Count, counts, losses.Count(l => l.Tags.Count == 0), growing));
+            cells.Add(new CellLossTags(group.Key, group.Count(), losses.Count, counts, losses.Count(l => l.Tags.Count == 0), growing, lostR));
             allLosses.AddRange(losses);
         }
 

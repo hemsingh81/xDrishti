@@ -8580,6 +8580,110 @@
         }
       }
     },
+    "/api/learning/smart-rules": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "What the stored plans say about each smart rule over the newest 1 to 60 planned sessions (plans, default 30): plans on which the rule was unavailable, candidates it moved to reserve by reason, and plans flagged for review. 'Ran on' is never derived (a plan row stores no code for a rule that ran), and every outcome is not_evaluable with its reason and the command that will fill it. 422 learning.invalid. Read only.",
+        "operationId": "GetSmartRulesEvidence",
+        "parameters": [
+          {
+            "name": "plans",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmartRulesView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/learning/loss-tags": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "Why trades lost, on the report population: per cell the loss count, untagged count, count, share and R lost per tag, growing tags, the worst losses, the number of comparisons with the expected chance flags, and what is not built. Repeat run=KEY:STYLE:EXIT (1 to 50) to name runs; without it the default run set of the reports is used for the runs that record a style and exit. Computed on read. 422 learning.invalid or reports.too_large; 404 learning.run_not_found; 409 learning.cell_duplicate or learning.mixed_basis. Read only.",
+        "operationId": "GetLossTags",
+        "parameters": [
+          {
+            "name": "run",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LossTagsView"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/learning/digest": {
       "get": {
         "tags": [
@@ -14541,6 +14645,66 @@
         },
         "description": "One point of the calibration table of a model: a raw score and the probability it maps to."
       },
+      "CellLossTagsView": {
+        "required": [
+          "cellKey",
+          "trades",
+          "losses",
+          "untagged",
+          "tags",
+          "growingState",
+          "growingReason",
+          "growing"
+        ],
+        "type": "object",
+        "properties": {
+          "cellKey": {
+            "type": "string",
+            "description": "The cell."
+          },
+          "trades": {
+            "type": "integer",
+            "description": "Closed trades.",
+            "format": "int32"
+          },
+          "losses": {
+            "type": "integer",
+            "description": "Losses.",
+            "format": "int32"
+          },
+          "untagged": {
+            "type": "integer",
+            "description": "Losses with no tag.",
+            "format": "int32"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagCountView"
+            },
+            "description": "Every tag kind with its count (zeros included)."
+          },
+          "growingState": {
+            "type": "string",
+            "description": "`evaluated` or `not_evaluable` (too few losses for two windows)."
+          },
+          "growingReason": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why not evaluable; null otherwise."
+          },
+          "growing": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrowingTagView"
+            },
+            "description": "Growing tags."
+          }
+        },
+        "description": "One cell."
+      },
       "CellStateView": {
         "required": [
           "cell",
@@ -19228,6 +19392,31 @@
         },
         "description": "What a first import did. Status: \"imported\" (the holdings were created; the counts say how many), \"skipped\" (the account already has holdings, nothing was\nimported), \"deferred\" (the account is not connected to Dhan, or the Portfolio role is off: the first sync imports every holding, dated FirstImportDate) or\n\"failed\" (the settings were saved but the import was not: ErrorCode is `portfolio.import_failed`, Cause the code of the reason, for example\n`portfolio.not_connected`, `portfolio.sync_running`; Message says what to do; save again or press Sync now to retry). Imported counts holdings created, DefaultDated those\namong them dated by the first import date, AlreadyImported keys the account had already, Unknown keys Dhan no longer lists. Redated counts the lots that\nfollowed a changed first import date (imported lots still on the default date; they stay flagged as such), RedateSkipped the ones that could not follow\nbecause they were closed before the new date; both are 0 when the date did not change or the account has no holdings (ADR 0015)."
       },
+      "FlaggedPlanView": {
+        "required": [
+          "planId",
+          "forDate",
+          "code"
+        ],
+        "type": "object",
+        "properties": {
+          "planId": {
+            "type": "integer",
+            "description": "The plan.",
+            "format": "int64"
+          },
+          "forDate": {
+            "type": "string",
+            "description": "The planned session.",
+            "format": "date"
+          },
+          "code": {
+            "type": "string",
+            "description": "The flag code."
+          }
+        },
+        "description": "A plan flagged for review."
+      },
       "FreshnessCheck": {
         "required": [
           "status",
@@ -19882,6 +20071,37 @@
           }
         },
         "description": "The groups of a report for a lens, in a fixed order (a value that was not recorded last), with the evidence of the report. bool GroupsView.NonAdditive is true when the basket dimension put a trade into more than one group, so the groups must not be summed."
+      },
+      "GrowingTagView": {
+        "required": [
+          "kind",
+          "recent",
+          "earlier",
+          "window"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The kind."
+          },
+          "recent": {
+            "type": "integer",
+            "description": "Losses with the tag in the latest window.",
+            "format": "int32"
+          },
+          "earlier": {
+            "type": "integer",
+            "description": "Losses with the tag in the window before.",
+            "format": "int32"
+          },
+          "window": {
+            "type": "integer",
+            "description": "Losses per window.",
+            "format": "int32"
+          }
+        },
+        "description": "A tag whose share rose between two windows of losses."
       },
       "HistoryBenchmark": {
         "required": [
@@ -23530,6 +23750,146 @@
           }
         },
         "description": "A profitable open lot that turns 12 months old soon (the `long_term_soon` rule): `LongTermOn` is the date it is 12 months old, `DaysLeft` the days until then, `GainPct` its unrealised gain in percent (null for a lot that cost nothing, for example bonus shares: the gain is then the whole value and has no percentage)."
+      },
+      "LossTagDetailView": {
+        "required": [
+          "kind",
+          "detail"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The kind."
+          },
+          "detail": {
+            "type": "string",
+            "description": "The numbers behind it, as text."
+          }
+        },
+        "description": "A tag on one loss."
+      },
+      "LossTagsEvidenceView": {
+        "required": [
+          "basis",
+          "n",
+          "runs",
+          "defaultRunSet",
+          "skipped",
+          "unavailableInputs"
+        ],
+        "type": "object",
+        "properties": {
+          "basis": {
+            "type": "string",
+            "description": "gross, net or mixed (per run)."
+          },
+          "n": {
+            "type": "integer",
+            "description": "Closed trades read.",
+            "format": "int32"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunUsedView"
+            },
+            "description": "The runs used."
+          },
+          "defaultRunSet": {
+            "type": "boolean",
+            "description": "The caller named no run."
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Runs left out of the default set, each with the reason."
+          },
+          "unavailableInputs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Inputs a figure would need that do not exist."
+          }
+        },
+        "description": "The evidence block of the loss tags."
+      },
+      "LossTagsView": {
+        "required": [
+          "state",
+          "tradesRead",
+          "losses",
+          "cells",
+          "worst",
+          "comparisons",
+          "expectedChanceFlags",
+          "notBuilt",
+          "evidence",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`empty` when no run can be used, else `ok`."
+          },
+          "tradesRead": {
+            "type": "integer",
+            "description": "Closed trades read.",
+            "format": "int32"
+          },
+          "losses": {
+            "type": "integer",
+            "description": "Of them, losses (R below 0).",
+            "format": "int32"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellLossTagsView"
+            },
+            "description": "One entry per cell."
+          },
+          "worst": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorstLossView"
+            },
+            "description": "The worst losses, at most 25."
+          },
+          "comparisons": {
+            "type": "integer",
+            "description": "Cell and tag pairs the growing-tag detector compared.",
+            "format": "int32"
+          },
+          "expectedChanceFlags": {
+            "type": "number",
+            "description": "Flags expected by chance alone at an assumed 5 per cent per comparison.",
+            "format": "double"
+          },
+          "notBuilt": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the data cannot support yet, verbatim from the analyzer."
+          },
+          "evidence": {
+            "description": "The runs behind the numbers.",
+            "$ref": "#/components/schemas/LossTagsEvidenceView"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sentences that must be printed with the result."
+          }
+        },
+        "description": "The loss tags of the report population, as the screen shows them (P8-13). Computed on read from the closed trades of stored runs; nothing is stored or applied."
       },
       "LotDateInput": {
         "required": [
@@ -27446,6 +27806,25 @@
         },
         "description": "Trades whose favourable excursion reached the level, and their share of the trades with a recorded excursion."
       },
+      "ReasonCountView": {
+        "required": [
+          "code",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The stable code."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Items.",
+            "format": "int32"
+          }
+        },
+        "description": "A reserve reason and its count."
+      },
       "RefreshRunView": {
         "required": [
           "id",
@@ -28716,6 +29095,38 @@
           }
         }
       },
+      "RuleOutcomeView": {
+        "required": [
+          "state",
+          "value",
+          "reason",
+          "command"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`not_evaluable` until the input exists."
+          },
+          "value": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Always null while not evaluable.",
+            "format": "double"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why it cannot be evaluated."
+          },
+          "command": {
+            "type": "string",
+            "description": "The verb or slice that would produce it."
+          }
+        },
+        "description": "The outcome metric of a rule."
+      },
       "RunListItemView": {
         "required": [
           "runKey",
@@ -29754,6 +30165,152 @@
         },
         "description": "A ticket approve-all left alone, and why."
       },
+      "SmartRuleView": {
+        "required": [
+          "id",
+          "name",
+          "state",
+          "ranOn",
+          "unavailableOn",
+          "partialOn",
+          "moved",
+          "reasons",
+          "notRecorded",
+          "outcome"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "gate, throttle, meta, windows or correlation."
+          },
+          "name": {
+            "type": "string",
+            "description": "The rule's name."
+          },
+          "state": {
+            "type": "string",
+            "description": "`empty` (no plan), `observed` (counts from plans) or `not_recorded` (the plan rows carry no code for this rule)."
+          },
+          "ranOn": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Plans on which the rule ran: always null, a plan row does not prove a run (ADR 0108).",
+            "format": "int32"
+          },
+          "unavailableOn": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Plans on which the rule was unavailable; null when not recorded.",
+            "format": "int32"
+          },
+          "partialOn": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Plans on which some correlation pairs were not checked; null for the other rules.",
+            "format": "int32"
+          },
+          "moved": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "Candidates moved to reserve; null when not recorded.",
+            "format": "int32"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonCountView"
+            },
+            "description": "Reserve reasons with counts."
+          },
+          "notRecorded": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Why a count is null; null when every count is known."
+          },
+          "outcome": {
+            "description": "The effect of the rule: never a number today.",
+            "$ref": "#/components/schemas/RuleOutcomeView"
+          }
+        },
+        "description": "One rule. A count that the plan rows cannot give is null with the reason in NotRecorded, never zero."
+      },
+      "SmartRulesView": {
+        "required": [
+          "state",
+          "plansRead",
+          "from",
+          "to",
+          "source",
+          "rules",
+          "flaggedPlans",
+          "limits"
+        ],
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "description": "`empty` when no plan is stored, else `observed`."
+          },
+          "plansRead": {
+            "type": "integer",
+            "description": "Planned sessions counted.",
+            "format": "int32"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Earliest planned session; null without a plan.",
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Latest planned session; null without a plan.",
+            "format": "date"
+          },
+          "source": {
+            "type": "string",
+            "description": "Where the counts come from."
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SmartRuleView"
+            },
+            "description": "The five rules."
+          },
+          "flaggedPlans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlaggedPlanView"
+            },
+            "description": "Plans flagged for review (a rule removed half or more of its candidates)."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the counts do not say."
+          }
+        },
+        "description": "The smart-rule evidence of P8-13: counts read from stored plan rows, and for every rule an outcome that is a named non-value until its input exists."
+      },
       "SpikeCheck": {
         "required": [
           "status",
@@ -30603,6 +31160,40 @@
             "format": "date-time"
           }
         }
+      },
+      "TagCountView": {
+        "required": [
+          "kind",
+          "count",
+          "share",
+          "lostR"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The kind, snake case."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Losses with the tag.",
+            "format": "int32"
+          },
+          "share": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "description": "Of the cell's losses; null when the cell has no loss. Tags overlap, shares do not add to 1.",
+            "format": "double"
+          },
+          "lostR": {
+            "type": "number",
+            "description": "Sum of the (negative) R of the losses carrying the tag.",
+            "format": "double"
+          }
+        },
+        "description": "A tag kind in a cell."
       },
       "TicketGradeView": {
         "required": [
@@ -32380,6 +32971,38 @@
           }
         },
         "description": "\"What works, in which basket, on which timeframe, with which exit\": the cells with enough sample ranked by the credible lower bound of expectancy, the rest after them with the reason, how many cells were looked at, and when no cell qualifies the answer\n`nothing_qualifies` with the counts. An answer, not an error."
+      },
+      "WorstLossView": {
+        "required": [
+          "key",
+          "cellKey",
+          "r",
+          "tags"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The trade key."
+          },
+          "cellKey": {
+            "type": "string",
+            "description": "The cell."
+          },
+          "r": {
+            "type": "number",
+            "description": "The R of the loss.",
+            "format": "double"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LossTagDetailView"
+            },
+            "description": "Its tags with the numbers behind each."
+          }
+        },
+        "description": "One of the worst losses."
       },
       "YearView": {
         "required": [

@@ -7,4 +7,5 @@ namespace XDrishti.Domain.Learning;
 /// <param name="Counts">Losses with each tag, for every kind in the order of <see cref="LossTagKind"/> (zeros included).</param>
 /// <param name="Untagged">Losses with no tag.</param>
 /// <param name="Growing">Growing tags of the cell.</param>
-public sealed record CellLossTags(string CellKey, int Trades, int Losses, IReadOnlyList<int> Counts, int Untagged, IReadOnlyList<GrowingTag> Growing);
+/// <param name="LostR">Per tag, parallel to <paramref name="Counts"/>: the sum of the (negative) R of the losses carrying the tag. Tags overlap, so the sums add to more than the cell's total; null when the producer did not compute it.</param>
+public sealed record CellLossTags(string CellKey, int Trades, int Losses, IReadOnlyList<int> Counts, int Untagged, IReadOnlyList<GrowingTag> Growing, IReadOnlyList<double>? LostR = null);

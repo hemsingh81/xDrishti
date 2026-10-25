@@ -176,7 +176,7 @@ describe('Learning overview', () => {
     mountLearning();
     renderLearning();
 
-    expect(await screen.findByText(/Not built yet: Journey \(P8-12\), Smart rules \(P8-13\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/Not built yet: Journey \(P8-12\)/)).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Overview',
       'Setups',
@@ -188,6 +188,8 @@ describe('Learning overview', () => {
       'Decisions',
       'Autonomy',
       'Phase checks',
+      'Smart rules',
+      'Loss tags',
     ]);
   });
 
