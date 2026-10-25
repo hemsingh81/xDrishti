@@ -8,8 +8,8 @@ internal static class Golden
     /// <summary>The header of the golden files of the cards and the index (P3-04c): they belong to the format <c>xd-sim-export-4</c> (P3-04d).</summary>
     public const string CardHeader = "export xd-sim-export-4";
 
-    /// <summary>The header of the golden files of the verification pack (P3-09): they belong to the format <c>xd-verify-pack-1</c>.</summary>
-    public const string PackHeader = "export xd-verify-pack-1";
+    /// <summary>The header of the golden files of the verification pack (P3-09): they belong to the format <c>xd-verify-pack-2</c>.</summary>
+    public const string PackHeader = "export xd-verify-pack-2";
 
     public static void CheckPack(string name, string rendered) =>
         XDrishti.Tests.Golden.GoldenFile.Check(name, rendered, PackHeader, "XDrishti.SimExport.Tests.csproj");

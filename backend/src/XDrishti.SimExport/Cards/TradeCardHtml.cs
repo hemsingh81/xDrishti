@@ -15,6 +15,11 @@ public static class TradeCardHtml
     /// <summary>The most reads of one condition a card lists; the compiler allows 64 and a page may not pass 150 KB, so a longer list is cut and says so.</summary>
     private const int MaxReadsShown = 12;
 
+    /// <summary>The most bytes of table rows the whole conditions section may hold, and the longest condition text printed; a card page may not pass 150 KB (rendering throws), so one large strategy must not be able to fail an export.</summary>
+    private const int MaxSectionBytes = 40 * 1024;
+
+    private const int MaxTextShown = 500;
+
     /// <summary>Writes the card of <paramref name="data"/> as UTF-8 to the sink.</summary>
     /// <param name="sink">Where the bytes go.</param>
     /// <param name="data">The trade and the bars of its day.</param>
@@ -204,11 +209,13 @@ public static class TradeCardHtml
 
         page.Append("<p class=\"note\">decision at ").Append(Html.Text(CardFormat.Clock(explanation.DecisionEpochSeconds))).Append(" India time, evaluated on ").Append(Html.Text(ExportSpellings.Of(explanation.Timeframe)))
             .Append(" bars. Recomputed by the engine that made the trade, from the same bars. A condition that is unknown never fires. A lag is the number of closed bars of the feature's own timeframe back from the latest.</p>\n");
+        var budget = MaxSectionBytes;
         foreach (var section in explanation.Sections)
         {
             page.Append("<h3>").Append(Html.Text(section.SectionName)).Append(" (").Append(section.Mode == "any" ? "any of" : "all of").Append(")</h3>\n<table>\n<thead>");
             CardPage.Row(page, "th", "condition", "truth", "reads");
             page.Append("</thead>\n<tbody>\n");
+            var shown = 0;
             foreach (var item in section.Items)
             {
                 var omitted = item.ReadsOmitted || item.Reads.Count > MaxReadsShown;
@@ -218,10 +225,25 @@ public static class TradeCardHtml
                     reads += (reads.Length == 0 ? string.Empty : "; ") + "more reads not listed";
                 }
 
-                CardPage.Row(page, "td", item.Text, item.Truth.ToString().ToLowerInvariant(), reads.Length == 0 ? "no feature read" : reads);
+                var text = item.Text.Length > MaxTextShown ? item.Text[..MaxTextShown] + "..." : item.Text;
+                var row = new StringBuilder();
+                CardPage.Row(row, "td", text, item.Truth.ToString().ToLowerInvariant(), reads.Length == 0 ? "no feature read" : reads);
+                var bytes = Encoding.UTF8.GetByteCount(row.ToString());
+                if (bytes > budget)
+                {
+                    break;
+                }
+
+                budget -= bytes;
+                page.Append(row);
+                shown++;
             }
 
             page.Append("</tbody>\n</table>\n");
+            if (shown < section.Items.Count)
+            {
+                page.Append("<p class=\"note\">").Append(Html.Text(CardFormat.Int(section.Items.Count - shown) + " more conditions not listed (the card keeps its section under " + CardFormat.Int(MaxSectionBytes / 1024) + " KB)")).Append("</p>\n");
+            }
         }
     }
 

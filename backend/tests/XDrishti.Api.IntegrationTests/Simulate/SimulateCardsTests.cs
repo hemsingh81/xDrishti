@@ -222,6 +222,32 @@ public sealed class SimulateCardsTests : IDisposable
     }
 
     [Fact]
+    public async Task A_mismatch_of_the_recomputation_is_exit_1_names_the_instrument_and_the_field_writes_nothing_and_logs_4486()
+    {
+        _verb.Cards = _ => Result.Failure<IReadOnlyList<TradeCardData>>(SimulationErrors.CardsMismatch("NSE:AAA", "StopPrice", "the replay gives another StopPrice for the trade X"));
+
+        var exit = await _verb.RunAsync(Common + " --cards 5", Ct);
+
+        exit.ShouldBe(1);
+        _verb.Error.ToString().ShouldContain("NSE:AAA: StopPrice: the replay gives another StopPrice");
+        Directory.Exists(_verb.ExportRoot).ShouldBeFalse("nothing was written, not even the root");
+        _verb.Out.ToString().ShouldBeEmpty();
+        var line = _verb.Logs.Lines.Single(l => l.EventId == 4486);
+        line.Arguments.Where(a => a.Key is "Symbol" or "Difference").Select(a => a.Value).ShouldBe(["NSE:AAA", "StopPrice"]);
+    }
+
+    [Fact]
+    public async Task A_successful_run_that_left_no_basis_is_an_internal_error_exit_3_and_writes_nothing_instead_of_cards_that_say_not_recomputed()
+    {
+        _verb.LeaveNoBasis = true;
+
+        var exit = await _verb.RunAsync(Common + " --cards 5", Ct);
+
+        exit.ShouldBe(3);
+        Directory.Exists(_verb.ExportRoot).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task The_second_read_comes_after_the_run_and_before_any_file_and_the_chosen_keys_are_the_selection()
     {
         var order = new List<string>();

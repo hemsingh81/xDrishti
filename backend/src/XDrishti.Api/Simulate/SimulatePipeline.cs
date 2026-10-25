@@ -94,6 +94,12 @@ internal static class SimulatePipeline
         return await handler.HandleAsync(new BuildTradeCardsQuery(run, tradeKeys, basis), cancellationToken);
     }
 
+    /// <summary>
+    /// The basis a successful live run left in its sink (P3-04d). A live run always sets it, so a null here is a defect, not a stored run: it fails the verb (exit 3) instead of writing cards that say "not recomputed".
+    /// </summary>
+    public static ExplainBasis RequireBasis(ExplainBasisSink sink) =>
+        sink.Basis ?? throw new InvalidOperationException("A successful run left no basis for the trade cards (internal error): the cards would not be recomputed.");
+
     /// <summary>Logs the first stale difference, or the first mismatch, of a refused second read, if the error is one.</summary>
     public static void LogStale(ILogger logger, Error error)
     {

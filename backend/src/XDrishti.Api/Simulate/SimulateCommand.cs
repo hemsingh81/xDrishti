@@ -128,7 +128,7 @@ internal static class SimulateCommand
 
         // selection, then the second read (a stale read refuses with nothing written), then render and write
         var choices = CardSelection.Choose(run, options.Cards);
-        var cards = await SimulatePipeline.CardsAsync(provider, run, [.. choices.Select(c => c.Trade.Trade.Key)], basis.Basis, cancellationToken);
+        var cards = await SimulatePipeline.CardsAsync(provider, run, [.. choices.Select(c => c.Trade.Trade.Key)], SimulatePipeline.RequireBasis(basis), cancellationToken);
         if (cards.IsFailure)
         {
             SimulatePipeline.LogStale(logger, cards.Error);

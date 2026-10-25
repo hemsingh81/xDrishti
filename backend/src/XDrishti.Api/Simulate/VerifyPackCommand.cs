@@ -97,7 +97,7 @@ internal static class VerifyPackCommand
         phaseStart = time.GetTimestamp();
         var rules = SimulatePipeline.Rules(FillsMode.Modelled);
         var runs = new List<SimulationRun>(options.Strategies.Count);
-        var bases = new List<ExplainBasis?>(options.Strategies.Count);
+        var bases = new List<ExplainBasis>(options.Strategies.Count);
         foreach (var strategy in options.Strategies)
         {
             // the registered defaults and the timeframe of the built-in: a pack checks the rule set as it ships
@@ -110,7 +110,7 @@ internal static class VerifyPackCommand
             }
 
             runs.Add(ran.Value);
-            bases.Add(sink.Basis);
+            bases.Add(SimulatePipeline.RequireBasis(sink));
         }
 
         var runTime = time.GetElapsedTime(phaseStart);

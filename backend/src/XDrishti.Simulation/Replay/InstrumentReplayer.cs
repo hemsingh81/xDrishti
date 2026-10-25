@@ -68,10 +68,11 @@ public static class InstrumentReplayer
                     }
                 }
             }
-        }).Members[0];
+        }).Members[0];   // a plain strategy has one member; for a comparison the explanation is of the first candidate, whose entries every member shares (one scan)
         return new ExplainResult(replay, found);
     }
 
+    /// <summary>The conditions of the candidate's side with the values the scanner recorded. The recorded truths are those the scanner folded into the decision; the lists are folded again by the cards handler with the same Kleene rules as <c>BoundSide.Evaluate</c>.</summary>
     private static TradeExplanation? ExplanationOf(CompiledSide side, EntryCandidate candidate)
     {
         var items = candidate.Trace.Items;
@@ -97,8 +98,14 @@ public static class InstrumentReplayer
                 var reads = new List<FeatureReadTrace>(condition.Reads.Count);
                 foreach (var read in condition.Reads)
                 {
-                    var lags = read.FeatureIndex >= 0 && read.FeatureIndex < trace.Values.Count ? trace.Values[read.FeatureIndex].Lags : [];
-                    var value = read.Lag < lags.Count && !double.IsNaN(lags[read.Lag]) ? lags[read.Lag] : (double?)null;
+                    // A read the trace cannot answer is a defect of the engine (a lag past the history the condition keeps), never "not ready": it throws.
+                    if (read.FeatureIndex < 0 || read.FeatureIndex >= trace.Values.Count || read.Lag >= trace.Values[read.FeatureIndex].Lags.Count)
+                    {
+                        throw new InvalidOperationException("The condition `" + condition.Source + "` reads " + read.Name + " at lag " + read.Lag.ToString(CultureInfo.InvariantCulture) + ", which the decision trace does not hold.");
+                    }
+
+                    var recorded = trace.Values[read.FeatureIndex].Lags[read.Lag];
+                    var value = double.IsNaN(recorded) ? (double?)null : recorded;
                     reads.Add(new FeatureReadTrace(read.Name, read.Timeframe, read.Lag, value));
                 }
 

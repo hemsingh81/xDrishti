@@ -1,4 +1,4 @@
-export xd-verify-pack-1
+export xd-verify-pack-2
 <!DOCTYPE html>
 <html lang="en">
 <head>

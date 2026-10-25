@@ -105,6 +105,9 @@ internal sealed class FakeVerb : IDisposable
     /// <summary>What the run handler answers; by default the fabricated standard run.</summary>
     public Func<RunSimulationQuery, Result<SimulationRun>> Run { get; set; } = _ => Result.Success(FabricatedRun.Standard());
 
+    /// <summary>Makes the run handler leave no basis in the sink, which a live run never does (an internal error of the verb).</summary>
+    public bool LeaveNoBasis { get; set; }
+
     /// <summary>An exception the run handler throws instead of answering.</summary>
     public Func<Exception?> RunThrows { get; set; } = () => null;
 
@@ -137,6 +140,28 @@ internal sealed class FakeVerb : IDisposable
             }),
         ];
         return Result.Success(cards);
+    }
+
+    /// <summary>A live run leaves its basis in the sink of the query (P3-04d); the fake run does too, with a strategy handle nothing recomputes with.</summary>
+    private Result<SimulationRun> WithBasis(RunSimulationQuery query, Result<SimulationRun> result)
+    {
+        if (result.IsSuccess && !LeaveNoBasis && query.BasisSink is { } sink)
+        {
+            sink.Basis = new ExplainBasis(new StubPrepared(result.Value.Strategy), new XDrishti.Domain.Market.Calendar.TradingCalendar(), new Dictionary<Guid, DateOnly>());
+        }
+
+        return result;
+    }
+
+    private sealed class StubPrepared(StrategyRecord record) : IPreparedStrategy
+    {
+        public StrategyRecord Record => record;
+
+        public IReadOnlyList<CandidateRecord> Candidates { get; } = [new CandidateRecord(record.Id, null, record, record.DefinitionSha256)];
+
+        public bool HoldsOvernight => false;
+
+        public IReadOnlyList<FieldError> Warnings { get; } = [];
     }
 
     public static InstrumentDetail Detail(Guid id, string symbol, string type = "share", decimal? tick = 5m) =>
@@ -185,7 +210,7 @@ internal sealed class FakeVerb : IDisposable
         services.AddSingleton<IQueryHandler<GetBasketMembersQuery, Result<BasketMembers>>>(
             new FuncHandler<GetBasketMembersQuery, Result<BasketMembers>>(
                 q => Members.TryGetValue(q.BasketId, out var m) ? Result.Success(m) : Result.Failure<BasketMembers>(XDrishti.Domain.Common.Error.NotFound("baskets.not_found", "no such basket"))));
-        RunHandler = new FuncHandler<RunSimulationQuery, Result<SimulationRun>>(q => RunThrows() is { } failure ? throw failure : Run(q));
+        RunHandler = new FuncHandler<RunSimulationQuery, Result<SimulationRun>>(q => RunThrows() is { } failure ? throw failure : WithBasis(q, Run(q)));
         services.AddSingleton<IQueryHandler<RunSimulationQuery, Result<SimulationRun>>>(RunHandler);
         CardsHandler = new FuncHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>(q => Cards(q));
         services.AddSingleton<IQueryHandler<BuildTradeCardsQuery, Result<IReadOnlyList<TradeCardData>>>>(CardsHandler);

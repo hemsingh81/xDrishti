@@ -1,4 +1,4 @@
-export xd-verify-pack-1
+export xd-verify-pack-2
 exploration: signal-level mechanics on past data, not evidence of an edge
 fills: modelled
 entry limit: +0.1 %

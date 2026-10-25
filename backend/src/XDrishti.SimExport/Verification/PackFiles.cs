@@ -17,8 +17,8 @@ namespace XDrishti.SimExport.Verification;
 /// </summary>
 public static class PackFiles
 {
-    /// <summary>The format string of the pack.</summary>
-    public const string Format = "xd-verify-pack-1";
+    /// <summary>The format string of the pack. <c>xd-verify-pack-1</c> was P3-09; the cards of the pack carry the conditions at the decision bar since P3-04d, so it is <c>xd-verify-pack-2</c> and the pack key and export key change.</summary>
+    public const string Format = "xd-verify-pack-2";
 
     /// <summary>The folder below the export root.</summary>
     public const string Folder = "verify";

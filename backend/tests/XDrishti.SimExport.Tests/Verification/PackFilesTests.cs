@@ -41,7 +41,7 @@ public sealed partial class PackFilesTests
         using var json = JsonDocument.Parse(Json(plan, pack));
         var root = json.RootElement;
 
-        root.GetProperty("format").GetString().ShouldBe("xd-verify-pack-1");
+        root.GetProperty("format").GetString().ShouldBe("xd-verify-pack-2");
         root.GetProperty("seed").GetString().ShouldBe(Seed);
         root.GetProperty("sampler").GetString().ShouldBe("verify-sampler-1");
         root.TryGetProperty("row_count", out _).ShouldBeFalse("the number of rows would reveal how many edge picks were added");

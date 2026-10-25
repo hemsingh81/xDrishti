@@ -1,4 +1,4 @@
-export xd-verify-pack-1
+export xd-verify-pack-2
 seq,trade_key,kind,chart,seen_entry_time,seen_entry_price,seen_stop,seen_target,seen_exit_time,seen_exit_price,seen_exit_reason,seen_r,ext_open,ext_high,ext_low,ext_close,verdict,finding,notes,signed_on
 1,ORB|NSE:M&M|Sell|2026-03-03,trade,,,,,,,,,,,,,,,,,
 2,ORB|NSE:AAA|Buy|2026-03-02,trade,,,,,,,,,,,,,,,,,

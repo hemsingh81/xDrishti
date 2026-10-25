@@ -103,11 +103,12 @@ public sealed class ConditionsSectionTests
     }
 
     [Fact]
-    public void The_largest_allowed_condition_lists_keep_the_card_far_below_the_page_limit_and_two_renders_are_byte_identical()
+    public void The_largest_allowed_lists_with_long_texts_are_cut_by_bytes_so_the_card_stays_under_the_page_limit_and_two_renders_are_byte_identical()
     {
         var reads = Enumerable.Range(0, 64).Select(i => Read("ema(" + (i + 1).ToString(System.Globalization.CultureInfo.InvariantCulture) + ")", i % 5, 100.123456 + i)).ToList();
-        var items = Enumerable.Range(0, 100).Select(i => new ConditionItemTrace("buy.trigger[" + i + "]", "ema(1) > ema(2) and ema(3) > ema(4)", TruthState.True, reads)).ToList();
-        var explanation = new TradeExplanation(Day.Epoch(CardFixtures.Date, 600), Timeframe.M15, [new ConditionSectionTrace("trigger", "all", items)]);
+        var longText = string.Join(" and ", Enumerable.Repeat("ema(1) > ema(2) & \"<x>\"", 150));
+        ConditionSectionTrace Section(string name) => new(name, "all", [.. Enumerable.Range(0, 100).Select(i => new ConditionItemTrace("buy." + name + "[" + i + "]", longText, TruthState.True, reads))]);
+        var explanation = new TradeExplanation(Day.Epoch(CardFixtures.Date, 600), Timeframe.M15, [Section("setup"), Section("trigger"), Section("invalidate")]);
         var (_, run, data) = CardFixtures.Goldens()[0];
         var withSection = data with { Explanation = explanation };
 
@@ -115,9 +116,19 @@ public sealed class ConditionsSectionTests
         var second = Sinks.Bytes(s => TradeCardHtml.Write(s, withSection, run, CardFixtures.Labels(run)));
 
         second.ShouldBe(first);
-        first.Length.ShouldBeGreaterThan(Sinks.Bytes(s => TradeCardHtml.Write(s, data, run, CardFixtures.Labels(run))).Length);
-        // the compiler allows 100 conditions of 64 reads; the card lists 12 reads of each and says it cut the rest, so the page stays under its limit (rendering throws above it)
         first.Length.ShouldBeLessThan(150 * 1024);
-        Encoding.UTF8.GetString(first).ShouldContain("more reads not listed");
+        var html = Encoding.UTF8.GetString(first);
+        html.ShouldContain("more reads not listed");
+        html.ShouldContain("more conditions not listed");
+        html.ShouldContain("</html>");
+    }
+
+    [Fact]
+    public void A_small_section_lists_every_condition_and_says_nothing_was_cut()
+    {
+        var html = Render(OrbBuy());
+
+        html.ShouldNotContain("more conditions not listed");
+        html.ShouldNotContain("more reads not listed");
     }
 }

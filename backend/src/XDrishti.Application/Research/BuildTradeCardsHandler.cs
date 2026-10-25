@@ -216,7 +216,7 @@ internal sealed class BuildTradeCardsHandler(IBarStore bars, IBarQueries barQuer
         return null;
     }
 
-    /// <summary>The value of a list (Kleene): all of its items, or any one of them.</summary>
+    /// <summary>The value of a list (Kleene): all of its items, or any one of them. This mirrors <c>ListFold.Fold</c> used by <c>BoundSide.Evaluate</c> (the engine's own fold, which Application cannot reach, ADR 0039); the guard would report a disagreement as a mismatch, and a test pins the rule.</summary>
     private static TruthState Fold(ConditionSectionTrace section)
     {
         var any = section.Mode == "any";
