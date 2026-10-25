@@ -27,6 +27,8 @@ export type SmartRules = Schemas['SmartRulesView'];
 export type SmartRule = Schemas['SmartRuleView'];
 export type LossTags = Schemas['LossTagsView'];
 export type CellLossTags = Schemas['CellLossTagsView'];
+export type EntryWindowStudy = Schemas['EntryWindowReportView'];
+export type MetaPolicyStudy = Schemas['MetaPolicyReportView'];
 
 /** The planned-session range of Plan vs actual and Decisions; either end may be absent (all plans). */
 export interface DateRange {
@@ -74,6 +76,8 @@ export const learningKeys = {
   planCheck: ['learning', 'plan-phase-check'] as const,
   learningCheck: ['learning', 'learning-phase-check'] as const,
   smartRules: ['learning', 'smart-rules'] as const,
+  entryWindows: ['learning', 'entry-windows'] as const,
+  metaPolicy: ['learning', 'meta-policy'] as const,
   lossTags: (runs: readonly string[]) => ['learning', 'loss-tags', ...runs] as const,
 };
 
@@ -261,3 +265,17 @@ export const lossTagsQuery = (runs: readonly string[]) =>
     queryFn: async ({ signal }) =>
       unwrap(await api.GET('/api/learning/loss-tags', { params: { query: { run: [...runs] } }, signal })),
   });
+
+// P8-13b: the entry-window study and the meta-policy evaluation are computed and stored by the owner's verbs; these only read the newest.
+// A 404 means none is stored (the tab shows the command), so there is no retry.
+export const entryWindowsQuery = queryOptions({
+  queryKey: learningKeys.entryWindows,
+  retry: false,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/learning/entry-windows', { signal })),
+});
+
+export const metaPolicyQuery = queryOptions({
+  queryKey: learningKeys.metaPolicy,
+  retry: false,
+  queryFn: async ({ signal }) => unwrap(await api.GET('/api/learning/meta-policy', { signal })),
+});

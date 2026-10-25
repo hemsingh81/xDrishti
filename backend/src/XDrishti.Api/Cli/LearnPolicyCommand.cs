@@ -26,8 +26,23 @@ internal static class LearnPolicyCommand
         try
         {
             await using var scope = services.CreateAsyncScope();
+            var query = new EvaluateMetaPolicyQuery(options.Sources, new CellStatsOptions(), null, new ValidationOptions(), options.Policy, options.HoldOutMonths);
+            if (options.Store)
+            {
+                var stored = await scope.ServiceProvider.GetRequiredService<ICommandHandler<StoreMetaPolicyCommand, StoredReport>>().HandleAsync(new StoreMetaPolicyCommand(query, "cli:xd"), cancellationToken);
+                if (stored.IsFailure)
+                {
+                    await console.Error.WriteLineAsync(SimulateOptions.Show(stored.Error.Code + ": " + stored.Error.Message));
+                    return XdCommand.Refused;
+                }
+
+                await console.Out.WriteAsync(stored.Value.Text);
+                await console.Out.WriteLineAsync(stored.Value.Created ? $"stored as #{stored.Value.Id}" : $"already stored as #{stored.Value.Id} (same inputs)");
+                return XdCommand.Done;
+            }
+
             var result = await scope.ServiceProvider.GetRequiredService<IQueryHandler<EvaluateMetaPolicyQuery, Result<MetaPolicyReport>>>()
-                .HandleAsync(new EvaluateMetaPolicyQuery(options.Sources, new CellStatsOptions(), null, new ValidationOptions(), options.Policy, options.HoldOutMonths), cancellationToken);
+                .HandleAsync(query, cancellationToken);
             if (result.IsFailure)
             {
                 await console.Error.WriteLineAsync(SimulateOptions.Show(result.Error.Code + ": " + result.Error.Message));

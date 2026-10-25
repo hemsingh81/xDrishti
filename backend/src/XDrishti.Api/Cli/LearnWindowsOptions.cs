@@ -6,14 +6,15 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Api.Cli;
 
 /// <summary>The parsed command line of <c>xd learn windows</c> (spec P6-14). Nothing here reads a file or the database.</summary>
-internal sealed record LearnWindowsOptions(IReadOnlyList<CellSource> Sources, EntryWindowOptions Options, int HoldOutMonths)
+internal sealed record LearnWindowsOptions(IReadOnlyList<CellSource> Sources, EntryWindowOptions Options, int HoldOutMonths, bool Store = false)
 {
     public const string Usage = """
         usage:
-          xd learn windows --run RUNKEY:STYLE:EXIT [--run ...] [--bucket-minutes N] [--min-trades N] [--min-lift X] [--prior-strength N] [--hold-out-months N]
+          xd learn windows --run RUNKEY:STYLE:EXIT [--run ...] [--bucket-minutes N] [--min-trades N] [--min-lift X] [--prior-strength N] [--hold-out-months N] [--store]
             RUNKEY is the 64-hex key of a stored run, STYLE is intraday or swing, EXIT labels the exit policy the run used (no '|')
             --hold-out-months keeps the last N months out of the search (default 6; 0 keeps none)
-            prints a proposal per cell; nothing is stored or applied
+            prints a proposal per cell
+            --store keeps the result in the insert-only learning reports (once per identical inputs; any changed knob is another row). Without it nothing is stored. Nothing is ever applied
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
@@ -26,11 +27,16 @@ internal sealed record LearnWindowsOptions(IReadOnlyList<CellSource> Sources, En
         ArgumentNullException.ThrowIfNull(args);
         var errors = new List<string>();
         var runs = new List<CellSource>();
+        var store = false;
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Count; i++)
         {
             var arg = args[i];
-            if (!Known.Contains(arg, StringComparer.Ordinal))
+            if (arg == "--store")
+            {
+                store = true;
+            }
+            else if (!Known.Contains(arg, StringComparer.Ordinal))
             {
                 errors.Add($"unknown argument '{SimulateOptions.Show(arg)}'");
             }
@@ -68,7 +74,7 @@ internal sealed record LearnWindowsOptions(IReadOnlyList<CellSource> Sources, En
             Number(values, "--min-lift", d.MinLift, errors),
             Number(values, "--prior-strength", d.PriorStrength, errors));
         var hold = Whole(values, "--hold-out-months", 6, errors);
-        return errors.Count > 0 ? (null, errors) : (new LearnWindowsOptions(runs, options, hold), errors);
+        return errors.Count > 0 ? (null, errors) : (new LearnWindowsOptions(runs, options, hold, store), errors);
     }
 
     private static int Whole(Dictionary<string, string> values, string key, int fallback, List<string> errors)

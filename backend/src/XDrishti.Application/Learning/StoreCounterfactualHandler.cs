@@ -34,7 +34,7 @@ internal sealed class StoreCounterfactualHandler(
             return Result.Failure<StoredCounterfactual>(LearningErrors.Invalid([new FieldError("sources", "Name at least one run; the options are required.")]));
         }
 
-        var basis = await BasisAsync(sources, cancellationToken);
+        var basis = await ReportBasis.ResolveAsync(runs, confirmations, sources, cancellationToken);
         if (basis.IsFailure)
         {
             CounterfactualStoreLog.Refused(logger, basis.Error.Code);
@@ -58,35 +58,5 @@ internal sealed class StoreCounterfactualHandler(
         var (stored, created) = await store.InsertAsync(row, cancellationToken);
         CounterfactualStoreLog.Stored(logger, view.Outcome, view.Windows.Count, created);
         return Result.Success(new StoredCounterfactual(stored.Id, created, stored.Report.Text));
-    }
-
-    private async ValueTask<Result<string>> BasisAsync(IReadOnlyList<CellSource> sources, CancellationToken cancellationToken)
-    {
-        var headers = new List<StoredRunHeader>();
-        foreach (var key in sources.Select(s => s.RunKey).Distinct(StringComparer.Ordinal))
-        {
-            var header = await runs.FindAsync(key, cancellationToken);
-            if (header is null)
-            {
-                return Result.Failure<string>(LearningErrors.RunNotFound(key));
-            }
-
-            headers.Add(header);
-        }
-
-        var costed = headers.Count(h => h.CostsSheetId is not null);
-        if (costed == 0)
-        {
-            return Result.Success("gross");
-        }
-
-        if (costed != headers.Count)
-        {
-            return Result.Failure<string>(LearningErrors.Invalid([new FieldError("sources", "Gross and costed runs are never mixed; name runs costed the same way.")]));
-        }
-
-        var confirmation = await confirmations.FindAsync(cancellationToken);
-        var confirmed = confirmation is not null && headers.All(h => string.Equals(h.CostsSheetId, confirmation.SheetId, StringComparison.Ordinal) && string.Equals(h.CostsRatesSha256, confirmation.RatesSha256, StringComparison.Ordinal));
-        return Result.Success(confirmed ? "net_confirmed" : "costed_unconfirmed");
     }
 }

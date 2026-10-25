@@ -496,6 +496,10 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<StoreCounterfactualCommand, StoredCounterfactual>, StoreCounterfactualHandler>(); // the counterfactual stored once per input hash; the verb's --store (P8-12, ADR 0110)
         services.AddScoped<IQueryHandler<GetCounterfactualQuery, Result<CounterfactualReportView>>, GetCounterfactualHandler>();
         services.AddScoped<IQueryHandler<ListCounterfactualsQuery, Result<IReadOnlyList<CounterfactualHeaderView>>>, ListCounterfactualsHandler>();
+        services.AddScoped<ICommandHandler<StoreEntryWindowsCommand, StoredReport>, StoreEntryWindowsHandler>(); // entry-window study stored by the verb's --store (P8-13b, ADR 0112)
+        services.AddScoped<ICommandHandler<StoreMetaPolicyCommand, StoredReport>, StoreMetaPolicyHandler>(); // meta-policy evaluation stored by the verb's --store (P8-13b, ADR 0112)
+        services.AddScoped<IQueryHandler<GetEntryWindowsQuery, Result<EntryWindowReportView>>, GetEntryWindowsHandler>();
+        services.AddScoped<IQueryHandler<GetMetaPolicyQuery, Result<MetaPolicyReportView>>, GetMetaPolicyHandler>();
         services.AddScoped<IQueryHandler<GetJourneyQuery, Result<JourneyView>>, GetJourneyHandler>(); // the Journey: stored counterfactual, plan-price weeks, live line not evaluable (P8-12)
         services.AddScoped<IQueryHandler<ShowSelectionQuery, Result<SelectionView>>, ShowSelectionHandler>(); // cell-level view of the P7 selection filters and rank, read-only (P7-01, ADR 0082)
         services.AddScoped<IQueryHandler<ListModelsQuery, Result<IReadOnlyList<ModelView>>>, ListModelsHandler>();

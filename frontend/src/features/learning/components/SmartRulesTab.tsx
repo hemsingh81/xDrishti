@@ -4,6 +4,7 @@ import { EvidenceBlock, formatCount, NonValue } from '@/shared/analytics';
 import { ErrorState, LoadingState } from '@/shared/ui';
 import { smartRulesQuery, type SmartRule } from '../api/learningQueries';
 import { Panel } from './Panel';
+import { StoredStudy } from './StoredStudies';
 
 const EMPTY_TEXT = 'No plan stored yet (the nightly service is paused until the owner starts it).';
 
@@ -28,6 +29,7 @@ function Count({ label, value, reason }: { label: string; value: number | null |
 function RuleCard({ rule }: { rule: SmartRule }) {
   const reason = rule.notRecorded ?? 'not recorded';
   const empty = rule.state === 'empty';
+  const stored = rule.id === 'windows' || rule.id === 'meta';
   return (
     <Panel title={rule.name}>
       <Chip
@@ -56,13 +58,24 @@ function RuleCard({ rule }: { rule: SmartRule }) {
         </ul>
       )}
       <Box sx={{ mt: 1 }}>
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          Outcome
-        </Typography>
-        <NonValue state={{ kind: 'not_evaluable', reason: rule.outcome.reason }} />
-        <Typography variant="caption" color="text.secondary">
-          Needs: <code>{rule.outcome.command}</code>
-        </Typography>
+        {stored ? (
+          <>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Stored study
+            </Typography>
+            <StoredStudy rule={rule} />
+          </>
+        ) : (
+          <>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Outcome
+            </Typography>
+            <NonValue state={{ kind: 'not_evaluable', reason: rule.outcome.reason }} />
+            <Typography variant="caption" color="text.secondary">
+              Needs: <code>{rule.outcome.command}</code>
+            </Typography>
+          </>
+        )}
       </Box>
     </Panel>
   );

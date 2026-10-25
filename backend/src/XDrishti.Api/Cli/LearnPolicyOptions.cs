@@ -6,15 +6,16 @@ using XDrishti.Domain.Learning;
 namespace XDrishti.Api.Cli;
 
 /// <summary>The parsed command line of <c>xd learn policy</c> (spec P6-13). Nothing here reads a file or the database.</summary>
-internal sealed record LearnPolicyOptions(IReadOnlyList<CellSource> Sources, MetaPolicyOptions Policy, int HoldOutMonths)
+internal sealed record LearnPolicyOptions(IReadOnlyList<CellSource> Sources, MetaPolicyOptions Policy, int HoldOutMonths, bool Store = false)
 {
     public const string Usage = """
         usage:
-          xd learn policy --run RUNKEY:STYLE:EXIT [--run ...] [--split none|style|side|style-side] [--min-kept-share X] [--min-lift-r X] [--min-skill-r X] [--trials N] [--hold-out-months N]
+          xd learn policy --run RUNKEY:STYLE:EXIT [--run ...] [--split none|style|side|style-side] [--min-kept-share X] [--min-lift-r X] [--min-skill-r X] [--trials N] [--hold-out-months N] [--store]
             needs a champion model (xd learn designate) made from the same runs; judges take or skip by the model's probability against taking everything, out of sample
             --trials is a floor on the models, splits and settings looked at, which widen the margins (default 1; the champion's registry count is used if larger); a re-run with other knobs or splits is another trial
             --hold-out-months keeps the last N months out of the search (default 6; 0 keeps none)
-            prints the evidence; nothing is stored or applied
+            prints the evidence
+            --store keeps the result, a NoPolicy answer too, in the insert-only learning reports (once per identical inputs; any changed knob is another row). Without it nothing is stored. Nothing is ever applied
         exit codes: 0 done, 1 refused, 2 wrong command line, 3 failure, 130 cancelled
 
         """;
@@ -27,11 +28,16 @@ internal sealed record LearnPolicyOptions(IReadOnlyList<CellSource> Sources, Met
         ArgumentNullException.ThrowIfNull(args);
         var errors = new List<string>();
         var runs = new List<CellSource>();
+        var store = false;
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < args.Count; i++)
         {
             var arg = args[i];
-            if (!Known.Contains(arg, StringComparer.Ordinal))
+            if (arg == "--store")
+            {
+                store = true;
+            }
+            else if (!Known.Contains(arg, StringComparer.Ordinal))
             {
                 errors.Add($"unknown argument '{SimulateOptions.Show(arg)}'");
             }
@@ -100,7 +106,7 @@ internal sealed record LearnPolicyOptions(IReadOnlyList<CellSource> Sources, Met
             errors.Add("--hold-out-months must be a whole number");
         }
 
-        return errors.Count > 0 ? (null, errors) : (new LearnPolicyOptions(runs, policy, hold), errors);
+        return errors.Count > 0 ? (null, errors) : (new LearnPolicyOptions(runs, policy, hold, store), errors);
     }
 
     private static double Number(Dictionary<string, string> values, string key, double fallback, List<string> errors)
