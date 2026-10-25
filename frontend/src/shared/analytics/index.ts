@@ -1,6 +1,8 @@
 // The shared analytics kit (docs/specs/P8-01): the honest states of a metric, the evidence beside a number, the verdict
 // chip, report formatters. Imported by path from lazy screens (`@/shared/analytics`), not through `shared/ui`, so the
 // initial bundle does not carry it. `shared/` never imports a feature.
+export { BarList, type BarRow } from './BarList';
+export { ColumnBars, type ColumnBin } from './ColumnBars';
 export { DataTable, type Column, type TableStatus } from './DataTable';
 export { EvidenceBlock, type EvidenceProps } from './EvidenceBlock';
 export {
