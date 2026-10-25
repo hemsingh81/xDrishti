@@ -1,5 +1,8 @@
 # P8-06 — Report read endpoints over stored runs
 
+> **SUPERSEDED (2026-10-25).** This slice was built from [P8-06-report-read-endpoints.md](P8-06-report-read-endpoints.md) (Approved, merged to main) while this Draft was being written. Do not build from this file; keep it only as a second opinion: read its 'Decisions (researched)' and 'Risks' against what was built and open a follow-up spec for anything it adds.
+
+
 - **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-06 of [P8-00](P8-00-reports-and-ui-plan.md)
 - **Design refs:** docs/design/13-reports-and-ui.md §1c, §2 (R3, R4, R20, R27, R28), §4 · docs/design/15-smart-insights-and-automation.md §6 · docs/design/06-instruments-and-baskets.md §4 · docs/design/11-strategy-lab.md §6 · ADR 0045 (result store), 0053/0054 (same-entries comparison), 0064, 0098, 0099 · P8-00 D1, D2, D4, D5

@@ -1,0 +1,71 @@
+# P10-02 — Paper ledger and open positions: equity, open risk, and the plan reads the paper book
+
+- **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
+- **Phase / roadmap row:** P10 — Paper trading, slice P10-02 of [P10-00](P10-00-paper-trading-plan.md)
+- **Design refs:** docs/design/12 §8 (plan link), 10 §5 to §7 (fill constraints, daily loss, equity throttle), 04 §1 (Trading role, paper mode), 15, 16 (risk profiles), 19 §3; ADR 0089 (allocation), 0092 (wiring, open book unavailable by default), 0042/0044 (costs, ISS-25); P7-07, P7-09
+- **Needs:** P10-01; P7-07, P7-09 (built). ADR: "the paper ledger is derived from entries and exits; the plan may read it" (next free ADR number at build time)
+- **Size:** 3 agent-days
+- **Safety:** yes. It changes what the nightly plan reads (sizing equity, open risk, held symbols, loss carried over, taken trades for the throttle) behind a new owner setting that **defaults OFF**. It adds no write endpoint, places no order, calls no broker.
+
+## Goal
+Per paper account the owner can see, from the stored paper trades alone, what the account would be worth, what is open and how much risk it carries, with every figure labelled as paper; and, when the owner switches it on, the nightly plan stops treating the open book as unavailable and uses this one.
+
+## Scope
+**In:** pure `Domain/Paper` `PaperLedger` (realised, open, equity, funds, open risk, day result, closed-trade drawdown), `PaperPosition`, `PaperMark`; port `IPaperBookReader` (and `PaperBook`, `PaperBookUnavailable`); `Application/Paper` `GetPaperAccountsHandler`, `GetPaperPositionsHandler`, `GetPaperEquityHandler`, `ReconcilePaperHandler`; `StoredPlanContextSource` takes the reader behind the new setting; Infrastructure reads; migration **none** (everything derives from P10-01 tables); endpoints `GET /api/paper/accounts`, `GET /api/paper/accounts/{id}/positions`, `GET /api/paper/accounts/{id}/equity`, `GET /api/paper/accounts/{id}/reconcile`; frontend feature `paper` with the `/paper` route frame (lazy, tab registry) and the **Ledger** tab; `scripts/gen-api.sh`.
+**Out:** any write endpoint, reports (P10-03/04), epochs beyond P10-01's (P10-05), marking intraday, margin/leverage, broker funds, a ledger for manual-live accounts (P11).
+
+## Acceptance criteria
+1. **Hand-checked ledger.** Given the fixture below, then equity, funds, open risk %, unrealised, realised gross/charges/net and the closed-trade drawdown equal the hand numbers exactly.
+2. **Derived, never stored.** The same entries and exits in any insert order give the same ledger; no table is added; deleting nothing is possible (insert-only sources).
+3. **Marks are honest.** Given an open position whose newest stored daily bar is the last closed session, then `mark.state = value` with the close; given an older bar or none, then `unavailable` with the reason and **no** unrealised figure (null, never 0), and the account's unrealised total is `unavailable`, not the sum of the others.
+4. **Reconciliation.** `reconcile` returns `ok` only when the sum of `paper.exits.net_pnl` (or gross when no sheet) equals the ledger's realised result, entries without exit equal the open positions, no entry belongs to an account that is not paper now, and every exit's `entry_at <= exit_at`; otherwise it lists each difference. A property test over seeded random trade sets holds the first identity.
+5. **Gross/net honesty (revised 2026-10-25).** With no charge sheet the ledger is gross and says `gross, no charges`; with a stored sheet it shows the charges and the result after them labelled **"after the stored sheet; the sheet is not confirmed as the owner's in this view (ISS-25)"**, and never calls it net. ADR 0100's architecture test lets only the report loader and the runs list read `IChargeSheetConfirmationSource`, so no `Application/Paper` type reads or can set a confirmation; a test pins that the paper code has no such dependency. Net as a result of record therefore needs the follow-up slice named in Open questions.
+6. **The setting is off by default and exclusive.** `Planning:OpenBook:UsePaperLedger` defaults false (behaviour of P7-09 unchanged: byte-identical plan context, a test compares). Setting it together with `Planning:OpenBook:AssumedEmpty` fails the host at start (`ValidateOnStart`).
+7. **When on, the plan reads this book.** `PlanContext.Book` lists every open paper position (symbol, side, style, `RiskPct` of that account's equity, sector, baskets); per paper `ContextAccount`: `Equity` = capital + realised net, `OpenRiskPct`, `FundsAvailable` = max(0, equity - open notional), `HeldSymbols` = open paper symbols, `DailyLossPct` = the last closed session's realised net loss as a positive percent of equity (0 when not a loss); `TakenTrades` = one per counted ticket (primary group, closed, current epoch; `TradeId = trade_key`, `ClosedOn` = India date of the exit, `R = r_sim`).
+8. **Stale book fails safe (revised 2026-10-25).** Given the book is read for a plan about to be built with last closed session L, then it is available only if, for every trading session from the epoch's first session to L, `paper.capture_runs` has a row with `outcome = 'done'` and `pending = 0` (P10-01 criterion 11b writes a row even for a session with no armed ticket). Otherwise `Book` is null with the note `paper book unavailable: capture is behind (sessions without a finished capture: <dates>)` and the plan takes nothing (the `book:unavailable` rule of ADR 0092). Tests: a missing row, a `partial` row, a `done` row with pending 1, and an empty session with a `done` row (available).
+9. **Unavailable is never a pass.** An account with no capital (BrokerFunds source) shows ledger P&L but `equity` and every percentage `unavailable` with the reason; the plan treats that account's limits as unknown.
+10. **UI.** `/paper` opens the Ledger tab: account picker, tiles (equity, realised net, open risk %, funds, last-session result), open positions table, closed trades table, realised-equity line; states loading, error, empty (`no paper trade yet: a ticket must be approved, armed and captured`), stale marks; status never by colour alone; no write control (a test fails if the feature imports a mutation or calls POST/PUT/DELETE). First-load JavaScript guard stays green: the only eager addition is the nav entry and one lazy route.
+11. Handlers internal sealed and registered; log ids 5210 to 5219 unique; read endpoints answer 404 `paper.not_found` for an unknown or non-paper account and 422 `paper.invalid` for a bad range.
+
+## Contract
+- **API (read only):** `GET /api/paper/accounts?epoch=` -> `PaperAccountView[]` { `accountId`, `name`, `epochId`, `capital`, `capitalSource`, `realised` { `gross`, `charges`, `net`, `basis` }, `equity`, `fundsAvailable`, `openRiskPct`, `openCount`, `unrealised` (metric), `lastSessionResult`, `maxDrawdownClosed` { `amount`, `pct` }, `chargeSheet` { `id`, `confirmedOn` or null }, `evidence`, `limits` }; `/{id}/positions` -> `PaperPositionView[]` { symbol, side, qty, entryAt, entryPrice, stopPrice, `mark` { `state`, `price`, `asOf`, `reason` }, `unrealised`, `riskAmount`, `riskPctOfEquity`, `heldSessions` }; `/{id}/equity?from=&to=` -> daily points of realised equity from the epoch start; `/{id}/reconcile`. Numbers use the `Metric` states of `Domain.Reporting` (`value / provisional / insufficient / unavailable / not_evaluable / empty`); a non-value has no number field.
+- **Data:** no migration. Reads `paper.*` (P10-01), `accounts.broker_accounts` (capital, risk profile), the stored daily bars (`market` schema, through the existing bar reader), `research.cost_sheet.<id>`.
+- **Setting:** `Planning:OpenBook:UsePaperLedger` (bool, default false), read through `IOpenBookSettings` (a second property `UsePaperLedger`).
+- **Events/jobs:** none.
+
+## Non-functional
+Ledger of one account over a 12-week epoch (about 100 rows) plus one daily-bar read per open position: p95 < 300 ms on the fixture; the plan's read adds one query of open entries and one of closed trades. No secret; logs carry ids and counts only.
+
+## Test plan
+Unit: `PaperLedger` hand fixture, ordering invariance, mark states, funds floor, daily-loss proxy, `TakenTrades` count-once (two accounts, one ticket: one taken trade). Application with fakes: reader unavailable cases (behind capture, no capital, mutual exclusion), reconcile differences. Integration: endpoints on a seeded epoch, `StoredPlanContextSource` with the flag off (identical) and on. Frontend (MSW): tab states, stale mark word, no mutation import. Architecture: unchanged.
+**Hand-worked fixture** (account capital 100,000.00, fixed; sheet fixture flat 10.00 per order built in the test): closed trade A: BUY 60 at 100.15, sell 102.30, gross 129.00, charges 20.00, net 109.00. Closed trade B: SELL 50 at 200.00, buy 202.00, gross -100.00, charges 20.00, net -120.00. Open swing C: BUY 40 at 50.00, stop 47.50, last close 51.00. Realised net = 109.00 - 120.00 = -11.00; equity = 99,989.00; open notional = 40 x 50.00 = 2,000.00; funds = 97,989.00; open risk = 40 x 2.50 = 100.00 = 0.1000 % of equity (100 / 99,989 = 0.10001 %, printed 0.100 %); unrealised = (51.00 - 50.00) x 40 = +40.00; closed-trade drawdown: running net 109.00 then -11.00, peak 109.00, trough -11.00, drawdown 120.00 = 0.1199 % of the peak equity 100,109.00. Last-session result (if B closed on the last session and A earlier) = -120.00 = 0.1199 % of the equity at the start of that session (100,109.00), the loss carried to the plan.
+
+## Decisions (researched)
+1. **Q: Stored or derived?** A: derived on read from entries, exits and the epoch baseline. Why: one source of truth, nothing to reconcile by hand, no new insert-only table, the same pattern as the plan state (the log is the state, ADR 0073). Rejected: a daily snapshot table (an extra writer that can disagree; the volume is tiny). Source: ADR 0073, ADR 0083.
+2. **Q: Equity definition?** A: capital + realised net; open positions are shown with their unrealised figure beside, not inside the sizing base. Why: sizing on marked equity makes the next ticket larger after an open gain, which is the pro-cyclical behaviour risk limits exist to stop. Rejected: marked equity. Source: doc 10 §5 (limits), doc 19 §6.
+3. **Q: Cash model?** A: no leverage: funds = max(0, equity - open notional). Why: intraday margin multiples are not verified for the owner's broker and the pre-trade checklist already treats unknown funds as unavailable; a cash model can only make the plan smaller. Rejected: assumed margin.
+4. **Q: Daily loss input for a plan made at night?** A: the last closed session's realised net loss, as a positive percent of equity, as a proxy. Why: the live rule ("daily loss limit cancels remaining tickets", doc 10 §7) has no value at 18:30; passing 0 hides a bad day, passing null would block every ticket as unavailable. The proxy errs toward fewer trades after a loss day and is printed in the plan note. It is a frozen setting (P10-05 class `frozen`).
+5. **Q: Why a setting, default OFF?** A: today the open book is unavailable and no ticket is primary (P7-09); switching on changes plan content, so it is an owner act, recorded in the epoch fingerprint, and the default keeps current behaviour. Rejected: always on (changes P7 behaviour without the owner).
+6. **Q: One paper account or several?** A: the plan recommends exactly one paper account for the measured epoch; several are supported and counted once per ticket. Why: R is size-free, so a second account adds correlated rows, not evidence; it complicates the book.
+7. **Q: Net language?** A: the sheet's charges are applied as soon as it is stored, but the word net is never printed as a result of record by the paper code. The only source of the owner's confirmation is `IChargeSheetConfirmationSource` (`ChargeSheetConfirmationStore`, ADR 0100), and the architecture test of ADR 0100 forbids any Application type except the report loader and the runs list from reading it; no spec writes the confirmation row (ADR 0100 defers that). Rejected: reading the settings row directly (would bypass the one-source rule). A follow-up owner-act slice is needed (see Open questions).
+
+## Risks and honest limits
+- Marks are daily closes; intraday drawdown inside a day is not seen.
+- The realised-equity drawdown ignores open positions' unrealised loss.
+- The loss proxy ties tomorrow's plan to today's result; with one account and 2 to 3 entries a day one stop-out can throttle a day.
+- Positions held in the owner's real broker app are not in the paper book (the plan note says so, as in P7-09).
+- Percentages use capital as of the epoch baseline; a capital change is a frozen change and starts a new epoch (P10-05).
+
+## Open questions
+None blocking. Owner acts, each with its default: set `Planning:OpenBook:UsePaperLedger` ON before the epoch starts (default OFF: the plan keeps the book unavailable); the charge-sheet confirmation needs a **new slice (P10-07, or P8-06b): write the confirmation row as an owner act (fresh password step-up, capability gate) and widen ADR 0100's allow-list so a paper reader may see it**; until it exists the wording above stands and P10-04/06 criteria C3/C4 read `not_evaluable: costs not confirmed`.
+
+## Done when
+- [ ] All acceptance criteria have evidence
+- [ ] `scripts/check.sh` green; reviewer agent: no blockers/majors
+- [ ] Contract regenerated (`scripts/gen-api.sh`); no migration
+- [ ] ADR written; doc 10/12 note and roadmap row updated; `scripts/build-docs.sh`
+
+## Review fixes 2026-10-25
+- Confirmation: the real port is `IChargeSheetConfirmationSource` (built in P8-06, ADR 0100); paper code may not read it; net is never printed until a separate owner-act slice (named P10-07 or P8-06b in the report) writes the row and widens the allow-list.
+- Criterion 8 now reads the stale-book rule from `capture_runs` (`outcome`, `pending`, one row per session); no "pending note" exists.
+- Step-up check: this slice has no write endpoint and no UI write (the screen is read only; `UsePaperLedger` is an owner setting edit, default OFF). Any later UI write needs fresh password step-up and the capability gate.

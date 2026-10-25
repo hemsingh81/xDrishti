@@ -644,10 +644,12 @@
     ['Decisions', [['review', 'Plan review'], ['suggestions', 'Suggestions']]],
     ['Portfolio', [['portfolio', 'Portfolio']]],
     ['Market', [['instruments', 'Instruments'], ['baskets', 'Baskets'], ['data', 'Data & import'], ['quality', 'Data quality']]],
-    ['Research', [['learning', 'Learning'], ['reports', 'Reports'], ['lab', 'Strategy Lab']]],
+    ['Trading', [['paper', 'Paper & live'], ['execution', 'Execution', 'P12']]],
+    ['Research', [['learning', 'Learning'], ['reports', 'Reports'], ['lab', 'Strategy Lab'], ['assistant', 'Assistant']]],
     ['System', [['accounts', 'Accounts'], ['services', 'Services'], ['settings', 'Settings'], ['audit', 'Audit log']]],
   ];
   const TITLES = Object.fromEntries(NAV.flatMap(([, items]) => items.map(([id, t]) => [id, t])));
+  BT.PHASE = Object.fromEntries(NAV.flatMap(([, items]) => items.filter((x) => x[2]).map(([id, , ph]) => [id, ph])));
   BT.NAV = NAV; BT.TITLES = TITLES;
   function badges() {
     return {
@@ -660,7 +662,7 @@
     $('#app').innerHTML = `<div class="shell">
       <nav class="side" id="side" aria-label="Main">
         <div class="brand" title="xDrishti — दृष्टि, vision">${BT.brandMark()}<b class="lbl"><span>x</span>Drishti</b></div>
-        ${NAV.map(([sec, items]) => `<div class="sec">${sec}</div>${items.map(([id, t]) => `<a href="#/${id}" data-nav="${id}" title="${t}">${BT.navIcon(id)}<span class="lbl">${t}</span>${b[id] ? `<span class="badge">${b[id]}</span>` : ''}</a>`).join('')}`).join('')}
+        ${NAV.map(([sec, items]) => `<div class="sec">${sec}</div>${items.map(([id, t, ph]) => `<a href="#/${id}" data-nav="${id}" title="${t}${ph ? ' (phase ' + ph + ', off by default)' : ''}">${BT.navIcon(id)}<span class="lbl">${t}</span>${ph ? `<span class="phase-tag lbl">${ph}</span>` : ''}${b[id] ? `<span class="badge">${b[id]}</span>` : ''}</a>`).join('')}`).join('')}
         <button class="btn ghost sm side-toggle" id="side-toggle" title="Collapse / expand sidebar">${BT.icon('chevronsLeft')} <span class="lbl">Collapse</span></button>
         <div class="foot lbl">Prototype · demo data · no backend<br>Services are simulated in this browser.</div>
       </nav>
@@ -670,6 +672,7 @@
           <h2 id="page-title"></h2>
           <button class="search-btn" id="cmdk" aria-label="Search or jump to (Ctrl/⌘ K)" title="Search or jump to">${BT.icon('search')}<span class="hide-sm">Search or jump to…</span><kbd class="hide-sm">⌘K</kbd></button>
           <div class="status" id="top-status"></div>
+          <span id="stop-slot"></span>
           <button class="btn icon" id="bell" aria-label="Notifications" title="Notifications">${BT.icon('bell')}</button>
           <button class="btn icon" id="theme" aria-label="Toggle dark mode" title="Toggle dark mode">${BT.icon(isDark() ? 'sun' : 'moon')}</button>
           <button class="btn user-btn" id="user-btn"><span class="avatar">O</span><span class="hide-sm">owner</span>${BT.icon('chevronDown')}</button>
@@ -688,24 +691,32 @@
     $('#cmdk').onclick = () => BT.palette && BT.palette();
     $('#user-btn').onclick = openUserMenu;
     renderTopStatus();
+    BT.afterShell && BT.afterShell();
   }
   function renderTopStatus() {
     const el = $('#top-status');
     if (!el) return;
     const da = BT.dataAccount();
-    const unread = S.notifications.filter((n) => !n.read).length;
+    const unread = S.notifications.filter((n) => !n.read).length + (BT.extraNotices ? BT.extraNotices().filter((n) => !n.resolved && !BT.noticeSeen(n)).length : 0);
     el.innerHTML = `<span class="pill hide-sm"><span class="dot ${S.settings.demoMarketOpen ? 'green pulse' : ''}"></span> Market <b>${S.settings.demoMarketOpen ? 'open (demo)' : 'closed'}</b></span>
       <span class="pill hide-sm hide-md">${BT.icon('database')} <b>${da ? esc(da.name) : '⚠ none'}</b></span>
       <span class="pill hide-sm">NIFTY <b class="num">${num(BT.ltp('NIFTY 50'))}</b> <span class="${sgn(BT.dayChange('NIFTY 50'))}">${pct(BT.dayChange('NIFTY 50'), 2)}</span></span>`;
     const bell = $('#bell'); if (bell) bell.innerHTML = BT.icon('bell') + (unread ? `<span class="badge bell-badge">${unread}</span>` : '');
+    BT.onStatus && BT.onStatus();
     const b = badges();
     $$('[data-nav]').forEach((a) => { const id = a.dataset.nav; const old = a.querySelector('.badge'); if (old) old.remove(); if (b[id]) a.insertAdjacentHTML('beforeend', `<span class="badge">${b[id]}</span>`); });
   }
   BT.renderTopStatus = renderTopStatus;
   function openNotifications() {
     const list = S.notifications.slice(0, 30);
-    drawer({ title: 'Notifications', body: list.length ? `<div class="card"><div class="card-b flush">${list.map((n) => `<div class="sugg" style="grid-template-columns:1fr auto"><div><div>${esc(n.text)}</div><div class="small muted">${fmtDT(n.at)}</div></div>${n.link ? `<a class="btn sm" href="${n.link}" data-close>Open</a>` : ''}</div>`).join('')}</div></div>` : '<div class="empty">No notifications yet.</div>' });
-    S.notifications.forEach((n) => (n.read = true)); save(); renderTopStatus();
+    const extra = BT.extraNotices ? BT.extraNotices() : [];
+    const sevIc = { error: ['xCircle', 'Error'], warning: ['alert', 'Warning'], info: ['bell', 'Info'] };
+    const noticeRow = (n) => { const [ic, w] = sevIc[n.severity] || sevIc.info; return `<div class="sugg" style="grid-template-columns:1fr auto"><div><div><span class="chip ${n.severity === 'error' ? 'red' : n.severity === 'warning' ? 'amber' : ''}">${BT.icon(ic)} ${w}</span> <b>${esc(n.title)}</b></div><div>${esc(n.text)}</div><div class="small muted">${n.resolved ? 'resolved · ' : ''}${esc(n.src)} · ${fmtDT(n.at)}</div></div>${n.link ? `<a class="btn sm" href="${n.link}" data-close>Open</a>` : ''}</div>`; };
+    const live = extra.filter((n) => !n.resolved), done = extra.filter((n) => n.resolved);
+    drawer({ title: 'Notifications', body: (live.length ? `<div class="card"><div class="card-h"><h3>Needs attention</h3><span class="small muted">goes away by itself when the cause is gone</span></div><div class="card-b flush">${live.map(noticeRow).join('')}</div></div>` : '')
+      + (list.length ? `<div class="card"><div class="card-h"><h3>Recent</h3></div><div class="card-b flush">${list.map((n) => `<div class="sugg" style="grid-template-columns:1fr auto"><div><div>${esc(n.text)}</div><div class="small muted">${fmtDT(n.at)}</div></div>${n.link ? `<a class="btn sm" href="${n.link}" data-close>Open</a>` : ''}</div>`).join('')}</div></div>` : (live.length || done.length ? '' : '<div class="empty">No notifications yet.</div>'))
+      + (done.length ? `<div class="card"><div class="card-h"><h3>Resolved (24 h)</h3></div><div class="card-b flush">${done.map(noticeRow).join('')}</div></div>` : '') });
+    S.notifications.forEach((n) => (n.read = true)); BT.markNoticesSeen && BT.markNoticesSeen(extra); save(); renderTopStatus();
   }
   function openUserMenu() {
     modal({

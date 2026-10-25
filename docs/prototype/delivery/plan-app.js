@@ -4,7 +4,7 @@
   const XD = window.XD;
   const KEY = "xd-plan-v1";
   const DAY = 864e5;
-  const CAL_BOUND = ["P10", "P11", "OPS"]; // calendar-bound epics: duration is waiting/reviewing time, not build effort
+  const CAL_BOUND = ["P10", "P11", "P12", "OPS"]; // calendar-bound epics: duration is waiting/reviewing time, not build effort
   const SHORT = { P0: "Foundations", P1: "Data platform", P2: "Portfolio & live", P3: "Simulator & DSL", P4: "Exits", P5: "Strategy Lab", P6: "Learning engine", P7: "Nightly plan", P8: "Reports & UI", P9: "AI assistant", P10: "Paper trading", P11: "Small live", P12: "Execution", P13: "Tick & depth", P14: "Options", P15: "Fundamentals", OPS: "Operations" };
   const DOCS = ["01-overview", "02-requirements", "03-target-architecture", "04-accounts-access-and-operations", "05-data-and-brokers", "06-instruments-and-baskets", "07-strategies", "08-exits-and-risk", "09-learning-engine", "10-trade-selection", "11-strategy-lab", "12-portfolio-monitoring", "13-reports-and-ui", "14-ai-assistant", "15-smart-insights-and-automation", "16-configuration", "17-deployment-and-operations", "18-roadmap", "19-risks-and-compliance", "20-extended-modules", "21-glossary"];
   const NAV = [
@@ -123,18 +123,25 @@
     const STATE = { built: ["Built", "st-done"], building: ["In progress", "st-doing"], planned: ["Planned", ""] };
     const SL = { built: ["Built", "st-done"], draft: ["Draft", ""], later: ["Later", ""], blocked: ["Blocked", "st-blocked"], optional: ["Optional", ""] };
     const sl = (p) => p.slices || [];
+    const specLink = (f) => (location.protocol === "file:" ? `<a href="../../specs/${esc(f)}.md" target="_blank" rel="noopener">docs/specs/${esc(f)}.md</a>` : `docs/specs/${esc(f)}.md`);
     const nb = (p) => sl(p).filter((x) => x[2] === "built").length;
     const phases = P.phases;
     const built = phases.filter((p) => p.state === "built").length;
     const slices = phases.flatMap(sl);
     const sBuilt = slices.filter((x) => x[2] === "built").length;
     const sOpen = slices.filter((x) => x[2] !== "built" && x[2] !== "optional");
+    const meta = (x) => x[4] || {};
+    const sDraft = slices.filter((x) => x[2] === "draft");
+    const sOwner = sDraft.filter((x) => meta(x).o);
+    const sDays = sDraft.reduce((a, x) => a + (meta(x).d || 0), 0);
+    const builtIds = phases.filter((p) => p.state === "built").map((p) => p.id);
+    const sPhases = [...new Set(slices.map((x) => x[0].match(/^P\d+/)[0]))];
     return `
     <section class="hero"><h2>Where we are — ${esc(P.asOf)}</h2><p class="lead">${esc(P.now)}</p></section>
     <div class="tiles">
-      <div class="tile"><div class="k">Phases built</div><div class="v">${built}<small class="dim"> / ${phases.length}</small></div><div class="s">P0–P5 built · P6 and P7 nearly built</div></div>
-      <div class="tile"><div class="k">Tracked slices built</div><div class="v">${sBuilt}<small class="dim"> / ${sBuilt + sOpen.length}</small></div><div class="s">P3–P7 slices listed below</div></div>
-      <div class="tile"><div class="k">Open or blocked</div><div class="v">${sOpen.length}</div><div class="s">${sOpen.map((x) => x[0]).join(", ")}</div></div>
+      <div class="tile"><div class="k">Phases built</div><div class="v">${built}<small class="dim"> / ${phases.length}</small></div><div class="s">${esc(builtIds.join(", "))} built · others under way or planned</div></div>
+      <div class="tile"><div class="k">Tracked slices built</div><div class="v">${sBuilt}<small class="dim"> / ${sBuilt + sOpen.length}</small></div><div class="s">slices of ${esc(sPhases.join(", "))} listed below</div></div>
+      <div class="tile"><div class="k">Open or blocked</div><div class="v">${sOpen.length}</div><div class="s">${sDraft.length} Draft specs waiting for your Approved (about ${Math.round(sDays)} agent-days), ${sOwner.length} of them SAFETY; ${sOpen.length - sDraft.length} later or blocked</div></div>
     </div>
     <div class="card" style="margin:14px 0"><h2>Needs you</h2><ul style="padding-left:18px">${P.owner.map((t) => `<li style="margin:4px 0">${esc(t)}</li>`).join("")}</ul></div>
     <div class="card" style="margin:14px 0"><h2>What "built" means here</h2><ul style="padding-left:18px">${P.honest.map((t) => `<li style="margin:4px 0">${esc(t)}</li>`).join("")}</ul></div>
@@ -142,7 +149,7 @@
     <details class="card" style="margin:10px 0" ${p.state === "building" ? "open" : ""}>
       <summary style="cursor:pointer;display:flex;align-items:center;gap:10px"><b>${esc(p.id)}</b><span style="flex:1">${esc(p.t)}</span>${sl(p).length ? `<span class="muted" style="font-size:12px">${nb(p)}/${sl(p).filter((x) => x[2] !== "optional").length} slices</span>` : ""}<span class="chip ${sc}">${sn}</span></summary>
       ${p.note ? `<p class="muted" style="margin:8px 0">${esc(p.note)}</p>` : ""}
-      ${sl(p).length ? `<table class="tbl" style="width:100%"><tbody>${sl(p).map((x) => { const [n, c] = SL[x[2]]; return `<tr><td style="white-space:nowrap;padding:3px 8px 3px 0"><code>${esc(x[0])}</code></td><td>${esc(x[1])}</td><td style="white-space:nowrap">${x[3] ? "ADR " + esc(x[3]) : ""}</td><td style="text-align:right"><span class="chip ${c}">${n}</span></td></tr>`; }).join("")}</tbody></table>` : ""}
+      ${sl(p).length ? `<table class="tbl" style="width:100%"><tbody>${sl(p).map((x) => { const [n, c] = SL[x[2]]; return `<tr><td style="white-space:nowrap;padding:3px 8px 3px 0"><code>${esc(x[0])}</code></td><td>${esc(x[1])}${meta(x).s ? `<div class="dim mono" style="font-size:11px">${specLink(meta(x).s)}</div>` : ""}</td><td style="white-space:nowrap">${x[3] ? "ADR " + esc(x[3]) : ""}${meta(x).d ? `<span class="dim"> ${meta(x).d} d</span>` : ""}</td><td style="text-align:right;white-space:nowrap">${meta(x).o ? '<span class="chip st-blocked" title="SAFETY or your own security decision: waits for you, setting stays OFF">Needs you</span> ' : ""}<span class="chip ${c}">${n}</span></td></tr>`; }).join("")}</tbody></table>` : ""}
     </details>`; }).join("")}`;
   };
 
@@ -404,7 +411,7 @@
       <dl class="kv"><dt>Status</dt><dd><select class="field" data-change="status" data-id="${s.id}" aria-label="Status">${XD.statuses.map((x) => `<option value="${x.id}" ${x.id === s.st ? "selected" : ""}>${x.name}</option>`).join("")}</select></dd>
         <dt>Priority</dt><dd>${priChip(s.pri)}</dd><dt>Effort</dt><dd>${s.pts} pts <span class="dim">(≈ ${s.pts} focused hours incl. review)</span></dd>
         <dt>Type · area</dt><dd>${esc(s.type)} · ${esc(s.area)}</dd><dt>Planned</dt><dd>${s.st === "done" ? `Done ${fmt(s.date, { year: "numeric" })}` : `Sprint ${s.sprint} · by ${fmt(s.date, { year: "numeric" })}`}</dd>
-        <dt>Design refs</dt><dd>${docLinks(s.doc) || "—"}</dd><dt>Spec file</dt><dd class="mono">docs/specs/${specName(s)}.md</dd></dl>
+        <dt>Design refs</dt><dd>${docLinks(s.doc) || "—"}</dd><dt>Spec file</dt><dd class="mono">docs/specs/${specName(s)}.md</dd>${s.safety ? '<dt>Safety</dt><dd><span class="chip st-blocked">SAFETY</span> <span class="dim">waits for your Approved; the setting stays OFF until you act</span></dd>' : ""}${s.owner ? '<dt>Who</dt><dd><span class="chip">You</span> <span class="dim">owner-only: no agent build</span></dd>' : ""}</dl>
       <div><h4>Acceptance criteria</h4><div class="ac">${s.ac.map((a, i) => `<label><input type="checkbox" data-ac="${s.id}" data-i="${i}" ${checked.has(i) ? "checked" : ""}><span>${esc(a)}</span></label>`).join("")}</div></div>
       ${s.dep.length ? `<div><h4>Depends on</h4><div class="chips">${s.dep.map((d) => depChip(d)).join("")}</div></div>` : ""}
       ${s.unlocks.length ? `<div><h4>Unlocks</h4><div class="chips">${s.unlocks.map((d) => depChip(d)).join("")}</div></div>` : ""}
@@ -413,7 +420,7 @@
     </div>`;
   }
   const depChip = (id) => { const d = M.byId[id]; return d ? `<a class="chip st-${d.st}" href="#/${currentView()}/${id}" title="${esc(d.t)}"><span class="dot ${d.st}"></span>${id} · ${esc(d.t.slice(0, 34))}${d.t.length > 34 ? "…" : ""}</a>` : ""; };
-  const specName = (s) => `${s.id}-${slug(s.t)}`;
+  const specName = (s) => s.spec || `${s.id}-${slug(s.t)}`;
 
   function epicDrawer(e) {
     return `<div class="d-head"><div class="top-row"><span class="chips">${epicChip(e, true)}<span class="chip">${esc(wave(e.wave).name)}</span></span><button class="btn sm" data-act="close" type="button" aria-label="Close">✕</button></div><h2>${esc(e.title)}</h2></div>

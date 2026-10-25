@@ -1,5 +1,8 @@
 # P8-15 — Plan notifications in the bell (read only, in-app)
 
+> **SUPERSEDED (2026-10-25).** This slice was built from [P8-15-plan-notifications.md](P8-15-plan-notifications.md) (Approved, merged to main) while this Draft was being written. Do not build from this file; keep it only as a second opinion: read its 'Decisions (researched)' and 'Risks' against what was built and open a follow-up spec for anything it adds.
+
+
 - **Status:** Draft (written 2026-10-24; decisions below were researched under the owner's delegation; the owner's Approved is still needed before an agent builds it)
 - **Phase / roadmap row:** P8 — Reports & UI, slice P8-15 of [P8-00](P8-00-reports-and-ui-plan.md) (P7-10 item 14, P7-11 item 14, P7-14 item 10, P7-17 item 13: "a notification before the cutoff", "plan events in the bell")
 - **Design refs:** docs/design/13-reports-and-ui.md "Notifications and pop-ups (P2-16)" · docs/design/19-risks-and-compliance.md §4 (plan not reviewed in time: mitigation "phone review via PWA", not available) · docs/design/15 §1 · ADR 0030 (notices are read-only, derived on read; `Resolved`, `Since`, route/command actions), 0027, 0018 §7 (service notices), 0095 (cutoff), 0096 (pre-open), 0086 (plan runs), 0097 · P8-00 D6, Q6

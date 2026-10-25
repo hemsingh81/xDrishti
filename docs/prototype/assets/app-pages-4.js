@@ -231,8 +231,6 @@
   /* ---------------- Journey ---------------- */
   function journey(body) {
     const h = history();
-    const health = [['Data quality', 94], ['Calibration', 88], ['Execution', 81], ['Stability', 76], ['Evidence', 72]];
-    const score = Math.round(sum(health, (x) => x[1]) / health.length);
     const learned = [
       'Skip breakouts when INDIA VIX > 18 — they fail twice as often (L1).',
       '5m and 15m stops at 1.2 ATR keep winners alive; 0.8 ATR was inside the noise (L2).',
@@ -241,9 +239,13 @@
       'Your manual SELL rejections cost more than they saved — auto-approve within limits (L5).',
     ];
     body.innerHTML = `<div class="grid lr-a">
-        ${card('Learning health', `<div class="card-b" style="display:grid;gap:14px;justify-items:center"><div class="score-ring" style="--p:${score}"><div><b>${score}</b><span>of 100</span></div></div>
-          <div style="width:100%;display:grid;gap:8px">${health.map(([l, v]) => `<div><div class="row between small"><span>${l}</span><b>${v}</b></div><div class="meter"><i class="grow" style="width:${v}%"></i></div></div>`).join('')}</div>
-          <div class="small muted">Evidence is lowest: 4 cells still have fewer than 60 trades.</div></div>`)}
+        ${card('What the evidence supports (no combined score)', `<div class="card-b" style="display:grid;gap:10px">${[
+          ['Data quality', `<span class="num">139 pass · 3 warn · 0 fail</span> <span class="small muted">of 142 instruments, validated ${ago(Date.now() - 2 * 86400000)}</span>`],
+          ['Calibration', `<span class="num">${num(h.ece[h.ece.length - 1], 1)}% error</span> <span class="small muted">n 214 predictions, last 4 weeks</span>`],
+          ['Execution gap', BT.kit ? BT.kit.st('not_evaluable', 'fills arrive with paper and live trading (P10/P11); the figures elsewhere on this screen are demo values') : 'not evaluable'],
+          ['Stability', BT.kit ? BT.kit.st('insufficient', 'needs 60 losses for two windows of 30 (n 41)') : 'insufficient'],
+          ['Evidence', `<span class="num">4 cells</span> <span class="small muted">still have fewer than 60 trades</span>`]].map(([l, v]) => `<div><div class="small muted">${l}</div><div>${v}</div></div>`).join('')}
+          <div class="small muted">Each line stands alone with its n or its reason. They are not added into one number, on purpose.</div></div>`)}
         ${card('Learning journey — weekly expectancy (R per trade)', '<div class="card-b"><div class="chart lg" id="lj-main"></div><div class="small muted">Red bands: problem detected → fix applied. Pins: lessons (click a pin to open it). Grey: the same strategies if the model had been frozen a year ago.</div></div>')}
       </div>
       <div class="grid g2" style="margin-top:16px">

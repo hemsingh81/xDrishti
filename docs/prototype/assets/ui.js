@@ -66,6 +66,17 @@
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
     command: '<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>',
     keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+    chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4"/>',
+    fileText: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6M9 9h2"/>',
+    send: '<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>',
+    octagon: '<path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M9 9l6 6M15 9l-6 6"/>',
+    ticket: '<path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M13 5v2M13 11v2M13 17v2"/>',
+    ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+    smartphone: '<rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/>',
+    power: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/>',
+    minus: '<path d="M5 12h14"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4M12 17.5h.01"/>',
   };
   BT.icon = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name] || P.dot}</svg>`;
 
@@ -77,6 +88,7 @@
     lab: ['flask', '#f472b6', '#db2777'], learning: ['brain', '#2dd4bf', '#6366f1'], accounts: ['users', '#60a5fa', '#2563eb'],
     // system status has no prototype page; the hue is used by the app's System-status nav item and page header
     system: ['server', '#2dd4bf', '#0f766e'],
+    assistant: ['chat', '#a78bfa', '#6d28d9'], paper: ['fileText', '#34d399', '#0f766e'], execution: ['send', '#fb7185', '#be123c'],
     services: ['server', '#38bdf8', '#6366f1'], settings: ['sliders', '#a1a1aa', '#52525b'], audit: ['history', '#fbbf24', '#b45309'],
   };
   BT.NAVSTYLE = NAVSTYLE;
@@ -224,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => { mo.observe(document.body, 
   const esc = (s) => BT.esc(s);
   const authed = () => BT.isAuthed && BT.isAuthed() && document.querySelector('.shell');
   const typing = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable;
-  const GO = { t: 'today', r: 'review', s: 'suggestions', p: 'portfolio', i: 'instruments', b: 'baskets', d: 'data', q: 'quality', l: 'learning', e: 'reports', x: 'lab', a: 'accounts', v: 'services', c: 'settings', u: 'audit' };
+  const GO = { t: 'today', r: 'review', s: 'suggestions', p: 'portfolio', i: 'instruments', b: 'baskets', d: 'data', q: 'quality', l: 'learning', e: 'reports', x: 'lab', a: 'accounts', v: 'services', c: 'settings', u: 'audit', h: 'assistant', w: 'paper', n: 'execution' };
   const KEY_OF = Object.fromEntries(Object.entries(GO).map(([k, v]) => [v, k]));
 
   function items() {
