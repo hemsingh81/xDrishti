@@ -78,6 +78,8 @@ namespace XDrishti.Api.Infrastructure;
 [JsonSerializable(typeof(DigestView))]
 [JsonSerializable(typeof(IReadOnlyList<DigestView>))]
 [JsonSerializable(typeof(CounterfactualReportView))]
+[JsonSerializable(typeof(EntryWindowReportView))]
+[JsonSerializable(typeof(MetaPolicyReportView))]
 [JsonSerializable(typeof(IReadOnlyList<CounterfactualHeaderView>))]
 [JsonSerializable(typeof(JourneyView))]
 [JsonSerializable(typeof(LessonView))]

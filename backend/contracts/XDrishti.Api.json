@@ -8684,6 +8684,88 @@
         }
       }
     },
+    "/api/learning/entry-windows": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "A stored entry-window study (id=), or the newest: options, trades, range, folds used, per cell the status, window HH:mm to HH:mm, trades and share kept, shrunk rate against the cell rate, lift, mean R inside and outside, folds held of evaluable and required, pooled out-of-sample lift, reasons, limits, basis and sources. A status other than Proposed is the answer. Stored by xd learn windows --store; nothing is computed here. 404 learning.entry_windows_not_found. Read only.",
+        "operationId": "GetEntryWindows",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryWindowReportView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/learning/meta-policy": {
+      "get": {
+        "tags": [
+          "Learning"
+        ],
+        "summary": "A stored meta-labelling policy evaluation (id=), or the newest: outcome (NoPolicy is a result), reasons, folds, pooled and recent kept and skipped totals with mean R, per-group thresholds, limits, basis and sources. Stored by xd learn policy --store; nothing is computed here. 404 learning.meta_policy_not_found. Read only.",
+        "operationId": "GetMetaPolicy",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaPolicyReportView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/learning/digest": {
       "get": {
         "tags": [
@@ -19511,6 +19593,288 @@
         },
         "description": "The largest peak-to-trough fall of a NAV series: `Pct` is a percent number (12.5 means it fell 12.5 %) from the peak on `From` to the low on `To`. A series that never falls (flat or rising)\ngives 0 and no dates."
       },
+      "EntryWindowCellView": {
+        "required": [
+          "cellKey",
+          "status",
+          "cellTrades",
+          "cellWinRate",
+          "windowFrom",
+          "windowTo",
+          "windowTrades",
+          "keptShare",
+          "shrunkRate",
+          "lift",
+          "meanRInside",
+          "meanROutside",
+          "removesMajority",
+          "foldsEvaluable",
+          "foldsHeld",
+          "foldsRequired",
+          "pooledLift",
+          "reasons"
+        ],
+        "type": "object",
+        "properties": {
+          "cellKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "cellTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "cellWinRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "windowFrom": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "windowTo": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "windowTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "keptShare": {
+            "type": "number",
+            "format": "double"
+          },
+          "shrunkRate": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "lift": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "meanRInside": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "meanROutside": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "removesMajority": {
+            "type": "boolean"
+          },
+          "foldsEvaluable": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "foldsHeld": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "foldsRequired": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pooledLift": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "description": "One cell of a stored entry-window study (P8-13b). A window is HH:mm text; a metric that cannot be computed is null. A status other than `Proposed` is the answer, shown as such."
+      },
+      "EntryWindowKnobsView": {
+        "required": [
+          "bucketMinutes",
+          "minWindowTrades",
+          "minLift",
+          "priorStrength",
+          "minFoldTrades",
+          "minEvaluableFolds",
+          "holdOutMonths"
+        ],
+        "type": "object",
+        "properties": {
+          "bucketMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minWindowTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minLift": {
+            "type": "number",
+            "format": "double"
+          },
+          "priorStrength": {
+            "type": "number",
+            "format": "double"
+          },
+          "minFoldTrades": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "minEvaluableFolds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdOutMonths": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The knobs an entry-window study was made with."
+      },
+      "EntryWindowReportView": {
+        "required": [
+          "schemaVersion",
+          "id",
+          "outcome",
+          "knobs",
+          "rows",
+          "from",
+          "to",
+          "usedFolds",
+          "outsideSession",
+          "cells",
+          "limits",
+          "basis",
+          "sources",
+          "text",
+          "builtBy",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "description": "1.",
+            "format": "int32"
+          },
+          "id": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row id; null inside the stored JSON.",
+            "format": "int64"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "`Proposed` when any cell has a proposed window, else `NoWindowProposed`."
+          },
+          "knobs": {
+            "description": "The knobs.",
+            "$ref": "#/components/schemas/EntryWindowKnobsView"
+          },
+          "rows": {
+            "type": "integer",
+            "description": "Trades given.",
+            "format": "int32"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Earliest trade date; null with no trades.",
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Latest trade date.",
+            "format": "date"
+          },
+          "usedFolds": {
+            "type": "integer",
+            "description": "Shared folds that took part.",
+            "format": "int32"
+          },
+          "outsideSession": {
+            "type": "integer",
+            "description": "Trades outside the regular session (not bucketed).",
+            "format": "int32"
+          },
+          "cells": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntryWindowCellView"
+            },
+            "description": "One entry per cell."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sentences that must be shown with the result."
+          },
+          "basis": {
+            "type": "string",
+            "description": "gross, costed_unconfirmed or net_confirmed."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellSource"
+            },
+            "description": "The runs behind the study."
+          },
+          "text": {
+            "type": "string",
+            "description": "The printed text."
+          },
+          "builtBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who stored it; null inside the stored JSON."
+          },
+          "createdAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When; null inside the stored JSON.",
+            "format": "date-time"
+          }
+        },
+        "description": "A stored entry-window study as the API shows it (`schemaVersion` 1). Every figure is a server field; the screen computes none."
+      },
       "EodOverview": {
         "required": [
           "enabled",
@@ -25359,6 +25723,322 @@
           }
         },
         "description": "Every member of the basket exactly once, in the wanted order."
+      },
+      "MetaFoldView": {
+        "required": [
+          "index",
+          "testStart",
+          "testEnd",
+          "evaluable",
+          "reason",
+          "thresholds",
+          "totals"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "testStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "testEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "evaluable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "thresholds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetaThresholdView"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/MetaTotalsView"
+          }
+        },
+        "description": "One fold of a stored policy evaluation."
+      },
+      "MetaPolicyKnobsView": {
+        "required": [
+          "split",
+          "minKeptShare",
+          "minLiftR",
+          "minSkillR",
+          "significanceZ",
+          "trials",
+          "holdOutMonths"
+        ],
+        "type": "object",
+        "properties": {
+          "split": {
+            "type": "string"
+          },
+          "minKeptShare": {
+            "type": "number",
+            "format": "double"
+          },
+          "minLiftR": {
+            "type": "number",
+            "format": "double"
+          },
+          "minSkillR": {
+            "type": "number",
+            "format": "double"
+          },
+          "significanceZ": {
+            "type": "number",
+            "format": "double"
+          },
+          "trials": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "holdOutMonths": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "description": "The knobs a meta-policy evaluation was made with."
+      },
+      "MetaPolicyReportView": {
+        "required": [
+          "schemaVersion",
+          "id",
+          "outcome",
+          "reasons",
+          "knobs",
+          "rows",
+          "from",
+          "to",
+          "usedFolds",
+          "folds",
+          "pooled",
+          "recent",
+          "policy",
+          "limits",
+          "basis",
+          "sources",
+          "text",
+          "builtBy",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "description": "1.",
+            "format": "int32"
+          },
+          "id": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "description": "The row id; null inside the stored JSON.",
+            "format": "int64"
+          },
+          "outcome": {
+            "type": "string",
+            "description": "NoPolicy, NotEnoughEvidence, DoesNotHelp, Inconclusive or Helps."
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Why, one sentence each."
+          },
+          "knobs": {
+            "description": "The knobs.",
+            "$ref": "#/components/schemas/MetaPolicyKnobsView"
+          },
+          "rows": {
+            "type": "integer",
+            "description": "Development trades given.",
+            "format": "int32"
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Earliest trade date; null with no trades.",
+            "format": "date"
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Latest trade date.",
+            "format": "date"
+          },
+          "usedFolds": {
+            "type": "integer",
+            "description": "Usable folds.",
+            "format": "int32"
+          },
+          "folds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetaFoldView"
+            },
+            "description": "Every fold."
+          },
+          "pooled": {
+            "description": "Kept and skipped pooled over the evaluable folds (out of sample).",
+            "$ref": "#/components/schemas/MetaTotalsView"
+          },
+          "recent": {
+            "description": "The same over the last evaluated trades.",
+            "$ref": "#/components/schemas/MetaTotalsView"
+          },
+          "policy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MetaThresholdView"
+            },
+            "description": "The thresholds proposed (chosen in-sample, so optimistic)."
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Sentences that must be shown with the result."
+          },
+          "basis": {
+            "type": "string",
+            "description": "gross, costed_unconfirmed or net_confirmed."
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CellSource"
+            },
+            "description": "The runs behind the report."
+          },
+          "text": {
+            "type": "string",
+            "description": "The printed text."
+          },
+          "builtBy": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who stored it; null inside the stored JSON."
+          },
+          "createdAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When; null inside the stored JSON.",
+            "format": "date-time"
+          }
+        },
+        "description": "A stored meta-labelling policy evaluation as the API shows it (`schemaVersion` 1). `NoPolicy` is stored like any other result."
+      },
+      "MetaThresholdView": {
+        "required": [
+          "group",
+          "threshold",
+          "rows",
+          "keptShare"
+        ],
+        "type": "object",
+        "properties": {
+          "group": {
+            "type": "string"
+          },
+          "threshold": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "rows": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "keptShare": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "A threshold of one group; a null threshold takes everything."
+      },
+      "MetaTotalsView": {
+        "required": [
+          "candidates",
+          "kept",
+          "skipped",
+          "meanKept",
+          "meanSkipped",
+          "baselinePerCandidate",
+          "policyPerCandidate",
+          "lift",
+          "randomLift"
+        ],
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "kept": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "meanKept": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "meanSkipped": {
+            "type": [
+              "null",
+              "number"
+            ],
+            "format": "double"
+          },
+          "baselinePerCandidate": {
+            "type": "number",
+            "format": "double"
+          },
+          "policyPerCandidate": {
+            "type": "number",
+            "format": "double"
+          },
+          "lift": {
+            "type": "number",
+            "format": "double"
+          },
+          "randomLift": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "description": "Kept and skipped R of a set of candidates."
       },
       "MetricView": {
         "required": [

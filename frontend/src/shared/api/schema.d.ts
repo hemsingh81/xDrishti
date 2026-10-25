@@ -2554,6 +2554,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/learning/entry-windows': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A stored entry-window study (id=), or the newest: options, trades, range, folds used, per cell the status, window HH:mm to HH:mm, trades and share kept, shrunk rate against the cell rate, lift, mean R inside and outside, folds held of evaluable and required, pooled out-of-sample lift, reasons, limits, basis and sources. A status other than Proposed is the answer. Stored by xd learn windows --store; nothing is computed here. 404 learning.entry_windows_not_found. Read only. */
+    get: operations['GetEntryWindows'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/learning/meta-policy': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** A stored meta-labelling policy evaluation (id=), or the newest: outcome (NoPolicy is a result), reasons, folds, pooled and recent kept and skipped totals with mean R, per-group thresholds, limits, basis and sources. Stored by xd learn policy --store; nothing is computed here. 404 learning.meta_policy_not_found. Read only. */
+    get: operations['GetMetaPolicy'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/learning/digest': {
     parameters: {
       query?: never;
@@ -6176,6 +6210,115 @@ export interface components {
       /** Format: date */
       to: null | string;
     };
+    /** @description One cell of a stored entry-window study (P8-13b). A window is HH:mm text; a metric that cannot be computed is null. A status other than `Proposed` is the answer, shown as such. */
+    EntryWindowCellView: {
+      cellKey: string;
+      status: string;
+      /** Format: int32 */
+      cellTrades: number;
+      /** Format: double */
+      cellWinRate: null | number;
+      windowFrom: null | string;
+      windowTo: null | string;
+      /** Format: int32 */
+      windowTrades: number;
+      /** Format: double */
+      keptShare: number;
+      /** Format: double */
+      shrunkRate: null | number;
+      /** Format: double */
+      lift: null | number;
+      /** Format: double */
+      meanRInside: null | number;
+      /** Format: double */
+      meanROutside: null | number;
+      removesMajority: boolean;
+      /** Format: int32 */
+      foldsEvaluable: number;
+      /** Format: int32 */
+      foldsHeld: number;
+      /** Format: int32 */
+      foldsRequired: number;
+      /** Format: double */
+      pooledLift: null | number;
+      reasons: string[];
+    };
+    /** @description The knobs an entry-window study was made with. */
+    EntryWindowKnobsView: {
+      /** Format: int32 */
+      bucketMinutes: number;
+      /** Format: int32 */
+      minWindowTrades: number;
+      /** Format: double */
+      minLift: number;
+      /** Format: double */
+      priorStrength: number;
+      /** Format: int32 */
+      minFoldTrades: number;
+      /** Format: int32 */
+      minEvaluableFolds: number;
+      /** Format: int32 */
+      holdOutMonths: number;
+    };
+    /** @description A stored entry-window study as the API shows it (`schemaVersion` 1). Every figure is a server field; the screen computes none. */
+    EntryWindowReportView: {
+      /**
+       * Format: int32
+       * @description 1.
+       */
+      schemaVersion: number;
+      /**
+       * Format: int64
+       * @description The row id; null inside the stored JSON.
+       */
+      id: null | number;
+      /** @description `Proposed` when any cell has a proposed window, else `NoWindowProposed`. */
+      outcome: string;
+      /** @description The knobs. */
+      knobs: components['schemas']['EntryWindowKnobsView'];
+      /**
+       * Format: int32
+       * @description Trades given.
+       */
+      rows: number;
+      /**
+       * Format: date
+       * @description Earliest trade date; null with no trades.
+       */
+      from: null | string;
+      /**
+       * Format: date
+       * @description Latest trade date.
+       */
+      to: null | string;
+      /**
+       * Format: int32
+       * @description Shared folds that took part.
+       */
+      usedFolds: number;
+      /**
+       * Format: int32
+       * @description Trades outside the regular session (not bucketed).
+       */
+      outsideSession: number;
+      /** @description One entry per cell. */
+      cells: components['schemas']['EntryWindowCellView'][];
+      /** @description Sentences that must be shown with the result. */
+      limits: string[];
+      /** @description gross, costed_unconfirmed or net_confirmed. */
+      basis: string;
+      /** @description The runs behind the study. */
+      sources: components['schemas']['CellSource'][];
+      /** @description The printed text. */
+      text: string;
+      /** @description Who stored it; null inside the stored JSON. */
+      builtBy: null | string;
+      /**
+       * Format: date-time
+       * @description When; null inside the stored JSON.
+       */
+      createdAt: null | string;
+    };
     /**
      * @description The scheduled end-of-day run (ADR 0017 §2) as set on the Services screen (ADR 0018): `enabled` (the service is not paused), `timeIst` (`HH:mm`, India time; empty when the schedule has no time of its own),
      *     `nextRunAt` (the next scheduled start; null when paused or none ahead), `lastRun` (the latest automatic data job, null before the first) and `scheduleWords` (the schedule in words).
@@ -8358,6 +8501,128 @@ export interface components {
     /** @description Every member of the basket exactly once, in the wanted order. */
     MembersOrderInput: {
       instrumentIds: null | string[];
+    };
+    /** @description One fold of a stored policy evaluation. */
+    MetaFoldView: {
+      /** Format: int32 */
+      index: number;
+      /** Format: date */
+      testStart: string;
+      /** Format: date */
+      testEnd: string;
+      evaluable: boolean;
+      reason: null | string;
+      thresholds: components['schemas']['MetaThresholdView'][];
+      totals: components['schemas']['MetaTotalsView'];
+    };
+    /** @description The knobs a meta-policy evaluation was made with. */
+    MetaPolicyKnobsView: {
+      split: string;
+      /** Format: double */
+      minKeptShare: number;
+      /** Format: double */
+      minLiftR: number;
+      /** Format: double */
+      minSkillR: number;
+      /** Format: double */
+      significanceZ: number;
+      /** Format: int32 */
+      trials: number;
+      /** Format: int32 */
+      holdOutMonths: number;
+    };
+    /** @description A stored meta-labelling policy evaluation as the API shows it (`schemaVersion` 1). `NoPolicy` is stored like any other result. */
+    MetaPolicyReportView: {
+      /**
+       * Format: int32
+       * @description 1.
+       */
+      schemaVersion: number;
+      /**
+       * Format: int64
+       * @description The row id; null inside the stored JSON.
+       */
+      id: null | number;
+      /** @description NoPolicy, NotEnoughEvidence, DoesNotHelp, Inconclusive or Helps. */
+      outcome: string;
+      /** @description Why, one sentence each. */
+      reasons: string[];
+      /** @description The knobs. */
+      knobs: components['schemas']['MetaPolicyKnobsView'];
+      /**
+       * Format: int32
+       * @description Development trades given.
+       */
+      rows: number;
+      /**
+       * Format: date
+       * @description Earliest trade date; null with no trades.
+       */
+      from: null | string;
+      /**
+       * Format: date
+       * @description Latest trade date.
+       */
+      to: null | string;
+      /**
+       * Format: int32
+       * @description Usable folds.
+       */
+      usedFolds: number;
+      /** @description Every fold. */
+      folds: components['schemas']['MetaFoldView'][];
+      /** @description Kept and skipped pooled over the evaluable folds (out of sample). */
+      pooled: components['schemas']['MetaTotalsView'];
+      /** @description The same over the last evaluated trades. */
+      recent: components['schemas']['MetaTotalsView'];
+      /** @description The thresholds proposed (chosen in-sample, so optimistic). */
+      policy: components['schemas']['MetaThresholdView'][];
+      /** @description Sentences that must be shown with the result. */
+      limits: string[];
+      /** @description gross, costed_unconfirmed or net_confirmed. */
+      basis: string;
+      /** @description The runs behind the report. */
+      sources: components['schemas']['CellSource'][];
+      /** @description The printed text. */
+      text: string;
+      /** @description Who stored it; null inside the stored JSON. */
+      builtBy: null | string;
+      /**
+       * Format: date-time
+       * @description When; null inside the stored JSON.
+       */
+      createdAt: null | string;
+    };
+    /** @description A threshold of one group; a null threshold takes everything. */
+    MetaThresholdView: {
+      group: string;
+      /** Format: double */
+      threshold: null | number;
+      /** Format: int32 */
+      rows: number;
+      /** Format: double */
+      keptShare: number;
+    };
+    /** @description Kept and skipped R of a set of candidates. */
+    MetaTotalsView: {
+      /** Format: int32 */
+      candidates: number;
+      /** Format: int32 */
+      kept: number;
+      /** Format: int32 */
+      skipped: number;
+      /** Format: double */
+      meanKept: null | number;
+      /** Format: double */
+      meanSkipped: null | number;
+      /** Format: double */
+      baselinePerCandidate: number;
+      /** Format: double */
+      policyPerCandidate: number;
+      /** Format: double */
+      lift: number;
+      /** Format: double */
+      randomLift: number;
     };
     /** @description One reported figure on the wire (P8-00 D3): a state and, only for `value` and `provisional`, a number. For every other state (`insufficient`, `unavailable`, `not_evaluable`, `empty`) the number is absent and the reason says why; a screen draws a word, never a digit. */
     MetricView: {
@@ -18239,6 +18504,68 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetEntryWindows: {
+    parameters: {
+      query?: {
+        id?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntryWindowReportView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  GetMetaPolicy: {
+    parameters: {
+      query?: {
+        id?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MetaPolicyReportView'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

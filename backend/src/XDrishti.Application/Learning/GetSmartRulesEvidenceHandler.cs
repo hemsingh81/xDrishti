@@ -22,8 +22,8 @@ internal sealed class GetSmartRulesEvidenceHandler(IPlanStore plans) : IQueryHan
     {
         ["gate"] = ("Market gate", "R by VIX and breadth bucket needs market context, which is not stored (P3-01d/e).", "P3-01d/e (market context)", null),
         ["throttle"] = ("Equity throttle", "Equity with and without the throttle needs real taken trades, which exist only after paper and live trading. The throttle cuts risk, so it moves no candidate.", "P10/P11 (taken trades)", null),
-        ["meta"] = ("Meta-labelling", "R taken against R skipped needs a champion model and a stored policy. The plan rows leave no code when the policy ran.", "xd learn policy", "the plan rows carry no code for this rule"),
-        ["windows"] = ("Entry windows", "A window study is run by the owner's verb and no table stores it yet (P8-12 is not built). R by entry hour is the calendar report of P8-10.", "xd learn windows", "the plan rows carry no code for this rule"),
+        ["meta"] = ("Meta-labelling", "R taken against R skipped needs a champion model and a stored policy evaluation (xd learn policy --store). The plan rows leave no code when the policy ran.", "xd learn policy", "the plan rows carry no code for this rule"),
+        ["windows"] = ("Entry windows", "No entry-window study is stored; the owner runs and stores one with xd learn windows --store. R by entry hour is the calendar report of P8-10.", "xd learn windows", "the plan rows carry no code for this rule"),
         ["correlation"] = ("Correlation screen", "A correlation matrix needs the 60-day return table at plan time, which the plan does not keep; only a code for pairs not checked is stored.", "P8-14 (plan flags)", null),
     };
 

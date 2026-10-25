@@ -24,6 +24,36 @@ internal sealed class LearningEvidenceEndpoints : IEndpointModule
             .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status409Conflict);
+
+        learning.MapGet("/entry-windows", EntryWindowsAsync)
+            .WithName("GetEntryWindows")
+            .WithSummary("A stored entry-window study (id=), or the newest: options, trades, range, folds used, per cell the status, window HH:mm to HH:mm, trades and share kept, shrunk rate against the cell rate, lift, mean R inside and outside, folds held of evaluable and required, pooled out-of-sample lift, reasons, limits, basis and sources. A status other than Proposed is the answer. Stored by xd learn windows --store; nothing is computed here. 404 learning.entry_windows_not_found. Read only.")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
+        learning.MapGet("/meta-policy", MetaPolicyAsync)
+            .WithName("GetMetaPolicy")
+            .WithSummary("A stored meta-labelling policy evaluation (id=), or the newest: outcome (NoPolicy is a result), reasons, folds, pooled and recent kept and skipped totals with mean R, per-group thresholds, limits, basis and sources. Stored by xd learn policy --store; nothing is computed here. 404 learning.meta_policy_not_found. Read only.")
+            .ProducesProblem(StatusCodes.Status404NotFound);
+    }
+
+    private static async Task<Results<Ok<EntryWindowReportView>, ProblemHttpResult>> EntryWindowsAsync(
+        long? id,
+        HttpContext http,
+        IQueryHandler<GetEntryWindowsQuery, Result<EntryWindowReportView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetEntryWindowsQuery(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
+    }
+
+    private static async Task<Results<Ok<MetaPolicyReportView>, ProblemHttpResult>> MetaPolicyAsync(
+        long? id,
+        HttpContext http,
+        IQueryHandler<GetMetaPolicyQuery, Result<MetaPolicyReportView>> handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetMetaPolicyQuery(id), cancellationToken);
+        return result.IsFailure ? Problem(result.Error, http) : TypedResults.Ok(result.Value);
     }
 
     private static async Task<Results<Ok<SmartRulesView>, ProblemHttpResult>> SmartRulesAsync(
